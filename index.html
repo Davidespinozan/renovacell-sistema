@@ -270,11 +270,30 @@
   .lp-cell .t{font-size:13px;font-weight:600;margin-bottom:3px}
   .lp-cell .s{font-size:11.5px;color:var(--ink-2);line-height:1.4}
   @media (max-width:1180px){.lp-bot{position:static;width:auto;margin-top:26px}}
+  .hamb{display:none;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--line);background:#fff;border-radius:11px;cursor:pointer;flex:none;color:var(--ink);padding:0}
+  .hamb svg{width:20px;height:20px}
+  #drawerOverlay{display:none}
   @media (max-width:900px){
-    .app{grid-template-columns:1fr;height:auto;min-height:100vh}
-    .side{flex-direction:row;align-items:center;overflow-x:auto;padding:12px 14px;gap:6px}
-    .side::before{display:none}.nav{flex-direction:row;flex:1;gap:4px;padding:0;overflow-x:auto}.nav .grp,.side-foot{display:none}.nav a{white-space:nowrap}
-    .canvas{padding:18px 16px 56px}.top{padding:14px 16px}.switch{padding:13px 16px 2px}.searchbox{display:none}.op-wrap,.pos-wrap{grid-template-columns:1fr}.screen-title{font-size:19px}.lp-hero{padding:36px 22px}.lp-cell{border-right:none;border-bottom:1px solid var(--line)}
+    .app{display:block;height:auto;min-height:100vh;overflow:visible}
+    .side{position:fixed;top:0;left:0;height:100vh;height:100dvh;width:264px;max-width:82vw;flex-direction:column;align-items:stretch;overflow-y:auto;padding:18px 0 14px;transform:translateX(-100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:60;box-shadow:18px 0 50px rgba(0,0,0,.45)}
+    body.drawer-open .side{transform:translateX(0)}
+    #drawerOverlay{display:block;position:fixed;inset:0;background:rgba(12,20,15,.5);z-index:55;opacity:0;visibility:hidden;transition:opacity .26s,visibility .26s}
+    body.drawer-open #drawerOverlay{opacity:1;visibility:visible}
+    .hamb{display:inline-flex}
+    .top{padding:12px 14px;justify-content:flex-start}
+    .top-r{margin-left:auto}
+    .canvas{padding:18px 16px 56px}
+    .switch{padding:13px 16px 2px}
+    .searchbox{display:none}
+    .op-wrap,.pos-wrap{grid-template-columns:1fr}
+    .screen-title{font-size:18px}
+    .menu-wrap{padding:30px 18px 56px}
+    .menu-head{margin-bottom:24px}
+    .menu-title{font-size:29px}
+    .syscard{padding:18px}
+    .card{padding:16px}
+    .lp-hero{padding:34px 20px}
+    .lp-cell{border-right:none;border-bottom:1px solid var(--line)}
   }
 </style>
 </head>
@@ -290,6 +309,7 @@
   </aside>
   <div class="main">
     <header class="top">
+      <button id="menuBtn" class="hamb" aria-label="Abrir menú" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <div><h1 class="screen-title serif" id="title"></h1><div class="screen-sub" id="sub"></div></div>
       <div class="top-r"><div class="searchbox"><span data-ic="search"></span><input placeholder="Buscar…"></div><button class="icobtn"><span data-ic="bell"></span><span class="bdg"></span></button></div>
     </header>
@@ -659,6 +679,10 @@
   });
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeOv();if(e.key==='ArrowRight')deckSet(_deckI+1);if(e.key==='ArrowLeft')deckSet(_deckI-1);});
   paint(document);renderMenu();
+</script>
+<div id="drawerOverlay"></div>
+<script>
+(function(){var b=document.body;document.addEventListener("click",function(e){if(e.target.closest("#menuBtn")){b.classList.add("drawer-open");return;}if(e.target.closest("#drawerOverlay")){b.classList.remove("drawer-open");return;}if(e.target.closest("#nav a")){b.classList.remove("drawer-open");}});window.addEventListener("resize",function(){if(window.innerWidth>900)b.classList.remove("drawer-open");});})();
 </script>
 </body>
 </html>
