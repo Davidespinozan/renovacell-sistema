@@ -11,6 +11,9 @@ import { Existencias } from './warehouse/Existencias'
 import { Surtido } from './warehouse/Surtido'
 import { Caducidades } from './warehouse/Caducidades'
 import { Entradas } from './warehouse/Entradas'
+import { Cola } from './packing/Cola'
+import { Guias } from './packing/Guias'
+import { Recibo } from './packing/Recibo'
 import { COMMON_SCREEN, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
@@ -25,6 +28,9 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
   entradas: () => <Entradas />,
+  cola: () => <Cola />,
+  guia: () => <Guias />,
+  recibo: () => <Recibo />,
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

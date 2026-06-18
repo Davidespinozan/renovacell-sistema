@@ -49,12 +49,17 @@ export function OrderCard({
 
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 
-      {order.shipping_meta && typeof order.shipping_meta === 'object' && 'carrier' in order.shipping_meta && (
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
-          Paquetería: {(order.shipping_meta as { carrier?: string }).carrier}
-          {(order.shipping_meta as { tracking?: string }).tracking ? ` · guía ${(order.shipping_meta as { tracking?: string }).tracking}` : ''}
-        </div>
-      )}
+      <ShippingLine meta={order.shipping_meta} />
     </div>
   )
+}
+
+function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
+  if (!meta || typeof meta !== 'object') return null
+  const m = meta as { carrier?: string; tracking?: string; driver?: string }
+  let text = ''
+  if (m.driver) text = `Entrega: chofer propio · ${m.driver}`
+  else if (m.carrier) text = `Paquetería: ${m.carrier}${m.tracking ? ` · guía ${m.tracking}` : ''}`
+  if (!text) return null
+  return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>{text}</div>
 }

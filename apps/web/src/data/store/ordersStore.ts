@@ -80,3 +80,9 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
   )
   emit()
 }
+
+// Empaque: al asignar envío, el pedido pasa a En camino y guarda el resumen de envío.
+export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {
+  orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta } : o))
+  emit()
+}
