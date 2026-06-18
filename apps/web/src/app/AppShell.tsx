@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
-import { RoleSwitch } from './RoleSwitch'
 import { BottomNav } from './BottomNav'
 import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
@@ -25,7 +24,6 @@ export function AppShell() {
       <Sidebar onNavigate={() => setDrawer(false)} />
       <div className="main">
         <TopBar onMenu={() => setDrawer(true)} />
-        <RoleSwitch />
         <div className="canvas">
           <div id="content" key={`${role}:${screen}`}>
             {renderScreen(role, screen)}
