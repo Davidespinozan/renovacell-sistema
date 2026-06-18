@@ -6,13 +6,13 @@
 import React, { useMemo, useState } from 'react'
 import {
   Megaphone, Bell, ThumbsUp, CheckCheck, MessageCircle, Pin, Pencil, Trash2,
-  X, Send, Image as ImageIcon, Download, Eye, ShieldCheck,
+  X, Send, Image as ImageIcon, Download, Eye, ShieldCheck, Upload,
 } from 'lucide-react'
+import { useAssets, type AssetInput } from '../data/hooks/useAssets'
 import { timeAgo, initials, avatarColor } from '../lib/format'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
 import { useAnnouncements, type AnnouncementKind } from '../data/hooks/useAnnouncements'
-import { useAssets } from '../data/hooks/useAssets'
 import { MOCK_COMMENTS, type MockComment } from '../data/mock/comunicacion'
 import type { Announcement, RoleId } from '../data/types'
 
@@ -42,6 +42,7 @@ export function CommonView() {
   const [comments, setComments] = useState<Record<string, MockComment[]>>(() => ({ ...MOCK_COMMENTS }))
   const [sheetFor, setSheetFor] = useState<Announcement | null>(null)
   const [editing, setEditing] = useState<Announcement | null>(null)
+  const [assetOpen, setAssetOpen] = useState(false)
 
   const feed = useMemo(
     () => ann.data.filter((a) => (filter === 'todos' ? true : kindOf(a) === filter)).sort(byPinnedThenDate),
@@ -98,11 +99,20 @@ export function CommonView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
           <ImageIcon size={18} color="var(--green-deep)" />
           <h2 style={{ fontSize: 16, fontWeight: 600 }}>Biblioteca</h2>
+          {canManage && (
+            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAssetOpen(true)}>
+              <Upload size={14} /> Subir asset
+            </button>
+          )}
         </div>
         <div className="libgrid" style={{ width: '100%' }}>
           {assets.data.map((as) => (
             <div key={as.id} className="libcard">
-              <div className="libtile"><ImageIcon /></div>
+              {as.url && as.url.startsWith('data:image') ? (
+                <img src={as.url} alt={as.key ?? ''} style={{ width: '100%', height: 92, objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div className="libtile"><ImageIcon /></div>
+              )}
               <div className="libbody">
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
@@ -137,6 +147,65 @@ export function CommonView() {
           onSave={(input) => { ann.update(editing.id, input); setEditing(null) }}
         />
       )}
+      {assetOpen && (
+        <AssetUploadModal
+          onClose={() => setAssetOpen(false)}
+          onSave={(input) => { assets.create(input); setAssetOpen(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (input: AssetInput) => void }) {
+  const [key, setKey] = useState('')
+  const [dataUrl, setDataUrl] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [tags, setTags] = useState('')
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+
+  const onFile = (f: File | undefined) => {
+    if (!f) return
+    setFileName(f.name)
+    const r = new FileReader()
+    r.onload = () => setDataUrl(String(r.result))
+    r.readAsDataURL(f)
+  }
+  const save = () => {
+    if (!key.trim()) return
+    onSave({ key: key.trim(), url: dataUrl, tags: tags.split(',').map((t) => t.trim()).filter(Boolean) })
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div><h3>Subir asset</h3><div className="ms">Logo, imagen o documento para el equipo. (Mock: sin storage real todavía.)</div></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Título</label>
+          <input style={input} value={key} onChange={(e) => setKey(e.target.value)} placeholder="Ej. Logo Renovacell — verde" />
+
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }}>Imagen / archivo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+            <label className="btn ghost sm" style={{ cursor: 'pointer' }}>
+              <Upload size={14} /> {dataUrl ? 'Cambiar' : 'Elegir imagen'}
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => onFile(e.target.files?.[0])} />
+            </label>
+            {dataUrl && <img src={dataUrl} alt="preview" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }} />}
+            {fileName && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{fileName}</span>}
+          </div>
+
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }}>Etiquetas (coma)</label>
+          <input style={input} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="logo, marca" />
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" onClick={save}><Upload size={15} /> Subir</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
