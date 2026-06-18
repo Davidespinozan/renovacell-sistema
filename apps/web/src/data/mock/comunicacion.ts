@@ -21,7 +21,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     body: 'Sesión de 1h para el equipo de facturación sobre el timbrado CFDI. Sala 2, 10:00.',
     start_at: '2026-06-12T17:00:00Z', end_at: null, created_by: null,
     created_at: '2026-06-12T17:00:00Z',
-    metadata: { kind: 'anuncio', pinned: false, audience: 'billing', author: 'Claudia Dirección', reactions: 2, reads: 5 },
+    metadata: { kind: 'anuncio', pinned: false, audience: 'admin', author: 'Claudia Dirección', reactions: 2, reads: 5 },
   },
   {
     id: 'an-3', title: 'Bienvenida al nuevo sistema operativo',
@@ -35,7 +35,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     body: 'Surtido desde el 25/09, sin salir. Revisar antes de las 14:00.',
     start_at: '2026-06-18T08:30:00Z', end_at: null, created_by: null,
     created_at: '2026-06-18T08:30:00Z',
-    metadata: { kind: 'aviso', pinned: true, audience: 'packing', author: 'Alberto Almacén', reactions: 1, reads: 3 },
+    metadata: { kind: 'aviso', pinned: true, audience: 'warehouse', author: 'Alberto Almacén', reactions: 1, reads: 3 },
   },
   {
     id: 'av-2', title: 'Lote STL-44 próximo a caducar',

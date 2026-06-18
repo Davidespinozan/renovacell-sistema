@@ -8,7 +8,7 @@ export type ISODateTime = string  // timestamptz
 export type Json = Record<string, unknown> | null
 
 export type RoleId =
-  | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'billing' | 'driver' | 'comm'
+  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver' | 'comm'
 
 export interface Role {
   id: RoleId

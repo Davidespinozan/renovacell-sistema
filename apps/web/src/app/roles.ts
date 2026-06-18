@@ -10,7 +10,7 @@ import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
 export type RoleKey =
-  | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'billing' | 'driver' | 'comm'
+  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver' | 'comm'
 
 export interface ScreenDef {
   key: string
@@ -58,20 +58,14 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'warehouse', label: 'Almacén', group: 'Almacén',
+    // Almacén y Empaque los ve la MISMA persona (Alberto) → un solo rol.
+    key: 'warehouse', label: 'Almacén / Empaque', group: 'Almacén y Empaque · Alberto',
     icon: 'box', isStaff: true, ready: true,
     modules: [
       { key: 'stock', label: 'Existencias', icon: 'box' },
       { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
       { key: 'caduc', label: 'Caducidades', icon: 'clock' },
       { key: 'entradas', label: 'Entradas', icon: 'download' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
-    ],
-  },
-  {
-    key: 'packing', label: 'Empaque', group: 'Empaque',
-    icon: 'pkg', isStaff: true, ready: true,
-    modules: [
       { key: 'cola', label: 'Por empacar', icon: 'pkg' },
       { key: 'guia', label: 'Guías', icon: 'truck' },
       { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt' },
@@ -84,13 +78,6 @@ export const ROLES: RoleDef[] = [
     modules: [
       { key: 'caja', label: 'Caja', icon: 'store' },
       { key: 'vev', label: 'Ventas del evento', icon: 'grid' },
-    ],
-  },
-  {
-    key: 'billing', label: 'Facturación', group: 'Facturación · Finanzas',
-    icon: 'receipt', isStaff: true, ready: true,
-    modules: [
-      { key: 'fin', label: 'Facturación', icon: 'receipt' },
     ],
   },
   {
