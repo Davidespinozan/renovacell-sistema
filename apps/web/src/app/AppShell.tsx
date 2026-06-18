@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { RoleSwitch } from './RoleSwitch'
+import { BottomNav } from './BottomNav'
 import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
 
@@ -32,6 +33,7 @@ export function AppShell() {
         </div>
       </div>
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
+      <BottomNav />
     </div>
   )
 }
