@@ -128,3 +128,30 @@ export function markDelivered(orderId: string) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
 }
+
+// Facturación: emisión de CFDI (MOCK). Hoy genera un folio fiscal simulado;
+// en la fase de Supabase + Facturama esto será una llamada real al PAC y el
+// invoice_meta guardará el UUID/serie reales. La forma de orders no cambia.
+function fakeFiscalUuid(seed: string): string {
+  let h = 0
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  const hex = (n: number, len: number) => (n >>> 0).toString(16).toUpperCase().padStart(len, '0').slice(0, len)
+  const a = hex(h, 8), b = hex(h * 7, 4), c = hex(h * 13, 4), d = hex(h * 17, 4), e = hex(h * 19, 8) + hex(h * 23, 4)
+  return `${a}-${b}-${c}-${d}-${e}`
+}
+export function markInvoiced(orderId: string) {
+  const now = new Date().toISOString()
+  orders = orders.map((o) =>
+    o.id === orderId
+      ? { ...o, invoice_requested: true, invoice_meta: { status: 'emitida', uuid: fakeFiscalUuid(o.external_ref ?? o.id), emitida_at: now } }
+      : o,
+  )
+  emit()
+}
+
+// Facturación: registrar el cobro (MOCK). En Supabase = update payment_status
+// (o webhook de Stripe). Cierra el pendiente de "contra pedido".
+export function markPaid(orderId: string) {
+  orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid' } : o))
+  emit()
+}
