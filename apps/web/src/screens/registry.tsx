@@ -18,6 +18,7 @@ import { Seguimiento } from './logistics/Seguimiento'
 import { MisEntregas } from './driver/MisEntregas'
 import { Tablero } from './admin/Tablero'
 import { Trazabilidad } from './admin/Trazabilidad'
+import { Doctores } from './admin/Doctores'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, type RoleKey } from '../app/roles'
@@ -41,6 +42,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   driver_home: () => <MisEntregas />,
   tablero: () => <Tablero />,
   av_traza: () => <Trazabilidad />,
+  av_doc: () => <Doctores />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
 }
