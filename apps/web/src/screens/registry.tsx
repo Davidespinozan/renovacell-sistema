@@ -23,7 +23,7 @@ import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
-import { COMMON_SCREEN, CHAT_SCREEN, type RoleKey } from '../app/roles'
+import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
 
@@ -56,6 +56,8 @@ export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
     return <AddOnInactive title="Vista común" addon="Comunicación interna" />
   }
   if (screen === CHAT_SCREEN.key) {
+    // Chat = comunicación interna: solo staff. Los doctores (clientes) no lo ven.
+    if (!getRole(role).isStaff) return <Placeholder role={role} screen={screen} />
     if (FEATURES.comunicacionInterna) return <Chat />
     return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }

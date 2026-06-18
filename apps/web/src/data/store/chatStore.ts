@@ -2,6 +2,7 @@
 // con RLS + Realtime; el hook useChat no cambia.
 import type { Conversation, Message } from '../types'
 import { CURRENT_USER, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../mock/chat'
+import { isStaffUser } from '../mock/users'
 
 let conversations: Conversation[] = [...MOCK_CONVERSATIONS]
 let messages: Record<string, Message[]> = { ...MOCK_MESSAGES }
@@ -51,8 +52,11 @@ export function sendMessage(conversationId: string, body: string) {
   emit()
 }
 
-// Abre el DM con un usuario; si no existe, lo crea. Devuelve el id de conversación.
-export function ensureDirect(user: { id: string; name: string }): string {
+// Abre el DM con un usuario; si no existe, lo crea. Devuelve el id de conversación
+// o null. DEFENSA: solo se permiten DMs con STAFF (el chat es interno; los doctores
+// son clientes). Mañana lo refuerza la RLS sobre conversations/messages.
+export function ensureDirect(user: { id: string; name: string }): string | null {
+  if (!isStaffUser(user.id)) return null
   const existing = conversations.find((c) => c.kind === 'dm' && c.member_ids.includes(user.id))
   if (existing) return existing.id
   seq += 1

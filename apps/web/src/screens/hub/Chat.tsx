@@ -97,7 +97,7 @@ export function Chat() {
       {newOpen && (
         <NewChatModal
           onClose={() => setNewOpen(false)}
-          onPick={(u) => { setSelectedId(ensureDirect(u)); setNewOpen(false) }}
+          onPick={(u) => { const id = ensureDirect(u); if (id) setSelectedId(id); setNewOpen(false) }}
         />
       )}
     </div>
@@ -105,7 +105,7 @@ export function Chat() {
 }
 
 function NewChatModal({ onClose, onPick }: { onClose: () => void; onPick: (u: DirectoryUser) => void }) {
-  const { data: users } = useUsers()
+  const { data: users } = useUsers({ staffOnly: true }) // chat interno: solo staff (sin doctores)
   const [q, setQ] = useState('')
   const filtered = users.filter((u) => u.name.toLowerCase().includes(q.trim().toLowerCase()))
 
