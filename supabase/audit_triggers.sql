@@ -1,11 +1,17 @@
 -- Audit triggers: append to audit_logs on state changes for orders and shipments
 -- Requires audit_logs table as defined in schema.sql
 
--- Function to insert audit log
-CREATE OR REPLACE FUNCTION public.log_audit() RETURNS trigger AS $$
+-- Function to insert audit log.
+-- actor = auth.uid() (lo resuelve Supabase desde el JWT). Si la operación corre
+-- con service_role o sin sesión, auth.uid() es NULL y queda registrado como tal.
+CREATE OR REPLACE FUNCTION public.log_audit() RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO audit_logs(actor, action, resource_type, resource_id, payload, created_at)
-  VALUES (current_setting('request.jwt.claims.sub', true)::uuid,
+  VALUES (auth.uid(),
           TG_OP || ' ' || TG_TABLE_NAME,
           TG_TABLE_NAME,
           NEW.id::text,
@@ -13,7 +19,7 @@ BEGIN
           now());
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Orders: log INSERT and UPDATE
 DROP TRIGGER IF EXISTS orders_audit_trigger ON orders;

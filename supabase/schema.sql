@@ -1,11 +1,27 @@
 -- Supabase schema (propuesta inicial)
 -- Run as migration in supabase SQL editor. Ajustar nombres de esquemas/schemas según convención.
+-- Orden de ejecución: schema.sql -> rls.sql -> audit_triggers.sql -> seeds/
+
+-- gen_random_uuid() vive en pgcrypto (algunos proyectos lo requieren explícito)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Roles table (managed by auth but useful for RBAC mapping)
 CREATE TABLE IF NOT EXISTS roles (
   id text PRIMARY KEY,
   description text
 );
+
+-- Catálogo de roles del sistema (RBAC: "una base, varias puertas")
+INSERT INTO roles (id, description) VALUES
+  ('admin',     'Dirección / administración — acceso total'),
+  ('doctor',    'Médico cliente — portal de pedidos'),
+  ('warehouse', 'Almacén — existencias, FEFO, entradas'),
+  ('packing',   'Empaque — cola, guías, recibos'),
+  ('pos',       'Punto de venta — caja en eventos'),
+  ('billing',   'Facturación / finanzas — CFDI y pagos'),
+  ('driver',    'Chofer — entregas y prueba de entrega'),
+  ('comm',      'Comunicación interna — anuncios y prospectos')
+ON CONFLICT (id) DO NOTHING;
 
 -- Users (supabase auth stores users; keep profile data here)
 CREATE TABLE IF NOT EXISTS profiles (
@@ -30,6 +46,19 @@ CREATE TABLE IF NOT EXISTS products (
   price numeric,
   unit text,
   metadata jsonb
+);
+
+-- Costos / margen: SEPARADO de products a propósito. products es el catálogo
+-- VENDIBLE (precio de venta); los costos viven aquí y solo los ve admin/billing.
+-- Así un doctor (o cualquier autenticado) nunca puede leer el costo, ni aunque
+-- se agreguen columnas nuevas — la barrera es la tabla, no la columna.
+CREATE TABLE IF NOT EXISTS product_costs (
+  product_id uuid PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+  unit_cost numeric,
+  supplier text,
+  notes text,
+  metadata jsonb,
+  updated_at timestamptz DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS lots (
@@ -61,10 +90,10 @@ CREATE TABLE IF NOT EXISTS orders (
   doctor_id uuid REFERENCES profiles(id),
   total numeric,
   currency text DEFAULT 'MXN',
-  status text,
+  status text DEFAULT 'draft',
   payment_method text,
   payment_ref text,
-  payment_status text,
+  payment_status text DEFAULT 'pending',
   stripe_payment_id text,
   invoice_requested boolean DEFAULT false,
   invoice_meta jsonb,
@@ -148,18 +177,5 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_lots_expiry ON lots(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
-/* RLS / Policies (sugerencias):
-  - profiles: allow select for authenticated users; update only own profile.
-  - announcements: allow insert/update/delete only for role = 'admin' or 'comm'
-  - orders: doctors can insert/select their own orders; admin can see all; warehouse/packing can update status.
-  - shipments: drivers can update their shipments; warehouse/packing can create shipment records.
-*/
-
--- Example policy (pseudocódigo):
--- ENABLE ROW LEVEL SECURITY ON orders;
--- CREATE POLICY "doctors_can_manage_their_orders" ON orders
---  FOR ALL
---  USING (auth.role() = 'admin' OR doctor_id = auth.uid())
---  WITH CHECK (auth.role() = 'admin' OR doctor_id = auth.uid());
-
--- Ajustar políticas RLS en Supabase Console según necesidades.
+-- Las políticas RLS, funciones helper y triggers de seguridad viven en
+-- supabase/rls.sql (ejecutar DESPUÉS de este archivo). No definir políticas aquí.
