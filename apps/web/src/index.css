@@ -1,6 +1,7 @@
 /* Tokens de marca + estilos del shell (del demo). Los @import van primero. */
 @import '@renovacell/ui/tokens.css';
 @import './styles/shell.css';
+@import './styles/social.css';
 
 @tailwind base;
 @tailwind components;

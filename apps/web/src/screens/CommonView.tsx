@@ -1,43 +1,34 @@
-// VISTA COMÚN — home del hub (sistema de comunicación). La ve todo el staff.
-// Lectura para todos; admin y rol "comunicación" pueden crear/editar.
-// Datos mock (forma de announcements + assets) detrás de hooks.
+// VISTA COMÚN — hub interno con estilo social cálido (inspirado en Healthy Space
+// Club): feed de anuncios/avisos con avatar, "hace X", reacciones, acuse de
+// lectura y comentarios en sheet; biblioteca visual. NADA de publicaciones
+// públicas: es comunicación interna del equipo. Lectura para todo el staff;
+// admin y "comunicación" publican/editan.
 import React, { useMemo, useState } from 'react'
-import { Icon } from '../app/icons'
+import {
+  Megaphone, Bell, ThumbsUp, CheckCheck, MessageCircle, Pin, Pencil, Trash2,
+  X, Send, Image as ImageIcon, Download, Eye, ShieldCheck,
+} from 'lucide-react'
+import { timeAgo, initials, avatarColor } from '../lib/format'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
-import type { RoleId } from '../data/types'
-import {
-  useAnnouncements,
-  type AnnouncementInput,
-  type AnnouncementKind,
-} from '../data/hooks/useAnnouncements'
-import { useAssets, type AssetInput } from '../data/hooks/useAssets'
-import type { Announcement } from '../data/types'
+import { useAnnouncements, type AnnouncementKind } from '../data/hooks/useAnnouncements'
+import { useAssets } from '../data/hooks/useAssets'
+import { MOCK_COMMENTS, type MockComment } from '../data/mock/comunicacion'
+import type { Announcement, RoleId } from '../data/types'
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1px solid var(--line)',
-  borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff',
-}
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em',
-  textTransform: 'uppercase', color: 'var(--ink-3)', margin: '14px 0 6px',
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
-  } catch {
-    return iso
-  }
-}
-
-const kindOf = (a: Announcement): AnnouncementKind => ((a.metadata?.kind as AnnouncementKind) ?? 'anuncio')
+const kindOf = (a: Announcement): AnnouncementKind => (a.metadata?.kind as AnnouncementKind) ?? 'anuncio'
 const isPinned = (a: Announcement): boolean => Boolean(a.metadata?.pinned)
-const audienceOf = (a: Announcement): RoleId | null => ((a.metadata?.audience as RoleId) ?? null)
-const roleLabel = (key: RoleId): string => getRole(key as RoleKey).label
+const audienceOf = (a: Announcement): RoleId | null => (a.metadata?.audience as RoleId) ?? null
+const authorOf = (a: Announcement): string => (a.metadata?.author as string) ?? 'Equipo'
+const baseReactions = (a: Announcement): number => Number(a.metadata?.reactions ?? 0)
+const baseReads = (a: Announcement): number => Number(a.metadata?.reads ?? 0)
+const roleLabel = (k: RoleId): string => getRole(k as RoleKey).label
+const STAFF = ROLES.filter((r) => r.isStaff)
 
 const byPinnedThenDate = (a: Announcement, b: Announcement) =>
   Number(isPinned(b)) - Number(isPinned(a)) || (a.created_at < b.created_at ? 1 : -1)
+
+type Filter = 'todos' | 'anuncio' | 'aviso'
 
 export function CommonView() {
   const { role } = useRole()
@@ -45,254 +36,299 @@ export function CommonView() {
   const ann = useAnnouncements()
   const assets = useAssets()
 
-  const avisos = useMemo(() => ann.data.filter((a) => kindOf(a) === 'aviso').sort(byPinnedThenDate), [ann.data])
-  const anuncios = useMemo(() => ann.data.filter((a) => kindOf(a) === 'anuncio').sort(byPinnedThenDate), [ann.data])
+  const [filter, setFilter] = useState<Filter>('todos')
+  const [reacted, setReacted] = useState<Set<string>>(new Set())
+  const [read, setRead] = useState<Set<string>>(new Set())
+  const [comments, setComments] = useState<Record<string, MockComment[]>>(() => ({ ...MOCK_COMMENTS }))
+  const [sheetFor, setSheetFor] = useState<Announcement | null>(null)
+  const [editing, setEditing] = useState<Announcement | null>(null)
 
-  const [editing, setEditing] = useState<{ mode: 'create' | 'edit'; kind: AnnouncementKind; row?: Announcement } | null>(null)
-  const [assetOpen, setAssetOpen] = useState(false)
+  const feed = useMemo(
+    () => ann.data.filter((a) => (filter === 'todos' ? true : kindOf(a) === filter)).sort(byPinnedThenDate),
+    [ann.data, filter],
+  )
+
+  const toggle = (set: Set<string>, id: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set)
+    next.has(id) ? next.delete(id) : next.add(id)
+    setter(next)
+  }
+
+  const addComment = (id: string, text: string) => {
+    const c: MockComment = { id: `c-${Date.now()}`, author: 'Tú', text, created_at: new Date().toISOString() }
+    setComments((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), c] }))
+  }
 
   return (
-    <div className="grid" style={{ gap: 22 }}>
-      <div className="eyebrow">Hub Renovacell · Comunicación interna</div>
+    <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
+      <div className="feed">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Hub Renovacell · Comunicación interna</div>
+        </div>
 
-      {/* AVISOS */}
-      <Section
-        title="Avisos"
-        icon="bell"
-        action={canManage ? { label: 'Nuevo aviso', onClick: () => setEditing({ mode: 'create', kind: 'aviso' }) } : undefined}
-      >
-        {avisos.length === 0 ? (
-          <Empty text="Sin avisos." />
-        ) : (
-          <div className="grid two">
-            {avisos.map((a) => (
-              <div key={a.id} className="card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  {isPinned(a) && <span className="pill p-warn"><Icon name="pin" style={{ width: 12, height: 12 }} /> Fijado</span>}
-                  {audienceOf(a) && <span className="pill p-blue">{roleLabel(audienceOf(a)!)}</span>}
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>{fmtDate(a.created_at)}</span>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{a.title}</div>
-                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.45 }}>{a.body}</div>
-                {canManage && <ManageRow onEdit={() => setEditing({ mode: 'edit', kind: 'aviso', row: a })} onPin={() => ann.togglePin(a.id)} onDelete={() => ann.remove(a.id)} />}
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
+        {/* Composer (solo admin/comm) */}
+        {canManage && <Composer onPublish={ann.create} />}
 
-      {/* ANUNCIOS */}
-      <Section
-        title="Anuncios"
-        icon="megaphone"
-        action={canManage ? { label: 'Nuevo anuncio', onClick: () => setEditing({ mode: 'create', kind: 'anuncio' }) } : undefined}
-      >
-        {anuncios.length === 0 ? (
-          <Empty text="Sin anuncios." />
-        ) : (
-          <div className="grid" style={{ gap: 14 }}>
-            {anuncios.map((a) => (
-              <div key={a.id} className="card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
-                  {isPinned(a) && <span className="pill p-warn"><Icon name="pin" style={{ width: 12, height: 12 }} /> Fijado</span>}
-                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(a.created_at)}</span>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 5 }}>{a.title}</div>
-                <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>{a.body}</div>
-                {canManage && <ManageRow onEdit={() => setEditing({ mode: 'edit', kind: 'anuncio', row: a })} onPin={() => ann.togglePin(a.id)} onDelete={() => ann.remove(a.id)} />}
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
+        {/* Filtros */}
+        <div className="fchips">
+          {([['todos', 'Todos'], ['anuncio', 'Anuncios'], ['aviso', 'Avisos']] as const).map(([k, lbl]) => (
+            <button key={k} className={'fchip' + (filter === k ? ' on' : '')} onClick={() => setFilter(k)} type="button">{lbl}</button>
+          ))}
+        </div>
 
-      {/* BIBLIOTECA DE ASSETS */}
-      <Section
-        title="Biblioteca"
-        icon="image"
-        action={canManage ? { label: 'Subir asset', onClick: () => setAssetOpen(true) } : undefined}
-      >
-        <div className="posgrid">
+        {/* Feed */}
+        {feed.map((a) => (
+          <FeedCard
+            key={a.id}
+            a={a}
+            canManage={canManage}
+            reacted={reacted.has(a.id)}
+            read={read.has(a.id)}
+            commentCount={(comments[a.id] ?? []).length}
+            onReact={() => toggle(reacted, a.id, setReacted)}
+            onRead={() => toggle(read, a.id, setRead)}
+            onComments={() => setSheetFor(a)}
+            onEdit={() => setEditing(a)}
+            onPin={() => ann.togglePin(a.id)}
+            onDelete={() => ann.remove(a.id)}
+          />
+        ))}
+
+        {/* Biblioteca */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+          <ImageIcon size={18} color="var(--green-deep)" />
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Biblioteca</h2>
+        </div>
+        <div className="libgrid" style={{ width: '100%' }}>
           {assets.data.map((as) => (
-            <div key={as.id} className="poscard" style={{ cursor: 'default' }}>
-              <div style={{ height: 72, borderRadius: 10, background: 'var(--ok-bg)', color: 'var(--green-deep)', display: 'grid', placeItems: 'center', marginBottom: 10 }}>
-                <Icon name="image" style={{ width: 26, height: 26 }} />
-              </div>
-              <h5 style={{ margin: '0 0 4px' }}>{as.key}</h5>
-              <div className="lt">{(as.tags ?? []).join(' · ')}</div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <a className="btn ghost sm" href={as.url || '#'} target="_blank" rel="noreferrer"><Icon name="eye" /> Ver</a>
-                <a className="btn sm" href={as.url || '#'} download><Icon name="download" /> Descargar</a>
+            <div key={as.id} className="libcard">
+              <div className="libtile"><ImageIcon /></div>
+              <div className="libbody">
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                  <a className="btn ghost sm" href={as.url || '#'} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
+                  <a className="btn sm" href={as.url || '#'} download><Download size={14} /> Descargar</a>
+                </div>
               </div>
             </div>
           ))}
         </div>
-      </Section>
 
-      {!canManage && (
-        <div className="footnote">
-          <span className="d" />
-          Estás viendo la vista común en modo lectura. Solo Administración y Comunicación pueden crear o editar.
-        </div>
-      )}
-
-      {editing && (
-        <AnnouncementModal
-          mode={editing.mode}
-          kind={editing.kind}
-          row={editing.row}
-          onClose={() => setEditing(null)}
-          onSave={(input) => {
-            if (editing.mode === 'edit' && editing.row) ann.update(editing.row.id, input)
-            else ann.create(input)
-            setEditing(null)
-          }}
-        />
-      )}
-      {assetOpen && (
-        <AssetModal
-          onClose={() => setAssetOpen(false)}
-          onSave={(input) => {
-            assets.create(input)
-            setAssetOpen(false)
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function Section({ title, icon, action, children }: {
-  title: string
-  icon: Parameters<typeof Icon>[0]['name']
-  action?: { label: string; onClick: () => void }
-  children: React.ReactNode
-}) {
-  return (
-    <section className="grid" style={{ gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Icon name={icon} style={{ width: 18, height: 18, color: 'var(--green-deep)' }} />
-        <h2 style={{ fontSize: 17, fontWeight: 600 }}>{title}</h2>
-        {action && (
-          <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={action.onClick} type="button">
-            <Icon name="plus" /> {action.label}
-          </button>
+        {!canManage && (
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
+            Modo lectura · solo Administración y Comunicación publican.
+          </div>
         )}
       </div>
-      {children}
-    </section>
-  )
-}
 
-function ManageRow({ onEdit, onPin, onDelete }: { onEdit: () => void; onPin: () => void; onDelete: () => void }) {
-  return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-      <button className="btn ghost sm" onClick={onEdit} type="button"><Icon name="edit" /> Editar</button>
-      <button className="btn ghost sm" onClick={onPin} type="button"><Icon name="pin" /> Fijar</button>
-      <button className="btn ghost sm" onClick={onDelete} type="button" style={{ color: 'var(--danger)' }}><Icon name="trash" /> Borrar</button>
+      {sheetFor && (
+        <CommentsSheet
+          announcement={sheetFor}
+          comments={comments[sheetFor.id] ?? []}
+          onAdd={(t) => addComment(sheetFor.id, t)}
+          onClose={() => setSheetFor(null)}
+        />
+      )}
+      {editing && (
+        <EditModal
+          announcement={editing}
+          onClose={() => setEditing(null)}
+          onSave={(input) => { ann.update(editing.id, input); setEditing(null) }}
+        />
+      )}
     </div>
   )
 }
 
-function Empty({ text }: { text: string }) {
-  return <div className="card" style={{ color: 'var(--ink-3)', fontSize: 13.5, textAlign: 'center' }}>{text}</div>
+function Avatar({ name, sm }: { name: string; sm?: boolean }) {
+  return <div className={'avatar' + (sm ? ' sm' : '')} style={{ background: avatarColor(name) }}>{initials(name)}</div>
 }
 
-const STAFF_AUDIENCE = ROLES.filter((r) => r.isStaff)
-
-function AnnouncementModal({ mode, kind, row, onClose, onSave }: {
-  mode: 'create' | 'edit'
-  kind: AnnouncementKind
-  row?: Announcement
-  onClose: () => void
-  onSave: (input: AnnouncementInput) => void
+function FeedCard({
+  a, canManage, reacted, read, commentCount,
+  onReact, onRead, onComments, onEdit, onPin, onDelete,
+}: {
+  a: Announcement
+  canManage: boolean
+  reacted: boolean
+  read: boolean
+  commentCount: number
+  onReact: () => void; onRead: () => void; onComments: () => void
+  onEdit: () => void; onPin: () => void; onDelete: () => void
 }) {
-  const [title, setTitle] = useState(row?.title ?? '')
-  const [body, setBody] = useState(row?.body ?? '')
-  const [k, setK] = useState<AnnouncementKind>(row ? kindOf(row) : kind)
-  const [pinned, setPinned] = useState(row ? isPinned(row) : false)
-  const [audience, setAudience] = useState<RoleId | ''>(row ? (audienceOf(row) ?? '') : '')
+  const kind = kindOf(a)
+  const aud = audienceOf(a)
+  const reactions = baseReactions(a) + (reacted ? 1 : 0)
+  const reads = baseReads(a) + (read ? 1 : 0)
+  const author = authorOf(a)
 
-  const save = () => {
+  return (
+    <div className={'fcard' + (isPinned(a) ? ' pinned' : '')}>
+      <div className="fhead">
+        <Avatar name={author} />
+        <div style={{ minWidth: 0 }}>
+          <div className="fname">{author}</div>
+          <div className="fmeta">
+            <span>{timeAgo(a.created_at)}</span>
+            <span className={'pill ' + (kind === 'aviso' ? 'p-warn' : 'p-neu')}>
+              {kind === 'aviso' ? <Bell size={11} /> : <Megaphone size={11} />} {kind === 'aviso' ? 'Aviso' : 'Anuncio'}
+            </span>
+            {aud && <span className="pill p-blue">{roleLabel(aud)}</span>}
+            {isPinned(a) && <span className="pill p-ok"><Pin size={11} /> Fijado</span>}
+          </div>
+        </div>
+        {canManage && (
+          <div className="fmanage">
+            <button className="fbtn" type="button" onClick={onEdit} title="Editar"><Pencil size={15} /></button>
+            <button className="fbtn" type="button" onClick={onPin} title="Fijar"><Pin size={15} /></button>
+            <button className="fbtn" type="button" onClick={onDelete} title="Borrar"><Trash2 size={15} className="danger" color="var(--danger)" /></button>
+          </div>
+        )}
+      </div>
+
+      <div className="ftitle">{a.title}</div>
+      <div className="fbody">{a.body}</div>
+
+      <div className="factions">
+        <button className={'fbtn' + (reacted ? ' on' : '')} type="button" onClick={onReact}>
+          <ThumbsUp size={16} /> {reactions || ''} <span style={{ fontWeight: 500 }}>Me sirve</span>
+        </button>
+        <button className={'fbtn read' + (read ? ' on' : '')} type="button" onClick={onRead}>
+          <CheckCheck size={16} /> {read ? 'Leído' : 'Marcar leído'} {reads ? `· ${reads}` : ''}
+        </button>
+        <button className="fbtn" type="button" onClick={onComments}>
+          <MessageCircle size={16} /> {commentCount || ''} <span style={{ fontWeight: 500 }}>Comentar</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Composer({ onPublish }: { onPublish: (input: { title: string; body: string; kind: AnnouncementKind; pinned: boolean; audience: RoleId | null }) => void }) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [kind, setKind] = useState<AnnouncementKind>('anuncio')
+  const [pinned, setPinned] = useState(false)
+  const [audience, setAudience] = useState<RoleId | ''>('')
+
+  const publish = () => {
     if (!title.trim()) return
-    onSave({ title: title.trim(), body: body.trim(), kind: k, pinned, audience: audience || null })
+    onPublish({ title: title.trim(), body: body.trim(), kind, pinned, audience: audience || null })
+    setTitle(''); setBody(''); setPinned(false); setAudience(''); setKind('anuncio')
   }
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="mhead">
-          <div>
-            <h3>{mode === 'edit' ? 'Editar' : 'Nuevo'} {k === 'aviso' ? 'aviso' : 'anuncio'}</h3>
-            <div className="ms">Visible para todo el staff en la vista común.</div>
+    <div className="composer">
+      <Avatar name="Tú" />
+      <div style={{ flex: 1 }}>
+        <input
+          value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título…"
+          style={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 600, background: 'none' }}
+        />
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Escribe un anuncio o aviso para el equipo…" rows={2} />
+        <div className="composer-actions">
+          <div className="fchips">
+            <button type="button" className={'fchip' + (kind === 'anuncio' ? ' on' : '')} onClick={() => setKind('anuncio')}>Anuncio</button>
+            <button type="button" className={'fchip' + (kind === 'aviso' ? ' on' : '')} onClick={() => setKind('aviso')}>Aviso</button>
           </div>
-          <button className="mclose" onClick={onClose} type="button"><Icon name="x" /></button>
-        </div>
-        <div className="mbody">
-          <label style={labelStyle}>Tipo</label>
-          <select style={inputStyle} value={k} onChange={(e) => setK(e.target.value as AnnouncementKind)}>
-            <option value="anuncio">Anuncio</option>
-            <option value="aviso">Aviso</option>
-          </select>
-
-          <label style={labelStyle}>Título</label>
-          <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título…" />
-
-          <label style={labelStyle}>Cuerpo</label>
-          <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Mensaje…" />
-
-          <label style={labelStyle}>Dirigido a (opcional)</label>
-          <select style={inputStyle} value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}>
+          <select
+            value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}
+            style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 'var(--pill)', fontFamily: 'inherit', fontSize: 12.5, background: '#fff' }}
+          >
             <option value="">Todo el equipo</option>
-            {STAFF_AUDIENCE.map((r) => (
-              <option key={r.key} value={r.key}>{r.label}</option>
-            ))}
+            {STAFF.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </select>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, fontSize: 13.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Fijar arriba
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Fijar
           </label>
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-            <button className="btn ghost" onClick={onClose} type="button">Cancelar</button>
-            <button className="btn" onClick={save} type="button"><Icon name="plus" /> {mode === 'edit' ? 'Guardar' : 'Publicar'}</button>
-          </div>
+          <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={publish}><Send size={14} /> Publicar</button>
         </div>
       </div>
     </div>
   )
 }
 
-function AssetModal({ onClose, onSave }: { onClose: () => void; onSave: (input: AssetInput) => void }) {
-  const [key, setKey] = useState('')
-  const [url, setUrl] = useState('')
-  const [tags, setTags] = useState('')
+function CommentsSheet({ announcement, comments, onAdd, onClose }: {
+  announcement: Announcement
+  comments: MockComment[]
+  onAdd: (text: string) => void
+  onClose: () => void
+}) {
+  const [text, setText] = useState('')
+  const send = () => { if (text.trim()) { onAdd(text.trim()); setText('') } }
 
-  const save = () => {
-    if (!key.trim()) return
-    onSave({ key: key.trim(), url: url.trim(), tags: tags.split(',').map((t) => t.trim()).filter(Boolean) })
-  }
+  return (
+    <div className="sheet-wrap" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <MessageCircle size={18} color="var(--green-deep)" />
+          <div style={{ fontWeight: 600 }}>Comentarios</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>· {announcement.title}</div>
+          <button className="fbtn" style={{ marginLeft: 'auto' }} type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="sheet-body">
+          {comments.length === 0 ? (
+            <div style={{ color: 'var(--ink-3)', fontSize: 13.5, padding: '16px 0', textAlign: 'center' }}>Sé el primero en comentar.</div>
+          ) : (
+            comments.map((c) => (
+              <div key={c.id} className="cmt">
+                <Avatar name={c.author} sm />
+                <div className="body">
+                  <div className="who">{c.author}<span className="when">{timeAgo(c.created_at)}</span></div>
+                  <div className="txt">{c.text}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="sheet-foot">
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe un comentario…" onKeyDown={(e) => e.key === 'Enter' && send()} />
+          <button className="iconbtn-round" type="button" onClick={send}><Send size={17} /></button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditModal({ announcement, onClose, onSave }: {
+  announcement: Announcement
+  onClose: () => void
+  onSave: (input: { title: string; body: string; kind: AnnouncementKind; pinned: boolean; audience: RoleId | null }) => void
+}) {
+  const [title, setTitle] = useState(announcement.title)
+  const [body, setBody] = useState(announcement.body ?? '')
+  const [kind, setKind] = useState<AnnouncementKind>(kindOf(announcement))
+  const [pinned, setPinned] = useState(isPinned(announcement))
+  const [audience, setAudience] = useState<RoleId | ''>(audienceOf(announcement) ?? '')
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div>
-            <h3>Subir asset</h3>
-            <div className="ms">Logo, imagen o documento para el equipo.</div>
-          </div>
-          <button className="mclose" onClick={onClose} type="button"><Icon name="x" /></button>
+          <div><h3>Editar {kind === 'aviso' ? 'aviso' : 'anuncio'}</h3></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
-          <label style={labelStyle}>Nombre</label>
-          <input style={inputStyle} value={key} onChange={(e) => setKey(e.target.value)} placeholder="Ej. Logo Renovacell — verde" />
-          <label style={labelStyle}>URL</label>
-          <input style={inputStyle} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (mock por ahora)" />
-          <label style={labelStyle}>Etiquetas (separadas por coma)</label>
-          <input style={inputStyle} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="logo, marca" />
-          <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-            <button className="btn ghost" onClick={onClose} type="button">Cancelar</button>
-            <button className="btn" onClick={save} type="button"><Icon name="plus" /> Subir</button>
+          <input style={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
+          <textarea style={{ ...input, minHeight: 90, resize: 'vertical' }} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Mensaje" />
+          <div className="fchips" style={{ marginTop: 12 }}>
+            <button type="button" className={'fchip' + (kind === 'anuncio' ? ' on' : '')} onClick={() => setKind('anuncio')}>Anuncio</button>
+            <button type="button" className={'fchip' + (kind === 'aviso' ? ' on' : '')} onClick={() => setKind('aviso')}>Aviso</button>
+          </div>
+          <select style={input} value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}>
+            <option value="">Todo el equipo</option>
+            {STAFF.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Fijar arriba
+          </label>
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" onClick={() => onSave({ title: title.trim(), body: body.trim(), kind, pinned, audience: audience || null })}>
+              <ShieldCheck size={15} /> Guardar
+            </button>
           </div>
         </div>
       </div>

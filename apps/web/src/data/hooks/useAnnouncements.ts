@@ -46,7 +46,7 @@ export function useAnnouncements() {
       end_at: null,
       created_by: null,
       created_at: new Date().toISOString(),
-      metadata: { kind: input.kind, pinned: input.pinned, audience: input.audience },
+      metadata: { kind: input.kind, pinned: input.pinned, audience: input.audience, author: 'Tú', reactions: 0, reads: 0 },
     }
     setData((prev) => [row, ...prev])
   }
