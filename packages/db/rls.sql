@@ -115,20 +115,33 @@ CREATE POLICY profiles_delete_admin ON profiles
   USING (public.auth_role() = 'admin');
 
 -- ---------- PRODUCTS (catálogo) ---------------------------------------------
--- Lectura para cualquier usuario autenticado (doctores y staff lo necesitan).
--- NOTA: la landing pública NO lee esta tabla directo; cuando se construya el
--- Módulo 1 se expondrá un catálogo público vía vista/Edge Function con solo
--- las columnas seguras. Por ahora: sin acceso anon.
-DROP POLICY IF EXISTS products_select_auth ON products;
-CREATE POLICY products_select_auth ON products
+-- La TABLA base solo la lee admin (incluye `metadata`, que puede tener notas
+-- internas). El resto de usuarios lee la VISTA de columnas seguras `products_safe`
+-- (ver abajo). El costo/margen/proveedor viven en product_costs, nunca aquí.
+DROP POLICY IF EXISTS products_select_auth ON products;   -- política permisiva anterior
+DROP POLICY IF EXISTS products_select_admin ON products;
+CREATE POLICY products_select_admin ON products
   FOR SELECT TO authenticated
-  USING (true);
+  USING (public.auth_role() = 'admin');
 
 DROP POLICY IF EXISTS products_write_admin ON products;
 CREATE POLICY products_write_admin ON products
   FOR ALL TO authenticated
   USING (public.auth_role() = 'admin')
   WITH CHECK (public.auth_role() = 'admin');
+
+-- Vista de columnas seguras para NO-admin (doctores y staff): expone solo lo
+-- vendible/visible. Sin costo, sin margen, sin proveedor (esos están en
+-- product_costs) y sin `metadata` interna.
+-- security_invoker = off (por defecto): la vista corre como owner y omite la RLS
+-- admin-only de la tabla base, exponiendo SOLO estas columnas a quien tenga GRANT.
+CREATE OR REPLACE VIEW public.products_safe
+  WITH (security_invoker = false) AS
+  SELECT id, sku, name, line, category, description, price, unit
+  FROM public.products;
+
+REVOKE ALL ON public.products_safe FROM PUBLIC;          -- cierra anon explícitamente
+GRANT SELECT ON public.products_safe TO authenticated;   -- todos los autenticados leen el catálogo seguro
 
 -- ---------- PRODUCT_COSTS (costo/margen — CONFIDENCIAL) ----------------------
 -- Solo admin y facturación. Un doctor o staff operativo NUNCA lee el costo.
@@ -344,11 +357,12 @@ CREATE POLICY prospects_delete_admin ON prospects
   USING (public.auth_role() = 'admin');
 
 -- ---------- ANNOUNCEMENTS (lobby interno) -----------------------------------
--- SELECT: cualquier usuario autenticado (staff). NO anon. Gestión: admin/comm.
+-- SELECT: SOLO staff interno. El doctor (cliente externo) NO ve el lobby. NO anon.
 DROP POLICY IF EXISTS announcements_select_auth ON announcements;
-CREATE POLICY announcements_select_auth ON announcements
+DROP POLICY IF EXISTS announcements_select_staff ON announcements;
+CREATE POLICY announcements_select_staff ON announcements
   FOR SELECT TO authenticated
-  USING (true);
+  USING (public.auth_role() = ANY (ARRAY['admin','warehouse','packing','pos','billing','driver','comm']));
 
 DROP POLICY IF EXISTS announcements_manage_admin_comm ON announcements;
 CREATE POLICY announcements_manage_admin_comm ON announcements
@@ -357,10 +371,12 @@ CREATE POLICY announcements_manage_admin_comm ON announcements
   WITH CHECK (public.auth_role() = ANY (ARRAY['admin','comm']));
 
 -- ---------- ASSETS (biblioteca de logos/imágenes internas) -------------------
+-- SELECT: SOLO staff interno. El doctor NO ve la biblioteca interna. NO anon.
 DROP POLICY IF EXISTS assets_select_auth ON assets;
-CREATE POLICY assets_select_auth ON assets
+DROP POLICY IF EXISTS assets_select_staff ON assets;
+CREATE POLICY assets_select_staff ON assets
   FOR SELECT TO authenticated
-  USING (true);
+  USING (public.auth_role() = ANY (ARRAY['admin','warehouse','packing','pos','billing','driver','comm']));
 
 DROP POLICY IF EXISTS assets_manage_admin_comm ON assets;
 CREATE POLICY assets_manage_admin_comm ON assets
@@ -424,8 +440,15 @@ BEGIN
 
   -- DOCTOR: solo su pedido, solo en etapa temprana, sin tocar dinero/identidad.
   IF r = 'doctor' AND OLD.doctor_id = auth.uid() THEN
+    -- Solo puede EDITAR pedidos que aún estén en etapa temprana.
     IF OLD.status IS NOT NULL AND OLD.status NOT IN ('draft','pending_payment') THEN
       RAISE EXCEPTION 'No autorizado: el pedido ya está en proceso';
+    END IF;
+    -- Y solo puede mover el estado dentro de draft/pending_payment, o cancelar.
+    -- NUNCA puede empujarlo a fulfillment (shipped, fulfilled, etc.).
+    IF NEW.status IS DISTINCT FROM OLD.status
+       AND NEW.status NOT IN ('draft','pending_payment','cancelled') THEN
+      RAISE EXCEPTION 'No autorizado: el doctor no puede mover el pedido a ese estado';
     END IF;
     IF NEW.doctor_id        IS DISTINCT FROM OLD.doctor_id
        OR NEW.total         IS DISTINCT FROM OLD.total
