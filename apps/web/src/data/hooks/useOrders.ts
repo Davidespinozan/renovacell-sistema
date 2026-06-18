@@ -5,14 +5,22 @@ import { useSyncExternalStore } from 'react'
 import {
   subscribe,
   getSnapshot,
+  getSnapshotAll,
   createOrder,
   type OrderWithItems,
   type NewOrderLine,
 } from '../store/ordersStore'
 
+// Pedidos del doctor actual (Portal). Mañana lo limita la RLS de Supabase.
 export function useOrders() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   return { data, loading: false, error: null as string | null, createOrder }
+}
+
+// Todos los pedidos (staff de operación: almacén/empaque).
+export function useAllOrders() {
+  const data = useSyncExternalStore(subscribe, getSnapshotAll, getSnapshotAll)
+  return { data, loading: false, error: null as string | null }
 }
 
 export type { OrderWithItems, NewOrderLine }

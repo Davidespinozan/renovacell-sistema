@@ -7,6 +7,10 @@ import { CommonView } from './CommonView'
 import { Catalogo } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
+import { Existencias } from './warehouse/Existencias'
+import { Surtido } from './warehouse/Surtido'
+import { Caducidades } from './warehouse/Caducidades'
+import { Entradas } from './warehouse/Entradas'
 import { COMMON_SCREEN, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
@@ -17,6 +21,10 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,
   // 'asist' (Asistente IA) sigue en Placeholder por ahora.
+  stock: () => <Existencias />,
+  surtido: () => <Surtido />,
+  caduc: () => <Caducidades />,
+  entradas: () => <Entradas />,
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

@@ -1,0 +1,70 @@
+// Lógica de surtido FEFO (first-expired, first-out).
+// planSurtido: función PURA que sugiere lotes por caducidad ascendente.
+// surtirPedido: confirma el surtido — descuenta lotes (+movimientos) y marca el
+// pedido como Empacado. Conecta lotsStore + ordersStore.
+import type { Lot, OrderItem } from '../types'
+import { getSnapshotLots, consume } from '../store/lotsStore'
+import { markPacked, type OrderWithItems } from '../store/ordersStore'
+
+export interface Alloc {
+  lot: Lot
+  qty: number
+}
+
+export interface ItemPlan {
+  item: OrderItem
+  allocations: Alloc[]
+  shortfall: number // unidades que faltan (sin stock suficiente)
+  quote: boolean // renglón de cotización: no se surte
+}
+
+// Orden FEFO: caduca antes primero; sin fecha al final.
+function byExpiry(a: Lot, b: Lot): number {
+  if (!a.expiry_date) return 1
+  if (!b.expiry_date) return -1
+  return a.expiry_date < b.expiry_date ? -1 : a.expiry_date > b.expiry_date ? 1 : 0
+}
+
+export function planSurtido(order: OrderWithItems, lots: Lot[]): ItemPlan[] {
+  return order.items.map((item) => {
+    if (item.unit_price == null) {
+      return { item, allocations: [], shortfall: 0, quote: true }
+    }
+    const avail = lots
+      .filter((l) => l.product_id === item.product_id && l.quantity > 0)
+      .sort(byExpiry)
+
+    let need = item.qty
+    const allocations: Alloc[] = []
+    for (const lot of avail) {
+      if (need <= 0) break
+      const take = Math.min(need, lot.quantity)
+      allocations.push({ lot, qty: take })
+      need -= take
+    }
+    return { item, allocations, shortfall: Math.max(0, need), quote: false }
+  })
+}
+
+// ¿Se puede surtir? Debe haber al menos un renglón de compra y todos con stock.
+export function canFulfill(plans: ItemPlan[]): boolean {
+  const buy = plans.filter((p) => !p.quote)
+  return buy.length > 0 && buy.every((p) => p.shortfall === 0)
+}
+
+// Confirma el surtido FEFO del pedido.
+export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemPlan[] } {
+  const plans = planSurtido(order, getSnapshotLots())
+  if (!canFulfill(plans)) return { ok: false, plans }
+
+  const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty })))
+  consume(allocations, order.external_ref ?? order.id)
+
+  const itemLot: Record<string, string | null> = {}
+  plans.forEach((p) => {
+    if (!p.quote) itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null
+  })
+  markPacked(order.id, itemLot)
+
+  return { ok: true, plans }
+}
