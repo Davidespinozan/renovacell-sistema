@@ -1,13 +1,15 @@
-// Barra superior: hamburguesa (móvil), título/subtítulo de la pantalla, buscador y campana.
+// Barra superior del hub: hamburguesa (móvil), título/subtítulo de la pantalla,
+// buscador y campana.
 import React from 'react'
 import { Icon } from './icons'
-import { getRole, getScreen } from './roles'
+import { getRole, getScreenDef, COMMON_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen } = useRole()
   const r = getRole(role)
-  const s = getScreen(r, screen)
+  const s = getScreenDef(r, screen)
+  const sub = screen === COMMON_SCREEN.key ? 'Comunicación interna · equipo' : r.label
 
   return (
     <header className="top">
@@ -16,7 +18,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       </button>
       <div>
         <h1 className="screen-title serif">{s.label}</h1>
-        <div className="screen-sub">{r.label}</div>
+        <div className="screen-sub">{sub}</div>
       </div>
       <div className="top-r">
         <div className="searchbox">

@@ -1,12 +1,12 @@
-// Placeholder de pantalla aún no construida. Se reemplaza por la pantalla real
+// Placeholder de módulo aún no construido. Se reemplaza por la pantalla real
 // conforme las vayamos haciendo. Usa los estilos del demo (card/eyebrow/sysnote).
 import React from 'react'
 import { Icon } from '../app/icons'
-import { getRole, getScreen, type RoleKey } from '../app/roles'
+import { getRole, getScreenDef, type RoleKey } from '../app/roles'
 
 export function Placeholder({ role, screen }: { role: RoleKey; screen: string }) {
   const r = getRole(role)
-  const s = getScreen(r, screen)
+  const s = getScreenDef(r, screen)
 
   return (
     <div className="grid">
@@ -24,7 +24,7 @@ export function Placeholder({ role, screen }: { role: RoleKey; screen: string })
           <div>
             <div style={{ fontSize: 19, fontWeight: 600 }}>{s.label}</div>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>
-              Pantalla de {r.label}
+              Módulo de {r.label}
             </div>
           </div>
         </div>
@@ -33,8 +33,8 @@ export function Placeholder({ role, screen }: { role: RoleKey; screen: string })
           <div className="sysnote">
             <Icon name="shield" />
             <span>
-              Pantalla en construcción. El shell (layout, navegación por rol y “ver como”)
-              ya está listo; esta vista se implementará con datos mock conectados por hooks.
+              Módulo en construcción. El hub (marco, navegación por rol y vista común) ya está
+              listo; esta pantalla se implementará con datos mock conectados por hooks.
             </span>
           </div>
         ) : (

@@ -7,6 +7,7 @@ export type IconName =
   | 'receipt' | 'bag' | 'clock' | 'chat' | 'layers' | 'download' | 'pkg'
   | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf'
   | 'chevronRight' | 'chevronLeft' | 'shield'
+  | 'home' | 'plus' | 'edit' | 'trash' | 'pin' | 'x' | 'eye' | 'megaphone'
 
 const P: Record<IconName, React.ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>,
@@ -32,6 +33,14 @@ const P: Record<IconName, React.ReactNode> = {
   chevronRight: <><path d="M9 6l6 6-6 6" /></>,
   chevronLeft: <><path d="M15 6l-6 6 6 6" /></>,
   shield: <><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></>,
+  home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
+  plus: <><path d="M12 5v14M5 12h14" /></>,
+  edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
+  trash: <><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /></>,
+  pin: <><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3H7l3-3z" /></>,
+  x: <><path d="M6 6l12 12M18 6L6 18" /></>,
+  eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></>,
+  megaphone: <><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15 8a4 4 0 0 1 0 8" /></>,
 }
 
 export function Icon({ name, ...rest }: { name: IconName } & React.SVGProps<SVGSVGElement>) {

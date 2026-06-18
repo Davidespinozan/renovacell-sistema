@@ -16,12 +16,13 @@ const RoleCtx = createContext<RoleState | null>(null)
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<RoleKey>('admin')
-  const [screen, setScreen] = useState<string>(getRole('admin').defScreen)
+  // Entrada tras "login": staff -> vista común; doctor -> su portal.
+  const [screen, setScreen] = useState<string>(getRole('admin').entry)
 
-  // Al cambiar de rol, saltar a su pantalla por defecto.
+  // Al cambiar de rol, aterrizar en la pantalla de entrada de ese rol.
   const setRole = (r: RoleKey) => {
     setRoleState(r)
-    setScreen(getRole(r).defScreen)
+    setScreen(getRole(r).entry)
   }
 
   const value = useMemo(() => ({ role, screen, setRole, setScreen }), [role, screen])
