@@ -44,7 +44,7 @@ export function Caducidades() {
 
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
-          <table>
+          <table className="tbl-cards">
             <thead>
               <tr><th>Producto</th><th>Lote</th><th>Caducidad</th><th>Restante</th><th>Cant.</th></tr>
             </thead>
@@ -53,11 +53,11 @@ export function Caducidades() {
                 const sev = severity(d)
                 return (
                   <tr key={lot.id}>
-                    <td>{byId[lot.product_id]?.name ?? 'Producto'}</td>
-                    <td><span className="lc">{lot.lot_code}</span></td>
-                    <td>{fmtDate(lot.expiry_date ?? '')}</td>
-                    <td><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
-                    <td className="mono">{lot.quantity} u</td>
+                    <td data-label="Producto">{byId[lot.product_id]?.name ?? 'Producto'}</td>
+                    <td data-label="Lote"><span className="lc">{lot.lot_code}</span></td>
+                    <td data-label="Caducidad">{fmtDate(lot.expiry_date ?? '')}</td>
+                    <td data-label="Restante"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
+                    <td data-label="Cant." className="mono">{lot.quantity} u</td>
                   </tr>
                 )
               })}

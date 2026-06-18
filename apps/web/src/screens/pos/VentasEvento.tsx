@@ -25,15 +25,15 @@ export function VentasEvento() {
 
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Folio</th><th>Fecha</th><th>Pago</th><th>Total</th></tr></thead>
             <tbody>
               {ventas.map((o) => (
                 <tr key={o.id}>
-                  <td className="mono">{o.external_ref}</td>
-                  <td>{fmtDate(o.created_at)}</td>
-                  <td><span className="pill p-neu">{o.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}</span></td>
-                  <td className="mono">{money(o.total)}</td>
+                  <td data-label="Folio" className="mono">{o.external_ref}</td>
+                  <td data-label="Fecha">{fmtDate(o.created_at)}</td>
+                  <td data-label="Pago"><span className="pill p-neu">{o.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}</span></td>
+                  <td data-label="Total" className="mono">{money(o.total)}</td>
                 </tr>
               ))}
               {ventas.length === 0 && (

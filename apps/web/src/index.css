@@ -2,6 +2,7 @@
 @import '@renovacell/ui/tokens.css';
 @import './styles/shell.css';
 @import './styles/social.css';
+@import '@renovacell/ui/responsive.css';
 
 @tailwind base;
 @tailwind components;

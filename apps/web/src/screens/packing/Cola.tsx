@@ -141,7 +141,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                     <option>Estafeta</option>
                     <option>DHL</option>
                   </select>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+                  <div className="form-grid-2" style={{ marginTop: 14 }}>
                     <div>
                       <label style={labelStyle}>Guía (tracking)</label>
                       <input style={inputStyle} value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="Ej. 7790-2291" />

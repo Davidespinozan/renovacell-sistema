@@ -1,0 +1,57 @@
+/* ============================================================================
+   Renovacell — patrones responsive COMPARTIDOS (Fase 1: shell + roles de campo).
+   Add-ons mobile SOBRE el layout desktop: nunca lo reemplazan, solo agregan
+   comportamiento en pantallas chicas. Breakpoint de teléfono alineado a Tailwind
+   `sm` (640px); el shell ya colapsa el nav a 900px (drawer + bottom-nav).
+   Fuente ÚNICA de los patrones (tabla→tarjetas, scroll, touch, sheet) para no
+   parchar pantalla por pantalla.
+   ============================================================================ */
+
+/* --- Patrón TABLA → TARJETAS -------------------------------------------------
+   Desktop: tabla normal. ≤640px: cada fila se vuelve tarjeta apilada y cada
+   celda muestra su etiqueta vía data-label. Uso:
+     <table class="tbl-cards"> … <td data-label="Producto">…</td> */
+@media (max-width: 640px) {
+  table.tbl-cards thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  table.tbl-cards tr { display: block; border: 1px solid var(--line); border-radius: 14px; padding: 6px 14px; margin-bottom: 10px; background: #fff; box-shadow: var(--sh-sm); }
+  table.tbl-cards tbody tr:hover { background: #fff; }
+  table.tbl-cards td { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; text-align: right; }
+  table.tbl-cards tr td:last-child { border-bottom: none; }
+  table.tbl-cards td::before { content: attr(data-label); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; text-align: left; flex: none; }
+  table.tbl-cards td:not([data-label])::before { content: none; }
+}
+
+/* --- Patrón SCROLL HORIZONTAL (tablas densas mejor no partir, p.ej. en modal) -
+   Envolver: <div class="tbl-scroll"><table>…</table></div> */
+.tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 640px) { .tbl-scroll table { min-width: 460px; } }
+
+/* --- Form grid de 2 columnas que colapsa a 1 en teléfono --------------------- */
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .form-grid-2 { grid-template-columns: 1fr; } }
+
+/* --- Touch targets ≥44px en teléfono (uso a pulgar) -------------------------- */
+@media (max-width: 640px) {
+  .btn, .btn.sm, .devchip, .lchip, .backbtn, .seg button, .mclose, .dbtn { min-height: 44px; }
+  .btn.sm { padding-top: 10px; padding-bottom: 10px; }
+  .seg button { display: inline-flex; align-items: center; justify-content: center; }
+  select, input[type="date"], input[type="number"], input[type="text"] { min-height: 44px; }
+}
+
+/* --- Existencias: los lotes envuelven en vez de desbordar -------------------- */
+@media (max-width: 640px) {
+  .lote { flex-wrap: wrap; }
+  .lote .lq { margin-left: auto; }
+}
+
+/* --- Chofer: acciones de entrega a ancho completo (cómodo con el pulgar) ----- */
+@media (max-width: 640px) {
+  .field-actions { flex-direction: column; align-items: stretch; }
+  .field-actions .btn, .field-actions label.btn { width: 100%; margin-left: 0 !important; }
+}
+
+/* --- Modales como hoja casi a pantalla completa en teléfono ------------------ */
+@media (max-width: 640px) {
+  .overlay { padding: 0; place-items: end center; }
+  .modal { width: 100%; max-width: 100%; max-height: 92vh; border-radius: 18px 18px 0 0; }
+}

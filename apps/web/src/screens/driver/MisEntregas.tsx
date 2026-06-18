@@ -75,7 +75,7 @@ export function MisEntregas() {
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div className="field-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <label className="btn ghost sm" style={{ cursor: 'pointer' }}>
                   <Icon name="image" /> {photo ? 'Cambiar foto' : 'Subir foto de prueba'}
                   <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />

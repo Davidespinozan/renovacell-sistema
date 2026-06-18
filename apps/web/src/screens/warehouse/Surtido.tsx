@@ -154,26 +154,28 @@ function ItemPlanRow({ plan, name }: { plan: ItemPlan; name: string }) {
         <span style={{ fontWeight: 600, fontSize: 14 }}>{name} <span style={{ color: 'var(--ink-3)' }}>×{plan.item.qty}</span></span>
         {plan.shortfall > 0 && <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Faltan {plan.shortfall} u</span>}
       </div>
-      <table>
-        <thead>
-          <tr><th>Lote sugerido</th><th>Caducidad</th><th>Cant.</th></tr>
-        </thead>
-        <tbody>
-          {plan.allocations.map((a, i) => (
-            <tr key={a.lot.id}>
-              <td>
-                <span className="lc">{a.lot.lot_code}</span>
-                {i === 0 && <span className="fefo" style={{ marginLeft: 8 }}><Icon name="check" /> FEFO</span>}
-              </td>
-              <td>{fmtDate(a.lot.expiry_date ?? '')}</td>
-              <td className="mono">{a.qty} u</td>
-            </tr>
-          ))}
-          {plan.allocations.length === 0 && (
-            <tr><td colSpan={3} style={{ color: 'var(--danger)' }}>Sin stock disponible</td></tr>
-          )}
-        </tbody>
-      </table>
+      <div className="tbl-scroll">
+        <table className="tbl-cards">
+          <thead>
+            <tr><th>Lote sugerido</th><th>Caducidad</th><th>Cant.</th></tr>
+          </thead>
+          <tbody>
+            {plan.allocations.map((a, i) => (
+              <tr key={a.lot.id}>
+                <td data-label="Lote sugerido">
+                  <span className="lc">{a.lot.lot_code}</span>
+                  {i === 0 && <span className="fefo" style={{ marginLeft: 8 }}><Icon name="check" /> FEFO</span>}
+                </td>
+                <td data-label="Caducidad">{fmtDate(a.lot.expiry_date ?? '')}</td>
+                <td data-label="Cant." className="mono">{a.qty} u</td>
+              </tr>
+            ))}
+            {plan.allocations.length === 0 && (
+              <tr><td colSpan={3} style={{ color: 'var(--danger)' }}>Sin stock disponible</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

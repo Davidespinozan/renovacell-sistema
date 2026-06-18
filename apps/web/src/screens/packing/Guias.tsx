@@ -31,7 +31,7 @@ export function Guias() {
       <div className="eyebrow">Empaque · Guías</div>
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
-          <table>
+          <table className="tbl-cards">
             <thead>
               <tr><th>Pedido</th><th>Método</th><th>Estimada</th><th>Estatus</th></tr>
             </thead>
@@ -40,16 +40,16 @@ export function Guias() {
                 const sp = shipPill(s.status)
                 return (
                   <tr key={s.id}>
-                    <td className="mono">{folioOf[s.order_id] ?? s.order_id}</td>
-                    <td>
+                    <td data-label="Pedido" className="mono">{folioOf[s.order_id] ?? s.order_id}</td>
+                    <td data-label="Método">
                       {s.driver_id ? (
                         <span><Icon name="usercheck" style={{ width: 13, height: 13, display: 'inline', verticalAlign: '-2px' }} /> {driverName(s.driver_id)}</span>
                       ) : (
                         <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}</span>
                       )}
                     </td>
-                    <td>{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
-                    <td><span className={'pill ' + sp.pill}>{sp.label}</span></td>
+                    <td data-label="Estimada">{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
+                    <td data-label="Estatus"><span className={'pill ' + sp.pill}>{sp.label}</span></td>
                   </tr>
                 )
               })}
