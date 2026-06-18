@@ -34,6 +34,7 @@ export interface Product {
   description: string | null
   price: number | null     // null = "a consultar" (profesional)
   unit: string | null
+  image_url: string | null // imagen real del producto (Storage en el futuro)
   metadata: Json           // interno (NO visible para no-admin)
 }
 

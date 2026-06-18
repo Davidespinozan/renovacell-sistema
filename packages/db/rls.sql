@@ -137,7 +137,7 @@ CREATE POLICY products_write_admin ON products
 -- admin-only de la tabla base, exponiendo SOLO estas columnas a quien tenga GRANT.
 CREATE OR REPLACE VIEW public.products_safe
   WITH (security_invoker = false) AS
-  SELECT id, sku, name, line, category, description, price, unit
+  SELECT id, sku, name, line, category, description, price, unit, image_url
   FROM public.products;
 
 REVOKE ALL ON public.products_safe FROM PUBLIC;          -- cierra anon explícitamente

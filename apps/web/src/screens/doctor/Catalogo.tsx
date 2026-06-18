@@ -104,9 +104,11 @@ function ProductCard({ p, qty, onAdd, onDec }: { p: ProductSafe; qty: number; on
   const isProf = p.line === 'prof'
   return (
     <div className="pcard">
-      <div className={'ptile ' + (isProf ? 'prof' : 'cosm')}>
+      <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
-        <Icon name="leaf" />
+        {p.image_url
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <Icon name="leaf" />}
       </div>
       <div className="pb">
         <h5>{p.name}</h5>

@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
   description text,
   price numeric,
   unit text,
+  image_url text,
   metadata jsonb
 );
 
