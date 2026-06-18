@@ -18,6 +18,7 @@ import {
   billingSummary, monthlySales, doctorsAtRisk,
 } from '../../data/metrics'
 import type { ProductSafe, Profile } from '../../data/types'
+import { VentasDetalle } from './VentasDetalle'
 
 const GREEN = '#007311'
 const GREEN_SOFT = '#5FB873'
@@ -31,6 +32,23 @@ const PERIODOS: { v: Periodo; label: string; days: number | null }[] = [
 ]
 
 export function Ventas() {
+  const [tab, setTab] = useState<'detalle' | 'resumen'>('detalle')
+  return (
+    <div className="grid" style={{ gap: 18 }}>
+      <div>
+        <div className="eyebrow" style={{ marginBottom: 4 }}>Administración · Ventas</div>
+        <h1 style={{ fontSize: 22, fontWeight: 600 }}>Ventas</h1>
+      </div>
+      <div className="fchips">
+        <button type="button" className={'fchip' + (tab === 'detalle' ? ' on' : '')} onClick={() => setTab('detalle')}>Detalle</button>
+        <button type="button" className={'fchip' + (tab === 'resumen' ? ' on' : '')} onClick={() => setTab('resumen')}>Resumen</button>
+      </div>
+      {tab === 'detalle' ? <VentasDetalle /> : <VentasResumen />}
+    </div>
+  )
+}
+
+function VentasResumen() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
@@ -63,11 +81,6 @@ export function Ventas() {
 
   return (
     <div className="grid" style={{ gap: 26 }}>
-      <div>
-        <div className="eyebrow" style={{ marginBottom: 4 }}>Administración · Ventas</div>
-        <h1 style={{ fontSize: 22, fontWeight: 600 }}>Métricas comerciales</h1>
-      </div>
-
       {/* Selector de período */}
       <div className="fchips">
         {PERIODOS.map((p) => (
