@@ -1,0 +1,8 @@
+/* Tokens de marca compartidos (variables CSS). Debe ir antes de @tailwind. */
+@import '@renovacell/ui/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,body,#root{height:100%}

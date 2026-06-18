@@ -178,4 +178,4 @@ CREATE INDEX IF NOT EXISTS idx_lots_expiry ON lots(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
 -- Las políticas RLS, funciones helper y triggers de seguridad viven en
--- supabase/rls.sql (ejecutar DESPUÉS de este archivo). No definir políticas aquí.
+-- rls.sql (este paquete; ejecutar DESPUÉS de este archivo). No definir políticas aquí.

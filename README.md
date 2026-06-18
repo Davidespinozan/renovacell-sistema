@@ -1,26 +1,38 @@
-# Renovacell — Sistema operativo (scaffold)
+# Renovacell — Sistema operativo
 
-Este PR contiene el esqueleto del proyecto y los artefactos iniciales para arrancar el desarrollo.
+Monorepo del sistema operativo de Renovacell: landing pública, sistema interno
+(portal del doctor + módulos operativos) y la base de datos, sobre una sola base
+de datos compartida ("una base, varias puertas").
 
-Contenido creado:
-- `package.json`, `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `postcss.config.cjs`
-- `src/main.tsx`, `src/App.tsx`, `src/index.css`, `src/lib/supabaseClient.ts`
-- `.env.example` (no incluyas credenciales reales aquí)
-- `reference/renovacell-demo.html` (copia read-only del demo — especificación visual/funcional)
-- `supabase/schema.sql` (esquema base ya presente)
-- `supabase/rls.sql` (RLS policies draft — revisar)
-- `supabase/seeds/seed_products.sql` (seed con catálogo demo)
-- `supabase/audit_triggers.sql` (triggers para auditoría de orders/shipments)
+## Estructura
 
-Instrucciones:
-1. Crear un proyecto Supabase NUEVO y exclusivo para Renovacell.
-2. Copiar `.env.example` → `.env` y poblar las variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
-3. Ejecutar las migraciones/SQL en el orden:
-   - `supabase/schema.sql`
-   - `supabase/rls.sql` (revisar políticas y adaptar roles)
-   - `supabase/audit_triggers.sql`
-   - `supabase/seeds/seed_products.sql` (usa service role key)
+```
+apps/web        Sistema interno (React + Vite + TS + Tailwind)
+apps/landing    Landing pública + agente IA (se integra en el Módulo 1)
+packages/db     Esquema Supabase (schema, RLS, auditoría, seeds)
+packages/ui     Tokens de marca + preset de Tailwind
+reference/      Prototipos HTML (especificación visual/funcional)
+docs/           Documentación interna
+```
 
-No instalaré dependencias ni ejecutaré comandos hasta que confirmes.
+Ver [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) para el detalle.
 
-Próximo paso si apruebas: crear PR formal con estos cambios y continuar con el scaffold completo (instalación y scripts de dev).
+## Empezar (cuando toque desarrollar)
+
+```bash
+npm install                 # instala y enlaza los workspaces
+cp .env.example .env        # poblar credenciales (cuando exista el proyecto Supabase)
+npm run dev                 # levanta apps/web
+```
+
+> **Estado actual:** andamiaje organizado. Dependencias sin instalar y **sin
+> proyecto Supabase creado** todavía — eso es el siguiente paso, deliberadamente.
+
+## Base de datos
+
+El esquema y las políticas de seguridad viven en [`packages/db`](packages/db).
+Orden de ejecución y notas de seguridad en su README.
+
+## Stack
+
+React · Vite · TypeScript · Tailwind · Supabase · Netlify · GitHub.

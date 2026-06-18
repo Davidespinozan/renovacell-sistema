@@ -1,0 +1,14 @@
+{
+  "name": "@renovacell/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sistema de diseño Renovacell: tokens de marca y preset de Tailwind, compartidos entre apps/web y apps/landing",
+  "files": [
+    "tokens.css",
+    "tailwind-preset.cjs"
+  ],
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./tailwind-preset.cjs": "./tailwind-preset.cjs"
+  }
+}
