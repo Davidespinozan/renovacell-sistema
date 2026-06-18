@@ -12,6 +12,7 @@ export function DevBar() {
     <div className="devbar">
       <span className="devbar-tag">DEV · Ver como</span>
       <button type="button" className={'devchip' + (mode === 'landing' ? ' on' : '')} onClick={() => setMode('landing')}>Landing</button>
+      <button type="button" className={'devchip' + (mode === 'login' ? ' on' : '')} onClick={() => setMode('login')}>Login</button>
       <span className="devbar-sep" />
       {availableRoles().map((r) => (
         <button

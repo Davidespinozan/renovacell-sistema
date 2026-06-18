@@ -3,15 +3,23 @@ import { RoleProvider, useRole } from './auth/RoleContext'
 import { AppShell } from './app/AppShell'
 import { DevBar } from './app/DevBar'
 import { LandingPreview } from './screens/LandingPreview'
+import { Login } from './screens/Login'
+import { ReviewPending } from './screens/ReviewPending'
 
 function Root() {
-  const { mode } = useRole()
+  const { mode, role, verified } = useRole()
+
+  let view
+  if (mode === 'landing') view = <LandingPreview />
+  else if (mode === 'login') view = <Login />
+  // Gate: doctor no verificado no entra al portal.
+  else if (role === 'doctor' && !verified) view = <ReviewPending />
+  else view = <AppShell />
+
   return (
     <div className="dev-root">
       <DevBar />
-      <div className="dev-view">
-        {mode === 'landing' ? <LandingPreview /> : <AppShell />}
-      </div>
+      <div className="dev-view">{view}</div>
     </div>
   )
 }

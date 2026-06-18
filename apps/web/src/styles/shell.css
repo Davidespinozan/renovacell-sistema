@@ -19,6 +19,10 @@ svg{display:block}
 .devchip:hover{border-color:rgba(255,255,255,.4);color:#fff}
 .devchip.on{background:var(--grad-green);color:#fff;border-color:transparent}
 
+/* Login / pantallas de sesión centradas */
+.login-wrap{min-height:100%;display:grid;place-items:center;padding:28px;background:radial-gradient(1000px 460px at 50% -10%,rgba(95,184,115,.16),transparent 60%),var(--hueso)}
+.login-card{width:min(400px,100%);background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh-lg);padding:28px}
+
 .app{display:grid;grid-template-columns:252px 1fr;grid-template-rows:1fr;height:100%;overflow:hidden}
 .hidden{display:none!important}
 #menu{display:none;min-height:100vh;background:radial-gradient(1100px 500px at 50% -10%,rgba(95,184,115,.14),transparent 60%),var(--hueso);overflow:auto}
