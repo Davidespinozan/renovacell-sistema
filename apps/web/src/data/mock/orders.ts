@@ -30,6 +30,22 @@ export const MOCK_ORDERS: Order[] = [
     invoice_meta: null, shipping_meta: null,
     created_at: '2026-06-17T16:45:00Z',
   },
+  // ATORADO: surtido (Empacado) desde hace meses, sin envío asignado (caso S12840).
+  {
+    id: 'o-12840', external_ref: 'S12840', doctor_id: DOCTOR_ID, total: 3780, currency: 'MXN',
+    status: 'packed', payment_method: 'contra_pedido', payment_ref: 'TR-12840',
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
+    invoice_meta: null, shipping_meta: null,
+    created_at: '2025-09-25T10:00:00Z',
+  },
+  // Asignado a CHOFER propio (drv-1) para entrega local — alimenta la vista del chofer.
+  {
+    id: 'o-3640', external_ref: 'S3640', doctor_id: DOCTOR_ID, total: 2670, currency: 'MXN',
+    status: 'shipped', payment_method: 'contra_pedido', payment_ref: 'TR-3640',
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
+    invoice_meta: null, shipping_meta: { method: 'chofer', driver: 'Chofer local Culiacán', driver_id: 'drv-1' },
+    created_at: '2026-06-15T09:00:00Z',
+  },
 ]
 
 export const MOCK_ORDER_ITEMS: OrderItem[] = [
@@ -41,4 +57,8 @@ export const MOCK_ORDER_ITEMS: OrderItem[] = [
   // S3712 (pendiente de pago) — incluye una cotización (unit_price null)
   { id: 'oi-4', order_id: 'o-3712', product_id: 'p-pl-12', lot_id: null, qty: 1, unit_price: 680, created_at: '2026-06-17T16:45:00Z' },
   { id: 'oi-5', order_id: 'o-3712', product_id: 'p-gp-300', lot_id: null, qty: 1, unit_price: null, created_at: '2026-06-17T16:45:00Z' },
+  // S12840 (atorado, surtido sin salir)
+  { id: 'oi-6', order_id: 'o-12840', product_id: 'p-gs-114', lot_id: 'l-gs-1', qty: 2, unit_price: 1890, created_at: '2025-09-25T10:00:00Z' },
+  // S3640 (chofer)
+  { id: 'oi-7', order_id: 'o-3640', product_id: 'p-mgp-90', lot_id: 'l-mgp-a', qty: 3, unit_price: 890, created_at: '2026-06-15T09:00:00Z' },
 ]

@@ -51,3 +51,12 @@ export function createShipment(input: ShipmentInput): Shipment {
   emit()
   return sh
 }
+
+// Entrega confirmada por el chofer: estatus Entregado + foto de prueba.
+export function markDelivered(shipmentId: string, proofUrl: string | null) {
+  const now = new Date().toISOString()
+  shipments = shipments.map((s) =>
+    s.id === shipmentId ? { ...s, status: 'delivered', delivered_at: now, proof_image_url: proofUrl } : s,
+  )
+  emit()
+}

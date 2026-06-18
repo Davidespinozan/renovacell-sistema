@@ -86,3 +86,9 @@ export function markShipped(orderId: string, shipping_meta: Record<string, unkno
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta } : o))
   emit()
 }
+
+// Seguimiento/Chofer: entrega confirmada -> cierra el ciclo (Entregado).
+export function markDelivered(orderId: string) {
+  orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
+  emit()
+}

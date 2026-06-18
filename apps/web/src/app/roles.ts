@@ -43,6 +43,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_inv', label: 'Inventario', icon: 'box' },
       { key: 'av_doc', label: 'Doctores', icon: 'usercheck' },
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
       { key: 'av_fin', label: 'Facturación', icon: 'receipt' },
     ],
   },
@@ -64,6 +65,7 @@ export const ROLES: RoleDef[] = [
       { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
       { key: 'caduc', label: 'Caducidades', icon: 'clock' },
       { key: 'entradas', label: 'Entradas', icon: 'download' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
     ],
   },
   {
@@ -73,6 +75,7 @@ export const ROLES: RoleDef[] = [
       { key: 'cola', label: 'Por empacar', icon: 'pkg' },
       { key: 'guia', label: 'Guías', icon: 'truck' },
       { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
     ],
   },
   {
@@ -92,7 +95,7 @@ export const ROLES: RoleDef[] = [
   },
   {
     key: 'driver', label: 'Chofer', group: 'Chofer · Entregas',
-    icon: 'truck', isStaff: true, ready: false, requiresFeature: 'chofer',
+    icon: 'truck', isStaff: true, ready: true, requiresFeature: 'chofer',
     modules: [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
     ],

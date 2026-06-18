@@ -14,6 +14,8 @@ import { Entradas } from './warehouse/Entradas'
 import { Cola } from './packing/Cola'
 import { Guias } from './packing/Guias'
 import { Recibo } from './packing/Recibo'
+import { Seguimiento } from './logistics/Seguimiento'
+import { MisEntregas } from './driver/MisEntregas'
 import { COMMON_SCREEN, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
@@ -31,6 +33,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   cola: () => <Cola />,
   guia: () => <Guias />,
   recibo: () => <Recibo />,
+  seguimiento: () => <Seguimiento />,
+  driver_home: () => <MisEntregas />,
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
