@@ -103,6 +103,23 @@
 .composer-bar input:focus { border-color: var(--green-soft); box-shadow: 0 0 0 3px rgba(95,184,115,.18); }
 @media (max-width: 900px) { .chat-wrap { grid-template-columns: 1fr; height: auto; } .conv-list { max-height: 260px; } .bubbles { min-height: 320px; } }
 
+/* ===== Asistente IA del Portal (chat concierge) ===== */
+.asst-shell { display: flex; flex-direction: column; height: calc(100vh - 280px); min-height: 460px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: #fff; box-shadow: var(--sh-md); }
+.asst-row { display: flex; gap: 10px; align-items: flex-start; }
+.asst-av { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--grad-green); color: #fff; box-shadow: var(--glow); }
+.asst-prods { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.asst-prod { display: flex; gap: 11px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: #fff; box-shadow: var(--sh-sm); }
+.asst-thumb { width: 46px; height: 46px; border-radius: 10px; flex: none; overflow: hidden; display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #E9F4EC, #CFE6D6); color: var(--green-deep); }
+.asst-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.asst-ok { display: inline-flex; align-items: center; gap: 8px; background: var(--ok-bg); border: 1px solid #C9E4CF; color: var(--green-deep); border-radius: 12px; padding: 9px 13px; font-size: 13px; }
+.asst-draft { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-top: 1px solid var(--line); background: var(--bone-warm); }
+.asst-foot { background: #fff; }
+.asst-chips { padding: 12px 14px 4px; }
+@media (max-width: 900px) {
+  .asst-shell { height: auto; }
+  .asst-shell .bubbles { min-height: 320px; }
+}
+
 /* Comentario */
 .cmt { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .cmt:last-child { border-bottom: none; }

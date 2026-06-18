@@ -8,6 +8,7 @@ import { Chat } from './hub/Chat'
 import { Catalogo } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
+import { Asistente } from './doctor/Asistente'
 import { Existencias } from './warehouse/Existencias'
 import { Surtido } from './warehouse/Surtido'
 import { Caducidades } from './warehouse/Caducidades'
@@ -32,7 +33,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   catalogo: () => <Catalogo />,
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,
-  // 'asist' (Asistente IA) sigue en Placeholder por ahora.
+  asist: () => <Asistente />,
   stock: () => <Existencias />,
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
