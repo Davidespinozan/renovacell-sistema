@@ -4,6 +4,7 @@
 import React from 'react'
 import { Placeholder } from './Placeholder'
 import { CommonView } from './CommonView'
+import { Chat } from './hub/Chat'
 import { Catalogo } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
@@ -22,7 +23,7 @@ import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
-import { COMMON_SCREEN, type RoleKey } from '../app/roles'
+import { COMMON_SCREEN, CHAT_SCREEN, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
 
@@ -53,6 +54,10 @@ export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
   if (screen === COMMON_SCREEN.key) {
     if (FEATURES.comunicacionInterna) return <CommonView />
     return <AddOnInactive title="Vista común" addon="Comunicación interna" />
+  }
+  if (screen === CHAT_SCREEN.key) {
+    if (FEATURES.comunicacionInterna) return <Chat />
+    return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }
   const real = SCREENS[screen]
   if (real) return real()

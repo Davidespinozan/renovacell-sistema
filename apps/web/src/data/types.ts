@@ -151,6 +151,26 @@ export interface Asset {
   created_at: ISODateTime
 }
 
+// --- Chat interno (tablas futuras: conversations / messages + realtime) ---
+export interface Conversation {
+  id: string
+  kind: 'group' | 'dm'
+  title: string | null      // título del grupo, o nombre del contacto en DM
+  area: RoleId | null       // grupo por área (opcional)
+  member_ids: string[]
+  created_at: ISODateTime
+  last_message_at: ISODateTime | null
+}
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  sender_name: string | null
+  body: string
+  created_at: ISODateTime
+}
+
 // Estado estándar que devuelven los hooks de datos (igual con mock o Supabase).
 export interface QueryResult<T> {
   data: T

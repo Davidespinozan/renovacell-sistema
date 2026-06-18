@@ -2,15 +2,17 @@
 // módulos del rol) + pie "Operado por STRYV". El marco permanece; el contenido cambia.
 import React from 'react'
 import { Icon } from './icons'
-import { getRole, getNav, COMMON_SCREEN } from './roles'
+import { getRole, getNav, HUB_SCREENS } from './roles'
 import { useRole } from '../auth/RoleContext'
+
+const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen } = useRole()
   const r = getRole(role)
   const nav = getNav(r)
-  const hasCommon = nav.some((s) => s.key === COMMON_SCREEN.key)
-  const modules = nav.filter((s) => s.key !== COMMON_SCREEN.key)
+  const hub = nav.filter((s) => HUB_KEYS.has(s.key))
+  const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 
   const go = (key: string) => {
     setScreen(key)
@@ -30,17 +32,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="nav">
-        {/* Vista común: solo si el add-on de Comunicación interna está activo. */}
-        {hasCommon && (
+        {/* Hub (vista común + chat): solo con el add-on de Comunicación interna. */}
+        {hub.length > 0 && (
           <>
             <div className="grp">Hub Renovacell</div>
-            <a
-              className={screen === COMMON_SCREEN.key ? 'on' : undefined}
-              onClick={() => go(COMMON_SCREEN.key)}
-            >
-              <Icon name={COMMON_SCREEN.icon} />
-              <span>{COMMON_SCREEN.label}</span>
-            </a>
+            {hub.map((s) => (
+              <a key={s.key} className={s.key === screen ? 'on' : undefined} onClick={() => go(s.key)}>
+                <Icon name={s.icon} />
+                <span>{s.label}</span>
+              </a>
+            ))}
           </>
         )}
 

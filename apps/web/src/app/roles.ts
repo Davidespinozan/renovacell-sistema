@@ -29,8 +29,10 @@ export interface RoleDef {
   requiresFeature?: keyof Features       // el rol existe solo si el add-on está activo
 }
 
-// La VISTA COMÚN pertenece al add-on "Comunicación interna", no al hub base.
+// La VISTA COMÚN y el CHAT pertenecen al add-on "Comunicación interna" (hub).
 export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Vista común', icon: 'home' }
+export const CHAT_SCREEN: ScreenDef = { key: 'chat', label: 'Chat', icon: 'chat' }
+export const HUB_SCREENS: ScreenDef[] = [COMMON_SCREEN, CHAT_SCREEN]
 
 export const ROLES: RoleDef[] = [
   {
@@ -105,7 +107,7 @@ export const availableRoles = (features: Features = FEATURES): RoleDef[] =>
 // Navegación visible: staff = [vista común (si add-on), ...módulos]; doctor = módulos.
 export const getNav = (role: RoleDef, features: Features = FEATURES): ScreenDef[] => {
   const nav: ScreenDef[] = []
-  if (role.isStaff && features.comunicacionInterna) nav.push(COMMON_SCREEN)
+  if (role.isStaff && features.comunicacionInterna) nav.push(...HUB_SCREENS)
   nav.push(...role.modules)
   return nav
 }

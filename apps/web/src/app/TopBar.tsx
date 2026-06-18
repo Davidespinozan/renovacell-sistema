@@ -2,14 +2,17 @@
 // buscador y campana.
 import React from 'react'
 import { Icon } from './icons'
-import { getRole, getScreenDef, COMMON_SCREEN } from './roles'
+import { getRole, getScreenDef, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen } = useRole()
   const r = getRole(role)
   const s = getScreenDef(r, screen)
-  const sub = screen === COMMON_SCREEN.key ? 'Comunicación interna · equipo' : r.label
+  const sub =
+    screen === COMMON_SCREEN.key ? 'Comunicación interna · equipo'
+      : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
+        : r.label
 
   return (
     <header className="top">
