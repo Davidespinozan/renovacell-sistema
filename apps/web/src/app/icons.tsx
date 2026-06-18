@@ -8,6 +8,7 @@ export type IconName =
   | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf'
   | 'chevronRight' | 'chevronLeft' | 'shield'
   | 'home' | 'plus' | 'edit' | 'trash' | 'pin' | 'x' | 'eye' | 'megaphone'
+  | 'check' | 'minus' | 'cart'
 
 const P: Record<IconName, React.ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>,
@@ -41,6 +42,9 @@ const P: Record<IconName, React.ReactNode> = {
   x: <><path d="M6 6l12 12M18 6L6 18" /></>,
   eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></>,
   megaphone: <><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15 8a4 4 0 0 1 0 8" /></>,
+  check: <><path d="M5 12l4.5 4.5L19 7" /></>,
+  minus: <><path d="M5 12h14" /></>,
+  cart: <><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /><path d="M2 3h3l2.5 13h11l2-9H6" /></>,
 }
 
 export function Icon({ name, ...rest }: { name: IconName } & React.SVGProps<SVGSVGElement>) {
