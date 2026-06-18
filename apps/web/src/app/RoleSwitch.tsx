@@ -2,7 +2,7 @@
 // Desaparecerá cuando haya login real (el rol vendrá del perfil de Supabase).
 import React from 'react'
 import { Icon } from './icons'
-import { ROLES } from './roles'
+import { availableRoles } from './roles'
 import { useRole } from '../auth/RoleContext'
 
 export function RoleSwitch() {
@@ -11,7 +11,7 @@ export function RoleSwitch() {
     <div className="switch">
       <span className="switch-lbl">Ver como</span>
       <div className="seg">
-        {ROLES.map((r) => (
+        {availableRoles().map((r) => (
           <button
             key={r.key}
             type="button"

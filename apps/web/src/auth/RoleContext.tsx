@@ -1,9 +1,12 @@
 // AUTH STUB (solo dev). No hay login real todavía.
 // Mantiene el "rol activo" (como el 'ver como' del demo) y la pantalla activa.
-// Cuando conectemos Supabase Auth, este provider se reemplaza por uno que lea
-// el rol del perfil; los componentes que usan useRole() no cambian.
+// La entrada por rol respeta los add-ons contratados (config.ts):
+//   staff -> vista común si "comunicación interna" está activa, si no su primer módulo;
+//   doctor -> su portal.
+// Cuando conectemos Supabase Auth, este provider leerá el rol del perfil; los
+// componentes que usan useRole() no cambian.
 import React, { createContext, useContext, useMemo, useState } from 'react'
-import { ROLES, getRole, type RoleKey } from '../app/roles'
+import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
 
 interface RoleState {
   role: RoleKey
@@ -16,13 +19,11 @@ const RoleCtx = createContext<RoleState | null>(null)
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<RoleKey>('admin')
-  // Entrada tras "login": staff -> vista común; doctor -> su portal.
-  const [screen, setScreen] = useState<string>(getRole('admin').entry)
+  const [screen, setScreen] = useState<string>(getEntryScreen(getRole('admin')))
 
-  // Al cambiar de rol, aterrizar en la pantalla de entrada de ese rol.
   const setRole = (r: RoleKey) => {
     setRoleState(r)
-    setScreen(getRole(r).entry)
+    setScreen(getEntryScreen(getRole(r)))
   }
 
   const value = useMemo(() => ({ role, screen, setRole, setScreen }), [role, screen])
@@ -34,5 +35,3 @@ export function useRole(): RoleState {
   if (!ctx) throw new Error('useRole debe usarse dentro de <RoleProvider>')
   return ctx
 }
-
-export { ROLES }

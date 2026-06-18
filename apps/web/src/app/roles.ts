@@ -1,10 +1,13 @@
-// Modelo del HUB (sistema de comunicación = contenedor de toda la plataforma).
+// Modelo del HUB base ("el sistema": una base, varias puertas).
 //
-// - El hub (sidebar/topbar) es el marco; el contenido cambia al módulo.
-// - STAFF entra a la VISTA COMÚN (home interna) y navega a sus módulos permitidos.
-// - DOCTOR entra directo a su Portal y NO ve la vista común (es contenido del equipo).
-// - "Comunicación" como ROL es quien gestiona anuncios/avisos/assets (no es un módulo aparte).
+// - El hub base es NEUTRO; el marco (sidebar/topbar) permanece y el contenido
+//   cambia al módulo según el rol.
+// - La VISTA COMÚN (anuncios/avisos/biblioteca) NO es el contenedor: es el add-on
+//   "Comunicación interna", que se activa con un flag (ver config.ts). Cuando está
+//   activo, es la home del staff; cuando no, el staff entra a su primer módulo.
+// - DOCTOR entra directo a su Portal y nunca ve la vista común (contenido del equipo).
 import type { IconName } from './icons'
+import { FEATURES, type Features } from './config'
 
 export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'billing' | 'driver' | 'comm'
@@ -17,28 +20,22 @@ export interface ScreenDef {
 
 export interface RoleDef {
   key: RoleKey
-  label: string        // etiqueta corta para el switch
-  group: string        // encabezado del grupo de módulos en el sidebar
-  icon: IconName       // ícono del rol en el switch
-  isStaff: boolean     // staff ve la vista común; el doctor no
-  entry: string        // pantalla de entrada tras "login"
-  modules: ScreenDef[] // módulos propios del rol (SIN la vista común)
-  ready: boolean       // false = pendiente de spec (placeholder informativo)
+  label: string
+  group: string
+  icon: IconName
+  isStaff: boolean                       // staff puede ver la vista común; el doctor no
+  modules: ScreenDef[]                   // módulos propios del rol (SIN la vista común)
+  ready: boolean                         // false = pendiente de spec
+  requiresFeature?: keyof Features       // el rol existe solo si el add-on está activo
 }
 
-// La VISTA COMÚN es el home del hub: la comparten todos los roles staff.
-// No es un módulo de ningún rol; es el contenedor.
+// La VISTA COMÚN pertenece al add-on "Comunicación interna", no al hub base.
 export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Vista común', icon: 'home' }
 
 export const ROLES: RoleDef[] = [
   {
-    key: 'admin',
-    label: 'Administración',
-    group: 'Administración · Dirección',
-    icon: 'dashboard',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'admin', label: 'Administración', group: 'Administración · Dirección',
+    icon: 'dashboard', isStaff: true, ready: true,
     modules: [
       { key: 'tablero', label: 'Tablero', icon: 'dashboard' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart' },
@@ -50,13 +47,8 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'doctor',
-    label: 'Portal del Doctor',
-    group: 'Portal del Doctor',
-    icon: 'bag',
-    isStaff: false,            // NO ve la vista común
-    entry: 'catalogo',         // entra directo a su portal
-    ready: true,
+    key: 'doctor', label: 'Portal del Doctor', group: 'Portal del Doctor',
+    icon: 'bag', isStaff: false, ready: true,
     modules: [
       { key: 'catalogo', label: 'Catálogo', icon: 'grid' },
       { key: 'pedidosdr', label: 'Mis pedidos', icon: 'bag' },
@@ -65,13 +57,8 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'warehouse',
-    label: 'Almacén',
-    group: 'Almacén',
-    icon: 'box',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'warehouse', label: 'Almacén', group: 'Almacén',
+    icon: 'box', isStaff: true, ready: true,
     modules: [
       { key: 'stock', label: 'Existencias', icon: 'box' },
       { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
@@ -80,13 +67,8 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'packing',
-    label: 'Empaque',
-    group: 'Empaque',
-    icon: 'pkg',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'packing', label: 'Empaque', group: 'Empaque',
+    icon: 'pkg', isStaff: true, ready: true,
     modules: [
       { key: 'cola', label: 'Por empacar', icon: 'pkg' },
       { key: 'guia', label: 'Guías', icon: 'truck' },
@@ -94,50 +76,30 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'pos',
-    label: 'Punto de Venta',
-    group: 'Punto de venta · Ventas',
-    icon: 'store',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'pos', label: 'Punto de Venta', group: 'Punto de venta · Ventas',
+    icon: 'store', isStaff: true, ready: true,
     modules: [
       { key: 'caja', label: 'Caja', icon: 'store' },
       { key: 'vev', label: 'Ventas del evento', icon: 'grid' },
     ],
   },
   {
-    key: 'billing',
-    label: 'Facturación',
-    group: 'Facturación · Finanzas',
-    icon: 'receipt',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'billing', label: 'Facturación', group: 'Facturación · Finanzas',
+    icon: 'receipt', isStaff: true, ready: true,
     modules: [
       { key: 'fin', label: 'Facturación', icon: 'receipt' },
     ],
   },
   {
-    key: 'driver',
-    label: 'Chofer',
-    group: 'Chofer · Entregas',
-    icon: 'truck',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: false, // pendiente de spec
+    key: 'driver', label: 'Chofer', group: 'Chofer · Entregas',
+    icon: 'truck', isStaff: true, ready: false, requiresFeature: 'chofer',
     modules: [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
     ],
   },
   {
-    key: 'comm',
-    label: 'Comunicación',
-    group: 'Comunicación interna',
-    icon: 'megaphone',
-    isStaff: true,
-    entry: COMMON_SCREEN.key,
-    ready: true,
+    key: 'comm', label: 'Comunicación', group: 'Comunicación interna',
+    icon: 'megaphone', isStaff: true, ready: true, requiresFeature: 'comunicacionInterna',
     // Su "módulo" ES la vista común (la gestiona). No tiene módulos extra.
     modules: [],
   },
@@ -146,13 +108,27 @@ export const ROLES: RoleDef[] = [
 export const getRole = (key: RoleKey): RoleDef =>
   ROLES.find((r) => r.key === key) ?? ROLES[0]
 
-// Navegación visible para un rol: staff = [vista común, ...módulos]; doctor = módulos.
-export const getNav = (role: RoleDef): ScreenDef[] =>
-  role.isStaff ? [COMMON_SCREEN, ...role.modules] : role.modules
+// Roles disponibles según los add-ons contratados (oculta comm/driver si no aplican).
+export const availableRoles = (features: Features = FEATURES): RoleDef[] =>
+  ROLES.filter((r) => !r.requiresFeature || features[r.requiresFeature])
 
-// Resuelve un ScreenDef por key dentro del alcance del rol (incluye la vista común).
-export const getScreenDef = (role: RoleDef, key: string): ScreenDef =>
-  getNav(role).find((s) => s.key === key) ?? getNav(role)[0]
+// Navegación visible: staff = [vista común (si add-on), ...módulos]; doctor = módulos.
+export const getNav = (role: RoleDef, features: Features = FEATURES): ScreenDef[] => {
+  const nav: ScreenDef[] = []
+  if (role.isStaff && features.comunicacionInterna) nav.push(COMMON_SCREEN)
+  nav.push(...role.modules)
+  return nav
+}
 
-// Roles staff con permiso de gestión de la vista común (crear/editar).
+// Pantalla de entrada tras "login": la primera de su navegación.
+export const getEntryScreen = (role: RoleDef, features: Features = FEATURES): string =>
+  getNav(role, features)[0]?.key ?? COMMON_SCREEN.key
+
+// Resuelve un ScreenDef por key dentro del alcance del rol.
+export const getScreenDef = (role: RoleDef, key: string, features: Features = FEATURES): ScreenDef => {
+  const nav = getNav(role, features)
+  return nav.find((s) => s.key === key) ?? nav[0] ?? COMMON_SCREEN
+}
+
+// Roles con permiso de gestión de la vista común (crear/editar).
 export const canManageHub = (key: RoleKey): boolean => key === 'admin' || key === 'comm'

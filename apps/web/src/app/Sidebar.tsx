@@ -1,13 +1,16 @@
-// Sidebar del hub: marca + navegación (vista común para staff + módulos del rol)
-// + pie "Operado por STRYV". El marco permanece; el contenido cambia al módulo.
+// Sidebar del hub: marca + navegación (vista común si el add-on está activo +
+// módulos del rol) + pie "Operado por STRYV". El marco permanece; el contenido cambia.
 import React from 'react'
 import { Icon } from './icons'
-import { getRole, COMMON_SCREEN } from './roles'
+import { getRole, getNav, COMMON_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen } = useRole()
   const r = getRole(role)
+  const nav = getNav(r)
+  const hasCommon = nav.some((s) => s.key === COMMON_SCREEN.key)
+  const modules = nav.filter((s) => s.key !== COMMON_SCREEN.key)
 
   const go = (key: string) => {
     setScreen(key)
@@ -27,8 +30,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="nav">
-        {/* Vista común: solo staff (el doctor no la ve). */}
-        {r.isStaff && (
+        {/* Vista común: solo si el add-on de Comunicación interna está activo. */}
+        {hasCommon && (
           <>
             <div className="grp">Hub Renovacell</div>
             <a
@@ -41,11 +44,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </>
         )}
 
-        {/* Módulos del rol */}
-        {r.modules.length > 0 && (
+        {modules.length > 0 && (
           <>
             <div className="grp">{r.group}</div>
-            {r.modules.map((s) => (
+            {modules.map((s) => (
               <a key={s.key} className={s.key === screen ? 'on' : undefined} onClick={() => go(s.key)}>
                 <Icon name={s.icon} />
                 <span>{s.label}</span>
