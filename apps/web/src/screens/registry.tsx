@@ -17,6 +17,7 @@ import { Recibo } from './packing/Recibo'
 import { Seguimiento } from './logistics/Seguimiento'
 import { MisEntregas } from './driver/MisEntregas'
 import { Tablero } from './admin/Tablero'
+import { Ventas } from './admin/Ventas'
 import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
 import { Caja } from './pos/Caja'
@@ -41,6 +42,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   seguimiento: () => <Seguimiento />,
   driver_home: () => <MisEntregas />,
   tablero: () => <Tablero />,
+  av_ventas: () => <Ventas />,
   av_traza: () => <Trazabilidad />,
   av_doc: () => <Doctores />,
   caja: () => <Caja />,

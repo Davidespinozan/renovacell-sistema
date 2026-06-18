@@ -9,6 +9,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
+import { salesSummary, doctorActivity } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 import type { ProductSafe } from '../../data/types'
@@ -34,7 +35,8 @@ export function Tablero() {
     return m
   }, [products])
 
-  const ventas = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + (o.total ?? 0), 0)
+  const sum = salesSummary(orders)
+  const act = doctorActivity(orders)
 
   const porEstatus = useMemo(() => {
     const acc: Record<Bucket, number> = { Pedido: 0, Empacado: 0, 'En camino': 0, Entregado: 0 }
@@ -74,8 +76,10 @@ export function Tablero() {
 
       {/* KPIs */}
       <div className="grid sigs">
-        <Sig icon="bag" value={String(orders.length)} k="Pedidos" s="en el sistema" />
-        <Sig icon="chart" value={money(ventas)} k="Ventas" s="compras acumuladas" />
+        <Sig icon="bag" value={String(sum.orders)} k="Pedidos" s="en el sistema" />
+        <Sig icon="chart" value={money(sum.revenue)} k="Ventas" s="compras acumuladas" />
+        <Sig icon="receipt" value={money(sum.avgTicket)} k="Ticket promedio" s="por pedido" />
+        <Sig icon="usercheck" value={String(act.active)} k="Doctores activos" s="con compra" />
         <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
         <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
         <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s="≤ 60 días o caducados" tone={porCaducar.length ? 'warn' : undefined} />
