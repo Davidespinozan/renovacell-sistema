@@ -28,6 +28,9 @@
   --ok: #007311;     --ok-bg: #E7F3E9;
   --blue: #2C6E8F;   --blue-bg: #E7F0F4;
 
+  /* Superficie cálida (placeholders del demo) */
+  --bone-warm: #F4F2EA;
+
   /* Radios */
   --r-sm: 10px;
   --r: 14px;

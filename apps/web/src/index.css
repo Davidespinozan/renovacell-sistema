@@ -1,5 +1,6 @@
-/* Tokens de marca compartidos (variables CSS). Debe ir antes de @tailwind. */
+/* Tokens de marca + estilos del shell (del demo). Los @import van primero. */
 @import '@renovacell/ui/tokens.css';
+@import './styles/shell.css';
 
 @tailwind base;
 @tailwind components;
