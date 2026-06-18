@@ -33,7 +33,11 @@ export function Seguimiento() {
   }, [products])
 
   const rows = useMemo(() => {
-    const inFlight = orders.filter((o) => ['packed', 'shipped', 'delivered'].includes(o.status ?? ''))
+    const inFlight = orders.filter(
+      (o) =>
+        ['packed', 'shipped', 'delivered'].includes(o.status ?? '') &&
+        (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos', // POS no es envío
+    )
     return inFlight
       .map((o): Row => {
         const shipment = shipments.find((s) => s.order_id === o.id)

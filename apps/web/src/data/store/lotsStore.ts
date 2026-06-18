@@ -68,8 +68,9 @@ export function addEntry(input: EntryInput): Lot {
   return lot
 }
 
-// Consumir lotes (salida por surtido). Decrementa y registra un movimiento por lote.
-export function consume(allocations: { lot_id: string; qty: number }[], reference: string) {
+// Consumir lotes (salida). Decrementa y registra un movimiento por lote.
+// `reason`: 'surtido' (Almacén) | 'venta' (POS) | etc.
+export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido') {
   const now = new Date().toISOString()
   const newMovs: InventoryMovement[] = []
   lots = lots.map((l) => {
@@ -83,7 +84,7 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
       id: `m-${seq}-${i}`,
       lot_id: a.lot_id,
       change: -a.qty,
-      reason: 'surtido',
+      reason,
       reference,
       created_by: null,
       created_at: now,

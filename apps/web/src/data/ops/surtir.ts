@@ -25,24 +25,28 @@ function byExpiry(a: Lot, b: Lot): number {
   return a.expiry_date < b.expiry_date ? -1 : a.expiry_date > b.expiry_date ? 1 : 0
 }
 
+// Núcleo FEFO reutilizable: asigna `qty` de un producto desde sus lotes,
+// caducando primero. Lo usan Surtido (Almacén) y Punto de Venta.
+export function allocateFEFO(productId: string, qty: number, lots: Lot[]): { allocations: Alloc[]; shortfall: number } {
+  const avail = lots.filter((l) => l.product_id === productId && l.quantity > 0).sort(byExpiry)
+  let need = qty
+  const allocations: Alloc[] = []
+  for (const lot of avail) {
+    if (need <= 0) break
+    const take = Math.min(need, lot.quantity)
+    allocations.push({ lot, qty: take })
+    need -= take
+  }
+  return { allocations, shortfall: Math.max(0, need) }
+}
+
 export function planSurtido(order: OrderWithItems, lots: Lot[]): ItemPlan[] {
   return order.items.map((item) => {
     if (item.unit_price == null) {
       return { item, allocations: [], shortfall: 0, quote: true }
     }
-    const avail = lots
-      .filter((l) => l.product_id === item.product_id && l.quantity > 0)
-      .sort(byExpiry)
-
-    let need = item.qty
-    const allocations: Alloc[] = []
-    for (const lot of avail) {
-      if (need <= 0) break
-      const take = Math.min(need, lot.quantity)
-      allocations.push({ lot, qty: take })
-      need -= take
-    }
-    return { item, allocations, shortfall: Math.max(0, need), quote: false }
+    const { allocations, shortfall } = allocateFEFO(item.product_id ?? '', item.qty, lots)
+    return { item, allocations, shortfall, quote: false }
   })
 }
 

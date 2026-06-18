@@ -18,6 +18,7 @@ export interface NewOrderLine {
 let orders: Order[] = [...MOCK_ORDERS]
 let items: OrderItem[] = [...MOCK_ORDER_ITEMS]
 let folioSeq = 3800
+let posSeq = 100
 
 const listeners = new Set<() => void>()
 
@@ -62,6 +63,41 @@ export function createOrder(input: {
   }
   const newItems: OrderItem[] = input.lines.map((l, i) => ({
     id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: null,
+    qty: l.qty, unit_price: l.unit_price, created_at: now,
+  }))
+
+  orders = [order, ...orders]
+  items = [...items, ...newItems]
+  emit()
+  return { ...order, items: newItems }
+}
+
+// Punto de Venta: venta inmediata en persona. Pago cobrado al momento y
+// producto entregado en el acto (sin doctor, sin envío). Origen POS.
+export interface PosOrderLine {
+  product_id: string
+  qty: number
+  unit_price: number
+  lot_id: string | null
+}
+export function createPosOrder(input: {
+  lines: PosOrderLine[]
+  total: number
+  payment_method: string // 'efectivo' | 'tarjeta'
+}): OrderWithItems {
+  posSeq += 1
+  const id = `pos-${posSeq}`
+  const folio = `POS-${posSeq}`
+  const now = new Date().toISOString()
+
+  const order: Order = {
+    id, external_ref: folio, doctor_id: null, total: input.total, currency: 'MXN',
+    status: 'delivered', payment_method: input.payment_method, payment_ref: null,
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
+    invoice_meta: null, shipping_meta: { channel: 'pos' }, created_at: now,
+  }
+  const newItems: OrderItem[] = input.lines.map((l, i) => ({
+    id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: l.lot_id,
     qty: l.qty, unit_price: l.unit_price, created_at: now,
   }))
 
