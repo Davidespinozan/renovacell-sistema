@@ -127,7 +127,7 @@ export function CommonView() {
 
         {!canManage && (
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
-            Modo lectura · solo Administración y Comunicación publican.
+            Modo lectura · solo Administración publica.
           </div>
         )}
       </div>

@@ -9,7 +9,7 @@ body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'ss01','cv11
 .serif{font-family:'Inter',sans-serif;letter-spacing:-.022em}.display{font-family:'Special Gothic Expanded One',sans-serif;font-weight:400}
 svg{display:block}
 ::selection{background:rgba(95,184,115,.3)}
-.app{display:grid;grid-template-columns:252px 1fr;height:100vh;overflow:hidden}
+.app{display:grid;grid-template-columns:252px 1fr;grid-template-rows:100vh;height:100vh;overflow:hidden}
 .hidden{display:none!important}
 #menu{display:none;min-height:100vh;background:radial-gradient(1100px 500px at 50% -10%,rgba(95,184,115,.14),transparent 60%),var(--hueso);overflow:auto}
 #menu.show{display:block}
@@ -57,7 +57,7 @@ svg{display:block}
 .side-foot .op b{color:#fff;font-weight:600}
 .live{width:7px;height:7px;border-radius:50%;background:#fff;animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(95,184,115,.5)}70%{box-shadow:0 0 0 7px rgba(95,184,115,0)}100%{box-shadow:0 0 0 0 rgba(95,184,115,0)}}
-.main{position:relative;display:flex;flex-direction:column;min-width:0;background:radial-gradient(1100px 460px at 100% -8%,rgba(95,184,115,.12),transparent 58%),var(--hueso)}
+.main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:radial-gradient(1100px 460px at 100% -8%,rgba(95,184,115,.12),transparent 58%),var(--hueso)}
 .top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 30px;background:rgba(247,248,245,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9}
 .screen-title{font-size:23px;font-weight:500;letter-spacing:-.012em;line-height:1.1}
 .screen-sub{font-size:12.5px;color:var(--ink-2);margin-top:2px}
@@ -74,7 +74,7 @@ svg{display:block}
 .seg button{font-family:inherit;border:none;background:none;padding:9px 13px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:.18s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .seg button svg{width:14px;height:14px}.seg button:hover{color:var(--ink)}
 .seg button.active{background:var(--grad-green);color:#fff;box-shadow:var(--glow)}
-.canvas{padding:22px 30px 60px;overflow:auto;flex:1}
+.canvas{padding:22px 30px 60px;overflow:auto;flex:1;min-height:0}
 #content{animation:rise .45s cubic-bezier(.2,.7,.3,1) both}
 .grid{display:grid;gap:18px}
 .card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--sh-md);animation:rise .5s cubic-bezier(.2,.7,.3,1) both}

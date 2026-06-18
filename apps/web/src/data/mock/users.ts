@@ -13,7 +13,6 @@ const STAFF: DirectoryUser[] = [
   { id: 'u-alberto', name: 'Alberto Almacén', role: 'Almacén / Empaque' },
   { id: 'u-ventas', name: 'Ventas', role: 'Punto de Venta' },
   { id: 'u-chofer', name: 'Chofer local Culiacán', role: 'Chofer' },
-  { id: 'u-comm', name: 'Comunicación', role: 'Comunicación' },
 ]
 
 export const MOCK_USERS: DirectoryUser[] = [

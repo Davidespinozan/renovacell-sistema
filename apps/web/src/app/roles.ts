@@ -10,7 +10,7 @@ import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
 export type RoleKey =
-  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver' | 'comm'
+  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 export interface ScreenDef {
   key: string
@@ -89,12 +89,6 @@ export const ROLES: RoleDef[] = [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
     ],
   },
-  {
-    key: 'comm', label: 'Comunicación', group: 'Comunicación interna',
-    icon: 'megaphone', isStaff: true, ready: true, requiresFeature: 'comunicacionInterna',
-    // Su "módulo" ES la vista común (la gestiona). No tiene módulos extra.
-    modules: [],
-  },
 ]
 
 export const getRole = (key: RoleKey): RoleDef =>
@@ -122,5 +116,6 @@ export const getScreenDef = (role: RoleDef, key: string, features: Features = FE
   return nav.find((s) => s.key === key) ?? nav[0] ?? COMMON_SCREEN
 }
 
-// Roles con permiso de gestión de la vista común (crear/editar).
-export const canManageHub = (key: RoleKey): boolean => key === 'admin' || key === 'comm'
+// Quién puede gestionar la vista común (crear/editar anuncios/avisos/assets):
+// Administración. El resto del staff la ve en modo lectura.
+export const canManageHub = (key: RoleKey): boolean => key === 'admin'

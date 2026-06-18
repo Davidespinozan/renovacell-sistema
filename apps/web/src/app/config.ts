@@ -2,7 +2,7 @@
 // se cotizan por separado"). Se activan según lo que el cliente haya contratado.
 //
 //  - comunicacionInterna ($18k): habilita la VISTA COMÚN (anuncios/avisos/biblioteca)
-//    como home del staff, y el rol "Comunicación" que la gestiona.
+//    como home del staff (anuncios/avisos/biblioteca + chat). La gestiona Administración.
 //  - chofer ($12k): habilita el módulo "Chofer / Seguimiento" y el rol Chofer.
 //
 // En el PAQUETE BASE ambos serían `false` (el hub base es neutro: "una base,
