@@ -51,4 +51,21 @@ export function sendMessage(conversationId: string, body: string) {
   emit()
 }
 
+// Abre el DM con un usuario; si no existe, lo crea. Devuelve el id de conversación.
+export function ensureDirect(user: { id: string; name: string }): string {
+  const existing = conversations.find((c) => c.kind === 'dm' && c.member_ids.includes(user.id))
+  if (existing) return existing.id
+  seq += 1
+  const id = `dm-${seq}`
+  const now = new Date().toISOString()
+  const conv: Conversation = {
+    id, kind: 'dm', title: user.name, area: null,
+    member_ids: [CURRENT_USER.id, user.id], created_at: now, last_message_at: now,
+  }
+  conversations = [conv, ...conversations]
+  if (!messages[id]) messages = { ...messages, [id]: [] }
+  emit()
+  return id
+}
+
 export { CURRENT_USER }

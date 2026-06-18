@@ -1,15 +1,17 @@
 // CHAT interno (hub) — tipo WhatsApp: grupos por área + DMs. Solo staff (add-on
 // Comunicación). UI-first: mock detrás de useChat (forma conversations/messages).
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, Send, MessageCircle } from 'lucide-react'
+import { Users, Send, MessageCircle, Plus, Search, X } from 'lucide-react'
 import { timeAgo, initials, avatarColor } from '../../lib/format'
 import { useChat } from '../../data/hooks/useChat'
+import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
 import type { Conversation } from '../../data/types'
 
 export function Chat() {
-  const { conversations, messagesByConv, send, me } = useChat()
+  const { conversations, messagesByConv, send, ensureDirect, me } = useChat()
   const [selectedId, setSelectedId] = useState<string>(conversations[0]?.id ?? '')
   const [text, setText] = useState('')
+  const [newOpen, setNewOpen] = useState(false)
   const conv = conversations.find((c) => c.id === selectedId) ?? conversations[0]
   const msgs = useMemo(() => (conv ? messagesByConv[conv.id] ?? [] : []), [messagesByConv, conv])
 
@@ -28,6 +30,10 @@ export function Chat() {
       <div className="chat-wrap">
         {/* Lista de conversaciones */}
         <div className="conv-list">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, background: 'var(--hueso)', zIndex: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Conversaciones</span>
+            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}><Plus size={14} /> Nuevo</button>
+          </div>
           {conversations.map((c) => {
             const arr = messagesByConv[c.id] ?? []
             const last = arr[arr.length - 1]
@@ -86,6 +92,51 @@ export function Chat() {
             <div style={{ textAlign: 'center' }}><MessageCircle size={28} /><div style={{ marginTop: 8 }}>Sin conversaciones</div></div>
           </div>
         )}
+      </div>
+
+      {newOpen && (
+        <NewChatModal
+          onClose={() => setNewOpen(false)}
+          onPick={(u) => { setSelectedId(ensureDirect(u)); setNewOpen(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function NewChatModal({ onClose, onPick }: { onClose: () => void; onPick: (u: DirectoryUser) => void }) {
+  const { data: users } = useUsers()
+  const [q, setQ] = useState('')
+  const filtered = users.filter((u) => u.name.toLowerCase().includes(q.trim().toLowerCase()))
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div><h3>Nuevo mensaje</h3><div className="ms">Busca a cualquier usuario para abrir un chat.</div></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <div className="searchbox" style={{ width: '100%', marginBottom: 8 }}>
+            <Search size={15} />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona…" />
+          </div>
+          <div style={{ maxHeight: 360, overflow: 'auto' }}>
+            {filtered.map((u) => (
+              <div key={u.id} className="lrow clickrow" style={{ cursor: 'pointer' }} onClick={() => onPick(u)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  <span className="avatar sm" style={{ background: avatarColor(u.name) }}>{initials(u.name)}</span>
+                  <div>
+                    <div className="nm">{u.name}</div>
+                    <div className="lt">{u.role}</div>
+                  </div>
+                </div>
+                <span className="pill p-neu">Chatear</span>
+              </div>
+            ))}
+            {filtered.length === 0 && <div style={{ color: 'var(--ink-3)', fontSize: 13.5, padding: '14px 0', textAlign: 'center' }}>Sin resultados.</div>}
+          </div>
+        </div>
       </div>
     </div>
   )
