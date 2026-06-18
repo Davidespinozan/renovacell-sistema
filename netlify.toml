@@ -1,0 +1,17 @@
+# Configuración de despliegue en Netlify.
+# El sistema dejó de ser un .html estático: ahora es un monorepo Vite + React
+# (workspaces npm). Netlify instala en la raíz, compila el workspace web y publica
+# la carpeta resultante. La regla SPA evita 404 en rutas/recargas.
+
+[build]
+  command = "npm run build"      # raíz → compila @renovacell/web (vite build)
+  publish = "apps/web/dist"      # salida del build (contiene index.html, assets, products, brand, landing)
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA: cualquier ruta cae en index.html (la app enruta del lado del cliente).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
