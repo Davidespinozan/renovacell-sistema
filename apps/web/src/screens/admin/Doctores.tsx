@@ -117,7 +117,7 @@ function DoctorDetail({
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div className="form-grid-2" style={{ marginBottom: 14 }}>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Correo</div>{doctor.email}</div>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Cédula</div>{(doctor.meta?.cedula as string) ?? '—'}</div>
             <div>
@@ -138,17 +138,17 @@ function DoctorDetail({
           {history.length === 0 ? (
             <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Sin pedidos.</div>
           ) : (
-            <table>
+            <table className="tbl-cards">
               <thead><tr><th>Folio</th><th>Estatus</th><th>Fecha</th><th>Total</th></tr></thead>
               <tbody>
                 {history.map((o) => {
                   const sv = statusView(o.status)
                   return (
                     <tr key={o.id}>
-                      <td className="mono">{o.external_ref}</td>
-                      <td><span className={'pill ' + sv.pill}>{sv.label}</span></td>
-                      <td>{fmtDate(o.created_at)}</td>
-                      <td className="mono">{money(o.total)}</td>
+                      <td data-label="Folio" className="mono">{o.external_ref}</td>
+                      <td data-label="Estatus"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
+                      <td data-label="Fecha">{fmtDate(o.created_at)}</td>
+                      <td data-label="Total" className="mono">{money(o.total)}</td>
                     </tr>
                   )
                 })}

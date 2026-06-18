@@ -131,14 +131,14 @@ function VentasResumen() {
         </ChartCard>
 
         <Bloque titulo="Top doctores (LTV)">
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Doctor</th><th>Pedidos</th><th>Total</th></tr></thead>
             <tbody>
               {docs.map((d) => (
                 <tr key={d.id}>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><span className="avatar sm" style={{ background: avatarColor(d.name) }}>{initials(d.name)}</span>{d.name}</div></td>
-                  <td className="mono">{d.orders}</td>
-                  <td className="mono">{money(d.total)}</td>
+                  <td data-label="Doctor"><div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><span className="avatar sm" style={{ background: avatarColor(d.name) }}>{initials(d.name)}</span>{d.name}</div></td>
+                  <td data-label="Pedidos" className="mono">{d.orders}</td>
+                  <td data-label="Total" className="mono">{money(d.total)}</td>
                 </tr>
               ))}
               {docs.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-3)' }}>Sin ventas a doctores en el periodo.</td></tr>}
@@ -173,14 +173,14 @@ function VentasResumen() {
           {risk.length === 0 ? (
             <div style={{ fontSize: 13.5, color: 'var(--ink-3)' }}>Ningún doctor verificado en riesgo. 🎉</div>
           ) : (
-            <table>
+            <table className="tbl-cards">
               <thead><tr><th>Doctor</th><th>Último pedido</th><th>Histórico</th></tr></thead>
               <tbody>
                 {risk.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td><span className={'pill ' + (r.lastDays == null ? 'p-neu' : 'p-warn')}>{r.lastDays == null ? 'Nunca' : `hace ${r.lastDays} d`}</span></td>
-                    <td className="mono">{money(r.total)}</td>
+                    <td data-label="Doctor">{r.name}</td>
+                    <td data-label="Último pedido"><span className={'pill ' + (r.lastDays == null ? 'p-neu' : 'p-warn')}>{r.lastDays == null ? 'Nunca' : `hace ${r.lastDays} d`}</span></td>
+                    <td data-label="Histórico" className="mono">{money(r.total)}</td>
                   </tr>
                 ))}
               </tbody>

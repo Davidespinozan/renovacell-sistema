@@ -128,17 +128,17 @@ export function Tablero() {
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '18px 18px 0' }}><div className="eyebrow">Actividad reciente</div></div>
         <div style={{ padding: '0 14px 8px' }}>
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Pedido</th><th>Estatus</th><th>Fecha</th><th>Total</th></tr></thead>
             <tbody>
               {recientes.map((o) => {
                 const sv = statusView(o.status)
                 return (
                   <tr key={o.id}>
-                    <td className="mono">{o.external_ref}</td>
-                    <td><span className={'pill ' + sv.pill}>{sv.label}</span></td>
-                    <td>{fmtDate(o.created_at)}</td>
-                    <td className="mono">{money(o.total)}</td>
+                    <td data-label="Pedido" className="mono">{o.external_ref}</td>
+                    <td data-label="Estatus"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
+                    <td data-label="Fecha">{fmtDate(o.created_at)}</td>
+                    <td data-label="Total" className="mono">{money(o.total)}</td>
                   </tr>
                 )
               })}

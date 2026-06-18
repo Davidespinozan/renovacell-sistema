@@ -55,3 +55,14 @@
   .overlay { padding: 0; place-items: end center; }
   .modal { width: 100%; max-width: 100%; max-height: 92vh; border-radius: 18px 18px 0 0; }
 }
+
+/* --- Buscadores DENTRO de filtros/modales siguen visibles en móvil ----------
+   El shell oculta .searchbox (la del topbar) a ≤900px; pero la misma clase se
+   reutiliza como filtro (Ventas) y como buscador de chat (Nuevo mensaje), que
+   SÍ deben verse. Mayor especificidad → los restaura sin tocar el shell. */
+@media (max-width: 900px) {
+  .card .searchbox, .modal .searchbox { display: flex; width: 100%; }
+}
+
+/* --- Acciones sociales (Vista común) envuelven en teléfono ------------------- */
+@media (max-width: 640px) { .factions { flex-wrap: wrap; } }

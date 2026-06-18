@@ -203,17 +203,17 @@ function PorPedido({
             <span>Aún sin salidas de inventario registradas. Súrtelo en Almacén (o si es POS, ya quedó cobrado) para ver la traza por lote.</span>
           </div>
         ) : (
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Lote</th><th>Producto</th><th>Cantidad</th><th>Tipo</th></tr></thead>
             <tbody>
               {salidas.map((m) => {
                 const lot = lotById[m.lot_id]
                 return (
                   <tr key={m.id}>
-                    <td><span className="lc">{lot?.lot_code ?? m.lot_id}</span></td>
-                    <td>{lot ? prodName[lot.product_id] ?? 'Producto' : '—'}</td>
-                    <td className="mono">{-m.change} u</td>
-                    <td><span className="pill p-neu">{reasonLabel(m.reason)}</span></td>
+                    <td data-label="Lote"><span className="lc">{lot?.lot_code ?? m.lot_id}</span></td>
+                    <td data-label="Producto">{lot ? prodName[lot.product_id] ?? 'Producto' : '—'}</td>
+                    <td data-label="Cantidad" className="mono">{-m.change} u</td>
+                    <td data-label="Tipo"><span className="pill p-neu">{reasonLabel(m.reason)}</span></td>
                   </tr>
                 )
               })}
@@ -226,14 +226,14 @@ function PorPedido({
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '18px 18px 0' }}><div className="eyebrow">Renglones del pedido</div></div>
         <div style={{ padding: '0 14px 8px' }}>
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Cant.</th><th>Importe</th></tr></thead>
             <tbody>
               {order.items.map((it) => (
                 <tr key={it.id}>
-                  <td>{prodName[it.product_id ?? ''] ?? 'Producto'}</td>
-                  <td className="mono">{it.qty} u</td>
-                  <td className="mono">{it.unit_price == null ? 'cotización' : money(it.unit_price * it.qty)}</td>
+                  <td data-label="Producto">{prodName[it.product_id ?? ''] ?? 'Producto'}</td>
+                  <td data-label="Cant." className="mono">{it.qty} u</td>
+                  <td data-label="Importe" className="mono">{it.unit_price == null ? 'cotización' : money(it.unit_price * it.qty)}</td>
                 </tr>
               ))}
             </tbody>

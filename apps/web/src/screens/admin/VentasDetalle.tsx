@@ -119,7 +119,7 @@ export function VentasDetalle() {
       {/* Tabla */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
-          <table>
+          <table className="tbl-cards">
             <thead>
               <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
             </thead>
@@ -128,14 +128,14 @@ export function VentasDetalle() {
                 const p = payInfo(o); const sv = statusView(o.status); const isPos = channelOf(o) === 'pos'
                 return (
                   <tr key={o.id} className="clickrow" onClick={() => setSelected(o.id)}>
-                    <td className="mono">{o.external_ref}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
-                    <td><span className={'pill ' + (isPos ? 'p-neu' : 'p-blue')}>{isPos ? 'POS' : 'Portal'}</span></td>
-                    <td>{clientName(o)}</td>
-                    <td style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
-                    <td className="mono">{money(o.total)}</td>
-                    <td><span className={'pill ' + p.pill}>{p.label}</span></td>
-                    <td><span className={'pill ' + sv.pill}>{sv.label}</span></td>
+                    <td data-label="Folio" className="mono">{o.external_ref}</td>
+                    <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
+                    <td data-label="Canal"><span className={'pill ' + (isPos ? 'p-neu' : 'p-blue')}>{isPos ? 'POS' : 'Portal'}</span></td>
+                    <td data-label="Cliente">{clientName(o)}</td>
+                    <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
+                    <td data-label="Monto" className="mono">{money(o.total)}</td>
+                    <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span></td>
+                    <td data-label="Pedido"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
                   </tr>
                 )
               })}
@@ -188,15 +188,15 @@ function SaleDetail({ order, productsById, clientName, channel, onClose }: {
             {order.invoice_requested && <span className="pill p-blue"><FileText size={12} /> CFDI solicitado</span>}
           </div>
 
-          <table>
+          <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Importe</th></tr></thead>
             <tbody>
               {order.items.map((it) => (
                 <tr key={it.id}>
-                  <td>{productsById[it.product_id ?? '']?.name ?? 'Producto'}</td>
-                  <td className="mono">{it.qty}</td>
-                  <td className="mono">{it.unit_price == null ? 'a consultar' : money(it.unit_price)}</td>
-                  <td className="mono">{it.unit_price == null ? 'cotización' : money(it.unit_price * it.qty)}</td>
+                  <td data-label="Producto">{productsById[it.product_id ?? '']?.name ?? 'Producto'}</td>
+                  <td data-label="Cant." className="mono">{it.qty}</td>
+                  <td data-label="Precio" className="mono">{it.unit_price == null ? 'a consultar' : money(it.unit_price)}</td>
+                  <td data-label="Importe" className="mono">{it.unit_price == null ? 'cotización' : money(it.unit_price * it.qty)}</td>
                 </tr>
               ))}
             </tbody>
