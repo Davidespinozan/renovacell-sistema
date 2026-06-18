@@ -22,6 +22,7 @@ import { Tablero } from './admin/Tablero'
 import { Ventas } from './admin/Ventas'
 import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
+import { Prospectos } from './admin/Prospectos'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
@@ -47,6 +48,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_ventas: () => <Ventas />,
   av_traza: () => <Trazabilidad />,
   av_doc: () => <Doctores />,
+  av_prosp: () => <Prospectos />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
 }
