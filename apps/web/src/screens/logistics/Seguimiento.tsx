@@ -9,6 +9,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useProducts } from '../../data/hooks/useProducts'
 import { driverName } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
+import { diagnoseShipment } from '../../data/ops/seguimiento'
 import type { Shipment, ProductSafe } from '../../data/types'
 
 interface Row {
@@ -18,41 +19,6 @@ interface Row {
   reason: string
   statusLabel: string
   statusPill: string
-}
-
-function diagnose(order: OrderWithItems, shipment: Shipment | undefined): Row {
-  let stuck = false
-  let reason = ''
-  let statusLabel = 'En proceso'
-  let statusPill = 'p-neu'
-
-  if (order.status === 'delivered') {
-    statusLabel = 'Entregado'; statusPill = 'p-ok'
-  } else if (!shipment) {
-    // Empacado pero sin envío asignado = surtido sin salir.
-    statusLabel = 'Empacado · sin asignar'; statusPill = 'p-warn'
-    stuck = true
-    const days = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 86_400_000)
-    reason = `Surtido sin salir${days > 0 ? ` · ${days} días detenido` : ''}`
-  } else {
-    const overdue =
-      shipment.status !== 'delivered' &&
-      shipment.estimated_delivery_at != null &&
-      new Date(shipment.estimated_delivery_at).getTime() < Date.now()
-    switch (shipment.status) {
-      case 'assigned': statusLabel = 'Asignado a chofer'; statusPill = 'p-warn'; break
-      case 'out_for_delivery': statusLabel = 'En reparto'; statusPill = 'p-blue'; break
-      case 'in_transit': statusLabel = 'En camino'; statusPill = 'p-blue'; break
-      case 'delivered': statusLabel = 'Entregado'; statusPill = 'p-ok'; break
-      default: statusLabel = shipment.status ?? '—'
-    }
-    if (overdue) {
-      stuck = true
-      reason = 'Entrega vencida · pasó su fecha estimada sin avanzar'
-      statusPill = 'p-dang'
-    }
-  }
-  return { order, shipment, stuck, reason, statusLabel, statusPill }
 }
 
 export function Seguimiento() {
@@ -69,7 +35,10 @@ export function Seguimiento() {
   const rows = useMemo(() => {
     const inFlight = orders.filter((o) => ['packed', 'shipped', 'delivered'].includes(o.status ?? ''))
     return inFlight
-      .map((o) => diagnose(o, shipments.find((s) => s.order_id === o.id)))
+      .map((o): Row => {
+        const shipment = shipments.find((s) => s.order_id === o.id)
+        return { order: o, shipment, ...diagnoseShipment(o, shipment) }
+      })
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || (a.order.created_at < b.order.created_at ? 1 : -1))
   }, [orders, shipments])
 

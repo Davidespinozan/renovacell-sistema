@@ -8,11 +8,9 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { planSurtido, canFulfill, surtirPedido, type ItemPlan } from '../../data/ops/surtir'
+import { isSurtible } from '../../data/ops/seguimiento'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
-
-const isSurtible = (o: OrderWithItems) =>
-  !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
 
 export function Surtido() {
   const { data: orders } = useAllOrders()
