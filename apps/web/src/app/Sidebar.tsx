@@ -51,11 +51,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="side-role"><Icon name={r.icon} /> {r.label}</div>
 
       <nav className="nav">
+        {/* En móvil el hub (Inicio/Chat) ya vive en el bottom-nav → se oculta aquí. */}
         {hub.length > 0 && (
-          <>
+          <div className="nav-hub">
             <div className="grp">Hub Renovacell</div>
             {hub.map(Link)}
-          </>
+          </div>
         )}
         {groups.map((g) => (
           <React.Fragment key={g.header}>

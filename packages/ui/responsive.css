@@ -67,6 +67,11 @@
 /* --- Acciones sociales (Vista común) envuelven en teléfono ------------------- */
 @media (max-width: 640px) { .factions { flex-wrap: wrap; } }
 
+/* --- Hub (Inicio/Chat) en el sidebar: visible en escritorio, oculto en móvil
+   (en móvil ya está en el bottom-nav, evita duplicar). ----------------------- */
+.nav-hub { display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 900px) { .nav-hub { display: none; } }
+
 /* --- Indicador de rol activo en el sidebar (sobre el verde) ----------------- */
 .side-role { display: flex; align-items: center; gap: 8px; margin: 0 22px 14px; padding: 7px 13px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; }
 .side-role svg { width: 15px; height: 15px; opacity: .92; flex: none; }
