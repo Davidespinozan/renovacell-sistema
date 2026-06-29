@@ -6,9 +6,10 @@
 import React, { useMemo, useState } from 'react'
 import {
   Megaphone, Bell, ThumbsUp, CheckCheck, MessageCircle, Pin, Pencil, Trash2,
-  X, Send, Image as ImageIcon, Download, Eye, ShieldCheck, Upload,
+  X, Send, Image as ImageIcon, Download, Eye, ShieldCheck, Upload, Plus,
 } from 'lucide-react'
 import { useAssets, type AssetInput } from '../data/hooks/useAssets'
+import { useResources } from '../data/hooks/useResources'
 import { timeAgo, initials, avatarColor } from '../lib/format'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
@@ -38,6 +39,8 @@ export function CommonView() {
   const hi = user?.name?.split('·')[0].trim() || 'Equipo'
   const ann = useAnnouncements()
   const assets = useAssets()
+  const resources = useResources()
+  const [reqOpen, setReqOpen] = useState(false)
 
   const [filter, setFilter] = useState<Filter>('todos')
   const [reacted, setReacted] = useState<Set<string>>(new Set())
@@ -133,6 +136,29 @@ export function CommonView() {
           ))}
         </div>
 
+        {/* Solicitudes de recurso — para esto es la Vista Común: pedir artes/recursos */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+          <ImageIcon size={18} color="var(--green-deep)" />
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Solicitudes de recurso</h2>
+          <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setReqOpen(true)}><Plus size={14} /> Solicitar recurso</button>
+        </div>
+        <div className="grid" style={{ gap: 8, width: '100%' }}>
+          {resources.data.slice(0, 5).map((rr) => {
+            const pill = rr.status === 'entregado' ? 'p-ok' : rr.status === 'en_proceso' ? 'p-blue' : 'p-warn'
+            const lbl = rr.status === 'entregado' ? 'Entregado' : rr.status === 'en_proceso' ? 'En proceso' : 'Solicitado'
+            return (
+              <div key={rr.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{rr.title}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Pidió {rr.requestedBy}</div>
+                </div>
+                <span className={'pill ' + pill}>{lbl}</span>
+              </div>
+            )
+          })}
+          {resources.data.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Aún no hay solicitudes.</div>}
+        </div>
+
         {!canManage && (
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
             Modo lectura · solo Administración publica.
@@ -161,6 +187,41 @@ export function CommonView() {
           onSave={(input) => { assets.create(input); setAssetOpen(false) }}
         />
       )}
+      {reqOpen && (
+        <ResourceRequestModal
+          onClose={() => setReqOpen(false)}
+          onSave={(i) => { resources.addRequest({ ...i, requestedBy: user?.name ?? 'Equipo' }); setReqOpen(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ResourceRequestModal({ onClose, onSave }: { onClose: () => void; onSave: (i: { title: string; description: string }) => void }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div><h3>Solicitar recurso</h3><div className="ms">Pide un arte o material; lo atiende quien tenga Diseño.</div></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <label style={{ ...label, marginTop: 0 }}>¿Qué necesitas?</label>
+          <input style={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Banner para congreso CDMX" />
+          <label style={label}>Detalle</label>
+          <textarea style={{ ...input, minHeight: 80, resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Para qué es, medidas, línea, fecha…" />
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!title.trim()} style={!title.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSave({ title: title.trim(), description: description.trim() })}>
+              <Plus size={15} /> Enviar solicitud
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
