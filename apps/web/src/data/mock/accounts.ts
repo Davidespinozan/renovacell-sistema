@@ -16,7 +16,8 @@ export interface MockAccount {
 export const MOCK_ACCOUNTS: MockAccount[] = [
   { email: 'direccion@renovacell.mx', password: 'demo', role: 'admin', verified: true, name: 'Claudia · Dirección', capabilities: [] },
   { email: 'almacen@renovacell.mx', password: 'demo', role: 'warehouse', verified: true, name: 'Alberto · Almacén / Empaque', capabilities: ['diseno'] },
-  { email: 'pos@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas / POS', capabilities: ['comercial'] },
+  { email: 'ventas1@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas', capabilities: ['eventos'] },
+  { email: 'ventas2@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Diego · Ventas', capabilities: [] },
   { email: 'chofer@renovacell.mx', password: 'demo', role: 'driver', verified: true, name: 'Beto · Chofer', capabilities: [] },
   { email: 'laura.mendez@renova.mx', password: 'demo', role: 'doctor', verified: true, name: 'Dra. Laura Méndez', capabilities: [] },
   { email: 'mario.ruiz@dermamr.mx', password: 'demo', role: 'doctor', verified: false, name: 'Dr. Mario Ruiz (en revisión)', capabilities: [] },

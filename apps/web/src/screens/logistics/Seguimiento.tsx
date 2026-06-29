@@ -7,6 +7,8 @@ import { fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useProducts } from '../../data/hooks/useProducts'
+import { useDoctors } from '../../data/hooks/useDoctors'
+import { useRole } from '../../auth/RoleContext'
 import { driverName } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
 import { diagnoseShipment } from '../../data/ops/seguimiento'
@@ -25,12 +27,23 @@ export function Seguimiento() {
   const { data: orders } = useAllOrders()
   const { data: shipments, resolveIncident } = useShipments()
   const { data: products } = useProducts()
+  const { data: doctors } = useDoctors()
+  const { role, user } = useRole()
+
+  // Vendedor: solo pedidos de SU cartera (doctor.meta.owner). Otros roles: todos.
+  const ownerByDoctor = useMemo(() => {
+    const m: Record<string, string> = {}
+    doctors.forEach((d) => { const o = (d.meta as Record<string, unknown>)?.owner as string; if (o) m[d.id] = o })
+    return m
+  }, [doctors])
+  const inCartera = (o: OrderWithItems) => role !== 'pos' || (o.doctor_id != null && ownerByDoctor[o.doctor_id] === user?.email)
 
   const incidents = useMemo(
     () => shipments
       .filter((s) => s.incident && !s.incident.resolved)
-      .map((s) => ({ shipment: s, order: orders.find((o) => o.id === s.order_id) })),
-    [shipments, orders],
+      .map((s) => ({ shipment: s, order: orders.find((o) => o.id === s.order_id) }))
+      .filter(({ order }) => (order ? inCartera(order) : role !== 'pos')),
+    [shipments, orders, role, user, ownerByDoctor],
   )
 
   const prodName = useMemo(() => {
@@ -43,7 +56,8 @@ export function Seguimiento() {
     const inFlight = orders.filter(
       (o) =>
         ['packed', 'shipped', 'delivered'].includes(o.status ?? '') &&
-        (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos', // POS no es envío
+        (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos' && // POS no es envío
+        inCartera(o),
     )
     return inFlight
       .map((o): Row => {
@@ -51,7 +65,7 @@ export function Seguimiento() {
         return { order: o, shipment, ...diagnoseShipment(o, shipment) }
       })
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || (a.order.created_at < b.order.created_at ? 1 : -1))
-  }, [orders, shipments])
+  }, [orders, shipments, role, user, ownerByDoctor])
 
   const stuckCount = rows.filter((r) => r.stuck).length
 

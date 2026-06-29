@@ -11,6 +11,7 @@ import { fmtDate, initials, avatarColor } from '../../lib/format'
 import { useProspects, type ProspectStatus, type ProspectNote } from '../../data/hooks/useProspects'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useProducts } from '../../data/hooks/useProducts'
+import { useRole } from '../../auth/RoleContext'
 import type { Prospect } from '../../data/types'
 
 const PIPELINE: ProspectStatus[] = ['nuevo', 'contactado', 'cotizado', 'descartado']
@@ -36,28 +37,35 @@ function Avatar({ name }: { name: string }) {
 export function Prospectos() {
   const { data: prospects, addProspect, setStatus, addNote, markConverted } = useProspects()
   const { addPending } = useDoctors()
+  const { role, user } = useRole()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
   const detail = prospects.find((p) => p.id === detailId) ?? null
 
+  // Aislamiento por vendedor: Admin ve todo; el vendedor solo SUS prospectos.
+  const visible = useMemo(
+    () => (role === 'admin' ? prospects : prospects.filter((p) => p.assigned_to === user?.email)),
+    [prospects, role, user],
+  )
+
   // Nuevos arriba; luego por fecha desc.
   const sorted = useMemo(
     () =>
-      prospects.slice().sort((a, b) => {
+      visible.slice().sort((a, b) => {
         const an = statusOf(a) === 'nuevo' ? 0 : 1
         const bn = statusOf(b) === 'nuevo' ? 0 : 1
         return an - bn || (a.created_at < b.created_at ? 1 : -1)
       }),
-    [prospects],
+    [visible],
   )
-  const nuevos = prospects.filter((p) => statusOf(p) === 'nuevo').length
+  const nuevos = visible.filter((p) => statusOf(p) === 'nuevo').length
 
   const convert = (p: Prospect) => {
     const doc = addPending({
       full_name: p.name ?? 'Doctor',
       email: p.email,
       organization: orgOf(p) || null,
-      meta: { cedula: p.cedula ?? undefined, fromProspect: p.id },
+      meta: { cedula: p.cedula ?? undefined, fromProspect: p.id, owner: role === 'admin' ? undefined : user?.email },
     })
     markConverted(p.id, doc.id)
   }
@@ -65,7 +73,7 @@ export function Prospectos() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Administración · Prospectos</div>
+        <div className="eyebrow" style={{ margin: 0 }}>{role === 'admin' ? 'Administración' : 'Ventas'} · Prospectos</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}>
           <Plus size={14} /> Nuevo prospecto
         </button>
@@ -113,7 +121,7 @@ export function Prospectos() {
       {newOpen && (
         <NewModal
           onClose={() => setNewOpen(false)}
-          onSave={(input) => { addProspect(input); setNewOpen(false) }}
+          onSave={(input) => { addProspect({ ...input, assignedTo: role === 'admin' ? null : user?.email ?? null }); setNewOpen(false) }}
         />
       )}
     </div>

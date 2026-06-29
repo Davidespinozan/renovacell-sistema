@@ -13,7 +13,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'comercial'
+export type CapabilityKey = 'diseno' | 'eventos'
 
 export interface ScreenDef {
   key: string
@@ -84,12 +84,13 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'pos', label: 'Ventas / Punto de Venta', group: 'Ventas · Punto de venta',
-    icon: 'store', isStaff: true, ready: true,
+    // Vendedor de campo: cada quien ve SOLO su cartera (aislado por vendedor).
+    key: 'pos', label: 'Ventas', group: 'Ventas · Campo',
+    icon: 'bag', isStaff: true, ready: true,
     modules: [
-      { key: 'eventos', label: 'Eventos', icon: 'store', section: 'Punto de venta' },
-      { key: 'caja', label: 'Caja', icon: 'store', section: 'Punto de venta' },
-      { key: 'vev', label: 'Ventas del evento', icon: 'grid', section: 'Punto de venta' },
+      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Mi cartera' },
+      { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Mi cartera' },
     ],
   },
   {
@@ -110,10 +111,11 @@ export const CAPABILITIES: CapabilityDef[] = [
     modules: [{ key: 'dis_solicitudes', label: 'Solicitudes de recurso', icon: 'image', section: 'Diseño' }],
   },
   {
-    key: 'comercial', label: 'Comercial',
+    key: 'eventos', label: 'Eventos',
     modules: [
-      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Comercial' },
+      { key: 'eventos', label: 'Eventos', icon: 'store', section: 'Eventos' },
+      { key: 'caja', label: 'Caja', icon: 'store', section: 'Eventos' },
+      { key: 'vev', label: 'Ventas del evento', icon: 'grid', section: 'Eventos' },
     ],
   },
 ]

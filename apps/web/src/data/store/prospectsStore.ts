@@ -15,13 +15,13 @@ export interface ProspectNote { text: string; at: string }
 const SEED: Prospect[] = [
   {
     id: 'pr-sample-1', name: '(Muestra) Dra. Ana López', email: 'ana.lopez@ejemplo.mx',
-    phone: '55 0000 0001', cedula: null, source: 'Landing', status: 'nuevo', assigned_to: null,
+    phone: '55 0000 0001', cedula: null, source: 'Landing', status: 'nuevo', assigned_to: 'ventas1@renovacell.mx',
     created_at: '2026-06-16T17:30:00.000Z',
     meta: { organization: 'Clínica Ejemplo', interest: ['Golden Serum'], notes: [] },
   },
   {
     id: 'pr-sample-2', name: '(Muestra) Dr. Beto Ramírez', email: 'beto@ejemplo.mx',
-    phone: '55 0000 0002', cedula: null, source: 'WhatsApp', status: 'contactado', assigned_to: null,
+    phone: '55 0000 0002', cedula: null, source: 'WhatsApp', status: 'contactado', assigned_to: 'ventas2@renovacell.mx',
     created_at: '2026-06-12T15:10:00.000Z',
     meta: {
       organization: 'Estética Demo', interest: ['Mascarilla GP'],
@@ -30,7 +30,7 @@ const SEED: Prospect[] = [
   },
   {
     id: 'pr-sample-3', name: '(Muestra) Dra. Carmen Soto', email: 'carmen@ejemplo.mx',
-    phone: '55 0000 0003', cedula: null, source: 'Referido', status: 'cotizado', assigned_to: null,
+    phone: '55 0000 0003', cedula: null, source: 'Referido', status: 'cotizado', assigned_to: 'ventas1@renovacell.mx',
     created_at: '2026-06-09T18:45:00.000Z',
     meta: { organization: 'Consultorio Prueba', interest: ['Ultrafiltrados UFS'], notes: [] },
   },
@@ -59,6 +59,7 @@ export function addProspect(input: {
   organization: string | null
   source: string
   interest: string[]
+  assignedTo?: string | null // vendedor dueño (el que lo da de alta), null = sin asignar
 }): Prospect {
   seq += 1
   const p: Prospect = {
@@ -69,7 +70,7 @@ export function addProspect(input: {
     cedula: null,
     source: input.source,
     status: 'nuevo',
-    assigned_to: null,
+    assigned_to: input.assignedTo ?? null,
     created_at: new Date().toISOString(),
     meta: { organization: input.organization, interest: input.interest, notes: [] },
   }

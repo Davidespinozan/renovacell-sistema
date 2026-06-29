@@ -16,7 +16,7 @@ export interface SearchResult { id: string; type: string; label: string; sub: st
 const norm = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 export function useGlobalSearch() {
-  const { role } = useRole()
+  const { role, user } = useRole()
   const { data: products } = useProducts()
   const { data: allOrders } = useAllOrders()
   const { data: myOrders } = useOrders()
@@ -46,8 +46,12 @@ export function useGlobalSearch() {
     }
 
     if (role === 'pos') {
-      products.filter((p) => p.price != null && hit(p.name, p.category)).slice(0, 8)
-        .forEach((p) => out.push({ id: p.id, type: 'Producto', label: p.name, sub: money(p.price), screen: 'caja' }))
+      // Vendedor: busca en SU cartera (prospectos y clientes propios).
+      const me = user?.email
+      prospects.filter((p) => p.assigned_to === me && hit(p.name, p.email)).slice(0, 5)
+        .forEach((p) => out.push({ id: p.id, type: 'Prospecto', label: p.name ?? '—', sub: p.source ?? '', screen: 'av_prosp' }))
+      doctors.filter((d) => ((d.meta as Record<string, unknown>)?.owner as string) === me && hit(d.full_name, d.organization, d.email)).slice(0, 5)
+        .forEach((d) => out.push({ id: d.id, type: 'Cliente', label: d.full_name ?? '—', sub: d.organization ?? '', screen: 'clientes' }))
       return out
     }
 
@@ -65,5 +69,5 @@ export function useGlobalSearch() {
     prospects.filter((p) => hit(p.name, p.email)).slice(0, 4)
       .forEach((p) => out.push({ id: p.id, type: 'Prospecto', label: p.name ?? '—', sub: p.source ?? '', screen: 'av_prosp' }))
     return out
-  }, [role, products, allOrders, myOrders, doctors, prospects])
+  }, [role, user, products, allOrders, myOrders, doctors, prospects])
 }
