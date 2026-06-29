@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   estimated_delivery_at timestamptz,
   delivered_at timestamptz,
   proof_image_url text,
+  received_by text,
   created_at timestamptz DEFAULT now()
 );
 

@@ -115,6 +115,7 @@ export interface Shipment {
   estimated_delivery_at: ISODateTime | null
   delivered_at: ISODateTime | null
   proof_image_url: string | null
+  received_by: string | null    // nombre de quien recibió en destino (prueba de entrega)
   created_at: ISODateTime
 }
 

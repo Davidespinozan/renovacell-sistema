@@ -4,6 +4,7 @@ export interface ClientInfo {
   id: string
   name: string
   clinic: string
+  phone: string
   address: string
   city: string
 }
@@ -12,6 +13,7 @@ export const DOCTOR_PROFILE: ClientInfo = {
   id: 'doctor-1',
   name: 'Dra. Laura Méndez',
   clinic: 'Clínica Renova Estética',
+  phone: '667 123 4567',
   address: 'Av. Álvaro Obregón 1234, Col. Centro',
   city: 'Culiacán, Sin.',
 }

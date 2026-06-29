@@ -45,6 +45,7 @@ export function createShipment(input: ShipmentInput): Shipment {
     estimated_delivery_at: input.estimated_delivery_at,
     delivered_at: null,
     proof_image_url: null,
+    received_by: null,
     created_at: new Date().toISOString(),
   }
   shipments = [sh, ...shipments]
@@ -52,11 +53,11 @@ export function createShipment(input: ShipmentInput): Shipment {
   return sh
 }
 
-// Entrega confirmada por el chofer: estatus Entregado + foto de prueba.
-export function markDelivered(shipmentId: string, proofUrl: string | null) {
+// Entrega confirmada por el chofer: estatus Entregado + foto de prueba + quién recibió.
+export function markDelivered(shipmentId: string, proofUrl: string | null, receivedBy: string | null = null) {
   const now = new Date().toISOString()
   shipments = shipments.map((s) =>
-    s.id === shipmentId ? { ...s, status: 'delivered', delivered_at: now, proof_image_url: proofUrl } : s,
+    s.id === shipmentId ? { ...s, status: 'delivered', delivered_at: now, proof_image_url: proofUrl, received_by: receivedBy } : s,
   )
   emit()
 }

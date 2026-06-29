@@ -3,7 +3,7 @@
 import { markDelivered as markShipmentDelivered } from '../store/shipmentsStore'
 import { markDelivered as markOrderDelivered } from '../store/ordersStore'
 
-export function entregar(shipmentId: string, orderId: string, proofUrl: string | null) {
-  markShipmentDelivered(shipmentId, proofUrl)
+export function entregar(shipmentId: string, orderId: string, proofUrl: string | null, receivedBy: string | null = null) {
+  markShipmentDelivered(shipmentId, proofUrl, receivedBy)
   markOrderDelivered(orderId)
 }

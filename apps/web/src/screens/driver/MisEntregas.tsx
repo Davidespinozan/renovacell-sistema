@@ -27,6 +27,7 @@ export function MisEntregas() {
   }, [orders])
 
   const [photos, setPhotos] = useState<Record<string, string>>({})
+  const [received, setReceived] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<string | null>(null)
 
   const mine = shipments.filter((s) => s.driver_id === CURRENT_DRIVER_ID && s.status !== 'delivered')
@@ -39,7 +40,7 @@ export function MisEntregas() {
   }
 
   const deliver = (shipmentId: string, orderId: string, folio: string) => {
-    entregar(shipmentId, orderId, photos[shipmentId] ?? null)
+    entregar(shipmentId, orderId, photos[shipmentId] ?? null, received[shipmentId]?.trim() || null)
     setToast(`Entrega confirmada: ${folio}`)
     window.setTimeout(() => setToast(null), 2600)
   }
@@ -71,8 +72,28 @@ export function MisEntregas() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13, marginBottom: 12 }}>
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name} · {client.clinic}</div>
-                <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>{client.address}, {client.city}</div>
+                <div>
+                  <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Teléfono</div>
+                  <a href={`tel:+52${client.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
+                    {client.phone} · Llamar
+                  </a>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>
+                  {client.address}, {client.city}{' '}
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.city}`)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap' }}>· Ver en mapa</a>
+                </div>
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Recibió (nombre de quien recibe)</label>
+                <input
+                  value={received[s.id] ?? ''}
+                  onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))}
+                  placeholder="Ej. Recepción / nombre de quien recibe"
+                  style={{ width: '100%', maxWidth: 320, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                />
               </div>
 
               <div className="field-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -81,17 +102,24 @@ export function MisEntregas() {
                   <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
                 </label>
                 {photo && <img src={photo} alt="prueba" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }} />}
-                <button
-                  className="btn"
-                  type="button"
-                  style={{ marginLeft: 'auto', opacity: photo ? 1 : 0.5, cursor: photo ? 'pointer' : 'not-allowed' }}
-                  disabled={!photo}
-                  onClick={() => deliver(s.id, order.id, order.external_ref ?? order.id)}
-                >
-                  <Icon name="check" /> Marcar entregado
-                </button>
+                {(() => {
+                  const ready = Boolean(photo) && Boolean(received[s.id]?.trim())
+                  return (
+                    <button
+                      className="btn"
+                      type="button"
+                      style={{ marginLeft: 'auto', opacity: ready ? 1 : 0.5, cursor: ready ? 'pointer' : 'not-allowed' }}
+                      disabled={!ready}
+                      onClick={() => deliver(s.id, order.id, order.external_ref ?? order.id)}
+                    >
+                      <Icon name="check" /> Marcar entregado
+                    </button>
+                  )
+                })()}
               </div>
-              {!photo && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Sube la foto de prueba para confirmar la entrega.</div>}
+              {!(Boolean(photo) && Boolean(received[s.id]?.trim())) && (
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Captura quién recibe y la foto de prueba para confirmar la entrega.</div>
+              )}
             </div>
           )
         })
