@@ -12,6 +12,7 @@ import { useAssets, type AssetInput } from '../data/hooks/useAssets'
 import { timeAgo, initials, avatarColor } from '../lib/format'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
+import { Icon } from '../app/icons'
 import { useAnnouncements, type AnnouncementKind } from '../data/hooks/useAnnouncements'
 import { MOCK_COMMENTS, type MockComment } from '../data/mock/comunicacion'
 import type { Announcement, RoleId } from '../data/types'
@@ -31,8 +32,10 @@ const byPinnedThenDate = (a: Announcement, b: Announcement) =>
 type Filter = 'todos' | 'anuncio' | 'aviso'
 
 export function CommonView() {
-  const { role } = useRole()
+  const { role, user } = useRole()
+  const r = getRole(role)
   const canManage = canManageHub(role)
+  const hi = user?.name?.split('·')[0].trim() || 'Equipo'
   const ann = useAnnouncements()
   const assets = useAssets()
 
@@ -63,8 +66,13 @@ export function CommonView() {
   return (
     <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
       <div className="feed">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Hub Renovacell · Comunicación interna</div>
+        <div className="feed-head">
+          <Avatar name={user?.name ?? 'Equipo'} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>Hola, {hi}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Vista común del equipo</div>
+          </div>
+          <span className="role-badge"><Icon name={r.icon} /> {r.label}</span>
         </div>
 
         {/* Composer (solo admin/comm) */}
