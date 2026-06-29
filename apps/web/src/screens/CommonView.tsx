@@ -33,9 +33,9 @@ const byPinnedThenDate = (a: Announcement, b: Announcement) =>
 type Filter = 'todos' | 'anuncio' | 'aviso'
 
 export function CommonView() {
-  const { role, user } = useRole()
+  const { role, user, capabilities } = useRole()
   const r = getRole(role)
-  const canManage = canManageHub(role)
+  const canManage = canManageHub(role) || capabilities.includes('anuncios')
   const hi = user?.name?.split('·')[0].trim() || 'Equipo'
   const ann = useAnnouncements()
   const assets = useAssets()

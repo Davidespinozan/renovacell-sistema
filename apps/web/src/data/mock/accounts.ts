@@ -15,7 +15,7 @@ export interface MockAccount {
 // gobierna Admin. Al conectar Supabase, esto será profiles + user_capabilities.
 export const MOCK_ACCOUNTS: MockAccount[] = [
   { email: 'direccion@renovacell.mx', password: 'demo', role: 'admin', verified: true, name: 'Claudia · Dirección', capabilities: [] },
-  { email: 'almacen@renovacell.mx', password: 'demo', role: 'warehouse', verified: true, name: 'Alberto · Almacén / Empaque', capabilities: ['diseno'] },
+  { email: 'almacen@renovacell.mx', password: 'demo', role: 'warehouse', verified: true, name: 'Alberto · Almacén / Empaque', capabilities: ['diseno', 'anuncios'] },
   { email: 'ventas1@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas', capabilities: ['eventos'] },
   { email: 'ventas2@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Diego · Ventas', capabilities: [] },
   { email: 'chofer@renovacell.mx', password: 'demo', role: 'driver', verified: true, name: 'Beto · Chofer', capabilities: [] },
