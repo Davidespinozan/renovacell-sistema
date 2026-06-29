@@ -21,6 +21,12 @@ export function subscribe(cb: () => void): () => void {
 }
 export const getSnapshot = (): Profile[] => snapshot
 
+// Verificación VIVA del doctor (la usa el login): si Admin lo revoca/deja
+// pendiente, el acceso se bloquea de inmediato. undefined = no es doctor del store.
+export function verifiedByEmail(email: string): boolean | undefined {
+  return doctors.find((d) => d.email?.toLowerCase() === email.trim().toLowerCase())?.verified
+}
+
 export function setVerified(id: string, verified: boolean) {
   const name = doctors.find((d) => d.id === id)?.full_name ?? id
   doctors = doctors.map((d) => (d.id === id ? { ...d, verified } : d))

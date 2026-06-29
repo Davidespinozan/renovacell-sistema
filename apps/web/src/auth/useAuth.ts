@@ -4,6 +4,7 @@
 import { useRole } from './RoleContext'
 import { MOCK_ACCOUNTS } from '../data/mock/accounts'
 import { userByEmail } from '../data/store/teamStore'
+import { verifiedByEmail } from '../data/store/doctorsStore'
 
 export interface LoginResult {
   ok: boolean
@@ -27,8 +28,9 @@ export function useAuth() {
       login(staff.role, true, { name: staff.name, email: staff.email }, staff.capabilities)
       return { ok: true }
     }
-    // Doctor (de cuentas mock): respeta su estado de verificación.
-    login(acc!.role, acc!.verified, { name: acc!.name, email: acc!.email }, acc!.capabilities)
+    // Doctor: la verificación VIVA manda (si Admin la cambió en Doctores).
+    const verified = acc!.role === 'doctor' ? (verifiedByEmail(acc!.email) ?? acc!.verified) : acc!.verified
+    login(acc!.role, verified, { name: acc!.name, email: acc!.email }, acc!.capabilities)
     return { ok: true }
   }
 

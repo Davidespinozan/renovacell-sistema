@@ -28,7 +28,11 @@ function byExpiry(a: Lot, b: Lot): number {
 // Núcleo FEFO reutilizable: asigna `qty` de un producto desde sus lotes,
 // caducando primero. Lo usan Surtido (Almacén) y Punto de Venta.
 export function allocateFEFO(productId: string, qty: number, lots: Lot[]): { allocations: Alloc[]; shortfall: number } {
-  const avail = lots.filter((l) => l.product_id === productId && l.quantity > 0).sort(byExpiry)
+  const today = new Date().toISOString().slice(0, 10)
+  // No surtir/vender producto YA caducado (regulado). Solo lotes vigentes con stock.
+  const avail = lots
+    .filter((l) => l.product_id === productId && l.quantity > 0 && !(l.expiry_date != null && l.expiry_date < today))
+    .sort(byExpiry)
   let need = qty
   const allocations: Alloc[] = []
   for (const lot of avail) {

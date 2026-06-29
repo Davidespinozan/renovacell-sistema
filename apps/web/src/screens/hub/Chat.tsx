@@ -27,7 +27,6 @@ export function Chat() {
 
   return (
     <div className="grid" style={{ gap: 14 }}>
-      <div className="eyebrow">Hub Renovacell · Chat</div>
       <div className="chat-wrap">
         {conv ? (
           /* Hilo a pantalla completa con botón para volver a la lista */
