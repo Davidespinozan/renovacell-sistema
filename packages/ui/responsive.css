@@ -66,3 +66,13 @@
 
 /* --- Acciones sociales (Vista común) envuelven en teléfono ------------------- */
 @media (max-width: 640px) { .factions { flex-wrap: wrap; } }
+
+/* --- Buscador global: dropdown de resultados -------------------------------- */
+.searchpop { position: absolute; top: calc(100% + 6px); right: 0; width: min(360px, 86vw); background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-lg); overflow: hidden; z-index: 40; max-height: 60vh; overflow-y: auto; }
+.searchpop-empty { padding: 14px 16px; font-size: 13px; color: var(--ink-3); }
+.searchpop-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font-family: inherit; background: none; border: none; border-bottom: 1px solid var(--line); padding: 10px 14px; cursor: pointer; }
+.searchpop-row:last-child { border-bottom: none; }
+.searchpop-row:hover { background: var(--hueso); }
+.searchpop-type { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--green-deep); background: var(--ok-bg); border-radius: 999px; padding: 3px 8px; flex: none; }
+.searchpop-label { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.searchpop-sub { margin-left: auto; font-size: 12px; color: var(--ink-3); flex: none; }
