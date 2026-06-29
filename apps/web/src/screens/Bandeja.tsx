@@ -98,7 +98,6 @@ function TaskRow({ task, onGo }: { task: Task; onGo: () => void }) {
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{task.title}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{task.detail}</div>
       </div>
       <span className={'pill ' + tonePill[task.tone]}>{task.count}</span>
       <span aria-hidden style={{ color: 'var(--ink-3)', fontSize: 20, lineHeight: 1, flex: 'none' }}>›</span>
