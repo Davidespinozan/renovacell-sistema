@@ -76,12 +76,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 ? <img className="su-av" src={user.avatarUrl} alt="" />
                 : <span className="su-av">{initials(user.name)}</span>}
               <span className="su-meta">
-                <span className="su-name">{user.name}</span>
+                <span className="su-name">{user.name.split('·')[0].trim()}</span>
                 <span className="su-role">{r.label}</span>
               </span>
             </button>
-            <button className="su-out" type="button" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={logout}>
-              <LogOut size={16} />
+            <button className="side-logout" type="button" onClick={logout}>
+              <LogOut size={15} /> Cerrar sesión
             </button>
           </div>
         )}

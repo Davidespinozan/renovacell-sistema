@@ -77,9 +77,12 @@
 .side-role svg { width: 15px; height: 15px; opacity: .92; flex: none; }
 
 /* --- Usuario logueado en el sidebar (sobre el verde) ------------------------ */
-.side-user { display: flex; align-items: center; gap: 8px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
-.su-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
+.side-user { display: flex; flex-direction: column; gap: 10px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
+.su-open { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
 .su-open:hover .su-name { text-decoration: underline; }
+.side-logout { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: .15s; }
+.side-logout:hover { background: rgba(255,255,255,.18); color: #fff; }
+.side-logout svg { width: 15px; height: 15px; }
 .su-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.22); color: #fff; font-weight: 700; font-size: 12.5px; object-fit: cover; }
 .su-meta { min-width: 0; flex: 1; display: block; }
 .su-name { display: block; color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
