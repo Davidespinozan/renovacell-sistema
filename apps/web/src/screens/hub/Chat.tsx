@@ -1,7 +1,8 @@
-// CHAT interno (hub) — tipo WhatsApp: grupos por área + DMs. Solo staff (add-on
-// Comunicación). UI-first: mock detrás de useChat (forma conversations/messages).
+// CHAT interno (hub) — estilo WhatsApp: solo grupos por área + DMs, staff only.
+// Single-pane: por default se ve la LISTA; al abrir un chat ocupa todo el panel
+// con una flecha para volver. UI-first: mock detrás de useChat.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, Send, MessageCircle, Plus, Search, X } from 'lucide-react'
+import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft } from 'lucide-react'
 import { timeAgo, initials, avatarColor } from '../../lib/format'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
@@ -9,10 +10,10 @@ import type { Conversation } from '../../data/types'
 
 export function Chat() {
   const { conversations, messagesByConv, send, ensureDirect, me } = useChat()
-  const [selectedId, setSelectedId] = useState<string>(conversations[0]?.id ?? '')
+  const [selectedId, setSelectedId] = useState<string | null>(null) // ninguno abierto por default
   const [text, setText] = useState('')
   const [newOpen, setNewOpen] = useState(false)
-  const conv = conversations.find((c) => c.id === selectedId) ?? conversations[0]
+  const conv = conversations.find((c) => c.id === selectedId) ?? null
   const msgs = useMemo(() => (conv ? messagesByConv[conv.id] ?? [] : []), [messagesByConv, conv])
 
   const endRef = useRef<HTMLDivElement>(null)
@@ -28,33 +29,13 @@ export function Chat() {
     <div className="grid" style={{ gap: 14 }}>
       <div className="eyebrow">Hub Renovacell · Chat</div>
       <div className="chat-wrap">
-        {/* Lista de conversaciones */}
-        <div className="conv-list">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, background: 'var(--hueso)', zIndex: 1 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Conversaciones</span>
-            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}><Plus size={14} /> Nuevo</button>
-          </div>
-          {conversations.map((c) => {
-            const arr = messagesByConv[c.id] ?? []
-            const last = arr[arr.length - 1]
-            const preview = last ? `${last.sender_id === me.id ? 'Tú: ' : ''}${last.body}` : 'Sin mensajes'
-            return (
-              <div key={c.id} className={'conv' + (c.id === conv?.id ? ' on' : '')} onClick={() => setSelectedId(c.id)}>
-                <ConvAvatar conv={c} />
-                <div className="cmeta">
-                  <div className="cnm">{c.title}</div>
-                  <div className="clast">{preview}</div>
-                </div>
-                <div className="cwhen">{timeAgo(c.last_message_at ?? c.created_at)}</div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Hilo */}
         {conv ? (
+          /* Hilo a pantalla completa con botón para volver a la lista */
           <div className="thread">
             <div className="thread-head">
+              <button className="chat-back" type="button" aria-label="Volver a conversaciones" onClick={() => setSelectedId(null)}>
+                <ArrowLeft size={18} />
+              </button>
               <ConvAvatar conv={conv} />
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{conv.title}</div>
@@ -88,8 +69,32 @@ export function Chat() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', placeItems: 'center', color: 'var(--ink-3)' }}>
-            <div style={{ textAlign: 'center' }}><MessageCircle size={28} /><div style={{ marginTop: 8 }}>Sin conversaciones</div></div>
+          /* Lista de conversaciones (nada abierto) */
+          <div className="conv-list">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Conversaciones</span>
+              <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}><Plus size={14} /> Nuevo</button>
+            </div>
+            {conversations.map((c) => {
+              const arr = messagesByConv[c.id] ?? []
+              const last = arr[arr.length - 1]
+              const preview = last ? `${last.sender_id === me.id ? 'Tú: ' : ''}${last.body}` : 'Sin mensajes'
+              return (
+                <div key={c.id} className="conv" onClick={() => setSelectedId(c.id)}>
+                  <ConvAvatar conv={c} />
+                  <div className="cmeta">
+                    <div className="cnm">{c.title}</div>
+                    <div className="clast">{preview}</div>
+                  </div>
+                  <div className="cwhen">{timeAgo(c.last_message_at ?? c.created_at)}</div>
+                </div>
+              )
+            })}
+            {conversations.length === 0 && (
+              <div style={{ display: 'grid', placeItems: 'center', padding: 40, color: 'var(--ink-3)' }}>
+                <div style={{ textAlign: 'center' }}><MessageCircle size={28} /><div style={{ marginTop: 8 }}>Sin conversaciones</div></div>
+              </div>
+            )}
           </div>
         )}
       </div>
