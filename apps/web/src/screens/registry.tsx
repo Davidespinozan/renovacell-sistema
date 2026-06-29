@@ -26,6 +26,7 @@ import { Doctores } from './admin/Doctores'
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { Bitacora } from './admin/Bitacora'
+import { Reabastecimiento } from './admin/Reabastecimiento'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
@@ -55,6 +56,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
   av_audit: () => <Bitacora />,
+  av_inv: () => <Reabastecimiento />,
+  compras: () => <Reabastecimiento />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
 }

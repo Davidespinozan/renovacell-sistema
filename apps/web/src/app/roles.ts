@@ -71,6 +71,7 @@ export const ROLES: RoleDef[] = [
       { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
       { key: 'caduc', label: 'Caducidades', icon: 'clock' },
       { key: 'entradas', label: 'Entradas', icon: 'download' },
+      { key: 'compras', label: 'Compras', icon: 'cart' },
       { key: 'cola', label: 'Por empacar', icon: 'pkg' },
       { key: 'guia', label: 'Guías', icon: 'truck' },
       { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt' },
