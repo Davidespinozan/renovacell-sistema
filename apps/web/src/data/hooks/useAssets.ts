@@ -1,51 +1,12 @@
-// Hook de acceso a la biblioteca de assets. HOY mock con estado local;
-// MAÑANA se cambia a Supabase (`assets` + Storage) SIN tocar la vista común.
-import { useEffect, useState } from 'react'
-import type { Asset } from '../types'
-import { MOCK_ASSETS } from '../mock/comunicacion'
-
-export interface AssetInput {
-  key: string
-  url: string
-  tags: string[]
-}
-
-function newId(prefix: string): string {
-  const c = (globalThis as { crypto?: Crypto }).crypto
-  return c?.randomUUID ? c.randomUUID() : `${prefix}-${Math.floor(performance.now())}`
-}
+// Hook de la biblioteca de assets sobre un store COMPARTIDO (useSyncExternalStore),
+// así lo que sube/edita un usuario lo ven todos y persiste durante la sesión.
+// Mañana: Supabase (`assets` + Storage) sin tocar la vista.
+import { useSyncExternalStore } from 'react'
+import { subscribe, getSnapshot, create, remove, type AssetInput } from '../store/assetsStore'
 
 export function useAssets() {
-  const [data, setData] = useState<Asset[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let alive = true
-    Promise.resolve(MOCK_ASSETS).then((d) => {
-      if (alive) {
-        setData(d)
-        setLoading(false)
-      }
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const create = (input: AssetInput) => {
-    const row: Asset = {
-      id: newId('as'),
-      key: input.key,
-      url: input.url,
-      uploaded_by: null,
-      tags: input.tags,
-      metadata: { type: 'image' },
-      created_at: new Date().toISOString(),
-    }
-    setData((prev) => [row, ...prev])
-  }
-
-  const remove = (id: string) => setData((prev) => prev.filter((a) => a.id !== id))
-
-  return { data, loading, error: null as string | null, create, remove }
+  const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return { data, loading: false, error: null as string | null, create, remove }
 }
+
+export type { AssetInput }

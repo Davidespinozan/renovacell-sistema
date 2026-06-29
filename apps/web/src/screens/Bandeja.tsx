@@ -22,7 +22,7 @@ const isEmitida = (o: OrderWithItems) =>
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 
 export function Bandeja() {
-  const { role, setScreen } = useRole()
+  const { role, setScreen, user } = useRole()
   const { data: orders } = useAllOrders()
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
@@ -56,8 +56,13 @@ export function Bandeja() {
       if (lotesCriticos.length) t.push({ id: 'caduc', icon: 'clock', title: 'Lotes por caducar', detail: 'Revisa el detalle en el Tablero.', count: lotesCriticos.length, tone: 'warn', screen: 'tablero' })
     }
 
+    if (role === 'pos') {
+      const prospNuevos = prospects.filter((p) => p.assigned_to === user?.email && (p.status ?? 'nuevo') === 'nuevo')
+      if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
+    }
+
     return t
-  }, [role, orders, shipments, lots, doctors, prospects])
+  }, [role, user, orders, shipments, lots, doctors, prospects])
 
   const total = tasks.reduce((s, x) => s + x.count, 0)
 

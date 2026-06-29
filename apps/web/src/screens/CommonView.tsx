@@ -51,8 +51,12 @@ export function CommonView() {
   const [assetOpen, setAssetOpen] = useState(false)
 
   const feed = useMemo(
-    () => ann.data.filter((a) => (filter === 'todos' ? true : kindOf(a) === filter)).sort(byPinnedThenDate),
-    [ann.data, filter],
+    () => ann.data
+      .filter((a) => (filter === 'todos' ? true : kindOf(a) === filter))
+      // Segmentación real: si el anuncio es para un área, solo esa área (o quien gestiona) lo ve.
+      .filter((a) => { const aud = audienceOf(a); return aud == null || aud === role || canManage })
+      .sort(byPinnedThenDate),
+    [ann.data, filter, role, canManage],
   )
 
   const toggle = (set: Set<string>, id: string, setter: (s: Set<string>) => void) => {

@@ -84,9 +84,11 @@ export function Asistente() {
   }
 
   const reorder = (o: OrderWithItems) => {
+    // Recalcula el total con precios actuales (no reusa el total viejo del pedido).
+    const total = o.items.reduce((s, it) => s + (it.unit_price != null ? it.unit_price * it.qty : 0), 0)
     const order = createOrder({
       lines: o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty, unit_price: it.unit_price })),
-      total: o.total ?? 0,
+      total,
       invoice_requested: false,
     })
     push({

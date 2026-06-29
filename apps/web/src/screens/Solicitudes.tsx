@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Play, Check, Upload, Eye } from 'lucide-react'
 import { fmtDate } from '../lib/format'
 import { useResources, type ResourceStatus } from '../data/hooks/useResources'
+import { useAssets } from '../data/hooks/useAssets'
 
 const META: Record<ResourceStatus, { label: string; pill: string }> = {
   solicitado: { label: 'Solicitado', pill: 'p-warn' },
@@ -13,12 +14,21 @@ const META: Record<ResourceStatus, { label: string; pill: string }> = {
 
 export function Solicitudes() {
   const { data, setStatus, deliver } = useResources()
+  const { create: addAsset } = useAssets()
   const [toast, setToast] = useState<string | null>(null)
 
   const onDeliver = (id: string, file: File | undefined) => {
     if (!file) return
     const r = new FileReader()
-    r.onload = () => { deliver(id, String(r.result)); setToast('Recurso entregado y adjunto.'); window.setTimeout(() => setToast(null), 2400) }
+    r.onload = () => {
+      const url = String(r.result)
+      deliver(id, url)
+      // El recurso entregado también entra a la Biblioteca de la Vista Común.
+      const req = data.find((x) => x.id === id)
+      addAsset({ key: req?.title ?? 'Recurso', url, tags: ['recurso'] })
+      setToast('Recurso entregado · disponible en la Biblioteca.')
+      window.setTimeout(() => setToast(null), 2600)
+    }
     r.readAsDataURL(file)
   }
   const sorted = data.slice().sort((a, b) => {

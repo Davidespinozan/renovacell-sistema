@@ -26,7 +26,7 @@ export function Reabastecimiento() {
   const sugerencias = useMemo(
     () => products
       .map((p) => ({ p, stock: stockByProduct.get(p.id) ?? 0, hasLots: stockByProduct.has(p.id) }))
-      .filter((x) => x.hasLots && x.stock <= LOW)
+      .filter((x) => (x.hasLots || x.p.price != null) && x.stock <= LOW)
       .sort((a, b) => a.stock - b.stock),
     [products, stockByProduct],
   )
