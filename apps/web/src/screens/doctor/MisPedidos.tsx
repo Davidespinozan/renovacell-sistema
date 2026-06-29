@@ -8,7 +8,7 @@ import { isPast } from './orderStatus'
 import type { ProductSafe } from '../../data/types'
 
 export function MisPedidos() {
-  const { data: orders } = useOrders()
+  const { data: orders, cancelOrder } = useOrders()
   const { data: products } = useProducts()
 
   const byId = useMemo(() => {
@@ -27,7 +27,14 @@ export function MisPedidos() {
           No tienes pedidos activos. Crea uno desde el catálogo.
         </div>
       ) : (
-        active.map((o) => <OrderCard key={o.id} order={o} productsById={byId} />)
+        active.map((o) => (
+          <OrderCard
+            key={o.id}
+            order={o}
+            productsById={byId}
+            onCancel={() => { if (window.confirm('¿Cancelar este pedido?')) cancelOrder(o.id, 'Portal del Doctor') }}
+          />
+        ))
       )}
     </div>
   )

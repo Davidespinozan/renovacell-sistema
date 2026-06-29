@@ -9,8 +9,14 @@ import { daysUntil, severity, sevPill, sevLabel } from './expiry'
 import type { ProductSafe } from '../../data/types'
 
 export function Caducidades() {
-  const { data: lots } = useLots()
+  const { data: lots, adjust } = useLots()
   const { data: products } = useProducts()
+
+  const darDeBaja = (lotId: string, code: string, qty: number) => {
+    if (window.confirm(`¿Dar de baja el lote ${code}? Se retiran ${qty} u del inventario (merma).`)) {
+      adjust(lotId, -qty, 'merma', code)
+    }
+  }
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -46,7 +52,7 @@ export function Caducidades() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Producto</th><th>Lote</th><th>Caducidad</th><th>Restante</th><th>Cant.</th></tr>
+              <tr><th>Producto</th><th>Lote</th><th>Caducidad</th><th>Restante</th><th>Cant.</th><th></th></tr>
             </thead>
             <tbody>
               {rows.map(({ lot, d }) => {
@@ -58,6 +64,9 @@ export function Caducidades() {
                     <td data-label="Caducidad">{fmtDate(lot.expiry_date ?? '')}</td>
                     <td data-label="Restante"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
                     <td data-label="Cant." className="mono">{lot.quantity} u</td>
+                    <td data-label="" style={{ textAlign: 'right' }}>
+                      <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => darDeBaja(lot.id, lot.lot_code, lot.quantity)}>Dar de baja</button>
+                    </td>
                   </tr>
                 )
               })}

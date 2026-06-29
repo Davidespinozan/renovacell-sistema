@@ -12,7 +12,7 @@ export const MOCK_DOCTORS: Profile[] = [
   {
     id: 'doctor-2', email: 'mario.ruiz@dermamr.mx', full_name: 'Dr. Mario Ruiz',
     role_id: 'doctor', verified: false, organization: 'Dermatología MR',
-    meta: { specialty: 'Dermatología', cedula: '7654321', owner: 'ventas2@renovacell.mx' },
+    meta: { specialty: 'Dermatología', cedula: '', owner: 'ventas2@renovacell.mx' },
   },
   {
     id: 'doctor-3', email: 'sofia.trevino@clinicasofi.mx', full_name: 'Dra. Sofía Treviño',

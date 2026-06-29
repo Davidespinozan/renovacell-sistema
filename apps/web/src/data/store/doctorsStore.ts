@@ -27,11 +27,15 @@ export function verifiedByEmail(email: string): boolean | undefined {
   return doctors.find((d) => d.email?.toLowerCase() === email.trim().toLowerCase())?.verified
 }
 
-export function setVerified(id: string, verified: boolean) {
-  const name = doctors.find((d) => d.id === id)?.full_name ?? id
+export function setVerified(id: string, verified: boolean): boolean {
+  const doc = doctors.find((d) => d.id === id)
+  if (!doc) return false
+  // No se puede verificar sin cédula profesional registrada (gate regulatorio).
+  if (verified && !((doc.meta?.cedula as string) ?? '').trim()) return false
   doctors = doctors.map((d) => (d.id === id ? { ...d, verified } : d))
   emit()
-  logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: name })
+  logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: doc.full_name ?? id })
+  return true
 }
 
 // Alta de doctor en estado PENDIENTE (verified:false). La usa la conversión de

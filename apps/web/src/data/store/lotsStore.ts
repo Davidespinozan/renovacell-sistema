@@ -68,6 +68,17 @@ export function addEntry(input: EntryInput): Lot {
   return lot
 }
 
+// Ajuste de un lote: delta negativo (baja por caducidad/merma/conteo) o positivo
+// (reingreso por cancelación/devolución). Registra el movimiento (trazabilidad).
+export function adjust(lotId: string, delta: number, reason: string, reference = '') {
+  seq += 1
+  lots = lots.map((l) => (l.id === lotId ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l))
+  movements = [...movements, {
+    id: `m-${seq}`, lot_id: lotId, change: delta, reason, reference, created_by: null, created_at: new Date().toISOString(),
+  }]
+  emit()
+}
+
 // Consumir lotes (salida). Decrementa y registra un movimiento por lote.
 // `reason`: 'surtido' (Almacén) | 'venta' (POS) | etc.
 export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido') {

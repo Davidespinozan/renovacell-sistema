@@ -14,6 +14,7 @@ function Avatar({ name }: { name: string }) {
 }
 
 const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
+const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
   const { data: doctors, verify, revoke } = useDoctors()
@@ -69,9 +70,13 @@ export function Doctores() {
               <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => revoke(d.id)}>
                 <Ban size={14} /> Revocar
               </button>
-            ) : (
+            ) : cedulaOf(d) ? (
               <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => verify(d.id)}>
                 <UserCheck size={14} /> Verificar
+              </button>
+            ) : (
+              <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled title="Falta la cédula profesional" onClick={() => setDetailId(d.id)}>
+                <UserCheck size={14} /> Falta cédula
               </button>
             )}
           </div>
@@ -130,7 +135,11 @@ function DoctorDetail({
           {!doctor.verified && (
             <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)', marginBottom: 14 }}>
               <Clock size={18} />
-              <span>No verificado: aún no puede ordenar en el Portal. Verifícalo para habilitar su canal.</span>
+              <span>
+                {cedulaOf(doctor)
+                  ? 'No verificado: aún no puede ordenar en el Portal. Confirma la cédula profesional y verifícalo para habilitar su canal.'
+                  : 'No verificado: falta la cédula profesional. No se puede verificar hasta que el doctor la registre.'}
+              </span>
             </div>
           )}
 
@@ -160,7 +169,7 @@ function DoctorDetail({
             {doctor.verified ? (
               <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={onRevoke}><Ban size={15} /> Revocar acceso</button>
             ) : (
-              <button className="btn" type="button" onClick={onVerify}><UserCheck size={15} /> Verificar doctor</button>
+              <button className="btn" type="button" disabled={!cedulaOf(doctor)} title={cedulaOf(doctor) ? '' : 'Falta la cédula profesional'} onClick={onVerify}><UserCheck size={15} /> Verificar doctor</button>
             )}
           </div>
         </div>

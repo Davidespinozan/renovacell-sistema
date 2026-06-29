@@ -3,17 +3,19 @@ import React from 'react'
 import { money, fmtDate } from '../../lib/format'
 import { statusView } from './orderStatus'
 import { Trk } from './Trk'
-import type { OrderWithItems } from '../../data/hooks/useOrders'
+import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
 
 export function OrderCard({
   order,
   productsById,
   showTracking = true,
+  onCancel,
 }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   showTracking?: boolean
+  onCancel?: () => void
 }) {
   const sv = statusView(order.status)
 
@@ -50,6 +52,12 @@ export function OrderCard({
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 
       <ShippingLine meta={order.shipping_meta} />
+
+      {onCancel && isCancelable(order.status) && (
+        <div style={{ marginTop: 10, textAlign: 'right' }}>
+          <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={onCancel}>Cancelar pedido</button>
+        </div>
+      )}
     </div>
   )
 }

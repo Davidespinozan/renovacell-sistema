@@ -6,6 +6,7 @@ import type { Order, OrderItem } from '../types'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
+import { adjust } from './lotsStore'
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 
@@ -76,6 +77,25 @@ export function createOrder(input: {
   notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
   logAudit({ actor: 'Portal del Doctor', action: 'Pedido creado', resource: folio })
   return { ...order, items: newItems }
+}
+
+// Cancelar pedido. Permitido hasta antes de enviarse. Si ya estaba surtido
+// (packed), REINGRESA el inventario a sus lotes (trazabilidad: motivo 'cancelacion').
+const CANCELABLE = ['draft', 'pending_payment', 'paid', 'picking', 'packed']
+export const isCancelable = (status: string | null): boolean => CANCELABLE.includes(status ?? '')
+export function cancelOrder(orderId: string, actor = 'Administración'): { ok: boolean } {
+  const o = orders.find((x) => x.id === orderId)
+  if (!o || !isCancelable(o.status)) return { ok: false }
+  if (o.status === 'packed') {
+    items
+      .filter((it) => it.order_id === orderId && it.lot_id && it.unit_price != null)
+      .forEach((it) => adjust(it.lot_id as string, it.qty, 'cancelacion', o.external_ref ?? o.id))
+  }
+  orders = orders.map((x) => (x.id === orderId ? { ...x, status: 'cancelled' } : x))
+  emit()
+  notify({ text: `Pedido ${o.external_ref ?? orderId} cancelado`, roles: ['admin'], screen: 'av_ventas' })
+  logAudit({ actor, action: 'Pedido cancelado', resource: o.external_ref ?? orderId })
+  return { ok: true }
 }
 
 // Punto de Venta: venta inmediata en persona. Pago cobrado al momento y

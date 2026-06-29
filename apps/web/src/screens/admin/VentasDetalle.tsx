@@ -5,7 +5,7 @@
 import React, { useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
-import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
+import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
@@ -29,7 +29,7 @@ const sel: React.CSSProperties = {
 }
 
 export function VentasDetalle() {
-  const { data: orders } = useAllOrders()
+  const { data: orders, cancelOrder } = useAllOrders()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
 
@@ -146,7 +146,7 @@ export function VentasDetalle() {
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} />
+        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => { if (window.confirm('¿Cancelar este pedido? Se reingresa el inventario si ya estaba surtido.')) { cancelOrder(selectedOrder.id, 'Administración'); setSelected(null) } }} />
       )}
     </div>
   )
@@ -163,12 +163,13 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
   )
 }
 
-function SaleDetail({ order, productsById, clientName, channel, onClose }: {
+function SaleDetail({ order, productsById, clientName, channel, onClose, onCancel }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
   channel: 'portal' | 'pos'
   onClose: () => void
+  onCancel: () => void
 }) {
   const p = payInfo(order); const sv = statusView(order.status)
   return (
@@ -208,6 +209,12 @@ function SaleDetail({ order, productsById, clientName, channel, onClose }: {
             <div className="sysnote" style={{ marginTop: 14 }}>
               <FileText size={16} />
               <span>El cliente solicitó factura. La generación del CFDI se hace en <b>Facturación</b> (diferido); aquí solo se refleja la solicitud.</span>
+            </div>
+          )}
+
+          {isCancelable(order.status) && (
+            <div style={{ marginTop: 16, textAlign: 'right' }}>
+              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={onCancel}>Cancelar pedido</button>
             </div>
           )}
         </div>
