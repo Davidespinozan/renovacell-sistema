@@ -45,6 +45,7 @@ export const ROLES: RoleDef[] = [
     modules: [
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Inicio' },
+      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Inicio' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
       { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
