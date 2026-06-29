@@ -13,3 +13,11 @@ dist/
 # Editor / OS
 .DS_Store
 *.log
+
+# Propuesta / material de venta — NUNCA en el repo (lo posee el cliente)
+docs/PROPOSAL.md
+**/propuesta*
+**/PROPUESTA*
+*deck*
+*cotiz*
+*pricing*
