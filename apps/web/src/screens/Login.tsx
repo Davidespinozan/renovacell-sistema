@@ -9,7 +9,7 @@ const input: React.CSSProperties = {
   borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff',
 }
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
-const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink-3)' }
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }
 
 export function Login() {
   const { signIn } = useAuth()
@@ -47,13 +47,13 @@ export function Login() {
           <div className="login-mini-brand">
             <img src="/brand/logo.png" alt="Renovacell" />
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: 18 }}>Renovacell</div>
-              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'var(--ink-3)' }}>Sistema operativo</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>Renovacell</div>
+              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Sistema operativo</div>
             </div>
           </div>
 
-          <h1 style={{ fontSize: 22, fontWeight: 600 }}>Iniciar sesión</h1>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', margin: '4px 0 20px' }}>Entra con tu correo de Renovacell.</div>
+          <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Iniciar sesión</h1>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>Entra con tu correo de Renovacell.</div>
 
           <form onSubmit={submit}>
             <label style={lbl}>Correo</label>
