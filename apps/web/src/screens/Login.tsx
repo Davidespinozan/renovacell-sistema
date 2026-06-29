@@ -13,7 +13,7 @@ const input: React.CSSProperties = {
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 
 export function Login() {
-  const { signIn, loginAs } = useAuth()
+  const { signIn, signInAs, goLanding } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -52,15 +52,21 @@ export function Login() {
         </form>
 
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--ink-3)', marginBottom: 8 }}>Cuentas demo (mock)</div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--ink-3)', marginBottom: 8 }}>Cuentas de prueba · contraseña <b>demo</b></div>
           <div style={{ display: 'grid', gap: 6 }}>
             {MOCK_ACCOUNTS.map((a) => (
-              <button key={a.email} type="button" className="btn ghost sm" style={{ justifyContent: 'space-between', width: '100%' }} onClick={() => loginAs(a.role, a.verified)}>
+              <button key={a.email} type="button" className="btn ghost sm" style={{ justifyContent: 'space-between', width: '100%' }} onClick={() => signInAs(a)}>
                 <span>{a.name}</span>
                 <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.email}</span>
               </button>
             ))}
           </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <button type="button" onClick={goLanding} style={{ background: 'none', border: 'none', color: 'var(--green-deep)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            Ver sitio público →
+          </button>
         </div>
       </div>
     </div>

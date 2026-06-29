@@ -67,6 +67,15 @@
 /* --- Acciones sociales (Vista común) envuelven en teléfono ------------------- */
 @media (max-width: 640px) { .factions { flex-wrap: wrap; } }
 
+/* --- Usuario logueado en el sidebar (sobre el verde) ------------------------ */
+.side-user { display: flex; align-items: center; gap: 10px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
+.su-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.22); color: #fff; font-weight: 700; font-size: 12.5px; }
+.su-meta { min-width: 0; flex: 1; }
+.su-name { color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.su-role { color: rgba(255,255,255,.72); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.su-out { flex: none; width: 32px; height: 32px; border-radius: 9px; border: none; background: rgba(255,255,255,.14); color: #fff; display: grid; place-items: center; cursor: pointer; transition: .15s; }
+.su-out:hover { background: rgba(255,255,255,.28); }
+
 /* --- Buscador global: dropdown de resultados -------------------------------- */
 .searchpop { position: absolute; top: calc(100% + 6px); right: 0; width: min(360px, 86vw); background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-lg); overflow: hidden; z-index: 40; max-height: 60vh; overflow-y: auto; }
 .searchpop-empty { padding: 14px 16px; font-size: 13px; color: var(--ink-3); }

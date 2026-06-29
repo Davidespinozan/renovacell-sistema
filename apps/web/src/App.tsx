@@ -1,7 +1,6 @@
 import React from 'react'
 import { RoleProvider, useRole } from './auth/RoleContext'
 import { AppShell } from './app/AppShell'
-import { DevBar } from './app/DevBar'
 import { LandingPreview } from './screens/LandingPreview'
 import { Login } from './screens/Login'
 import { ReviewPending } from './screens/ReviewPending'
@@ -18,7 +17,6 @@ function Root() {
 
   return (
     <div className="dev-root">
-      <DevBar />
       <div className="dev-view">{view}</div>
     </div>
   )

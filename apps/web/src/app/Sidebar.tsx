@@ -1,14 +1,16 @@
 // Sidebar del hub: marca + navegación (vista común si el add-on está activo +
 // módulos del rol) + pie "Operado por STRYV". El marco permanece; el contenido cambia.
 import React from 'react'
+import { LogOut } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_SCREENS } from './roles'
 import { useRole } from '../auth/RoleContext'
+import { initials } from '../lib/format'
 
 const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { role, screen, setScreen } = useRole()
+  const { role, screen, setScreen, user, logout } = useRole()
   const r = getRole(role)
   const nav = getNav(r)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
@@ -59,6 +61,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="side-foot">
+        {user && (
+          <div className="side-user">
+            <div className="su-av">{initials(user.name)}</div>
+            <div className="su-meta">
+              <div className="su-name">{user.name}</div>
+              <div className="su-role">{r.label}</div>
+            </div>
+            <button className="su-out" type="button" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={logout}>
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
         <div className="op">
           <span className="live" /> Operado por <b>STRYV</b>
         </div>
