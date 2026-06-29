@@ -67,7 +67,7 @@ export function Recibo() {
       <div className="recibo">
         <div className="rhead">
           <div className="rbrand">
-            <Icon name="leaf" style={{ width: 42, height: 42, color: 'var(--green)' }} />
+            <img src="/brand/logo.png" alt="Renovacell" />
             <div>
               <div className="rbn">Renovacell</div>
               <div className="rbs">Sistema operativo</div>

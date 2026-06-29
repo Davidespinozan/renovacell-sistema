@@ -41,7 +41,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <aside className="side">
       <div className="brand">
         <span className="lw">
-          <Icon name="leaf" style={{ width: 40, height: 40, color: 'var(--green-soft)' }} />
+          <img src="/brand/logo.png" alt="Renovacell" />
         </span>
         <div>
           <div className="bn">Renovacell</div>
