@@ -60,6 +60,20 @@ export function Facturacion() {
     return base.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   }, [valid, filter])
 
+  // Cuentas por cobrar agregadas por cliente (Sección B: alertas de adeudo).
+  const debt = useMemo(() => {
+    const m = new Map<string, { name: string; count: number; total: number; oldest: string }>()
+    valid.filter((o) => o.payment_status !== 'paid' && o.doctor_id).forEach((o) => {
+      const id = o.doctor_id as string
+      const e = m.get(id) ?? { name: doctorsById[id]?.full_name ?? 'Doctor', count: 0, total: 0, oldest: o.created_at }
+      e.count += 1; e.total += o.total ?? 0
+      if (o.created_at < e.oldest) e.oldest = o.created_at
+      m.set(id, e)
+    })
+    return [...m.values()].sort((a, b) => b.total - a.total)
+  }, [valid, doctorsById])
+  const debtTotal = debt.reduce((s, d) => s + d.total, 0)
+
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
 
   if (orders.length === 0) {
@@ -124,6 +138,33 @@ export function Facturacion() {
                 )
               })}
               {rows.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-3)' }}>Sin ventas en este filtro.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Cuentas por cobrar por cliente (alertas de adeudo) */}
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Cuentas por cobrar · por cliente</div>
+          {debtTotal > 0 && <span className="pill p-warn" style={{ marginLeft: 'auto' }}>Adeudo total {money(debtTotal)}</span>}
+        </div>
+        <div style={{ padding: '0 14px 8px' }}>
+          <table className="tbl-cards">
+            <thead><tr><th>Cliente</th><th>Pedidos</th><th>Adeudo</th><th>Antigüedad</th></tr></thead>
+            <tbody>
+              {debt.map((d) => {
+                const days = Math.max(0, Math.floor((Date.now() - new Date(d.oldest).getTime()) / 86_400_000))
+                return (
+                  <tr key={d.name}>
+                    <td data-label="Cliente">{d.name}</td>
+                    <td data-label="Pedidos" className="mono">{d.count}</td>
+                    <td data-label="Adeudo" className="mono">{money(d.total)}</td>
+                    <td data-label="Antigüedad"><span className={'pill ' + (days > 30 ? 'p-warn' : 'p-neu')}>{days} d</span></td>
+                  </tr>
+                )
+              })}
+              {debt.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-3)' }}>Sin adeudos · todo cobrado. 🎉</td></tr>}
             </tbody>
           </table>
         </div>
