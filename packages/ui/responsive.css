@@ -67,6 +67,10 @@
 /* --- Acciones sociales (Vista común) envuelven en teléfono ------------------- */
 @media (max-width: 640px) { .factions { flex-wrap: wrap; } }
 
+/* --- Indicador de rol activo en el sidebar (sobre el verde) ----------------- */
+.side-role { display: flex; align-items: center; gap: 8px; margin: 0 22px 14px; padding: 7px 13px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; }
+.side-role svg { width: 15px; height: 15px; opacity: .92; flex: none; }
+
 /* --- Usuario logueado en el sidebar (sobre el verde) ------------------------ */
 .side-user { display: flex; align-items: center; gap: 10px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
 .su-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.22); color: #fff; font-weight: 700; font-size: 12.5px; }

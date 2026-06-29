@@ -16,6 +16,7 @@ export interface ScreenDef {
   key: string
   label: string
   icon: IconName
+  section?: string // agrupa los módulos del sidebar (evita el "muro" de links)
 }
 
 export interface RoleDef {
@@ -39,16 +40,16 @@ export const ROLES: RoleDef[] = [
     key: 'admin', label: 'Administración', group: 'Administración · Dirección',
     icon: 'dashboard', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check' },
-      { key: 'tablero', label: 'Tablero', icon: 'dashboard' },
-      { key: 'av_ventas', label: 'Ventas', icon: 'chart' },
-      { key: 'av_prosp', label: 'Prospectos', icon: 'grid' },
-      { key: 'av_inv', label: 'Inventario', icon: 'box' },
-      { key: 'av_doc', label: 'Doctores', icon: 'usercheck' },
-      { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint' },
-      { key: 'av_audit', label: 'Bitácora', icon: 'shield' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
-      { key: 'av_fin', label: 'Facturación', icon: 'receipt' },
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
+      { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Inicio' },
+      { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
+      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
+      { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
+      { key: 'av_inv', label: 'Inventario', icon: 'box', section: 'Operación' },
+      { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
+      { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
+      { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Finanzas' },
     ],
   },
   {
@@ -66,16 +67,16 @@ export const ROLES: RoleDef[] = [
     key: 'warehouse', label: 'Almacén / Empaque', group: 'Almacén y Empaque · Alberto',
     icon: 'box', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check' },
-      { key: 'stock', label: 'Existencias', icon: 'box' },
-      { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
-      { key: 'caduc', label: 'Caducidades', icon: 'clock' },
-      { key: 'entradas', label: 'Entradas', icon: 'download' },
-      { key: 'compras', label: 'Compras', icon: 'cart' },
-      { key: 'cola', label: 'Por empacar', icon: 'pkg' },
-      { key: 'guia', label: 'Guías', icon: 'truck' },
-      { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck' },
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
+      { key: 'stock', label: 'Existencias', icon: 'box', section: 'Almacén' },
+      { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers', section: 'Almacén' },
+      { key: 'caduc', label: 'Caducidades', icon: 'clock', section: 'Almacén' },
+      { key: 'entradas', label: 'Entradas', icon: 'download', section: 'Almacén' },
+      { key: 'compras', label: 'Compras', icon: 'cart', section: 'Almacén' },
+      { key: 'cola', label: 'Por empacar', icon: 'pkg', section: 'Empaque' },
+      { key: 'guia', label: 'Guías', icon: 'truck', section: 'Empaque' },
+      { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt', section: 'Empaque' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Empaque' },
     ],
   },
   {
