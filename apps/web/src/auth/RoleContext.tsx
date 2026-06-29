@@ -4,6 +4,7 @@
 // usan useRole() no cambian.
 import React, { createContext, useContext, useMemo, useState } from 'react'
 import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
+import { FEATURES } from '../app/config'
 
 export type AppMode = 'app' | 'landing' | 'login'
 
@@ -15,10 +16,11 @@ interface RoleState {
   mode: AppMode
   verified: boolean
   user: SessionUser | null
+  capabilities: string[]
   setRole: (r: RoleKey) => void
   setScreen: (s: string) => void
   setMode: (m: AppMode) => void
-  login: (role: RoleKey, verified: boolean, profile?: SessionUser) => void
+  login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
   logout: () => void
 }
 
@@ -30,19 +32,22 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<AppMode>('login') // puerta de entrada: el login
   const [verified, setVerified] = useState(true)
   const [user, setUser] = useState<SessionUser | null>(null)
+  const [capabilities, setCapabilities] = useState<string[]>([])
 
   // Cambiar de rol manteniendo sesión (no usado por el flujo real; útil interno).
   const setRole = (r: RoleKey) => {
     setRoleState(r)
+    setCapabilities([])
     setScreen(getEntryScreen(getRole(r)))
     setVerified(true)
     setMode('app')
   }
 
-  // Login: entra con un rol, su verificación y el perfil del usuario.
-  const login = (r: RoleKey, v: boolean, profile?: SessionUser) => {
+  // Login: entra con un rol, su verificación, el perfil y sus capabilities.
+  const login = (r: RoleKey, v: boolean, profile?: SessionUser, caps: string[] = []) => {
     setRoleState(r)
-    setScreen(getEntryScreen(getRole(r)))
+    setCapabilities(caps)
+    setScreen(getEntryScreen(getRole(r), FEATURES, caps))
     setVerified(v)
     setUser(profile ?? null)
     setMode('app')
@@ -50,12 +55,13 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null)
+    setCapabilities([])
     setMode('login')
   }
 
   const value = useMemo(
-    () => ({ role, screen, mode, verified, user, setRole, setScreen, setMode, login, logout }),
-    [role, screen, mode, verified, user],
+    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout }),
+    [role, screen, mode, verified, user, capabilities],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>
 }

@@ -10,7 +10,10 @@ import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
 export type RoleKey =
-  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver' | 'design'
+  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
+
+// Responsabilidades que Administración suma a un usuario sobre su rol base.
+export type CapabilityKey = 'diseno' | 'comercial'
 
 export interface ScreenDef {
   key: string
@@ -80,11 +83,12 @@ export const ROLES: RoleDef[] = [
     ],
   },
   {
-    key: 'pos', label: 'Punto de Venta', group: 'Punto de venta · Ventas',
+    key: 'pos', label: 'Ventas / Punto de Venta', group: 'Ventas · Punto de venta',
     icon: 'store', isStaff: true, ready: true,
     modules: [
-      { key: 'caja', label: 'Caja', icon: 'store' },
-      { key: 'vev', label: 'Ventas del evento', icon: 'grid' },
+      { key: 'eventos', label: 'Eventos', icon: 'store', section: 'Punto de venta' },
+      { key: 'caja', label: 'Caja', icon: 'store', section: 'Punto de venta' },
+      { key: 'vev', label: 'Ventas del evento', icon: 'grid', section: 'Punto de venta' },
     ],
   },
   {
@@ -94,16 +98,27 @@ export const ROLES: RoleDef[] = [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
     ],
   },
+]
+
+// Capabilities (responsabilidades) que Admin asigna por usuario. Suman módulos
+// al rol base. Una persona puede tener varias (p. ej. Almacén + Diseño).
+export interface CapabilityDef { key: CapabilityKey; label: string; modules: ScreenDef[] }
+export const CAPABILITIES: CapabilityDef[] = [
   {
-    key: 'design', label: 'Diseño', group: 'Diseño · Producción',
-    icon: 'image', isStaff: true, ready: true,
+    key: 'diseno', label: 'Diseño',
+    modules: [{ key: 'dis_solicitudes', label: 'Solicitudes de recurso', icon: 'image', section: 'Diseño' }],
+  },
+  {
+    key: 'comercial', label: 'Comercial',
     modules: [
-      { key: 'dis_cal', label: 'Calendario', icon: 'clock' },
-      { key: 'dis_promos', label: 'Promociones', icon: 'megaphone' },
-      { key: 'dis_lib', label: 'Biblioteca y fichas', icon: 'image' },
+      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Comercial' },
     ],
   },
 ]
+export const getCapability = (k: CapabilityKey): CapabilityDef | undefined => CAPABILITIES.find((c) => c.key === k)
+export const capabilityModules = (caps: string[]): ScreenDef[] =>
+  caps.flatMap((k) => getCapability(k as CapabilityKey)?.modules ?? [])
 
 export const getRole = (key: RoleKey): RoleDef =>
   ROLES.find((r) => r.key === key) ?? ROLES[0]
@@ -112,21 +127,25 @@ export const getRole = (key: RoleKey): RoleDef =>
 export const availableRoles = (features: Features = FEATURES): RoleDef[] =>
   ROLES.filter((r) => !r.requiresFeature || features[r.requiresFeature])
 
-// Navegación visible: staff = [vista común (si add-on), ...módulos]; doctor = módulos.
-export const getNav = (role: RoleDef, features: Features = FEATURES): ScreenDef[] => {
+// Navegación visible: staff = [vista común (si add-on), ...módulos del rol,
+// ...módulos de sus capabilities]; doctor = módulos. Las capabilities las asigna
+// Administración por usuario.
+export const getNav = (role: RoleDef, features: Features = FEATURES, capabilities: string[] = []): ScreenDef[] => {
   const nav: ScreenDef[] = []
   if (role.isStaff && features.comunicacionInterna) nav.push(...HUB_SCREENS)
   nav.push(...role.modules)
+  const have = new Set(nav.map((s) => s.key))
+  capabilityModules(capabilities).forEach((m) => { if (!have.has(m.key)) { nav.push(m); have.add(m.key) } })
   return nav
 }
 
 // Pantalla de entrada tras "login": la primera de su navegación.
-export const getEntryScreen = (role: RoleDef, features: Features = FEATURES): string =>
-  getNav(role, features)[0]?.key ?? COMMON_SCREEN.key
+export const getEntryScreen = (role: RoleDef, features: Features = FEATURES, capabilities: string[] = []): string =>
+  getNav(role, features, capabilities)[0]?.key ?? COMMON_SCREEN.key
 
-// Resuelve un ScreenDef por key dentro del alcance del rol.
-export const getScreenDef = (role: RoleDef, key: string, features: Features = FEATURES): ScreenDef => {
-  const nav = getNav(role, features)
+// Resuelve un ScreenDef por key dentro del alcance del rol + capabilities.
+export const getScreenDef = (role: RoleDef, key: string, features: Features = FEATURES, capabilities: string[] = []): ScreenDef => {
+  const nav = getNav(role, features, capabilities)
   return nav.find((s) => s.key === key) ?? nav[0] ?? COMMON_SCREEN
 }
 

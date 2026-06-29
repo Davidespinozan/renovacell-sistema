@@ -11,9 +11,9 @@ import { initials } from '../lib/format'
 const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { role, screen, setScreen, user, logout } = useRole()
+  const { role, screen, setScreen, user, logout, capabilities } = useRole()
   const r = getRole(role)
-  const nav = getNav(r)
+  const nav = getNav(r, undefined, capabilities)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
   const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 

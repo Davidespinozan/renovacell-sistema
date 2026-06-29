@@ -12,7 +12,7 @@ export interface LoginResult {
 export function useAuth() {
   const { mode, role, verified, login, logout, setMode } = useRole()
 
-  const enter = (acc: MockAccount) => login(acc.role, acc.verified, { name: acc.name, email: acc.email })
+  const enter = (acc: MockAccount) => login(acc.role, acc.verified, { name: acc.name, email: acc.email }, acc.capabilities)
 
   const signIn = (email: string, password: string): LoginResult => {
     const acc = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase())

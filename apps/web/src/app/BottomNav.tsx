@@ -14,8 +14,8 @@ function short(label: string, key: string): string {
 }
 
 export function BottomNav({ onMenu }: { onMenu: () => void }) {
-  const { role, screen, setScreen } = useRole()
-  const nav = getNav(getRole(role))
+  const { role, screen, setScreen, capabilities } = useRole()
+  const nav = getNav(getRole(role), undefined, capabilities)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
   const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 

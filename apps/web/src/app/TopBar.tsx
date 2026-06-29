@@ -68,11 +68,11 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
 }
 
 function NotifBell() {
-  const { role, setScreen } = useRole()
+  const { role, setScreen, capabilities } = useRole()
   const { data, markAllRead, markRead } = useNotifications()
   const [open, setOpen] = useState(false)
 
-  const navKeys = useMemo(() => new Set(getNav(getRole(role)).map((s) => s.key)), [role])
+  const navKeys = useMemo(() => new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key)), [role, capabilities])
   const visible = useMemo(
     () => data.filter((n) => !n.roles || role === 'admin' || n.roles.includes(role)),
     [data, role],
