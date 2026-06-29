@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   delivered_at timestamptz,
   proof_image_url text,
   received_by text,
+  incident jsonb,
   created_at timestamptz DEFAULT now()
 );
 

@@ -10,8 +10,10 @@ import { entregar } from '../../data/ops/entregar'
 import { CURRENT_DRIVER_ID, driverName } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
 
+const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
+
 export function MisEntregas() {
-  const { data: shipments } = useShipments()
+  const { data: shipments, reportIncident } = useShipments()
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
 
@@ -28,7 +30,15 @@ export function MisEntregas() {
 
   const [photos, setPhotos] = useState<Record<string, string>>({})
   const [received, setReceived] = useState<Record<string, string>>({})
+  const [incType, setIncType] = useState<Record<string, string>>({})
+  const [incNote, setIncNote] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<string | null>(null)
+
+  const reportInc = (shipmentId: string, folio: string) => {
+    reportIncident(shipmentId, incType[shipmentId] ?? INCIDENT_TYPES[0], incNote[shipmentId]?.trim() || null, folio)
+    setToast(`Incidencia reportada: ${folio}`)
+    window.setTimeout(() => setToast(null), 2600)
+  }
 
   const mine = shipments.filter((s) => s.driver_id === CURRENT_DRIVER_ID && s.status !== 'delivered')
 
@@ -64,7 +74,9 @@ export function MisEntregas() {
             <div key={s.id} className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
-                <span className="pill p-blue"><span className="d" /> En reparto</span>
+                {s.incident && !s.incident.resolved
+                  ? <span className="pill p-dang">Incidencia: {s.incident.type}</span>
+                  : <span className="pill p-blue"><span className="d" /> En reparto</span>}
                 <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
                   {s.estimated_delivery_at ? `Estimada ${fmtDate(s.estimated_delivery_at)}` : ''}
                 </span>
@@ -120,6 +132,26 @@ export function MisEntregas() {
               {!(Boolean(photo) && Boolean(received[s.id]?.trim())) && (
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Captura quién recibe y la foto de prueba para confirmar la entrega.</div>
               )}
+
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-3)' }}>¿Problema con la entrega? Reportar incidencia</summary>
+                <div className="field-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  <select
+                    value={incType[s.id] ?? INCIDENT_TYPES[0]}
+                    onChange={(e) => setIncType((m) => ({ ...m, [s.id]: e.target.value }))}
+                    style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }}
+                  >
+                    {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input
+                    value={incNote[s.id] ?? ''}
+                    onChange={(e) => setIncNote((m) => ({ ...m, [s.id]: e.target.value }))}
+                    placeholder="Nota (opcional)"
+                    style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                  />
+                  <button className="btn ghost sm" type="button" onClick={() => reportInc(s.id, order.external_ref ?? order.id)}>Enviar incidencia</button>
+                </div>
+              </details>
             </div>
           )
         })

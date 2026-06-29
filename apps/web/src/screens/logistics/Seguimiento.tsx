@@ -23,8 +23,15 @@ interface Row {
 
 export function Seguimiento() {
   const { data: orders } = useAllOrders()
-  const { data: shipments } = useShipments()
+  const { data: shipments, resolveIncident } = useShipments()
   const { data: products } = useProducts()
+
+  const incidents = useMemo(
+    () => shipments
+      .filter((s) => s.incident && !s.incident.resolved)
+      .map((s) => ({ shipment: s, order: orders.find((o) => o.id === s.order_id) })),
+    [shipments, orders],
+  )
 
   const prodName = useMemo(() => {
     const m: Record<string, string> = {}
@@ -58,6 +65,26 @@ export function Seguimiento() {
           <div className="x">
             <b>{stuckCount} envío(s) atorado(s).</b> Hay pedidos vencidos o surtidos sin salir. Revísalos antes de que el doctor reclame.
           </div>
+        </div>
+      )}
+
+      {incidents.length > 0 && (
+        <div className="card" style={{ borderLeft: '4px solid var(--danger)' }}>
+          <div className="eyebrow">Incidencias de entrega ({incidents.length})</div>
+          {incidents.map(({ shipment, order }) => {
+            const folio = order?.external_ref ?? shipment.order_id
+            return (
+              <div key={shipment.id} className="lrow">
+                <div>
+                  <div className="nm mono">{folio}</div>
+                  <div className="lt">{shipment.incident!.type}{shipment.incident!.note ? ` · ${shipment.incident!.note}` : ''}</div>
+                </div>
+                <button className="btn sm" type="button" onClick={() => resolveIncident(shipment.id, folio)}>
+                  <Icon name="check" /> Resolver · reintentar
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 

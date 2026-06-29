@@ -4,6 +4,7 @@
 import type { Shipment } from '../types'
 import { MOCK_SHIPMENTS } from '../mock/shipments'
 import { notify } from './notificationsStore'
+import { logAudit } from './auditStore'
 
 let shipments: Shipment[] = [...MOCK_SHIPMENTS]
 let seq = 5000
@@ -47,12 +48,36 @@ export function createShipment(input: ShipmentInput): Shipment {
     delivered_at: null,
     proof_image_url: null,
     received_by: null,
+    incident: null,
     created_at: new Date().toISOString(),
   }
   shipments = [sh, ...shipments]
   emit()
   if (input.driver_id) notify({ text: 'Nueva entrega asignada a tu ruta', roles: ['driver'], screen: 'driver_home' })
   return sh
+}
+
+// Incidencia en entrega (chofer): registra el problema y avisa a logística/admin.
+export function reportIncident(shipmentId: string, type: string, note: string | null, folio: string) {
+  const now = new Date().toISOString()
+  shipments = shipments.map((s) =>
+    s.id === shipmentId ? { ...s, status: 'incident', incident: { type, note, at: now, resolved: false } } : s,
+  )
+  emit()
+  notify({ text: `Incidencia en ${folio}: ${type}`, roles: ['admin'], screen: 'seguimiento' })
+  logAudit({ actor: 'Chofer', action: 'Incidencia reportada', resource: folio, detail: type })
+}
+
+// Resolver incidencia (logística/admin): reintentar entrega (vuelve a reparto).
+export function resolveIncident(shipmentId: string, folio: string) {
+  shipments = shipments.map((s) =>
+    s.id === shipmentId && s.incident
+      ? { ...s, status: 'out_for_delivery', incident: { ...s.incident, resolved: true } }
+      : s,
+  )
+  emit()
+  notify({ text: `Incidencia de ${folio} resuelta · reintento de entrega`, roles: ['driver'], screen: 'driver_home' })
+  logAudit({ actor: 'Administración', action: 'Incidencia resuelta', resource: folio })
 }
 
 // Entrega confirmada por el chofer: estatus Entregado + foto de prueba + quién recibió.
