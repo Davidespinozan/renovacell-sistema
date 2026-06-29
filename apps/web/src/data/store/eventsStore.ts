@@ -62,7 +62,7 @@ export function assignStock(eventId: string, productId: string, qty: number): { 
 
 // Venta en el evento: crea la orden POS (ingreso/REPORTE) y descuenta del evento.
 // No vuelve a tocar el stock general (ya salió al asignar).
-export function sellAtEvent(eventId: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string): OrderWithItems | null {
+export function sellAtEvent(eventId: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string, seller: string | null = null): OrderWithItems | null {
   const ev = events.find((e) => e.id === eventId)
   if (!ev || lines.length === 0) return null
   // No permitir sobreventa ni vender un producto que no está en el inventario del evento.
@@ -75,6 +75,8 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
     lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price, lot_id: null })),
     total,
     payment_method: paymentMethod,
+    event_id: eventId,
+    seller,
   })
   events = events.map((e) => {
     if (e.id !== eventId) return e

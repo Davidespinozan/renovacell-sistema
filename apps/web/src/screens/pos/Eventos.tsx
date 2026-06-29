@@ -59,6 +59,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
   const { data: products } = useProducts()
   const { sellAtEvent, closeEvent } = useEvents()
   const { data: team } = useTeam()
+  const { user } = useRole()
   const memberNames = event.members
     .map((em) => team.find((u) => u.email === em)?.name.split('·')[0].trim() ?? em)
     .join(', ')
@@ -83,7 +84,8 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 
   const cobrar = () => {
     if (lines.length === 0) return
-    sellAtEvent(event.id, lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price ?? 0 })), total, 'efectivo')
+    const order = sellAtEvent(event.id, lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price ?? 0 })), total, 'efectivo', user?.email ?? null)
+    if (!order) { flash('No se pudo cobrar — revisa el stock del stand.'); return }
     setCart({})
     flash(`Venta registrada · ${money(total)}`)
   }

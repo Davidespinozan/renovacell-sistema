@@ -1,5 +1,7 @@
 // Datos de cliente (destino) MOCK. Con auth real vendrá de `profiles` (full_name,
 // organization) + dirección de envío del pedido. Hoy un único doctor de muestra.
+import { MOCK_DOCTORS } from './doctores'
+
 export interface ClientInfo {
   id: string
   name: string
@@ -18,4 +20,19 @@ export const DOCTOR_PROFILE: ClientInfo = {
   city: 'Culiacán, Sin.',
 }
 
-export const clientOf = (_doctorId: string | null): ClientInfo => DOCTOR_PROFILE
+// Cliente (destino) por doctor_id real: nombre/clínica del doctor. La dirección/
+// teléfono aún no se modelan por doctor (placeholder); con Supabase vienen del
+// perfil + dirección de envío del pedido.
+export const clientOf = (doctorId: string | null): ClientInfo => {
+  if (!doctorId) return DOCTOR_PROFILE
+  const d = MOCK_DOCTORS.find((x) => x.id === doctorId)
+  if (!d) return DOCTOR_PROFILE
+  return {
+    id: d.id,
+    name: d.full_name ?? 'Doctor',
+    clinic: d.organization ?? '',
+    phone: DOCTOR_PROFILE.phone,
+    address: DOCTOR_PROFILE.address,
+    city: DOCTOR_PROFILE.city,
+  }
+}

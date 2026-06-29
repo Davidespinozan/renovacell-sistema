@@ -7,8 +7,9 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { entregar } from '../../data/ops/entregar'
-import { CURRENT_DRIVER_ID, driverName } from '../../data/mock/shipments'
+import { driverIdByEmail, driverName } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
+import { useRole } from '../../auth/RoleContext'
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
 
@@ -16,6 +17,8 @@ export function MisEntregas() {
   const { data: shipments, reportIncident } = useShipments()
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
+  const { user } = useRole()
+  const driverId = driverIdByEmail(user?.email)
 
   const prodName = useMemo(() => {
     const m: Record<string, string> = {}
@@ -40,7 +43,7 @@ export function MisEntregas() {
     window.setTimeout(() => setToast(null), 2600)
   }
 
-  const mine = shipments.filter((s) => s.driver_id === CURRENT_DRIVER_ID && s.status !== 'delivered')
+  const mine = shipments.filter((s) => s.driver_id === driverId && s.status !== 'delivered')
 
   const onPhoto = (shipmentId: string, file: File | undefined) => {
     if (!file) return
@@ -57,7 +60,7 @@ export function MisEntregas() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Chofer / Seguimiento · {driverName(CURRENT_DRIVER_ID)}</div>
+      <div className="eyebrow">Chofer / Seguimiento · {driverName(driverId)}</div>
 
       {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>

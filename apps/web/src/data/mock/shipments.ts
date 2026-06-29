@@ -6,15 +6,17 @@ import type { Shipment } from '../types'
 export interface Driver {
   id: string
   name: string
+  email: string | null // cuenta con la que entra (mapea login → chofer)
 }
 
 export const MOCK_DRIVERS: Driver[] = [
-  { id: 'drv-1', name: 'Chofer local Culiacán' },
-  { id: 'drv-2', name: 'Repartidor zona centro' },
+  { id: 'drv-1', name: 'Beto · Chofer', email: 'chofer@renovacell.mx' },
+  { id: 'drv-2', name: 'Repartidor zona centro', email: null },
 ]
 
-// Chofer "logueado" en la vista del rol Chofer (sin auth real todavía).
-export const CURRENT_DRIVER_ID = 'drv-1'
+// Resuelve el chofer logueado por su correo (en Supabase = profiles.id = auth.uid).
+export const driverIdByEmail = (email?: string | null): string | null =>
+  MOCK_DRIVERS.find((d) => d.email && d.email.toLowerCase() === (email ?? '').trim().toLowerCase())?.id ?? null
 
 export const driverName = (id: string | null): string =>
   MOCK_DRIVERS.find((d) => d.id === id)?.name ?? '—'
