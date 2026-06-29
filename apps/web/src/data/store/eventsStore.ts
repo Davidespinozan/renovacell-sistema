@@ -16,6 +16,7 @@ export interface SalesEvent {
   date: string
   status: 'activo' | 'cerrado'
   items: EventItem[]
+  members: string[] // correos de los asignados al evento; solo ellos lo ven
   created_at: string
 }
 
@@ -30,9 +31,9 @@ export const getSnapshot = (): SalesEvent[] => snapshot
 
 export const remaining = (it: EventItem): number => it.assigned - it.sold
 
-export function createEvent(input: { name: string; venue: string; date: string }): SalesEvent {
+export function createEvent(input: { name: string; venue: string; date: string; members: string[] }): SalesEvent {
   seq += 1
-  const e: SalesEvent = { id: `evt-${seq}`, name: input.name, venue: input.venue, date: input.date, status: 'activo', items: [], created_at: new Date().toISOString() }
+  const e: SalesEvent = { id: `evt-${seq}`, name: input.name, venue: input.venue, date: input.date, status: 'activo', items: [], members: input.members, created_at: new Date().toISOString() }
   events = [e, ...events]
   emit()
   logAudit({ actor: 'Ventas', action: 'Evento creado', resource: input.name })

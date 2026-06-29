@@ -7,13 +7,22 @@ import { Plus, X, Store, PackagePlus, Check, ArrowLeft } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useEvents, remaining, type SalesEvent } from '../../data/hooks/useEvents'
+import { useTeam } from '../../data/hooks/useTeam'
+import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe } from '../../data/types'
 
 export function Eventos() {
   const { data: events } = useEvents()
+  const { role, user } = useRole()
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const active = events.find((e) => e.id === openId) ?? null
+
+  // Solo veo los eventos donde soy miembro (Admin ve todos).
+  const mine = useMemo(
+    () => (role === 'admin' ? events : events.filter((e) => e.members.includes(user?.email ?? ''))),
+    [events, role, user],
+  )
 
   if (active) return <EventDetail event={active} onBack={() => setOpenId(null)} />
 
@@ -24,12 +33,12 @@ export function Eventos() {
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setCreating(true)}><Plus size={14} /> Nuevo evento</button>
       </div>
 
-      {events.length === 0 ? (
+      {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Aún no hay eventos. Crea uno (expo, congreso) y ármale su inventario.
+          No tienes eventos asignados. Crea uno (expo, congreso) y arma su equipo e inventario.
         </div>
       ) : (
-        events.map((e) => (
+        mine.map((e) => (
           <button key={e.id} type="button" className="card clickrow" style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--line)' }} onClick={() => setOpenId(e.id)}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: 'var(--ok-bg)', color: 'var(--green-deep)', display: 'grid', placeItems: 'center', flex: 'none' }}><Store size={19} /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -49,6 +58,10 @@ export function Eventos() {
 function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void }) {
   const { data: products } = useProducts()
   const { sellAtEvent, closeEvent } = useEvents()
+  const { data: team } = useTeam()
+  const memberNames = event.members
+    .map((em) => team.find((u) => u.email === em)?.name.split('·')[0].trim() ?? em)
+    .join(', ')
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
 
   const [cart, setCart] = useState<Record<string, number>>({})
@@ -81,7 +94,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
         <button className="btn ghost sm" type="button" onClick={onBack}><ArrowLeft size={14} /> Eventos</button>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>{event.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{event.venue} · {event.date}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{event.venue} · {event.date}{memberNames ? ` · Equipo: ${memberNames}` : ''}</div>
         </div>
         <span className={'pill ' + (closed ? 'p-neu' : 'p-ok')} style={{ marginLeft: 'auto' }}>{closed ? 'Cerrado' : 'Activo'}</span>
         {!closed && <button className="btn ghost sm" type="button" onClick={() => setAssignOpen(true)}><PackagePlus size={14} /> Asignar inventario</button>}
@@ -202,11 +215,21 @@ function AssignModal({ event, onClose, onDone }: { event: SalesEvent; onClose: (
 
 function NewEvent({ onClose, onOpen }: { onClose: () => void; onOpen: (id: string) => void }) {
   const { createEvent } = useEvents()
+  const { data: team } = useTeam()
+  const { user } = useRole()
+  const candidates = team.filter((u) => u.active && u.capabilities.includes('eventos'))
   const [name, setName] = useState('')
   const [venue, setVenue] = useState('')
   const [date, setDate] = useState('')
+  const [members, setMembers] = useState<string[]>(user?.email ? [user.email] : [])
+  const toggle = (email: string) => setMembers((m) => (m.includes(email) ? m.filter((x) => x !== email) : [...m, email]))
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+
+  const create = () => {
+    const final = members.length > 0 ? members : (user?.email ? [user.email] : [])
+    onOpen(createEvent({ name: name.trim(), venue: venue.trim() || 'Por definir', date: date || '—', members: final }).id)
+  }
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -219,9 +242,18 @@ function NewEvent({ onClose, onOpen }: { onClose: () => void; onOpen: (id: strin
             <div><label style={label}>Sede</label><input style={input} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="WTC CDMX" /></div>
             <div><label style={label}>Fecha</label><input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
           </div>
+          <label style={label}>Equipo del evento (quién lo atiende)</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {candidates.length === 0 && <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Nadie tiene la responsabilidad “Eventos” aún (asígnala en Equipo).</span>}
+            {candidates.map((u) => (
+              <button key={u.id} type="button" className={'fchip' + (members.includes(u.email) ? ' on' : '')} onClick={() => toggle(u.email)}>
+                {members.includes(u.email) ? '✓ ' : '+ '}{u.name.split('·')[0].trim()}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onOpen(createEvent({ name: name.trim(), venue: venue.trim() || 'Por definir', date: date || '—' }).id)}>
+            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={create}>
               <Plus size={15} /> Crear y armar
             </button>
           </div>
