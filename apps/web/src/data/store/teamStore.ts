@@ -36,10 +36,14 @@ export function isActive(email: string): boolean {
   const u = users.find((x) => x.email.toLowerCase() === email.toLowerCase())
   return u ? u.active : true // doctores y otros no-staff: no aplican aquí
 }
+// Fuente de verdad del staff (existencia + rol + capabilities + activo) para el login.
+export function userByEmail(email: string): TeamUser | undefined {
+  return users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
+}
 
 export function addUser(input: { name: string; role: RoleKey }): TeamUser {
   seq += 1
-  const handle = input.name.split('·')[0].trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const handle = input.name.split('·')[0].trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const u: TeamUser = { id: `u-${seq}`, name: input.name, email: `${handle || 'usuario'}${seq}@renovacell.mx`, role: input.role, capabilities: [], active: true }
   users = [u, ...users]
   emit()

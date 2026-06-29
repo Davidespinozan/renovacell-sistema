@@ -13,7 +13,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const r = getRole(role)
   const s = getScreenDef(r, screen)
   const sub =
-    screen === COMMON_SCREEN.key ? 'Comunicación interna · equipo'
+    screen === COMMON_SCREEN.key ? ''
       : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
         : r.label
 
@@ -74,8 +74,13 @@ function NotifBell() {
 
   const navKeys = useMemo(() => new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key)), [role, capabilities])
   const visible = useMemo(
-    () => data.filter((n) => !n.roles || role === 'admin' || n.roles.includes(role)),
-    [data, role],
+    () => data.filter((n) => {
+      const audienceOk = !n.roles || role === 'admin' || n.roles.includes(role)
+      if (!audienceOk) return false
+      // Dirección ve todo (supervisión); el resto solo lo que puede abrir.
+      return role === 'admin' || !n.screen || navKeys.has(n.screen)
+    }),
+    [data, role, navKeys],
   )
   const unread = visible.filter((n) => !n.read).length
 

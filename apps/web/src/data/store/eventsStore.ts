@@ -64,6 +64,12 @@ export function assignStock(eventId: string, productId: string, qty: number): { 
 export function sellAtEvent(eventId: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string): OrderWithItems | null {
   const ev = events.find((e) => e.id === eventId)
   if (!ev || lines.length === 0) return null
+  // No permitir sobreventa ni vender un producto que no está en el inventario del evento.
+  const sellable = lines.every((l) => {
+    const it = ev.items.find((x) => x.product_id === l.product_id)
+    return it != null && remaining(it) >= l.qty
+  })
+  if (!sellable) return null
   const order = createPosOrder({
     lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price, lot_id: null })),
     total,
@@ -84,7 +90,7 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
 // Cierra el evento: el sobrante REGRESA al almacén (entrada) y se reporta.
 export function closeEvent(eventId: string) {
   const ev = events.find((e) => e.id === eventId)
-  if (!ev) return
+  if (!ev || ev.status === 'cerrado') return // idempotente: no reingresar dos veces
   ev.items.forEach((it) => {
     const left = remaining(it)
     if (left > 0) addEntry({ product_id: it.product_id, lot_code: `EVENTO-${ev.id}`, expiry_date: null, quantity: left, location: 'Almacén (regreso evento)' })

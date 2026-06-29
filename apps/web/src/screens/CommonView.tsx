@@ -71,9 +71,8 @@ export function CommonView() {
       <div className="feed">
         <div className="feed-head">
           <Avatar name={user?.name ?? 'Equipo'} />
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>Hola, {hi}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Vista común del equipo</div>
           </div>
           <span className="role-badge"><Icon name={r.icon} /> {r.label}</span>
         </div>

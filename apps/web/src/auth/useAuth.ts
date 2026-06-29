@@ -2,8 +2,8 @@
 // cambia el cuerpo por Supabase Auth (signInWithPassword + perfil) sin tocar la
 // pantalla de Login.
 import { useRole } from './RoleContext'
-import { MOCK_ACCOUNTS, type MockAccount } from '../data/mock/accounts'
-import { capabilitiesOf, isActive } from '../data/store/teamStore'
+import { MOCK_ACCOUNTS } from '../data/mock/accounts'
+import { userByEmail } from '../data/store/teamStore'
 
 export interface LoginResult {
   ok: boolean
@@ -13,18 +13,22 @@ export interface LoginResult {
 export function useAuth() {
   const { mode, role, verified, login, logout, setMode } = useRole()
 
-  // Capabilities desde el gobierno de Admin (teamStore); doctores no aplican.
-  const enter = (acc: MockAccount) => {
-    const caps = acc.role === 'doctor' ? acc.capabilities : capabilitiesOf(acc.email)
-    login(acc.role, acc.verified, { name: acc.name, email: acc.email }, caps)
-  }
-
+  // Fuente de verdad: staff → teamStore (gobierno de Admin: rol, capabilities,
+  // activo); doctores → MOCK_ACCOUNTS (verificación). Así un usuario dado de alta
+  // en Equipo SÍ puede entrar y los cambios de Admin se reflejan al loguear.
   const signIn = (email: string, password: string): LoginResult => {
-    const acc = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase())
-    if (!acc) return { ok: false, error: 'Correo no reconocido. Usa una de las cuentas de prueba.' }
+    const e = email.trim()
+    const staff = userByEmail(e)
+    const acc = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === e.toLowerCase())
+    if (!staff && !acc) return { ok: false, error: 'Correo no reconocido. Usa una de las cuentas de prueba.' }
     if (password.length === 0) return { ok: false, error: 'Escribe tu contraseña.' }
-    if (acc.role !== 'doctor' && !isActive(acc.email)) return { ok: false, error: 'Usuario suspendido. Contacta a Administración.' }
-    enter(acc) // mock: no valida la contraseña real
+    if (staff) {
+      if (!staff.active) return { ok: false, error: 'Usuario suspendido. Contacta a Administración.' }
+      login(staff.role, true, { name: staff.name, email: staff.email }, staff.capabilities)
+      return { ok: true }
+    }
+    // Doctor (de cuentas mock): respeta su estado de verificación.
+    login(acc!.role, acc!.verified, { name: acc!.name, email: acc!.email }, acc!.capabilities)
     return { ok: true }
   }
 
@@ -33,7 +37,6 @@ export function useAuth() {
     role,
     verified,
     signIn,
-    signInAs: enter,
     logout,
     goLogin: () => setMode('login'),
     goLanding: () => setMode('landing'),
