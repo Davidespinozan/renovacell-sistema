@@ -4,6 +4,7 @@
 // la fase de Supabase (un insert a prospects desde el front público / función);
 // hoy el equipo da de alta manual los que llegan por WhatsApp/llamada.
 import type { Prospect } from '../types'
+import { notify } from './notificationsStore'
 
 export type ProspectStatus = 'nuevo' | 'contactado' | 'cotizado' | 'convertido' | 'descartado'
 
@@ -74,6 +75,7 @@ export function addProspect(input: {
   }
   prospects = [p, ...prospects]
   emit()
+  notify({ text: `Nuevo prospecto: ${p.name}`, roles: ['admin'], screen: 'av_prosp' })
   return p
 }
 

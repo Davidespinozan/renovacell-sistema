@@ -3,6 +3,7 @@
 // insert/select sobre shipments; el hook useShipments no cambia.
 import type { Shipment } from '../types'
 import { MOCK_SHIPMENTS } from '../mock/shipments'
+import { notify } from './notificationsStore'
 
 let shipments: Shipment[] = [...MOCK_SHIPMENTS]
 let seq = 5000
@@ -50,6 +51,7 @@ export function createShipment(input: ShipmentInput): Shipment {
   }
   shipments = [sh, ...shipments]
   emit()
+  if (input.driver_id) notify({ text: 'Nueva entrega asignada a tu ruta', roles: ['driver'], screen: 'driver_home' })
   return sh
 }
 

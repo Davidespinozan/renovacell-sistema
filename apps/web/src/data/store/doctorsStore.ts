@@ -3,6 +3,7 @@
 // (y la RLS hará cumplir el gate de ordenar). El hook useDoctors no cambia.
 import type { Profile } from '../types'
 import { MOCK_DOCTORS } from '../mock/doctores'
+import { notify } from './notificationsStore'
 
 let doctors: Profile[] = [...MOCK_DOCTORS]
 const listeners = new Set<() => void>()
@@ -47,5 +48,6 @@ export function addDoctor(input: {
   }
   doctors = [doc, ...doctors]
   emit()
+  notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
   return doc
 }

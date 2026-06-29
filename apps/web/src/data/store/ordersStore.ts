@@ -4,6 +4,9 @@
 // Al migrar a Supabase: queries + RLS; los hooks mantienen su firma.
 import type { Order, OrderItem } from '../types'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
+import { notify } from './notificationsStore'
+
+const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 
 export interface OrderWithItems extends Order {
   items: OrderItem[]
@@ -69,6 +72,7 @@ export function createOrder(input: {
   orders = [order, ...orders]
   items = [...items, ...newItems]
   emit()
+  notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
   return { ...order, items: newItems }
 }
 
@@ -115,18 +119,21 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
     it.order_id === orderId && itemLot[it.id] !== undefined ? { ...it, lot_id: itemLot[it.id] } : it,
   )
   emit()
+  notify({ text: `Pedido ${folioOf(orderId)} surtido · por empacar`, roles: ['warehouse'], screen: 'cola' })
 }
 
 // Empaque: al asignar envío, el pedido pasa a En camino y guarda el resumen de envío.
 export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta } : o))
   emit()
+  notify({ text: `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
 }
 
 // Seguimiento/Chofer: entrega confirmada -> cierra el ciclo (Entregado).
 export function markDelivered(orderId: string) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
+  notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
 }
 
 // Facturación: emisión de CFDI (MOCK). Hoy genera un folio fiscal simulado;
@@ -147,6 +154,7 @@ export function markInvoiced(orderId: string) {
       : o,
   )
   emit()
+  notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
 }
 
 // Facturación: registrar el cobro (MOCK). En Supabase = update payment_status
@@ -154,4 +162,5 @@ export function markInvoiced(orderId: string) {
 export function markPaid(orderId: string) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid' } : o))
   emit()
+  notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
 }

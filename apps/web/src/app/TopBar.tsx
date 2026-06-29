@@ -2,9 +2,11 @@
 // buscador GLOBAL (indexado, acotado por rol) y campana.
 import React, { useMemo, useState } from 'react'
 import { Icon } from './icons'
-import { getRole, getScreenDef, COMMON_SCREEN, CHAT_SCREEN } from './roles'
+import { getRole, getScreenDef, getNav, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
+import { useNotifications } from '../data/hooks/useNotifications'
+import { timeAgo } from '../lib/format'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen } = useRole()
@@ -59,11 +61,70 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             </div>
           )}
         </div>
-        <button className="icobtn" type="button" aria-label="Notificaciones">
-          <Icon name="bell" />
-          <span className="bdg" />
-        </button>
+        <NotifBell />
       </div>
     </header>
+  )
+}
+
+function NotifBell() {
+  const { role, setScreen } = useRole()
+  const { data, markAllRead, markRead } = useNotifications()
+  const [open, setOpen] = useState(false)
+
+  const navKeys = useMemo(() => new Set(getNav(getRole(role)).map((s) => s.key)), [role])
+  const visible = useMemo(
+    () => data.filter((n) => !n.roles || role === 'admin' || n.roles.includes(role)),
+    [data, role],
+  )
+  const unread = visible.filter((n) => !n.read).length
+
+  const onPick = (id: string, toScreen?: string) => {
+    markRead(id)
+    if (toScreen && navKeys.has(toScreen)) setScreen(toScreen)
+    setOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        className="icobtn"
+        type="button"
+        aria-label="Notificaciones"
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      >
+        <Icon name="bell" />
+        {unread > 0 && <span className="bdg" />}
+      </button>
+      {open && (
+        <div className="searchpop">
+          <div className="notif-head">
+            <span>Notificaciones</span>
+            {unread > 0 && (
+              <button type="button" className="notif-readall" onMouseDown={() => markAllRead(visible.map((n) => n.id))}>
+                Marcar todo leído
+              </button>
+            )}
+          </div>
+          {visible.length === 0 ? (
+            <div className="searchpop-empty">Sin notificaciones.</div>
+          ) : (
+            visible.slice(0, 12).map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                className={'notif-row' + (n.read ? '' : ' unread')}
+                onMouseDown={() => onPick(n.id, n.screen)}
+              >
+                <span className="notif-dot" data-on={!n.read} />
+                <span className="notif-text">{n.text}</span>
+                <span className="notif-when">{timeAgo(n.at)}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   )
 }
