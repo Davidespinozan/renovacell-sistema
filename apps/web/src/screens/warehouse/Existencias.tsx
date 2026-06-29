@@ -1,6 +1,7 @@
 // Existencias: stock por producto y por LOTE (lote + caducidad + cantidad).
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
+import { PageHead } from '../../app/PageHead'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -25,10 +26,18 @@ export function Existencias() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Almacén · Existencias</div>
+      <PageHead title="Lo que hay en almacén">
+        Todo el producto guardado, agrupado por tipo y por lote. La etiqueta
+        <b> Usar primero</b> marca el lote que debe salir antes, porque es el que caduca más pronto.
+      </PageHead>
       {groups.map((g) => (
         <ProductStock key={g.product.id} product={g.product} lots={g.lots} />
       ))}
+      {groups.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
+          Todavía no hay producto en almacén. Regístralo en “Registrar entradas”.
+        </div>
+      )}
     </div>
   )
 }
@@ -47,21 +56,21 @@ function ProductStock({ product, lots }: { product: ProductSafe; lots: Lot[] }) 
             {product.name}{' '}
             <span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span>
           </div>
-          <div className="mono" style={{ fontSize: 13 }}>{total} u</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{total} {total === 1 ? 'pieza' : 'piezas'}</div>
         </div>
         {lots.map((l) => {
           const d = daysUntil(l.expiry_date)
           const sev = severity(d)
           return (
             <div key={l.id} className="lote">
-              <span className="lc">{l.lot_code}</span>
+              <span className="lc" title="Código de lote">{l.lot_code}</span>
               {l.id === fefoId && (
-                <span className="fefo"><Icon name="check" /> FEFO</span>
+                <span className="fefo"><Icon name="check" /> Usar primero</span>
               )}
               <span style={{ color: 'var(--ink-3)' }}>{fmtDate(l.expiry_date ?? '')}</span>
               <span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
-              <span className="lq">{l.quantity} u</span>
+              <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
             </div>
           )
         })}

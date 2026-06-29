@@ -2,11 +2,22 @@
 // inventory_movement (+cantidad). Muestra el ledger inmutable de movimientos.
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
+import { PageHead } from '../../app/PageHead'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useProducts } from '../../data/hooks/useProducts'
 import type { Lot, ProductSafe } from '../../data/types'
+
+// Motivos del movimiento en palabras claras (el dato técnico vive en el store).
+const reasonLabel = (r: string | null): string => ({
+  entrada: 'Entró a almacén',
+  surtido: 'Salió en un pedido',
+  venta: 'Salió en una venta',
+  merma: 'Baja (caducó / dañado)',
+  cancelacion: 'Regresó por cancelación',
+  ajuste: 'Ajuste de conteo',
+}[r ?? ''] ?? (r ?? '—'))
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1px solid var(--line)',
@@ -51,15 +62,20 @@ export function Entradas() {
       quantity: Number(qty),
       location: location.trim() || null,
     })
-    setToast(`Entrada registrada: ${lotCode.trim()} (+${qty} u)`)
+    setToast(`Entrada registrada: ${lotCode.trim()} (+${qty} pzas)`)
     setLotCode(''); setExpiry(''); setQty('')
     window.setTimeout(() => setToast(null), 2600)
   }
 
   return (
-    <div className="grid two" style={{ alignItems: 'start', gap: 18 }}>
+    <div className="grid" style={{ gap: 16 }}>
+      <PageHead title="Registrar entradas">
+        Cuando llega producto del proveedor, dalo de alta aquí: queda como un lote nuevo
+        con su caducidad y se suma al inventario. A la derecha ves el historial de todo lo que ha entrado y salido.
+      </PageHead>
+      <div className="grid two" style={{ alignItems: 'start', gap: 18 }}>
       <div className="card">
-        <div className="eyebrow">Registrar entrada</div>
+        <div className="eyebrow">Nueva entrada</div>
         <label style={labelStyle}>Producto</label>
         <select style={inputStyle} value={productId} onChange={(e) => setProductId(e.target.value)}>
           <option value="">Selecciona…</option>
@@ -95,12 +111,13 @@ export function Entradas() {
 
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '18px 18px 0' }}>
-          <div className="eyebrow">Movimientos (ledger inmutable)</div>
+          <div className="eyebrow">Historial de movimientos</div>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '-8px 0 4px' }}>No se puede editar ni borrar: cada entrada y salida queda registrada (trazabilidad).</p>
         </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Fecha</th><th>Lote</th><th>Motivo</th><th>Ref.</th><th>Cambio</th></tr>
+              <tr><th>Fecha</th><th>Lote</th><th>Qué pasó</th><th>Referencia</th><th>Cambio</th></tr>
             </thead>
             <tbody>
               {movements.map((m) => {
@@ -114,15 +131,16 @@ export function Entradas() {
                       <span className="lc">{lot?.lot_code ?? m.lot_id}</span>
                       {prod && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{prod.name}</div>}
                     </td>
-                    <td data-label="Motivo"><span className={'pill ' + (m.reason === 'entrada' ? 'p-ok' : 'p-neu')}>{m.reason}</span></td>
-                    <td data-label="Ref." className="mono" style={{ fontSize: 11.5 }}>{m.reference}</td>
-                    <td data-label="Cambio" className="mono" style={{ color: pos ? 'var(--green-deep)' : 'var(--danger)' }}>{pos ? '+' : ''}{m.change} u</td>
+                    <td data-label="Qué pasó"><span className={'pill ' + (m.reason === 'entrada' ? 'p-ok' : 'p-neu')}>{reasonLabel(m.reason)}</span></td>
+                    <td data-label="Referencia" className="mono" style={{ fontSize: 11.5 }}>{m.reference || '—'}</td>
+                    <td data-label="Cambio" className="mono" style={{ color: pos ? 'var(--green-deep)' : 'var(--danger)' }}>{pos ? '+' : ''}{m.change} {Math.abs(m.change) === 1 ? 'pza' : 'pzas'}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
         </div>
+      </div>
       </div>
 
       {toast && (

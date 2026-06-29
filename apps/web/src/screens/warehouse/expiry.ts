@@ -19,8 +19,9 @@ export function sevPill(s: Sev): 'p-dang' | 'p-warn' | 'p-ok' {
 }
 
 export function sevLabel(days: number | null): string {
-  if (days == null) return 'Sin fecha'
-  if (days < 0) return `Caducó hace ${-days} d`
+  if (days == null) return 'Sin caducidad'
+  if (days < 0) return `Caducó hace ${-days} día${-days === 1 ? '' : 's'}`
   if (days === 0) return 'Caduca hoy'
-  return `${days} d`
+  if (days === 1) return 'Caduca mañana'
+  return `Caduca en ${days} días`
 }

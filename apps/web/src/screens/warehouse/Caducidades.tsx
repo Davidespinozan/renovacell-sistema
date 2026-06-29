@@ -2,6 +2,7 @@
 // cercanos (y de los ya caducados).
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
+import { PageHead } from '../../app/PageHead'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -37,13 +38,16 @@ export function Caducidades() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Almacén · Caducidades</div>
+      <PageHead title="Por caducar">
+        Lotes ordenados por fecha de caducidad: arriba lo más urgente. Procura que salga primero
+        lo que está por vencer; si ya caducó, dalo de baja para que no se cuente como disponible.
+      </PageHead>
 
       {urgent.length > 0 && (
         <div className="alert">
           <div className="ico"><Icon name="clock" /></div>
           <div className="x">
-            <b>{urgent.length} lote(s) requieren atención.</b> Hay producto caducado o por vencer en ≤ 60 días. Prioriza su salida o retíralo.
+            <b>{urgent.length} lote(s) necesitan atención.</b> Hay producto caducado o que vence en menos de 60 días. Dale salida o retíralo.
           </div>
         </div>
       )}
@@ -52,7 +56,7 @@ export function Caducidades() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Producto</th><th>Lote</th><th>Caducidad</th><th>Restante</th><th>Cant.</th><th></th></tr>
+              <tr><th>Producto</th><th>Lote</th><th>Caduca</th><th>Estado</th><th>Cantidad</th><th></th></tr>
             </thead>
             <tbody>
               {rows.map(({ lot, d }) => {
@@ -62,8 +66,8 @@ export function Caducidades() {
                     <td data-label="Producto">{byId[lot.product_id]?.name ?? 'Producto'}</td>
                     <td data-label="Lote"><span className="lc">{lot.lot_code}</span></td>
                     <td data-label="Caducidad">{fmtDate(lot.expiry_date ?? '')}</td>
-                    <td data-label="Restante"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
-                    <td data-label="Cant." className="mono">{lot.quantity} u</td>
+                    <td data-label="Estado"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
+                    <td data-label="Cantidad" className="mono">{lot.quantity} {lot.quantity === 1 ? 'pza' : 'pzas'}</td>
                     <td data-label="" style={{ textAlign: 'right' }}>
                       <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => darDeBaja(lot.id, lot.lot_code, lot.quantity)}>Dar de baja</button>
                     </td>
