@@ -3,6 +3,7 @@
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
 import React from 'react'
 import { Placeholder } from './Placeholder'
+import { Bandeja } from './Bandeja'
 import { CommonView } from './CommonView'
 import { Chat } from './hub/Chat'
 import { Catalogo } from './doctor/Catalogo'
@@ -32,6 +33,7 @@ import { Icon } from '../app/icons'
 
 // Pantallas reales ya construidas (por key de pantalla).
 const SCREENS: Record<string, () => React.ReactNode> = {
+  bandeja: () => <Bandeja />,
   catalogo: () => <Catalogo />,
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,

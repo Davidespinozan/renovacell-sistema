@@ -39,6 +39,7 @@ export const ROLES: RoleDef[] = [
     key: 'admin', label: 'Administración', group: 'Administración · Dirección',
     icon: 'dashboard', isStaff: true, ready: true,
     modules: [
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check' },
       { key: 'tablero', label: 'Tablero', icon: 'dashboard' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid' },
@@ -64,6 +65,7 @@ export const ROLES: RoleDef[] = [
     key: 'warehouse', label: 'Almacén / Empaque', group: 'Almacén y Empaque · Alberto',
     icon: 'box', isStaff: true, ready: true,
     modules: [
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check' },
       { key: 'stock', label: 'Existencias', icon: 'box' },
       { key: 'surtido', label: 'Surtido (FEFO)', icon: 'layers' },
       { key: 'caduc', label: 'Caducidades', icon: 'clock' },
