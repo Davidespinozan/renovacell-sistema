@@ -1,7 +1,7 @@
 // DISEÑO (capability) · Solicitudes de recurso. Quien tenga la responsabilidad de
 // Diseño atiende aquí los recursos que el equipo pide desde la Vista Común.
-import React from 'react'
-import { Play, Check } from 'lucide-react'
+import React, { useState } from 'react'
+import { Play, Check, Upload, Eye } from 'lucide-react'
 import { fmtDate } from '../lib/format'
 import { useResources, type ResourceStatus } from '../data/hooks/useResources'
 
@@ -12,7 +12,15 @@ const META: Record<ResourceStatus, { label: string; pill: string }> = {
 }
 
 export function Solicitudes() {
-  const { data, setStatus } = useResources()
+  const { data, setStatus, deliver } = useResources()
+  const [toast, setToast] = useState<string | null>(null)
+
+  const onDeliver = (id: string, file: File | undefined) => {
+    if (!file) return
+    const r = new FileReader()
+    r.onload = () => { deliver(id, String(r.result)); setToast('Recurso entregado y adjunto.'); window.setTimeout(() => setToast(null), 2400) }
+    r.readAsDataURL(file)
+  }
   const sorted = data.slice().sort((a, b) => {
     const order = { solicitado: 0, en_proceso: 1, entregado: 2 }
     return order[a.status] - order[b.status] || (a.at < b.at ? 1 : -1)
@@ -41,16 +49,24 @@ export function Solicitudes() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
               <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Pidió {r.requestedBy} · {fmtDate(r.at)}</span>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                 {r.status === 'solicitado' && <button className="btn ghost sm" type="button" onClick={() => setStatus(r.id, 'en_proceso')}><Play size={14} /> Tomar</button>}
-                {r.status === 'en_proceso' && <button className="btn sm" type="button" onClick={() => setStatus(r.id, 'entregado')}><Check size={14} /> Marcar entregado</button>}
-                {r.status === 'entregado' && <span className="pill p-ok"><Check size={12} /> Listo</span>}
+                {r.status === 'en_proceso' && (
+                  <label className="btn sm" style={{ cursor: 'pointer' }}>
+                    <Upload size={14} /> Subir y entregar
+                    <input type="file" style={{ display: 'none' }} onChange={(e) => onDeliver(r.id, e.target.files?.[0])} />
+                  </label>
+                )}
+                {r.status === 'entregado' && (r.assetUrl
+                  ? <a className="btn ghost sm" href={r.assetUrl} target="_blank" rel="noreferrer" download><Eye size={14} /> Ver recurso</a>
+                  : <span className="pill p-ok"><Check size={12} /> Listo</span>)}
               </div>
             </div>
           </div>
         )
       })}
       {sorted.length === 0 && <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Sin solicitudes.</div>}
+      {toast && <div className="toast show"><Check size={16} /> {toast}</div>}
     </div>
   )
 }

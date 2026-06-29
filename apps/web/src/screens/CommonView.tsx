@@ -152,6 +152,9 @@ export function CommonView() {
                   <div style={{ fontWeight: 600, fontSize: 13.5 }}>{rr.title}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Pidió {rr.requestedBy}</div>
                 </div>
+                {rr.status === 'entregado' && rr.assetUrl && (
+                  <a className="btn ghost sm" href={rr.assetUrl} target="_blank" rel="noreferrer" download><Eye size={14} /> Ver</a>
+                )}
                 <span className={'pill ' + pill}>{lbl}</span>
               </div>
             )

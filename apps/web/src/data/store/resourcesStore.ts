@@ -39,3 +39,9 @@ export function setStatus(id: string, status: ResourceStatus) {
   items = items.map((r) => (r.id === id ? { ...r, status } : r))
   emit()
 }
+
+// Entregar el recurso: adjunta el archivo subido y marca entregado.
+export function deliver(id: string, assetUrl: string) {
+  items = items.map((r) => (r.id === id ? { ...r, status: 'entregado', assetUrl } : r))
+  emit()
+}
