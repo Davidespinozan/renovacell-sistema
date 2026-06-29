@@ -4,7 +4,6 @@
 import React, { useState } from 'react'
 import { Mail, Lock, LogIn } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
-import { MOCK_ACCOUNTS } from '../data/mock/accounts'
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px 11px 38px', border: '1px solid var(--line)',
@@ -13,7 +12,7 @@ const input: React.CSSProperties = {
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 
 export function Login() {
-  const { signIn, signInAs, goLanding } = useAuth()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,24 +49,6 @@ export function Login() {
 
           <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }}><LogIn size={16} /> Entrar</button>
         </form>
-
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--ink-3)', marginBottom: 8 }}>Cuentas de prueba · contraseña <b>demo</b></div>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {MOCK_ACCOUNTS.map((a) => (
-              <button key={a.email} type="button" className="btn ghost sm" style={{ justifyContent: 'space-between', width: '100%' }} onClick={() => signInAs(a)}>
-                <span>{a.name}</span>
-                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.email}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button type="button" onClick={goLanding} style={{ background: 'none', border: 'none', color: 'var(--green-deep)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-            Ver sitio público →
-          </button>
-        </div>
       </div>
     </div>
   )
