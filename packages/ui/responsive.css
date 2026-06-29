@@ -77,11 +77,13 @@
 .side-role svg { width: 15px; height: 15px; opacity: .92; flex: none; }
 
 /* --- Usuario logueado en el sidebar (sobre el verde) ------------------------ */
-.side-user { display: flex; align-items: center; gap: 10px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
-.su-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.22); color: #fff; font-weight: 700; font-size: 12.5px; }
-.su-meta { min-width: 0; flex: 1; }
-.su-name { color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.su-role { color: rgba(255,255,255,.72); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-user { display: flex; align-items: center; gap: 8px; margin: 0 14px 12px; padding: 10px 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; }
+.su-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
+.su-open:hover .su-name { text-decoration: underline; }
+.su-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.22); color: #fff; font-weight: 700; font-size: 12.5px; object-fit: cover; }
+.su-meta { min-width: 0; flex: 1; display: block; }
+.su-name { display: block; color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.su-role { display: block; color: rgba(255,255,255,.72); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .su-out { flex: none; width: 32px; height: 32px; border-radius: 9px; border: none; background: rgba(255,255,255,.14); color: #fff; display: grid; place-items: center; cursor: pointer; transition: .15s; }
 .su-out:hover { background: rgba(255,255,255,.28); }
 

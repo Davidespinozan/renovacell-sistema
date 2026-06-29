@@ -1,17 +1,19 @@
 // Sidebar del hub: marca + indicador de rol + navegación agrupada por secciones
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
-import React from 'react'
+import React, { useState } from 'react'
 import { LogOut } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_SCREENS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
+import { ProfileModal } from '../screens/MiPerfil'
 
 const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen, user, logout, capabilities } = useRole()
+  const [profileOpen, setProfileOpen] = useState(false)
   const r = getRole(role)
   const nav = getNav(r, undefined, capabilities)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
@@ -69,11 +71,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="side-foot">
         {user && (
           <div className="side-user">
-            <div className="su-av">{initials(user.name)}</div>
-            <div className="su-meta">
-              <div className="su-name">{user.name}</div>
-              <div className="su-role">{r.label}</div>
-            </div>
+            <button type="button" className="su-open" title="Mi perfil" onClick={() => setProfileOpen(true)}>
+              {user.avatarUrl
+                ? <img className="su-av" src={user.avatarUrl} alt="" />
+                : <span className="su-av">{initials(user.name)}</span>}
+              <span className="su-meta">
+                <span className="su-name">{user.name}</span>
+                <span className="su-role">{r.label}</span>
+              </span>
+            </button>
             <button className="su-out" type="button" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={logout}>
               <LogOut size={16} />
             </button>
@@ -83,6 +89,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <span className="live" /> Operado por <b>STRYV</b>
         </div>
       </div>
+
+      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
     </aside>
   )
 }

@@ -8,7 +8,7 @@ import { FEATURES } from '../app/config'
 
 export type AppMode = 'app' | 'landing' | 'login'
 
-export interface SessionUser { name: string; email: string }
+export interface SessionUser { name: string; email: string; avatarUrl?: string }
 
 interface RoleState {
   role: RoleKey
@@ -22,6 +22,7 @@ interface RoleState {
   setMode: (m: AppMode) => void
   login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
   logout: () => void
+  updateProfile: (patch: Partial<SessionUser>) => void
 }
 
 const RoleCtx = createContext<RoleState | null>(null)
@@ -59,8 +60,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setMode('login')
   }
 
+  const updateProfile = (patch: Partial<SessionUser>) =>
+    setUser((u) => (u ? { ...u, ...patch } : u))
+
   const value = useMemo(
-    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout }),
+    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout, updateProfile }),
     [role, screen, mode, verified, user, capabilities],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>
