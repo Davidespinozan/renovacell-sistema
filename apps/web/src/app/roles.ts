@@ -10,7 +10,7 @@ import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
 export type RoleKey =
-  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
+  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver' | 'design'
 
 export interface ScreenDef {
   key: string
@@ -91,6 +91,15 @@ export const ROLES: RoleDef[] = [
     icon: 'truck', isStaff: true, ready: true, requiresFeature: 'chofer',
     modules: [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
+    ],
+  },
+  {
+    key: 'design', label: 'Diseño', group: 'Diseño · Producción',
+    icon: 'image', isStaff: true, ready: true,
+    modules: [
+      { key: 'dis_cal', label: 'Calendario', icon: 'clock' },
+      { key: 'dis_promos', label: 'Promociones', icon: 'megaphone' },
+      { key: 'dis_lib', label: 'Biblioteca y fichas', icon: 'image' },
     ],
   },
 ]

@@ -27,6 +27,9 @@ import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { Bitacora } from './admin/Bitacora'
 import { Reabastecimiento } from './admin/Reabastecimiento'
+import { Calendario } from './design/Calendario'
+import { Promociones } from './design/Promociones'
+import { BibliotecaFichas } from './design/BibliotecaFichas'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
@@ -58,6 +61,9 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_audit: () => <Bitacora />,
   av_inv: () => <Reabastecimiento />,
   compras: () => <Reabastecimiento />,
+  dis_cal: () => <Calendario />,
+  dis_promos: () => <Promociones />,
+  dis_lib: () => <BibliotecaFichas />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
 }
