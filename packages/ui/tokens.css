@@ -19,6 +19,12 @@
      El verde queda solo como ACENTO (ítem activo, íconos). */
   --side-bg: #16181d;
   --side-active: rgba(255, 255, 255, .12);
+  /* Acabado metálico: gradiente con dirección (luz desde arriba), grano fino
+     tipo metal cepillado y filo especular. Da profundidad sin perder sobriedad. */
+  --chrome-grad: linear-gradient(177deg, #262b33 0%, #181b21 50%, #0f1115 100%);
+  --chrome-grad-h: linear-gradient(180deg, #23272f 0%, #16191e 100%);
+  --chrome-grain: repeating-linear-gradient(90deg, rgba(255, 255, 255, .015) 0, rgba(255, 255, 255, .015) 1px, transparent 1px, transparent 3px);
+  --chrome-edge: rgba(255, 255, 255, .07);
 
   /* Tinta / texto */
   --ink: #0A0C08;
