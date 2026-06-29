@@ -50,8 +50,8 @@ svg{display:block}
 .backbtn svg{width:15px;height:15px}
 .cursys{margin-left:13px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
 /* Sidebar con el COLOR DE MARCA (verde), no oscuro. Texto blanco; activo en blanco translúcido. */
-.side{position:relative;background:linear-gradient(168deg,#067a1a 0%,#00500b 100%);color:rgba(255,255,255,.82);display:flex;flex-direction:column;padding:22px 0;overflow:hidden}
-.side::before{content:"";position:absolute;top:-80px;left:-40px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+.side{position:relative;background:var(--side-bg);color:rgba(255,255,255,.74);display:flex;flex-direction:column;padding:22px 0;overflow:hidden;border-right:1px solid rgba(255,255,255,.06)}
+.side::before{content:"";position:absolute;top:-90px;left:-50px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(95,184,115,.12),transparent 70%)}
 .brand{display:flex;align-items:center;gap:11px;padding:2px 22px 20px}
 .brand .lw{position:relative;width:40px;height:40px;flex:none}
 .brand .lw::after{content:"";position:absolute;inset:-6px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.35),transparent 70%)}
@@ -59,11 +59,13 @@ svg{display:block}
 .brand .bn{font-weight:700;font-size:15.5px;color:#fff;line-height:1}
 .brand .bs{font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.72);font-weight:600;margin-top:4px}
 .nav{display:flex;flex-direction:column;gap:2px;padding:0 13px;flex:1;overflow-y:auto}
-.nav .grp{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);padding:14px 11px 8px;font-weight:600}
-.nav a{display:flex;align-items:center;gap:11px;padding:9.5px 11px;border-radius:11px;color:rgba(255,255,255,.82);font-size:13.5px;font-weight:500;cursor:pointer;transition:.16s}
-.nav a svg{width:17px;height:17px;opacity:.9;flex:none}
-.nav a:hover{background:rgba(255,255,255,.12);color:#fff}
-.nav a.on{background:rgba(255,255,255,.17);color:#fff}
+.nav .grp{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:14px 11px 8px;font-weight:600}
+.nav a{display:flex;align-items:center;gap:11px;padding:9.5px 11px;border-radius:11px;color:rgba(255,255,255,.72);font-size:13.5px;font-weight:500;cursor:pointer;transition:.16s}
+.nav a svg{width:17px;height:17px;opacity:.8;flex:none}
+.nav a:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav a:hover svg{opacity:1}
+.nav a.on{background:var(--side-active);color:#fff;box-shadow:inset 2px 0 0 var(--green-soft)}
+.nav a.on svg{color:var(--green-soft);opacity:1}
 .side-foot{margin:0 13px;padding:13px 11px 2px;border-top:1px solid rgba(255,255,255,.14)}
 .side-foot .comp{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#9aa291;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:8px}
 .side-foot .comp svg{width:13px;height:13px;color:var(--green-soft)}
@@ -72,9 +74,9 @@ svg{display:block}
 .live{width:7px;height:7px;border-radius:50%;background:#fff;animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(95,184,115,.5)}70%{box-shadow:0 0 0 7px rgba(95,184,115,0)}100%{box-shadow:0 0 0 0 rgba(95,184,115,0)}}
 .main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:radial-gradient(1100px 460px at 100% -8%,rgba(95,184,115,.12),transparent 58%),var(--hueso)}
-.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 30px;background:rgba(247,248,245,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9}
-.screen-title{font-size:23px;font-weight:500;letter-spacing:-.012em;line-height:1.1}
-.screen-sub{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 30px;background:var(--side-bg);border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:9;color:#fff}
+.screen-title{font-size:23px;font-weight:500;letter-spacing:-.012em;line-height:1.1;color:#fff}
+.screen-sub{font-size:12.5px;color:rgba(255,255,255,.7);margin-top:2px}
 .top-r{display:flex;align-items:center;gap:12px}
 .searchbox{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:var(--pill);padding:8px 14px;color:var(--ink-3);transition:.16s;width:150px}
 .searchbox:focus-within{border-color:var(--green-soft);box-shadow:0 0 0 3px rgba(95,184,115,.18)}
@@ -257,11 +259,12 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
 /* Bottom nav móvil (color de marca) — navegación por rol, mejor UX en móvil */
 .bnav{display:none}
 @media (max-width:900px){
-  .bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:58;background:linear-gradient(168deg,#067a1a,#00500b);border-top:1px solid rgba(255,255,255,.12);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));justify-content:space-around;gap:4px;box-shadow:0 -8px 26px rgba(0,0,0,.18)}
-  .bnav a{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 4px;border-radius:14px;color:rgba(255,255,255,.62);font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;text-align:center;line-height:1.1}
+  .bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:58;background:var(--side-bg);border-top:1px solid rgba(255,255,255,.08);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));justify-content:space-around;gap:4px;box-shadow:0 -8px 26px rgba(0,0,0,.18)}
+  .bnav a{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 4px;border-radius:14px;color:rgba(255,255,255,.6);font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;text-align:center;line-height:1.1}
   .bnav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bnav a svg{width:21px;height:21px;flex:none}
-  .bnav a.on{background:rgba(255,255,255,.16);color:#fff}
+  .bnav a.on{background:var(--side-active);color:#fff}
+  .bnav a.on svg{color:var(--green-soft)}
   .canvas{padding-bottom:88px!important}
 }
 

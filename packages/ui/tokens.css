@@ -15,6 +15,11 @@
   --hueso: #F9FAF8;
   --white: #fff;
 
+  /* Chrome (menú + barra de título): verde PROFUNDO y elegante, no neón.
+     El contenido queda neutro para no saturar. */
+  --side-bg: #0E3A1C;
+  --side-active: rgba(255, 255, 255, .15);
+
   /* Tinta / texto */
   --ink: #0A0C08;
   --ink-2: #252921;

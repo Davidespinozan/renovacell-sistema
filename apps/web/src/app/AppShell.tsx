@@ -31,7 +31,7 @@ export function AppShell() {
         </div>
       </div>
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
-      <BottomNav />
+      <BottomNav onMenu={() => setDrawer(true)} />
     </div>
   )
 }
