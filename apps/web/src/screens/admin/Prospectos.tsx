@@ -5,7 +5,7 @@
 // fase de Supabase.
 import React, { useMemo, useState } from 'react'
 import {
-  Plus, X, UserPlus, Send, ShieldCheck, Clock, ArrowRight, Ban, MessageSquare, CheckCircle2,
+  Plus, X, UserPlus, Send, Clock, ArrowRight, Ban, MessageSquare, CheckCircle2,
 } from 'lucide-react'
 import { fmtDate, initials, avatarColor } from '../../lib/format'
 import { useProspects, type ProspectStatus, type ProspectNote } from '../../data/hooks/useProspects'
@@ -69,15 +69,6 @@ export function Prospectos() {
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}>
           <Plus size={14} /> Nuevo prospecto
         </button>
-      </div>
-
-      <div className="sysnote">
-        <ShieldCheck size={18} />
-        <span>
-          Bandeja de leads (datos personales · solo staff). La captura automática desde la landing
-          se conectará en la fase de Supabase; por ahora el equipo registra manualmente los que
-          llegan por WhatsApp o llamada.
-        </span>
       </div>
 
       {nuevos > 0 && (

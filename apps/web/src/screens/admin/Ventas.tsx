@@ -167,8 +167,7 @@ function VentasResumen() {
       {/* Avanzado: retención / riesgo */}
       <div style={{ borderTop: '1px solid var(--line)', paddingTop: 22 }}>
         <div className="eyebrow" style={{ color: 'var(--green-deep)' }}>Avanzado</div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Retención y recompra</h2>
-        <p style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 16 }}>Quién vuelve a comprar y quién lleva tiempo sin pedir.</p>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Retención y recompra</h2>
         <Bloque titulo={<><AlertTriangle size={14} style={ic} /> Doctores en riesgo (sin pedidos recientes)</>}>
           {risk.length === 0 ? (
             <div style={{ fontSize: 13.5, color: 'var(--ink-3)' }}>Ningún doctor verificado en riesgo. 🎉</div>

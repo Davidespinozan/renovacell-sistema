@@ -4,7 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import React, { useMemo, useState } from 'react'
-import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, ShieldCheck } from 'lucide-react'
+import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -91,20 +91,11 @@ export function Facturacion() {
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Administración · Facturación</div>
 
-      <div className="sysnote">
-        <ShieldCheck size={18} />
-        <span>
-          Gestión de cobro y CFDI sobre las ventas reales. La emisión del CFDI (Facturama/PAC) y el
-          cobro por Stripe se conectan en la fase de Supabase; aquí <b>“Emitir CFDI”</b> y
-          <b> “Marcar cobrado”</b> son simulación con la forma final de los datos.
-        </span>
-      </div>
-
       {/* KPIs */}
       <div className="grid sigs">
         <Stat icon={<FileText size={18} />} v={String(solicitados)} k="CFDI solicitados" s="por el cliente" />
         <Stat icon={<Receipt size={18} />} v={String(porEmitir)} k="Por emitir" s="solicitados sin CFDI" />
-        <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados (mock)" />
+        <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados" />
         <Stat icon={<BadgeDollarSign size={18} />} v={money(bill.paid)} k="Cobrado" s="pagos confirmados" />
         <Stat icon={<Clock size={18} />} v={money(bill.pending)} k="Por cobrar" s="contra pedido / pendiente" />
       </div>
@@ -231,7 +222,7 @@ function BillDetail({ order, productsById, clientName, onClose }: {
           {emitida && uuid && (
             <div className="sysnote" style={{ marginTop: 14 }}>
               <FileCheck2 size={16} />
-              <span>CFDI emitido (simulado) · UUID <b className="mono">{uuid}</b>. En producción este folio viene del PAC (Facturama).</span>
+              <span>CFDI emitido · UUID <b className="mono">{uuid}</b></span>
             </div>
           )}
 

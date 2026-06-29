@@ -32,11 +32,7 @@ export function Bitacora() {
 
       <div className="sysnote">
         <ShieldCheck size={18} />
-        <span>
-          Registro <b>inmutable</b> de acciones críticas (creación, cambios de estatus, autorizaciones,
-          cobro y CFDI) con autor y fecha/hora. No se edita ni se borra. En producción es <code>audit_logs</code>
-          {' '}insert-only por RLS.
-        </span>
+        <span>Registro <b>inmutable</b> de acciones críticas con autor y fecha/hora. No se edita ni se borra.</span>
       </div>
 
       <div className="fchips">

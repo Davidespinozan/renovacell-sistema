@@ -28,10 +28,6 @@ export function Surtido() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Almacén · Surtido (FEFO)</div>
-      <div className="footnote">
-        <span className="d" />
-        El sistema sugiere lotes por FEFO: sale primero el que caduca antes. Al confirmar se descuenta del lote y se registra el movimiento.
-      </div>
 
       {pending.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
@@ -107,7 +103,7 @@ function SurtirModal({
             <div className="mhead">
               <div>
                 <h3>Surtir {order.external_ref}</h3>
-                <div className="ms">Lotes sugeridos por FEFO (sale primero el que caduca antes).</div>
+                <div className="ms">Lotes sugeridos por FEFO.</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>

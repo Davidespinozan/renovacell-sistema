@@ -120,7 +120,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
             <div className="mhead">
               <div>
                 <h3>Asignar envío · {order.external_ref}</h3>
-                <div className="ms">Elige el método. La paquetería se sugiere según el destino.</div>
+                <div className="ms">Elige el método de envío.</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
@@ -159,10 +159,6 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                     <option value="">Selecciona…</option>
                     {MOCK_DRIVERS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <div className="sysnote" style={{ marginTop: 14 }}>
-                    <Icon name="usercheck" />
-                    <span>Entrega local con chofer propio (sin guía de paquetería). Alimenta el módulo de Seguimiento.</span>
-                  </div>
                 </>
               )}
 

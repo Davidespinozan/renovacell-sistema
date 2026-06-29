@@ -183,9 +183,6 @@ function CartPanel({
           <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={onReview}>
             <Icon name="check" /> Revisar y crear pedido
           </button>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.4 }}>
-            Pago contra pedido · la factura CFDI es opcional.
-          </div>
         </>
       )}
     </div>
@@ -238,7 +235,6 @@ function CheckoutModal({
               <p>
                 Tu pedido <b>{folio}</b> quedó registrado como <b>pago contra pedido</b>.
                 {quote.length > 0 && ' Los productos a consultar se enviaron como solicitud de cotización.'}
-                {' '}El cobro se coordina después (Stripe próximamente).
               </p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Entendido</button>
             </div>
@@ -248,7 +244,6 @@ function CheckoutModal({
             <div className="mhead">
               <div>
                 <h3>Revisar pedido</h3>
-                <div className="ms">Confirma para crear el pedido (contra pedido).</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
@@ -274,11 +269,6 @@ function CheckoutModal({
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
-
-              <div className="sysnote" style={{ marginTop: 14 }}>
-                <Icon name="shield" />
-                <span>Pago <b>contra pedido</b>: el cobro por Stripe se habilitará después. Por ahora solo se registra el pedido.</span>
-              </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>

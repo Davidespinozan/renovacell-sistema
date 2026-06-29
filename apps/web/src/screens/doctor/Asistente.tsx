@@ -113,10 +113,7 @@ export function Asistente() {
       {/* Nota de alcance SIEMPRE visible (cliente regulado) */}
       <div className="sysnote" style={{ background: 'var(--blue-bg)', borderColor: '#CFE0EC', color: 'var(--blue)' }}>
         <ShieldCheck size={18} />
-        <span>
-          Asistente de <b>pedidos</b>: catálogo, pedidos y estatus. No da consejo médico ni indicaciones
-          de uso — para lo clínico, revisa la ficha técnica o consúltalo con Renovacell.
-        </span>
+        <span>Asistente de <b>pedidos</b>: catálogo, pedidos y estatus. No da consejo clínico.</span>
       </div>
 
       <div className="asst-shell">

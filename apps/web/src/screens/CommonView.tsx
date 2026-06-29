@@ -180,7 +180,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div><h3>Subir asset</h3><div className="ms">Logo, imagen o documento para el equipo. (Mock: sin storage real todavía.)</div></div>
+          <div><h3>Subir asset</h3><div className="ms">Logo, imagen o documento para el equipo.</div></div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
