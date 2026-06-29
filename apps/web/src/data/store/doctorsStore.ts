@@ -4,6 +4,7 @@
 import type { Profile } from '../types'
 import { MOCK_DOCTORS } from '../mock/doctores'
 import { notify } from './notificationsStore'
+import { logAudit } from './auditStore'
 
 let doctors: Profile[] = [...MOCK_DOCTORS]
 const listeners = new Set<() => void>()
@@ -21,8 +22,10 @@ export function subscribe(cb: () => void): () => void {
 export const getSnapshot = (): Profile[] => snapshot
 
 export function setVerified(id: string, verified: boolean) {
+  const name = doctors.find((d) => d.id === id)?.full_name ?? id
   doctors = doctors.map((d) => (d.id === id ? { ...d, verified } : d))
   emit()
+  logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: name })
 }
 
 // Alta de doctor en estado PENDIENTE (verified:false). La usa la conversión de

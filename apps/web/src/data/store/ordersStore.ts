@@ -5,6 +5,7 @@
 import type { Order, OrderItem } from '../types'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
+import { logAudit } from './auditStore'
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 
@@ -73,6 +74,7 @@ export function createOrder(input: {
   items = [...items, ...newItems]
   emit()
   notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
+  logAudit({ actor: 'Portal del Doctor', action: 'Pedido creado', resource: folio })
   return { ...order, items: newItems }
 }
 
@@ -108,6 +110,8 @@ export function createPosOrder(input: {
   orders = [order, ...orders]
   items = [...items, ...newItems]
   emit()
+  notify({ text: `Venta POS ${folio} cobrada`, roles: ['admin'], screen: 'av_ventas' })
+  logAudit({ actor: 'Punto de Venta', action: 'Venta POS', resource: folio, detail: input.payment_method })
   return { ...order, items: newItems }
 }
 
@@ -120,6 +124,7 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
   )
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} surtido · por empacar`, roles: ['warehouse'], screen: 'cola' })
+  logAudit({ actor: 'Almacén', action: 'Surtido (FEFO)', resource: folioOf(orderId) })
 }
 
 // Empaque: al asignar envío, el pedido pasa a En camino y guarda el resumen de envío.
@@ -127,6 +132,7 @@ export function markShipped(orderId: string, shipping_meta: Record<string, unkno
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
+  logAudit({ actor: 'Empaque', action: 'Envío asignado', resource: folioOf(orderId) })
 }
 
 // Seguimiento/Chofer: entrega confirmada -> cierra el ciclo (Entregado).
@@ -134,6 +140,7 @@ export function markDelivered(orderId: string) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
+  logAudit({ actor: 'Chofer', action: 'Entrega confirmada', resource: folioOf(orderId) })
 }
 
 // Facturación: emisión de CFDI (MOCK). Hoy genera un folio fiscal simulado;
@@ -155,6 +162,7 @@ export function markInvoiced(orderId: string) {
   )
   emit()
   notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+  logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
 }
 
 // Facturación: registrar el cobro (MOCK). En Supabase = update payment_status
@@ -163,4 +171,5 @@ export function markPaid(orderId: string) {
   orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid' } : o))
   emit()
   notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+  logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
 }
