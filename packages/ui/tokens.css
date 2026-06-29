@@ -15,10 +15,10 @@
   --hueso: #F9FAF8;
   --white: #fff;
 
-  /* Chrome (menú + barra de título): verde PROFUNDO y elegante, no neón.
-     El contenido queda neutro para no saturar. */
-  --side-bg: #0E3A1C;
-  --side-active: rgba(255, 255, 255, .15);
+  /* Chrome (menú + barra de título): negro neutro elegante (mismo del login).
+     El verde queda solo como ACENTO (ítem activo, íconos). */
+  --side-bg: #16181d;
+  --side-active: rgba(255, 255, 255, .12);
 
   /* Tinta / texto */
   --ink: #0A0C08;
