@@ -12,7 +12,7 @@
 
   /* Neutros / superficies */
   --carbon: #23271F;
-  --hueso: #F9FAF8;
+  --hueso: #F4F3F0;   /* greige neutro (gris cafecito), no verdoso */
   --white: #fff;
 
   /* Chrome (menú + barra de título): negro neutro elegante (mismo del login).
@@ -66,10 +66,10 @@
   --glass-border: rgba(255,255,255,.55);
   --edge-light: linear-gradient(90deg, transparent, rgba(0,115,17,.34), transparent);
 
-  /* Luz ambiental por área (verde marca por defecto). Cada área la redefine:
-     posición e intensidad de la luz cambian, el color se mantiene en familia. */
-  --area-tint: rgba(95,184,115,.13);
-  --area-tint-2: rgba(0,115,17,.05);
+  /* Luz ambiental por área: tinte NEUTRO (greige cálido), nada de verde de
+     fondo. Cada área cambia la posición e intensidad de la luz, no el color. */
+  --area-tint: rgba(122,112,98,.12);
+  --area-tint-2: rgba(96,88,76,.06);
   --area-light: radial-gradient(1100px 480px at 100% -8%, var(--area-tint), transparent 58%),
                 radial-gradient(760px 420px at -6% 110%, var(--area-tint-2), transparent 60%);
 }
