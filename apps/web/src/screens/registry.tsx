@@ -30,7 +30,7 @@ import { Facturacion } from './admin/Facturacion'
 import { Bitacora } from './admin/Bitacora'
 import { Reabastecimiento } from './admin/Reabastecimiento'
 import { Equipo } from './admin/Equipo'
-import { Contenido } from './admin/Contenido'
+import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
 import { Eventos } from './pos/Eventos'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
@@ -66,7 +66,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_inv: () => <Reabastecimiento />,
   compras: () => <Reabastecimiento />,
   av_equipo: () => <Equipo />,
-  av_contenido: () => <Contenido />,
+  av_catalogo: () => <CatalogoAdmin />,
+  av_sitio: () => <SitioWeb />,
   eventos: () => <Eventos />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,

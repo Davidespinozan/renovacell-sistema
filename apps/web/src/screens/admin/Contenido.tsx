@@ -10,24 +10,28 @@ import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts
 import { useLanding, type LandingContent } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
 
-type Tab = 'productos' | 'landing'
-
-export function Contenido() {
-  const [tab, setTab] = useState<Tab>('productos')
+// Pantalla "Catálogo" (Comercial): edita los productos del Portal del Doctor.
+export function CatalogoAdmin() {
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Contenido">
-        Dos superficies distintas, con público distinto: el <b>catálogo del Portal del Doctor</b>
-        (lo ven solo doctores verificados, para comprar) y la <b>landing pública</b> (la ve cualquiera,
-        para captar e informar). Puedes dar acceso a editar con la responsabilidad “Contenido” desde Equipo.
+      <PageHead title="Catálogo">
+        Lo que ven los doctores <b>verificados</b> en su portal para comprar. Crea, edita precios
+        y muestra/oculta productos; el Portal lo refleja al instante.
       </PageHead>
+      <ProductsEditor />
+    </div>
+  )
+}
 
-      <div className="seg" style={{ alignSelf: 'flex-start' }}>
-        <button type="button" className={tab === 'productos' ? 'active' : undefined} onClick={() => setTab('productos')}>Catálogo · Portal del Doctor</button>
-        <button type="button" className={tab === 'landing' ? 'active' : undefined} onClick={() => setTab('landing')}>Landing · Página pública</button>
-      </div>
-
-      {tab === 'productos' ? <ProductsEditor /> : <LandingTab />}
+// Pantalla "Sitio web" (Comercial): edita la landing pública (captación).
+export function SitioWeb() {
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      <PageHead title="Sitio web">
+        La página pública (landing): <b>captación e información</b>, no venta. Edítala completa abajo;
+        el embudo es landing → Prospectos → verificación → Portal.
+      </PageHead>
+      <LandingTab />
     </div>
   )
 }

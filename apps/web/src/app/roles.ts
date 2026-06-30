@@ -49,8 +49,9 @@ export const ROLES: RoleDef[] = [
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
       { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
+      { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Comercial' },
+      { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Comercial' },
       { key: 'av_inv', label: 'Inventario', icon: 'box', section: 'Operación' },
-      { key: 'av_contenido', label: 'Contenido', icon: 'grid', section: 'Operación' },
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
       { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
@@ -123,8 +124,11 @@ export const CAPABILITIES: CapabilityDef[] = [
   // Sin módulos propios: es un permiso (publicar/gestionar anuncios en Vista Común).
   { key: 'anuncios', label: 'Anuncios', modules: [] },
   {
-    key: 'contenido', label: 'Contenido',
-    modules: [{ key: 'av_contenido', label: 'Contenido', icon: 'grid', section: 'Contenido' }],
+    key: 'contenido', label: 'Catálogo y sitio web',
+    modules: [
+      { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Comercial' },
+      { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Comercial' },
+    ],
   },
 ]
 export const getCapability = (k: CapabilityKey): CapabilityDef | undefined => CAPABILITIES.find((c) => c.key === k)
