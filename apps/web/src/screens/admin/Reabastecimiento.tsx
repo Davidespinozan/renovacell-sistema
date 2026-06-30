@@ -10,6 +10,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
 import { stockByProduct } from '../../data/ops/stock'
+import { costOf } from '../../data/mock/costs'
 import type { ProductSafe } from '../../data/types'
 
 const LOW = 20      // umbral de stock bajo (reorden)
@@ -115,7 +116,7 @@ export function Reabastecimiento() {
           suggested={replen.suggested}
           onClose={() => setReplen(null)}
           onConfirm={(input) => {
-            createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, kind: input.kind, supplier: input.supplier })
+            createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, unit_cost: input.unitCost, kind: input.kind, supplier: input.supplier })
             setReplen(null)
           }}
         />
@@ -126,7 +127,7 @@ export function Reabastecimiento() {
           po={receiving}
           onClose={() => setReceiving(null)}
           onConfirm={(input) => {
-            addEntry({ product_id: receiving.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date, quantity: input.quantity, location: null })
+            addEntry({ product_id: receiving.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date, quantity: input.quantity, location: null, unit_cost: receiving.unit_cost })
             markReceived(receiving.id)
             setReceiving(null)
           }}
@@ -143,13 +144,15 @@ function ReplenishModal({ product, suggested, onClose, onConfirm }: {
   product: ProductSafe
   suggested: number
   onClose: () => void
-  onConfirm: (input: { qty: number; kind: ReplenKind; supplier: string | null }) => void
+  onConfirm: (input: { qty: number; unitCost: number; kind: ReplenKind; supplier: string | null }) => void
 }) {
   const [kind, setKind] = useState<ReplenKind>('compra')
   const [supplier, setSupplier] = useState('')
   const [qty, setQty] = useState(String(suggested))
+  const [cost, setCost] = useState(String(costOf(product.id) || ''))
   const n = Math.max(0, parseInt(qty, 10) || 0)
-  const valid = n > 0 && (kind === 'produccion' || supplier.trim() !== '')
+  const c = Math.max(0, Number(cost) || 0)
+  const valid = n > 0 && c > 0 && (kind === 'produccion' || supplier.trim() !== '')
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -172,16 +175,25 @@ function ReplenishModal({ product, suggested, onClose, onConfirm }: {
             </>
           )}
 
-          <label style={lbl}>Cantidad</label>
-          <input style={fld} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+          <div className="form-grid-2">
+            <div>
+              <label style={lbl}>Cantidad</label>
+              <input style={fld} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>{kind === 'compra' ? 'Costo unitario (proveedor)' : 'Costo unitario (producir)'}</label>
+              <input style={fld} type="number" min={1} value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+          {c > 0 && n > 0 && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>Total: <b className="mono">${(c * n).toLocaleString('es-MX')}</b> · este costo se hereda al lote (para el costo de ventas real).</div>}
 
           <div className="sysnote" style={{ marginTop: 14 }}>
-            <span>Queda <b>pendiente de recibir</b>. Almacén lo dará de alta como lote (con caducidad) cuando llegue.</span>
+            <span>Queda <b>pendiente de recibir</b>. Almacén lo dará de alta como lote (con caducidad) cuando llegue.{kind === 'compra' ? ' La compra entra a cuentas por pagar hasta que la liquides.' : ''}</span>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onConfirm({ qty: n, kind, supplier: supplier.trim() || null })}>
+            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onConfirm({ qty: n, unitCost: c, kind, supplier: supplier.trim() || null })}>
               {kind === 'compra' ? 'Registrar compra' : 'Registrar producción'}
             </button>
           </div>

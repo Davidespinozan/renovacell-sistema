@@ -6,6 +6,7 @@ import type { Lot, InventoryMovement } from '../types'
 import { MOCK_LOTS, MOCK_MOVEMENTS } from '../mock/inventory'
 import { notify } from './notificationsStore'
 import { getSnapshot as productsSnapshot } from './productsStore'
+import { costOf } from '../mock/costs'
 
 const LOW_STOCK_REORDER = 20 // umbral para avisar a Dirección que hay que reabastecer
 
@@ -33,7 +34,8 @@ function flagLowStock(before: Record<string, number>, ids: Set<string>) {
   })
 }
 
-let lots: Lot[] = [...MOCK_LOTS]
+// Los lotes semilla heredan el costo del producto (los nuevos lo traen de la compra/producción).
+let lots: Lot[] = MOCK_LOTS.map((l) => ({ ...l, unit_cost: l.unit_cost ?? costOf(l.product_id) }))
 let movements: InventoryMovement[] = [...MOCK_MOVEMENTS]
 let seq = 1000
 
@@ -66,6 +68,7 @@ export interface EntryInput {
   expiry_date: string | null
   quantity: number
   location: string | null
+  unit_cost?: number | null   // costo unitario al que entra (de la compra/producción)
 }
 
 // Registrar entrada: crea un lote nuevo y su movimiento (+cantidad).
@@ -79,6 +82,7 @@ export function addEntry(input: EntryInput): Lot {
     expiry_date: input.expiry_date,
     quantity: input.quantity,
     location: input.location,
+    unit_cost: input.unit_cost ?? costOf(input.product_id),
     metadata: null,
   }
   const mov: InventoryMovement = {

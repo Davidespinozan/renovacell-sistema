@@ -14,9 +14,11 @@ export interface PurchaseOrder {
   product_id: string
   product_name: string
   qty: number
+  unit_cost: number         // costo unitario (proveedor o producción) → hereda al lote
   kind: ReplenKind
   supplier: string | null   // proveedor (solo en compra)
   status: ReplenStatus
+  paid: boolean             // si es compra: ¿ya se pagó al proveedor? (cuentas por pagar)
   created_at: string
 }
 
@@ -38,12 +40,14 @@ export const getSnapshot = (): PurchaseOrder[] => snapshot
 
 // Dirección registra el reabastecimiento (compra o producción). Avisa a Almacén
 // para que lo reciba y dé de alta el lote.
-export function createReplenishment(input: { product_id: string; product_name: string; qty: number; kind: ReplenKind; supplier?: string | null }): PurchaseOrder {
+export function createReplenishment(input: { product_id: string; product_name: string; qty: number; unit_cost: number; kind: ReplenKind; supplier?: string | null }): PurchaseOrder {
   seq += 1
   const po: PurchaseOrder = {
     id: `po-${seq}`, product_id: input.product_id, product_name: input.product_name, qty: input.qty,
+    unit_cost: input.unit_cost,
     kind: input.kind, supplier: input.kind === 'compra' ? (input.supplier ?? null) : null,
-    status: 'pendiente', created_at: new Date().toISOString(),
+    status: 'pendiente', paid: input.kind !== 'compra', // producción no genera cuenta por pagar
+    created_at: new Date().toISOString(),
   }
   orders = [po, ...orders]
   emit()
@@ -58,4 +62,13 @@ export function markReceived(id: string) {
   orders = orders.map((o) => (o.id === id ? { ...o, status: 'recibida' } : o))
   emit()
   if (po) logAudit({ actor: 'Almacén', action: 'Reabastecimiento recibido', resource: po.product_name, detail: `×${po.qty}` })
+}
+
+// Pago al proveedor: liquida la cuenta por pagar (salida de efectivo, NO gasto:
+// el costo ya va a Costo de Ventas cuando se venda el lote).
+export function markPaid(id: string) {
+  const po = orders.find((o) => o.id === id)
+  orders = orders.map((o) => (o.id === id ? { ...o, paid: true } : o))
+  emit()
+  if (po) logAudit({ actor: 'Dirección', action: 'Pago a proveedor', resource: po.product_name, detail: `$${po.unit_cost * po.qty}${po.supplier ? ` · ${po.supplier}` : ''}` })
 }

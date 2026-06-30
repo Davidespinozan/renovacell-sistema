@@ -6,6 +6,11 @@ import { isSale, isPosOrder } from '../metrics'
 import { costOf } from '../mock/costs'
 import type { Gasto } from '../store/gastosStore'
 import type { PurchaseOrder } from '../store/comprasStore'
+import type { InventoryMovement, Lot } from '../types'
+
+// Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
+const COGS_OUT = new Set(['surtido', 'venta', 'evento'])
+const COGS_IN = new Set(['cancelacion', 'evento-regreso'])
 
 export interface EstadoResultados {
   ventas: number
@@ -18,13 +23,22 @@ export interface EstadoResultados {
 }
 
 // Estado de resultados del periodo: ventas − costo de ventas − gastos = utilidad.
-export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[]): EstadoResultados {
+// El COSTO DE VENTAS sale del LEDGER valuado al costo REAL de cada lote que salió
+// (no un costo plano): trazabilidad de costo lote por lote.
+export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], movements: InventoryMovement[], lots: Lot[]): EstadoResultados {
   const sales = orders.filter(isSale)
   const ventas = sales.reduce((s, o) => s + (o.total ?? 0), 0)
-  const costoVentas = sales.reduce(
-    (s, o) => s + o.items.reduce((t, it) => t + costOf(it.product_id) * it.qty, 0),
-    0,
-  )
+  const lotById: Record<string, Lot | undefined> = Object.fromEntries(lots.map((l) => [l.id, l]))
+  const lotCost = (lotId: string): number => {
+    const l = lotById[lotId]
+    return l?.unit_cost ?? costOf(l?.product_id)
+  }
+  const costoVentas = movements.reduce((s, m) => {
+    const c = lotCost(m.lot_id)
+    if (COGS_OUT.has(m.reason ?? '') && m.change < 0) return s + (-m.change) * c
+    if (COGS_IN.has(m.reason ?? '') && m.change > 0) return s - m.change * c
+    return s
+  }, 0)
   const gastosTotal = gastos.reduce((s, g) => s + g.monto, 0)
   const utilidadBruta = ventas - costoVentas
   const utilidadNeta = utilidadBruta - gastosTotal
@@ -45,10 +59,11 @@ export function cuentasPorCobrar(orders: OrderWithItems[]): { total: number; cou
   return { total: pend.reduce((s, o) => s + (o.total ?? 0), 0), count: pend.length }
 }
 
-// Cuentas por PAGAR: compras a proveedor pendientes (valoradas a costo unitario).
+// Cuentas por PAGAR: compras a proveedor NO pagadas (pendientes o recibidas sin
+// pagar), valoradas a su costo real de compra.
 export function cuentasPorPagar(compras: PurchaseOrder[]): { total: number; count: number } {
-  const pend = compras.filter((p) => p.kind === 'compra' && p.status === 'pendiente')
-  return { total: pend.reduce((s, p) => s + costOf(p.product_id) * p.qty, 0), count: pend.length }
+  const pend = compras.filter((p) => p.kind === 'compra' && !p.paid)
+  return { total: pend.reduce((s, p) => s + p.unit_cost * p.qty, 0), count: pend.length }
 }
 
 // Desglose de gastos por categoría (para gráfica/tabla).

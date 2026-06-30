@@ -60,6 +60,7 @@ export interface Lot {
   expiry_date: ISODate | null
   quantity: number
   location: string | null
+  unit_cost?: number | null   // costo al que ENTRÓ el lote (compra/producción) → COGS real
   metadata: Json
 }
 

@@ -7,6 +7,8 @@ import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCompras } from '../../data/hooks/useCompras'
+import { useInventory } from '../../data/hooks/useInventory'
+import { useLots } from '../../data/hooks/useLots'
 import { useGastos, type GastoCategoria } from '../../data/hooks/useFinanzas'
 import { GASTO_CATEGORIAS } from '../../data/store/gastosStore'
 import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria } from '../../data/ops/finanzas'
@@ -15,13 +17,16 @@ const pct = (n: number) => `${n.toFixed(1)}%`
 
 export function Finanzas() {
   const { data: orders } = useAllOrders()
-  const { data: compras } = useCompras()
+  const { data: compras, markPaid } = useCompras()
+  const { data: movements } = useInventory()
+  const { data: lots } = useLots()
   const { data: gastos, addGasto, removeGasto } = useGastos()
   const [open, setOpen] = useState(false)
 
-  const er = useMemo(() => estadoResultados(orders, gastos), [orders, gastos])
+  const er = useMemo(() => estadoResultados(orders, gastos, movements, lots), [orders, gastos, movements, lots])
   const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
+  const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
   const porCat = useMemo(() => gastosPorCategoria(gastos), [gastos])
 
   return (
@@ -60,7 +65,18 @@ export function Finanzas() {
               <div style={{ fontSize: 20, fontWeight: 600 }}>{money(cxp.total)}</div>
             </div>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxp.count} compra(s) a proveedor pendientes (a costo).</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxp.count} compra(s) a proveedor sin pagar (a costo real).</div>
+          {porPagar.length > 0 && (
+            <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+              {porPagar.slice(0, 5).map((p) => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.product_name}{p.supplier ? ` · ${p.supplier}` : ''}</span>
+                  <span className="mono">{money(p.unit_cost * p.qty)}</span>
+                  <button className="btn ghost sm" type="button" onClick={() => markPaid(p.id)}>Pagar</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
