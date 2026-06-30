@@ -24,6 +24,8 @@ export const MOCK_LOTS: Lot[] = [
   { id: 'l-sac-21', product_id: 'p-sac-21', lot_code: 'SAC-21', manufacture_date: null, expiry_date: '2026-10-01', quantity: 18, location: 'Culiacán', metadata: null },
   // Stoplip — CADUCADO (expiry < hoy) para demostrar la alerta de caducidades
   { id: 'l-stl-44', product_id: 'p-stl-44', lot_code: 'STL-44', manufacture_date: null, expiry_date: '2026-04-01', quantity: 9, location: 'Culiacán', metadata: null },
+  // Íntimo Renovacell — con stock para que el catálogo muestre disponibilidad real.
+  { id: 'l-int-01', product_id: 'p-int-01', lot_code: 'INT-01', manufacture_date: null, expiry_date: '2027-03-01', quantity: 24, location: 'Culiacán', metadata: null },
 ]
 
 // Ledger inicial (entradas que dieron origen a los lotes). INMUTABLE: solo se agrega.

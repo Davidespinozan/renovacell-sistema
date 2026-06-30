@@ -6,6 +6,8 @@ import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
+import { useLots } from '../../data/hooks/useLots'
+import { stockByProduct, stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import type { ProductSafe } from '../../data/types'
 
 type LineFilter = 'all' | 'cosm' | 'prof'
@@ -19,10 +21,13 @@ interface CartLine {
 export function Catalogo() {
   const { data: products, loading } = useProducts()
   const { createOrder } = useOrders()
+  const { data: lots } = useLots()
 
   const [filter, setFilter] = useState<LineFilter>('all')
   const [cart, setCart] = useState<Cart>({})
   const [checkout, setCheckout] = useState(false)
+
+  const stockMap = useMemo(() => stockByProduct(lots), [lots])
 
   const shown = useMemo(
     () => products.filter(isActiveProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
@@ -39,7 +44,13 @@ export function Catalogo() {
 
   const total = lines.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0)
 
-  const add = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }))
+  // No se puede pedir más de lo disponible en inventario.
+  const add = (id: string) => setCart((c) => {
+    const info = stockInfoFor(stockMap, id)
+    const max = info.tracked ? info.qty : 0
+    const next = (c[id] ?? 0) + 1
+    return next > max ? c : { ...c, [id]: next }
+  })
   const dec = (id: string) =>
     setCart((c) => {
       const q = (c[id] ?? 0) - 1
@@ -75,7 +86,7 @@ export function Catalogo() {
 
         <div className="pgrid">
           {shown.map((p) => (
-            <ProductCard key={p.id} p={p} qty={cart[p.id] ?? 0} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
+            <ProductCard key={p.id} p={p} qty={cart[p.id] ?? 0} stock={stockInfoFor(stockMap, p.id)} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
           ))}
         </div>
       </div>
@@ -96,21 +107,36 @@ export function Catalogo() {
   )
 }
 
-function ProductCard({ p, qty, onAdd, onDec }: { p: ProductSafe; qty: number; onAdd: () => void; onDec: () => void }) {
+function StockTag({ stock }: { stock: StockInfo }) {
+  if (stock.status === 'ok') return null
+  if (stock.status === 'low') return <span className="pill p-warn" style={{ marginLeft: 'auto' }}>Quedan {stock.qty}</span>
+  return <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Agotado</span>
+}
+
+function ProductCard({ p, qty, stock, onAdd, onDec }: { p: ProductSafe; qty: number; stock: StockInfo; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
+  const sellable = stock.tracked && stock.qty > 0
+  const atMax = qty >= stock.qty
   return (
     <div className="pcard">
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
         {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: sellable ? 1 : 0.55 }} />
           : <Icon name="leaf" />}
       </div>
       <div className="pb">
-        <h5>{p.name}</h5>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h5 style={{ margin: 0 }}>{p.name}</h5>
+          <StockTag stock={stock} />
+        </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.category}</div>
         <div className="pr">{money(p.price)}</div>
-        {qty === 0 ? (
+        {!sellable ? (
+          <button className="addb" type="button" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+            {stock.tracked ? 'Agotado' : 'Sin existencias'}
+          </button>
+        ) : qty === 0 ? (
           <button className="addb" type="button" onClick={onAdd}>
             <Icon name="plus" /> Agregar
           </button>
@@ -118,9 +144,10 @@ function ProductCard({ p, qty, onAdd, onDec }: { p: ProductSafe; qty: number; on
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
             <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
             <span className="mono" style={{ fontSize: 15 }}>{qty}</span>
-            <button className="btn sm" type="button" onClick={onAdd}><Icon name="plus" /></button>
+            <button className="btn sm" type="button" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
           </div>
         )}
+        {qty > 0 && atMax && <div style={{ fontSize: 10.5, color: 'var(--warn)', marginTop: 5 }}>Máximo disponible</div>}
       </div>
     </div>
   )
