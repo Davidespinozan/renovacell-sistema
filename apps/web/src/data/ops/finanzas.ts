@@ -53,9 +53,14 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
   }
 }
 
-// Cuentas por COBRAR: pedidos del Portal (contra pedido) vendidos pero sin pagar.
+// Cuentas por COBRAR: pedidos del Portal confirmados (contra pedido) que el
+// cliente aún no paga — incluye los 'pending_payment' (contra pedido es un
+// cobrable real). Excluye cancelados, borradores y POS (POS se cobra al momento).
 export function cuentasPorCobrar(orders: OrderWithItems[]): { total: number; count: number } {
-  const pend = orders.filter((o) => isSale(o) && !isPosOrder(o) && o.payment_status !== 'paid')
+  const pend = orders.filter((o) =>
+    !isPosOrder(o)
+    && o.status !== 'cancelled' && o.status !== 'draft'
+    && o.payment_status !== 'paid')
   return { total: pend.reduce((s, o) => s + (o.total ?? 0), 0), count: pend.length }
 }
 

@@ -34,4 +34,17 @@ export const MOCK_MOVEMENTS: InventoryMovement[] = [
   { id: 'm-2', lot_id: 'l-mgp-b', change: 50, reason: 'entrada', reference: 'MGP-90-B', created_by: null, created_at: '2026-05-03T10:00:00Z' },
   { id: 'm-3', lot_id: 'l-ab-1', change: 12, reason: 'entrada', reference: 'AB-50-1', created_by: null, created_at: '2026-01-10T10:00:00Z' },
   { id: 'm-4', lot_id: 'l-stl-44', change: 9, reason: 'entrada', reference: 'STL-44', created_by: null, created_at: '2025-10-01T10:00:00Z' },
+  // Salidas de las ventas semilla (surtido) → dan COSTO DE VENTAS real al P&L.
+  { id: 'm-s1', lot_id: 'l-mgp-a', change: -2, reason: 'surtido', reference: 'S3683', created_by: null, created_at: '2026-05-21T10:00:00Z' },
+  { id: 'm-s2', lot_id: 'l-gs-1', change: -1, reason: 'surtido', reference: 'S3683', created_by: null, created_at: '2026-05-21T10:00:00Z' },
+  { id: 'm-s3', lot_id: 'l-ab-1', change: -1, reason: 'surtido', reference: 'S3559', created_by: null, created_at: '2026-06-11T09:30:00Z' },
+  { id: 'm-s4', lot_id: 'l-gs-1', change: -2, reason: 'surtido', reference: 'S12840', created_by: null, created_at: '2025-09-25T11:00:00Z' },
+  { id: 'm-s5', lot_id: 'l-mgp-a', change: -3, reason: 'surtido', reference: 'S3640', created_by: null, created_at: '2026-06-15T09:30:00Z' },
+  // Salidas de las ventas POS de junio (venta).
+  { id: 'm-p1', lot_id: 'l-gp-300', change: -2, reason: 'venta', reference: 'POS-201', created_by: null, created_at: '2026-06-04T12:00:00Z' },
+  { id: 'm-p2', lot_id: 'l-ufs-11', change: -3, reason: 'venta', reference: 'POS-202', created_by: null, created_at: '2026-06-08T13:00:00Z' },
+  { id: 'm-p3', lot_id: 'l-sac-21', change: -4, reason: 'venta', reference: 'POS-203', created_by: null, created_at: '2026-06-11T11:30:00Z' },
+  { id: 'm-p4', lot_id: 'l-gv-07', change: -3, reason: 'venta', reference: 'POS-204', created_by: null, created_at: '2026-06-17T16:00:00Z' },
+  { id: 'm-p5', lot_id: 'l-gp-300', change: -2, reason: 'venta', reference: 'POS-205', created_by: null, created_at: '2026-06-21T10:30:00Z' },
+  { id: 'm-p6', lot_id: 'l-gs-1', change: -4, reason: 'venta', reference: 'POS-206', created_by: null, created_at: '2026-06-25T17:00:00Z' },
 ]
