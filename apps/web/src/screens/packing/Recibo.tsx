@@ -7,6 +7,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
+import { PageHead } from '../../app/PageHead'
 import { driverName } from '../../data/mock/shipments'
 
 export function Recibo() {
@@ -48,8 +49,12 @@ export function Recibo() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <PageHead title="Recibo de entrega">
+        El comprobante imprimible que acompaña al paquete: qué producto va, de qué <b>lote</b> (traza),
+        y a qué cliente. Elige el envío y dale <b>Imprimir</b>; quien recibe lo firma como prueba de entrega.
+      </PageHead>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Empaque · Recibo de entrega</div>
+        <div className="eyebrow" style={{ margin: 0 }}>Selecciona el envío</div>
         <select
           style={{ marginLeft: 'auto', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13 }}
           value={selectedId}

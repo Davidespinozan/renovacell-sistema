@@ -90,15 +90,10 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
   return order
 }
 
-// Cierra el evento: el sobrante REGRESA a SUS lotes de origen (conserva caducidad
-// y trazabilidad). Idempotente. Fallback a entrada genérica solo si no se puede
-// mapear el lote original.
-export function closeEvent(eventId: string) {
-  const ev = events.find((e) => e.id === eventId)
-  if (!ev || ev.status === 'cerrado') return // idempotente: no reingresar dos veces
+// Regresa a SUS lotes de origen el sobrante (asignado − vendido) de un evento.
+function returnLeftover(ev: SalesEvent) {
   const lots = getSnapshotLots()
   const productOfLot = (lotId: string) => lots.find((l) => l.id === lotId)?.product_id
-  // Asignaciones de este evento por lote (salidas con reason 'evento').
   const assigns = getSnapshotMovements().filter((m) => m.reference === ev.name && m.reason === 'evento' && m.change < 0)
   ev.items.forEach((it) => {
     let left = remaining(it)
@@ -112,6 +107,32 @@ export function closeEvent(eventId: string) {
     }
     if (left > 0) addEntry({ product_id: it.product_id, lot_code: `EVENTO-${ev.id}`, expiry_date: null, quantity: left, location: 'Almacén (regreso evento)' })
   })
+}
+
+// Editar datos del evento (no toca el inventario asignado).
+export function updateEvent(eventId: string, patch: { name?: string; venue?: string; date?: string; members?: string[] }) {
+  const before = events.find((e) => e.id === eventId)
+  events = events.map((e) => (e.id === eventId ? { ...e, ...patch } : e))
+  emit()
+  if (before) logAudit({ actor: 'Ventas', action: 'Evento editado', resource: patch.name ?? before.name })
+}
+
+// Eliminar evento: si está activo, primero regresa el sobrante al almacén.
+export function deleteEvent(eventId: string) {
+  const ev = events.find((e) => e.id === eventId)
+  if (!ev) return
+  if (ev.status === 'activo') returnLeftover(ev)
+  events = events.filter((e) => e.id !== eventId)
+  emit()
+  logAudit({ actor: 'Ventas', action: 'Evento eliminado', resource: ev.name })
+}
+
+// Cierra el evento: el sobrante REGRESA a SUS lotes de origen (conserva caducidad
+// y trazabilidad). Idempotente.
+export function closeEvent(eventId: string) {
+  const ev = events.find((e) => e.id === eventId)
+  if (!ev || ev.status === 'cerrado') return // idempotente: no reingresar dos veces
+  returnLeftover(ev)
   events = events.map((e) => (e.id === eventId ? { ...e, status: 'cerrado' } : e))
   emit()
   logAudit({ actor: 'Ventas', action: 'Evento cerrado', resource: ev.name })

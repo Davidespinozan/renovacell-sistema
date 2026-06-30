@@ -3,7 +3,7 @@
 // cerrar el sobrante regresa al almacén. Todo sobre data real (mock).
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
-import { Plus, X, Store, PackagePlus, Check, ArrowLeft } from 'lucide-react'
+import { Plus, X, Store, PackagePlus, Check, ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useEvents, remaining, type SalesEvent } from '../../data/hooks/useEvents'
@@ -57,9 +57,10 @@ export function Eventos() {
 
 function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void }) {
   const { data: products } = useProducts()
-  const { sellAtEvent, closeEvent } = useEvents()
+  const { sellAtEvent, closeEvent, updateEvent, deleteEvent } = useEvents()
   const { data: team } = useTeam()
   const { user } = useRole()
+  const [editOpen, setEditOpen] = useState(false)
   const memberNames = event.members
     .map((em) => team.find((u) => u.email === em)?.name.split('·')[0].trim() ?? em)
     .join(', ')
@@ -101,7 +102,9 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
         </div>
         <span className={'pill ' + (closed ? 'p-neu' : 'p-ok')} style={{ marginLeft: 'auto' }}>{closed ? 'Cerrado' : 'Activo'}</span>
         {!closed && <button className="btn ghost sm" type="button" onClick={() => setAssignOpen(true)}><PackagePlus size={14} /> Asignar inventario</button>}
+        {!closed && <button className="btn ghost sm" type="button" onClick={() => setEditOpen(true)}><Pencil size={14} /> Editar</button>}
         {!closed && event.items.length > 0 && <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { closeEvent(event.id); flash('Evento cerrado · sobrante regresó al almacén') }}>Cerrar evento</button>}
+        <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { if (window.confirm('¿Eliminar este evento? El sobrante asignado regresa al almacén.')) { deleteEvent(event.id); onBack() } }}><Trash2 size={14} /> Eliminar</button>
       </div>
 
       <div className="grid sigs">
@@ -177,6 +180,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
       )}
 
       {assignOpen && <AssignModal event={event} onClose={() => setAssignOpen(false)} onDone={(m) => { setAssignOpen(false); flash(m) }} />}
+      {editOpen && <EditEvent event={event} onClose={() => setEditOpen(false)} onSave={(patch) => { updateEvent(event.id, patch); setEditOpen(false); flash('Evento actualizado') }} />}
       {toast && <div className="toast show"><Check size={16} /> {toast}</div>}
     </div>
   )
@@ -214,6 +218,46 @@ function AssignModal({ event, onClose, onDone }: { event: SalesEvent; onClose: (
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" onClick={save}><PackagePlus size={15} /> Asignar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditEvent({ event, onClose, onSave }: { event: SalesEvent; onClose: () => void; onSave: (patch: { name: string; venue: string; date: string; members: string[] }) => void }) {
+  const { data: team } = useTeam()
+  const candidates = team.filter((u) => u.active && u.capabilities.includes('eventos'))
+  const [name, setName] = useState(event.name)
+  const [venue, setVenue] = useState(event.venue)
+  const [date, setDate] = useState(event.date === '—' ? '' : event.date)
+  const [members, setMembers] = useState<string[]>(event.members)
+  const toggle = (email: string) => setMembers((m) => (m.includes(email) ? m.filter((x) => x !== email) : [...m, email]))
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead"><div><h3>Editar evento</h3><div className="ms">Datos del evento (no toca el inventario asignado).</div></div><button className="mclose" type="button" onClick={onClose}><X size={16} /></button></div>
+        <div className="mbody">
+          <label style={{ ...label, marginTop: 0 }}>Nombre</label>
+          <input style={input} value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="form-grid-2" style={{ marginTop: 0 }}>
+            <div><label style={label}>Sede</label><input style={input} value={venue} onChange={(e) => setVenue(e.target.value)} /></div>
+            <div><label style={label}>Fecha</label><input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+          </div>
+          <label style={label}>Equipo del evento</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {candidates.map((u) => (
+              <button key={u.id} type="button" className={'fchip' + (members.includes(u.email) ? ' on' : '')} onClick={() => toggle(u.email)}>
+                {members.includes(u.email) ? '✓ ' : '+ '}{u.name.split('·')[0].trim()}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSave({ name: name.trim(), venue: venue.trim() || 'Por definir', date: date || '—', members })}>Guardar cambios</button>
           </div>
         </div>
       </div>
