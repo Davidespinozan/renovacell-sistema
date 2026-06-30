@@ -4,6 +4,28 @@
 // insert en inventory_movements + update de lots; los hooks no cambian.
 import type { Lot, InventoryMovement } from '../types'
 import { MOCK_LOTS, MOCK_MOVEMENTS } from '../mock/inventory'
+import { notify } from './notificationsStore'
+import { getSnapshot as productsSnapshot } from './productsStore'
+
+const LOW_STOCK_REORDER = 20 // umbral para avisar a Dirección que hay que reabastecer
+
+// Total disponible (todos los lotes) de los productos indicados.
+function totalsFor(ids: Set<string>): Record<string, number> {
+  const m: Record<string, number> = {}
+  lots.forEach((l) => { if (ids.has(l.product_id)) m[l.product_id] = (m[l.product_id] ?? 0) + l.quantity })
+  return m
+}
+// Avisa a Dirección (campana) cuando un producto CRUZA el umbral de stock bajo.
+function flagLowStock(before: Record<string, number>, ids: Set<string>) {
+  const after = totalsFor(ids)
+  const names = Object.fromEntries(productsSnapshot().map((p) => [p.id, p.name]))
+  ids.forEach((pid) => {
+    const b = before[pid] ?? 0, a = after[pid] ?? 0
+    if (b > LOW_STOCK_REORDER && a <= LOW_STOCK_REORDER) {
+      notify({ text: a <= 0 ? `Agotado: ${names[pid] ?? 'producto'} · reabastece` : `Stock bajo: ${names[pid] ?? 'producto'} (${a} u) · reabastece`, roles: ['admin'], screen: 'av_inv' })
+    }
+  })
+}
 
 let lots: Lot[] = [...MOCK_LOTS]
 let movements: InventoryMovement[] = [...MOCK_MOVEMENTS]
@@ -83,6 +105,10 @@ export function adjust(lotId: string, delta: number, reason: string, reference =
 // `reason`: 'surtido' (Almacén) | 'venta' (POS) | etc.
 export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido') {
   const now = new Date().toISOString()
+  // Productos afectados + su stock ANTES (para detectar cruce de umbral).
+  const affected = new Set<string>()
+  allocations.forEach((a) => { const lot = lots.find((l) => l.id === a.lot_id); if (lot) affected.add(lot.product_id) })
+  const before = totalsFor(affected)
   const newMovs: InventoryMovement[] = []
   lots = lots.map((l) => {
     const alloc = allocations.find((a) => a.lot_id === l.id)
@@ -103,4 +129,5 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
   })
   movements = [...movements, ...newMovs]
   emit()
+  flagLowStock(before, affected)
 }

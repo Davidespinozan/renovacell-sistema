@@ -1,101 +1,125 @@
-// COMPRAS / REABASTECIMIENTO (Logística + Dirección). Stock por producto con
-// sugerencia de reorden cuando está bajo, y órdenes de compra a proveedor.
-// El alta de inventario al recibir se hace en Almacén → Entradas (lote+caducidad).
+// INVENTARIO / REABASTECIMIENTO. Proceso claro y con responsable:
+//  1) El sistema muestra el STOCK BAJO (aquí + campana de Dirección).
+//  2) DIRECCIÓN reabastece: Compra a proveedor o Producción interna (mixto).
+//  3) ALMACÉN recibe y da de alta el lote (código + caducidad + cantidad).
 import React, { useMemo, useState } from 'react'
-import { ShoppingCart, PackageCheck, AlertTriangle, X } from 'lucide-react'
+import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
+import { PageHead } from '../../app/PageHead'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
-import { useCompras, type PurchaseOrder } from '../../data/hooks/useCompras'
+import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
+import { stockByProduct } from '../../data/ops/stock'
+import type { ProductSafe } from '../../data/types'
 
-const LOW = 20      // umbral de stock bajo
-const TARGET = 60   // stock objetivo tras reorden
+const LOW = 20      // umbral de stock bajo (reorden)
+const TARGET = 60   // stock objetivo tras reabastecer
 
 export function Reabastecimiento() {
   const { data: lots, addEntry } = useLots()
   const { data: products } = useProducts()
-  const { data: pos, createPurchase, markReceived } = useCompras()
+  const { data: pos, createReplenishment, markReceived } = useCompras()
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
+  const [replen, setReplen] = useState<{ product: ProductSafe; suggested: number } | null>(null)
 
-  const stockByProduct = useMemo(() => {
-    const m = new Map<string, number>()
-    lots.forEach((l) => m.set(l.product_id, (m.get(l.product_id) ?? 0) + l.quantity))
-    return m
-  }, [lots])
+  const stock = useMemo(() => stockByProduct(lots), [lots])
+  const stockOf = (id: string) => stock[id]?.qty ?? 0
 
-  // Sugerencias: productos con stock <= umbral (con lotes registrados).
+  // Sugerencias: productos con stock ≤ umbral (con lotes o con precio definido).
   const sugerencias = useMemo(
     () => products
-      .map((p) => ({ p, stock: stockByProduct.get(p.id) ?? 0, hasLots: stockByProduct.has(p.id) }))
-      .filter((x) => (x.hasLots || x.p.price != null) && x.stock <= LOW)
-      .sort((a, b) => a.stock - b.stock),
-    [products, stockByProduct],
+      .map((p) => ({ p, qty: stockOf(p.id), tracked: Boolean(stock[p.id]) }))
+      .filter((x) => (x.tracked || x.p.price != null) && x.qty <= LOW)
+      .sort((a, b) => a.qty - b.qty),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, stock],
   )
 
-  const pendientePO = (productId: string) => pos.some((o) => o.product_id === productId && o.status === 'solicitada')
+  const enCurso = (productId: string) => pos.some((o) => o.product_id === productId && o.status === 'pendiente')
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Logística · Compras y reabastecimiento</div>
+      <PageHead title="Inventario">
+        El sistema te avisa cuando hay <b>stock bajo</b> (aquí y en la campana). Tú, Dirección, reabastreces
+        con una <b>compra a proveedor</b> o una <b>producción interna</b>. Almacén lo recibe y da de alta el lote.
+      </PageHead>
 
-      {/* Sugerencias de reorden */}
+      {/* 1+2) Stock bajo → Dirección reabastece */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertTriangle size={16} style={{ color: 'var(--warn)' }} />
-          <div className="eyebrow" style={{ margin: 0 }}>Sugerencias de reorden (stock ≤ {LOW} u)</div>
+          <div className="eyebrow" style={{ margin: 0 }}>Hay que reabastecer · stock ≤ {LOW} u</div>
         </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Stock</th><th>Estado</th><th>Sugerido</th><th></th></tr></thead>
             <tbody>
-              {sugerencias.map(({ p, stock }) => {
-                const sugerido = Math.max(TARGET - stock, 10)
-                const agotado = stock <= 0
+              {sugerencias.map(({ p, qty }) => {
+                const sugerido = Math.max(TARGET - qty, 10)
+                const agotado = qty <= 0
                 return (
                   <tr key={p.id}>
                     <td data-label="Producto">{p.name}</td>
-                    <td data-label="Stock" className="mono">{stock} u</td>
+                    <td data-label="Stock" className="mono">{qty} u</td>
                     <td data-label="Estado"><span className={'pill ' + (agotado ? 'p-dang' : 'p-warn')}>{agotado ? 'Agotado' : 'Bajo'}</span></td>
                     <td data-label="Sugerido" className="mono">+{sugerido} u</td>
                     <td data-label="">
-                      {pendientePO(p.id)
-                        ? <span className="pill p-blue">Ya solicitada</span>
-                        : <button className="btn sm" type="button" onClick={() => createPurchase({ product_id: p.id, product_name: p.name, qty: sugerido })}><ShoppingCart size={14} /> Solicitar compra</button>}
+                      {enCurso(p.id)
+                        ? <span className="pill p-blue">En curso</span>
+                        : <button className="btn sm" type="button" onClick={() => setReplen({ product: p, suggested: sugerido })}><ShoppingCart size={14} /> Reabastecer</button>}
                     </td>
                   </tr>
                 )
               })}
-              {sugerencias.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Stock saludable · sin reorden sugerido. 🎉</td></tr>}
+              {sugerencias.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Inventario saludable · nada por reabastecer. 🎉</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Órdenes de compra */}
+      {/* 3) Reabastecimientos en curso → Almacén recibe */}
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '16px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Órdenes de compra</div></div>
+        <div style={{ padding: '16px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Reabastecimientos · Almacén los recibe</div></div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
-            <thead><tr><th>Producto</th><th>Cantidad</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
             <tbody>
               {pos.map((o) => (
                 <tr key={o.id}>
                   <td data-label="Producto">{o.product_name}</td>
+                  <td data-label="Tipo">
+                    <span className={'pill ' + (o.kind === 'compra' ? 'p-blue' : 'p-neu')}>
+                      {o.kind === 'compra' ? 'Compra' : 'Producción'}
+                    </span>
+                    {o.supplier && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{o.supplier}</div>}
+                  </td>
                   <td data-label="Cantidad" className="mono">{o.qty} u</td>
                   <td data-label="Fecha">{fmtDate(o.created_at)}</td>
-                  <td data-label="Estado"><span className={'pill ' + (o.status === 'recibida' ? 'p-ok' : 'p-warn')}>{o.status === 'recibida' ? 'Recibida' : 'Solicitada'}</span></td>
+                  <td data-label="Estado"><span className={'pill ' + (o.status === 'recibida' ? 'p-ok' : 'p-warn')}>{o.status === 'recibida' ? 'Recibida' : 'Pendiente'}</span></td>
                   <td data-label="">
-                    {o.status === 'solicitada'
+                    {o.status === 'pendiente'
                       ? <button className="btn ghost sm" type="button" onClick={() => setReceiving(o)}><PackageCheck size={14} /> Recibir y dar de alta</button>
                       : <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Lote dado de alta</span>}
                   </td>
                 </tr>
               ))}
-              {pos.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Aún no hay órdenes de compra.</td></tr>}
+              {pos.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-3)' }}>Aún no hay reabastecimientos.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+
+      {replen && (
+        <ReplenishModal
+          product={replen.product}
+          suggested={replen.suggested}
+          onClose={() => setReplen(null)}
+          onConfirm={(input) => {
+            createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, kind: input.kind, supplier: input.supplier })
+            setReplen(null)
+          }}
+        />
+      )}
 
       {receiving && (
         <RecibirModal
@@ -112,6 +136,61 @@ export function Reabastecimiento() {
   )
 }
 
+const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 6 }
+const lbl: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+
+function ReplenishModal({ product, suggested, onClose, onConfirm }: {
+  product: ProductSafe
+  suggested: number
+  onClose: () => void
+  onConfirm: (input: { qty: number; kind: ReplenKind; supplier: string | null }) => void
+}) {
+  const [kind, setKind] = useState<ReplenKind>('compra')
+  const [supplier, setSupplier] = useState('')
+  const [qty, setQty] = useState(String(suggested))
+  const n = Math.max(0, parseInt(qty, 10) || 0)
+  const valid = n > 0 && (kind === 'produccion' || supplier.trim() !== '')
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div><h3>Reabastecer</h3><div className="ms">{product.name}</div></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <label style={{ ...lbl, marginTop: 0 }}>¿Cómo se reabastece?</label>
+          <div className="seg" style={{ marginTop: 8 }}>
+            <button type="button" className={kind === 'compra' ? 'active' : undefined} onClick={() => setKind('compra')}><ShoppingCart size={14} /> Compra a proveedor</button>
+            <button type="button" className={kind === 'produccion' ? 'active' : undefined} onClick={() => setKind('produccion')}><Factory size={14} /> Producción interna</button>
+          </div>
+
+          {kind === 'compra' && (
+            <>
+              <label style={lbl}>Proveedor</label>
+              <input style={fld} value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Nombre del proveedor / fabricante" autoFocus />
+            </>
+          )}
+
+          <label style={lbl}>Cantidad</label>
+          <input style={fld} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+
+          <div className="sysnote" style={{ marginTop: 14 }}>
+            <span>Queda <b>pendiente de recibir</b>. Almacén lo dará de alta como lote (con caducidad) cuando llegue.</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onConfirm({ qty: n, kind, supplier: supplier.trim() || null })}>
+              {kind === 'compra' ? 'Registrar compra' : 'Registrar producción'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function RecibirModal({ po, onClose, onConfirm }: {
   po: PurchaseOrder
   onClose: () => void
@@ -123,38 +202,33 @@ function RecibirModal({ po, onClose, onConfirm }: {
   const n = Math.max(0, parseInt(qty, 10) || 0)
   const valid = lotCode.trim() !== '' && n > 0
 
-  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none' }
-
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div>
-            <h3>Recibir compra</h3>
-            <div className="ms">{po.product_name} · {po.qty} u solicitadas</div>
+            <h3>Recibir y dar de alta</h3>
+            <div className="ms">{po.product_name} · {po.kind === 'compra' ? `compra${po.supplier ? ` · ${po.supplier}` : ''}` : 'producción'} · {po.qty} u</div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
-          <div className="grid" style={{ gap: 12 }}>
-            <label style={{ display: 'grid', gap: 5 }}>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Código de lote</span>
-              <input style={fld} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="p. ej. LT-2026-014" autoFocus />
-            </label>
-            <label style={{ display: 'grid', gap: 5 }}>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Caducidad</span>
-              <input type="date" style={fld} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
-            </label>
-            <label style={{ display: 'grid', gap: 5 }}>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Cantidad recibida</span>
-              <input type="number" min={1} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} />
-            </label>
-            <button className="btn" type="button" disabled={!valid} onClick={() => onConfirm({ lot_code: lotCode.trim(), expiry_date: expiry || null, quantity: n })}>
+          <label style={{ ...lbl, marginTop: 0 }}>Código de lote</label>
+          <input style={fld} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="p. ej. LT-2026-014" autoFocus />
+          <label style={lbl}>Caducidad</label>
+          <input type="date" style={fld} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+          <label style={lbl}>Cantidad recibida</label>
+          <input type="number" min={1} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} />
+
+          <div className="sysnote" style={{ marginTop: 14 }}>
+            <span>Se crea el lote con su caducidad y queda el movimiento de entrada (trazabilidad).</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onConfirm({ lot_code: lotCode.trim(), expiry_date: expiry || null, quantity: n })}>
               <PackageCheck size={15} /> Dar de alta lote
             </button>
-            <div className="sysnote">
-              <span>Se crea el lote con su caducidad y queda registrado el movimiento de entrada (trazabilidad).</span>
-            </div>
           </div>
         </div>
       </div>
