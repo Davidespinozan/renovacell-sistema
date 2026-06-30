@@ -17,14 +17,14 @@ export function Contenido() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Contenido">
-        Edita lo que ve el cliente desde un solo lugar: el catálogo del Portal del Doctor y,
-        próximamente, la landing pública. Puedes dar acceso a otra persona con la responsabilidad
-        “Contenido” desde Equipo.
+        Dos superficies distintas, con público distinto: el <b>catálogo del Portal del Doctor</b>
+        (lo ven solo doctores verificados, para comprar) y la <b>landing pública</b> (la ve cualquiera,
+        para captar e informar). Puedes dar acceso a editar con la responsabilidad “Contenido” desde Equipo.
       </PageHead>
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
-        <button type="button" className={tab === 'productos' ? 'active' : undefined} onClick={() => setTab('productos')}>Productos</button>
-        <button type="button" className={tab === 'landing' ? 'active' : undefined} onClick={() => setTab('landing')}>Landing</button>
+        <button type="button" className={tab === 'productos' ? 'active' : undefined} onClick={() => setTab('productos')}>Catálogo · Portal del Doctor</button>
+        <button type="button" className={tab === 'landing' ? 'active' : undefined} onClick={() => setTab('landing')}>Landing · Página pública</button>
       </div>
 
       {tab === 'productos' ? <ProductsEditor /> : <LandingTab />}
@@ -199,10 +199,20 @@ function LandingTab() {
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   return (
-    <div className="grid two" style={{ alignItems: 'start', gap: 16 }}>
+    <div className="grid" style={{ gap: 16 }}>
+      {/* Propósito de la landing (nuevo rumbo): captación, no venta. */}
+      <div className="sysnote" style={{ alignItems: 'flex-start' }}>
+        <span>
+          La landing <b>no vende ni muestra precios</b>: es para <b>captar e informar</b> (info + contacto +
+          agente IA + formulario). La compra ocurre <b>después de verificar al doctor</b>, en el Portal.
+          Embudo: <b>landing → Prospectos → verificación → Portal</b>.
+        </span>
+      </div>
+
+      <div className="grid two" style={{ alignItems: 'start', gap: 16 }}>
       {/* Editor */}
       <div className="card">
-        <div className="eyebrow" style={{ margin: '0 0 6px' }}>Página pública</div>
+        <div className="eyebrow" style={{ margin: '0 0 6px' }}>Página pública · captación</div>
 
         <label style={{ ...label, marginTop: 6 }}>Título de pestaña (SEO)</label>
         <input style={input} value={draft.metaTitle} onChange={(e) => set('metaTitle', e.target.value)} />
@@ -274,6 +284,7 @@ function LandingTab() {
         <a href="/" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--green-soft)', marginTop: 16, fontWeight: 600 }}>
           <ExternalLink size={13} /> Abrir landing real
         </a>
+      </div>
       </div>
     </div>
   )
