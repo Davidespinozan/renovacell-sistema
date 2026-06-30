@@ -3,10 +3,11 @@
 // punta) y la LANDING pública (siguiente paso, mismo editor). El acceso se da
 // con la capability "contenido" desde Equipo.
 import React, { useMemo, useState } from 'react'
-import { Plus, X, Eye, EyeOff, Pencil } from 'lucide-react'
+import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw, ExternalLink } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
+import { useLanding, type LandingContent } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
 
 type Tab = 'productos' | 'landing'
@@ -182,15 +183,97 @@ function ProductModal({ product, onClose, onSave }: {
 }
 
 function LandingTab() {
+  const { data, saveLanding, resetLanding } = useLanding()
+  const [draft, setDraft] = useState<LandingContent>(data)
+  const [saved, setSaved] = useState(false)
+
+  const set = <K extends keyof LandingContent>(k: K, v: LandingContent[K]) => { setDraft({ ...draft, [k]: v }); setSaved(false) }
+  const setCert = (i: number, patch: Partial<{ label: string; sub: string }>) => {
+    const certifications = draft.certifications.map((c, j) => (j === i ? { ...c, ...patch } : c))
+    setDraft({ ...draft, certifications }); setSaved(false)
+  }
+  const addCert = () => setDraft({ ...draft, certifications: [...draft.certifications, { label: '', sub: '' }] })
+  const delCert = (i: number) => setDraft({ ...draft, certifications: draft.certifications.filter((_, j) => j !== i) })
+
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+
   return (
-    <div className="card">
-      <div className="sysnote" style={{ alignItems: 'flex-start' }}>
-        <span>
-          <b>Editor de la landing — siguiente paso.</b> Aquí editarás los textos, imágenes y secciones
-          de la página pública con este mismo editor. La landing es una app aparte (hoy estática): el
-          editor funciona en cuanto lo construya, y la página pública lo consume en vivo al conectar el
-          backend (fase Supabase).
-        </span>
+    <div className="grid two" style={{ alignItems: 'start', gap: 16 }}>
+      {/* Editor */}
+      <div className="card">
+        <div className="eyebrow" style={{ margin: '0 0 6px' }}>Página pública</div>
+
+        <label style={{ ...label, marginTop: 6 }}>Título de pestaña (SEO)</label>
+        <input style={input} value={draft.metaTitle} onChange={(e) => set('metaTitle', e.target.value)} />
+        <label style={label}>Descripción (SEO)</label>
+        <textarea style={{ ...input, minHeight: 56, resize: 'vertical' }} value={draft.metaDescription} onChange={(e) => set('metaDescription', e.target.value)} />
+
+        <label style={label}>Eyebrow (sobre el título)</label>
+        <input style={input} value={draft.heroEyebrow} onChange={(e) => set('heroEyebrow', e.target.value)} />
+        <label style={label}>Título principal</label>
+        <input style={input} value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} />
+        <label style={label}>Subtítulo</label>
+        <textarea style={{ ...input, minHeight: 64, resize: 'vertical' }} value={draft.heroSubtitle} onChange={(e) => set('heroSubtitle', e.target.value)} />
+
+        <div className="form-grid-2">
+          <div><label style={label}>Botón principal</label><input style={input} value={draft.ctaPrimary} onChange={(e) => set('ctaPrimary', e.target.value)} /></div>
+          <div><label style={label}>Botón secundario</label><input style={input} value={draft.ctaSecondary} onChange={(e) => set('ctaSecondary', e.target.value)} /></div>
+        </div>
+        <div className="form-grid-2">
+          <div><label style={label}>WhatsApp</label><input style={input} value={draft.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="52667…" /></div>
+          <div><label style={label}>Correo de contacto</label><input style={input} value={draft.email} onChange={(e) => set('email', e.target.value)} /></div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 16 }}>
+          <label style={{ ...label, marginTop: 0 }}>Certificaciones</label>
+          <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={addCert}><Plus size={13} /> Agregar</button>
+        </div>
+        {draft.certifications.map((c, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input style={{ ...input, marginTop: 0, flex: '0 0 34%' }} value={c.label} onChange={(e) => setCert(i, { label: e.target.value })} placeholder="CE" />
+            <input style={{ ...input, marginTop: 0, flex: 1 }} value={c.sub} onChange={(e) => setCert(i, { sub: e.target.value })} placeholder="Certificación EU" />
+            <button className="btn ghost sm" type="button" onClick={() => delCert(i)}><Trash2 size={14} /></button>
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, alignItems: 'center' }}>
+          <button className="btn ghost sm" type="button" onClick={() => { resetLanding(); setDraft({ ...data }); }}><RotateCcw size={14} /> Restaurar</button>
+          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar cambios</button>
+        </div>
+        {saved && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}><span>Contenido guardado.</span></div>}
+
+        <div className="sysnote" style={{ marginTop: 12, alignItems: 'flex-start' }}>
+          <span>La landing pública es un sitio aparte (hoy estático). Estos cambios viven en el sistema; al conectar el backend la página los lee en vivo (se vuelve data-driven).</span>
+        </div>
+      </div>
+
+      {/* Vista previa */}
+      <div className="card" style={{ position: 'sticky', top: 90, overflow: 'hidden', background: 'linear-gradient(177deg,#1b2a26,#0e1714)', color: '#fff', border: 'none' }}>
+        <div style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--green-soft)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Eye size={13} /> Vista previa
+        </div>
+        <div style={{ fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', marginTop: 18 }}>{draft.heroEyebrow}</div>
+        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.1, marginTop: 8 }}>{draft.heroTitle || 'Título principal'}</div>
+        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,.78)', lineHeight: 1.55, marginTop: 12 }}>{draft.heroSubtitle}</p>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+          <span style={{ background: 'var(--grad-green)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{draft.ctaPrimary || 'CTA'}</span>
+          <span style={{ border: '1px solid rgba(255,255,255,.3)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{draft.ctaSecondary}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 22, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.12)' }}>
+          {draft.certifications.map((c, i) => (
+            <div key={i}>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{c.label || '—'}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)' }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', marginTop: 18 }}>
+          WhatsApp {draft.whatsapp} · {draft.email}
+        </div>
+        <a href="/" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--green-soft)', marginTop: 16, fontWeight: 600 }}>
+          <ExternalLink size={13} /> Abrir landing real
+        </a>
       </div>
     </div>
   )
