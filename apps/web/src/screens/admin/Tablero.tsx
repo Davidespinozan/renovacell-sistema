@@ -36,10 +36,11 @@ export function Tablero() {
 
   const sum = salesSummary(orders)
   const act = doctorActivity(orders)
-  // Variación mes vs mes anterior (para el dato hero).
+  // Dato hero = ventas del MES en curso + variación vs el mes anterior.
   const ms = useMemo(() => monthlySales(orders, 2), [orders])
   const curM = ms[ms.length - 1]?.revenue ?? 0
   const prevM = ms[ms.length - 2]?.revenue ?? 0
+  const mesLabel = ms[ms.length - 1]?.label ?? 'este mes'
   const deltaPct = prevM > 0 ? ((curM - prevM) / prevM) * 100 : null
 
   const porEstatus = useMemo(() => {
@@ -81,11 +82,11 @@ export function Tablero() {
       {/* Dato HERO (estilo app) */}
       <div className="grid two" style={{ gap: 16, alignItems: 'stretch' }}>
         <div className="feature">
-          <div className="fk">Ventas acumuladas</div>
-          <div className="fv">{money(sum.revenue)}</div>
+          <div className="fk">Ventas · {mesLabel}</div>
+          <div className="fv">{money(curM)}</div>
           <div className="fs">
-            {deltaPct != null && <span className="delta up">{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span>}
-            <span>{sum.orders} pedidos · ticket {money(sum.avgTicket)}</span>
+            {deltaPct != null && <span className={'delta ' + (deltaPct >= 0 ? 'up' : 'down')}>{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span>}
+            <span>vs. mes anterior · {money(sum.revenue)} histórico</span>
           </div>
         </div>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

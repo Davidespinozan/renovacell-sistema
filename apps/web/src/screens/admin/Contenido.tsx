@@ -3,7 +3,7 @@
 // punta) y la LANDING pública (siguiente paso, mismo editor). El acceso se da
 // con la capability "contenido" desde Equipo.
 import React, { useMemo, useState } from 'react'
-import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw, ExternalLink } from 'lucide-react'
+import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
@@ -347,7 +347,7 @@ function LandingTab() {
 
       <div className="card" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn ghost sm" type="button" onClick={() => { setDraft(resetLanding()); setSaved(false) }}><RotateCcw size={14} /> Restaurar</button>
-        <a className="btn ghost sm" href="/" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir landing</a>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>El sitio público es un deploy aparte; los cambios se publican al conectar el backend.</span>
         <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar y publicar</button>
         {saved && <span style={{ fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>Guardado ✓</span>}
       </div>
