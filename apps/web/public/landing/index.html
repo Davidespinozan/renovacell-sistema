@@ -3546,5 +3546,78 @@ document.addEventListener('keydown', e => {
   } catch (e) { /* conserva el contenido por defecto */ }
 })();
 </script>
+<!-- ASISTENTE IA (landing) — orientación de captación. UI-first: motor por reglas
+     sobre los temas de la landing (ciencia, cumplimiento, acceso médico). En la
+     fase backend se conecta a un modelo real (Claude/GPT) vía endpoint con la
+     llave protegida en el servidor; el widget no cambia. -->
+<style>
+.rnc-ai-fab{position:fixed;right:22px;bottom:22px;z-index:9999;display:flex;align-items:center;gap:9px;background:linear-gradient(135deg,#0a8f1f,#006a10);color:#fff;border:none;border-radius:999px;padding:13px 18px;font:600 14px/1 'Inter',system-ui,sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:.15s}
+.rnc-ai-fab svg{width:18px;height:18px}
+.rnc-ai-fab:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.rnc-ai-panel{position:fixed;right:22px;bottom:22px;z-index:10000;width:min(382px,calc(100vw - 28px));height:min(566px,calc(100vh - 36px));background:#0b1410;border:1px solid rgba(255,255,255,.1);border-radius:20px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.55);font-family:'Inter',system-ui,sans-serif}
+.rnc-ai-panel.open{display:flex}
+.rnc-ai-head{display:flex;align-items:center;gap:10px;padding:15px 16px;background:linear-gradient(135deg,#0a8f1f,#006a10);color:#fff}
+.rnc-ai-head b{font-size:14px}.rnc-ai-head small{display:block;font-size:11px;opacity:.85;font-weight:400}
+.rnc-ai-x{margin-left:auto;background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1}
+.rnc-ai-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.rnc-ai-msg{max-width:86%;padding:10px 13px;border-radius:14px;font-size:13.5px;line-height:1.46}
+.rnc-ai-bot{align-self:flex-start;background:#16241c;color:#e8efe9;border:1px solid rgba(255,255,255,.06);border-bottom-left-radius:4px}
+.rnc-ai-user{align-self:flex-end;background:#0a8f1f;color:#fff;border-bottom-right-radius:4px}
+.rnc-ai-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 10px}
+.rnc-ai-chip{background:#16241c;border:1px solid rgba(95,184,115,.4);color:#aee0bb;border-radius:999px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.rnc-ai-chip:hover{background:#1d3326}
+.rnc-ai-foot{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.08)}
+.rnc-ai-foot input{flex:1;background:#16241c;border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:11px;padding:10px 12px;font-size:13.5px;outline:none;font-family:inherit}
+.rnc-ai-send{background:#0a8f1f;border:none;color:#fff;border-radius:11px;padding:0 14px;cursor:pointer;font-size:16px}
+.rnc-ai-note{font-size:10.5px;color:#6b7d70;text-align:center;padding:0 16px 11px}
+</style>
+<button class="rnc-ai-fab" id="rncAiFab" aria-label="Abrir asistente">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2z"/></svg>
+  Asistente
+</button>
+<div class="rnc-ai-panel" id="rncAiPanel" role="dialog" aria-label="Asistente Renovacell">
+  <div class="rnc-ai-head">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="width:20px;height:20px"><path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2z"/></svg>
+    <span><b>Asistente Renovacell</b><small>Orientación para profesionales de la salud</small></span>
+    <button class="rnc-ai-x" id="rncAiClose" aria-label="Cerrar">&times;</button>
+  </div>
+  <div class="rnc-ai-body" id="rncAiBody"></div>
+  <div class="rnc-ai-chips" id="rncAiChips"></div>
+  <div class="rnc-ai-foot">
+    <input id="rncAiInput" placeholder="Escribe tu pregunta…" autocomplete="off">
+    <button class="rnc-ai-send" id="rncAiSend" aria-label="Enviar">&rarr;</button>
+  </div>
+  <div class="rnc-ai-note">Asistente de orientación · no brinda consejo clínico</div>
+</div>
+<script>
+(function(){
+  var panel=document.getElementById('rncAiPanel'),fab=document.getElementById('rncAiFab');
+  var body=document.getElementById('rncAiBody'),chipsEl=document.getElementById('rncAiChips');
+  var input=document.getElementById('rncAiInput');
+  function openP(){panel.classList.add('open');fab.style.display='none';if(!body.children.length)greet();input.focus();}
+  function closeP(){panel.classList.remove('open');fab.style.display='flex';}
+  fab.onclick=openP;document.getElementById('rncAiClose').onclick=closeP;
+  function add(text,who){var d=document.createElement('div');d.className='rnc-ai-msg '+(who==='user'?'rnc-ai-user':'rnc-ai-bot');d.innerHTML=text;body.appendChild(d);body.scrollTop=body.scrollHeight;return d;}
+  function chips(arr){chipsEl.innerHTML='';arr.forEach(function(c){var b=document.createElement('button');b.className='rnc-ai-chip';b.textContent=c;b.onclick=function(){handle(c);};chipsEl.appendChild(b);});}
+  function goAcceso(){closeP();var el=document.getElementById('contacto');if(el)el.scrollIntoView({behavior:'smooth'});}
+  // Motor de respuestas (mock por reglas). Fase backend: reemplazar por endpoint a modelo real.
+  function reply(q){
+    var t=q.toLowerCase();
+    if(/acces|cuenta|registr|comprar|precio|catalog|catálog/.test(t)) return {a:'El acceso es exclusivo para médicos verificados. Deja tus datos y tu <b>cédula profesional</b> en el formulario y validamos tu perfil; al aprobarlo habilitamos tu portal con catálogo y precios.',cta:true};
+    if(/s2rm|s²rm|ciencia|tecnolog|funciona|que es|qué es|stem|célul|celul/.test(t)) return {a:'Renovacell trabaja con tecnología celular <b>S²RM®</b> (Systemic Stem Cell Released Molecules), desarrollada en Europa para medicina regenerativa de grado médico.'};
+    if(/certific|cofepris|\bce\b|iso|regulat|cumplim|legal|sanit/.test(t)) return {a:'Tenemos <b>certificación CE (UE)</b>, <b>registro COFEPRIS</b> y calidad <b>ISO 13485</b>. Operamos en México y la Unión Europea desde 2008.'};
+    if(/paciente|público|publico|consumidor|persona/.test(t)) return {a:'Es exclusivo para <b>profesionales de la salud verificados</b>; no vendemos directo al público.'};
+    if(/contact|whats|teléfono|telefono|correo|email|hablar|asesor/.test(t)) return {a:'Con gusto. Deja tus datos en el formulario de acceso o escríbenos por los medios de contacto al pie de la página.',cta:true};
+    return {a:'Te oriento sobre la <b>ciencia (S²RM®)</b>, el <b>cumplimiento regulatorio</b> y <b>cómo obtener acceso</b> como médico. ¿Qué te gustaría saber?'};
+  }
+  function handle(q){add(q,'user');setTimeout(function(){var r=reply(q);add(r.a,'bot');if(r.cta){var d=add('','bot');d.innerHTML='';var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='2px';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;d.appendChild(b);body.scrollTop=body.scrollHeight;}defaultChips();},300);}
+  function defaultChips(){chips(['¿Qué es S²RM®?','¿Cómo obtengo acceso?','¿Tienen certificaciones?']);}
+  function greet(){add('Hola 👋 Soy el asistente de Renovacell. Te oriento sobre nuestra tecnología, el cumplimiento regulatorio y cómo obtener acceso como profesional de la salud.','bot');defaultChips();}
+  function send(){var v=input.value.trim();if(!v)return;input.value='';handle(v);}
+  document.getElementById('rncAiSend').onclick=send;
+  input.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
+})();
+</script>
+
 </body>
 </html>
