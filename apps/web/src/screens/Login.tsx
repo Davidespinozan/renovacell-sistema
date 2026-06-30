@@ -16,11 +16,23 @@ export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<'login' | 'recover'>('login')
+  const [sent, setSent] = useState(false)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const res = signIn(email, password)
     if (!res.ok) setError(res.error ?? 'No se pudo iniciar sesión.')
+  }
+
+  const recover = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSent(true) // mock: con backend enviará el correo de restablecimiento
+  }
+
+  const linkBtn: React.CSSProperties = {
+    background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+    color: 'var(--green-soft)', fontSize: 12.5, fontWeight: 600,
   }
 
   return (
@@ -52,26 +64,62 @@ export function Login() {
             </div>
           </div>
 
-          <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Iniciar sesión</h1>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>Entra con tu correo de Renovacell.</div>
+          {view === 'login' ? (
+            <>
+              <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Iniciar sesión</h1>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>Entra con tu correo de Renovacell.</div>
 
-          <form onSubmit={submit}>
-            <label style={lbl}>Correo</label>
-            <div style={{ position: 'relative', margin: '6px 0 14px' }}>
-              <Mail size={16} style={iconStyle} />
-              <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@renovacell.mx" autoFocus />
-            </div>
+              <form onSubmit={submit}>
+                <label style={lbl}>Correo</label>
+                <div style={{ position: 'relative', margin: '6px 0 14px' }}>
+                  <Mail size={16} style={iconStyle} />
+                  <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@renovacell.mx" autoFocus />
+                </div>
 
-            <label style={lbl}>Contraseña</label>
-            <div style={{ position: 'relative', margin: '6px 0 4px' }}>
-              <Lock size={16} style={iconStyle} />
-              <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-            </div>
+                <label style={lbl}>Contraseña</label>
+                <div style={{ position: 'relative', margin: '6px 0 4px' }}>
+                  <Lock size={16} style={iconStyle} />
+                  <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+                </div>
 
-            {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
+                <div style={{ textAlign: 'right', marginTop: 8 }}>
+                  <button type="button" style={linkBtn} onClick={() => { setView('recover'); setError(null); setSent(false) }}>¿Olvidaste tu contraseña?</button>
+                </div>
 
-            <button className="btn" type="submit" style={{ width: '100%', marginTop: 18 }}><LogIn size={16} /> Entrar</button>
-          </form>
+                {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
+
+                <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }}><LogIn size={16} /> Entrar</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Recuperar contraseña</h1>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>
+                Te enviaremos un enlace para restablecerla a tu correo.
+              </div>
+
+              {sent ? (
+                <>
+                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+                    <span>Si <b>{email || 'tu correo'}</b> está registrado, te enviamos las instrucciones para restablecer tu contraseña. Revisa tu bandeja.</span>
+                  </div>
+                  <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => { setView('login'); setSent(false) }}>Volver a iniciar sesión</button>
+                </>
+              ) : (
+                <form onSubmit={recover}>
+                  <label style={lbl}>Correo</label>
+                  <div style={{ position: 'relative', margin: '6px 0 4px' }}>
+                    <Mail size={16} style={iconStyle} />
+                    <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@renovacell.mx" autoFocus />
+                  </div>
+                  <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }} disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} >Enviar instrucciones</button>
+                  <div style={{ textAlign: 'center', marginTop: 12 }}>
+                    <button type="button" style={linkBtn} onClick={() => setView('login')}>Volver a iniciar sesión</button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

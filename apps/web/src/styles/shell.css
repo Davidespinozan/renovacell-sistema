@@ -341,3 +341,19 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   .lp-hero{padding:34px 20px}
   .lp-cell{border-right:none;border-bottom:1px solid var(--line)}
 }
+
+/* Móvil-first: menos "aire". Compacta padding/gaps en teléfono para que la
+   información rinda más en pantalla chica (sin apretar de más). */
+@media (max-width:640px){
+  .canvas{padding:12px 12px 56px}
+  .canvas #content > .grid{gap:11px!important}
+  .card{padding:13px;border-radius:13px}
+  .card.sig{padding:12px 13px}
+  .sigs{margin-bottom:12px;gap:10px}
+  .page-h{padding:14px 15px;border-radius:15px;margin-bottom:2px}
+  .page-h h1{font-size:18.5px}
+  .page-h p{font-size:12.5px;margin-top:4px;line-height:1.45}
+  .eyebrow{margin-bottom:11px}
+  .alert{padding:13px 15px;margin-bottom:12px}
+  .coitem{padding:8px 0}
+}

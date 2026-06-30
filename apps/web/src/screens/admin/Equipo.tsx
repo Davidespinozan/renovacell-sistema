@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { UserPlus, X, Ban, RotateCcw } from 'lucide-react'
 import { initials, avatarColor } from '../../lib/format'
 import { useTeam, type TeamUser } from '../../data/hooks/useTeam'
+import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
 
 const STAFF_ROLES = ROLES.filter((r) => r.isStaff)
@@ -61,37 +62,66 @@ export function Equipo() {
         </div>
       ))}
 
-      {open && <NewUser onClose={() => setOpen(false)} onSave={(i) => { addUser(i); setOpen(false) }} />}
+      {open && <NewUser onClose={() => setOpen(false)} onSave={(i) => addUser(i)} />}
     </div>
   )
 }
 
-function NewUser({ onClose, onSave }: { onClose: () => void; onSave: (i: { name: string; role: RoleKey }) => void }) {
+function NewUser({ onClose, onSave }: { onClose: () => void; onSave: (i: { name: string; role: RoleKey; email: string }) => { ok: boolean; error?: string } }) {
   const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [role, setRole] = useState<RoleKey>('warehouse')
+  const [err, setErr] = useState<string | null>(null)
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const valid = name.trim() !== '' && emailOk
+
+  const save = () => {
+    const res = onSave({ name: name.trim(), role, email: email.trim() })
+    if (res.ok) onClose()
+    else setErr(res.error ?? 'No se pudo crear el usuario.')
+  }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div><h3>Nuevo usuario</h3><div className="ms">Administración da de alta y define el rol. Las responsabilidades se asignan después.</div></div>
+          <div><h3>Nuevo usuario</h3><div className="ms">Administración da de alta, define el rol y asigna el correo de acceso.</div></div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
           <label style={{ ...label, marginTop: 0 }}>Nombre</label>
           <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre y apellido" />
+
+          <label style={label}>Correo de acceso</label>
+          <input style={input} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(null) }} placeholder="correo@empresa.com o el suyo" />
+          <button
+            type="button"
+            className="btn ghost sm"
+            style={{ marginTop: 8 }}
+            disabled={!name.trim()}
+            onClick={() => { setEmail(suggestCompanyEmail(name)); setErr(null) }}
+          >
+            Sugerir correo de empresa (@renovacell.mx)
+          </button>
+
           <label style={label}>Rol base</label>
           <select style={input} value={role} onChange={(e) => setRole(e.target.value as RoleKey)}>
             {STAFF_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </select>
+
           <div className="sysnote" style={{ marginTop: 14 }}>
-            <span>Se genera su correo de acceso (@renovacell.mx). Tras crearlo, asígnale responsabilidades (Diseño, Comercial) desde la tarjeta.</span>
+            <span>Tú eliges el correo: el propio del trabajador o uno con el dominio de la empresa. Tras crearlo, asígnale responsabilidades (Diseño, Comercial…) desde su tarjeta.</span>
           </div>
+          {err && (
+            <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}>
+              <span>{err}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSave({ name: name.trim(), role })}>
+            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={save}>
               <UserPlus size={15} /> Crear usuario
             </button>
           </div>

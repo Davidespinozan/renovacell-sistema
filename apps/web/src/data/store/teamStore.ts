@@ -41,14 +41,26 @@ export function userByEmail(email: string): TeamUser | undefined {
   return users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
 }
 
-export function addUser(input: { name: string; role: RoleKey }): TeamUser {
+// El correo lo ELIGE Administración (no se autogenera): puede ser el correo del
+// trabajador o uno con el dominio de la empresa. Devuelve error si está repetido.
+export function addUser(input: { name: string; role: RoleKey; email: string }): { ok: boolean; user?: TeamUser; error?: string } {
+  const email = input.email.trim().toLowerCase()
+  if (!email) return { ok: false, error: 'Falta el correo.' }
+  if (users.some((u) => u.email.toLowerCase() === email)) return { ok: false, error: 'Ya existe un usuario con ese correo.' }
   seq += 1
-  const handle = input.name.split('·')[0].trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const u: TeamUser = { id: `u-${seq}`, name: input.name, email: `${handle || 'usuario'}${seq}@renovacell.mx`, role: input.role, capabilities: [], active: true }
+  const u: TeamUser = { id: `u-${seq}`, name: input.name, email, role: input.role, capabilities: [], active: true }
   users = [u, ...users]
   emit()
-  logAudit({ actor: 'Administración', action: 'Usuario dado de alta', resource: input.name })
-  return u
+  logAudit({ actor: 'Administración', action: 'Usuario dado de alta', resource: `${input.name} · ${email}` })
+  return { ok: true, user: u }
+}
+
+// Sugerencia de correo de empresa a partir del nombre (el admin la puede editar).
+export function suggestCompanyEmail(name: string): string {
+  const parts = name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  const handle = parts.length === 1 ? parts[0] : `${parts[0]}.${parts[parts.length - 1]}`
+  return `${handle}@renovacell.mx`
 }
 
 export function toggleCapability(id: string, cap: CapabilityKey) {
