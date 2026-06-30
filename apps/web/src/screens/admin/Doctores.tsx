@@ -18,7 +18,7 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke, setCedula } = useDoctors()
+  const { data: doctors, verify, revoke, setCedula, inviteDoctor } = useDoctors()
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
@@ -98,6 +98,7 @@ export function Doctores() {
           onVerify={() => verify(detail.id)}
           onRevoke={() => revoke(detail.id)}
           onSetCedula={(c) => setCedula(detail.id, c)}
+          onInvite={() => inviteDoctor(detail.id)}
         />
       )}
 
@@ -107,7 +108,7 @@ export function Doctores() {
 }
 
 function DoctorDetail({
-  doctor, orders, onClose, onVerify, onRevoke, onSetCedula,
+  doctor, orders, onClose, onVerify, onRevoke, onSetCedula, onInvite,
 }: {
   doctor: Profile
   orders: ReturnType<typeof useAllOrders>['data']
@@ -115,6 +116,7 @@ function DoctorDetail({
   onVerify: () => void
   onRevoke: () => void
   onSetCedula: (cedula: string) => void
+  onInvite: () => void
 }) {
   // doctor.verified puede cambiar mientras el modal está abierto; leemos del store vía prop.
   const history = orders.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
@@ -191,9 +193,24 @@ function DoctorDetail({
             </table>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+          {doctor.verified && (
+            <div className="sysnote" style={{ marginTop: 4, marginBottom: 4, alignItems: 'center' }}>
+              <span>
+                {(doctor.meta?.invited as boolean)
+                  ? 'Ya se le envió acceso a su Portal (puede pedir él mismo o por su vendedor).'
+                  : 'Verificado: puede comprar. Si quiere pedir desde su propio Portal, envíale el acceso.'}
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             {doctor.verified ? (
-              <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={onRevoke}><Ban size={15} /> Revocar acceso</button>
+              <>
+                <button className="btn ghost" type="button" disabled={Boolean(doctor.meta?.invited)} style={Boolean(doctor.meta?.invited) ? { opacity: 0.6 } : undefined} onClick={onInvite}>
+                  <UserCheck size={15} /> {(doctor.meta?.invited as boolean) ? 'Acceso enviado' : 'Enviar acceso al Portal'}
+                </button>
+                <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={onRevoke}><Ban size={15} /> Revocar acceso</button>
+              </>
             ) : (
               <button className="btn" type="button" disabled={!cedulaOf(doctor)} title={cedulaOf(doctor) ? '' : 'Falta la cédula profesional'} onClick={onVerify}><UserCheck size={15} /> Verificar doctor</button>
             )}

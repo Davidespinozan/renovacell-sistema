@@ -43,7 +43,14 @@ export function MisEntregas() {
     window.setTimeout(() => setToast(null), 2600)
   }
 
-  const mine = shipments.filter((s) => s.driver_id === driverId && s.status !== 'delivered')
+  const myAll = shipments.filter((s) => s.driver_id === driverId)
+  const mine = myAll.filter((s) => s.status !== 'delivered')
+  const entregadas = myAll.filter((s) => s.status === 'delivered')
+  // Piezas a bordo = suma de unidades de los pedidos pendientes en su ruta.
+  const piezasABordo = mine.reduce((s, sh) => {
+    const o = orderById[sh.order_id]
+    return s + (o ? o.items.filter((it) => it.unit_price != null).reduce((t, it) => t + it.qty, 0) : 0)
+  }, 0)
 
   const onPhoto = (shipmentId: string, file: File | undefined) => {
     if (!file) return
@@ -60,7 +67,14 @@ export function MisEntregas() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Chofer / Seguimiento · {driverName(driverId)}</div>
+      <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
+
+      {/* Resumen de carga del día */}
+      <div className="grid sigs">
+        <div className="card sig"><div className="chip"><Icon name="truck" /></div><div className="v">{mine.length}</div><div className="k">A bordo</div><div className="s">{piezasABordo} pza(s) cargadas</div></div>
+        <div className="card sig"><div className="chip"><Icon name="check" /></div><div className="v">{entregadas.length}</div><div className="k">Entregadas</div><div className="s">de tu ruta</div></div>
+        <div className={'card sig' + (mine.length ? ' warn' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{mine.length}</div><div className="k">Por entregar</div><div className="s">regresa lo no entregado</div></div>
+      </div>
 
       {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
@@ -113,8 +127,8 @@ export function MisEntregas() {
 
               <div className="field-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <label className="btn ghost sm" style={{ cursor: 'pointer' }}>
-                  <Icon name="image" /> {photo ? 'Cambiar foto' : 'Subir foto de prueba'}
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
+                  <Icon name="image" /> {photo ? 'Cambiar foto' : 'Foto de entrega'}
+                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
                 </label>
                 {photo && <img src={photo} alt="prueba" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }} />}
                 {(() => {
@@ -133,7 +147,7 @@ export function MisEntregas() {
                 })()}
               </div>
               {!(Boolean(photo) && Boolean(received[s.id]?.trim())) && (
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Captura quién recibe y la foto de prueba para confirmar la entrega.</div>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Prueba de entrega: foto del <b>paquete en el sitio</b> (no de la persona) + el nombre de quién recibió.</div>
               )}
 
               <details style={{ marginTop: 10 }}>

@@ -48,6 +48,18 @@ export function setCedula(id: string, cedula: string) {
   logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
 }
 
+// Enviar acceso al Portal: invita al doctor (verificado) a entrar a su portal.
+// Hoy mock (marca invited + audita). Con backend: crea su usuario de auth y le
+// envía invitación / enlace mágico por correo. La firma no cambia.
+export function inviteDoctor(id: string) {
+  const doc = doctors.find((d) => d.id === id)
+  if (!doc) return
+  doctors = doctors.map((d) => (d.id === id ? { ...d, meta: { ...(d.meta ?? {}), invited: true } } : d))
+  emit()
+  notify({ text: `Acceso al Portal enviado a ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  logAudit({ actor: 'Administración', action: 'Acceso al Portal enviado', resource: doc.full_name ?? id })
+}
+
 // Alta de doctor en estado PENDIENTE (verified:false). La usa la conversión de
 // Prospectos: cierra el embudo landing→prospecto→doctor→Portal sin duplicar el
 // concepto de Doctores. En Supabase = insert en profiles (role_id='doctor',

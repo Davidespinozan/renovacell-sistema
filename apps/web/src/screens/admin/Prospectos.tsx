@@ -234,8 +234,8 @@ function DetailModal({
                 <CheckCircle2 size={15} /> Ya convertido
               </button>
             ) : (
-              <button className="btn" type="button" onClick={onConvert}>
-                <UserPlus size={15} /> Convertir a doctor <ArrowRight size={14} />
+              <button className="btn" type="button" onClick={onConvert} title="Lo da de alta como doctor; Dirección lo verifica (cédula) antes de que pueda comprar">
+                <UserPlus size={15} /> Convertir en cliente <ArrowRight size={14} />
               </button>
             )}
           </div>
