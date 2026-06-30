@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
-import { useProducts } from '../../data/hooks/useProducts'
+import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
 
@@ -25,7 +25,7 @@ export function Catalogo() {
   const [checkout, setCheckout] = useState(false)
 
   const shown = useMemo(
-    () => products.filter((p) => (filter === 'all' ? true : p.line === filter)),
+    () => products.filter(isActiveProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
     [products, filter],
   )
 

@@ -1,30 +1,27 @@
-// Hook de acceso a datos del catálogo. HOY devuelve mock; MAÑANA se cambia el
-// cuerpo por una consulta a Supabase (`products_safe`) SIN tocar las pantallas.
-//
-// Para migrar a Supabase, reemplazar el cuerpo por algo como:
-//   const { data, error } = await supabase.from('products_safe').select('*')
-// y mapear a ProductSafe[]. La firma { data, loading, error } no cambia.
-import { useEffect, useState } from 'react'
+// Hook de acceso al catálogo. HOY lee del store editable (productsStore); el
+// Portal del Doctor ve solo los ACTIVOS. MAÑANA (Supabase) se cambia el cuerpo
+// por un select a `products_safe` SIN tocar las pantallas.
+import { useSyncExternalStore } from 'react'
 import type { ProductSafe, QueryResult } from '../types'
-import { MOCK_PRODUCTS } from '../mock/catalog'
+import {
+  subscribe, getSnapshot,
+  createProduct, updateProduct, toggleActive, type ProductInput,
+} from '../store/productsStore'
 
+// Catálogo completo (incluye ocultos) — se usa para resolver nombres de
+// productos en pedidos/reportes. Las pantallas del DOCTOR filtran por `active`
+// con isActiveProduct() para no mostrar los ocultos.
 export function useProducts(): QueryResult<ProductSafe[]> {
-  const [state, setState] = useState<QueryResult<ProductSafe[]>>({
-    data: [],
-    loading: true,
-    error: null,
-  })
-
-  useEffect(() => {
-    let alive = true
-    // Simula la carga asíncrona (igual forma que una llamada a Supabase).
-    Promise.resolve(MOCK_PRODUCTS).then((data) => {
-      if (alive) setState({ data, loading: false, error: null })
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  return state
+  const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return { data, loading: false, error: null }
 }
+
+export const isActiveProduct = (p: ProductSafe): boolean => p.active !== false
+
+// Catálogo COMPLETO (Admin/Contenido): incluye los ocultos + mutaciones.
+export function useCatalogAdmin() {
+  const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return { data, createProduct, updateProduct, toggleActive }
+}
+
+export type { ProductInput }

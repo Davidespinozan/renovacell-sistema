@@ -13,7 +13,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido'
 
 export interface ScreenDef {
   key: string
@@ -50,6 +50,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
       { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
       { key: 'av_inv', label: 'Inventario', icon: 'box', section: 'Operación' },
+      { key: 'av_contenido', label: 'Contenido', icon: 'grid', section: 'Operación' },
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
       { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
@@ -121,6 +122,10 @@ export const CAPABILITIES: CapabilityDef[] = [
   },
   // Sin módulos propios: es un permiso (publicar/gestionar anuncios en Vista Común).
   { key: 'anuncios', label: 'Anuncios', modules: [] },
+  {
+    key: 'contenido', label: 'Contenido',
+    modules: [{ key: 'av_contenido', label: 'Contenido', icon: 'grid', section: 'Contenido' }],
+  },
 ]
 export const getCapability = (k: CapabilityKey): CapabilityDef | undefined => CAPABILITIES.find((c) => c.key === k)
 export const capabilityModules = (caps: string[]): ScreenDef[] =>

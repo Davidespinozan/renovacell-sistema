@@ -35,6 +35,7 @@ export interface Product {
   price: number | null     // todos los productos llevan precio (null solo por compat. de esquema)
   unit: string | null
   image_url: string | null // imagen real del producto (Storage en el futuro)
+  active?: boolean         // visible en el catálogo del doctor (default: true)
   metadata: Json           // interno (NO visible para no-admin)
 }
 
