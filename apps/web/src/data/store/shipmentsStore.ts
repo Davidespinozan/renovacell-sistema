@@ -55,8 +55,26 @@ export function createShipment(input: ShipmentInput): Shipment {
   }
   shipments = [sh, ...shipments]
   emit()
-  if (input.driver_id) notify({ text: 'Nueva entrega asignada a tu ruta', roles: ['driver'], screen: 'driver_home' })
+  if (input.driver_id) notify({ text: 'Carga por despachar para tu ruta', roles: ['driver'], screen: 'driver_home' })
   return sh
+}
+
+// Despacho (Empaque o Administración): autoriza y registra la entrega de la carga
+// al chofer (quién y cuándo). El chofer aún debe confirmar que la recibió.
+export function dispatchShipment(id: string, by: string, folio: string) {
+  const now = new Date().toISOString()
+  shipments = shipments.map((s) => (s.id === id ? { ...s, status: 'despachado', dispatched_by: by, dispatched_at: now } : s))
+  emit()
+  notify({ text: `Carga despachada · confirma recepción (${folio})`, roles: ['driver'], screen: 'driver_home' })
+  logAudit({ actor: by, action: 'Carga despachada al chofer', resource: folio })
+}
+
+// El chofer confirma que recibió sus paquetes → entra a reparto.
+export function confirmLoad(id: string, who: string, folio: string) {
+  const now = new Date().toISOString()
+  shipments = shipments.map((s) => (s.id === id ? { ...s, status: 'out_for_delivery', load_confirmed_at: now } : s))
+  emit()
+  logAudit({ actor: who, action: 'Carga recibida (chofer)', resource: folio })
 }
 
 // Incidencia en entrega (chofer): registra el problema y avisa a logística/admin.

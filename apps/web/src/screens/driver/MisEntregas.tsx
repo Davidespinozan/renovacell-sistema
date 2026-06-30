@@ -14,7 +14,7 @@ import { useRole } from '../../auth/RoleContext'
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
 
 export function MisEntregas() {
-  const { data: shipments, reportIncident } = useShipments()
+  const { data: shipments, reportIncident, confirmLoad } = useShipments()
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { user } = useRole()
@@ -94,7 +94,11 @@ export function MisEntregas() {
                 <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
                 {s.incident && !s.incident.resolved
                   ? <span className="pill p-dang">Incidencia: {s.incident.type}</span>
-                  : <span className="pill p-blue"><span className="d" /> En reparto</span>}
+                  : s.status === 'por_despachar'
+                    ? <span className="pill p-neu">Por despachar</span>
+                    : s.status === 'despachado'
+                      ? <span className="pill p-warn">Confirma tu carga</span>
+                      : <span className="pill p-blue"><span className="d" /> En reparto</span>}
                 <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
                   {s.estimated_delivery_at ? `Estimada ${fmtDate(s.estimated_delivery_at)}` : ''}
                 </span>
@@ -116,6 +120,21 @@ export function MisEntregas() {
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
               </div>
 
+              {s.status === 'por_despachar' ? (
+                <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
+                  <Icon name="clock" /><span>Esperando que Almacén te <b>despache la carga</b>. En cuanto la entreguen, confírmala aquí.</span>
+                </div>
+              ) : s.status === 'despachado' ? (
+                <div>
+                  <div className="sysnote" style={{ marginBottom: 10 }}>
+                    <Icon name="truck" /><span>Almacén despachó tu carga{s.dispatched_by ? ` (autorizó ${s.dispatched_by})` : ''}. Cuenta tus paquetes y confirma que los recibiste.</span>
+                  </div>
+                  <button className="btn" type="button" onClick={() => confirmLoad(s.id, driverName(driverId), order.external_ref ?? order.id)}>
+                    <Icon name="check" /> Confirmar que recibí mi carga
+                  </button>
+                </div>
+              ) : (
+              <>
               <div style={{ marginBottom: 10 }}>
                 <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Recibió (nombre de quien recibe)</label>
                 <input
@@ -170,6 +189,8 @@ export function MisEntregas() {
                   <button className="btn ghost sm" type="button" onClick={() => reportInc(s.id, order.external_ref ?? order.id)}>Enviar incidencia</button>
                 </div>
               </details>
+              </>
+              )}
             </div>
           )
         })

@@ -127,7 +127,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
     const drv = MOCK_DRIVERS.find((d) => d.id === driverId)
     createShipment({
       order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
-      estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'out_for_delivery',
+      estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
     })
     markShipped(order.id, { method: 'chofer', driver: drv?.name ?? '', driver_id: driverId })
     setDoneChofer(true)

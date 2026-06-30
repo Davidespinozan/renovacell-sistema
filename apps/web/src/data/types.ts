@@ -115,6 +115,9 @@ export interface Shipment {
   label_url: string | null       // etiqueta/guía para imprimir (del agregador)
   driver_id: UUID | null
   status: string | null
+  dispatched_by?: string | null        // quién autorizó el despacho (Empaque/Admin)
+  dispatched_at?: ISODateTime | null   // cuándo se entregó la carga al chofer
+  load_confirmed_at?: ISODateTime | null // cuándo el chofer confirmó recibir la carga
   estimated_delivery_at: ISODateTime | null
   delivered_at: ISODateTime | null
   proof_image_url: string | null

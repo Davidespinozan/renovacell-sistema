@@ -20,6 +20,7 @@ import { Cola } from './packing/Cola'
 import { Guias } from './packing/Guias'
 import { Recibo } from './packing/Recibo'
 import { Seguimiento } from './logistics/Seguimiento'
+import { Despacho } from './logistics/Despacho'
 import { MisEntregas } from './driver/MisEntregas'
 // Pantallas con recharts: lazy para que la librería no cargue hasta abrirlas.
 const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ default: m.Tablero })))
@@ -60,6 +61,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   guia: () => <Guias />,
   recibo: () => <Recibo />,
   seguimiento: () => <Seguimiento />,
+  despacho: () => <Despacho />,
   driver_home: () => <MisEntregas />,
   tablero: () => <Tablero />,
   av_ventas: () => <Ventas />,
