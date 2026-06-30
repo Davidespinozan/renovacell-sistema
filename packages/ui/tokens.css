@@ -43,9 +43,10 @@
   --bone-warm: #F4F2EA;
 
   /* Radios */
-  --r-sm: 10px;
-  --r: 14px;
-  --r-lg: 20px;
+  --r-sm: 12px;
+  --r: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
   --pill: 999px;
 
   /* Sombras — escalonadas, basadas en verde-tinta (no negro puro) para dar

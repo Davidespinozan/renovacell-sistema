@@ -166,13 +166,25 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
 .alert .ico svg{width:20px;height:20px}.alert b{color:var(--danger)}
 .alert .x{font-size:13.5px;color:#7a4b47;line-height:1.45}.alert .more{margin-left:auto;color:var(--danger);font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:5px;white-space:nowrap}.alert .more svg{width:15px;height:15px}
 .sigs{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:18px}
-.card.sig{padding:15px 17px;display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:3px;align-items:center}
-.sig .chip{grid-row:1;grid-column:1;width:38px;height:38px;border-radius:11px;background:var(--ok-bg);color:var(--green-deep);display:grid;place-items:center;margin:0}.sig .chip svg{width:18px;height:18px}
+.card.sig{padding:17px 18px;border-radius:var(--r-lg);display:grid;grid-template-columns:auto 1fr;column-gap:13px;row-gap:4px;align-items:center}
+.sig .chip{grid-row:1;grid-column:1;width:42px;height:42px;border-radius:13px;background:var(--ok-bg);color:var(--green-deep);display:grid;place-items:center;margin:0}.sig .chip svg{width:19px;height:19px}
 .sig .v{grid-row:1;grid-column:2;align-self:center}
 .sig .k{grid-column:1 / -1}
 .sig .s{grid-column:1 / -1}
 .sig.warn .chip{background:var(--warn-bg);color:var(--warn)}.sig.dang .chip{background:var(--danger-bg);color:var(--danger)}
-.sig .v{font-family:'Inter',serif;font-size:22px;font-weight:600;line-height:1.05}
+.sig .v{font-family:'Inter',sans-serif;font-size:26px;font-weight:700;line-height:1.02;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+/* Pill de variación (+5.2% estilo app) */
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.delta.up{background:var(--ok-bg);color:var(--green-deep)}.delta.down{background:var(--danger-bg);color:var(--danger)}
+/* Tarjeta HERO del dato principal (estilo app fintech) */
+.feature{position:relative;overflow:hidden;border:none;border-radius:var(--r-xl);padding:22px 24px;color:#fff;
+  background:radial-gradient(120% 140% at 100% 0%,rgba(95,184,115,.45),transparent 55%),var(--grad-green);
+  box-shadow:0 20px 44px -18px rgba(0,89,13,.55)}
+.feature::after{content:"";position:absolute;top:-60px;right:-30px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%)}
+.feature .fk{position:relative;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.82);font-weight:600}
+.feature .fv{position:relative;font-size:clamp(30px,5vw,42px);font-weight:700;letter-spacing:-.03em;line-height:1.04;margin-top:6px;font-variant-numeric:tabular-nums}
+.feature .fs{position:relative;display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12.5px;color:rgba(255,255,255,.85)}
+.feature .delta.up{background:rgba(255,255,255,.18);color:#eafff0}
 .sig.warn .v{color:var(--warn)}.sig.dang .v{color:var(--danger)}
 .sig .k{font-size:10.5px;letter-spacing:.04em;color:var(--ink-3);font-weight:600;margin:0;text-transform:uppercase}
 .sig .s{font-size:12px;color:var(--ink-2);line-height:1.45}

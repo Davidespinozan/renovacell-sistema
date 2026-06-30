@@ -9,7 +9,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
-import { salesSummary, doctorActivity } from '../../data/metrics'
+import { salesSummary, doctorActivity, monthlySales } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 
@@ -36,6 +36,11 @@ export function Tablero() {
 
   const sum = salesSummary(orders)
   const act = doctorActivity(orders)
+  // Variación mes vs mes anterior (para el dato hero).
+  const ms = useMemo(() => monthlySales(orders, 2), [orders])
+  const curM = ms[ms.length - 1]?.revenue ?? 0
+  const prevM = ms[ms.length - 2]?.revenue ?? 0
+  const deltaPct = prevM > 0 ? ((curM - prevM) / prevM) * 100 : null
 
   const porEstatus = useMemo(() => {
     const acc: Record<Bucket, number> = { Pedido: 0, Empacado: 0, 'En camino': 0, Entregado: 0 }
@@ -70,8 +75,30 @@ export function Tablero() {
   const recientes = orders.slice(0, 6)
 
   return (
-    <div className="grid" style={{ gap: 20 }}>
+    <div className="grid" style={{ gap: 18 }}>
       <div className="eyebrow">Administración · Tablero</div>
+
+      {/* Dato HERO (estilo app) */}
+      <div className="grid two" style={{ gap: 16, alignItems: 'stretch' }}>
+        <div className="feature">
+          <div className="fk">Ventas acumuladas</div>
+          <div className="fv">{money(sum.revenue)}</div>
+          <div className="fs">
+            {deltaPct != null && <span className="delta up">{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span>}
+            <span>{sum.orders} pedidos · ticket {money(sum.avgTicket)}</span>
+          </div>
+        </div>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="eyebrow" style={{ margin: '0 0 12px' }}>Pedidos por estatus</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {(['Pedido', 'Empacado', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
+              <div key={b} className="sl-stat" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <b className="mono" style={{ fontSize: 18 }}>{porEstatus[b]}</b> {b}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* KPIs */}
       <div className="grid sigs">
@@ -82,18 +109,6 @@ export function Tablero() {
         <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
         <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
         <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s="≤ 60 días o caducados" tone={porCaducar.length ? 'warn' : undefined} />
-      </div>
-
-      {/* Pedidos por estatus */}
-      <div className="card">
-        <div className="eyebrow">Pedidos por estatus</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {(['Pedido', 'Empacado', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
-            <div key={b} className="sl-stat" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <b className="mono" style={{ fontSize: 16 }}>{porEstatus[b]}</b> {b}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* ALERTAS */}
