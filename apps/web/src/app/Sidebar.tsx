@@ -2,18 +2,20 @@
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
 import React, { useState } from 'react'
-import { LogOut, Pencil } from 'lucide-react'
+import { LogOut, Pencil, Settings } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_SCREENS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
+import { Ajustes } from '../screens/Ajustes'
 
 const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen, user, logout, capabilities } = useRole()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [ajustesOpen, setAjustesOpen] = useState(false)
   const r = getRole(role)
   const nav = getNav(r, undefined, capabilities)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
@@ -81,6 +83,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               </span>
               <Pencil size={14} className="su-edit" />
             </button>
+            <button className="side-logout" type="button" onClick={() => setAjustesOpen(true)}>
+              <Settings size={15} /> Ajustes
+            </button>
             <button className="side-logout" type="button" onClick={logout}>
               <LogOut size={15} /> Cerrar sesión
             </button>
@@ -92,6 +97,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}
+      {ajustesOpen && <Ajustes onClose={() => setAjustesOpen(false)} />}
     </aside>
   )
 }
