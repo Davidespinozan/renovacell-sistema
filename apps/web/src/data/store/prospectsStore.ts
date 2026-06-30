@@ -59,6 +59,7 @@ export function addProspect(input: {
   organization: string | null
   source: string
   interest: string[]
+  cedula?: string | null      // si ya la trae, al convertir se podrá verificar
   assignedTo?: string | null // vendedor dueño (el que lo da de alta), null = sin asignar
 }): Prospect {
   seq += 1
@@ -67,7 +68,7 @@ export function addProspect(input: {
     name: input.name,
     email: input.email,
     phone: input.phone,
-    cedula: null,
+    cedula: input.cedula ?? null,
     source: input.source,
     status: 'nuevo',
     assigned_to: input.assignedTo ?? null,

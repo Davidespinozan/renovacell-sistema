@@ -22,7 +22,7 @@ const STATUS_META: Record<ProspectStatus, { label: string; pill: string }> = {
   convertido: { label: 'Convertido', pill: 'p-ok' },
   descartado: { label: 'Descartado', pill: 'p-neu' },
 }
-const SOURCES = ['Landing', 'WhatsApp', 'Referido', 'Manual']
+const SOURCES = ['Puerta a puerta', 'Landing', 'WhatsApp', 'Referido', 'Evento', 'Manual']
 
 const orgOf = (p: Prospect) => ((p.meta as Record<string, unknown>)?.organization as string) ?? ''
 const interestOf = (p: Prospect) => ((p.meta as Record<string, unknown>)?.interest as string[]) ?? []
@@ -247,14 +247,15 @@ function DetailModal({
 
 function NewModal({ onClose, onSave }: {
   onClose: () => void
-  onSave: (input: { name: string; email: string | null; phone: string | null; organization: string | null; source: string; interest: string[] }) => void
+  onSave: (input: { name: string; email: string | null; phone: string | null; organization: string | null; source: string; interest: string[]; cedula: string | null }) => void
 }) {
   const { data: products } = useProducts()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [org, setOrg] = useState('')
-  const [source, setSource] = useState('Manual')
+  const [cedula, setCedula] = useState('')
+  const [source, setSource] = useState('Puerta a puerta')
   const [interest, setInterest] = useState('')
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
@@ -269,6 +270,7 @@ function NewModal({ onClose, onSave }: {
       organization: org.trim() || null,
       source,
       interest: interest ? [interest] : [],
+      cedula: cedula.trim() || null,
     })
   }
 
@@ -294,8 +296,16 @@ function NewModal({ onClose, onSave }: {
             </div>
           </div>
 
-          <label style={label}>Clínica / organización</label>
-          <input style={input} value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Nombre de la clínica" />
+          <div className="form-grid-2" style={{ marginTop: 0 }}>
+            <div>
+              <label style={label}>Clínica / organización</label>
+              <input style={input} value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Nombre de la clínica" />
+            </div>
+            <div>
+              <label style={label}>Cédula profesional (si la trae)</label>
+              <input style={input} value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="Para poder verificarlo al convertir" />
+            </div>
+          </div>
 
           <div className="form-grid-2" style={{ marginTop: 0 }}>
             <div>
