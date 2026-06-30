@@ -9,6 +9,15 @@
 
 /* Encabezado personalizado: saluda por nombre y deja VISIBLE el rol */
 .feed-head { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 13px 16px; box-shadow: var(--sh-sm); }
+/* Bienvenida (hero del Inicio) */
+.welcome { position: relative; overflow: hidden; display: flex; align-items: center; gap: 15px; width: 100%; padding: 20px 22px; border-radius: var(--r-xl); color: #fff;
+  background: radial-gradient(120% 150% at 100% 0%, rgba(95,184,115,.42), transparent 55%), var(--grad-green);
+  box-shadow: 0 18px 40px -18px rgba(0,89,13,.55); }
+.welcome::after { content: ""; position: absolute; top: -50px; right: -20px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.16), transparent 70%); pointer-events: none; }
+.welcome .avatar { width: 54px; height: 54px; font-size: 19px; border: 2px solid rgba(255,255,255,.55); flex: none; position: relative; }
+.welcome .wk { position: relative; font-size: 12px; letter-spacing: .04em; color: rgba(255,255,255,.85); font-weight: 600; }
+.welcome .wh { position: relative; font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin-top: 2px; }
+.welcome .role-badge { position: relative; margin-left: auto; background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.28); }
 .role-badge { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: var(--ok-bg); color: var(--green-deep); border: 1px solid #C9E4CF; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .role-badge svg { width: 14px; height: 14px; }
 

@@ -2,7 +2,7 @@
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
 import React, { useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { LogOut, Pencil } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_SCREENS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
@@ -71,14 +71,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="side-foot">
         {user && (
           <div className="side-user">
-            <button type="button" className="su-open" title="Mi perfil" onClick={() => setProfileOpen(true)}>
+            <button type="button" className="su-open" title="Editar mi perfil" onClick={() => setProfileOpen(true)}>
               {user.avatarUrl
                 ? <img className="su-av" src={user.avatarUrl} alt="" />
                 : <span className="su-av">{initials(user.name)}</span>}
               <span className="su-meta">
                 <span className="su-name">{user.name.split('·')[0].trim()}</span>
-                <span className="su-role">{r.label}</span>
+                <span className="su-role">Editar perfil</span>
               </span>
+              <Pencil size={14} className="su-edit" />
             </button>
             <button className="side-logout" type="button" onClick={logout}>
               <LogOut size={15} /> Cerrar sesión

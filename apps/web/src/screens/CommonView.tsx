@@ -73,10 +73,11 @@ export function CommonView() {
   return (
     <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
       <div className="feed">
-        <div className="feed-head">
+        <div className="welcome">
           <Avatar name={user?.name ?? 'Equipo'} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.15 }}>Hola, {hi}</div>
+            <div className="wk">Bienvenido a Renovacell</div>
+            <div className="wh">Hola, {hi}</div>
           </div>
           <span className="role-badge"><Icon name={r.icon} /> {r.label}</span>
         </div>

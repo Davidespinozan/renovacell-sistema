@@ -48,10 +48,10 @@ export function Login() {
           </div>
         </div>
         <div className="lb-mid">
-          <h2>Toda la operación, en un solo lugar.</h2>
-          <p>Catálogo, pedidos, almacén, ventas y entregas — cada área con su acceso. Inicia sesión para entrar a tu espacio.</p>
+          <h2>Sistema operativo Renovacell</h2>
+          <p>Acceso exclusivo para el equipo. Inicia sesión para entrar a tu espacio de trabajo.</p>
         </div>
-        <div className="lb-foot">Operado por STRYV</div>
+        <div className="lb-foot">Acceso seguro · uso interno</div>
       </aside>
 
       {/* Panel del formulario */}

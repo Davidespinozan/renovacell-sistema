@@ -34,7 +34,7 @@ export interface RoleDef {
 }
 
 // La VISTA COMÚN y el CHAT pertenecen al add-on "Comunicación interna" (hub).
-export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Vista común', icon: 'home' }
+export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Inicio', icon: 'home' }
 export const CHAT_SCREEN: ScreenDef = { key: 'chat', label: 'Chat', icon: 'chat' }
 export const HUB_SCREENS: ScreenDef[] = [COMMON_SCREEN, CHAT_SCREEN]
 
