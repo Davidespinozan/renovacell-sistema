@@ -1,71 +1,109 @@
 // Contenido editable de la LANDING pública (single source of truth).
-// Sembrado con los valores REALES de apps/landing/index.html.
+// La landing (apps/landing) se DIBUJA desde este modelo (data-driven): todo es
+// editable — textos, imágenes, logo, secciones.
 //
 // PUNTOS DE CONEXIÓN A SUPABASE (sin parches temporales):
-//   · LECTURA (admin):   getSnapshot()  → select de landing_content (1 fila).
-//   · ESCRITURA (admin): saveLanding()  → upsert de landing_content + (trigger/
-//                        edge function) regenera el content.json que sirve la
-//                        landing, o la landing lee la fila vía endpoint.
-//   · LECTURA (público): la landing hace fetch del contenido (hoy content.json
-//                        estático; mañana endpoint o json regenerado en saveLanding).
-// La firma de useLanding NO cambia al conectar: solo el cuerpo de estas funciones.
+//   · LECTURA admin   → getSnapshot()  = select de landing_content.
+//   · ESCRITURA admin → saveLanding()  = upsert de landing_content (+ regenera
+//                       el content.json que sirve la landing, o la landing lee
+//                       la fila vía endpoint).
+//   · LECTURA pública → la landing hace fetch del contenido (hoy content.json).
+//   · Imágenes/logo   → hoy por URL; con Storage de Supabase será subir archivo.
+// La firma de useLanding NO cambia al conectar; solo el cuerpo de estas funciones.
 import { logAudit } from './auditStore'
 
+export interface NavLink { label: string; href: string }
 export interface Certification { label: string; sub: string }
+export interface Feature { title: string; body: string }
 
 export interface LandingContent {
-  metaTitle: string
-  metaDescription: string
-  heroEyebrow: string
-  heroTitle: string
-  heroSubtitle: string
-  ctaPrimary: string
-  ctaSecondary: string
-  whatsapp: string   // número (wa.me)
-  email: string
-  certifications: Certification[]
+  seo: { title: string; description: string }
+  brand: { name: string; tagline: string; logoUrl: string }
+  nav: { links: NavLink[]; cta: string }
+  hero: { eyebrow: string; title: string; subtitle: string; ctaPrimary: string; ctaSecondary: string; imageUrl: string }
+  ticker: string[]
+  info: { eyebrow: string; title: string; body: string; imageUrl: string }
+  certifications: { eyebrow: string; title: string; items: Certification[] }
+  features: { eyebrow: string; title: string; items: Feature[] }
+  lead: { eyebrow: string; title: string; body: string; submitLabel: string; successText: string }
+  contact: { title: string; whatsapp: string; email: string; address: string }
+  footer: { text: string }
 }
 
-// Valores REALES extraídos de la landing actual.
+// Valores REALES (mismos que apps/landing/content.json).
 const DEFAULT: LandingContent = {
-  metaTitle: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008',
-  metaDescription: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.',
-  heroEyebrow: 'Desde 2008 · Unión Europea + México',
-  heroTitle: 'La nueva generación<br>de <span class="green">medicina regenerativa.</span>',
-  heroSubtitle: 'Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar.',
-  ctaPrimary: 'Acceso médico',
-  ctaSecondary: 'Línea cosmética',
-  whatsapp: '526675310910',
-  email: 'facturacion@goldenplacenta.com',
-  certifications: [
-    { label: 'CE', sub: 'Certificación EU' },
-    { label: 'COFEPRIS', sub: 'Registro Sanitario' },
-    { label: 'ISO 13485', sub: 'Calidad médica' },
-  ],
+  seo: {
+    title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008',
+    description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.',
+  },
+  brand: { name: 'Renovacell®', tagline: 'Tecnologías Antiedad', logoUrl: '' },
+  nav: {
+    links: [
+      { label: 'Ciencia', href: '#ciencia' },
+      { label: 'Cumplimiento', href: '#cumplimiento' },
+      { label: 'Para médicos', href: '#medicos' },
+      { label: 'Contacto', href: '#contacto' },
+    ],
+    cta: 'Acceso médico',
+  },
+  hero: {
+    eyebrow: 'Desde 2008 · Unión Europea + México',
+    title: 'La nueva generación de <span class="green">medicina regenerativa.</span>',
+    subtitle: 'Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar. Acceso exclusivo para médicos verificados.',
+    ctaPrimary: 'Solicitar acceso médico',
+    ctaSecondary: 'Conocer la ciencia',
+    imageUrl: '',
+  },
+  ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE · Certificación EU', 'COFEPRIS · Registro Sanitario', 'ISO 13485 · Calidad médica'],
+  info: {
+    eyebrow: '01 · La ciencia',
+    title: 'Tecnología celular S²RM®',
+    body: 'Moléculas liberadas por células madre, en líneas exclusivas para uso clínico — tópico, inyectable e implantable. Ingredientes biocompatibles respaldados por evidencia clínica.',
+    imageUrl: '',
+  },
+  certifications: {
+    eyebrow: '02 · Cumplimiento regulatorio',
+    title: 'Estándares europeo y mexicano',
+    items: [
+      { label: 'CE', sub: 'Certificación EU' },
+      { label: 'COFEPRIS', sub: 'Registro Sanitario' },
+      { label: 'ISO 13485', sub: 'Calidad médica' },
+    ],
+  },
+  features: {
+    eyebrow: '03 · Para médicos',
+    title: 'Acceso exclusivo para profesionales de la salud',
+    items: [
+      { title: 'Sin venta directa', body: 'El catálogo y los precios solo se muestran a médicos verificados con cédula profesional.' },
+      { title: 'Asesoría clínica', body: 'Acompañamiento y fichas técnicas para cada línea de producto.' },
+      { title: 'Logística propia', body: 'Surtido por lotes con trazabilidad y entrega a tu clínica.' },
+    ],
+  },
+  lead: {
+    eyebrow: 'Acceso médico',
+    title: 'Solicita tu acceso',
+    body: 'Exclusivo para profesionales de la salud. Verificamos tu cédula antes de habilitar el portal de compra.',
+    submitLabel: 'Enviar solicitud',
+    successText: '¡Gracias! Recibimos tu solicitud. Te contactaremos para verificar tu cédula y habilitar tu acceso.',
+  },
+  contact: { title: 'Contacto', whatsapp: '526675310910', email: 'facturacion@goldenplacenta.com', address: 'Culiacán, Sinaloa · México' },
+  footer: { text: '© Renovacell® · Tecnologías Antiedad · Operado por STRYV' },
 }
 
-let content: LandingContent = { ...DEFAULT, certifications: DEFAULT.certifications.map((c) => ({ ...c })) }
+const clone = (c: LandingContent): LandingContent => JSON.parse(JSON.stringify(c))
+
+let content: LandingContent = clone(DEFAULT)
 const listeners = new Set<() => void>()
 let snapshot: LandingContent = content
 
-function emit() {
-  snapshot = content
-  listeners.forEach((l) => l())
-}
-
-export function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  return () => listeners.delete(cb)
-}
+function emit() { snapshot = content; listeners.forEach((l) => l()) }
+export function subscribe(cb: () => void): () => void { listeners.add(cb); return () => listeners.delete(cb) }
 export const getSnapshot = (): LandingContent => snapshot
 
 export function saveLanding(next: LandingContent) {
-  content = { ...next, certifications: next.certifications.map((c) => ({ ...c })) }
+  content = clone(next)
   emit()
   logAudit({ actor: 'Administración', action: 'Landing actualizada', resource: 'Página pública' })
 }
 
-export function resetLanding() {
-  content = { ...DEFAULT, certifications: DEFAULT.certifications.map((c) => ({ ...c })) }
-  emit()
-}
+export function resetLanding() { content = clone(DEFAULT); emit() }

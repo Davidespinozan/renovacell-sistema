@@ -182,109 +182,170 @@ function ProductModal({ product, onClose, onSave }: {
   )
 }
 
+// ---- Editor de la landing (todas las secciones, data-driven) ----------------
+const fInput: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 5 }
+const fLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 12 }
+
+function Fld({ label, value, onChange, hint, mono }: { label: string; value: string; onChange: (v: string) => void; hint?: string; mono?: boolean }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={fLabel}>{label}</span>
+      <input style={{ ...fInput, fontFamily: mono ? 'monospace' : 'inherit' }} value={value} onChange={(e) => onChange(e.target.value)} />
+      {hint && <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{hint}</span>}
+    </label>
+  )
+}
+function Area({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={fLabel}>{label}</span>
+      <textarea style={{ ...fInput, minHeight: 60, resize: 'vertical' }} value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  )
+}
+function SecCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="card">
+      <div className="eyebrow" style={{ margin: '0 0 4px' }}>{title}</div>
+      {children}
+    </div>
+  )
+}
+
 function LandingTab() {
   const { data, saveLanding, resetLanding } = useLanding()
   const [draft, setDraft] = useState<LandingContent>(data)
   const [saved, setSaved] = useState(false)
 
-  const set = <K extends keyof LandingContent>(k: K, v: LandingContent[K]) => { setDraft({ ...draft, [k]: v }); setSaved(false) }
-  const setCert = (i: number, patch: Partial<{ label: string; sub: string }>) => {
-    const certifications = draft.certifications.map((c, j) => (j === i ? { ...c, ...patch } : c))
-    setDraft({ ...draft, certifications }); setSaved(false)
-  }
-  const addCert = () => setDraft({ ...draft, certifications: [...draft.certifications, { label: '', sub: '' }] })
-  const delCert = (i: number) => setDraft({ ...draft, certifications: draft.certifications.filter((_, j) => j !== i) })
+  const up = (patch: Partial<LandingContent>) => { setDraft((d) => ({ ...d, ...patch })); setSaved(false) }
+  const upSec = (k: keyof LandingContent, patch: Record<string, unknown>) => { setDraft((d) => ({ ...d, [k]: { ...(d[k] as object), ...patch } })); setSaved(false) }
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
-  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  // listas
+  const setLink = (i: number, patch: Partial<{ label: string; href: string }>) => upSec('nav', { links: draft.nav.links.map((l, j) => (j === i ? { ...l, ...patch } : l)) })
+  const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((s, j) => (j === i ? v : s)) })
+  const setCert = (i: number, patch: Partial<{ label: string; sub: string }>) => upSec('certifications', { items: draft.certifications.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setFeat = (i: number, patch: Partial<{ title: string; body: string }>) => upSec('features', { items: draft.features.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      {/* Propósito de la landing (nuevo rumbo): captación, no venta. */}
+    <div className="grid" style={{ gap: 14 }}>
       <div className="sysnote" style={{ alignItems: 'flex-start' }}>
         <span>
-          La landing <b>no vende ni muestra precios</b>: es para <b>captar e informar</b> (info + contacto +
-          agente IA + formulario). La compra ocurre <b>después de verificar al doctor</b>, en el Portal.
-          Embudo: <b>landing → Prospectos → verificación → Portal</b>.
+          La landing es <b>data-driven</b>: todo lo que ves abajo dibuja la página pública. Es de <b>captación</b>
+          (info + formulario + contacto), no de venta. Embudo: <b>landing → Prospectos → verificación → Portal</b>.
+          Imágenes/logo por URL hoy; subir archivo entra con Storage.
         </span>
       </div>
 
-      <div className="grid two" style={{ alignItems: 'start', gap: 16 }}>
-      {/* Editor */}
-      <div className="card">
-        <div className="eyebrow" style={{ margin: '0 0 6px' }}>Página pública · captación</div>
+      <SecCard title="SEO (buscadores)">
+        <Fld label="Título de pestaña" value={draft.seo.title} onChange={(v) => upSec('seo', { title: v })} />
+        <Area label="Descripción" value={draft.seo.description} onChange={(v) => upSec('seo', { description: v })} />
+      </SecCard>
 
-        <label style={{ ...label, marginTop: 6 }}>Título de pestaña (SEO)</label>
-        <input style={input} value={draft.metaTitle} onChange={(e) => set('metaTitle', e.target.value)} />
-        <label style={label}>Descripción (SEO)</label>
-        <textarea style={{ ...input, minHeight: 56, resize: 'vertical' }} value={draft.metaDescription} onChange={(e) => set('metaDescription', e.target.value)} />
-
-        <label style={label}>Eyebrow (sobre el título)</label>
-        <input style={input} value={draft.heroEyebrow} onChange={(e) => set('heroEyebrow', e.target.value)} />
-        <label style={label}>Título principal</label>
-        <input style={input} value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} />
-        <label style={label}>Subtítulo</label>
-        <textarea style={{ ...input, minHeight: 64, resize: 'vertical' }} value={draft.heroSubtitle} onChange={(e) => set('heroSubtitle', e.target.value)} />
-
+      <SecCard title="Marca y logo">
         <div className="form-grid-2">
-          <div><label style={label}>Botón principal</label><input style={input} value={draft.ctaPrimary} onChange={(e) => set('ctaPrimary', e.target.value)} /></div>
-          <div><label style={label}>Botón secundario</label><input style={input} value={draft.ctaSecondary} onChange={(e) => set('ctaSecondary', e.target.value)} /></div>
+          <Fld label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} />
+          <Fld label="Tagline" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
         </div>
-        <div className="form-grid-2">
-          <div><label style={label}>WhatsApp</label><input style={input} value={draft.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="52667…" /></div>
-          <div><label style={label}>Correo de contacto</label><input style={input} value={draft.email} onChange={(e) => set('email', e.target.value)} /></div>
-        </div>
+        <Fld label="Logo (URL)" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} mono hint="Pega una URL de imagen. El subir archivo llega con Storage." />
+      </SecCard>
 
-        <div style={{ display: 'flex', alignItems: 'center', marginTop: 16 }}>
-          <label style={{ ...label, marginTop: 0 }}>Certificaciones</label>
-          <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={addCert}><Plus size={13} /> Agregar</button>
-        </div>
-        {draft.certifications.map((c, i) => (
+      <SecCard title="Navegación">
+        {draft.nav.links.map((l, i) => (
           <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input style={{ ...input, marginTop: 0, flex: '0 0 34%' }} value={c.label} onChange={(e) => setCert(i, { label: e.target.value })} placeholder="CE" />
-            <input style={{ ...input, marginTop: 0, flex: 1 }} value={c.sub} onChange={(e) => setCert(i, { sub: e.target.value })} placeholder="Certificación EU" />
-            <button className="btn ghost sm" type="button" onClick={() => delCert(i)}><Trash2 size={14} /></button>
+            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={l.label} onChange={(e) => setLink(i, { label: e.target.value })} placeholder="Etiqueta" />
+            <input style={{ ...fInput, marginTop: 0, flex: 1, fontFamily: 'monospace' }} value={l.href} onChange={(e) => setLink(i, { href: e.target.value })} placeholder="#seccion" />
+            <button className="btn ghost sm" type="button" onClick={() => upSec('nav', { links: draft.nav.links.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
           </div>
         ))}
+        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('nav', { links: [...draft.nav.links, { label: '', href: '#' }] })}><Plus size={13} /> Agregar enlace</button>
+        <Fld label="Botón (CTA)" value={draft.nav.cta} onChange={(v) => upSec('nav', { cta: v })} />
+      </SecCard>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="btn ghost sm" type="button" onClick={() => { resetLanding(); setDraft({ ...data }); }}><RotateCcw size={14} /> Restaurar</button>
-          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar y publicar</button>
+      <SecCard title="Hero (encabezado)">
+        <Fld label="Eyebrow" value={draft.hero.eyebrow} onChange={(v) => upSec('hero', { eyebrow: v })} />
+        <Fld label="Título (admite HTML, p. ej. <span class=&quot;green&quot;>)" value={draft.hero.title} onChange={(v) => upSec('hero', { title: v })} />
+        <Area label="Subtítulo" value={draft.hero.subtitle} onChange={(v) => upSec('hero', { subtitle: v })} />
+        <div className="form-grid-2">
+          <Fld label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
+          <Fld label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
         </div>
-        {saved && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}><span>Contenido guardado.</span></div>}
+        <Fld label="Imagen del hero (URL)" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} mono />
+      </SecCard>
 
-        <div className="sysnote" style={{ marginTop: 12, alignItems: 'flex-start' }}>
-          <span>La landing es <b>data-driven</b>: lee su contenido por fuera. “Guardar y publicar” es el único punto de escritura; al conectar el backend, ahí se hace el guardado en la base y la página lo toma en vivo.</span>
-        </div>
-      </div>
+      <SecCard title="Ticker (cinta)">
+        {draft.ticker.map((s, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={s} onChange={(e) => setTick(i, e.target.value)} />
+            <button className="btn ghost sm" type="button" onClick={() => up({ ticker: draft.ticker.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
+          </div>
+        ))}
+        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => up({ ticker: [...draft.ticker, ''] })}><Plus size={13} /> Agregar</button>
+      </SecCard>
 
-      {/* Vista previa */}
-      <div className="card" style={{ position: 'sticky', top: 90, overflow: 'hidden', background: 'linear-gradient(177deg,#1b2a26,#0e1714)', color: '#fff', border: 'none' }}>
-        <div style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--green-soft)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Eye size={13} /> Vista previa
-        </div>
-        <div style={{ fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', marginTop: 18 }}>{draft.heroEyebrow}</div>
-        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.1, marginTop: 8 }} dangerouslySetInnerHTML={{ __html: draft.heroTitle || 'Título principal' }} />
-        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,.78)', lineHeight: 1.55, marginTop: 12 }}>{draft.heroSubtitle}</p>
-        <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-          <span style={{ background: 'var(--grad-green)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{draft.ctaPrimary || 'CTA'}</span>
-          <span style={{ border: '1px solid rgba(255,255,255,.3)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{draft.ctaSecondary}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 22, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.12)' }}>
-          {draft.certifications.map((c, i) => (
-            <div key={i}>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>{c.label || '—'}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)' }}>{c.sub}</div>
+      <SecCard title="Ciencia / Info">
+        <Fld label="Eyebrow" value={draft.info.eyebrow} onChange={(v) => upSec('info', { eyebrow: v })} />
+        <Fld label="Título" value={draft.info.title} onChange={(v) => upSec('info', { title: v })} />
+        <Area label="Texto" value={draft.info.body} onChange={(v) => upSec('info', { body: v })} />
+        <Fld label="Imagen (URL)" value={draft.info.imageUrl} onChange={(v) => upSec('info', { imageUrl: v })} mono />
+      </SecCard>
+
+      <SecCard title="Certificaciones">
+        <Fld label="Eyebrow" value={draft.certifications.eyebrow} onChange={(v) => upSec('certifications', { eyebrow: v })} />
+        <Fld label="Título" value={draft.certifications.title} onChange={(v) => upSec('certifications', { title: v })} />
+        {draft.certifications.items.map((c, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input style={{ ...fInput, marginTop: 0, flex: '0 0 34%' }} value={c.label} onChange={(e) => setCert(i, { label: e.target.value })} placeholder="CE" />
+            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={c.sub} onChange={(e) => setCert(i, { sub: e.target.value })} placeholder="Certificación EU" />
+            <button className="btn ghost sm" type="button" onClick={() => upSec('certifications', { items: draft.certifications.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
+          </div>
+        ))}
+        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('certifications', { items: [...draft.certifications.items, { label: '', sub: '' }] })}><Plus size={13} /> Agregar</button>
+      </SecCard>
+
+      <SecCard title="Para médicos (features)">
+        <Fld label="Eyebrow" value={draft.features.eyebrow} onChange={(v) => upSec('features', { eyebrow: v })} />
+        <Fld label="Título" value={draft.features.title} onChange={(v) => upSec('features', { title: v })} />
+        {draft.features.items.map((c, i) => (
+          <div key={i} style={{ borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 6 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}><Fld label={`Tarjeta ${i + 1}`} value={c.title} onChange={(v) => setFeat(i, { title: v })} /></div>
+              <button className="btn ghost sm" type="button" onClick={() => upSec('features', { items: draft.features.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
             </div>
-          ))}
+            <Area label="Texto" value={c.body} onChange={(v) => setFeat(i, { body: v })} />
+          </div>
+        ))}
+        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('features', { items: [...draft.features.items, { title: '', body: '' }] })}><Plus size={13} /> Agregar tarjeta</button>
+      </SecCard>
+
+      <SecCard title="Captación (formulario)">
+        <Fld label="Eyebrow" value={draft.lead.eyebrow} onChange={(v) => upSec('lead', { eyebrow: v })} />
+        <Fld label="Título" value={draft.lead.title} onChange={(v) => upSec('lead', { title: v })} />
+        <Area label="Texto" value={draft.lead.body} onChange={(v) => upSec('lead', { body: v })} />
+        <div className="form-grid-2">
+          <Fld label="Botón de envío" value={draft.lead.submitLabel} onChange={(v) => upSec('lead', { submitLabel: v })} />
+          <Fld label="Mensaje de éxito" value={draft.lead.successText} onChange={(v) => upSec('lead', { successText: v })} />
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', marginTop: 18 }}>
-          WhatsApp {draft.whatsapp} · {draft.email}
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>El formulario captará leads hacia Prospectos al conectar el backend.</div>
+      </SecCard>
+
+      <SecCard title="Contacto">
+        <Fld label="Título" value={draft.contact.title} onChange={(v) => upSec('contact', { title: v })} />
+        <div className="form-grid-2">
+          <Fld label="WhatsApp (número)" value={draft.contact.whatsapp} onChange={(v) => upSec('contact', { whatsapp: v })} mono />
+          <Fld label="Correo" value={draft.contact.email} onChange={(v) => upSec('contact', { email: v })} />
         </div>
-        <a href="/" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--green-soft)', marginTop: 16, fontWeight: 600 }}>
-          <ExternalLink size={13} /> Abrir landing real
-        </a>
-      </div>
+        <Fld label="Ubicación" value={draft.contact.address} onChange={(v) => upSec('contact', { address: v })} />
+      </SecCard>
+
+      <SecCard title="Footer">
+        <Fld label="Texto" value={draft.footer.text} onChange={(v) => upSec('footer', { text: v })} />
+      </SecCard>
+
+      <div className="card" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn ghost sm" type="button" onClick={() => { resetLanding(); setDraft({ ...data }); }}><RotateCcw size={14} /> Restaurar</button>
+        <a className="btn ghost sm" href="/" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir landing</a>
+        <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar y publicar</button>
+        {saved && <span style={{ fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>Guardado ✓</span>}
       </div>
     </div>
   )
