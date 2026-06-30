@@ -47,4 +47,6 @@ export const MOCK_MOVEMENTS: InventoryMovement[] = [
   { id: 'm-p4', lot_id: 'l-gv-07', change: -3, reason: 'venta', reference: 'POS-204', created_by: null, created_at: '2026-06-17T16:00:00Z' },
   { id: 'm-p5', lot_id: 'l-gp-300', change: -2, reason: 'venta', reference: 'POS-205', created_by: null, created_at: '2026-06-21T10:30:00Z' },
   { id: 'm-p6', lot_id: 'l-gs-1', change: -4, reason: 'venta', reference: 'POS-206', created_by: null, created_at: '2026-06-25T17:00:00Z' },
+  // Baja por caducidad (Stoplip vencido) → aparece como MERMA en el P&L.
+  { id: 'm-m1', lot_id: 'l-stl-44', change: -3, reason: 'merma', reference: 'STL-44', created_by: null, created_at: '2026-06-18T10:00:00Z' },
 ]

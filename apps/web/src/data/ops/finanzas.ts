@@ -11,12 +11,15 @@ import type { InventoryMovement, Lot } from '../types'
 // Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
 const COGS_OUT = new Set(['surtido', 'venta', 'evento'])
 const COGS_IN = new Set(['cancelacion', 'evento-regreso'])
+// Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad/daño.
+const MERMA = new Set(['merma', 'baja'])
 
 export interface EstadoResultados {
   ventas: number
   costoVentas: number
   utilidadBruta: number
   gastos: number
+  mermas: number        // pérdida por caducidad/daño (a costo)
   utilidadNeta: number
   margenBruto: number   // %
   margenNeto: number    // %
@@ -39,14 +42,16 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
     if (COGS_IN.has(m.reason ?? '') && m.change > 0) return s - m.change * c
     return s
   }, 0)
+  const mermas = movements.reduce((s, m) => (MERMA.has(m.reason ?? '') && m.change < 0 ? s + (-m.change) * lotCost(m.lot_id) : s), 0)
   const gastosTotal = gastos.reduce((s, g) => s + g.monto, 0)
   const utilidadBruta = ventas - costoVentas
-  const utilidadNeta = utilidadBruta - gastosTotal
+  const utilidadNeta = utilidadBruta - gastosTotal - mermas
   return {
     ventas,
     costoVentas,
     utilidadBruta,
     gastos: gastosTotal,
+    mermas,
     utilidadNeta,
     margenBruto: ventas > 0 ? (utilidadBruta / ventas) * 100 : 0,
     margenNeto: ventas > 0 ? (utilidadNeta / ventas) * 100 : 0,

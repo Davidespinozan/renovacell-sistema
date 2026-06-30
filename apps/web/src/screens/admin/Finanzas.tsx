@@ -66,6 +66,7 @@ export function Finanzas() {
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.costoVentas)} k="Costo de ventas" s={`margen bruto ${pct(er.margenBruto)}`} />
         <Stat icon={<Wallet size={18} />} v={money(er.utilidadBruta)} k="Utilidad bruta" s="ventas − costo" />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
+        <Stat icon={<ArrowDownCircle size={18} />} v={money(er.mermas)} k="Mermas" s="caducidad / daño" accent={er.mermas > 0 ? 'dang' : undefined} />
         <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={money(er.utilidadNeta)} k="Utilidad neta" s={`margen neto ${pct(er.margenNeto)}`} accent={er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
       </div>
 
