@@ -49,9 +49,9 @@ export function Login() {
         </div>
         <div className="lb-mid">
           <h2>Sistema operativo Renovacell</h2>
-          <p>Acceso exclusivo para el equipo. Inicia sesión para entrar a tu espacio de trabajo.</p>
+          <p>Acceso para el equipo y médicos verificados. Inicia sesión para entrar a tu espacio.</p>
         </div>
-        <div className="lb-foot">Acceso seguro · uso interno</div>
+        <div className="lb-foot">Acceso seguro</div>
       </aside>
 
       {/* Panel del formulario */}
@@ -68,13 +68,13 @@ export function Login() {
           {view === 'login' ? (
             <>
               <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Iniciar sesión</h1>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>Entra con tu correo de Renovacell.</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>Entra con tu correo y contraseña.</div>
 
               <form onSubmit={submit}>
                 <label style={lbl}>Correo</label>
                 <div style={{ position: 'relative', margin: '6px 0 14px' }}>
                   <Mail size={16} style={iconStyle} />
-                  <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@renovacell.mx" autoFocus />
+                  <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" autoFocus />
                 </div>
 
                 <label style={lbl}>Contraseña</label>
@@ -111,7 +111,7 @@ export function Login() {
                   <label style={lbl}>Correo</label>
                   <div style={{ position: 'relative', margin: '6px 0 4px' }}>
                     <Mail size={16} style={iconStyle} />
-                    <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@renovacell.mx" autoFocus />
+                    <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" autoFocus />
                   </div>
                   <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }} disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} >Enviar instrucciones</button>
                   <div style={{ textAlign: 'center', marginTop: 12 }}>
