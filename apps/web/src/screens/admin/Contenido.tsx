@@ -182,6 +182,24 @@ function ProductModal({ product, onClose, onSave }: {
   )
 }
 
+// Exporta el contenido como content.json (lo que lee la landing data-driven).
+// Bridge hasta tener backend: descarga el archivo y reemplázalo en apps/landing.
+function downloadContentJson(c: LandingContent) {
+  const json = {
+    metaTitle: c.metaTitle, metaDescription: c.metaDescription,
+    heroEyebrow: c.heroEyebrow, heroTitle: c.heroTitle, heroSubtitle: c.heroSubtitle,
+    ctaPrimary: c.ctaPrimary, ctaSecondary: c.ctaSecondary,
+    whatsapp: c.whatsapp, email: c.email,
+  }
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'content.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function LandingTab() {
   const { data, saveLanding, resetLanding } = useLanding()
   const [draft, setDraft] = useState<LandingContent>(data)
@@ -237,14 +255,15 @@ function LandingTab() {
           </div>
         ))}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 18, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn ghost sm" type="button" onClick={() => { resetLanding(); setDraft({ ...data }); }}><RotateCcw size={14} /> Restaurar</button>
+          <button className="btn ghost sm" type="button" onClick={() => downloadContentJson(draft)}>Descargar content.json</button>
           <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar cambios</button>
         </div>
         {saved && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}><span>Contenido guardado.</span></div>}
 
         <div className="sysnote" style={{ marginTop: 12, alignItems: 'flex-start' }}>
-          <span>La landing pública es un sitio aparte (hoy estático). Estos cambios viven en el sistema; al conectar el backend la página los lee en vivo (se vuelve data-driven).</span>
+          <span>La landing ya es <b>data-driven</b>: lee <code>content.json</code>. Para publicar tus cambios hoy, <b>Descarga content.json</b> y reemplaza el de <code>apps/landing</code>. Al conectar el backend, “Guardar” lo publicará solo.</span>
         </div>
       </div>
 
@@ -254,7 +273,7 @@ function LandingTab() {
           <Eye size={13} /> Vista previa
         </div>
         <div style={{ fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', marginTop: 18 }}>{draft.heroEyebrow}</div>
-        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.1, marginTop: 8 }}>{draft.heroTitle || 'Título principal'}</div>
+        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.1, marginTop: 8 }} dangerouslySetInnerHTML={{ __html: draft.heroTitle || 'Título principal' }} />
         <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,.78)', lineHeight: 1.55, marginTop: 12 }}>{draft.heroSubtitle}</p>
         <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
           <span style={{ background: 'var(--grad-green)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{draft.ctaPrimary || 'CTA'}</span>

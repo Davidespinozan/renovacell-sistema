@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008</title>
-<meta name="description" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.">
+<title data-rc="metaTitle">Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008</title>
+<meta name="description" data-rc-meta="metaDescription" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Special+Gothic+Expanded+One&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -2291,17 +2291,17 @@ body.modal-open{overflow:hidden;}
 
       <div class="hero-inner">
         <div class="hero-left">
-          <div class="hero-kicker rv">Desde 2008 · Unión Europea + México</div>
-          <h1 class="hero-headline rv d1">
+          <div class="hero-kicker rv" data-rc="heroEyebrow">Desde 2008 · Unión Europea + México</div>
+          <h1 class="hero-headline rv d1" data-rc-html="heroTitle">
             La nueva generación<br>
             de <span class="green">medicina regenerativa.</span>
           </h1>
-          <p class="hero-sub rv d2">
+          <p class="hero-sub rv d2" data-rc="heroSubtitle">
             Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar.
           </p>
           <div class="hero-cta-row rv d3">
-            <a href="#contacto" class="btn-hero-primary">Acceso médico</a>
-            <a href="#cosmetica" class="btn-hero-ghost">Línea cosmética</a>
+            <a href="#contacto" class="btn-hero-primary" data-rc="ctaPrimary">Acceso médico</a>
+            <a href="#cosmetica" class="btn-hero-ghost" data-rc="ctaSecondary">Línea cosmética</a>
           </div>
         </div>
 
@@ -3005,14 +3005,14 @@ body.modal-open{overflow:hidden;}
         <p class="rv d2">Respuesta directa del equipo clínico de Renovacell.</p>
 
         <div class="contact-channels">
-          <a href="https://wa.me/526675310910" class="contact-channel rv">
+          <a href="https://wa.me/526675310910" class="contact-channel rv" data-rc-wa="whatsapp">
             <div class="contact-channel-icon">W</div>
             <div class="contact-channel-text"><b>WhatsApp profesional</b><small>+52 667 531 0910</small></div>
             <div class="contact-channel-arrow">→</div>
           </a>
-          <a href="mailto:facturacion@goldenplacenta.com" class="contact-channel rv d1">
+          <a href="mailto:facturacion@goldenplacenta.com" class="contact-channel rv d1" data-rc-mail="email">
             <div class="contact-channel-icon">@</div>
-            <div class="contact-channel-text"><b>Correo facturación</b><small>facturacion@goldenplacenta.com</small></div>
+            <div class="contact-channel-text"><b>Correo facturación</b><small data-rc="email">facturacion@goldenplacenta.com</small></div>
             <div class="contact-channel-arrow">→</div>
           </a>
           <a href="#" class="contact-channel rv d2">
@@ -3501,6 +3501,43 @@ document.addEventListener('keydown', e => {
   });
   
   updateCartUI();
+})();
+</script>
+
+<!-- CONTENIDO EDITABLE (data-driven): hidrata textos desde content.json, que
+     edita Administración en el sistema (Contenido → Landing). Si el archivo no
+     existe o falla, la página conserva los textos por defecto del HTML. -->
+<script>
+(async function hydrateContent(){
+  try {
+    const res = await fetch('./content.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const c = await res.json();
+    document.querySelectorAll('[data-rc]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc')];
+      if (v != null) el.textContent = v;
+    });
+    document.querySelectorAll('[data-rc-html]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc-html')];
+      if (v != null) el.innerHTML = v;
+    });
+    document.querySelectorAll('[data-rc-meta]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc-meta')];
+      if (v != null) el.setAttribute('content', v);
+    });
+    document.querySelectorAll('[data-rc-wa]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc-wa')];
+      if (v != null) el.setAttribute('href', 'https://wa.me/' + v);
+    });
+    document.querySelectorAll('[data-rc-watext]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc-watext')];
+      if (v != null) el.textContent = v;
+    });
+    document.querySelectorAll('[data-rc-mail]').forEach(function(el){
+      var v = c[el.getAttribute('data-rc-mail')];
+      if (v != null) el.setAttribute('href', 'mailto:' + v);
+    });
+  } catch (e) { /* conserva el contenido por defecto */ }
 })();
 </script>
 </body>

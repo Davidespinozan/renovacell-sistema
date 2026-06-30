@@ -24,11 +24,11 @@ export interface LandingContent {
 const DEFAULT: LandingContent = {
   metaTitle: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008',
   metaDescription: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.',
-  heroEyebrow: 'S2RM® Technology',
-  heroTitle: 'Tecnologías Antiedad',
-  heroSubtitle: 'Medicina regenerativa de grado médico para profesionales de la salud. Líneas exclusivas para uso clínico — tópico, inyectable e implantable.',
+  heroEyebrow: 'Desde 2008 · Unión Europea + México',
+  heroTitle: 'La nueva generación<br>de <span class="green">medicina regenerativa.</span>',
+  heroSubtitle: 'Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar.',
   ctaPrimary: 'Acceso médico',
-  ctaSecondary: 'Más información',
+  ctaSecondary: 'Línea cosmética',
   whatsapp: '526675310910',
   email: 'facturacion@goldenplacenta.com',
   certifications: [
