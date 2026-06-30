@@ -6,6 +6,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sparkles, Send, Plus, RefreshCw, ShoppingBag, ShieldCheck, Leaf } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAssistant } from '../../data/hooks/useAssistant'
+import { useLots } from '../../data/hooks/useLots'
+import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { statusView } from './orderStatus'
 import type { AssistantReply } from '../../data/assistant/engine'
 import type { ProductSafe } from '../../data/types'
@@ -26,6 +28,8 @@ const GREETING =
 
 export function Asistente() {
   const { ask, createOrder } = useAssistant()
+  const { data: lots } = useLots()
+  const stockMap = useMemo(() => stockByProduct(lots), [lots])
 
   const seq = useRef(0)
   const nextId = () => `m-${(seq.current += 1)}`
@@ -51,15 +55,18 @@ export function Asistente() {
   }
 
   const addToDraft = (product: ProductSafe) => {
+    // No agregar más de lo disponible en inventario.
+    const info = stockInfoFor(stockMap, product.id)
+    const max = info.tracked ? info.qty : 0
+    const cur = draft.find((d) => d.product.id === product.id)?.qty ?? 0
+    if (max <= 0) { push({ role: 'assistant', text: `${product.name} está agotado ahora mismo.` }); return }
+    if (cur >= max) { push({ role: 'assistant', text: `Solo hay ${max} u de ${product.name} disponibles.` }); return }
     setDraft((prev) => {
       const found = prev.find((d) => d.product.id === product.id)
       if (found) return prev.map((d) => (d.product.id === product.id ? { ...d, qty: d.qty + 1 } : d))
       return [...prev, { product, qty: 1 }]
     })
-    push({
-      role: 'assistant',
-      text: `Agregué ${product.name} a tu pedido en armado (abajo).`,
-    })
+    push({ role: 'assistant', text: `Agregué ${product.name} a tu pedido en armado (abajo).` })
   }
 
   const draftTotal = draft.reduce((s, d) => s + (d.product.price ?? 0) * d.qty, 0)
@@ -80,16 +87,27 @@ export function Asistente() {
   }
 
   const reorder = (o: OrderWithItems) => {
-    // Recalcula el total con precios actuales (no reusa el total viejo del pedido).
-    const total = o.items.reduce((s, it) => s + (it.unit_price != null ? it.unit_price * it.qty : 0), 0)
-    const order = createOrder({
-      lines: o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty, unit_price: it.unit_price })),
-      total,
-      invoice_requested: false,
+    // Topa cada renglón al inventario disponible; descarta lo agotado.
+    const lines = o.items
+      .map((it) => {
+        const info = stockInfoFor(stockMap, it.product_id ?? '')
+        const max = info.tracked ? info.qty : 0
+        return { product_id: it.product_id ?? '', qty: Math.min(it.qty, max), unit_price: it.unit_price }
+      })
+      .filter((l) => l.qty > 0)
+    if (lines.length === 0) {
+      push({ role: 'assistant', text: `No pude recrear ${o.external_ref}: esos productos están agotados ahora mismo.` })
+      return
+    }
+    const adjusted = o.items.some((it) => {
+      const info = stockInfoFor(stockMap, it.product_id ?? '')
+      return it.qty > (info.tracked ? info.qty : 0)
     })
+    const total = lines.reduce((s, l) => s + (l.unit_price != null ? l.unit_price * l.qty : 0), 0)
+    const order = createOrder({ lines, total, invoice_requested: false })
     push({
       role: 'assistant',
-      text: `Recreé tu pedido ${o.external_ref} como ${order.external_ref} (pago contra pedido). Lo ves en “Mis pedidos”.`,
+      text: `Recreé tu pedido ${o.external_ref} como ${order.external_ref} (pago contra pedido).${adjusted ? ' Ajusté algunas cantidades al inventario disponible.' : ''} Lo ves en “Mis pedidos”.`,
       created: { folio: order.external_ref ?? '—' },
     })
   }

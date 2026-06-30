@@ -38,6 +38,16 @@ export function setVerified(id: string, verified: boolean): boolean {
   return true
 }
 
+// Registrar/actualizar la cédula profesional (requisito para verificar). Sin
+// esto, un doctor creado por conversión de prospecto nunca podría verificarse.
+export function setCedula(id: string, cedula: string) {
+  const doc = doctors.find((d) => d.id === id)
+  if (!doc) return
+  doctors = doctors.map((d) => (d.id === id ? { ...d, meta: { ...(d.meta ?? {}), cedula: cedula.trim() } } : d))
+  emit()
+  logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
+}
+
 // Alta de doctor en estado PENDIENTE (verified:false). La usa la conversión de
 // Prospectos: cierra el embudo landing→prospecto→doctor→Portal sin duplicar el
 // concepto de Doctores. En Supabase = insert en profiles (role_id='doctor',

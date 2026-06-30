@@ -2,7 +2,7 @@
 // inventario para el evento (se DESCUENTA del stock general al asignar, vía FEFO),
 // venden de ese inventario en el stand, y al cerrar el sobrante REGRESA al almacén.
 // Reutiliza la trazabilidad por lote (consume/addEntry). Mock; Supabase = tablas.
-import { getSnapshotLots, consume, addEntry } from './lotsStore'
+import { getSnapshotLots, getSnapshotMovements, consume, addEntry, adjust } from './lotsStore'
 import { allocateFEFO } from '../ops/surtir'
 import { createPosOrder, type OrderWithItems } from './ordersStore'
 import { notify } from './notificationsStore'
@@ -90,12 +90,26 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
   return order
 }
 
-// Cierra el evento: el sobrante REGRESA al almacén (entrada) y se reporta.
+// Cierra el evento: el sobrante REGRESA a SUS lotes de origen (conserva caducidad
+// y trazabilidad). Idempotente. Fallback a entrada genérica solo si no se puede
+// mapear el lote original.
 export function closeEvent(eventId: string) {
   const ev = events.find((e) => e.id === eventId)
   if (!ev || ev.status === 'cerrado') return // idempotente: no reingresar dos veces
+  const lots = getSnapshotLots()
+  const productOfLot = (lotId: string) => lots.find((l) => l.id === lotId)?.product_id
+  // Asignaciones de este evento por lote (salidas con reason 'evento').
+  const assigns = getSnapshotMovements().filter((m) => m.reference === ev.name && m.reason === 'evento' && m.change < 0)
   ev.items.forEach((it) => {
-    const left = remaining(it)
+    let left = remaining(it)
+    if (left <= 0) return
+    const lotsOfProduct = assigns.filter((m) => productOfLot(m.lot_id) === it.product_id)
+    for (const m of lotsOfProduct) {
+      if (left <= 0) break
+      const give = Math.min(left, -m.change)
+      adjust(m.lot_id, give, 'evento-regreso', ev.name)
+      left -= give
+    }
     if (left > 0) addEntry({ product_id: it.product_id, lot_code: `EVENTO-${ev.id}`, expiry_date: null, quantity: left, location: 'Almacén (regreso evento)' })
   })
   events = events.map((e) => (e.id === eventId ? { ...e, status: 'cerrado' } : e))

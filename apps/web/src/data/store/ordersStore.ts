@@ -6,7 +6,7 @@ import type { Order, OrderItem } from '../types'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
-import { adjust } from './lotsStore'
+import { restockByReference } from './lotsStore'
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 
@@ -87,9 +87,9 @@ export function cancelOrder(orderId: string, actor = 'Administración'): { ok: b
   const o = orders.find((x) => x.id === orderId)
   if (!o || !isCancelable(o.status)) return { ok: false }
   if (o.status === 'packed') {
-    items
-      .filter((it) => it.order_id === orderId && it.lot_id && it.unit_price != null)
-      .forEach((it) => adjust(it.lot_id as string, it.qty, 'cancelacion', o.external_ref ?? o.id))
+    // Reingresa el inventario a sus lotes reales (respeta el split FEFO), desde
+    // el ledger de salidas de este folio. No depende del precio del renglón.
+    restockByReference(o.external_ref ?? o.id)
   }
   orders = orders.map((x) => (x.id === orderId ? { ...x, status: 'cancelled' } : x))
   emit()
@@ -151,7 +151,7 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
 
 // Empaque: al asignar envío, el pedido pasa a En camino y guarda el resumen de envío.
 export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {
-  orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta } : o))
+  orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta: { ...(o.shipping_meta as object | null), ...shipping_meta } } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
   logAudit({ actor: 'Empaque', action: 'Envío asignado', resource: folioOf(orderId) })

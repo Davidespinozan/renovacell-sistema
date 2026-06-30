@@ -17,7 +17,7 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke } = useDoctors()
+  const { data: doctors, verify, revoke, setCedula } = useDoctors()
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)
   const detail = doctors.find((d) => d.id === detailId) ?? null // siempre el doctor vivo del store
@@ -90,6 +90,7 @@ export function Doctores() {
           onClose={() => setDetailId(null)}
           onVerify={() => verify(detail.id)}
           onRevoke={() => revoke(detail.id)}
+          onSetCedula={(c) => setCedula(detail.id, c)}
         />
       )}
     </div>
@@ -97,16 +98,18 @@ export function Doctores() {
 }
 
 function DoctorDetail({
-  doctor, orders, onClose, onVerify, onRevoke,
+  doctor, orders, onClose, onVerify, onRevoke, onSetCedula,
 }: {
   doctor: Profile
   orders: ReturnType<typeof useAllOrders>['data']
   onClose: () => void
   onVerify: () => void
   onRevoke: () => void
+  onSetCedula: (cedula: string) => void
 }) {
   // doctor.verified puede cambiar mientras el modal está abierto; leemos del store vía prop.
   const history = orders.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  const [ced, setCed] = useState('')
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -138,8 +141,20 @@ function DoctorDetail({
               <span>
                 {cedulaOf(doctor)
                   ? 'No verificado: aún no puede ordenar en el Portal. Confirma la cédula profesional y verifícalo para habilitar su canal.'
-                  : 'No verificado: falta la cédula profesional. No se puede verificar hasta que el doctor la registre.'}
+                  : 'No verificado: falta la cédula profesional. Regístrala abajo para poder verificarlo.'}
               </span>
+            </div>
+          )}
+
+          {!doctor.verified && !cedulaOf(doctor) && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input
+                value={ced}
+                onChange={(e) => setCed(e.target.value)}
+                placeholder="Cédula profesional"
+                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+              />
+              <button className="btn sm" type="button" disabled={!ced.trim()} style={!ced.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => { onSetCedula(ced.trim()); setCed('') }}>Registrar cédula</button>
             </div>
           )}
 

@@ -12,7 +12,6 @@ import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
 import { salesSummary, doctorActivity } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
-import type { ProductSafe } from '../../data/types'
 
 type Bucket = 'Pedido' | 'Empacado' | 'En camino' | 'Entregado'
 function bucketOf(status: string | null): Bucket | null {

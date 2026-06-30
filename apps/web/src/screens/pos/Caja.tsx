@@ -4,7 +4,9 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
-import { useProducts } from '../../data/hooks/useProducts'
+import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
+import { useLots } from '../../data/hooks/useLots'
+import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { venderPOS } from '../../data/ops/pos'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
@@ -14,7 +16,10 @@ interface Line { product: ProductSafe; qty: number }
 
 export function Caja() {
   const { data: products } = useProducts()
-  const sellable = useMemo(() => products.filter((p) => p.price != null), [products])
+  const { data: lots } = useLots()
+  // Solo productos activos y con precio (no se vende lo oculto).
+  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
+  const stockMap = useMemo(() => stockByProduct(lots), [lots])
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<PayMethod>('efectivo')
@@ -30,7 +35,13 @@ export function Caja() {
   )
   const total = lines.reduce((s, l) => s + (l.product.price ?? 0) * l.qty, 0)
 
-  const add = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }))
+  // No vender más de lo disponible en inventario.
+  const add = (id: string) => setCart((c) => {
+    const info = stockInfoFor(stockMap, id)
+    const max = info.tracked ? info.qty : 0
+    const next = (c[id] ?? 0) + 1
+    return next > max ? c : { ...c, [id]: next }
+  })
   const dec = (id: string) =>
     setCart((c) => {
       const q = (c[id] ?? 0) - 1
@@ -61,12 +72,16 @@ export function Caja() {
         <div className="posgrid">
           {sellable.map((p) => {
             const qty = cart[p.id] ?? 0
+            const stock = stockInfoFor(stockMap, p.id)
+            const out = !stock.tracked || stock.qty <= 0
             return (
-              <div key={p.id} className="poscard" onClick={() => add(p.id)}>
+              <div key={p.id} className="poscard" style={out ? { opacity: 0.55 } : undefined} onClick={() => { if (!out) add(p.id) }}>
                 <span className={'ltag ' + (p.line === 'prof' ? 'prof' : 'cosm')}>{p.line === 'prof' ? 'Professional' : 'Home Care'}</span>
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
                 <div className="pr">{money(p.price)}</div>
+                {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
+                  : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
                 {qty > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
                     <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Icon name="minus" /></button>

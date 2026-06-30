@@ -5,7 +5,7 @@
 import React, { useState } from 'react'
 import { UserPlus, X, Ban, RotateCcw } from 'lucide-react'
 import { initials, avatarColor } from '../../lib/format'
-import { useTeam, type TeamUser } from '../../data/hooks/useTeam'
+import { useTeam } from '../../data/hooks/useTeam'
 import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
 

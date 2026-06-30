@@ -106,4 +106,4 @@ export function saveLanding(next: LandingContent) {
   logAudit({ actor: 'Administración', action: 'Landing actualizada', resource: 'Página pública' })
 }
 
-export function resetLanding() { content = clone(DEFAULT); emit() }
+export function resetLanding(): LandingContent { content = clone(DEFAULT); emit(); return content }

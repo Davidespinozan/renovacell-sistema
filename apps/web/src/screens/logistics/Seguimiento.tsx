@@ -12,7 +12,7 @@ import { useRole } from '../../auth/RoleContext'
 import { driverName } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
 import { diagnoseShipment } from '../../data/ops/seguimiento'
-import type { Shipment, ProductSafe } from '../../data/types'
+import type { Shipment } from '../../data/types'
 
 interface Row {
   order: OrderWithItems

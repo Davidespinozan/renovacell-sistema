@@ -15,8 +15,9 @@ export function Recibo() {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
 
-  const [selected, setSelected] = useState<string>(shipments[0]?.id ?? '')
+  const [selected, setSelected] = useState<string>('')
   const shipment = shipments.find((s) => s.id === selected) ?? shipments[0]
+  const selectedId = shipment?.id ?? '' // refleja el envío realmente mostrado (evita desync del select)
   const order = orders.find((o) => o.id === shipment?.order_id)
 
   const prodName = useMemo(() => {
@@ -51,7 +52,7 @@ export function Recibo() {
         <div className="eyebrow" style={{ margin: 0 }}>Empaque · Recibo de entrega</div>
         <select
           style={{ marginLeft: 'auto', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13 }}
-          value={selected}
+          value={selectedId}
           onChange={(e) => setSelected(e.target.value)}
         >
           {shipments.map((s) => {

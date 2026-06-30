@@ -27,6 +27,7 @@ export function Login() {
 
   const recover = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return
     setSent(true) // mock: con backend enviará el correo de restablecimiento
   }
 
@@ -114,7 +115,7 @@ export function Login() {
                   </div>
                   <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }} disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} >Enviar instrucciones</button>
                   <div style={{ textAlign: 'center', marginTop: 12 }}>
-                    <button type="button" style={linkBtn} onClick={() => setView('login')}>Volver a iniciar sesión</button>
+                    <button type="button" style={linkBtn} onClick={() => { setView('login'); setError(null) }}>Volver a iniciar sesión</button>
                   </div>
                 </form>
               )}

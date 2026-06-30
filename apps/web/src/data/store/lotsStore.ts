@@ -9,10 +9,16 @@ import { getSnapshot as productsSnapshot } from './productsStore'
 
 const LOW_STOCK_REORDER = 20 // umbral para avisar a Dirección que hay que reabastecer
 
-// Total disponible (todos los lotes) de los productos indicados.
+// Total DISPONIBLE (excluye lotes caducados, igual que el catálogo) de los
+// productos indicados — para el aviso de reabastecimiento.
 function totalsFor(ids: Set<string>): Record<string, number> {
+  const today = new Date().toISOString().slice(0, 10)
   const m: Record<string, number> = {}
-  lots.forEach((l) => { if (ids.has(l.product_id)) m[l.product_id] = (m[l.product_id] ?? 0) + l.quantity })
+  lots.forEach((l) => {
+    if (!ids.has(l.product_id)) return
+    if (l.expiry_date != null && l.expiry_date < today) return
+    m[l.product_id] = (m[l.product_id] ?? 0) + l.quantity
+  })
   return m
 }
 // Avisa a Dirección (campana) cuando un producto CRUZA el umbral de stock bajo.
@@ -98,6 +104,24 @@ export function adjust(lotId: string, delta: number, reason: string, reference =
   movements = [...movements, {
     id: `m-${seq}`, lot_id: lotId, change: delta, reason, reference, created_by: null, created_at: new Date().toISOString(),
   }]
+  emit()
+}
+
+// Reingresa a SUS lotes las salidas registradas con una referencia (folio de
+// pedido). Reconstruye desde el ledger, así respeta el split FEFO multi-lote y
+// no depende del lot_id "resumen" del renglón. Lo usa la cancelación de pedidos.
+export function restockByReference(reference: string, reason = 'cancelacion'): void {
+  const outs = movements.filter((m) => m.reference === reference && m.change < 0 && (m.reason === 'surtido' || m.reason === 'venta'))
+  if (outs.length === 0) return
+  const now = new Date().toISOString()
+  const newMovs: InventoryMovement[] = []
+  outs.forEach((m, i) => {
+    const give = -m.change
+    lots = lots.map((l) => (l.id === m.lot_id ? { ...l, quantity: l.quantity + give } : l))
+    seq += 1
+    newMovs.push({ id: `m-${seq}-r${i}`, lot_id: m.lot_id, change: give, reason, reference, created_by: null, created_at: now })
+  })
+  movements = [...movements, ...newMovs]
   emit()
 }
 

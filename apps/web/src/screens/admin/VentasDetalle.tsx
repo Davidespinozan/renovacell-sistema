@@ -146,7 +146,7 @@ export function VentasDetalle() {
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => { if (window.confirm('¿Cancelar este pedido? Se reingresa el inventario si ya estaba surtido.')) { cancelOrder(selectedOrder.id, 'Administración'); setSelected(null) } }} />
+        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => { if (window.confirm('¿Cancelar este pedido? Se reingresa el inventario si ya estaba surtido.')) { const r = cancelOrder(selectedOrder.id, 'Administración'); if (!r.ok) window.alert('Este pedido ya no se puede cancelar (cambió de estado).'); setSelected(null) } }} />
       )}
     </div>
   )

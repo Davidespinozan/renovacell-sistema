@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { Plus, X, Store, PackagePlus, Check, ArrowLeft } from 'lucide-react'
 import { money } from '../../lib/format'
-import { useProducts } from '../../data/hooks/useProducts'
+import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useEvents, remaining, type SalesEvent } from '../../data/hooks/useEvents'
 import { useTeam } from '../../data/hooks/useTeam'
 import { useRole } from '../../auth/RoleContext'
@@ -179,7 +179,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 function AssignModal({ event, onClose, onDone }: { event: SalesEvent; onClose: () => void; onDone: (msg: string) => void }) {
   const { data: products } = useProducts()
   const { assignStock } = useEvents()
-  const sellable = products.filter((p) => p.price != null)
+  const sellable = products.filter((p) => p.price != null && isActiveProduct(p))
   const [productId, setProductId] = useState(sellable[0]?.id ?? '')
   const [qty, setQty] = useState('')
   const [err, setErr] = useState<string | null>(null)
