@@ -6,7 +6,7 @@ import type { ProductSafe, Profile } from './types'
 
 // "Venta" para KPIs: cuenta solo pedidos confirmados (al menos surtidos) o cobrados.
 // Excluye cancelados, borradores y pendientes de surtir → no infla ingresos con pipeline.
-const isSale = (o: OrderWithItems) => o.status != null && !['cancelled', 'draft', 'pending_payment'].includes(o.status)
+export const isSale = (o: OrderWithItems) => o.status != null && !['cancelled', 'draft', 'pending_payment'].includes(o.status)
 export const isPosOrder = (o: OrderWithItems) => Boolean(o.external_ref && o.external_ref.startsWith('POS'))
 
 export interface SalesSummary {

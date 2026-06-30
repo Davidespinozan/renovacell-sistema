@@ -28,6 +28,8 @@ import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
+import { Finanzas } from './admin/Finanzas'
+import { CierreCaja } from './admin/CierreCaja'
 import { Bitacora } from './admin/Bitacora'
 import { Reabastecimiento } from './admin/Reabastecimiento'
 import { Equipo } from './admin/Equipo'
@@ -63,6 +65,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_doc: () => <Doctores />,
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
+  av_finanzas: () => <Finanzas />,
+  av_cierre: () => <CierreCaja />,
   av_audit: () => <Bitacora />,
   av_inv: () => <Reabastecimiento />,
   compras: () => <Reabastecimiento />,
