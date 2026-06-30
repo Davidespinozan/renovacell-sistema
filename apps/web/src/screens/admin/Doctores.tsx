@@ -128,6 +128,8 @@ function DoctorDetail({
           <div className="form-grid-2" style={{ marginBottom: 14 }}>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Correo</div>{doctor.email}</div>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Cédula</div>{(doctor.meta?.cedula as string) ?? '—'}</div>
+            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Teléfono</div>{(doctor.meta?.phone as string) ?? '—'}</div>
+            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Dirección</div>{(doctor.meta?.address as string) ? `${doctor.meta?.address as string}, ${(doctor.meta?.city as string) ?? ''}` : '—'}</div>
             <div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Estatus</div>
               <span className={'pill ' + (doctor.verified ? 'p-ok' : 'p-warn')}>{doctor.verified ? 'Verificado' : 'Pendiente'}</span>

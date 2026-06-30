@@ -20,19 +20,20 @@ export const DOCTOR_PROFILE: ClientInfo = {
   city: 'Culiacán, Sin.',
 }
 
-// Cliente (destino) por doctor_id real: nombre/clínica del doctor. La dirección/
-// teléfono aún no se modelan por doctor (placeholder); con Supabase vienen del
-// perfil + dirección de envío del pedido.
+// Cliente (destino) por doctor_id real: nombre/clínica + dirección/teléfono/ciudad
+// ÚNICOS por doctor (catálogo de direcciones únicas — Regla 1: captura única).
+// Con Supabase vienen de profiles + la dirección de envío del pedido.
 export const clientOf = (doctorId: string | null): ClientInfo => {
   if (!doctorId) return DOCTOR_PROFILE
   const d = MOCK_DOCTORS.find((x) => x.id === doctorId)
   if (!d) return DOCTOR_PROFILE
+  const meta = (d.meta ?? {}) as { phone?: string; address?: string; city?: string }
   return {
     id: d.id,
     name: d.full_name ?? 'Doctor',
     clinic: d.organization ?? '',
-    phone: DOCTOR_PROFILE.phone,
-    address: DOCTOR_PROFILE.address,
-    city: DOCTOR_PROFILE.city,
+    phone: meta.phone ?? DOCTOR_PROFILE.phone,
+    address: meta.address ?? DOCTOR_PROFILE.address,
+    city: meta.city ?? DOCTOR_PROFILE.city,
   }
 }
