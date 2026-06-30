@@ -11,7 +11,7 @@ export interface Driver {
 
 export const MOCK_DRIVERS: Driver[] = [
   { id: 'drv-1', name: 'Beto · Chofer', email: 'chofer@renovacell.mx' },
-  { id: 'drv-2', name: 'Repartidor zona centro', email: null },
+  { id: 'drv-2', name: 'Marta · Chofer', email: 'chofer2@renovacell.mx' },
 ]
 
 // Resuelve el chofer logueado por su correo (en Supabase = profiles.id = auth.uid).
@@ -27,9 +27,10 @@ export const MOCK_SHIPMENTS: Shipment[] = [
     label_url: null, driver_id: null, status: 'delivered', estimated_delivery_at: '2026-05-23T00:00:00Z',
     delivered_at: '2026-05-23T15:10:00Z', proof_image_url: null, received_by: null, incident: null, created_at: '2026-05-21T10:00:00Z',
   },
+  // Entrega local con chofer propio (drv-2 · Marta), pendiente de entregar.
   {
-    id: 'sh-3559', order_id: 'o-3559', carrier: 'DHL', tracking_number: '4410-1180',
-    label_url: null, driver_id: null, status: 'in_transit', estimated_delivery_at: '2026-06-14T00:00:00Z',
+    id: 'sh-3559', order_id: 'o-3559', carrier: null, tracking_number: null,
+    label_url: null, driver_id: 'drv-2', status: 'out_for_delivery', estimated_delivery_at: '2026-06-14T00:00:00Z',
     delivered_at: null, proof_image_url: null, received_by: null, incident: null, created_at: '2026-06-11T09:00:00Z',
   },
   // Entrega local con chofer propio (drv-1), pendiente de entregar.

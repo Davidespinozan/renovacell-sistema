@@ -51,6 +51,7 @@ export function MisEntregas() {
     const o = orderById[sh.order_id]
     return s + (o ? o.items.filter((it) => it.unit_price != null).reduce((t, it) => t + it.qty, 0) : 0)
   }, 0)
+  const incidencias = mine.filter((s) => s.incident && !s.incident.resolved).length
 
   const onPhoto = (shipmentId: string, file: File | undefined) => {
     if (!file) return
@@ -69,11 +70,11 @@ export function MisEntregas() {
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
 
-      {/* Resumen de carga del día */}
+      {/* Resumen de la ruta (asignada por Empaque al elegir chofer) */}
       <div className="grid sigs">
-        <div className="card sig"><div className="chip"><Icon name="truck" /></div><div className="v">{mine.length}</div><div className="k">A bordo</div><div className="s">{piezasABordo} pza(s) cargadas</div></div>
+        <div className="card sig"><div className="chip"><Icon name="truck" /></div><div className="v">{mine.length}</div><div className="k">En tu ruta</div><div className="s">{piezasABordo} pieza(s) por entregar</div></div>
         <div className="card sig"><div className="chip"><Icon name="check" /></div><div className="v">{entregadas.length}</div><div className="k">Entregadas</div><div className="s">de tu ruta</div></div>
-        <div className={'card sig' + (mine.length ? ' warn' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{mine.length}</div><div className="k">Por entregar</div><div className="s">regresa lo no entregado</div></div>
+        <div className={'card sig' + (incidencias ? ' dang' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{incidencias}</div><div className="k">Con incidencia</div><div className="s">requieren atención</div></div>
       </div>
 
       {mine.length === 0 ? (
