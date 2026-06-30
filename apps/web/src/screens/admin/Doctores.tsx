@@ -2,10 +2,11 @@
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import React, { useMemo, useState } from 'react'
-import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock } from 'lucide-react'
+import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus } from 'lucide-react'
 import { money, fmtDate, initials, avatarColor } from '../../lib/format'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
+import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
 
@@ -20,6 +21,7 @@ export function Doctores() {
   const { data: doctors, verify, revoke, setCedula } = useDoctors()
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
   const detail = doctors.find((d) => d.id === detailId) ?? null // siempre el doctor vivo del store
 
   const orderCount = useMemo(() => {
@@ -67,9 +69,14 @@ export function Doctores() {
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             {d.verified ? (
-              <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => revoke(d.id)}>
-                <Ban size={14} /> Revocar
-              </button>
+              <>
+                <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
+                  <Plus size={14} /> Levantar pedido
+                </button>
+                <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => revoke(d.id)}>
+                  <Ban size={14} /> Revocar
+                </button>
+              </>
             ) : cedulaOf(d) ? (
               <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => verify(d.id)}>
                 <UserCheck size={14} /> Verificar
@@ -93,6 +100,8 @@ export function Doctores() {
           onSetCedula={(c) => setCedula(detail.id, c)}
         />
       )}
+
+      {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy="Administración" onClose={() => setPedidoFor(null)} />}
     </div>
   )
 }

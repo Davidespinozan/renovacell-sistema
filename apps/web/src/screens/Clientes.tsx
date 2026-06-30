@@ -1,11 +1,12 @@
 // CLIENTES — cartera del vendedor (directorio de doctores). Aislado por vendedor:
 // cada quien ve SOLO su cartera (doctor.meta.owner); Admin ve todos. Solo lectura.
-import React, { useMemo } from 'react'
-import { ShieldCheck, Clock, ShoppingBag } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { ShieldCheck, Clock, ShoppingBag, Plus } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { useDoctors } from '../data/hooks/useDoctors'
 import { useAllOrders } from '../data/hooks/useOrders'
 import { useRole } from '../auth/RoleContext'
+import { NuevoPedido } from './sales/NuevoPedido'
 import type { Profile } from '../data/types'
 
 const ownerOf = (d: Profile): string | null => ((d.meta as Record<string, unknown>)?.owner as string) ?? null
@@ -15,6 +16,8 @@ export function Clientes() {
   const { data: doctors } = useDoctors()
   const { data: orders } = useAllOrders()
   const { role, user } = useRole()
+  const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
+  const placedBy = role === 'admin' ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
 
   const mine = useMemo(
     () => (role === 'admin' ? doctors : doctors.filter((d) => ownerOf(d) === user?.email)),
@@ -49,8 +52,19 @@ export function Clientes() {
             </span>
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
+          <div style={{ display: 'flex', marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            {d.verified ? (
+              <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
+                <Plus size={14} /> Levantar pedido
+              </button>
+            ) : (
+              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Verifícalo para poder pedir</span>
+            )}
+          </div>
         </div>
       ))}
+
+      {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy={placedBy} onClose={() => setPedidoFor(null)} />}
     </div>
   )
 }

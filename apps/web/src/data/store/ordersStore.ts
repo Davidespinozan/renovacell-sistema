@@ -54,17 +54,20 @@ export function createOrder(input: {
   lines: NewOrderLine[]
   total: number
   invoice_requested: boolean
+  doctor_id?: string   // a nombre de qué doctor (default: el doctor en sesión)
+  placedBy?: string    // quién lo levantó (vendedor/dirección); default: Portal del Doctor
 }): OrderWithItems {
   folioSeq += 1
   const id = `o-${folioSeq}`
   const folio = `S${folioSeq}`
   const now = new Date().toISOString()
+  const doctorId = input.doctor_id ?? DOCTOR_ID
 
   const order: Order = {
-    id, external_ref: folio, doctor_id: DOCTOR_ID, total: input.total, currency: 'MXN',
+    id, external_ref: folio, doctor_id: doctorId, total: input.total, currency: 'MXN',
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
-    invoice_meta: null, shipping_meta: null, created_at: now,
+    invoice_meta: null, shipping_meta: input.placedBy ? { placed_by: input.placedBy } : null, created_at: now,
   }
   const newItems: OrderItem[] = input.lines.map((l, i) => ({
     id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: null,
@@ -75,7 +78,7 @@ export function createOrder(input: {
   items = [...items, ...newItems]
   emit()
   notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
-  logAudit({ actor: 'Portal del Doctor', action: 'Pedido creado', resource: folio })
+  logAudit({ actor: input.placedBy ?? 'Portal del Doctor', action: 'Pedido creado', resource: folio })
   return { ...order, items: newItems }
 }
 
