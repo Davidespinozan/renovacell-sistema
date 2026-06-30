@@ -22,7 +22,7 @@ export function AppShell() {
   return (
     <div className="app">
       <Sidebar onNavigate={() => setDrawer(false)} />
-      <div className="main">
+      <div className="main" data-area={role}>
         <TopBar onMenu={() => setDrawer(true)} />
         <div className="canvas">
           <div id="content" key={`${role}:${screen}`}>

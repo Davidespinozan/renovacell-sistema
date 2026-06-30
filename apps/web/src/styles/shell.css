@@ -93,7 +93,14 @@ svg{display:block}
 .side-foot .op b{color:#fff;font-weight:600}
 .live{width:7px;height:7px;border-radius:50%;background:#fff;animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(95,184,115,.5)}70%{box-shadow:0 0 0 7px rgba(95,184,115,0)}100%{box-shadow:0 0 0 0 rgba(95,184,115,0)}}
-.main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:radial-gradient(1100px 460px at 100% -8%,rgba(95,184,115,.12),transparent 58%),var(--hueso)}
+.main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--area-light),var(--hueso)}
+/* Personalidad por área (verde + profundidad por luz): cambia posición e
+   intensidad de la luz ambiental; el color se mantiene en familia verde. */
+.main[data-area="doctor"]{--area-tint:rgba(95,184,115,.16);--area-tint-2:rgba(0,115,17,.06)}
+.main[data-area="warehouse"]{--area-tint:rgba(44,110,99,.14);--area-tint-2:rgba(20,60,53,.06);--area-light:radial-gradient(960px 520px at 8% -10%,var(--area-tint),transparent 60%),radial-gradient(820px 420px at 108% 108%,var(--area-tint-2),transparent 62%)}
+.main[data-area="pos"]{--area-tint:rgba(95,184,115,.10);--area-tint-2:rgba(0,89,13,.07);--area-light:radial-gradient(900px 460px at 50% -12%,var(--area-tint),transparent 58%),radial-gradient(700px 460px at 100% 100%,var(--area-tint-2),transparent 60%)}
+.main[data-area="admin"]{--area-tint:rgba(40,70,80,.12);--area-tint-2:rgba(0,115,17,.05);--area-light:radial-gradient(1180px 520px at 100% -10%,var(--area-tint),transparent 56%),radial-gradient(820px 440px at -8% 112%,var(--area-tint-2),transparent 60%)}
+.main[data-area="driver"]{--area-tint:rgba(44,110,143,.13);--area-tint-2:rgba(0,89,13,.05);--area-light:radial-gradient(980px 500px at 0% -10%,var(--area-tint),transparent 60%),radial-gradient(760px 420px at 106% 110%,var(--area-tint-2),transparent 60%)}
 .top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 30px;background:var(--chrome-grad-h);background-color:var(--side-bg);border-bottom:1px solid rgba(0,0,0,.4);box-shadow:inset 0 1px 0 var(--chrome-edge);position:sticky;top:0;z-index:9;color:#fff}
 .screen-title{font-size:23px;font-weight:500;letter-spacing:-.012em;line-height:1.1;color:#fff}
 .screen-sub{font-size:12.5px;color:rgba(255,255,255,.7);margin-top:2px}
@@ -113,15 +120,31 @@ svg{display:block}
 .canvas{padding:22px 30px 60px;overflow:auto;flex:1;min-height:0}
 #content{animation:rise .45s cubic-bezier(.2,.7,.3,1) both}
 .grid{display:grid;gap:18px}
-.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-md);animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+.card{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-card);animation:rise .5s var(--ease-soft) both;transition:box-shadow var(--dur) ease,transform var(--dur) var(--ease-soft)}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* Entrada escalonada: las tarjetas del lienzo aparecen en cascada. */
+.canvas #content > .grid > .card,.canvas #content > .grid{animation:rise .5s var(--ease-soft) both}
+.canvas #content > .grid > *:nth-child(1){animation-delay:.03s}
+.canvas #content > .grid > *:nth-child(2){animation-delay:.07s}
+.canvas #content > .grid > *:nth-child(3){animation-delay:.11s}
+.canvas #content > .grid > *:nth-child(4){animation-delay:.15s}
+.canvas #content > .grid > *:nth-child(5){animation-delay:.19s}
+.canvas #content > .grid > *:nth-child(6){animation-delay:.23s}
+/* Lift sutil en tarjetas tipo "tile" e interactivas. */
+.card.sig:hover,.pcard:hover,.syscard:hover,.alert:hover,.card.clickable:hover{box-shadow:var(--sh-card-h);transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){.card,.canvas #content > .grid > *{animation:none}.card.sig:hover,.pcard:hover,.syscard:hover,.alert:hover,.card.clickable:hover{transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .eyebrow{display:flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mid);font-weight:600;margin-bottom:16px}
 .eyebrow::before{content:"";width:18px;height:2px;border-radius:2px;background:var(--green)}
-/* Título grande + explicación en lenguaje claro para encabezar una pantalla. */
-.page-h{margin:-2px 0 4px}
-.page-h h1{font-size:21px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
-.page-h p{font-size:13.5px;color:var(--ink-3);line-height:1.5;margin-top:5px;max-width:60ch}
+/* Encabezado de pantalla: hero sobrio con luz propia (gradiente verde sutil +
+   orb difuminado + hairline superior). Da identidad sin restar legibilidad. */
+.page-h{position:relative;overflow:hidden;margin:-2px 0 6px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-lg);
+  background:radial-gradient(120% 140% at 0% 0%,var(--area-tint),transparent 55%),linear-gradient(180deg,#fff,#fbfdfb);
+  box-shadow:var(--sh-card)}
+.page-h::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:var(--edge-light)}
+.page-h::after{content:"";position:absolute;top:-90px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--area-tint),transparent 70%);filter:blur(36px);opacity:.8;pointer-events:none}
+.page-h h1{position:relative;font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.page-h p{position:relative;font-size:13.5px;color:var(--ink-3);line-height:1.55;margin-top:6px;max-width:62ch}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:var(--pill);white-space:nowrap}
 .pill .d{width:6px;height:6px;border-radius:50%;background:currentColor}
 .p-ok{background:var(--ok-bg);color:var(--green-deep)}.p-warn{background:var(--warn-bg);color:var(--warn)}

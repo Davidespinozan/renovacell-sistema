@@ -48,9 +48,28 @@
   --r-lg: 20px;
   --pill: 999px;
 
-  /* Sombras */
+  /* Sombras — escalonadas, basadas en verde-tinta (no negro puro) para dar
+     profundidad cálida. _h = estado hover (sube un nivel). */
   --sh-sm: 0 1px 2px rgba(20,30,18,.07);
   --sh-md: 0 4px 16px rgba(20,30,18,.07), 0 1px 3px rgba(20,30,18,.05);
   --sh-lg: 0 22px 48px -14px rgba(20,30,18,.22), 0 4px 10px rgba(20,30,18,.05);
+  --sh-card: 0 1px 2px rgba(20,30,18,.05), 0 6px 18px -8px rgba(20,30,18,.12);
+  --sh-card-h: 0 2px 4px rgba(20,30,18,.06), 0 16px 34px -14px rgba(20,30,18,.22);
   --glow: 0 10px 26px -6px rgba(0,115,17,.5);
+
+  /* Profundidad / movimiento (playbook) */
+  --ease-soft: cubic-bezier(.22,1,.36,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --dur-fast: .16s;
+  --dur: .22s;
+  --glass: rgba(255,255,255,.62);
+  --glass-border: rgba(255,255,255,.55);
+  --edge-light: linear-gradient(90deg, transparent, rgba(0,115,17,.34), transparent);
+
+  /* Luz ambiental por área (verde marca por defecto). Cada área la redefine:
+     posición e intensidad de la luz cambian, el color se mantiene en familia. */
+  --area-tint: rgba(95,184,115,.13);
+  --area-tint-2: rgba(0,115,17,.05);
+  --area-light: radial-gradient(1100px 480px at 100% -8%, var(--area-tint), transparent 58%),
+                radial-gradient(760px 420px at -6% 110%, var(--area-tint-2), transparent 60%);
 }

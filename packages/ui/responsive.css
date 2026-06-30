@@ -28,7 +28,7 @@
 
 /* --- Form grid de 2 columnas que colapsa a 1 en teléfono --------------------- */
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 560px) { .form-grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .form-grid-2 { grid-template-columns: 1fr; } }
 
 /* --- Touch targets ≥44px en teléfono (uso a pulgar) -------------------------- */
 @media (max-width: 640px) {
@@ -41,7 +41,7 @@
 /* --- Existencias: los lotes envuelven en vez de desbordar -------------------- */
 @media (max-width: 640px) {
   .lote { flex-wrap: wrap; }
-  .lote .lq { margin-left: auto; }
+  .lote .lq { width: 100%; text-align: right; margin-left: 0; margin-top: 4px; }
 }
 
 /* --- Chofer: acciones de entrega a ancho completo (cómodo con el pulgar) ----- */
@@ -111,3 +111,37 @@
 .notif-dot[data-on="true"] { background: var(--green); }
 .notif-text { font-size: 13px; flex: 1; min-width: 0; }
 .notif-when { font-size: 11px; color: var(--ink-3); flex: none; }
+
+/* ============================================================================
+   FIXES RESPONSIVE (Fase 2): cierres de huecos detectados en auditoría.
+   ============================================================================ */
+
+/* Carrito/ticket pegajoso: bajo el topbar reducido en móvil (evita tapar). */
+@media (max-width: 900px) {
+  .card.ticket { top: 64px !important; }
+}
+
+/* Grids densas: colapsan cómodas en teléfono (KPIs, dos columnas, catálogos). */
+@media (max-width: 640px) {
+  .grid.sigs { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .grid.two { grid-template-columns: 1fr; }
+  .pgrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .posgrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* Recibo: meta a una columna y respiro en móvil. */
+@media (max-width: 640px) {
+  .recibo .rmeta { grid-template-columns: 1fr; gap: 10px; }
+}
+
+/* Inputs de login: cómodos al tacto en teléfono. */
+@media (max-width: 640px) {
+  input[type="email"], input[type="password"] { min-height: 44px; }
+}
+
+/* Bottom-nav en teléfonos muy chicos: solo íconos para que no se corten labels. */
+@media (max-width: 360px) {
+  .bnav a span { display: none; }
+  .bnav a { gap: 0; }
+  .bnav a svg { width: 23px; height: 23px; }
+}

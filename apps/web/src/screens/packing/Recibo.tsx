@@ -87,16 +87,16 @@ export function Recibo() {
         </div>
 
         <div className="rbody">
-          <table>
+          <table className="tbl-cards">
             <thead>
               <tr><th>Producto</th><th>Lote</th><th>Cant.</th></tr>
             </thead>
             <tbody>
               {order.items.filter((it) => it.unit_price != null).map((it) => (
                 <tr key={it.id}>
-                  <td>{prodName[it.product_id ?? ''] ?? 'Producto'}</td>
-                  <td><span className="lc">{it.lot_id ? lotCode[it.lot_id] ?? it.lot_id : '—'}</span></td>
-                  <td className="mono">{it.qty} u</td>
+                  <td data-label="Producto">{prodName[it.product_id ?? ''] ?? 'Producto'}</td>
+                  <td data-label="Lote"><span className="lc">{it.lot_id ? lotCode[it.lot_id] ?? it.lot_id : '—'}</span></td>
+                  <td data-label="Cant." className="mono">{it.qty} {it.qty === 1 ? 'pza' : 'pzas'}</td>
                 </tr>
               ))}
             </tbody>
