@@ -110,6 +110,7 @@ export interface Shipment {
   order_id: UUID
   carrier: string | null
   tracking_number: string | null
+  label_url: string | null       // etiqueta/guía para imprimir (del agregador)
   driver_id: UUID | null
   status: string | null
   estimated_delivery_at: ISODateTime | null

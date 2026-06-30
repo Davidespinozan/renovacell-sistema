@@ -4,6 +4,7 @@ import { money, fmtDate } from '../../lib/format'
 import { statusView } from './orderStatus'
 import { Trk } from './Trk'
 import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
+import { trackingUrl } from '../../data/shipping/provider'
 import type { ProductSafe } from '../../data/types'
 
 export function OrderCard({
@@ -63,9 +64,19 @@ export function OrderCard({
 function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
   if (!meta || typeof meta !== 'object') return null
   const m = meta as { carrier?: string; tracking?: string; driver?: string }
-  let text = ''
-  if (m.driver) text = `Entrega: chofer propio · ${m.driver}`
-  else if (m.carrier) text = `Paquetería: ${m.carrier}${m.tracking ? ` · guía ${m.tracking}` : ''}`
-  if (!text) return null
-  return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>{text}</div>
+  if (m.driver) {
+    return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Entrega: chofer propio · {m.driver}</div>
+  }
+  if (m.carrier) {
+    const url = m.tracking ? trackingUrl(m.carrier, m.tracking) : null
+    return (
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
+        Paquetería: {m.carrier}
+        {m.tracking && (url
+          ? <> · guía <a href={url} target="_blank" rel="noreferrer" className="mono" style={{ color: 'var(--green-deep)', fontWeight: 600 }}>{m.tracking}</a></>
+          : <> · guía {m.tracking}</>)}
+      </div>
+    )
+  }
+  return null
 }

@@ -9,7 +9,17 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useShipments } from '../../data/hooks/useShipments'
 import { markShipped } from '../../data/store/ordersStore'
 import { MOCK_DRIVERS } from '../../data/mock/shipments'
+import { clientOf } from '../../data/mock/profiles'
+import { ORIGIN, quoteRates, generateLabel, type ShipAddress, type RateQuote, type LabelResult } from '../../data/shipping/provider'
 import type { ProductSafe } from '../../data/types'
+
+// Destino a partir del perfil del doctor del pedido. Con Supabase: dirección de
+// envío del pedido. El CP es placeholder mientras no se modele por doctor.
+function destinationOf(order: OrderWithItems): ShipAddress {
+  const c = clientOf(order.doctor_id)
+  const [city, state] = (c.city || 'Culiacán, Sin.').split(',').map((s) => s.trim())
+  return { name: c.clinic || c.name, street: c.address, city: city || 'Culiacán', state: state || 'Sin.', zip: '80000', phone: c.phone }
+}
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1px solid var(--line)',
@@ -72,46 +82,84 @@ type Method = 'paqueteria' | 'chofer'
 function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
   const { createShipment } = useShipments()
   const [method, setMethod] = useState<Method>('paqueteria')
-  const [carrier, setCarrier] = useState('Estafeta')
-  const [tracking, setTracking] = useState('')
-  const [eta, setEta] = useState('')
   const [driverId, setDriverId] = useState('')
-  const [done, setDone] = useState(false)
 
-  const valid = method === 'paqueteria' ? Boolean(tracking.trim()) : Boolean(driverId)
+  // Paquetería: paquete → cotizar → elegir tarifa → generar guía.
+  const dest = useMemo(() => destinationOf(order), [order])
+  const [parcel, setParcel] = useState({ weightKg: '0.5', lengthCm: '20', widthCm: '15', heightCm: '10' })
+  const [rates, setRates] = useState<RateQuote[] | null>(null)
+  const [rateId, setRateId] = useState('')
+  const [busy, setBusy] = useState<false | 'quote' | 'label'>(false)
+  const [result, setResult] = useState<LabelResult | null>(null)
+  const [doneChofer, setDoneChofer] = useState(false)
 
-  const confirm = () => {
-    if (!valid) return
-    if (method === 'paqueteria') {
-      createShipment({
-        order_id: order.id, carrier, tracking_number: tracking.trim(), driver_id: null,
-        estimated_delivery_at: eta ? new Date(eta).toISOString() : null, status: 'in_transit',
-      })
-      markShipped(order.id, { method: 'paqueteria', carrier, tracking: tracking.trim() })
-    } else {
-      const drv = MOCK_DRIVERS.find((d) => d.id === driverId)
-      createShipment({
-        order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
-        estimated_delivery_at: null, status: 'assigned',
-      })
-      markShipped(order.id, { method: 'chofer', driver: drv?.name ?? '', driver_id: driverId })
-    }
-    setDone(true)
+  const req = () => ({
+    origin: ORIGIN,
+    destination: dest,
+    parcel: {
+      weightKg: Number(parcel.weightKg) || 0.5, lengthCm: Number(parcel.lengthCm) || 1,
+      widthCm: Number(parcel.widthCm) || 1, heightCm: Number(parcel.heightCm) || 1,
+    },
+    orderRef: order.external_ref ?? order.id,
+  })
+
+  const cotizar = async () => {
+    setBusy('quote'); setRates(null); setRateId('')
+    const r = await quoteRates(req())
+    setRates(r); setRateId(r[0]?.id ?? ''); setBusy(false)
   }
+
+  const generarGuia = async () => {
+    const rate = rates?.find((r) => r.id === rateId)
+    if (!rate) return
+    setBusy('label')
+    const label = await generateLabel(rate, req())
+    createShipment({
+      order_id: order.id, carrier: label.carrier, tracking_number: label.tracking,
+      label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
+    })
+    markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
+    setResult(label); setBusy(false)
+  }
+
+  const asignarChofer = () => {
+    if (!driverId) return
+    const drv = MOCK_DRIVERS.find((d) => d.id === driverId)
+    createShipment({
+      order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
+      estimated_delivery_at: null, status: 'assigned',
+    })
+    markShipped(order.id, { method: 'chofer', driver: drv?.name ?? '', driver_id: driverId })
+    setDoneChofer(true)
+  }
+
+  const f2: React.CSSProperties = { ...inputStyle }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        {done ? (
+        {result ? (
+          <div className="mbody">
+            <div className="success">
+              <div className="ck"><Icon name="check" /></div>
+              <h3>Guía generada</h3>
+              <p>
+                <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.
+                Guía <b className="mono">{result.tracking}</b> · entrega estimada {fmtDate(result.estimatedDeliveryAt)}.
+                El doctor ya la ve en su seguimiento.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+                <a className="btn" href={result.labelUrl} target="_blank" rel="noreferrer"><Icon name="download" /> Imprimir etiqueta</a>
+                <button className="btn ghost" type="button" onClick={onClose}>Listo</button>
+              </div>
+            </div>
+          </div>
+        ) : doneChofer ? (
           <div className="mbody">
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
               <h3>Envío asignado</h3>
-              <p>
-                <b>{order.external_ref}</b> pasó a <b>En camino</b> por{' '}
-                {method === 'paqueteria' ? `${carrier} (guía ${tracking.trim()})` : 'chofer propio'}.
-                El doctor ya lo ve en su seguimiento.
-              </p>
+              <p><b>{order.external_ref}</b> pasó a <b>En camino</b> con chofer propio. Ya aparece en la ruta del chofer.</p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
@@ -120,7 +168,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
             <div className="mhead">
               <div>
                 <h3>Asignar envío · {order.external_ref}</h3>
-                <div className="ms">Elige el método de envío.</div>
+                <div className="ms">Genera la guía con la paquetería o asígnalo a un chofer propio.</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
@@ -136,21 +184,51 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
 
               {method === 'paqueteria' ? (
                 <>
-                  <label style={labelStyle}>Paquetería</label>
-                  <select style={inputStyle} value={carrier} onChange={(e) => setCarrier(e.target.value)}>
-                    <option>Estafeta</option>
-                    <option>DHL</option>
-                  </select>
-                  <div className="form-grid-2" style={{ marginTop: 14 }}>
-                    <div>
-                      <label style={labelStyle}>Guía (tracking)</label>
-                      <input style={inputStyle} value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="Ej. 7790-2291" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Entrega estimada</label>
-                      <input style={inputStyle} type="date" value={eta} onChange={(e) => setEta(e.target.value)} />
-                    </div>
+                  {/* Destino: del perfil del doctor */}
+                  <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
+                    <Icon name="truck" />
+                    <span>
+                      <b>Destino:</b> {dest.name} · {dest.street}, {dest.city}, {dest.state}.<br />
+                      <b>Origen:</b> {ORIGIN.city}, {ORIGIN.state}.
+                    </span>
                   </div>
+
+                  <label style={labelStyle}>Paquete</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                    <input style={f2} type="number" min="0.1" step="0.1" value={parcel.weightKg} onChange={(e) => { setParcel({ ...parcel, weightKg: e.target.value }); setRates(null) }} placeholder="kg" />
+                    <input style={f2} type="number" min="1" value={parcel.lengthCm} onChange={(e) => { setParcel({ ...parcel, lengthCm: e.target.value }); setRates(null) }} placeholder="largo" />
+                    <input style={f2} type="number" min="1" value={parcel.widthCm} onChange={(e) => { setParcel({ ...parcel, widthCm: e.target.value }); setRates(null) }} placeholder="ancho" />
+                    <input style={f2} type="number" min="1" value={parcel.heightCm} onChange={(e) => { setParcel({ ...parcel, heightCm: e.target.value }); setRates(null) }} placeholder="alto" />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>Peso (kg) y medidas en cm (largo × ancho × alto).</div>
+
+                  {!rates ? (
+                    <button className="btn" type="button" style={{ width: '100%', marginTop: 16 }} onClick={cotizar} disabled={busy === 'quote'}>
+                      {busy === 'quote' ? 'Cotizando…' : <><Icon name="truck" /> Cotizar envío</>}
+                    </button>
+                  ) : (
+                    <>
+                      <label style={{ ...labelStyle, marginTop: 16 }}>Tarifas disponibles</label>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {rates.map((r) => (
+                          <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', border: '1px solid ' + (rateId === r.id ? 'var(--green)' : 'var(--line)'), borderRadius: 11, cursor: 'pointer', background: rateId === r.id ? 'var(--ok-bg)' : '#fff' }}>
+                            <input type="radio" name="rate" checked={rateId === r.id} onChange={() => setRateId(r.id)} />
+                            <span style={{ flex: 1 }}>
+                              <b>{r.carrier}</b> · {r.service}
+                              <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Entrega en {r.etaDays} día(s)</span>
+                            </span>
+                            <b className="mono">{money(r.amount)}</b>
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
+                        <button className="btn ghost" type="button" onClick={() => setRates(null)}>Recotizar</button>
+                        <button className="btn" type="button" onClick={generarGuia} disabled={busy === 'label' || !rateId} style={busy === 'label' ? { opacity: .6 } : undefined}>
+                          {busy === 'label' ? 'Generando guía…' : <><Icon name="check" /> Generar guía</>}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -159,15 +237,14 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                     <option value="">Selecciona…</option>
                     {MOCK_DRIVERS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+                    <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+                    <button className="btn" type="button" onClick={asignarChofer} disabled={!driverId} style={!driverId ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+                      <Icon name="check" /> Asignar a chofer
+                    </button>
+                  </div>
                 </>
               )}
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
-                <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-                  <Icon name="check" /> Generar envío
-                </button>
-              </div>
             </div>
           </>
         )}

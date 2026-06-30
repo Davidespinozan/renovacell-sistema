@@ -30,6 +30,7 @@ export interface ShipmentInput {
   order_id: string
   carrier: string | null
   tracking_number: string | null
+  label_url?: string | null
   driver_id: string | null
   estimated_delivery_at: string | null
   status: string // 'in_transit' (paquetería) | 'assigned' (chofer)
@@ -42,6 +43,7 @@ export function createShipment(input: ShipmentInput): Shipment {
     order_id: input.order_id,
     carrier: input.carrier,
     tracking_number: input.tracking_number,
+    label_url: input.label_url ?? null,
     driver_id: input.driver_id,
     status: input.status,
     estimated_delivery_at: input.estimated_delivery_at,
