@@ -118,12 +118,16 @@ svg{display:block}
 .seg button svg{width:14px;height:14px}.seg button:hover{color:var(--ink)}
 .seg button.active{background:var(--grad-green);color:#fff;box-shadow:var(--glow)}
 .canvas{padding:22px 30px 60px;overflow:auto;flex:1;min-height:0}
-#content{animation:rise .45s cubic-bezier(.2,.7,.3,1) both}
+/* Solo opacidad (sin transform): un transform con fill-mode 'both' convertiría a
+   #content en "containing block" y atraparía los modales position:fixed (iOS). */
+#content{animation:fade .4s ease both}
 .grid{display:grid;gap:18px}
 .card{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-card);animation:rise .5s var(--ease-soft) both;transition:box-shadow var(--dur) ease,transform var(--dur) var(--ease-soft)}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 /* Entrada escalonada: las tarjetas del lienzo aparecen en cascada. */
-.canvas #content > .grid > .card,.canvas #content > .grid{animation:rise .5s var(--ease-soft) both}
+/* Solo las TARJETAS hacen el rise (transform). El contenedor .grid NO se anima
+   con transform, para no atrapar los modales fixed que cuelgan de él. */
+.canvas #content > .grid > .card{animation:rise .5s var(--ease-soft) both}
 .canvas #content > .grid > *:nth-child(1){animation-delay:.03s}
 .canvas #content > .grid > *:nth-child(2){animation-delay:.07s}
 .canvas #content > .grid > *:nth-child(3){animation-delay:.11s}

@@ -147,3 +147,21 @@
   .bnav a { gap: 0; }
   .bnav a svg { width: 23px; height: 23px; }
 }
+
+/* ---- Pulidos de móvil (zoom, composer, biblioteca) ------------------------ */
+@media (max-width: 640px) {
+  /* Evita el ZOOM automático de iOS al enfocar un campo (se dispara con < 16px).
+     !important porque varios campos traen font-size en estilo en línea. */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Composer (publicar anuncio): más compacto, sin avatar, y el botón Publicar
+     a ancho completo (sin la línea con aire desperdiciado). */
+  .composer { padding: 12px; gap: 10px; }
+  .composer > .avatar { display: none; }
+  .composer-actions { gap: 8px; margin-top: 10px; }
+  .composer-actions .btn.sm { margin-left: 0 !important; width: 100%; justify-content: center; order: 9; }
+
+  /* Biblioteca: una sola columna para que "Ver" y "Descargar" quepan completos
+     (en 2 columnas el botón se cortaba). */
+  .libgrid { grid-template-columns: 1fr; }
+}
