@@ -66,6 +66,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
 
   const [cart, setCart] = useState<Record<string, number>>({})
+  const [method, setMethod] = useState<'efectivo' | 'tarjeta'>('efectivo')
   const [assignOpen, setAssignOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const closed = event.status === 'cerrado'
@@ -84,7 +85,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 
   const cobrar = () => {
     if (lines.length === 0) return
-    const order = sellAtEvent(event.id, lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price ?? 0 })), total, 'efectivo', user?.email ?? null)
+    const order = sellAtEvent(event.id, lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price ?? 0 })), total, method, user?.email ?? null)
     if (!order) { flash('No se pudo cobrar — revisa el stock del stand.'); return }
     setCart({})
     flash(`Venta registrada · ${money(total)}`)
@@ -163,6 +164,11 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
                   </div>
                 ))}
                 <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}><span>Total</span><b>{money(total)}</b></div>
+                <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '14px 0 6px' }}>Pago</div>
+                <div className="seg">
+                  <button type="button" className={method === 'efectivo' ? 'active' : undefined} onClick={() => setMethod('efectivo')}>Efectivo</button>
+                  <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
+                </div>
                 <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={cobrar}><Check size={16} /> Cobrar {money(total)}</button>
               </>
             )}

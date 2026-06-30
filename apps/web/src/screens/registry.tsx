@@ -21,8 +21,9 @@ import { Guias } from './packing/Guias'
 import { Recibo } from './packing/Recibo'
 import { Seguimiento } from './logistics/Seguimiento'
 import { MisEntregas } from './driver/MisEntregas'
-import { Tablero } from './admin/Tablero'
-import { Ventas } from './admin/Ventas'
+// Pantallas con recharts: lazy para que la librería no cargue hasta abrirlas.
+const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ default: m.Tablero })))
+const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default: m.Ventas })))
 import { Trazabilidad } from './admin/Trazabilidad'
 import { Doctores } from './admin/Doctores'
 import { Prospectos } from './admin/Prospectos'
@@ -85,7 +86,7 @@ export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
     return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }
   const real = SCREENS[screen]
-  if (real) return real()
+  if (real) return <React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{real()}</React.Suspense>
   return <Placeholder role={role} screen={screen} />
 }
 
