@@ -1,8 +1,14 @@
 // Contenido editable de la LANDING pública (single source of truth).
-// Sembrado con los valores REALES de apps/landing/index.html. Administración (o
-// quien tenga la capability "contenido") lo edita aquí. Hoy es un store mock;
-// la página pública consumirá este modelo al conectar el backend (la landing se
-// vuelve data-driven: lee este JSON en vez de tener el texto incrustado).
+// Sembrado con los valores REALES de apps/landing/index.html.
+//
+// PUNTOS DE CONEXIÓN A SUPABASE (sin parches temporales):
+//   · LECTURA (admin):   getSnapshot()  → select de landing_content (1 fila).
+//   · ESCRITURA (admin): saveLanding()  → upsert de landing_content + (trigger/
+//                        edge function) regenera el content.json que sirve la
+//                        landing, o la landing lee la fila vía endpoint.
+//   · LECTURA (público): la landing hace fetch del contenido (hoy content.json
+//                        estático; mañana endpoint o json regenerado en saveLanding).
+// La firma de useLanding NO cambia al conectar: solo el cuerpo de estas funciones.
 import { logAudit } from './auditStore'
 
 export interface Certification { label: string; sub: string }

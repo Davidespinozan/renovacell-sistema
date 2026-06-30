@@ -182,24 +182,6 @@ function ProductModal({ product, onClose, onSave }: {
   )
 }
 
-// Exporta el contenido como content.json (lo que lee la landing data-driven).
-// Bridge hasta tener backend: descarga el archivo y reemplázalo en apps/landing.
-function downloadContentJson(c: LandingContent) {
-  const json = {
-    metaTitle: c.metaTitle, metaDescription: c.metaDescription,
-    heroEyebrow: c.heroEyebrow, heroTitle: c.heroTitle, heroSubtitle: c.heroSubtitle,
-    ctaPrimary: c.ctaPrimary, ctaSecondary: c.ctaSecondary,
-    whatsapp: c.whatsapp, email: c.email,
-  }
-  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'content.json'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 function LandingTab() {
   const { data, saveLanding, resetLanding } = useLanding()
   const [draft, setDraft] = useState<LandingContent>(data)
@@ -257,13 +239,12 @@ function LandingTab() {
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn ghost sm" type="button" onClick={() => { resetLanding(); setDraft({ ...data }); }}><RotateCcw size={14} /> Restaurar</button>
-          <button className="btn ghost sm" type="button" onClick={() => downloadContentJson(draft)}>Descargar content.json</button>
-          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar cambios</button>
+          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar y publicar</button>
         </div>
         {saved && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}><span>Contenido guardado.</span></div>}
 
         <div className="sysnote" style={{ marginTop: 12, alignItems: 'flex-start' }}>
-          <span>La landing ya es <b>data-driven</b>: lee <code>content.json</code>. Para publicar tus cambios hoy, <b>Descarga content.json</b> y reemplaza el de <code>apps/landing</code>. Al conectar el backend, “Guardar” lo publicará solo.</span>
+          <span>La landing es <b>data-driven</b>: lee su contenido por fuera. “Guardar y publicar” es el único punto de escritura; al conectar el backend, ahí se hace el guardado en la base y la página lo toma en vivo.</span>
         </div>
       </div>
 
