@@ -35,6 +35,8 @@ import { Reabastecimiento } from './admin/Reabastecimiento'
 import { Equipo } from './admin/Equipo'
 import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
 import { Eventos } from './pos/Eventos'
+import { MiConsigna } from './sales/MiConsigna'
+import { Consigna } from './warehouse/Consigna'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
@@ -76,6 +78,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   eventos: () => <Eventos />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
+  consigna: () => <MiConsigna />,
+  consigna_alm: () => <Consigna />,
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

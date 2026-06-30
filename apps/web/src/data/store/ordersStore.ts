@@ -115,6 +115,8 @@ export function createPosOrder(input: {
   payment_method: string // 'efectivo' | 'tarjeta'
   event_id?: string | null // venta de evento (null = caja mostrador)
   seller?: string | null   // correo del vendedor que cobró
+  doctor_id?: string | null // cliente (venta directa de consignación)
+  channel?: string          // 'pos' | 'evento' | 'consigna'
 }): OrderWithItems {
   posSeq += 1
   const id = `pos-${posSeq}`
@@ -122,10 +124,10 @@ export function createPosOrder(input: {
   const now = new Date().toISOString()
 
   const order: Order = {
-    id, external_ref: folio, doctor_id: null, total: input.total, currency: 'MXN',
+    id, external_ref: folio, doctor_id: input.doctor_id ?? null, total: input.total, currency: 'MXN',
     status: 'delivered', payment_method: input.payment_method, payment_ref: null,
     payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
-    invoice_meta: null, shipping_meta: { channel: 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null }, created_at: now,
+    invoice_meta: null, shipping_meta: { channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null }, created_at: now,
   }
   const newItems: OrderItem[] = input.lines.map((l, i) => ({
     id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: l.lot_id,

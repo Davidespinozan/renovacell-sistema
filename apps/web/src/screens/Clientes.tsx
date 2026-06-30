@@ -7,6 +7,7 @@ import { useDoctors } from '../data/hooks/useDoctors'
 import { useAllOrders } from '../data/hooks/useOrders'
 import { useRole } from '../auth/RoleContext'
 import { NuevoPedido } from './sales/NuevoPedido'
+import { VentaDirecta } from './sales/VentaDirecta'
 import type { Profile } from '../data/types'
 
 const ownerOf = (d: Profile): string | null => ((d.meta as Record<string, unknown>)?.owner as string) ?? null
@@ -17,6 +18,7 @@ export function Clientes() {
   const { data: orders } = useAllOrders()
   const { role, user } = useRole()
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
+  const [ventaFor, setVentaFor] = useState<{ id: string; name: string } | null>(null)
   const placedBy = role === 'admin' ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
 
   const mine = useMemo(
@@ -54,9 +56,14 @@ export function Clientes() {
           </div>
           <div style={{ display: 'flex', marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
             {d.verified ? (
-              <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
-                <Plus size={14} /> Levantar pedido
-              </button>
+              <>
+                <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setVentaFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
+                  <Plus size={14} /> Venta directa
+                </button>
+                <button className="btn sm" type="button" onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
+                  <Plus size={14} /> Levantar pedido
+                </button>
+              </>
             ) : (
               <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Verifícalo para poder pedir</span>
             )}
@@ -65,6 +72,7 @@ export function Clientes() {
       ))}
 
       {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy={placedBy} onClose={() => setPedidoFor(null)} />}
+      {ventaFor && <VentaDirecta doctor={ventaFor} vendor={user?.email ?? ''} onClose={() => setVentaFor(null)} />}
     </div>
   )
 }
