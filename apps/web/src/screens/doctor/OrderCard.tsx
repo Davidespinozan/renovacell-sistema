@@ -1,5 +1,6 @@
 // Tarjeta de pedido reutilizable (Mis pedidos e Historial).
 import React from 'react'
+import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
 import { statusView } from './orderStatus'
 import { Trk } from './Trk'
@@ -12,19 +13,23 @@ export function OrderCard({
   productsById,
   showTracking = true,
   onCancel,
+  onPay,
 }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   showTracking?: boolean
   onCancel?: () => void
+  onPay?: () => void
 }) {
   const sv = statusView(order.status)
+  const unpaid = order.payment_status !== 'paid' && order.status !== 'cancelled'
 
   return (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
+        {order.payment_status === 'paid' && <span className="pill p-ok">Pagado</span>}
         {order.invoice_requested && <span className="pill p-neu">CFDI</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(order.created_at)}</span>
       </div>
@@ -47,6 +52,21 @@ export function OrderCard({
         <span>Total</span>
         <b>{money(order.total)}</b>
       </div>
+
+      {unpaid && onPay && (
+        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--warn-bg)', border: '1px solid #EEDDB6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: 'var(--warn)', fontWeight: 600 }}>Este pedido está pendiente de pago.</span>
+          <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={onPay}>
+            <Icon name="receipt" /> Pagar {money(order.total)}
+          </button>
+        </div>
+      )}
+
+      {order.payment_status === 'paid' && order.payment_ref && (
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
+          Pagado{order.payment_method ? ` · ${order.payment_method}` : ''} · ref. <span className="mono">{order.payment_ref}</span>
+        </div>
+      )}
 
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 

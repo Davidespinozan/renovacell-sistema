@@ -200,3 +200,28 @@ export function markPaid(orderId: string) {
   notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
   logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
 }
+
+// Cobro EN LÍNEA del pedido (MOCK · Portal del Doctor o staff). Marca pagado,
+// guarda el método y la referencia del cargo, y avanza el pedido a 'paid' para
+// que entre a surtido (Almacén solo prepara lo ya pagado). En Supabase: lo
+// dispara el webhook de Stripe al confirmar el PaymentIntent → mismo update.
+export function payOrder(orderId: string, payment: { method: string; ref: string; actor?: string }): { ok: boolean } {
+  const o = orders.find((x) => x.id === orderId)
+  if (!o || o.payment_status === 'paid') return { ok: false }
+  orders = orders.map((x) =>
+    x.id === orderId
+      ? {
+          ...x,
+          payment_status: 'paid',
+          payment_method: payment.method,
+          payment_ref: payment.ref,
+          status: x.status === 'pending_payment' ? 'paid' : x.status,
+        }
+      : x,
+  )
+  emit()
+  notify({ text: `Pago recibido · ${o.external_ref ?? orderId} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+  notify({ text: `Pago recibido · ${o.external_ref ?? orderId}`, roles: ['admin'], screen: 'av_fin' })
+  logAudit({ actor: payment.actor ?? 'Portal del Doctor', action: 'Pago en línea', resource: o.external_ref ?? orderId, detail: payment.method })
+  return { ok: true }
+}

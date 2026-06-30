@@ -8,7 +8,9 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useLots } from '../../data/hooks/useLots'
 import { stockByProduct, stockInfoFor, type StockInfo } from '../../data/ops/stock'
+import { PaymentModal } from './PaymentModal'
 import type { ProductSafe } from '../../data/types'
+import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 type LineFilter = 'all' | 'cosm' | 'prof'
 type Cart = Record<string, number>
@@ -20,7 +22,7 @@ interface CartLine {
 
 export function Catalogo() {
   const { data: products, loading } = useProducts()
-  const { createOrder } = useOrders()
+  const { createOrder, payOrder } = useOrders()
   const { data: lots } = useLots()
 
   const [filter, setFilter] = useState<LineFilter>('all')
@@ -99,6 +101,7 @@ export function Catalogo() {
           lines={lines}
           total={total}
           onConfirm={onConfirm}
+          onPay={(orderId, r) => payOrder(orderId, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
           onDone={clear}
           onClose={() => setCheckout(false)}
         />
@@ -214,35 +217,55 @@ function LineRow({ l, onInc, onDec }: { l: CartLine; onInc: () => void; onDec: (
 }
 
 function CheckoutModal({
-  lines, total, onConfirm, onDone, onClose,
+  lines, total, onConfirm, onPay, onDone, onClose,
 }: {
   lines: CartLine[]
   total: number
-  onConfirm: (invoice: boolean) => { external_ref: string | null }
+  onConfirm: (invoice: boolean) => OrderWithItems
+  onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
 }) {
   const [invoice, setInvoice] = useState(false)
-  const [folio, setFolio] = useState<string | null>(null)
+  const [order, setOrder] = useState<OrderWithItems | null>(null)
+  const [payNow, setPayNow] = useState(false)
 
   const confirm = () => {
-    const order = onConfirm(invoice)
-    setFolio(order.external_ref ?? '—')
+    const created = onConfirm(invoice)
+    setOrder(created)
     onDone() // limpia el carrito
+  }
+
+  // Paso de pago en línea (al elegir "Pagar ahora").
+  if (order && payNow) {
+    return (
+      <PaymentModal
+        folio={order.external_ref ?? order.id}
+        amount={order.total ?? total}
+        onPaid={(r) => onPay(order.id, { method: r.method, id: r.id })}
+        onClose={onClose}
+      />
+    )
   }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        {folio ? (
+        {order ? (
           <div className="mbody">
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
               <h3>Pedido creado</h3>
               <p>
-                Tu pedido <b>{folio}</b> quedó registrado como <b>pago contra pedido</b>.
+                Tu pedido <b>{order.external_ref}</b> quedó registrado. Págalo ahora para que
+                entre a preparación, o más tarde desde <b>Mis pedidos</b>.
               </p>
-              <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Entendido</button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="btn ghost" type="button" onClick={onClose}>Pagar después</button>
+                <button className="btn" type="button" onClick={() => setPayNow(true)}>
+                  <Icon name="receipt" /> Pagar ahora
+                </button>
+              </div>
             </div>
           </div>
         ) : (

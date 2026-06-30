@@ -10,8 +10,10 @@ export interface Diagnosis {
   statusPill: string
 }
 
-// Un pedido está pendiente de surtir si aún no se empacó/envió/entregó/canceló.
+// Un pedido está pendiente de surtir si YA SE PAGÓ y aún no se empacó/envió/
+// entregó/canceló. Almacén solo prepara lo cobrado (el doctor paga primero).
 export const isSurtible = (o: OrderWithItems): boolean =>
+  o.payment_status === 'paid' &&
   !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
 
 // Diagnóstico de un envío en curso: detecta atorados (vencido o surtido sin salir).
