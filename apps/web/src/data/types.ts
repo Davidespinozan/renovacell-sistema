@@ -32,7 +32,7 @@ export interface Product {
   line: string | null      // 'prof' | 'cosm'
   category: string | null
   description: string | null
-  price: number | null     // null = "a consultar" (profesional)
+  price: number | null     // todos los productos llevan precio (null solo por compat. de esquema)
   unit: string | null
   image_url: string | null // imagen real del producto (Storage en el futuro)
   metadata: Json           // interno (NO visible para no-admin)

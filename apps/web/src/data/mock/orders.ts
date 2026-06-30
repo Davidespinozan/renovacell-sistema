@@ -1,9 +1,8 @@
 // Pedidos MOCK del doctor actual, con la forma de las tablas `orders` y
 // `order_items` de packages/db/schema.sql. Los product_id referencian el
 // catálogo mock (data/mock/catalog.ts).
-//
-// Convención: order_items.unit_price = null  -> renglón de COTIZACIÓN
-// (producto profesional "a consultar"), no compra directa.
+// Todos los renglones tienen precio (unit_price). Ya no existe el concepto de
+// "cotización": cada producto del catálogo se vende a precio de lista.
 import type { Order, OrderItem } from '../types'
 
 export const DOCTOR_ID = 'doctor-1'
@@ -24,7 +23,7 @@ export const MOCK_ORDERS: Order[] = [
     created_at: '2026-06-10T09:30:00Z',
   },
   {
-    id: 'o-3712', external_ref: 'S3712', doctor_id: DOCTOR_ID, total: 680, currency: 'MXN',
+    id: 'o-3712', external_ref: 'S3712', doctor_id: DOCTOR_ID, total: 7580, currency: 'MXN',
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: true,
     invoice_meta: null, shipping_meta: null,
@@ -54,9 +53,9 @@ export const MOCK_ORDER_ITEMS: OrderItem[] = [
   { id: 'oi-2', order_id: 'o-3683', product_id: 'p-gs-114', lot_id: null, qty: 1, unit_price: 1890, created_at: '2026-05-20T10:00:00Z' },
   // S3559 (en camino)
   { id: 'oi-3', order_id: 'o-3559', product_id: 'p-ab-50', lot_id: null, qty: 1, unit_price: 1450, created_at: '2026-06-10T09:30:00Z' },
-  // S3712 (pendiente de pago) — incluye una cotización (unit_price null)
+  // S3712 (pendiente de pago)
   { id: 'oi-4', order_id: 'o-3712', product_id: 'p-pl-12', lot_id: null, qty: 1, unit_price: 680, created_at: '2026-06-17T16:45:00Z' },
-  { id: 'oi-5', order_id: 'o-3712', product_id: 'p-gp-300', lot_id: null, qty: 1, unit_price: null, created_at: '2026-06-17T16:45:00Z' },
+  { id: 'oi-5', order_id: 'o-3712', product_id: 'p-gp-300', lot_id: null, qty: 1, unit_price: 6900, created_at: '2026-06-17T16:45:00Z' },
   // S12840 (atorado, surtido sin salir)
   { id: 'oi-6', order_id: 'o-12840', product_id: 'p-gs-114', lot_id: 'l-gs-1', qty: 2, unit_price: 1890, created_at: '2025-09-25T10:00:00Z' },
   // S3640 (chofer)

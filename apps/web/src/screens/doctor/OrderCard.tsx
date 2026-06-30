@@ -31,14 +31,12 @@ export function OrderCard({
       <div style={{ marginBottom: 8 }}>
         {order.items.map((it) => {
           const p = productsById[it.product_id ?? '']
-          const isQuote = it.unit_price == null
           return (
             <div key={it.id} className="coitem">
               <span>
                 {p?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
-                {isQuote && <span className="pill p-blue" style={{ marginLeft: 8 }}>Cotización</span>}
               </span>
-              <span className="mono">{it.unit_price == null ? 'a consultar' : money(it.unit_price * it.qty)}</span>
+              <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
             </div>
           )
         })}

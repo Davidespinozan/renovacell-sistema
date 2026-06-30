@@ -212,7 +212,7 @@ function BillDetail({ order, productsById, clientName, onClose }: {
                 <tr key={it.id}>
                   <td data-label="Producto">{productsById[it.product_id ?? '']?.name ?? 'Producto'}</td>
                   <td data-label="Cant." className="mono">{it.qty}</td>
-                  <td data-label="Importe" className="mono">{it.unit_price == null ? 'cotización' : money(it.unit_price * it.qty)}</td>
+                  <td data-label="Importe" className="mono">{money((it.unit_price ?? 0) * it.qty)}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,7 +1,6 @@
 // Catálogo del Portal del Doctor + flujo "armar pedido".
 // Catálogo (products_safe) -> agregar al pedido -> revisar -> crear (contra pedido).
-// Sin costo/margen (forma products_safe). Profesionales "a consultar" entran como
-// solicitud de cotización (sin precio fijo), no como compra directa.
+// Sin costo/margen (forma products_safe). Todos los productos tienen precio.
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -38,9 +37,7 @@ export function Catalogo() {
     [cart, products],
   )
 
-  const buy = lines.filter((l) => l.product.price != null)
-  const quote = lines.filter((l) => l.product.price == null)
-  const total = buy.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0)
+  const total = lines.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0)
 
   const add = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }))
   const dec = (id: string) =>
@@ -84,12 +81,11 @@ export function Catalogo() {
       </div>
 
       {/* DERECHA: pedido en curso */}
-      <CartPanel buy={buy} quote={quote} total={total} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
+      <CartPanel lines={lines} total={total} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
 
       {checkout && (
         <CheckoutModal
-          buy={buy}
-          quote={quote}
+          lines={lines}
           total={total}
           onConfirm={onConfirm}
           onDone={clear}
@@ -116,7 +112,7 @@ function ProductCard({ p, qty, onAdd, onDec }: { p: ProductSafe; qty: number; on
         <div className="pr">{money(p.price)}</div>
         {qty === 0 ? (
           <button className="addb" type="button" onClick={onAdd}>
-            <Icon name="plus" /> {isProf ? 'Solicitar cotización' : 'Agregar'}
+            <Icon name="plus" /> Agregar
           </button>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
@@ -131,17 +127,16 @@ function ProductCard({ p, qty, onAdd, onDec }: { p: ProductSafe; qty: number; on
 }
 
 function CartPanel({
-  buy, quote, total, onInc, onDec, onClear, onReview,
+  lines, total, onInc, onDec, onClear, onReview,
 }: {
-  buy: CartLine[]
-  quote: CartLine[]
+  lines: CartLine[]
   total: number
   onInc: (id: string) => void
   onDec: (id: string) => void
   onClear: () => void
   onReview: () => void
 }) {
-  const empty = buy.length === 0 && quote.length === 0
+  const empty = lines.length === 0
   return (
     <div className="card ticket" style={{ position: 'sticky', top: 90 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
@@ -156,28 +151,14 @@ function CartPanel({
 
       {empty && <div className="empty">Agrega productos del catálogo para armar tu pedido.</div>}
 
-      {buy.length > 0 && (
-        <>
-          <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '10px 0 4px' }}>Compra</div>
-          {buy.map((l) => (
-            <LineRow key={l.product.id} l={l} onInc={() => onInc(l.product.id)} onDec={() => onDec(l.product.id)} />
-          ))}
-        </>
-      )}
-
-      {quote.length > 0 && (
-        <>
-          <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '12px 0 4px' }}>Solicitud de cotización</div>
-          {quote.map((l) => (
-            <LineRow key={l.product.id} l={l} onInc={() => onInc(l.product.id)} onDec={() => onDec(l.product.id)} quote />
-          ))}
-        </>
-      )}
+      {lines.map((l) => (
+        <LineRow key={l.product.id} l={l} onInc={() => onInc(l.product.id)} onDec={() => onDec(l.product.id)} />
+      ))}
 
       {!empty && (
         <>
           <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
-            <span>Total{quote.length > 0 ? ' (compra)' : ''}</span>
+            <span>Total</span>
             <b>{money(total)}</b>
           </div>
           <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={onReview}>
@@ -189,12 +170,12 @@ function CartPanel({
   )
 }
 
-function LineRow({ l, onInc, onDec, quote = false }: { l: CartLine; onInc: () => void; onDec: () => void; quote?: boolean }) {
+function LineRow({ l, onInc, onDec }: { l: CartLine; onInc: () => void; onDec: () => void }) {
   return (
     <div className="titem">
       <div>
         <div>{l.product.name}</div>
-        <div className="tl">{quote ? 'a consultar' : money(l.product.price)}</div>
+        <div className="tl">{money(l.product.price)}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
@@ -206,10 +187,9 @@ function LineRow({ l, onInc, onDec, quote = false }: { l: CartLine; onInc: () =>
 }
 
 function CheckoutModal({
-  buy, quote, total, onConfirm, onDone, onClose,
+  lines, total, onConfirm, onDone, onClose,
 }: {
-  buy: CartLine[]
-  quote: CartLine[]
+  lines: CartLine[]
   total: number
   onConfirm: (invoice: boolean) => { external_ref: string | null }
   onDone: () => void
@@ -234,7 +214,6 @@ function CheckoutModal({
               <h3>Pedido creado</h3>
               <p>
                 Tu pedido <b>{folio}</b> quedó registrado como <b>pago contra pedido</b>.
-                {quote.length > 0 && ' Los productos a consultar se enviaron como solicitud de cotización.'}
               </p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Entendido</button>
             </div>
@@ -248,21 +227,15 @@ function CheckoutModal({
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
             <div className="mbody">
-              {buy.map((l) => (
+              {lines.map((l) => (
                 <div key={l.product.id} className="coitem">
                   <span>{l.product.name} <span style={{ color: 'var(--ink-3)' }}>×{l.qty}</span></span>
                   <span className="mono">{money((l.product.price ?? 0) * l.qty)}</span>
                 </div>
               ))}
-              {quote.map((l) => (
-                <div key={l.product.id} className="coitem">
-                  <span>{l.product.name} <span style={{ color: 'var(--ink-3)' }}>×{l.qty}</span> <span className="pill p-blue" style={{ marginLeft: 6 }}>Cotización</span></span>
-                  <span className="mono">a consultar</span>
-                </div>
-              ))}
 
               <div className="cototal">
-                <span>Total{quote.length > 0 ? ' (compra)' : ''}</span>
+                <span>Total</span>
                 <b>{money(total)}</b>
               </div>
 

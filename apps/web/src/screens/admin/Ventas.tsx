@@ -154,8 +154,8 @@ function VentasResumen() {
           <SplitRow label="Punto de Venta" amount={channel.pos.revenue} total={channel.portal.revenue + channel.pos.revenue} />
         </Bloque>
         <Bloque titulo={<><Package size={14} style={ic} /> Por línea</>}>
-          <SplitRow label="Home Care" amount={mix.cosm.revenue} total={mix.cosm.revenue + mix.prof.revenue} />
-          <SplitRow label="Professional" amount={mix.prof.revenue} total={mix.cosm.revenue + mix.prof.revenue} sub={`${mix.prof.units} u · a consultar`} />
+          <SplitRow label="Home Care" amount={mix.cosm.revenue} total={mix.cosm.revenue + mix.prof.revenue} sub={`${mix.cosm.units} pzas`} />
+          <SplitRow label="Professional" amount={mix.prof.revenue} total={mix.cosm.revenue + mix.prof.revenue} sub={`${mix.prof.units} pzas`} />
         </Bloque>
         <Bloque titulo={<><Receipt size={14} style={ic} /> Cobro y CFDI</>}>
           <Mini k="CFDI solicitados" v={pct(bill.cfdiRate)} />

@@ -52,7 +52,7 @@ export function Cola() {
             {o.items.map((it) => (
               <div key={it.id} className="coitem">
                 <span>{byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span></span>
-                <span className="mono">{it.unit_price == null ? 'cotización' : money((it.unit_price ?? 0) * it.qty)}</span>
+                <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}
             <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>

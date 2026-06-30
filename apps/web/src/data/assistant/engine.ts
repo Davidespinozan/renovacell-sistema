@@ -134,8 +134,8 @@ export function answer(text: string, ctx: AssistantContext): AssistantReply {
     return {
       intent: 'professional',
       text:
-        'Línea Professional (inyectables, precio a consultar). Puedo levantar tu solicitud de ' +
-        'cotización; la indicación de uso la ves con Renovacell o en la ficha técnica:',
+        'Línea Professional (inyectables). Puedo agregarlos a tu pedido; la indicación de ' +
+        'uso la ves con Renovacell o en la ficha técnica:',
       products: pro,
     }
   }

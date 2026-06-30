@@ -51,9 +51,8 @@ export function Surtido() {
                 <div key={it.id} className="coitem">
                   <span>
                     {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
-                    {it.unit_price == null && <span className="pill p-blue" style={{ marginLeft: 8 }}>Cotización</span>}
                   </span>
-                  <span className="mono">{it.unit_price == null ? 'a consultar' : money(it.unit_price * it.qty)}</span>
+                  <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
                 </div>
               ))}
               <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>
@@ -138,16 +137,6 @@ function SurtirModal({
 }
 
 function ItemPlanRow({ plan, name }: { plan: ItemPlan; name: string }) {
-  if (plan.quote) {
-    return (
-      <div style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{name} <span style={{ color: 'var(--ink-3)' }}>×{plan.item.qty}</span></div>
-        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 4 }}>
-          <span className="pill p-blue">Cotización</span> No se surte (solicitud de cotización, sin precio).
-        </div>
-      </div>
-    )
-  }
   return (
     <div style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>

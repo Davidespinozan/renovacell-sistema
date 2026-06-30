@@ -15,7 +15,6 @@ export interface ItemPlan {
   item: OrderItem
   allocations: Alloc[]
   shortfall: number // unidades que faltan (sin stock suficiente)
-  quote: boolean // renglón de cotización: no se surte
 }
 
 // Orden FEFO: caduca antes primero; sin fecha al final.
@@ -46,18 +45,14 @@ export function allocateFEFO(productId: string, qty: number, lots: Lot[]): { all
 
 export function planSurtido(order: OrderWithItems, lots: Lot[]): ItemPlan[] {
   return order.items.map((item) => {
-    if (item.unit_price == null) {
-      return { item, allocations: [], shortfall: 0, quote: true }
-    }
     const { allocations, shortfall } = allocateFEFO(item.product_id ?? '', item.qty, lots)
-    return { item, allocations, shortfall, quote: false }
+    return { item, allocations, shortfall }
   })
 }
 
-// ¿Se puede surtir? Debe haber al menos un renglón de compra y todos con stock.
+// ¿Se puede surtir? Debe haber renglones y todos con stock suficiente.
 export function canFulfill(plans: ItemPlan[]): boolean {
-  const buy = plans.filter((p) => !p.quote)
-  return buy.length > 0 && buy.every((p) => p.shortfall === 0)
+  return plans.length > 0 && plans.every((p) => p.shortfall === 0)
 }
 
 // Confirma el surtido FEFO del pedido.
@@ -70,7 +65,7 @@ export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemP
 
   const itemLot: Record<string, string | null> = {}
   plans.forEach((p) => {
-    if (!p.quote) itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null
+    itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null
   })
   markPacked(order.id, itemLot)
 

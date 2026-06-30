@@ -4,7 +4,6 @@
 import type { OrderWithItems } from './hooks/useOrders'
 import type { ProductSafe, Profile } from './types'
 
-const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 // "Venta" para KPIs: cuenta solo pedidos confirmados (al menos surtidos) o cobrados.
 // Excluye cancelados, borradores y pendientes de surtir → no infla ingresos con pipeline.
 const isSale = (o: OrderWithItems) => o.status != null && !['cancelled', 'draft', 'pending_payment'].includes(o.status)
@@ -111,14 +110,6 @@ export function lineMix(orders: OrderWithItems[], productsById: Record<string, P
     })
   })
   return acc
-}
-
-// Cotizaciones (líneas "a consultar") pendientes en pedidos vivos.
-export function quotesPending(orders: OrderWithItems[]): number {
-  return orders.filter(notCancelled).reduce(
-    (s, o) => s + o.items.filter((it) => it.unit_price == null).length,
-    0,
-  )
 }
 
 // Ventas por mes (últimos N meses), para gráfica de tendencia.

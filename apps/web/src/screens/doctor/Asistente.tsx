@@ -3,7 +3,7 @@
 // doctor (useOrders). No da consejo clínico: el motor (data/assistant/engine) lo
 // defiere. Acciones reales contra ordersStore (createOrder) vía useAssistant.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sparkles, Send, Plus, FileText, RefreshCw, ShoppingBag, ShieldCheck, Leaf } from 'lucide-react'
+import { Sparkles, Send, Plus, RefreshCw, ShoppingBag, ShieldCheck, Leaf } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAssistant } from '../../data/hooks/useAssistant'
 import { statusView } from './orderStatus'
@@ -58,13 +58,11 @@ export function Asistente() {
     })
     push({
       role: 'assistant',
-      text: `Agregué ${product.name}${product.price == null ? ' (a cotizar)' : ''} a tu pedido en armado (abajo).`,
+      text: `Agregué ${product.name} a tu pedido en armado (abajo).`,
     })
   }
 
-  const buy = draft.filter((d) => d.product.price != null)
-  const quoteCount = draft.length - buy.length
-  const draftTotal = buy.reduce((s, d) => s + (d.product.price ?? 0) * d.qty, 0)
+  const draftTotal = draft.reduce((s, d) => s + (d.product.price ?? 0) * d.qty, 0)
 
   const crearPedido = () => {
     if (draft.length === 0) return
@@ -75,9 +73,7 @@ export function Asistente() {
     })
     push({
       role: 'assistant',
-      text:
-        `¡Listo! Creé tu pedido ${order.external_ref} como pago contra pedido` +
-        `${quoteCount > 0 ? ', con tus productos a cotizar incluidos' : ''}. Ya aparece en “Mis pedidos”.`,
+      text: `¡Listo! Creé tu pedido ${order.external_ref} como pago contra pedido. Ya aparece en “Mis pedidos”.`,
       created: { folio: order.external_ref ?? '—' },
     })
     setDraft([])
@@ -161,7 +157,7 @@ export function Asistente() {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink-3)', fontWeight: 700 }}>Pedido en armado</div>
               <div style={{ fontSize: 13 }}>
-                {draft.length} artículo(s){quoteCount > 0 ? ` · ${quoteCount} a cotizar` : ''} · <b className="mono">{money(draftTotal)}</b>
+                {draft.length} artículo(s) · <b className="mono">{money(draftTotal)}</b>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
@@ -212,8 +208,8 @@ function ProductRow({ p, onAdd }: { p: ProductSafe; onAdd: () => void }) {
         <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{p.category}</div>
         <div className="mono" style={{ fontSize: 13, marginTop: 2 }}>{money(p.price)}</div>
       </div>
-      <button className={'btn sm' + (isProf ? ' ghost' : '')} type="button" onClick={onAdd}>
-        {isProf ? <><FileText size={14} /> Cotización</> : <><Plus size={14} /> Agregar</>}
+      <button className="btn sm" type="button" onClick={onAdd}>
+        <Plus size={14} /> Agregar
       </button>
     </div>
   )
