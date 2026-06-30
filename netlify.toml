@@ -10,6 +10,14 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Landing (sitio público) servida desde el mismo deploy en /landing/. Forzamos la
+# diagonal final para que el content.json (ruta relativa) cargue bien. Va ANTES
+# del catch-all del SPA para que no la absorba.
+[[redirects]]
+  from = "/landing"
+  to = "/landing/"
+  status = 301
+
 # SPA: cualquier ruta cae en index.html (la app enruta del lado del cliente).
 [[redirects]]
   from = "/*"
