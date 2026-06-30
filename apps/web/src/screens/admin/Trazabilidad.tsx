@@ -14,6 +14,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil } from '../warehouse/expiry'
 import { statusView } from '../doctor/orderStatus'
 import { clientOf } from '../../data/mock/profiles'
+import { costOf } from '../../data/mock/costs'
 import type { InventoryMovement, Lot } from '../../data/types'
 
 type Mode = 'lote' | 'pedido'
@@ -86,12 +87,17 @@ function PorLote({ lots, movements, prodName, orderByRef }: {
   const st = lotStatus(lot)
   const entrada = hist.find((m) => m.change > 0)
   const salidas = hist.filter((m) => m.change < 0)
-  // Clientes alcanzados por el lote (para el recall).
+  const lotCost = lot.unit_cost ?? costOf(lot.product_id)
+  // Clientes alcanzados por el lote (para el recall) + utilidad por salida.
   const destinos = salidas.map((m) => {
     const o = orderByRef[m.reference ?? '']
-    return { qty: -m.change, folio: m.reference ?? '—', cliente: clientLabel(o), fecha: m.created_at }
+    const qty = -m.change
+    const precio = o?.items.find((it) => it.product_id === lot.product_id)?.unit_price ?? 0
+    const importe = precio * qty
+    return { qty, folio: m.reference ?? '—', cliente: clientLabel(o), fecha: m.created_at, importe, utilidad: importe - lotCost * qty }
   })
   const clientesUnicos = new Set(destinos.map((d) => d.cliente)).size
+  const utilidadLote = destinos.reduce((s, d) => s + d.utilidad, 0)
 
   return (
     <>
@@ -109,11 +115,12 @@ function PorLote({ lots, movements, prodName, orderByRef }: {
           <span style={{ fontWeight: 600 }}>{prodName[lot.product_id] ?? 'Producto'}</span>
           <span className={'pill ' + st.pill} style={{ marginLeft: 'auto' }}>{st.label}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, fontSize: 13 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10, fontSize: 13 }}>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Quedan</div><b className="mono">{lot.quantity} u</b></div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Caduca</div>{fmtDate(lot.expiry_date ?? '')}</div>
-          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Ubicación</div>{lot.location ?? '—'}</div>
+          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Costo unitario</div><b className="mono">{money(lotCost)}</b></div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Llegó a</div><b>{clientesUnicos}</b> cliente(s)</div>
+          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Utilidad del lote</div><b className="mono" style={{ color: utilidadLote >= 0 ? 'var(--green-deep)' : 'var(--danger)' }}>{money(utilidadLote)}</b></div>
         </div>
       </div>
 
@@ -135,13 +142,15 @@ function PorLote({ lots, movements, prodName, orderByRef }: {
           <div className="sysnote"><Icon name="check" /><span>Este lote aún no ha salido a ningún cliente.</span></div>
         ) : (
           <table className="tbl-cards">
-            <thead><tr><th>Cliente</th><th>Pedido</th><th>Cantidad</th><th>Fecha</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Pedido</th><th>Cantidad</th><th>Importe</th><th>Utilidad</th><th>Fecha</th></tr></thead>
             <tbody>
               {destinos.map((d, i) => (
                 <tr key={i}>
                   <td data-label="Cliente"><b>{d.cliente}</b></td>
                   <td data-label="Pedido" className="mono">{d.folio}</td>
                   <td data-label="Cantidad" className="mono">{d.qty} u</td>
+                  <td data-label="Importe" className="mono">{money(d.importe)}</td>
+                  <td data-label="Utilidad" className="mono" style={{ color: d.utilidad >= 0 ? 'var(--green-deep)' : 'var(--danger)' }}>{money(d.utilidad)}</td>
                   <td data-label="Fecha">{fmtDate(d.fecha)}</td>
                 </tr>
               ))}

@@ -23,11 +23,28 @@ export function Finanzas() {
   const { data: gastos, addGasto, removeGasto } = useGastos()
   const [open, setOpen] = useState(false)
 
-  const er = useMemo(() => estadoResultados(orders, gastos, movements, lots), [orders, gastos, movements, lots])
+  const [period, setPeriod] = useState<'mes' | 'pasado' | 'todo'>('mes')
+  const range = useMemo(() => {
+    const now = new Date()
+    const y = now.getFullYear(); const m = now.getMonth()
+    if (period === 'todo') return { from: '0000-01-01', to: '9999-12-31', label: 'Todo el histórico' }
+    if (period === 'pasado') {
+      return { from: new Date(y, m - 1, 1).toISOString().slice(0, 10), to: new Date(y, m, 0).toISOString().slice(0, 10), label: 'Mes pasado' }
+    }
+    return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10), label: 'Este mes' }
+  }, [period])
+  const inRange = (iso: string) => { const d = iso.slice(0, 10); return d >= range.from && d <= range.to }
+
+  const fOrders = useMemo(() => orders.filter((o) => inRange(o.created_at)), [orders, range])
+  const fGastos = useMemo(() => gastos.filter((g) => inRange(g.fecha)), [gastos, range])
+  const fMov = useMemo(() => movements.filter((m) => inRange(m.created_at)), [movements, range])
+
+  // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
+  const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots), [fOrders, fGastos, fMov, lots])
   const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
   const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
-  const porCat = useMemo(() => gastosPorCategoria(gastos), [gastos])
+  const porCat = useMemo(() => gastosPorCategoria(fGastos), [fGastos])
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -35,6 +52,13 @@ export function Finanzas() {
         La salud real del negocio: cuánto vendiste, cuánto costó, cuánto gastaste y
         <b> cuánto ganaste</b> — más lo que te deben y lo que debes. (Solo Dirección.)
       </PageHead>
+
+      <div className="seg" style={{ alignSelf: 'flex-start' }}>
+        <button type="button" className={period === 'mes' ? 'active' : undefined} onClick={() => setPeriod('mes')}>Este mes</button>
+        <button type="button" className={period === 'pasado' ? 'active' : undefined} onClick={() => setPeriod('pasado')}>Mes pasado</button>
+        <button type="button" className={period === 'todo' ? 'active' : undefined} onClick={() => setPeriod('todo')}>Todo</button>
+      </div>
+      <div className="eyebrow" style={{ margin: '-4px 0 0' }}>Estado de resultados · {range.label}</div>
 
       {/* Estado de resultados */}
       <div className="grid sigs">
@@ -95,7 +119,7 @@ export function Finanzas() {
           <table className="tbl-cards">
             <thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Monto</th><th></th></tr></thead>
             <tbody>
-              {gastos.map((g) => (
+              {fGastos.map((g) => (
                 <tr key={g.id}>
                   <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(g.fecha)}</td>
                   <td data-label="Categoría"><span className="pill p-neu">{g.categoria}</span></td>
@@ -106,7 +130,7 @@ export function Finanzas() {
                   </td>
                 </tr>
               ))}
-              {gastos.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Sin gastos registrados.</td></tr>}
+              {fGastos.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Sin gastos en el periodo.</td></tr>}
             </tbody>
           </table>
         </div>
