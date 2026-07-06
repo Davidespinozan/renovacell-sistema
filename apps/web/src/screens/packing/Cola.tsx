@@ -8,7 +8,7 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useShipments } from '../../data/hooks/useShipments'
 import { markShipped } from '../../data/store/ordersStore'
-import { MOCK_DRIVERS } from '../../data/mock/shipments'
+import { getDrivers } from '../../data/mock/shipments'
 import { clientOf } from '../../data/mock/profiles'
 import { ORIGIN, quoteRates, generateLabel, type ShipAddress, type RateQuote, type LabelResult } from '../../data/shipping/provider'
 import type { ProductSafe } from '../../data/types'
@@ -124,7 +124,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
 
   const asignarChofer = () => {
     if (!driverId) return
-    const drv = MOCK_DRIVERS.find((d) => d.id === driverId)
+    const drv = getDrivers().find((d) => d.id === driverId)
     createShipment({
       order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
       estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
@@ -235,7 +235,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                   <label style={labelStyle}>Chofer</label>
                   <select style={inputStyle} value={driverId} onChange={(e) => setDriverId(e.target.value)}>
                     <option value="">Selecciona…</option>
-                    {MOCK_DRIVERS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {getDrivers().map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                     <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>

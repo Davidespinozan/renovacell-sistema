@@ -1,7 +1,9 @@
 // Envíos MOCK + choferes propios, con la forma de la tabla `shipments`.
-// Los pedidos ya enviados del mock (S3683 entregado, S3559 en camino) tienen
-// su envío aquí para alimentar Guías / Recibo / Seguimiento.
+// Los helpers de chofer (driverName / driverIdByEmail / getDrivers) son
+// CONSCIENTES DEL BACKEND: con Supabase resuelven contra los perfiles reales
+// (role_id='driver'); sin backend usan MOCK_DRIVERS. Así las pantallas no cambian.
 import type { Shipment } from '../types'
+import { hasSupabase, supabase } from '../../lib/supabase'
 
 export interface Driver {
   id: string
@@ -14,12 +16,39 @@ export const MOCK_DRIVERS: Driver[] = [
   { id: 'drv-2', name: 'Marta · Chofer', email: 'chofer2@renovacell.mx' },
 ]
 
-// Resuelve el chofer logueado por su correo (en Supabase = profiles.id = auth.uid).
-export const driverIdByEmail = (email?: string | null): string | null =>
-  MOCK_DRIVERS.find((d) => d.email && d.email.toLowerCase() === (email ?? '').trim().toLowerCase())?.id ?? null
+// Cache síncrono de los choferes reales (perfiles role_id='driver'), hidratado
+// desde Supabase. Los helpers lo consultan de forma síncrona en render.
+let dbDrivers: Driver[] = []
+async function loadDrivers() {
+  if (!hasSupabase) return
+  const { data, error } = await supabase.from('profiles')
+    .select('id, full_name, email, meta')
+    .eq('role_id', 'driver')
+  if (error) { console.warn('[drivers] load', error.message); return }
+  dbDrivers = (data ?? []).map((d) => ({
+    id: d.id,
+    name: ((d.meta as { name?: string } | null)?.name) ?? d.full_name ?? d.email ?? 'Chofer',
+    email: d.email,
+  }))
+}
+if (hasSupabase) {
+  loadDrivers()
+  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') loadDrivers() })
+}
+
+// Lista de choferes para el selector (Empaque asigna).
+export const getDrivers = (): Driver[] => (hasSupabase ? dbDrivers : MOCK_DRIVERS)
+
+// Resuelve el chofer logueado por su correo -> id (uuid real con backend).
+export const driverIdByEmail = (email?: string | null): string | null => {
+  const list = getDrivers()
+  return list.find((d) => d.email && d.email.toLowerCase() === (email ?? '').trim().toLowerCase())?.id ?? null
+}
 
 export const driverName = (id: string | null): string =>
-  MOCK_DRIVERS.find((d) => d.id === id)?.name ?? '—'
+  getDrivers().find((d) => d.id === id)?.name
+  ?? MOCK_DRIVERS.find((d) => d.id === id)?.name
+  ?? '—'
 
 export const MOCK_SHIPMENTS: Shipment[] = [
   {
@@ -27,13 +56,11 @@ export const MOCK_SHIPMENTS: Shipment[] = [
     label_url: null, driver_id: null, status: 'delivered', estimated_delivery_at: '2026-05-23T00:00:00Z',
     delivered_at: '2026-05-23T15:10:00Z', proof_image_url: null, received_by: null, incident: null, created_at: '2026-05-21T10:00:00Z',
   },
-  // Entrega local con chofer propio (drv-2 · Marta), pendiente de entregar.
   {
     id: 'sh-3559', order_id: 'o-3559', carrier: null, tracking_number: null,
     label_url: null, driver_id: 'drv-2', status: 'out_for_delivery', estimated_delivery_at: '2026-06-14T00:00:00Z',
     delivered_at: null, proof_image_url: null, received_by: null, incident: null, created_at: '2026-06-11T09:00:00Z',
   },
-  // Entrega local con chofer propio (drv-1), pendiente de entregar.
   {
     id: 'sh-3640', order_id: 'o-3640', carrier: null, tracking_number: null,
     label_url: null, driver_id: 'drv-1', status: 'out_for_delivery', estimated_delivery_at: '2026-06-16T00:00:00Z',

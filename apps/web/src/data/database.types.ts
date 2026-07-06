@@ -516,10 +516,14 @@ export type Database = {
           carrier: string | null
           created_at: string | null
           delivered_at: string | null
+          dispatched_at: string | null
+          dispatched_by: string | null
           driver_id: string | null
           estimated_delivery_at: string | null
           id: string
           incident: Json | null
+          label_url: string | null
+          load_confirmed_at: string | null
           order_id: string | null
           proof_image_url: string | null
           received_by: string | null
@@ -530,10 +534,14 @@ export type Database = {
           carrier?: string | null
           created_at?: string | null
           delivered_at?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           driver_id?: string | null
           estimated_delivery_at?: string | null
           id?: string
           incident?: Json | null
+          label_url?: string | null
+          load_confirmed_at?: string | null
           order_id?: string | null
           proof_image_url?: string | null
           received_by?: string | null
@@ -544,10 +552,14 @@ export type Database = {
           carrier?: string | null
           created_at?: string | null
           delivered_at?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           driver_id?: string | null
           estimated_delivery_at?: string | null
           id?: string
           incident?: Json | null
+          label_url?: string | null
+          load_confirmed_at?: string | null
           order_id?: string | null
           proof_image_url?: string | null
           received_by?: string | null
