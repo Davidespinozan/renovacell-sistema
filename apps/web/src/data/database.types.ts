@@ -371,6 +371,7 @@ export type Database = {
       }
       products: {
         Row: {
+          active: boolean
           category: string | null
           description: string | null
           id: string
@@ -383,6 +384,7 @@ export type Database = {
           unit: string | null
         }
         Insert: {
+          active?: boolean
           category?: string | null
           description?: string | null
           id?: string
@@ -395,6 +397,7 @@ export type Database = {
           unit?: string | null
         }
         Update: {
+          active?: boolean
           category?: string | null
           description?: string | null
           id?: string
@@ -570,8 +573,31 @@ export type Database = {
       }
     }
     Views: {
+      product_stock: {
+        Row: {
+          available: number | null
+          product_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products_safe: {
         Row: {
+          active: boolean | null
           category: string | null
           description: string | null
           id: string | null
@@ -583,6 +609,7 @@ export type Database = {
           unit: string | null
         }
         Insert: {
+          active?: boolean | null
           category?: string | null
           description?: string | null
           id?: string | null
@@ -594,6 +621,7 @@ export type Database = {
           unit?: string | null
         }
         Update: {
+          active?: boolean | null
           category?: string | null
           description?: string | null
           id?: string | null

@@ -6,8 +6,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sparkles, Send, Plus, RefreshCw, ShoppingBag, ShieldCheck, Leaf } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAssistant } from '../../data/hooks/useAssistant'
-import { useLots } from '../../data/hooks/useLots'
-import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
+import { useStock } from '../../data/hooks/useStock'
+import { stockInfoFor } from '../../data/ops/stock'
 import { statusView } from './orderStatus'
 import type { AssistantReply } from '../../data/assistant/engine'
 import type { ProductSafe } from '../../data/types'
@@ -28,8 +28,7 @@ const GREETING =
 
 export function Asistente() {
   const { ask, createOrder } = useAssistant()
-  const { data: lots } = useLots()
-  const stockMap = useMemo(() => stockByProduct(lots), [lots])
+  const stockMap = useStock()
 
   const seq = useRef(0)
   const nextId = () => `m-${(seq.current += 1)}`

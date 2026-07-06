@@ -5,8 +5,10 @@ import type { Shipment } from '../types'
 import { MOCK_SHIPMENTS } from '../mock/shipments'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
+import { hasSupabase } from '../../lib/supabase'
 
-let shipments: Shipment[] = [...MOCK_SHIPMENTS]
+// Con backend arranca vacío (los envíos reales nacen del uso).
+let shipments: Shipment[] = hasSupabase ? [] : [...MOCK_SHIPMENTS]
 let seq = 5000
 
 const listeners = new Set<() => void>()

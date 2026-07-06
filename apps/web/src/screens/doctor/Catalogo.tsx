@@ -6,8 +6,8 @@ import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
-import { useLots } from '../../data/hooks/useLots'
-import { stockByProduct, stockInfoFor, type StockInfo } from '../../data/ops/stock'
+import { useStock } from '../../data/hooks/useStock'
+import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { PaymentModal } from './PaymentModal'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
@@ -23,13 +23,12 @@ interface CartLine {
 export function Catalogo() {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
-  const { data: lots } = useLots()
 
   const [filter, setFilter] = useState<LineFilter>('all')
   const [cart, setCart] = useState<Cart>({})
   const [checkout, setCheckout] = useState(false)
 
-  const stockMap = useMemo(() => stockByProduct(lots), [lots])
+  const stockMap = useStock()
 
   const shown = useMemo(
     () => products.filter(isActiveProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),

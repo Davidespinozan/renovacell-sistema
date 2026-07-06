@@ -7,6 +7,7 @@ import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
+import { hasSupabase } from '../../lib/supabase'
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 
@@ -20,8 +21,10 @@ export interface NewOrderLine {
   unit_price: number | null // null = cotización
 }
 
-let orders: Order[] = [...MOCK_ORDERS]
-let items: OrderItem[] = [...MOCK_ORDER_ITEMS]
+// Con backend, arranca VACÍO (los pedidos reales nacen del uso; sin semillas mock
+// con ids viejos). Sin backend, usa las semillas de demostración.
+let orders: Order[] = hasSupabase ? [] : [...MOCK_ORDERS]
+let items: OrderItem[] = hasSupabase ? [] : [...MOCK_ORDER_ITEMS]
 let folioSeq = 3800
 let posSeq = 100
 
