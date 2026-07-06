@@ -637,6 +637,10 @@ export type Database = {
     }
     Functions: {
       auth_role: { Args: never; Returns: string }
+      pay_order: {
+        Args: { p_method: string; p_order: string; p_ref: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

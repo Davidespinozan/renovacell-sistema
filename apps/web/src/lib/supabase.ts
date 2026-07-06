@@ -19,3 +19,12 @@ export const supabase = createClient<Database>(url ?? '', anonKey ?? '', {
 
 // Bandera para que los hooks decidan si ya hay backend conectado.
 export const hasSupabase = Boolean(url && anonKey)
+
+// Cache SÍNCRONO del id del usuario en sesión (para escribir doctor_id = auth.uid()
+// sin await). Se actualiza con los eventos de auth.
+let _uid: string | null = null
+export const currentUserId = (): string | null => _uid
+if (hasSupabase) {
+  supabase.auth.getSession().then(({ data }) => { _uid = data.session?.user?.id ?? null })
+  supabase.auth.onAuthStateChange((_e, session) => { _uid = session?.user?.id ?? null })
+}
