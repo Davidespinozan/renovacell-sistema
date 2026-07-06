@@ -1,20 +1,24 @@
-// Gastos / egresos operativos (Finanzas, solo Dirección). Mock hoy; con Supabase
-// = tabla expenses. Alimenta el Estado de Resultados (utilidad = ventas − costo − gastos).
+// Gastos / egresos operativos (Finanzas, solo Dirección/Facturación). Con backend
+// lee/escribe la tabla `expenses` (RLS admin/billing). Alimenta el Estado de
+// Resultados (utilidad = ventas − costo − gastos − mermas).
 import { logAudit } from './auditStore'
+import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { makeLive } from './live'
 
 export type GastoCategoria = 'Renta' | 'Nómina' | 'Logística' | 'Marketing' | 'Insumos' | 'Servicios' | 'Otros'
 export const GASTO_CATEGORIAS: GastoCategoria[] = ['Renta', 'Nómina', 'Logística', 'Marketing', 'Insumos', 'Servicios', 'Otros']
 
 export interface Gasto {
   id: string
-  fecha: string        // ISO YYYY-MM-DD
+  fecha: string
   categoria: GastoCategoria
   concepto: string
-  monto: number        // MXN
+  monto: number
   created_at: string
 }
 
-// Seed para que el módulo se vea vivo en el review (montos plausibles del mes).
+// Seed de muestra SOLO para modo mock (sin backend). Con backend arranca vacío
+// (los gastos reales los captura Dirección).
 const SEED: Gasto[] = [
   { id: 'g-1', fecha: '2026-06-02', categoria: 'Renta', concepto: 'Renta bodega Culiacán', monto: 12000, created_at: '2026-06-02T10:00:00Z' },
   { id: 'g-2', fecha: '2026-06-05', categoria: 'Nómina', concepto: 'Nómina quincena 1', monto: 7000, created_at: '2026-06-05T10:00:00Z' },
@@ -24,29 +28,33 @@ const SEED: Gasto[] = [
   { id: 'g-6', fecha: '2026-06-22', categoria: 'Servicios', concepto: 'Luz, agua, internet', monto: 1400, created_at: '2026-06-22T10:00:00Z' },
 ]
 
-let gastos: Gasto[] = [...SEED]
+const live = makeLive<Gasto>(async () => {
+  const { data, error } = await supabase.from('expenses')
+    .select('id, fecha, categoria, concepto, monto, created_at')
+    .order('fecha', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as unknown as Gasto[]
+}, [...SEED].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)))
+
+export const subscribe = live.subscribe
+export const getSnapshot = live.getSnapshot
+
 let seq = 100
-const listeners = new Set<() => void>()
-let snapshot: Gasto[] = sortDesc(gastos)
-
-function sortDesc(g: Gasto[]): Gasto[] { return [...g].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)) }
-function emit() { snapshot = sortDesc(gastos); listeners.forEach((l) => l()) }
-
-export function subscribe(cb: () => void): () => void { listeners.add(cb); return () => listeners.delete(cb) }
-export const getSnapshot = (): Gasto[] => snapshot
-
 export function addGasto(input: { fecha: string; categoria: GastoCategoria; concepto: string; monto: number }): Gasto {
   seq += 1
-  const g: Gasto = { id: `g-${seq}`, ...input, created_at: new Date().toISOString() }
-  gastos = [g, ...gastos]
-  emit()
+  const g: Gasto = { id: hasSupabase ? (globalThis.crypto?.randomUUID?.() ?? `g-${seq}`) : `g-${seq}`, ...input, created_at: new Date().toISOString() }
+  live.setLocal([g, ...live.current()].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)))
   logAudit({ actor: 'Dirección', action: 'Gasto registrado', resource: input.concepto, detail: `${input.categoria} · $${input.monto}` })
+  if (hasSupabase) {
+    supabase.from('expenses').insert({ id: g.id, fecha: input.fecha, categoria: input.categoria, concepto: input.concepto, monto: input.monto, created_by: currentUserId() })
+      .then(({ error }) => { if (error) console.warn('[expenses] insert', error.message); live.reload() })
+  }
   return g
 }
 
 export function removeGasto(id: string) {
-  const g = gastos.find((x) => x.id === id)
-  gastos = gastos.filter((x) => x.id !== id)
-  emit()
+  const g = live.current().find((x) => x.id === id)
+  live.setLocal(live.current().filter((x) => x.id !== id))
   if (g) logAudit({ actor: 'Dirección', action: 'Gasto eliminado', resource: g.concepto })
+  if (hasSupabase) supabase.from('expenses').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[expenses] remove', error.message); live.reload() })
 }

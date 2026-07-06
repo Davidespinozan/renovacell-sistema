@@ -123,6 +123,75 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_closings: {
+        Row: {
+          alcance: string
+          contado: number
+          created_at: string | null
+          created_by: string | null
+          diferencia: number
+          esperado: number
+          fecha: string
+          id: string
+          motivo: string | null
+          usuario: string | null
+        }
+        Insert: {
+          alcance: string
+          contado: number
+          created_at?: string | null
+          created_by?: string | null
+          diferencia: number
+          esperado: number
+          fecha: string
+          id?: string
+          motivo?: string | null
+          usuario?: string | null
+        }
+        Update: {
+          alcance?: string
+          contado?: number
+          created_at?: string | null
+          created_by?: string | null
+          diferencia?: number
+          esperado?: number
+          fecha?: string
+          id?: string
+          motivo?: string | null
+          usuario?: string | null
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          categoria: string
+          concepto: string
+          created_at: string | null
+          created_by: string | null
+          fecha: string
+          id: string
+          monto: number
+        }
+        Insert: {
+          categoria: string
+          concepto: string
+          created_at?: string | null
+          created_by?: string | null
+          fecha: string
+          id?: string
+          monto: number
+        }
+        Update: {
+          categoria?: string
+          concepto?: string
+          created_at?: string | null
+          created_by?: string | null
+          fecha?: string
+          id?: string
+          monto?: number
+        }
+        Relationships: []
+      }
       inventory_movements: {
         Row: {
           change: number
@@ -492,6 +561,63 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      replenishments: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          kind: string
+          paid: boolean
+          product_id: string | null
+          product_name: string | null
+          qty: number
+          status: string
+          supplier: string | null
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          kind: string
+          paid?: boolean
+          product_id?: string | null
+          product_name?: string | null
+          qty: number
+          status?: string
+          supplier?: string | null
+          unit_cost: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          kind?: string
+          paid?: boolean
+          product_id?: string | null
+          product_name?: string | null
+          qty?: number
+          status?: string
+          supplier?: string | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replenishments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
             referencedColumns: ["id"]
           },
         ]
