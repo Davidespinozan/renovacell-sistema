@@ -855,6 +855,15 @@ export type Database = {
       auth_role: { Args: never; Returns: string }
       has_cap: { Args: { cap: string }; Returns: boolean }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
+      log_audit: {
+        Args: {
+          p_action: string
+          p_actor_name: string
+          p_detail: string
+          p_resource: string
+        }
+        Returns: undefined
+      }
       order_owner: { Args: { o_id: string }; Returns: string }
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
