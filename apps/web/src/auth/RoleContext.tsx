@@ -2,9 +2,11 @@
 // MODO de la app (público=landing, login, app). Hoy el rol/usuario vienen del
 // login mock; al conectar Supabase Auth vendrán del perfil y los componentes que
 // usan useRole() no cambian.
-import React, { createContext, useContext, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
+import { hasSupabase, supabase } from '../lib/supabase'
+import { currentSession } from './supabaseAuth'
 
 export type AppMode = 'app' | 'landing' | 'login'
 
@@ -62,6 +64,25 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = (patch: Partial<SessionUser>) =>
     setUser((u) => (u ? { ...u, ...patch } : u))
+
+  // Con backend conectado: rehidrata la sesión al recargar (mantiene al usuario
+  // dentro si ya había iniciado sesión) y reacciona al cierre de sesión.
+  useEffect(() => {
+    if (!hasSupabase) return
+    let active = true
+    currentSession().then((s) => {
+      if (active && s) login(s.role, s.verified, { name: s.name, email: s.email }, s.capabilities)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setCapabilities([])
+        setMode('login')
+      }
+    })
+    return () => { active = false; sub.subscription.unsubscribe() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const value = useMemo(
     () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout, updateProfile }),

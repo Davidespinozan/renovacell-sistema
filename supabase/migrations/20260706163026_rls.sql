@@ -408,9 +408,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- service_role (backend/migraciones/seeds) y admin pueden fijar role_id/verified.
-  IF coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'role', '') = 'service_role'
-     OR public.auth_role() = 'admin' THEN
+  IF public.auth_role() = 'admin' THEN
     RETURN NEW;
   END IF;
   IF NEW.role_id IS DISTINCT FROM OLD.role_id

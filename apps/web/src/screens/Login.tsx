@@ -12,23 +12,29 @@ const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '5
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }
 
 export function Login() {
-  const { signIn } = useAuth()
+  const { signIn, recoverPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'login' | 'recover'>('login')
   const [sent, setSent] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = signIn(email, password)
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    const res = await signIn(email, password)
     if (!res.ok) setError(res.error ?? 'No se pudo iniciar sesión.')
+    setBusy(false)
   }
 
-  const recover = (e: React.FormEvent) => {
+  const recover = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return
-    setSent(true) // mock: con backend enviará el correo de restablecimiento
+    await recoverPassword(email) // con backend envía el correo real de restablecimiento
+    setSent(true)
   }
 
   const linkBtn: React.CSSProperties = {
@@ -89,7 +95,7 @@ export function Login() {
 
                 {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
 
-                <button className="btn" type="submit" style={{ width: '100%', marginTop: 16 }}><LogIn size={16} /> Entrar</button>
+                <button className="btn" type="submit" disabled={busy} style={{ width: '100%', marginTop: 16, opacity: busy ? 0.7 : 1 }}><LogIn size={16} /> {busy ? 'Entrando…' : 'Entrar'}</button>
               </form>
             </>
           ) : (
