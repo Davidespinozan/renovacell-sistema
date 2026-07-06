@@ -1,56 +1,34 @@
-// Store compartido de PROSPECTOS (leads). Forma de la tabla `prospects` (PII,
-// staff-only). Hoy mock; mañana Supabase: select/insert/update con RLS staff.
-// La captura AUTOMÁTICA desde la landing (agente IA / formulario) se conecta en
-// la fase de Supabase (un insert a prospects desde el front público / función);
-// hoy el equipo da de alta manual los que llegan por WhatsApp/llamada.
+// Store de PROSPECTOS (leads · PII staff-only). Con backend hidrata de la tabla
+// `prospects` (RLS: vendedor ve los suyos por assigned_to = auth.uid(); admin/comm
+// todos) y las mutaciones escriben write-through. Sin backend, opera sobre seeds
+// de muestra. La captura pública desde la landing se conectará vía función.
 import type { Prospect } from '../types'
 import { notify } from './notificationsStore'
+import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { makeLive } from './live'
+import type { Json } from '../database.types'
 
 export type ProspectStatus = 'nuevo' | 'contactado' | 'cotizado' | 'convertido' | 'descartado'
-
 export interface ProspectNote { text: string; at: string }
 
-// Seeds CLARAMENTE de muestra (prefijo "(Muestra)") — no son leads reales de
-// Renovacell; existen solo para que el pipeline se vea poblado.
 const SEED: Prospect[] = [
-  {
-    id: 'pr-sample-1', name: '(Muestra) Dra. Ana López', email: 'ana.lopez@ejemplo.mx',
-    phone: '55 0000 0001', cedula: null, source: 'Landing', status: 'nuevo', assigned_to: 'ventas1@renovacell.mx',
-    created_at: '2026-06-16T17:30:00.000Z',
-    meta: { organization: 'Clínica Ejemplo', interest: ['Golden Serum'], notes: [] },
-  },
-  {
-    id: 'pr-sample-2', name: '(Muestra) Dr. Beto Ramírez', email: 'beto@ejemplo.mx',
-    phone: '55 0000 0002', cedula: null, source: 'WhatsApp', status: 'contactado', assigned_to: 'ventas2@renovacell.mx',
-    created_at: '2026-06-12T15:10:00.000Z',
-    meta: {
-      organization: 'Estética Demo', interest: ['Mascarilla GP'],
-      notes: [{ text: 'Pidió info por WhatsApp; le interesa Home Care.', at: '2026-06-13T16:00:00.000Z' }],
-    },
-  },
-  {
-    id: 'pr-sample-3', name: '(Muestra) Dra. Carmen Soto', email: 'carmen@ejemplo.mx',
-    phone: '55 0000 0003', cedula: null, source: 'Referido', status: 'cotizado', assigned_to: 'ventas1@renovacell.mx',
-    created_at: '2026-06-09T18:45:00.000Z',
-    meta: { organization: 'Consultorio Prueba', interest: ['Ultrafiltrados UFS'], notes: [] },
-  },
+  { id: 'pr-sample-1', name: '(Muestra) Dra. Ana López', email: 'ana.lopez@ejemplo.mx', phone: '55 0000 0001', cedula: null, source: 'Landing', status: 'nuevo', assigned_to: 'ventas1@renovacell.mx', created_at: '2026-06-16T17:30:00.000Z', meta: { organization: 'Clínica Ejemplo', interest: ['Golden Serum'], notes: [] } },
+  { id: 'pr-sample-2', name: '(Muestra) Dr. Beto Ramírez', email: 'beto@ejemplo.mx', phone: '55 0000 0002', cedula: null, source: 'WhatsApp', status: 'contactado', assigned_to: 'ventas2@renovacell.mx', created_at: '2026-06-12T15:10:00.000Z', meta: { organization: 'Estética Demo', interest: ['Mascarilla GP'], notes: [{ text: 'Pidió info por WhatsApp; le interesa Home Care.', at: '2026-06-13T16:00:00.000Z' }] } },
+  { id: 'pr-sample-3', name: '(Muestra) Dra. Carmen Soto', email: 'carmen@ejemplo.mx', phone: '55 0000 0003', cedula: null, source: 'Referido', status: 'cotizado', assigned_to: 'ventas1@renovacell.mx', created_at: '2026-06-09T18:45:00.000Z', meta: { organization: 'Consultorio Prueba', interest: ['Ultrafiltrados UFS'], notes: [] } },
 ]
 
-let prospects: Prospect[] = [...SEED]
-const listeners = new Set<() => void>()
-let snapshot: Prospect[] = [...prospects]
+const live = makeLive<Prospect>(async () => {
+  const { data, error } = await supabase.from('prospects')
+    .select('id, name, email, phone, cedula, source, status, assigned_to, created_at, meta')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as unknown as Prospect[]
+}, SEED)
+
+export const subscribe = live.subscribe
+export const getSnapshot = live.getSnapshot
+
 let seq = 0
-
-function emit() {
-  snapshot = [...prospects]
-  listeners.forEach((l) => l())
-}
-
-export function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  return () => listeners.delete(cb)
-}
-export const getSnapshot = (): Prospect[] => snapshot
 
 export function addProspect(input: {
   name: string
@@ -59,50 +37,45 @@ export function addProspect(input: {
   organization: string | null
   source: string
   interest: string[]
-  cedula?: string | null      // si ya la trae, al convertir se podrá verificar
-  assignedTo?: string | null // vendedor dueño (el que lo da de alta), null = sin asignar
+  cedula?: string | null
+  assignedTo?: string | null
 }): Prospect {
   seq += 1
+  const assigned = hasSupabase ? (input.assignedTo ? currentUserId() : null) : (input.assignedTo ?? null)
+  const meta = { organization: input.organization, interest: input.interest, notes: [] as ProspectNote[] }
   const p: Prospect = {
-    id: `pr-new-${seq}`,
-    name: input.name,
-    email: input.email,
-    phone: input.phone,
-    cedula: input.cedula ?? null,
-    source: input.source,
-    status: 'nuevo',
-    assigned_to: input.assignedTo ?? null,
-    created_at: new Date().toISOString(),
-    meta: { organization: input.organization, interest: input.interest, notes: [] },
+    id: hasSupabase ? (globalThis.crypto?.randomUUID?.() ?? `pr-new-${seq}`) : `pr-new-${seq}`,
+    name: input.name, email: input.email, phone: input.phone, cedula: input.cedula ?? null,
+    source: input.source, status: 'nuevo', assigned_to: assigned, created_at: new Date().toISOString(), meta,
   }
-  prospects = [p, ...prospects]
-  emit()
+  live.setLocal([p, ...live.current()])
   notify({ text: `Nuevo prospecto: ${p.name}`, roles: ['admin'], screen: 'av_prosp' })
+  if (hasSupabase) {
+    supabase.from('prospects').insert({
+      id: p.id, name: p.name, email: p.email, phone: p.phone, cedula: p.cedula,
+      source: p.source, status: 'nuevo', assigned_to: assigned, meta: meta as unknown as Json,
+    }).then(({ error }) => { if (error) console.warn('[prospects] insert', error.message); live.reload() })
+  }
   return p
 }
 
 export function setStatus(id: string, status: ProspectStatus) {
-  prospects = prospects.map((p) => (p.id === id ? { ...p, status } : p))
-  emit()
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, status } : p)))
+  if (hasSupabase) supabase.from('prospects').update({ status }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] status', error.message); live.reload() })
 }
 
 export function addNote(id: string, text: string) {
   const note: ProspectNote = { text, at: new Date().toISOString() }
-  prospects = prospects.map((p) => {
-    if (p.id !== id) return p
-    const meta = (p.meta ?? {}) as Record<string, unknown>
-    const notes = [...((meta.notes as ProspectNote[]) ?? []), note]
-    return { ...p, meta: { ...meta, notes } }
-  })
-  emit()
+  const cur = live.current().find((p) => p.id === id)
+  const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>) }
+  meta.notes = [...(((meta.notes as ProspectNote[]) ?? [])), note]
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, meta } : p)))
+  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] note', error.message); live.reload() })
 }
 
-// Marca convertido y enlaza el doctor creado (para no convertir dos veces).
 export function markConverted(id: string, doctorId: string) {
-  prospects = prospects.map((p) => {
-    if (p.id !== id) return p
-    const meta = (p.meta ?? {}) as Record<string, unknown>
-    return { ...p, status: 'convertido', meta: { ...meta, convertedDoctorId: doctorId } }
-  })
-  emit()
+  const cur = live.current().find((p) => p.id === id)
+  const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>), convertedDoctorId: doctorId }
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, status: 'convertido', meta } : p)))
+  if (hasSupabase) supabase.from('prospects').update({ status: 'convertido', meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] convert', error.message); live.reload() })
 }

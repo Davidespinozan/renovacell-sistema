@@ -12,6 +12,7 @@ import { useProspects, type ProspectStatus, type ProspectNote } from '../../data
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
+import { hasSupabase } from '../../lib/supabase'
 import type { Prospect } from '../../data/types'
 
 const PIPELINE: ProspectStatus[] = ['nuevo', 'contactado', 'cotizado', 'descartado']
@@ -43,8 +44,9 @@ export function Prospectos() {
   const detail = prospects.find((p) => p.id === detailId) ?? null
 
   // Aislamiento por vendedor: Admin ve todo; el vendedor solo SUS prospectos.
+  // Con backend el RLS ya acota (assigned_to = auth.uid()), no re-filtramos.
   const visible = useMemo(
-    () => (role === 'admin' ? prospects : prospects.filter((p) => p.assigned_to === user?.email)),
+    () => (role === 'admin' || hasSupabase ? prospects : prospects.filter((p) => p.assigned_to === user?.email)),
     [prospects, role, user],
   )
 
