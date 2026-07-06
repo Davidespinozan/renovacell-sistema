@@ -1,69 +1,67 @@
-// Store compartido de doctores (perfiles). El admin verifica/revoca; el cambio
-// se refleja en lista y detalle. Al migrar a Supabase: update de profiles.verified
-// (y la RLS hará cumplir el gate de ordenar). El hook useDoctors no cambia.
+// Store de doctores (perfiles con role_id='doctor'). Con backend hidrata de
+// `profiles` (RLS: admin y staff operativo ven a los doctores/clientes; nadie ve
+// PII de otro staff) y verify/revoke/cédula escriben write-through (solo admin por
+// RLS + profiles_guard). El alta por conversión de prospecto queda local hasta el
+// flujo de invitación (un doctor es un usuario de auth). El hook no cambia.
 import type { Profile } from '../types'
 import { MOCK_DOCTORS } from '../mock/doctores'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
+import { hasSupabase, supabase } from '../../lib/supabase'
+import { makeLive } from './live'
+import type { Json } from '../database.types'
 
-let doctors: Profile[] = [...MOCK_DOCTORS]
-const listeners = new Set<() => void>()
-let snapshot: Profile[] = [...doctors]
+const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
 
-function emit() {
-  snapshot = [...doctors]
-  listeners.forEach((l) => l())
-}
+const live = makeLive<Profile>(async () => {
+  const { data, error } = await supabase.from('profiles')
+    .select('id, email, full_name, role_id, verified, organization, meta')
+    .eq('role_id', 'doctor')
+    .order('full_name')
+  if (error) throw error
+  return (data ?? []) as unknown as Profile[]
+}, MOCK_DOCTORS)
 
-export function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  return () => listeners.delete(cb)
-}
-export const getSnapshot = (): Profile[] => snapshot
+export const subscribe = live.subscribe
+export const getSnapshot = live.getSnapshot
 
-// Verificación VIVA del doctor (la usa el login): si Admin lo revoca/deja
-// pendiente, el acceso se bloquea de inmediato. undefined = no es doctor del store.
 export function verifiedByEmail(email: string): boolean | undefined {
-  return doctors.find((d) => d.email?.toLowerCase() === email.trim().toLowerCase())?.verified
+  return live.current().find((d) => d.email?.toLowerCase() === email.trim().toLowerCase())?.verified
 }
 
 export function setVerified(id: string, verified: boolean): boolean {
-  const doc = doctors.find((d) => d.id === id)
+  const doc = live.current().find((d) => d.id === id)
   if (!doc) return false
-  // No se puede verificar sin cédula profesional registrada (gate regulatorio).
-  if (verified && !((doc.meta?.cedula as string) ?? '').trim()) return false
-  doctors = doctors.map((d) => (d.id === id ? { ...d, verified } : d))
-  emit()
+  if (verified && !((doc.meta?.cedula as string) ?? '').trim()) return false // gate: sin cédula no se verifica
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified } : d)))
   logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: doc.full_name ?? id })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verify', error.message); live.reload() })
   return true
 }
 
-// Registrar/actualizar la cédula profesional (requisito para verificar). Sin
-// esto, un doctor creado por conversión de prospecto nunca podría verificarse.
 export function setCedula(id: string, cedula: string) {
-  const doc = doctors.find((d) => d.id === id)
+  const doc = live.current().find((d) => d.id === id)
   if (!doc) return
-  doctors = doctors.map((d) => (d.id === id ? { ...d, meta: { ...(d.meta ?? {}), cedula: cedula.trim() } } : d))
-  emit()
+  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), cedula: cedula.trim() }
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] cedula', error.message); live.reload() })
 }
 
-// Enviar acceso al Portal: invita al doctor (verificado) a entrar a su portal.
-// Hoy mock (marca invited + audita). Con backend: crea su usuario de auth y le
-// envía invitación / enlace mágico por correo. La firma no cambia.
 export function inviteDoctor(id: string) {
-  const doc = doctors.find((d) => d.id === id)
+  const doc = live.current().find((d) => d.id === id)
   if (!doc) return
-  doctors = doctors.map((d) => (d.id === id ? { ...d, meta: { ...(d.meta ?? {}), invited: true } } : d))
-  emit()
+  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), invited: true }
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   notify({ text: `Acceso al Portal enviado a ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
   logAudit({ actor: 'Administración', action: 'Acceso al Portal enviado', resource: doc.full_name ?? id })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(() => live.reload())
+  // Nota: la invitación real (crear usuario de auth + enlace mágico) es acción
+  // server-side (admin API / Edge Function) que se conecta en la fase de correo.
 }
 
-// Alta de doctor en estado PENDIENTE (verified:false). La usa la conversión de
-// Prospectos: cierra el embudo landing→prospecto→doctor→Portal sin duplicar el
-// concepto de Doctores. En Supabase = insert en profiles (role_id='doctor',
-// verified=false); luego el admin lo verifica con setVerified.
+// Alta como PENDIENTE (conversión de prospecto). Un doctor es un usuario de auth,
+// así que la persistencia real requiere el flujo de invitación; por ahora local.
 let newSeq = 0
 export function addDoctor(input: {
   full_name: string
@@ -73,16 +71,10 @@ export function addDoctor(input: {
 }): Profile {
   newSeq += 1
   const doc: Profile = {
-    id: `doctor-new-${newSeq}`,
-    email: input.email,
-    full_name: input.full_name,
-    role_id: 'doctor',
-    verified: false,
-    organization: input.organization,
-    meta: input.meta ?? {},
+    id: `doctor-new-${newSeq}`, email: input.email, full_name: input.full_name,
+    role_id: 'doctor', verified: false, organization: input.organization, meta: input.meta ?? {},
   }
-  doctors = [doc, ...doctors]
-  emit()
+  live.setLocal([doc, ...live.current()])
   notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
   return doc
 }
