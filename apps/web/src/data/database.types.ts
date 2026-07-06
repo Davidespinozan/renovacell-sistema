@@ -162,6 +162,48 @@ export type Database = {
         }
         Relationships: []
       }
+      consignment_stock: {
+        Row: {
+          assigned: number
+          id: string
+          product_id: string | null
+          sold: number
+          updated_at: string | null
+          vendor: string
+        }
+        Insert: {
+          assigned?: number
+          id?: string
+          product_id?: string | null
+          sold?: number
+          updated_at?: string | null
+          vendor: string
+        }
+        Update: {
+          assigned?: number
+          id?: string
+          product_id?: string | null
+          sold?: number
+          updated_at?: string | null
+          vendor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consignment_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consignment_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           categoria: string

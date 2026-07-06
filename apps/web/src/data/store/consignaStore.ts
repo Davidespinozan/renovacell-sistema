@@ -1,13 +1,14 @@
 // CONSIGNACIÓN POR VENDEDOR (saldo permanente). Almacén ASIGNA producto a un
-// vendedor (descuenta del central por FEFO, con trazabilidad); el vendedor lo
-// trae consigo y VENDE DIRECTO a sus clientes descontando de SU saldo. No hay
-// cierre diario: regresa lo no vendido cuando quiera. Modelo: equipo chico que
-// confía en sus vendedores. Mock; con Supabase = tabla consignment_stock.
+// vendedor (descuenta del central por FEFO); el vendedor VENDE DIRECTO descontando
+// de SU saldo; regresa lo no vendido cuando quiera. Con backend persiste en
+// `consignment_stock` (vendor = email; RLS por email del JWT); el descuento/
+// reingreso de lotes ya escribe write-through en lotsStore. El hook no cambia.
 import { getSnapshotLots, getSnapshotMovements, consume, adjust } from './lotsStore'
 import { allocateFEFO } from '../ops/surtir'
 import { createPosOrder, type OrderWithItems } from './ordersStore'
 import { logAudit } from './auditStore'
 import { notify } from './notificationsStore'
+import { hasSupabase, supabase } from '../../lib/supabase'
 
 export interface ConsignaItem { product_id: string; assigned: number; sold: number }
 export const remaining = (it: ConsignaItem): number => it.assigned - it.sold
@@ -27,7 +28,36 @@ export const remainingFor = (vendor: string, productId: string): number => {
 }
 const ref = (vendor: string) => `CONSIGNA-${vendor}`
 
-// Almacén asigna producto al vendedor: descuenta del central (FEFO) y lo suma a su saldo.
+// ---- Hidratación desde Supabase (RLS acota por email del vendedor) ----
+async function hydrate() {
+  if (!hasSupabase) return
+  const { data, error } = await supabase.from('consignment_stock').select('vendor, product_id, assigned, sold')
+  if (error) { console.warn('[consigna] hydrate', error.message); return }
+  const map: Record<string, ConsignaItem[]> = {}
+  ;(data ?? []).forEach((r) => {
+    const v = r.vendor as string
+    ;(map[v] ??= []).push({ product_id: r.product_id as string, assigned: r.assigned, sold: r.sold })
+  })
+  byVendor = map
+  emit()
+}
+if (hasSupabase) {
+  hydrate()
+  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT' || ev === 'TOKEN_REFRESHED') hydrate() })
+}
+
+// Persiste (upsert/borra) el renglón del vendedor para un producto tras mutar.
+function persist(vendor: string, productId: string) {
+  if (!hasSupabase) return
+  const it = (byVendor[vendor] ?? []).find((x) => x.product_id === productId)
+  if (!it || (it.assigned <= 0 && it.sold <= 0)) {
+    supabase.from('consignment_stock').delete().eq('vendor', vendor).eq('product_id', productId).then(({ error }) => { if (error) console.warn('[consigna] delete', error.message) })
+  } else {
+    supabase.from('consignment_stock').upsert({ vendor, product_id: productId, assigned: it.assigned, sold: it.sold, updated_at: new Date().toISOString() }, { onConflict: 'vendor,product_id' }).then(({ error }) => { if (error) console.warn('[consigna] upsert', error.message) })
+  }
+}
+
+// Almacén asigna al vendedor: descuenta del central (FEFO, write-through) y suma a su saldo.
 export function assignToVendor(vendor: string, productId: string, qty: number): { ok: boolean; missing?: number } {
   if (!vendor || qty <= 0) return { ok: false }
   const plan = allocateFEFO(productId, qty, getSnapshotLots())
@@ -39,13 +69,13 @@ export function assignToVendor(vendor: string, productId: string, qty: number): 
   else list.push({ product_id: productId, assigned: qty, sold: 0 })
   byVendor = { ...byVendor, [vendor]: list }
   emit()
+  persist(vendor, productId)
   notify({ text: `Recibiste ${qty} u en consignación`, roles: ['pos'], screen: 'consigna' })
   logAudit({ actor: 'Almacén', action: 'Consignación asignada', resource: vendor, detail: `producto ${productId} ×${qty}` })
   return { ok: true }
 }
 
-// Venta directa del vendedor: descuenta de SU saldo y registra la venta (POS) a
-// nombre del cliente. NO vuelve a tocar el central (ya salió al asignar).
+// Venta directa del vendedor: descuenta de SU saldo y registra la venta (POS).
 export function sellFromConsigna(vendor: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string, doctorId: string): OrderWithItems | null {
   if (!vendor || lines.length === 0) return null
   const ok = lines.every((l) => remainingFor(vendor, l.product_id) >= l.qty)
@@ -62,11 +92,12 @@ export function sellFromConsigna(vendor: string, lines: { product_id: string; qt
     }),
   }
   emit()
+  lines.forEach((l) => persist(vendor, l.product_id))
   logAudit({ actor: vendor, action: 'Venta directa (consignación)', resource: order.external_ref ?? '', detail: `cliente ${doctorId}` })
   return order
 }
 
-// Regresar al almacén lo no vendido (cuando el vendedor quiera): vuelve a SUS lotes.
+// Regresar al almacén lo no vendido: vuelve a SUS lotes (adjust write-through).
 export function returnToWarehouse(vendor: string, productId: string, qty: number) {
   if (qty <= 0) return
   const lots = getSnapshotLots()
@@ -84,5 +115,6 @@ export function returnToWarehouse(vendor: string, productId: string, qty: number
     [vendor]: (byVendor[vendor] ?? []).map((it) => (it.product_id === productId ? { ...it, assigned: Math.max(it.sold, it.assigned - qty) } : it)).filter((it) => it.assigned > 0 || it.sold > 0),
   }
   emit()
+  persist(vendor, productId)
   logAudit({ actor: 'Almacén', action: 'Consignación devuelta', resource: vendor, detail: `producto ${productId} ×${qty}` })
 }
