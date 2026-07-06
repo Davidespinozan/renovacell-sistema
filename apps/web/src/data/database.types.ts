@@ -637,6 +637,9 @@ export type Database = {
     }
     Functions: {
       auth_role: { Args: never; Returns: string }
+      has_cap: { Args: { cap: string }; Returns: boolean }
+      is_order_driver: { Args: { o_id: string }; Returns: boolean }
+      order_owner: { Args: { o_id: string }; Returns: string }
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
