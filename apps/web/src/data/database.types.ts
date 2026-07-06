@@ -204,6 +204,42 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          date: string | null
+          id: string
+          items: Json
+          members: Json
+          name: string
+          status: string
+          venue: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          id?: string
+          items?: Json
+          members?: Json
+          name: string
+          status?: string
+          venue?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          id?: string
+          items?: Json
+          members?: Json
+          name?: string
+          status?: string
+          venue?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           categoria: string
