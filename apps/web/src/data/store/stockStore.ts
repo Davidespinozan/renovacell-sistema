@@ -4,15 +4,17 @@
 // stockInfoFor().
 import { LOW_STOCK, stockByProduct, type StockInfo } from '../ops/stock'
 import { MOCK_LOTS } from '../mock/inventory'
+import type { Lot } from '../types'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 
 interface StockRow { product_id: string; available: number }
 
+const rowsFromLots = (lots: Lot[]): StockRow[] =>
+  Object.entries(stockByProduct(lots)).map(([product_id, si]) => ({ product_id, available: si.qty }))
+
 // Fallback mock: disponibilidad derivada de los lotes de demostración.
-const fallback: StockRow[] = Object.entries(stockByProduct(MOCK_LOTS)).map(
-  ([product_id, si]) => ({ product_id, available: si.qty }),
-)
+const fallback: StockRow[] = rowsFromLots(MOCK_LOTS)
 
 const live = makeLive<StockRow>(async () => {
   const { data, error } = await supabase.from('product_stock').select('product_id, available')
@@ -22,6 +24,13 @@ const live = makeLive<StockRow>(async () => {
 
 export const subscribe = live.subscribe
 export const getSnapshot = live.getSnapshot
+
+// Invalida la disponibilidad tras un movimiento de inventario (lo llama lotsStore).
+// Con backend re-consulta product_stock; en mock recalcula de los lotes actuales.
+export function refreshStock(lots?: Lot[]) {
+  if (hasSupabase) { live.reload(); return }
+  if (lots) live.setLocal(rowsFromLots(lots))
+}
 
 export function toStockMap(rows: StockRow[]): Record<string, StockInfo> {
   const out: Record<string, StockInfo> = {}

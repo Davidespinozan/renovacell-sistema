@@ -44,9 +44,13 @@ export const getSnapshot = live.getSnapshot
 let seq = 0
 export function logAudit(input: { actor: string; action: string; resource: string; detail?: string }) {
   seq += 1
-  live.setLocal([{ id: `a-${seq}`, at: new Date().toISOString(), ...input }, ...live.current()])
+  const optimisticId = `a-${seq}`
+  live.setLocal([{ id: optimisticId, at: new Date().toISOString(), ...input }, ...live.current()])
   if (hasSupabase) {
     supabase.rpc('log_audit', { p_action: input.action, p_resource: input.resource, p_detail: input.detail ?? '', p_actor_name: input.actor })
-      .then(({ error }) => { if (error) console.warn('[audit] log', error.message) })
+      .then(({ error }) => {
+        // #10: si el RPC inmutable falla, quita la entrada optimista (no fingir registro).
+        if (error) { console.warn('[audit] log', error.message); live.setLocal(live.current().filter((e) => e.id !== optimisticId)) }
+      })
   }
 }

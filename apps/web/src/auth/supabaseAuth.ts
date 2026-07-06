@@ -46,7 +46,11 @@ export async function signInSupabase(email: string, password: string): Promise<{
     return { error: m }
   }
   const session = await fetchProfile(data.user.id, data.user.email ?? email)
-  if (!session) return { error: 'No se encontró tu perfil. Contacta a Administración.' }
+  if (!session) {
+    // #9: no dejar una sesión autenticada colgada si el perfil no existe.
+    await supabase.auth.signOut()
+    return { error: 'No se encontró tu perfil. Contacta a Administración.' }
+  }
   return { session }
 }
 

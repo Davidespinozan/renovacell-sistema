@@ -9,6 +9,7 @@ import { getSnapshot as productsSnapshot } from './productsStore'
 import { costOf } from '../mock/costs'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { refreshStock } from './stockStore'
 
 const LOW_STOCK_REORDER = 20
 
@@ -100,15 +101,17 @@ export function addEntry(input: EntryInput): Lot {
   }
   lotsLive.setLocal([...lotsLive.current(), lot])
   movsLive.setLocal([mov, ...movsLive.current()])
+  refreshStock(lotsLive.current())
   if (hasSupabase) {
     (async () => {
+      // Lote nace en 0; el RPC atómico fija la cantidad y registra la entrada.
       const ins = await supabase.from('lots').insert({
         product_id: input.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date,
-        quantity: input.quantity, location: input.location,
+        quantity: 0, location: input.location,
       }).select('id').single()
       if (ins.error) { console.warn('[lots] entrada', ins.error.message); return }
-      await supabase.from('inventory_movements').insert({ lot_id: ins.data.id, change: input.quantity, reason: 'entrada', reference: input.lot_code })
-      lotsLive.reload(); movsLive.reload()
+      await supabase.rpc('apply_lot_movement', { p_lot: ins.data.id, p_change: input.quantity, p_reason: 'entrada', p_reference: input.lot_code })
+      lotsLive.reload(); movsLive.reload(); refreshStock()
     })()
   }
   return lot
@@ -121,12 +124,9 @@ export function adjust(lotId: string, delta: number, reason: string, reference =
   seq += 1
   lotsLive.setLocal(lotsLive.current().map((l) => (l.id === lotId ? { ...l, quantity: newQty } : l)))
   movsLive.setLocal([{ id: `m-${seq}`, lot_id: lotId, change: delta, reason, reference, created_by: null, created_at: nowIso() }, ...movsLive.current()])
-  if (hasSupabase) {
-    (async () => {
-      await supabase.from('lots').update({ quantity: newQty }).eq('id', lotId)
-      await supabase.from('inventory_movements').insert({ lot_id: lotId, change: delta, reason, reference })
-      lotsLive.reload(); movsLive.reload()
-    })()
+  refreshStock(lotsLive.current())
+  if (hasSupabase && /^[0-9a-f]{8}-/i.test(lotId)) {
+    supabase.rpc('apply_lot_movement', { p_lot: lotId, p_change: delta, p_reason: reason, p_reference: reference }).then(({ error }) => { if (error) console.warn('[lots] adjust', error.message); lotsLive.reload(); movsLive.reload(); refreshStock() })
   }
 }
 
@@ -142,17 +142,14 @@ export function restockByReference(reference: string, reason = 'cancelacion'): v
     lots = lots.map((l) => (l.id === m.lot_id ? { ...l, quantity: l.quantity + give } : l))
     seq += 1
     newMovs.push({ id: `m-${seq}-r${i}`, lot_id: m.lot_id, change: give, reason, reference, created_by: null, created_at: now })
-    if (hasSupabase) {
-      (async () => {
-        const cur = (await supabase.from('lots').select('quantity').eq('id', m.lot_id).single()).data
-        if (cur) await supabase.from('lots').update({ quantity: cur.quantity + give }).eq('id', m.lot_id)
-        await supabase.from('inventory_movements').insert({ lot_id: m.lot_id, change: give, reason, reference })
-      })()
+    if (hasSupabase && /^[0-9a-f]{8}-/i.test(m.lot_id)) {
+      supabase.rpc('apply_lot_movement', { p_lot: m.lot_id, p_change: give, p_reason: reason, p_reference: reference }).then(({ error }) => { if (error) console.warn('[lots] restock', error.message) })
     }
   })
   lotsLive.setLocal(lots)
   movsLive.setLocal([...newMovs, ...movsLive.current()])
-  if (hasSupabase) { lotsLive.reload(); movsLive.reload() }
+  refreshStock(lotsLive.current())
+  if (hasSupabase) { lotsLive.reload(); movsLive.reload(); refreshStock() }
 }
 
 // Consumir lotes (salida): decrementa y registra un movimiento por lote.
@@ -169,14 +166,14 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
   seq += allocations.length
   movsLive.setLocal([...newMovs, ...movsLive.current()])
   flagLowStock(before, affected)
+  refreshStock(lotsLive.current())
   if (hasSupabase) {
     (async () => {
+      // RPC atómico por lote: evita el lost-update del read-modify-write.
       for (const a of allocations) {
-        const cur = (await supabase.from('lots').select('quantity').eq('id', a.lot_id).single()).data
-        if (cur) await supabase.from('lots').update({ quantity: Math.max(0, cur.quantity - a.qty) }).eq('id', a.lot_id)
-        await supabase.from('inventory_movements').insert({ lot_id: a.lot_id, change: -a.qty, reason, reference })
+        if (/^[0-9a-f]{8}-/i.test(a.lot_id)) await supabase.rpc('apply_lot_movement', { p_lot: a.lot_id, p_change: -a.qty, p_reason: reason, p_reference: reference })
       }
-      lotsLive.reload(); movsLive.reload()
+      lotsLive.reload(); movsLive.reload(); refreshStock()
     })()
   }
 }

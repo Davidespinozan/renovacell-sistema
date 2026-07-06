@@ -8,7 +8,7 @@ import { FEATURES } from '../app/config'
 import { hasSupabase, supabase } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
 
-export type AppMode = 'app' | 'landing' | 'login'
+export type AppMode = 'app' | 'landing' | 'login' | 'reset'
 
 export interface SessionUser { name: string; email: string; avatarUrl?: string }
 
@@ -70,11 +70,19 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return
     let active = true
-    currentSession().then((s) => {
-      if (active && s) login(s.role, s.verified, { name: s.name, email: s.email }, s.capabilities)
-    })
+    // #2: si llegan por el enlace de recuperación, NO auto-loguear: llevar a fijar
+    // nueva contraseña.
+    const recovery = typeof window !== 'undefined' && /type=recovery/.test(window.location.hash)
+    if (recovery) {
+      setMode('reset')
+    } else {
+      currentSession().then((s) => {
+        if (active && s) login(s.role, s.verified, { name: s.name, email: s.email }, s.capabilities)
+      })
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
+      if (event === 'PASSWORD_RECOVERY') setMode('reset')
+      else if (event === 'SIGNED_OUT') {
         setUser(null)
         setCapabilities([])
         setMode('login')

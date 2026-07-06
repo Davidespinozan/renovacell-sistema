@@ -852,9 +852,19 @@ export type Database = {
       }
     }
     Functions: {
+      apply_lot_movement: {
+        Args: {
+          p_change: number
+          p_lot: string
+          p_reason: string
+          p_reference: string
+        }
+        Returns: undefined
+      }
       auth_role: { Args: never; Returns: string }
       has_cap: { Args: { cap: string }; Returns: boolean }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
+      is_verified: { Args: never; Returns: boolean }
       log_audit: {
         Args: {
           p_action: string
@@ -865,6 +875,7 @@ export type Database = {
         Returns: undefined
       }
       order_owner: { Args: { o_id: string }; Returns: string }
+      order_vendor_email: { Args: { o_id: string }; Returns: string }
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
