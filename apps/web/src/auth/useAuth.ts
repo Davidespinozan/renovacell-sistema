@@ -22,7 +22,7 @@ export function useAuth() {
       if (password.length === 0) return { ok: false, error: 'Escribe tu contraseña.' }
       const { session, error } = await signInSupabase(email, password)
       if (error || !session) return { ok: false, error: error ?? 'No se pudo iniciar sesión.' }
-      login(session.role, session.verified, { name: session.name, email: session.email }, session.capabilities)
+      login(session.role, session.verified, { name: session.name, email: session.email, avatarUrl: session.avatarUrl }, session.capabilities)
       return { ok: true }
     }
 

@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
-import { hasSupabase, supabase } from '../lib/supabase'
+import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
 
 export type AppMode = 'app' | 'landing' | 'login' | 'reset'
@@ -62,8 +62,22 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setMode('login')
   }
 
-  const updateProfile = (patch: Partial<SessionUser>) =>
+  // Actualiza el perfil en la sesión Y lo PERSISTE en la base (nombre + foto).
+  // La foto ya viene como URL de Storage (la sube MiPerfil). Preserva el resto del
+  // meta (capabilities, cédula…) haciendo merge.
+  const updateProfile = async (patch: Partial<SessionUser>) => {
     setUser((u) => (u ? { ...u, ...patch } : u))
+    if (!hasSupabase) return
+    const uid = currentUserId()
+    if (!uid) return
+    const { data } = await supabase.from('profiles').select('meta').eq('id', uid).single()
+    const meta = { ...((data?.meta ?? {}) as Record<string, unknown>) }
+    if (patch.name != null) meta.name = patch.name
+    if (patch.avatarUrl !== undefined) meta.avatar_url = patch.avatarUrl
+    const fields: Record<string, unknown> = { meta }
+    if (patch.name != null) fields.full_name = patch.name
+    await supabase.from('profiles').update(fields as never).eq('id', uid)
+  }
 
   // Con backend conectado: rehidrata la sesión al recargar (mantiene al usuario
   // dentro si ya había iniciado sesión) y reacciona al cierre de sesión.
@@ -77,7 +91,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       setMode('reset')
     } else {
       currentSession().then((s) => {
-        if (active && s) login(s.role, s.verified, { name: s.name, email: s.email }, s.capabilities)
+        if (active && s) login(s.role, s.verified, { name: s.name, email: s.email, avatarUrl: s.avatarUrl }, s.capabilities)
       })
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {

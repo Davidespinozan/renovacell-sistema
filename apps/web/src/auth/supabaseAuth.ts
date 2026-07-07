@@ -16,16 +16,18 @@ export interface Session {
   name: string
   email: string
   capabilities: string[]
+  avatarUrl?: string
 }
 
 function toSessionRow(row: { role_id: string | null; verified: boolean | null; full_name: string | null; meta: unknown }, email: string): Session {
-  const meta = (row.meta ?? {}) as { capabilities?: string[]; name?: string }
+  const meta = (row.meta ?? {}) as { capabilities?: string[]; name?: string; avatar_url?: string }
   return {
     role: ROLE_MAP[row.role_id ?? 'doctor'] ?? 'doctor',
     verified: Boolean(row.verified),
     name: meta.name ?? row.full_name ?? email,
     email,
     capabilities: meta.capabilities ?? [],
+    avatarUrl: meta.avatar_url ?? undefined,
   }
 }
 
