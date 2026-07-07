@@ -44,6 +44,20 @@ async function hydrate() {
 if (hasSupabase) {
   hydrate()
   supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT' || ev === 'TOKEN_REFRESHED') hydrate() })
+} else {
+  // Semilla de DEMO (sin backend): consignación de los vendedores para mostrar saldos,
+  // la alerta de saldo bajo y "pedir reabasto". Es estado de demo (no descuenta lotes).
+  byVendor = {
+    'ventas1@renovacell.mx': [
+      { product_id: 'p-mgp-90', assigned: 20, sold: 18 }, // quedan 2 → saldo bajo
+      { product_id: 'p-ab-50', assigned: 10, sold: 3 },   // quedan 7
+      { product_id: 'p-pl-12', assigned: 8, sold: 5 },    // quedan 3 → saldo bajo
+    ],
+    'ventas2@renovacell.mx': [
+      { product_id: 'p-gs-114', assigned: 12, sold: 4 },  // quedan 8
+    ],
+  }
+  emit()
 }
 
 // Persiste (upsert/borra) el renglón del vendedor para un producto tras mutar.
@@ -95,6 +109,17 @@ export function sellFromConsigna(vendor: string, lines: { product_id: string; qt
   lines.forEach((l) => persist(vendor, l.product_id))
   logAudit({ actor: vendor, action: 'Venta directa (consignación)', resource: order.external_ref ?? '', detail: `cliente ${doctorId}` })
   return order
+}
+
+// Umbral de "saldo bajo" en consignación: a esta cantidad o menos, conviene reabastecer.
+export const LOW_CONSIGNA = 5
+
+// El vendedor pide a Almacén que le reabastezca un producto de su consignación. NO
+// mueve inventario: notifica a Almacén/Dirección (que asignan desde su pantalla de
+// consignación) y lo deja en la bitácora. La asignación real la hace Almacén.
+export function requestRestock(vendor: string, productId: string, productName: string): void {
+  notify({ text: `${vendor} pide reabasto de ${productName} (consignación)`, roles: ['warehouse', 'admin'], screen: 'consigna_alm' })
+  logAudit({ actor: vendor, action: 'Reabasto de consignación solicitado', resource: productName, detail: `producto ${productId}` })
 }
 
 // Regresar al almacén lo no vendido: vuelve a SUS lotes (adjust write-through).
