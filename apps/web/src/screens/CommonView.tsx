@@ -18,7 +18,7 @@ import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
 import { Icon } from '../app/icons'
 import { useAnnouncements, type AnnouncementKind } from '../data/hooks/useAnnouncements'
-import { MOCK_COMMENTS, type MockComment } from '../data/mock/comunicacion'
+import { useAnnSocial, type AnnComment } from '../data/hooks/useAnnSocial'
 import type { Announcement, RoleId } from '../data/types'
 
 const kindOf = (a: Announcement): AnnouncementKind => (a.metadata?.kind as AnnouncementKind) ?? 'anuncio'
@@ -53,9 +53,7 @@ export function CommonView() {
   const [reqOpen, setReqOpen] = useState(false)
 
   const [filter, setFilter] = useState<Filter>('todos')
-  const [reacted, setReacted] = useState<Set<string>>(new Set())
-  const [read, setRead] = useState<Set<string>>(new Set())
-  const [comments, setComments] = useState<Record<string, MockComment[]>>(() => ({ ...MOCK_COMMENTS }))
+  const social = useAnnSocial() // comentarios/reacciones/leído persistentes
   const [sheetFor, setSheetFor] = useState<Announcement | null>(null)
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [assetOpen, setAssetOpen] = useState(false)
@@ -68,17 +66,6 @@ export function CommonView() {
       .sort(byPinnedThenDate),
     [ann.data, filter, role, canManage],
   )
-
-  const toggle = (set: Set<string>, id: string, setter: (s: Set<string>) => void) => {
-    const next = new Set(set)
-    next.has(id) ? next.delete(id) : next.add(id)
-    setter(next)
-  }
-
-  const addComment = (id: string, text: string) => {
-    const c: MockComment = { id: `c-${Date.now()}`, author: 'Tú', text, created_at: new Date().toISOString() }
-    setComments((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), c] }))
-  }
 
   return (
     <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
@@ -109,12 +96,14 @@ export function CommonView() {
             a={a}
             authorUrl={avatarById[a.created_by ?? ''] ?? (authorOf(a) === user?.name ? user?.avatarUrl : undefined)}
             canManage={canManage}
-            reacted={reacted.has(a.id)}
-            read={read.has(a.id)}
-            commentCount={(comments[a.id] ?? []).length}
-            onReact={() => toggle(reacted, a.id, setReacted)}
-            onRead={() => toggle(read, a.id, setRead)}
-            onComments={() => setSheetFor(a)}
+            reacted={social.reacted(a.id)}
+            read={social.read(a.id)}
+            reactionCount={social.reactionCount(a.id)}
+            readCount={social.readCount(a.id)}
+            commentCount={social.comments(a.id).length}
+            onReact={() => social.toggleReaction(a.id)}
+            onRead={() => social.markRead(a.id)}
+            onComments={() => { social.markRead(a.id); setSheetFor(a) }}
             onEdit={() => setEditing(a)}
             onPin={() => ann.togglePin(a.id)}
             onDelete={() => ann.remove(a.id)}
@@ -187,8 +176,8 @@ export function CommonView() {
       {sheetFor && (
         <CommentsSheet
           announcement={sheetFor}
-          comments={comments[sheetFor.id] ?? []}
-          onAdd={(t) => addComment(sheetFor.id, t)}
+          comments={social.comments(sheetFor.id)}
+          onAdd={(t) => social.addComment(sheetFor.id, t, user?.name ?? 'Equipo')}
           onClose={() => setSheetFor(null)}
         />
       )}
@@ -309,7 +298,7 @@ function Avatar({ name, sm, url }: { name: string; sm?: boolean; url?: string })
 }
 
 function FeedCard({
-  a, authorUrl, canManage, reacted, read, commentCount,
+  a, authorUrl, canManage, reacted, read, reactionCount, readCount, commentCount,
   onReact, onRead, onComments, onEdit, onPin, onDelete,
 }: {
   a: Announcement
@@ -317,14 +306,16 @@ function FeedCard({
   canManage: boolean
   reacted: boolean
   read: boolean
+  reactionCount: number
+  readCount: number
   commentCount: number
   onReact: () => void; onRead: () => void; onComments: () => void
   onEdit: () => void; onPin: () => void; onDelete: () => void
 }) {
   const kind = kindOf(a)
   const aud = audienceOf(a)
-  const reactions = baseReactions(a) + (reacted ? 1 : 0)
-  const reads = baseReads(a) + (read ? 1 : 0)
+  const reactions = reactionCount
+  const reads = readCount
   const author = authorOf(a)
 
   return (
@@ -415,7 +406,7 @@ function Composer({ onPublish, meUrl, meName }: { onPublish: (input: { title: st
 
 function CommentsSheet({ announcement, comments, onAdd, onClose }: {
   announcement: Announcement
-  comments: MockComment[]
+  comments: AnnComment[]
   onAdd: (text: string) => void
   onClose: () => void
 }) {
@@ -440,7 +431,7 @@ function CommentsSheet({ announcement, comments, onAdd, onClose }: {
                 <Avatar name={c.author} sm />
                 <div className="body">
                   <div className="who">{c.author}<span className="when">{timeAgo(c.created_at)}</span></div>
-                  <div className="txt">{c.text}</div>
+                  <div className="txt">{c.body}</div>
                 </div>
               </div>
             ))

@@ -9,8 +9,11 @@ import { driverName } from '../../data/mock/shipments'
 function shipPill(status: string | null): { label: string; pill: string } {
   switch (status) {
     case 'assigned': return { label: 'Asignado a chofer', pill: 'p-warn' }
+    case 'por_despachar': return { label: 'Por despachar', pill: 'p-warn' }
+    case 'despachado': return { label: 'Despachado', pill: 'p-blue' }
     case 'in_transit': return { label: 'En camino', pill: 'p-blue' }
     case 'out_for_delivery': return { label: 'En reparto', pill: 'p-blue' }
+    case 'incident': return { label: 'Incidencia', pill: 'p-dang' }
     case 'delivered': return { label: 'Entregado', pill: 'p-ok' }
     default: return { label: status ?? '—', pill: 'p-neu' }
   }

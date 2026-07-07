@@ -39,6 +39,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcement_comments: {
+        Row: {
+          announcement_id: string
+          author: string | null
+          body: string
+          created_at: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          announcement_id: string
+          author?: string | null
+          body: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          announcement_id?: string
+          author?: string | null
+          body?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_comments_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcement_reactions: {
+        Row: {
+          announcement_id: string
+          created_at: string | null
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string | null
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reactions_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           body: string | null
