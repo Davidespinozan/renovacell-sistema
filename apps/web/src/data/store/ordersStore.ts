@@ -52,6 +52,8 @@ export const getSnapshotAll = (): OrderWithItems[] => snapshotAll
 // ("No tienes pedidos activos") mientras aún carga desde Supabase.
 let hydrated = !hasSupabase
 export const ready = (): boolean => hydrated
+// Recarga tras una escritura externa (p. ej. la RPC surtir_pedido).
+export function reloadOrders() { if (hasSupabase) hydrate() }
 
 // ---- Hidratación desde Supabase (RLS acota el resultado por rol) ----
 let hgen = 0 // guard de generación: una hidratación obsoleta no pisa la más nueva
@@ -195,7 +197,7 @@ export function createPosOrder(input: {
   return { ...order, items: newItems }
 }
 
-export function markPacked(orderId: string, itemLot: Record<string, string | null>) {
+export function markPacked(orderId: string, itemLot: Record<string, string | null>, localOnly = false) {
   // Solo se empaca un pedido PAGADO y aún no empacado (no saltar pago/estado).
   const cur = orders.find((o) => o.id === orderId)
   if (!cur || !['paid', 'picking'].includes(cur.status ?? '')) return
@@ -204,7 +206,7 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} surtido · por empacar`, roles: ['warehouse'], screen: 'cola' })
   logAudit({ actor: 'Almacén', action: 'Surtido (FEFO)', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId)) {
+  if (hasSupabase && isUuid(orderId) && !localOnly) {
     (async () => {
       await supabase.from('orders').update({ status: 'packed' }).eq('id', orderId)
       for (const [itemId, lotId] of Object.entries(itemLot)) {

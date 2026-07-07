@@ -117,7 +117,12 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
     return { ...e, items }
   })
   emit()
-  persistEvent(eventId)
+  // ATÓMICO: en vez de reescribir el items completo (last-write-wins → lost update
+  // con varios vendedores), la RPC event_sell incrementa `sold` con FOR UPDATE y tope.
+  if (hasSupabase && isUuid(eventId)) {
+    supabase.rpc('event_sell', { p_event: eventId, p_sales: lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) })
+      .then(({ data, error }) => { if (error || data === false) console.warn('[events] venta concurrente rechazada', error?.message); hydrate() })
+  }
   return order
 }
 

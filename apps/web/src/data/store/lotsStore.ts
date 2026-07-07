@@ -168,7 +168,9 @@ export function restockByReference(reference: string, reason = 'cancelacion'): v
 }
 
 // Consumir lotes (salida): decrementa y registra un movimiento por lote.
-export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido') {
+// `localOnly`: solo actualiza el cache (sin escribir a Supabase) — lo usa el surtido
+// atómico, que persiste todo (lotes+pedido) en UNA sola RPC (surtir_pedido).
+export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido', localOnly = false) {
   const now = nowIso()
   const affected = new Set<string>()
   allocations.forEach((a) => { const lot = lotsLive.current().find((l) => l.id === a.lot_id); if (lot) affected.add(lot.product_id) })
@@ -182,7 +184,7 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
   movsLive.setLocal([...newMovs, ...movsLive.current()])
   flagLowStock(before, affected)
   refreshStock(lotsLive.current())
-  if (hasSupabase) {
+  if (hasSupabase && !localOnly) {
     (async () => {
       // RPC atómico por lote: evita el lost-update del read-modify-write.
       for (const a of allocations) {
@@ -192,3 +194,6 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
     })()
   }
 }
+
+// Recarga lotes+movimientos+stock tras una escritura externa (p. ej. surtir_pedido RPC).
+export function reloadInventory() { if (hasSupabase) { lotsLive.reload(); movsLive.reload(); refreshStock() } }

@@ -2,7 +2,8 @@
 // posición financiera (por cobrar / por pagar) y registro de gastos. Datos
 // SENSIBLES (costos/utilidad): solo Dirección. Lógica pura en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle } from 'lucide-react'
+import { useProducts } from '../../data/hooks/useProducts'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -20,8 +21,16 @@ export function Finanzas() {
   const { data: compras, markPaid } = useCompras()
   const { data: movements } = useInventory()
   const { data: lots } = useLots()
+  const { data: products } = useProducts()
   const { data: gastos, addGasto, removeGasto } = useGastos()
   const [open, setOpen] = useState(false)
+
+  // Productos con lotes SIN costo registrado (falta su renglón en product_costs):
+  // su costo de ventas se contabiliza en 0 → la utilidad saldría inflada. Se avisa.
+  const missingCost = useMemo(() => {
+    const zero = new Set(lots.filter((l) => (l.unit_cost ?? 0) === 0).map((l) => l.product_id))
+    return products.filter((p) => zero.has(p.id)).map((p) => p.name)
+  }, [lots, products])
 
   const [period, setPeriod] = useState<'mes' | 'pasado' | 'todo'>('mes')
   const range = useMemo(() => {
@@ -52,6 +61,16 @@ export function Finanzas() {
         La salud real del negocio: cuánto vendiste, cuánto costó, cuánto gastaste y
         <b> cuánto ganaste</b> — más lo que te deben y lo que debes. (Solo Dirección.)
       </PageHead>
+
+      {missingCost.length > 0 && (
+        <div className="sysnote" style={{ background: 'var(--warn-bg, #FFF6E5)', borderColor: '#E9D8A6', color: '#8a6d1a', alignItems: 'flex-start' }}>
+          <AlertTriangle size={16} />
+          <span>
+            <b>{missingCost.length} producto(s) sin costo registrado.</b> Su costo de ventas se cuenta en $0, así que la
+            utilidad puede estar <b>sobrevaluada</b>. Captura su costo (Catálogo/Inventario): {missingCost.slice(0, 6).join(', ')}{missingCost.length > 6 ? '…' : ''}.
+          </span>
+        </div>
+      )}
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         <button type="button" className={period === 'mes' ? 'active' : undefined} onClick={() => setPeriod('mes')}>Este mes</button>

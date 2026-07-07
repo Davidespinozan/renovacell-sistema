@@ -1304,6 +1304,7 @@ export type Database = {
       }
       auth_role: { Args: never; Returns: string }
       can_access_conversation: { Args: { cid: string }; Returns: boolean }
+      event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       has_cap: { Args: { cap: string }; Returns: boolean }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
       is_verified: { Args: never; Returns: boolean }
@@ -1321,6 +1322,15 @@ export type Database = {
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
+      }
+      surtir_pedido: {
+        Args: {
+          p_allocations: Json
+          p_item_lots: Json
+          p_order: string
+          p_ref: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

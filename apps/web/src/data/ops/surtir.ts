@@ -3,8 +3,11 @@
 // surtirPedido: confirma el surtido — descuenta lotes (+movimientos) y marca el
 // pedido como Empacado. Conecta lotsStore + ordersStore.
 import type { Lot, OrderItem } from '../types'
-import { getSnapshotLots, consume } from '../store/lotsStore'
-import { markPacked, type OrderWithItems } from '../store/ordersStore'
+import { getSnapshotLots, consume, reloadInventory } from '../store/lotsStore'
+import { markPacked, reloadOrders, type OrderWithItems } from '../store/ordersStore'
+import { hasSupabase, supabase } from '../../lib/supabase'
+
+const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
 
 export interface Alloc {
   lot: Lot
@@ -66,13 +69,26 @@ export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemP
   if (!canFulfill(plans)) return { ok: false, plans }
 
   const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty })))
-  consume(allocations, order.external_ref ?? order.id)
-
   const itemLot: Record<string, string | null> = {}
-  plans.forEach((p) => {
-    itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null
-  })
-  markPacked(order.id, itemLot)
+  plans.forEach((p) => { itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null })
+  const ref = order.external_ref ?? order.id
+
+  // Optimista local (para respuesta instantánea).
+  consume(allocations, ref, 'surtido', true)
+  markPacked(order.id, itemLot, true)
+
+  if (hasSupabase && isUuid(order.id)) {
+    // ATÓMICO: descuenta lotes + movimientos + estado + lote por renglón en UNA
+    // sola transacción (surtir_pedido). Si algo falla, recarga y revierte lo local.
+    supabase.rpc('surtir_pedido', {
+      p_order: order.id, p_ref: ref,
+      p_allocations: allocations.filter((a) => isUuid(a.lot_id)),
+      p_item_lots: Object.fromEntries(Object.entries(itemLot).filter(([k]) => isUuid(k)).map(([k, v]) => [k, v ?? ''])),
+    }).then(({ error }) => {
+      if (error) console.warn('[surtir] rpc', error.message)
+      reloadInventory(); reloadOrders()
+    })
+  }
 
   return { ok: true, plans }
 }
