@@ -1,13 +1,14 @@
 // Catálogo del Portal del Doctor + flujo "armar pedido".
 // Catálogo (products_safe) -> agregar al pedido -> revisar -> crear (contra pedido).
 // Sin costo/margen (forma products_safe). Todos los productos tienen precio.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
+import { takeReorderSeed } from '../../data/store/reorderStore'
 import { PaymentModal } from './PaymentModal'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
@@ -27,8 +28,41 @@ export function Catalogo() {
   const [filter, setFilter] = useState<LineFilter>('all')
   const [cart, setCart] = useState<Cart>({})
   const [checkout, setCheckout] = useState(false)
+  const [reorderNote, setReorderNote] = useState<string | null>(null)
 
   const stockMap = useStock()
+
+  // "Volver a pedir": si venimos de Historial/Mis pedidos con una siembra, rearmar
+  // el carrito una sola vez —cuando ya cargó el catálogo—, capando cada renglón al
+  // stock disponible y descartando productos dados de baja o sin precio publicado.
+  const seedRef = useRef(takeReorderSeed())
+  useEffect(() => {
+    const seed = seedRef.current
+    if (!seed || products.length === 0) return
+    seedRef.current = null
+    const next: Cart = {}
+    let dropped = 0
+    let capped = 0
+    seed.forEach(({ product_id, qty }) => {
+      const prod = products.find((p) => p.id === product_id)
+      if (!prod || !isActiveProduct(prod) || prod.price == null) { dropped += 1; return }
+      const info = stockInfoFor(stockMap, product_id)
+      const max = info.tracked ? info.qty : 0
+      const q = Math.min(qty, max)
+      if (q <= 0) { dropped += 1; return }
+      if (q < qty) capped += 1
+      next[product_id] = q
+    })
+    if (Object.keys(next).length > 0) setCart(next)
+    if (dropped > 0 || capped > 0) {
+      const parts: string[] = []
+      if (dropped > 0) parts.push(`${dropped} producto(s) ya no están disponibles`)
+      if (capped > 0) parts.push(`${capped} se ajustaron al stock actual`)
+      setReorderNote(`Rearmamos tu pedido anterior · ${parts.join(' y ')}.`)
+    } else if (Object.keys(next).length > 0) {
+      setReorderNote('Rearmamos tu pedido anterior. Revísalo y confírmalo.')
+    }
+  }, [products, stockMap])
 
   const shown = useMemo(
     () => products.filter(isActiveProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
@@ -80,6 +114,13 @@ export function Catalogo() {
       {/* IZQUIERDA: catálogo */}
       <div className="grid" style={{ gap: 16 }}>
         <div className="eyebrow">Portal del Doctor · Catálogo</div>
+        {reorderNote && (
+          <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Icon name="cart" />
+            <span style={{ flex: 1 }}>{reorderNote}</span>
+            <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setReorderNote(null)}><Icon name="x" /></button>
+          </div>
+        )}
         <div className="seg" style={{ alignSelf: 'flex-start' }}>
           {([['all', 'Todos'], ['cosm', 'Home Care'], ['prof', 'Professional']] as const).map(([k, lbl]) => (
             <button key={k} type="button" className={filter === k ? 'active' : undefined} onClick={() => setFilter(k)}>

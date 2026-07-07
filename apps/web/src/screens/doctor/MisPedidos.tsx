@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from 'react'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
+import { useRole } from '../../auth/RoleContext'
+import { seedReorder } from '../../data/store/reorderStore'
 import { OrderCard } from './OrderCard'
 import { PaymentModal } from './PaymentModal'
 import { isPast } from './orderStatus'
@@ -12,7 +14,13 @@ import type { OrderWithItems } from '../../data/hooks/useOrders'
 export function MisPedidos() {
   const { data: orders, loading, cancelOrder, payOrder } = useOrders()
   const { data: products } = useProducts()
+  const { setScreen } = useRole()
   const [paying, setPaying] = useState<OrderWithItems | null>(null)
+
+  const reorder = (o: OrderWithItems) => {
+    seedReorder(o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty })))
+    setScreen('catalogo')
+  }
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -39,6 +47,7 @@ export function MisPedidos() {
             productsById={byId}
             onPay={() => setPaying(o)}
             onCancel={() => { if (window.confirm('¿Cancelar este pedido?')) cancelOrder(o.id, 'Portal del Doctor') }}
+            onReorder={() => reorder(o)}
           />
         ))
       )}

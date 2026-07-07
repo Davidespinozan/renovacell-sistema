@@ -14,12 +14,14 @@ export function OrderCard({
   showTracking = true,
   onCancel,
   onPay,
+  onReorder,
 }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   showTracking?: boolean
   onCancel?: () => void
   onPay?: () => void
+  onReorder?: () => void
 }) {
   const sv = statusView(order.status)
   const unpaid = order.payment_status !== 'paid' && order.status !== 'cancelled'
@@ -72,9 +74,16 @@ export function OrderCard({
 
       <ShippingLine meta={order.shipping_meta} />
 
-      {onCancel && isCancelable(order.status) && (
-        <div style={{ marginTop: 10, textAlign: 'right' }}>
-          <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={onCancel}>Cancelar pedido</button>
+      {((onReorder && order.items.length > 0) || (onCancel && isCancelable(order.status))) && (
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {onReorder && order.items.length > 0 && (
+            <button className="btn ghost sm" type="button" onClick={onReorder}>
+              <Icon name="cart" /> Volver a pedir
+            </button>
+          )}
+          {onCancel && isCancelable(order.status) && (
+            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
+          )}
         </div>
       )}
     </div>

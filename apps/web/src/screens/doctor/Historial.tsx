@@ -2,13 +2,22 @@
 import React, { useMemo } from 'react'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
+import { useRole } from '../../auth/RoleContext'
+import { seedReorder } from '../../data/store/reorderStore'
 import { OrderCard } from './OrderCard'
 import { isPast } from './orderStatus'
 import type { ProductSafe } from '../../data/types'
+import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function Historial() {
   const { data: orders, loading } = useOrders()
   const { data: products } = useProducts()
+  const { setScreen } = useRole()
+
+  const reorder = (o: OrderWithItems) => {
+    seedReorder(o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty })))
+    setScreen('catalogo')
+  }
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -28,7 +37,7 @@ export function Historial() {
           Aún no hay pedidos en tu historial.
         </div>
       ) : (
-        past.map((o) => <OrderCard key={o.id} order={o} productsById={byId} showTracking={false} />)
+        past.map((o) => <OrderCard key={o.id} order={o} productsById={byId} showTracking={false} onReorder={() => reorder(o)} />)
       )}
     </div>
   )
