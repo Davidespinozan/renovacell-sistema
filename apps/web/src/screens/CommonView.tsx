@@ -123,7 +123,7 @@ export function CommonView() {
         <div className="libgrid" style={{ width: '100%' }}>
           {assets.data.map((as) => (
             <div key={as.id} className="libcard">
-              {as.url && as.url.startsWith('data:image') ? (
+              {as.url && (as.url.startsWith('data:image') || /^https?:\/\//.test(as.url)) ? (
                 <img src={as.url} alt={as.key ?? ''} style={{ width: '100%', height: 92, objectFit: 'cover', display: 'block' }} />
               ) : (
                 <div className="libtile"><ImageIcon /></div>

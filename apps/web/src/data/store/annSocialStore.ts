@@ -83,6 +83,9 @@ export function markRead(announcementId: string) {
   if (cur.includes(id)) return
   readUsers = { ...readUsers, [announcementId]: [...cur, id] }
   emit()
-  if (hasSupabase) supabase.from('announcement_reads').upsert({ announcement_id: announcementId, user_id: id })
+  // DO NOTHING en conflicto (no DO UPDATE): la tabla solo tiene policy INSERT/SELECT,
+  // no UPDATE. Ya evitamos duplicados con el early-return de arriba; ignoreDuplicates
+  // cubre la carrera sin requerir permiso de UPDATE.
+  if (hasSupabase) supabase.from('announcement_reads').upsert({ announcement_id: announcementId, user_id: id }, { onConflict: 'announcement_id,user_id', ignoreDuplicates: true })
     .then(({ error }) => { if (error) { console.warn('[annSocial] read', error.message); readUsers = { ...readUsers, [announcementId]: cur }; emit() } })
 }
