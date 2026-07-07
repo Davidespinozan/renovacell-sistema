@@ -78,6 +78,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       assets: {
@@ -114,6 +121,13 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -666,6 +680,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_costs: {
@@ -833,6 +854,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospects_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -1009,6 +1037,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "shipments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "shipments_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -1079,6 +1114,35 @@ export type Database = {
           unit?: string | null
         }
         Relationships: []
+      }
+      staff_directory: {
+        Row: {
+          avatar_url: string | null
+          id: string | null
+          name: string | null
+          role_id: string | null
+        }
+        Insert: {
+          avatar_url?: never
+          id?: string | null
+          name?: never
+          role_id?: string | null
+        }
+        Update: {
+          avatar_url?: never
+          id?: string | null
+          name?: never
+          role_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

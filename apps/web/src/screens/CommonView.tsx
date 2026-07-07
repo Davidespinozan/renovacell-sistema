@@ -10,8 +10,10 @@ import {
 } from 'lucide-react'
 import { useAssets, type AssetInput } from '../data/hooks/useAssets'
 import { useResources } from '../data/hooks/useResources'
-import { timeAgo, initials, avatarColor } from '../lib/format'
+import { timeAgo } from '../lib/format'
 import { uploadImage } from '../lib/uploads'
+import { UserAvatar } from '../app/UserAvatar'
+import { useUsers } from '../data/hooks/useUsers'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
 import { Icon } from '../app/icons'
@@ -41,6 +43,13 @@ export function CommonView() {
   const ann = useAnnouncements()
   const assets = useAssets()
   const resources = useResources()
+  // Fotos del equipo (para el autor de cada anuncio) — del directorio seguro.
+  const { data: directory } = useUsers({ staffOnly: true })
+  const avatarById = useMemo(() => {
+    const m: Record<string, string | undefined> = {}
+    directory.forEach((u) => { m[u.id] = u.avatarUrl })
+    return m
+  }, [directory])
   const [reqOpen, setReqOpen] = useState(false)
 
   const [filter, setFilter] = useState<Filter>('todos')
@@ -75,7 +84,7 @@ export function CommonView() {
     <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
       <div className="feed">
         <div className="welcome">
-          <Avatar name={user?.name ?? 'Equipo'} />
+          <Avatar name={user?.name ?? 'Equipo'} url={user?.avatarUrl} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="wk">Bienvenido a Renovacell</div>
             <div className="wh">Hola, {hi}</div>
@@ -84,7 +93,7 @@ export function CommonView() {
         </div>
 
         {/* Composer (solo admin/comm) */}
-        {canManage && <Composer onPublish={ann.create} />}
+        {canManage && <Composer onPublish={ann.create} meUrl={user?.avatarUrl} meName={user?.name} />}
 
         {/* Filtros */}
         <div className="fchips">
@@ -98,6 +107,7 @@ export function CommonView() {
           <FeedCard
             key={a.id}
             a={a}
+            authorUrl={avatarById[a.created_by ?? ''] ?? (authorOf(a) === user?.name ? user?.avatarUrl : undefined)}
             canManage={canManage}
             reacted={reacted.has(a.id)}
             read={read.has(a.id)}
@@ -294,15 +304,16 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
   )
 }
 
-function Avatar({ name, sm }: { name: string; sm?: boolean }) {
-  return <div className={'avatar' + (sm ? ' sm' : '')} style={{ background: avatarColor(name) }}>{initials(name)}</div>
+function Avatar({ name, sm, url }: { name: string; sm?: boolean; url?: string }) {
+  return <UserAvatar name={name} url={url} size={sm ? 30 : 40} className={'avatar' + (sm ? ' sm' : '')} />
 }
 
 function FeedCard({
-  a, canManage, reacted, read, commentCount,
+  a, authorUrl, canManage, reacted, read, commentCount,
   onReact, onRead, onComments, onEdit, onPin, onDelete,
 }: {
   a: Announcement
+  authorUrl?: string
   canManage: boolean
   reacted: boolean
   read: boolean
@@ -319,7 +330,7 @@ function FeedCard({
   return (
     <div className={'fcard' + (isPinned(a) ? ' pinned' : '')}>
       <div className="fhead">
-        <Avatar name={author} />
+        <Avatar name={author} url={authorUrl} />
         <div style={{ minWidth: 0 }}>
           <div className="fname">{author}</div>
           <div className="fmeta">
@@ -358,7 +369,7 @@ function FeedCard({
   )
 }
 
-function Composer({ onPublish }: { onPublish: (input: { title: string; body: string; kind: AnnouncementKind; pinned: boolean; audience: RoleId | null }) => void }) {
+function Composer({ onPublish, meUrl, meName }: { onPublish: (input: { title: string; body: string; kind: AnnouncementKind; pinned: boolean; audience: RoleId | null }) => void; meUrl?: string; meName?: string }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [kind, setKind] = useState<AnnouncementKind>('anuncio')
@@ -373,7 +384,7 @@ function Composer({ onPublish }: { onPublish: (input: { title: string; body: str
 
   return (
     <div className="composer">
-      <Avatar name="Tú" />
+      <Avatar name={meName ?? 'Tú'} url={meUrl} />
       <div style={{ flex: 1 }}>
         <input
           value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título…"

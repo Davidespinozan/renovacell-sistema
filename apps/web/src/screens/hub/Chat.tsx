@@ -74,12 +74,12 @@ export function Chat() {
               {msgs.length === 0 && <div style={{ margin: 'auto', color: 'var(--ink-3)', fontSize: 13 }}>Inicia la conversación.</div>}
               {msgs.map((m) => {
                 const mine = m.sender_id === me.id
-                const showAvatar = !mine && conv.kind === 'group'
+                const showAvatar = conv.kind === 'group'
                 return (
                   <div key={m.id} className={'brow' + (mine ? ' me' : '')}>
-                    {showAvatar && <UserAvatar name={m.sender_name ?? '?'} url={avatarById[m.sender_id]} size={28} className="avatar sm" />}
+                    {showAvatar && <UserAvatar name={mine ? me.name : (m.sender_name ?? '?')} url={avatarById[m.sender_id]} size={28} className="avatar sm" />}
                     <div className={'bubble' + (mine ? ' me' : '')} style={{ position: 'relative' }}>
-                      {showAvatar && <div className="who">{m.sender_name}</div>}
+                      {!mine && showAvatar && <div className="who">{m.sender_name}</div>}
                       <div className="btxt">{m.body}</div>
                       <div className="bwhen">{timeAgo(m.created_at)}</div>
                       {mine && (
