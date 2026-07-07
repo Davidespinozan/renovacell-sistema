@@ -162,6 +162,13 @@ export type Database = {
             foreignKeyName: "announcements_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -203,6 +210,13 @@ export type Database = {
           url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assets_uploaded_by_fkey"
             columns: ["uploaded_by"]
@@ -764,6 +778,13 @@ export type Database = {
             foreignKeyName: "orders_doctor_id_fkey"
             columns: ["doctor_id"]
             isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -936,6 +957,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "prospects_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "prospects_assigned_to_fkey"
             columns: ["assigned_to"]
@@ -1120,6 +1148,13 @@ export type Database = {
             foreignKeyName: "shipments_driver_id_fkey"
             columns: ["driver_id"]
             isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1141,6 +1176,30 @@ export type Database = {
       }
     }
     Views: {
+      doctor_directory: {
+        Row: {
+          id: string | null
+          meta: Json | null
+          name: string | null
+          organization: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          id?: string | null
+          meta?: never
+          name?: never
+          organization?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          id?: string | null
+          meta?: never
+          name?: never
+          organization?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       product_stock: {
         Row: {
           available: number | null

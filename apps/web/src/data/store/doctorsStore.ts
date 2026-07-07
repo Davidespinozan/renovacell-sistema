@@ -14,12 +14,20 @@ import type { Json } from '../database.types'
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
 
 const live = makeLive<Profile>(async () => {
-  const { data, error } = await supabase.from('profiles')
-    .select('id, email, full_name, role_id, verified, organization, meta')
-    .eq('role_id', 'doctor')
-    .order('full_name')
-  if (error) throw error
-  return (data ?? []) as unknown as Profile[]
+  // Admin lee el perfil COMPLETO (email/cédula, para verificar); el resto de staff
+  // NO puede leer perfiles de doctores por RLS y usa la vista segura `doctor_directory`
+  // (nombre/org/verificado/contacto de envío, SIN correo ni cédula). Se piden ambos
+  // en paralelo: si `profiles` trae filas → admin; si no → el directorio.
+  const [prof, dir] = await Promise.all([
+    supabase.from('profiles').select('id, email, full_name, role_id, verified, organization, meta').eq('role_id', 'doctor').order('full_name'),
+    supabase.from('doctor_directory').select('id, name, organization, verified, meta').order('name'),
+  ])
+  if ((prof.data?.length ?? 0) > 0) return prof.data as unknown as Profile[]
+  if (dir.error) { if (prof.error) throw prof.error; return [] }
+  return (dir.data ?? []).map((d) => ({
+    id: d.id as string, email: null, full_name: d.name as string, role_id: 'doctor',
+    verified: d.verified, organization: d.organization, meta: (d.meta ?? {}) as Profile['meta'],
+  })) as unknown as Profile[]
 }, MOCK_DOCTORS)
 
 export const subscribe = live.subscribe
