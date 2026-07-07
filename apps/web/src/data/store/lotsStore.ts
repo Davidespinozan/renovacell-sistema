@@ -21,14 +21,20 @@ const lotsFallback: Lot[] = MOCK_LOTS.map((l) => ({ ...l, unit_cost: l.unit_cost
 const movsFallback: InventoryMovement[] = sortDesc(MOCK_MOVEMENTS)
 
 const lotsLive = makeLive<Lot>(async () => {
-  const { data, error } = await supabase
-    .from('lots')
-    .select('id, product_id, lot_code, manufacture_date, expiry_date, quantity, location, metadata')
-  if (error) throw error
-  return (data ?? []).map((l) => ({
+  // El costo real vive en `product_costs` (uuid → unit_cost), protegido por RLS
+  // (solo admin/billing lo lee). Para otros roles la consulta devuelve [] y el
+  // costo queda en 0 —correcto: no ven finanzas. NUNCA usar costOf(uuid): sus
+  // claves son slugs legacy ('p-mgp-90') y con uuid siempre daría 0 (utilidad falsa).
+  const [lotsRes, costsRes] = await Promise.all([
+    supabase.from('lots').select('id, product_id, lot_code, manufacture_date, expiry_date, quantity, location, metadata'),
+    supabase.from('product_costs').select('product_id, unit_cost'),
+  ])
+  if (lotsRes.error) throw lotsRes.error
+  const costMap = new Map<string, number>((costsRes.data ?? []).map((c) => [c.product_id as string, Number(c.unit_cost) || 0]))
+  return (lotsRes.data ?? []).map((l) => ({
     id: l.id, product_id: l.product_id ?? '', lot_code: l.lot_code,
     manufacture_date: l.manufacture_date, expiry_date: l.expiry_date, quantity: l.quantity,
-    location: l.location, unit_cost: costOf(l.product_id ?? ''), metadata: (l.metadata ?? null) as Lot['metadata'],
+    location: l.location, unit_cost: costMap.get(l.product_id ?? '') ?? 0, metadata: (l.metadata ?? null) as Lot['metadata'],
   }))
 }, lotsFallback)
 

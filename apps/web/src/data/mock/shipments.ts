@@ -17,9 +17,12 @@ export const MOCK_DRIVERS: Driver[] = [
 ]
 
 // Cache síncrono de los choferes reales (perfiles role_id='driver'), hidratado
-// desde Supabase. Los helpers lo consultan de forma síncrona en render.
+// desde Supabase. Los helpers lo consultan de forma síncrona en render. La carga
+// la ORQUESTA shipmentsStore: espera a loadDrivers() ANTES de emitir los envíos,
+// para que el re-render encuentre ya resueltos los nombres/ids de chofer (evita
+// "Mi ruta · —" y la columna Chofer en blanco por una carrera de hidratación).
 let dbDrivers: Driver[] = []
-async function loadDrivers() {
+export async function loadDrivers(): Promise<void> {
   if (!hasSupabase) return
   const { data, error } = await supabase.from('profiles')
     .select('id, full_name, email, meta')
@@ -30,10 +33,6 @@ async function loadDrivers() {
     name: ((d.meta as { name?: string } | null)?.name) ?? d.full_name ?? d.email ?? 'Chofer',
     email: d.email,
   }))
-}
-if (hasSupabase) {
-  loadDrivers()
-  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') loadDrivers() })
 }
 
 // Lista de choferes para el selector (Empaque asigna).

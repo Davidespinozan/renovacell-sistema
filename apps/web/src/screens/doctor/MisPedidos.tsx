@@ -10,7 +10,7 @@ import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function MisPedidos() {
-  const { data: orders, cancelOrder, payOrder } = useOrders()
+  const { data: orders, loading, cancelOrder, payOrder } = useOrders()
   const { data: products } = useProducts()
   const [paying, setPaying] = useState<OrderWithItems | null>(null)
 
@@ -25,7 +25,9 @@ export function MisPedidos() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Portal del Doctor · Mis pedidos</div>
-      {active.length === 0 ? (
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tus pedidos…</div>
+      ) : active.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
           No tienes pedidos activos. Crea uno desde el catálogo.
         </div>

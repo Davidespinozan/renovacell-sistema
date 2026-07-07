@@ -33,6 +33,7 @@ const live = makeLive<ProductSafe>(async () => {
 
 export const subscribe = live.subscribe
 export const getSnapshot = live.getSnapshot
+export const ready = live.ready
 
 export interface ProductInput {
   name: string
@@ -83,4 +84,20 @@ export function toggleActive(id: string) {
   if (hasSupabase) {
     supabase.from('products').update({ active: now }).eq('id', id).then(({ error }) => { if (error) console.warn('[products] toggle', error.message); live.reload() })
   }
+}
+
+// Elimina un producto del catálogo (solo admin por RLS). Si el producto ya tuvo
+// pedidos/lotes, la base puede impedirlo por integridad; devuelve el error para
+// sugerir ocultarlo en su lugar.
+const isUuidP = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
+export async function deleteProduct(id: string): Promise<{ ok: boolean; error?: string }> {
+  const cur = live.current().find((p) => p.id === id)
+  live.setLocal(live.current().filter((p) => p.id !== id))
+  logAudit({ actor: 'Administración', action: 'Producto eliminado', resource: cur?.name ?? id })
+  if (hasSupabase && isUuidP(id)) {
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) { await live.reload(); return { ok: false, error: 'No se pudo eliminar (¿ya tiene pedidos o inventario? Mejor ocúltalo).' } }
+    await live.reload()
+  }
+  return { ok: true }
 }

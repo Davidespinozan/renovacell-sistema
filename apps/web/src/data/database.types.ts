@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       announcements: {
@@ -204,6 +229,69 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          area: string | null
+          created_at: string | null
+          id: string
+          kind: string
+          last_message_at: string | null
+          member_ids: string[]
+          title: string | null
+        }
+        Insert: {
+          area?: string | null
+          created_at?: string | null
+          id?: string
+          kind?: string
+          last_message_at?: string | null
+          member_ids?: string[]
+          title?: string | null
+        }
+        Update: {
+          area?: string | null
+          created_at?: string | null
+          id?: string
+          kind?: string
+          last_message_at?: string | null
+          member_ids?: string[]
+          title?: string | null
+        }
+        Relationships: []
+      }
+      design_calendar: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: string
+          kind: string
+          notes: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           created_at: string | null
@@ -308,6 +396,24 @@ export type Database = {
           },
         ]
       }
+      landing_content: {
+        Row: {
+          content: Json
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: Json
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: Json
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lots: {
         Row: {
           expiry_date: string | null
@@ -355,6 +461,94 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          sender_id: string | null
+          sender_name: string | null
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_reads: {
+        Row: {
+          notification_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          notification_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          notification_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          roles: string[] | null
+          screen: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          roles?: string[] | null
+          screen?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          roles?: string[] | null
+          screen?: string | null
+        }
+        Relationships: []
       }
       order_items: {
         Row: {
@@ -700,6 +894,42 @@ export type Database = {
           },
         ]
       }
+      resource_requests: {
+        Row: {
+          asset_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          origin: string
+          requested_by: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          asset_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          origin?: string
+          requested_by?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          asset_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          origin?: string
+          requested_by?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           description: string | null
@@ -852,6 +1082,7 @@ export type Database = {
       }
     }
     Functions: {
+      app_role: { Args: never; Returns: string }
       apply_lot_movement: {
         Args: {
           p_change: number
@@ -862,6 +1093,7 @@ export type Database = {
         Returns: undefined
       }
       auth_role: { Args: never; Returns: string }
+      can_access_conversation: { Args: { cid: string }; Returns: boolean }
       has_cap: { Args: { cap: string }; Returns: boolean }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
       is_verified: { Args: never; Returns: boolean }
@@ -1008,6 +1240,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

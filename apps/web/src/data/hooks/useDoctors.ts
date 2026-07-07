@@ -1,7 +1,7 @@
 // Hook de acceso a doctores. HOY store mock; MAÑANA Supabase (profiles con
 // role_id='doctor'); verify/revoke = update de profiles.verified (solo admin por RLS).
 import { useSyncExternalStore } from 'react'
-import { subscribe, getSnapshot, setVerified, setCedula, inviteDoctor, addDoctor } from '../store/doctorsStore'
+import { subscribe, getSnapshot, setVerified, setCedula, inviteDoctor, addDoctor, updateDoctor, deleteDoctor } from '../store/doctorsStore'
 
 export function useDoctors() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
@@ -13,6 +13,8 @@ export function useDoctors() {
     revoke: (id: string) => setVerified(id, false),
     setCedula,
     inviteDoctor,
+    updateDoctor,
+    deleteDoctor,
     // Alta como PENDIENTE (la usa Prospectos al convertir).
     addPending: addDoctor,
   }

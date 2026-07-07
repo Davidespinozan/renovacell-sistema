@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { fmtDate } from '../../lib/format'
+import { uploadImage } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -43,7 +44,9 @@ export function MisEntregas() {
     window.setTimeout(() => setToast(null), 2600)
   }
 
-  const myAll = shipments.filter((s) => s.driver_id === driverId)
+  // Solo con chofer resuelto: si driverId es null (aún cargando) no se listan
+  // envíos —evita que un envío sin chofer (driver_id null) entre por null===null.
+  const myAll = driverId ? shipments.filter((s) => s.driver_id === driverId) : []
   const mine = myAll.filter((s) => s.status !== 'delivered')
   const entregadas = myAll.filter((s) => s.status === 'delivered')
   // Piezas a bordo = suma de unidades de los pedidos pendientes en su ruta.
@@ -53,11 +56,15 @@ export function MisEntregas() {
   }, 0)
   const incidencias = mine.filter((s) => s.incident && !s.incident.resolved).length
 
-  const onPhoto = (shipmentId: string, file: File | undefined) => {
+  const onPhoto = async (shipmentId: string, file: File | undefined) => {
     if (!file) return
+    // Preview inmediato (data-URI) y en paralelo sube a Storage; al terminar,
+    // guarda la URL pública para que la prueba de entrega NO sea un data-URI.
     const reader = new FileReader()
     reader.onload = () => setPhotos((p) => ({ ...p, [shipmentId]: String(reader.result) }))
     reader.readAsDataURL(file)
+    const url = await uploadImage(file, 'proofs')
+    setPhotos((p) => ({ ...p, [shipmentId]: url }))
   }
 
   const deliver = (shipmentId: string, orderId: string, folio: string) => {

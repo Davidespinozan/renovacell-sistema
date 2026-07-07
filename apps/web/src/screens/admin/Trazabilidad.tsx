@@ -13,14 +13,18 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil } from '../warehouse/expiry'
 import { statusView } from '../doctor/orderStatus'
+import { useDoctors } from '../../data/hooks/useDoctors'
 import { clientOf } from '../../data/mock/profiles'
 import { costOf } from '../../data/mock/costs'
 import type { InventoryMovement, Lot } from '../../data/types'
 
 type Mode = 'lote' | 'pedido'
 
-const clientLabel = (o: OrderWithItems | undefined): string =>
-  !o ? '—' : o.doctor_id ? clientOf(o.doctor_id).name : 'Venta en mostrador (POS)'
+// Nombre del cliente por doctor_id: primero el perfil REAL (names, viene de
+// profiles con backend), y solo como respaldo el mock. Antes usaba clientOf(uuid)
+// directo, que no encontraba el uuid en el mock y caía SIEMPRE a 'Dra. Laura Méndez'.
+const clientLabel = (o: OrderWithItems | undefined, names: Record<string, string>): string =>
+  !o ? '—' : o.doctor_id ? (names[o.doctor_id] ?? clientOf(o.doctor_id).name) : 'Venta en mostrador (POS)'
 
 function lotStatus(lot: Lot): { label: string; pill: string } {
   if (lot.quantity <= 0) return { label: 'Agotado', pill: 'p-neu' }
@@ -39,9 +43,14 @@ export function Trazabilidad() {
   const { data: lots } = useLots()
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
+  const { data: doctors } = useDoctors()
   const [mode, setMode] = useState<Mode>('lote')
 
   const prodName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
+  const clientName = useMemo(
+    () => Object.fromEntries(doctors.map((d) => [d.id, d.full_name ?? d.organization ?? 'Doctor'])) as Record<string, string>,
+    [doctors],
+  )
   const lotById = useMemo(() => Object.fromEntries(lots.map((l) => [l.id, l])) as Record<string, Lot | undefined>, [lots])
   const orderByRef = useMemo(() => {
     const m: Record<string, OrderWithItems | undefined> = {}
@@ -66,14 +75,14 @@ export function Trazabilidad() {
       </div>
 
       {mode === 'lote'
-        ? <PorLote lots={lots} movements={movements} prodName={prodName} orderByRef={orderByRef} />
-        : <PorPedido orders={orders} movements={movements} lotById={lotById} prodName={prodName} />}
+        ? <PorLote lots={lots} movements={movements} prodName={prodName} orderByRef={orderByRef} clientName={clientName} />
+        : <PorPedido orders={orders} movements={movements} lotById={lotById} prodName={prodName} clientName={clientName} />}
     </div>
   )
 }
 
-function PorLote({ lots, movements, prodName, orderByRef }: {
-  lots: Lot[]; movements: InventoryMovement[]; prodName: Record<string, string>; orderByRef: Record<string, OrderWithItems | undefined>
+function PorLote({ lots, movements, prodName, orderByRef, clientName }: {
+  lots: Lot[]; movements: InventoryMovement[]; prodName: Record<string, string>; orderByRef: Record<string, OrderWithItems | undefined>; clientName: Record<string, string>
 }) {
   const [lotId, setLotId] = useState(lots[0]?.id ?? '')
   const lot = lots.find((l) => l.id === lotId) ?? lots[0]
@@ -94,7 +103,7 @@ function PorLote({ lots, movements, prodName, orderByRef }: {
     const qty = -m.change
     const precio = o?.items.find((it) => it.product_id === lot.product_id)?.unit_price ?? 0
     const importe = precio * qty
-    return { qty, folio: m.reference ?? '—', cliente: clientLabel(o), fecha: m.created_at, importe, utilidad: importe - lotCost * qty }
+    return { qty, folio: m.reference ?? '—', cliente: clientLabel(o, clientName), fecha: m.created_at, importe, utilidad: importe - lotCost * qty }
   })
   const clientesUnicos = new Set(destinos.map((d) => d.cliente)).size
   const utilidadLote = destinos.reduce((s, d) => s + d.utilidad, 0)
@@ -162,8 +171,8 @@ function PorLote({ lots, movements, prodName, orderByRef }: {
   )
 }
 
-function PorPedido({ orders, movements, lotById, prodName }: {
-  orders: OrderWithItems[]; movements: InventoryMovement[]; lotById: Record<string, Lot | undefined>; prodName: Record<string, string>
+function PorPedido({ orders, movements, lotById, prodName, clientName }: {
+  orders: OrderWithItems[]; movements: InventoryMovement[]; lotById: Record<string, Lot | undefined>; prodName: Record<string, string>; clientName: Record<string, string>
 }) {
   const [orderId, setOrderId] = useState(orders[0]?.id ?? '')
   const order = orders.find((o) => o.id === orderId) ?? orders[0]
@@ -179,7 +188,7 @@ function PorPedido({ orders, movements, lotById, prodName }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Pedido</span>
         <select style={selStyle} value={orderId} onChange={(e) => setOrderId(e.target.value)}>
-          {orders.map((o) => <option key={o.id} value={o.id}>{o.external_ref} · {clientLabel(o)}</option>)}
+          {orders.map((o) => <option key={o.id} value={o.id}>{o.external_ref} · {clientLabel(o, clientName)}</option>)}
         </select>
       </div>
 
@@ -187,7 +196,7 @@ function PorPedido({ orders, movements, lotById, prodName }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
           <span className={'pill ' + sv.pill}>{sv.label}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)' }}>{clientLabel(order)} · {fmtDate(order.created_at)}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)' }}>{clientLabel(order, clientName)} · {fmtDate(order.created_at)}</span>
         </div>
 
         <div className="eyebrow" style={{ marginBottom: 4 }}>Con qué lotes se surtió</div>

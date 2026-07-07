@@ -7,7 +7,7 @@ import { isPast } from './orderStatus'
 import type { ProductSafe } from '../../data/types'
 
 export function Historial() {
-  const { data: orders } = useOrders()
+  const { data: orders, loading } = useOrders()
   const { data: products } = useProducts()
 
   const byId = useMemo(() => {
@@ -21,7 +21,9 @@ export function Historial() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Portal del Doctor · Historial</div>
-      {past.length === 0 ? (
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tu historial…</div>
+      ) : past.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
           Aún no hay pedidos en tu historial.
         </div>

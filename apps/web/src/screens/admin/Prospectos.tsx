@@ -5,7 +5,7 @@
 // fase de Supabase.
 import React, { useMemo, useState } from 'react'
 import {
-  Plus, X, UserPlus, Send, Clock, ArrowRight, Ban, MessageSquare, CheckCircle2,
+  Plus, X, UserPlus, Send, Clock, ArrowRight, Ban, MessageSquare, CheckCircle2, Pencil, Trash2,
 } from 'lucide-react'
 import { fmtDate, initials, avatarColor } from '../../lib/format'
 import { useProspects, type ProspectStatus, type ProspectNote } from '../../data/hooks/useProspects'
@@ -36,7 +36,13 @@ function Avatar({ name }: { name: string }) {
 }
 
 export function Prospectos() {
-  const { data: prospects, addProspect, setStatus, addNote, markConverted } = useProspects()
+  const { data: prospects, addProspect, setStatus, addNote, markConverted, updateProspect, deleteProspect } = useProspects()
+  const [editP, setEditP] = useState<{ id: string; name: string; email: string; phone: string; org: string } | null>(null)
+  const onDeleteProspect = async (id: string, name: string) => {
+    if (!window.confirm(`¿Eliminar el prospecto "${name}"?`)) return
+    const r = await deleteProspect(id)
+    if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
+  }
   const { addPending } = useDoctors()
   const { role, user } = useRole()
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -103,9 +109,11 @@ export function Prospectos() {
               <span className="pill p-neu">{p.source}</span>
               <span className={'pill ' + st.pill}>{st.label}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(p.created_at)}</span>
               <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setDetailId(p.id)}>Ver detalle</button>
+              <button className="btn ghost sm" type="button" onClick={() => setEditP({ id: p.id, name: p.name ?? '', email: p.email ?? '', phone: p.phone ?? '', org: orgOf(p) })}><Pencil size={14} /> Editar</button>
+              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => onDeleteProspect(p.id, p.name ?? 'este prospecto')}><Trash2 size={14} /> Eliminar</button>
             </div>
           </div>
         )
@@ -118,6 +126,13 @@ export function Prospectos() {
           onStatus={(s) => setStatus(detail.id, s)}
           onNote={(t) => addNote(detail.id, t)}
           onConvert={() => convert(detail)}
+        />
+      )}
+      {editP && (
+        <EditProspectModal
+          initial={editP}
+          onClose={() => setEditP(null)}
+          onSave={(patch) => { updateProspect(editP.id, patch); setEditP(null) }}
         />
       )}
       {newOpen && (
@@ -330,6 +345,41 @@ function NewModal({ onClose, onSave }: {
             <button className="btn" type="button" onClick={save} disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
               <Plus size={15} /> Registrar prospecto
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditProspectModal({ initial, onClose, onSave }: {
+  initial: { name: string; email: string; phone: string; org: string }
+  onClose: () => void
+  onSave: (patch: { name: string; email: string | null; phone: string | null; organization: string | null }) => void
+}) {
+  const [name, setName] = useState(initial.name)
+  const [email, setEmail] = useState(initial.email)
+  const [phone, setPhone] = useState(initial.phone)
+  const [org, setOrg] = useState(initial.org)
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead"><div><h3>Editar prospecto</h3></div><button className="mclose" type="button" onClick={onClose}><X size={16} /></button></div>
+        <div className="mbody">
+          <label style={{ ...label, marginTop: 0 }}>Nombre</label>
+          <input style={input} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <label style={label}>Correo</label>
+          <input style={input} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@clinica.mx" />
+          <label style={label}>Teléfono</label>
+          <input style={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="55 0000 0000" />
+          <label style={label}>Clínica</label>
+          <input style={input} value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Nombre de la clínica" />
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              onClick={() => onSave({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, organization: org.trim() || null })}>Guardar cambios</button>
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@
 import React, { useState } from 'react'
 import { Play, Check, Upload, Eye, Plus, Sparkles, X } from 'lucide-react'
 import { fmtDate } from '../lib/format'
+import { uploadImage } from '../lib/uploads'
 import { useResources, type ResourceStatus } from '../data/hooks/useResources'
 import { useAssets } from '../data/hooks/useAssets'
 import { useRole } from '../auth/RoleContext'
@@ -24,18 +25,15 @@ export function Solicitudes() {
 
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600) }
 
-  const onDeliver = (id: string, file: File | undefined) => {
+  const onDeliver = async (id: string, file: File | undefined) => {
     if (!file) return
-    const r = new FileReader()
-    r.onload = () => {
-      const url = String(r.result)
-      deliver(id, url)
-      // El recurso entregado también entra a la Biblioteca de la Vista Común.
-      const req = data.find((x) => x.id === id)
-      addAsset({ key: req?.title ?? 'Recurso', url, tags: ['recurso'] })
-      flash('Recurso entregado · disponible en la Biblioteca.')
-    }
-    r.readAsDataURL(file)
+    // Sube el recurso a Storage y guarda su URL (no data-URI).
+    const url = await uploadImage(file, 'design')
+    deliver(id, url)
+    // El recurso entregado también entra a la Biblioteca de la Vista Común.
+    const req = data.find((x) => x.id === id)
+    addAsset({ key: req?.title ?? 'Recurso', url, tags: ['recurso'] })
+    flash('Recurso entregado · disponible en la Biblioteca.')
   }
 
   const onCrearPendiente = (title: string, description: string) => {

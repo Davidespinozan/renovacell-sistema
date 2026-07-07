@@ -48,6 +48,11 @@ export function subscribe(cb: () => void): () => void {
 export const getSnapshot = (): OrderWithItems[] => snapshotDoctor
 export const getSnapshotAll = (): OrderWithItems[] => snapshotAll
 
+// ¿Terminó la primera hidratación con la sesión actual? Evita empty-states falsos
+// ("No tienes pedidos activos") mientras aún carga desde Supabase.
+let hydrated = !hasSupabase
+export const ready = (): boolean => hydrated
+
 // ---- Hidratación desde Supabase (RLS acota el resultado por rol) ----
 async function hydrate() {
   if (!hasSupabase) return
@@ -55,19 +60,23 @@ async function hydrate() {
     .from('orders')
     .select('id, external_ref, doctor_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
     .order('created_at', { ascending: false })
-  if (error) { console.warn('[orders] hydrate', error.message); return }
+  if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
   const rows = data ?? []
   orders = rows.map((r) => {
     const { order_items: _oi, ...o } = r as Record<string, unknown>
     return o as unknown as Order
   })
   items = rows.flatMap((r) => ((r as { order_items?: OrderItem[] }).order_items ?? []))
+  hydrated = true
   emit()
 }
 if (hasSupabase) {
   hydrate()
   supabase.auth.onAuthStateChange((ev) => {
-    if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT' || ev === 'TOKEN_REFRESHED') hydrate()
+    // En login / cambio de sesión volvemos a "no hidratado" para no mostrar un
+    // vacío falso; el refresco de token recarga en silencio.
+    if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') { hydrated = false; hydrate() }
+    else if (ev === 'TOKEN_REFRESHED') hydrate()
   })
 }
 

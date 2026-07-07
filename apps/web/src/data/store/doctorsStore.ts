@@ -48,6 +48,34 @@ export function setCedula(id: string, cedula: string) {
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] cedula', error.message); live.reload() })
 }
 
+// Editar datos del doctor (nombre, organización). Admin por RLS/guard.
+export function updateDoctor(id: string, patch: { full_name?: string; organization?: string | null }) {
+  const cur = live.current().find((d) => d.id === id)
+  if (!cur) return
+  const meta = { ...((cur.meta ?? {}) as Record<string, unknown>) }
+  if (patch.full_name != null) meta.name = patch.full_name
+  const next = { ...cur, full_name: patch.full_name ?? cur.full_name, organization: patch.organization !== undefined ? patch.organization : cur.organization, meta }
+  live.setLocal(live.current().map((d) => (d.id === id ? next : d)))
+  logAudit({ actor: 'Administración', action: 'Doctor editado', resource: next.full_name ?? id })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ full_name: next.full_name, organization: next.organization, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] update', error.message); live.reload() })
+}
+
+// Eliminar un doctor. Es un usuario de auth → se borra vía la Edge Function
+// `staff-admin` (service role, solo admin). Los locales (sin persistir) se quitan
+// de la lista sin más.
+export async function deleteDoctor(id: string): Promise<{ ok: boolean; error?: string }> {
+  const cur = live.current().find((d) => d.id === id)
+  live.setLocal(live.current().filter((d) => d.id !== id))
+  logAudit({ actor: 'Administración', action: 'Doctor eliminado', resource: cur?.full_name ?? id })
+  if (hasSupabase && isUuid(id)) {
+    const { data, error } = await supabase.functions.invoke('staff-admin', { body: { action: 'delete', id } })
+    const err = error?.message ?? (data as { error?: string } | null)?.error
+    if (err) { await live.reload(); return { ok: false, error: err } }
+    await live.reload()
+  }
+  return { ok: true }
+}
+
 export function inviteDoctor(id: string) {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return
@@ -60,8 +88,11 @@ export function inviteDoctor(id: string) {
   // server-side (admin API / Edge Function) que se conecta en la fase de correo.
 }
 
-// Alta como PENDIENTE (conversión de prospecto). Un doctor es un usuario de auth,
-// así que la persistencia real requiere el flujo de invitación; por ahora local.
+// Alta como PENDIENTE (conversión de prospecto). Un doctor es un usuario de auth:
+// con backend, la Edge Function `invite-doctor` (service role, solo admin) lo crea
+// de verdad y persiste el perfil; aquí lo agregamos optimista y al confirmar
+// recargamos para traer el doctor real (uuid). Sin correo del prospecto no se puede
+// crear el usuario → queda local (se persiste cuando se capture un correo).
 let newSeq = 0
 export function addDoctor(input: {
   full_name: string
@@ -76,5 +107,13 @@ export function addDoctor(input: {
   }
   live.setLocal([doc, ...live.current()])
   notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  if (hasSupabase && input.email) {
+    supabase.functions.invoke('invite-doctor', {
+      body: { email: input.email, full_name: input.full_name, organization: input.organization, meta: input.meta ?? {} },
+    }).then(({ error }) => {
+      if (error) { console.warn('[doctors] invite-doctor', error.message); return }
+      live.reload() // reemplaza el optimista por el doctor real persistido
+    })
+  }
   return doc
 }

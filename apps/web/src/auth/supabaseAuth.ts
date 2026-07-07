@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import type { RoleKey } from '../app/roles'
 
 // La base tiene 8 roles; la app usa 5. Mapeo seguro (packing→almacén, billing/comm→admin).
-const ROLE_MAP: Record<string, RoleKey> = {
+export const ROLE_MAP: Record<string, RoleKey> = {
   admin: 'admin', doctor: 'doctor', warehouse: 'warehouse', packing: 'warehouse',
   pos: 'pos', billing: 'admin', comm: 'admin', driver: 'driver',
 }

@@ -3,7 +3,7 @@
 // mutaciones escriben write-through. El guard limita al chofer a estado/entrega.
 // Sin backend, opera sobre el mock. driver_id = uuid del perfil del chofer.
 import type { Shipment } from '../types'
-import { MOCK_SHIPMENTS } from '../mock/shipments'
+import { MOCK_SHIPMENTS, loadDrivers } from '../mock/shipments'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
@@ -14,6 +14,9 @@ const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[
 const uuid = (): string => (globalThis.crypto?.randomUUID?.() ?? `sh-${Math.random().toString(16).slice(2)}`)
 
 const live = makeLive<Shipment>(async () => {
+  // Espera a que carguen los choferes ANTES de emitir: así driverName()/driverIdByEmail()
+  // ya resuelven cuando la pantalla (que se suscribe a envíos) re-renderiza.
+  await loadDrivers()
   const { data, error } = await supabase.from('shipments')
     .select('id, order_id, carrier, tracking_number, label_url, driver_id, status, estimated_delivery_at, delivered_at, proof_image_url, received_by, incident, dispatched_by, dispatched_at, load_confirmed_at, created_at')
     .order('created_at', { ascending: false })

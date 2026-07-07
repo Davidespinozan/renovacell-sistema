@@ -2,14 +2,14 @@
 // Single-pane: por default se ve la LISTA; al abrir un chat ocupa todo el panel
 // con una flecha para volver. UI-first: mock detrás de useChat.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft } from 'lucide-react'
+import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2 } from 'lucide-react'
 import { timeAgo, initials, avatarColor } from '../../lib/format'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
 import type { Conversation } from '../../data/types'
 
 export function Chat() {
-  const { conversations, messagesByConv, send, ensureDirect, me } = useChat()
+  const { conversations, messagesByConv, send, ensureDirect, deleteMessage, deleteConversation, me } = useChat()
   const [selectedId, setSelectedId] = useState<string | null>(null) // ninguno abierto por default
   const [text, setText] = useState('')
   const [newOpen, setNewOpen] = useState(false)
@@ -36,10 +36,21 @@ export function Chat() {
                 <ArrowLeft size={18} />
               </button>
               <ConvAvatar conv={conv} />
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{conv.title}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{conv.kind === 'group' ? 'Grupo' : 'Mensaje directo'}</div>
               </div>
+              {conv.kind === 'dm' && (
+                <button
+                  type="button"
+                  className="iconbtn-round"
+                  title="Eliminar conversación"
+                  aria-label="Eliminar conversación"
+                  onClick={() => { if (window.confirm('¿Eliminar esta conversación y sus mensajes?')) { deleteConversation(conv.id); setSelectedId(null) } }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
 
             <div className="bubbles">
@@ -47,10 +58,21 @@ export function Chat() {
               {msgs.map((m) => {
                 const mine = m.sender_id === me.id
                 return (
-                  <div key={m.id} className={'bubble' + (mine ? ' me' : '')}>
+                  <div key={m.id} className={'bubble' + (mine ? ' me' : '')} style={{ position: 'relative' }}>
                     {!mine && conv.kind === 'group' && <div className="who">{m.sender_name}</div>}
                     <div className="btxt">{m.body}</div>
                     <div className="bwhen">{timeAgo(m.created_at)}</div>
+                    {mine && (
+                      <button
+                        type="button"
+                        className="bubble-del"
+                        title="Eliminar mensaje"
+                        aria-label="Eliminar mensaje"
+                        onClick={() => { if (window.confirm('¿Eliminar este mensaje?')) deleteMessage(conv.id, m.id) }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 )
               })}

@@ -3510,15 +3510,44 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
-<!-- CONTENIDO EDITABLE (data-driven): hidrata textos desde content.json, que
-     edita Administración en el sistema (Contenido → Landing). Si el archivo no
-     existe o falla, la página conserva los textos por defecto del HTML. -->
+<!-- CONTENIDO EDITABLE (data-driven): hidrata textos desde el sistema. Fuente:
+     1) tabla `landing_content` en Supabase (lo que edita Administración en
+        Sitio web — lectura pública por RLS), y si no hay fila/ falla,
+     2) ./content.json (respaldo estático). Si ambos fallan, conserva los textos
+     por defecto del HTML. El modelo del sistema es ANIDADO (hero.title…); aquí
+     se APLANA a las claves data-rc del landing (heroTitle, metaTitle…). -->
 <script>
 (async function hydrateContent(){
+  var SUPA_URL = 'https://amurlvlvfohwucvxfdot.supabase.co';
+  var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  // Aplana el modelo anidado del sistema a las claves planas del landing.
+  function flatten(n){
+    if (!n) return null;
+    return {
+      metaTitle: (n.seo||{}).title, metaDescription: (n.seo||{}).description,
+      heroEyebrow: (n.hero||{}).eyebrow, heroTitle: (n.hero||{}).title, heroSubtitle: (n.hero||{}).subtitle,
+      ctaPrimary: (n.hero||{}).ctaPrimary, ctaSecondary: (n.hero||{}).ctaSecondary,
+      email: (n.contact||{}).email, whatsapp: (n.contact||{}).whatsapp
+    };
+  }
+  async function fromSupabase(){
+    try {
+      var r = await fetch(SUPA_URL + '/rest/v1/landing_content?id=eq.main&select=content', {
+        headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + SUPA_ANON }, cache: 'no-store'
+      });
+      if (!r.ok) return null;
+      var rows = await r.json();
+      return (rows && rows[0] && rows[0].content) ? flatten(rows[0].content) : null;
+    } catch (e) { return null; }
+  }
+  async function fromJson(){
+    try { var r = await fetch('./content.json', { cache: 'no-store' }); return r.ok ? flatten(await r.json()) : null; }
+    catch (e) { return null; }
+  }
   try {
-    const res = await fetch('./content.json', { cache: 'no-store' });
-    if (!res.ok) return;
-    const c = await res.json();
+    var c = await fromSupabase();
+    if (!c) c = await fromJson();
+    if (!c) return; // sin fuente: conserva los textos por defecto del HTML
     document.querySelectorAll('[data-rc]').forEach(function(el){
       var v = c[el.getAttribute('data-rc')];
       if (v != null) el.textContent = v;

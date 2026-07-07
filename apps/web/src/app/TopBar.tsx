@@ -9,9 +9,11 @@ import { useNotifications } from '../data/hooks/useNotifications'
 import { timeAgo } from '../lib/format'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
-  const { role, screen, setScreen } = useRole()
+  const { role, screen, setScreen, capabilities } = useRole()
   const r = getRole(role)
-  const s = getScreenDef(r, screen)
+  // Pasa las capabilities para resolver también el título de las pantallas de
+  // capacidad (Diseño/Eventos); si no, caían al primero de la nav ("Inicio").
+  const s = getScreenDef(r, screen, undefined, capabilities)
   const sub =
     screen === COMMON_SCREEN.key ? ''
       : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'

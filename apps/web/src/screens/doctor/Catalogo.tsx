@@ -45,8 +45,11 @@ export function Catalogo() {
 
   const total = lines.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0)
 
-  // No se puede pedir más de lo disponible en inventario.
+  // No se puede pedir más de lo disponible en inventario. Ni un producto sin
+  // precio publicado (price null = "a consultar"): evita un pedido con renglón a $0.
   const add = (id: string) => setCart((c) => {
+    const prod = products.find((p) => p.id === id)
+    if (!prod || prod.price == null) return c
     const info = stockInfoFor(stockMap, id)
     const max = info.tracked ? info.qty : 0
     const next = (c[id] ?? 0) + 1
@@ -86,7 +89,11 @@ export function Catalogo() {
         </div>
 
         <div className="pgrid">
-          {shown.map((p) => (
+          {shown.length === 0 ? (
+            <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ink-3)' }}>
+              No hay productos disponibles en este momento.
+            </div>
+          ) : shown.map((p) => (
             <ProductCard key={p.id} p={p} qty={cart[p.id] ?? 0} stock={stockInfoFor(stockMap, p.id)} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
           ))}
         </div>

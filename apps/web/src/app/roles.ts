@@ -117,7 +117,10 @@ export interface CapabilityDef { key: CapabilityKey; label: string; modules: Scr
 export const CAPABILITIES: CapabilityDef[] = [
   {
     key: 'diseno', label: 'Diseño',
-    modules: [{ key: 'dis_solicitudes', label: 'Solicitudes de recurso', icon: 'image', section: 'Diseño' }],
+    modules: [
+      { key: 'dis_solicitudes', label: 'Solicitudes de recurso', icon: 'image', section: 'Diseño' },
+      { key: 'dis_calendario', label: 'Calendario', icon: 'dashboard', section: 'Diseño' },
+    ],
   },
   {
     key: 'eventos', label: 'Eventos',

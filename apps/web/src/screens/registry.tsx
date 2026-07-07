@@ -5,6 +5,7 @@ import React from 'react'
 import { Placeholder } from './Placeholder'
 import { Bandeja } from './Bandeja'
 import { Solicitudes } from './Solicitudes'
+import { Calendario } from './Calendario'
 import { Clientes } from './Clientes'
 import { CommonView } from './CommonView'
 import { Chat } from './hub/Chat'
@@ -48,6 +49,7 @@ import { Icon } from '../app/icons'
 const SCREENS: Record<string, () => React.ReactNode> = {
   bandeja: () => <Bandeja />,
   dis_solicitudes: () => <Solicitudes />,
+  dis_calendario: () => <Calendario />,
   clientes: () => <Clientes />,
   catalogo: () => <Catalogo />,
   pedidosdr: () => <MisPedidos />,

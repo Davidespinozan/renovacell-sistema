@@ -11,6 +11,7 @@ import {
 import { useAssets, type AssetInput } from '../data/hooks/useAssets'
 import { useResources } from '../data/hooks/useResources'
 import { timeAgo, initials, avatarColor } from '../lib/format'
+import { uploadImage } from '../lib/uploads'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
 import { Icon } from '../app/icons'
@@ -235,21 +236,28 @@ function ResourceRequestModal({ onClose, onSave }: { onClose: () => void; onSave
 
 function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (input: AssetInput) => void }) {
   const [key, setKey] = useState('')
-  const [dataUrl, setDataUrl] = useState('')
+  const [dataUrl, setDataUrl] = useState('') // preview local
+  const [file, setFile] = useState<File | null>(null)
   const [fileName, setFileName] = useState('')
   const [tags, setTags] = useState('')
+  const [busy, setBusy] = useState(false)
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
 
   const onFile = (f: File | undefined) => {
     if (!f) return
+    setFile(f)
     setFileName(f.name)
     const r = new FileReader()
     r.onload = () => setDataUrl(String(r.result))
     r.readAsDataURL(f)
   }
-  const save = () => {
-    if (!key.trim()) return
-    onSave({ key: key.trim(), url: dataUrl, tags: tags.split(',').map((t) => t.trim()).filter(Boolean) })
+  const save = async () => {
+    if (!key.trim() || busy) return
+    setBusy(true)
+    // Sube la imagen a Storage y guarda su URL (no el data-URI).
+    const url = file ? await uploadImage(file, 'library') : dataUrl
+    onSave({ key: key.trim(), url, tags: tags.split(',').map((t) => t.trim()).filter(Boolean) })
+    setBusy(false)
   }
 
   return (
@@ -278,7 +286,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" onClick={save}><Upload size={15} /> Subir</button>
+            <button className="btn" type="button" onClick={save} disabled={busy || !key.trim()} style={busy || !key.trim() ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}><Upload size={15} /> {busy ? 'Subiendo…' : 'Subir'}</button>
           </div>
         </div>
       </div>

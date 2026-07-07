@@ -73,6 +73,35 @@ export function addNote(id: string, text: string) {
   if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] note', error.message); live.reload() })
 }
 
+// Editar datos del prospecto (nombre, contacto, organización, interés).
+export function updateProspect(id: string, patch: { name?: string; email?: string | null; phone?: string | null; organization?: string | null; interest?: string[] }) {
+  const cur = live.current().find((p) => p.id === id)
+  if (!cur) return
+  const meta = { ...((cur.meta ?? {}) as Record<string, unknown>) }
+  if (patch.organization !== undefined) meta.organization = patch.organization
+  if (patch.interest !== undefined) meta.interest = patch.interest
+  const next = {
+    ...cur,
+    name: patch.name ?? cur.name,
+    email: patch.email !== undefined ? patch.email : cur.email,
+    phone: patch.phone !== undefined ? patch.phone : cur.phone,
+    meta,
+  }
+  live.setLocal(live.current().map((p) => (p.id === id ? next : p)))
+  if (hasSupabase) supabase.from('prospects').update({ name: next.name, email: next.email, phone: next.phone, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] update', error.message); live.reload() })
+}
+
+// Eliminar prospecto (solo admin por RLS: prospects_delete_admin).
+export async function deleteProspect(id: string): Promise<{ ok: boolean; error?: string }> {
+  live.setLocal(live.current().filter((p) => p.id !== id))
+  if (hasSupabase) {
+    const { error } = await supabase.from('prospects').delete().eq('id', id)
+    if (error) { await live.reload(); return { ok: false, error: error.message } }
+    await live.reload()
+  }
+  return { ok: true }
+}
+
 export function markConverted(id: string, doctorId: string) {
   const cur = live.current().find((p) => p.id === id)
   const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>), convertedDoctorId: doctorId }

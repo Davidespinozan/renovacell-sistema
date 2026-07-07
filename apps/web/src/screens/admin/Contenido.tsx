@@ -37,8 +37,14 @@ export function SitioWeb() {
 }
 
 function ProductsEditor() {
-  const { data, createProduct, updateProduct, toggleActive } = useCatalogAdmin()
+  const { data, createProduct, updateProduct, toggleActive, deleteProduct } = useCatalogAdmin()
   const [editing, setEditing] = useState<ProductSafe | 'new' | null>(null)
+
+  const onDelete = async (p: ProductSafe) => {
+    if (!window.confirm(`¿Eliminar "${p.name}" del catálogo? Si ya tuvo pedidos, mejor ocúltalo.`)) return
+    const r = await deleteProduct(p.id)
+    if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
+  }
 
   const groups = useMemo(() => ({
     cosm: data.filter((p) => p.line === 'cosm'),
@@ -52,8 +58,8 @@ function ProductsEditor() {
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setEditing('new')}><Plus size={14} /> Nuevo producto</button>
       </div>
 
-      <Section title="Home Care" items={groups.cosm} onEdit={setEditing} onToggle={toggleActive} />
-      <Section title="Professional" items={groups.prof} onEdit={setEditing} onToggle={toggleActive} />
+      <Section title="Home Care" items={groups.cosm} onEdit={setEditing} onToggle={toggleActive} onDelete={onDelete} />
+      <Section title="Professional" items={groups.prof} onEdit={setEditing} onToggle={toggleActive} onDelete={onDelete} />
 
       {editing && (
         <ProductModal
@@ -70,11 +76,12 @@ function ProductsEditor() {
   )
 }
 
-function Section({ title, items, onEdit, onToggle }: {
+function Section({ title, items, onEdit, onToggle, onDelete }: {
   title: string
   items: ProductSafe[]
   onEdit: (p: ProductSafe) => void
   onToggle: (id: string) => void
+  onDelete: (p: ProductSafe) => void
 }) {
   if (items.length === 0) return null
   return (
@@ -97,6 +104,7 @@ function Section({ title, items, onEdit, onToggle }: {
                       {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
                     <button className="btn ghost sm" type="button" style={{ marginLeft: 6 }} onClick={() => onEdit(p)}><Pencil size={14} /> Editar</button>
+                    <button className="btn ghost sm" type="button" style={{ marginLeft: 6, color: 'var(--danger)' }} title="Eliminar producto" onClick={() => onDelete(p)}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               )

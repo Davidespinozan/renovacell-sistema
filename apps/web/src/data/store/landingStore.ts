@@ -11,6 +11,8 @@
 //   · Imágenes/logo   → hoy por URL; con Storage de Supabase será subir archivo.
 // La firma de useLanding NO cambia al conectar; solo el cuerpo de estas funciones.
 import { logAudit } from './auditStore'
+import { hasSupabase, supabase } from '../../lib/supabase'
+import type { Json } from '../database.types'
 
 export interface NavLink { label: string; href: string }
 export interface Certification { label: string; sub: string }
@@ -92,6 +94,10 @@ const DEFAULT: LandingContent = {
 
 const clone = (c: LandingContent): LandingContent => JSON.parse(JSON.stringify(c))
 
+// Fila única id='main'. Con backend hidrata de `landing_content` (lectura
+// pública; escritura solo admin por RLS) y saveLanding hace upsert write-through.
+// Sin backend, opera sobre DEFAULT en memoria.
+const ROW_ID = 'main'
 let content: LandingContent = clone(DEFAULT)
 const listeners = new Set<() => void>()
 let snapshot: LandingContent = content
@@ -100,10 +106,30 @@ function emit() { snapshot = content; listeners.forEach((l) => l()) }
 export function subscribe(cb: () => void): () => void { listeners.add(cb); return () => listeners.delete(cb) }
 export const getSnapshot = (): LandingContent => snapshot
 
+async function hydrate() {
+  if (!hasSupabase) return
+  const { data, error } = await supabase.from('landing_content').select('content').eq('id', ROW_ID).maybeSingle()
+  if (error) { console.warn('[landing] hydrate', error.message); return }
+  if (data?.content) { content = clone({ ...DEFAULT, ...(data.content as unknown as LandingContent) }); emit() }
+}
+if (hasSupabase) {
+  hydrate()
+  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') hydrate() })
+}
+
 export function saveLanding(next: LandingContent) {
   content = clone(next)
   emit()
   logAudit({ actor: 'Administración', action: 'Landing actualizada', resource: 'Página pública' })
+  if (hasSupabase) {
+    supabase.from('landing_content').upsert({ id: ROW_ID, content: content as unknown as Json, updated_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) console.warn('[landing] save', error.message) })
+  }
 }
 
-export function resetLanding(): LandingContent { content = clone(DEFAULT); emit(); return content }
+export function resetLanding(): LandingContent {
+  content = clone(DEFAULT)
+  emit()
+  if (hasSupabase) supabase.from('landing_content').upsert({ id: ROW_ID, content: content as unknown as Json, updated_at: new Date().toISOString() }).then(({ error }) => { if (error) console.warn('[landing] reset', error.message) })
+  return content
+}

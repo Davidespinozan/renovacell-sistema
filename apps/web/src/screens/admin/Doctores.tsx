@@ -2,7 +2,7 @@
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import React, { useMemo, useState } from 'react'
-import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus } from 'lucide-react'
+import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2 } from 'lucide-react'
 import { money, fmtDate, initials, avatarColor } from '../../lib/format'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -18,7 +18,13 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke, setCedula, inviteDoctor } = useDoctors()
+  const { data: doctors, verify, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
+  const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
+  const onDeleteDoctor = async (id: string, name: string) => {
+    if (!window.confirm(`¿Eliminar a ${name}? Perderá el acceso y se borra su cuenta. Esta acción no se puede deshacer.`)) return
+    const r = await deleteDoctor(id)
+    if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
+  }
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
@@ -66,8 +72,10 @@ export function Doctores() {
             </span>
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap' }}>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
+            <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
+            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => onDeleteDoctor(d.id, d.full_name ?? 'este doctor')}><Trash2 size={14} /> Eliminar</button>
             {d.verified ? (
               <>
                 <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
@@ -103,6 +111,37 @@ export function Doctores() {
       )}
 
       {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy="Administración" onClose={() => setPedidoFor(null)} />}
+      {editDoc && (
+        <EditDoctorModal
+          initial={editDoc}
+          onClose={() => setEditDoc(null)}
+          onSave={(name, org) => { updateDoctor(editDoc.id, { full_name: name, organization: org }); setEditDoc(null) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function EditDoctorModal({ initial, onClose, onSave }: { initial: { name: string; org: string }; onClose: () => void; onSave: (name: string, org: string) => void }) {
+  const [name, setName] = useState(initial.name)
+  const [org, setOrg] = useState(initial.org)
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead"><div><h3>Editar doctor</h3></div><button className="mclose" type="button" onClick={onClose}><X size={16} /></button></div>
+        <div className="mbody">
+          <label style={{ ...label, marginTop: 0 }}>Nombre</label>
+          <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Dra. / Dr. Nombre Apellido" autoFocus />
+          <label style={label}>Clínica / organización</label>
+          <input style={input} value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Nombre de la clínica" />
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={!name.trim()} style={!name.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSave(name.trim(), org.trim())}>Guardar cambios</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
