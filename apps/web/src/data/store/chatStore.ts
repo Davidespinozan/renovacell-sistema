@@ -188,19 +188,24 @@ export function ensureDirect(user: { id: string; name: string }): string | null 
   return id
 }
 
-// Borra un mensaje (el RLS permite el propio; admin cualquiera).
+// Borra un mensaje (el RLS permite el propio; admin cualquiera). Revierte si falla.
 export function deleteMessage(conversationId: string, messageId: string) {
-  messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((m) => m.id !== messageId) }
+  const prev = messages[conversationId] ?? []
+  messages = { ...messages, [conversationId]: prev.filter((m) => m.id !== messageId) }
   emit()
-  if (hasSupabase && isUuid(messageId)) supabase.from('messages').delete().eq('id', messageId).then(({ error }) => { if (error) console.warn('[chat] del msg', error.message) })
+  if (hasSupabase && isUuid(messageId)) supabase.from('messages').delete().eq('id', messageId)
+    .then(({ error }) => { if (error) { console.warn('[chat] del msg', error.message); messages = { ...messages, [conversationId]: prev }; emit() } })
 }
 
 // Borra una conversación completa (DM: cualquier miembro; grupo: solo admin).
-// Los mensajes caen por ON DELETE CASCADE.
+// Los mensajes caen por ON DELETE CASCADE. Revierte si el backend lo rechaza.
 export function deleteConversation(conversationId: string) {
+  const prevConvs = conversations
+  const prevMsgs = messages
   conversations = conversations.filter((c) => c.id !== conversationId)
   const { [conversationId]: _drop, ...rest } = messages
   messages = rest
   emit()
-  if (hasSupabase && isUuid(conversationId)) supabase.from('conversations').delete().eq('id', conversationId).then(({ error }) => { if (error) console.warn('[chat] del conv', error.message) })
+  if (hasSupabase && isUuid(conversationId)) supabase.from('conversations').delete().eq('id', conversationId)
+    .then(({ error }) => { if (error) { console.warn('[chat] del conv', error.message); conversations = prevConvs; messages = prevMsgs; emit() } })
 }

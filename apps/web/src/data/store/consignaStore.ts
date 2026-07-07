@@ -100,6 +100,13 @@ export function sellFromConsigna(vendor: string, lines: { product_id: string; qt
 // Regresar al almacén lo no vendido: vuelve a SUS lotes (adjust write-through).
 export function returnToWarehouse(vendor: string, productId: string, qty: number) {
   if (qty <= 0) return
+  // Tope: solo se puede devolver lo que sigue EN PODER del vendedor (asignado −
+  // vendido). Sin esto, devolver de más reingresaba unidades ya vendidas → stock
+  // fantasma en el almacén.
+  const item = (byVendor[vendor] ?? []).find((it) => it.product_id === productId)
+  const remaining = item ? Math.max(0, item.assigned - item.sold) : 0
+  qty = Math.min(qty, remaining)
+  if (qty <= 0) return
   const lots = getSnapshotLots()
   const productOfLot = (lotId: string) => lots.find((l) => l.id === lotId)?.product_id
   const assigns = getSnapshotMovements().filter((m) => m.reference === ref(vendor) && m.reason === 'consigna' && m.change < 0 && productOfLot(m.lot_id) === productId)

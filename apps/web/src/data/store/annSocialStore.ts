@@ -43,11 +43,13 @@ if (hasSupabase) {
 
 export function addComment(announcementId: string, body: string, author: string) {
   const text = body.trim(); if (!text) return
-  const uid = currentUserId() ?? 'me'
+  const uid = currentUserId()
+  if (hasSupabase && !uid) return // sin sesión aún: no crear comentarios fantasma
   const c: AnnComment = { id: uuid(), announcement_id: announcementId, author, body: text, created_at: new Date().toISOString() }
   comments = { ...comments, [announcementId]: [...(comments[announcementId] ?? []), c] }
   emit()
-  if (hasSupabase) supabase.from('announcement_comments').insert({ id: c.id, announcement_id: announcementId, user_id: uid, author, body: text }).then(({ error }) => { if (error) console.warn('[annSocial] comment', error.message) })
+  if (hasSupabase) supabase.from('announcement_comments').insert({ id: c.id, announcement_id: announcementId, user_id: uid, author, body: text })
+    .then(({ error }) => { if (error) { console.warn('[annSocial] comment', error.message); comments = { ...comments, [announcementId]: (comments[announcementId] ?? []).filter((x) => x.id !== c.id) }; emit() } })
 }
 
 export function deleteComment(announcementId: string, commentId: string) {
@@ -57,24 +59,30 @@ export function deleteComment(announcementId: string, commentId: string) {
 }
 
 export function toggleReaction(announcementId: string) {
-  const uid = currentUserId() ?? 'me'
+  const uid = currentUserId()
+  if (hasSupabase && !uid) return
+  const id = uid ?? 'me'
   const cur = reactionUsers[announcementId] ?? []
-  const has = cur.includes(uid)
-  reactionUsers = { ...reactionUsers, [announcementId]: has ? cur.filter((u) => u !== uid) : [...cur, uid] }
+  const has = cur.includes(id)
+  const revert = () => { reactionUsers = { ...reactionUsers, [announcementId]: cur }; emit() }
+  reactionUsers = { ...reactionUsers, [announcementId]: has ? cur.filter((u) => u !== id) : [...cur, id] }
   emit()
   if (hasSupabase) {
     const q = has
-      ? supabase.from('announcement_reactions').delete().eq('announcement_id', announcementId).eq('user_id', uid)
-      : supabase.from('announcement_reactions').insert({ announcement_id: announcementId, user_id: uid })
-    q.then(({ error }) => { if (error) console.warn('[annSocial] reaction', error.message) })
+      ? supabase.from('announcement_reactions').delete().eq('announcement_id', announcementId).eq('user_id', id)
+      : supabase.from('announcement_reactions').insert({ announcement_id: announcementId, user_id: id })
+    q.then(({ error }) => { if (error) { console.warn('[annSocial] reaction', error.message); revert() } })
   }
 }
 
 export function markRead(announcementId: string) {
-  const uid = currentUserId() ?? 'me'
+  const uid = currentUserId()
+  if (hasSupabase && !uid) return
+  const id = uid ?? 'me'
   const cur = readUsers[announcementId] ?? []
-  if (cur.includes(uid)) return
-  readUsers = { ...readUsers, [announcementId]: [...cur, uid] }
+  if (cur.includes(id)) return
+  readUsers = { ...readUsers, [announcementId]: [...cur, id] }
   emit()
-  if (hasSupabase) supabase.from('announcement_reads').upsert({ announcement_id: announcementId, user_id: uid }).then(({ error }) => { if (error) console.warn('[annSocial] read', error.message) })
+  if (hasSupabase) supabase.from('announcement_reads').upsert({ announcement_id: announcementId, user_id: id })
+    .then(({ error }) => { if (error) { console.warn('[annSocial] read', error.message); readUsers = { ...readUsers, [announcementId]: cur }; emit() } })
 }

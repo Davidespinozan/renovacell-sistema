@@ -69,7 +69,11 @@ export async function deleteDoctor(id: string): Promise<{ ok: boolean; error?: s
   logAudit({ actor: 'Administración', action: 'Doctor eliminado', resource: cur?.full_name ?? id })
   if (hasSupabase && isUuid(id)) {
     const { data, error } = await supabase.functions.invoke('staff-admin', { body: { action: 'delete', id } })
-    const err = error?.message ?? (data as { error?: string } | null)?.error
+    let err = error?.message ?? (data as { error?: string } | null)?.error
+    // FK con orders.doctor_id: el doctor tiene pedidos en su historial → mensaje claro.
+    if (err && /foreign key|violates|constraint|orders/i.test(err)) {
+      err = 'No se puede eliminar: el doctor tiene pedidos en su historial. Revócale el acceso en su lugar.'
+    }
     if (err) { await live.reload(); return { ok: false, error: err } }
     await live.reload()
   }

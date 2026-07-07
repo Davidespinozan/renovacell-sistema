@@ -20,21 +20,25 @@ export function makeLive<T>(load: () => Promise<T[]>, fallback: T[]): Live<T> {
   let snap: T[] = cache
   // Sin backend el fallback ya está listo; con backend arranca "no listo".
   let loaded = !hasSupabase
+  let gen = 0 // token de generación: descarta el resultado de un load() obsoleto
   const listeners = new Set<() => void>()
   const emit = () => { snap = cache; listeners.forEach((l) => l()) }
 
   const reload = async () => {
     if (!hasSupabase) return
-    try { cache = await load() } catch (e) { console.warn('[live] error al cargar', e) }
-    finally { loaded = true; emit() }
+    const g = ++gen
+    let next: T[] | null = null
+    try { next = await load() } catch (e) { console.warn('[live] error al cargar', e) }
+    if (g !== gen) return // llegó una hidratación más nueva; ignora esta (evita que
+    // el reload pre-sesión —RLS vacío— pise los datos reales ya cargados)
+    if (next != null) cache = next
+    loaded = true
+    emit()
   }
 
   if (hasSupabase) {
-    reload()
-    // Re-hidrata en los eventos de sesión: al entrar (SIGNED_IN / INITIAL_SESSION)
-    // el usuario ya está autenticado y el RLS le permite leer lo suyo. En login /
-    // cambio de sesión volvemos a "no listo" para no mostrar el set del anterior
-    // ni un vacío falso; el refresco de token recarga en silencio (sin parpadeo).
+    // Nota: NO se hidrata en la carga del módulo — INITIAL_SESSION siempre dispara
+    // al inicializar el cliente, y hacerlo aquí solo añade una carrera pre-sesión.
     supabase.auth.onAuthStateChange((ev) => {
       if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') { loaded = false; reload() }
       else if (ev === 'TOKEN_REFRESHED') reload()

@@ -143,19 +143,28 @@ export function restockByReference(reference: string, reason = 'cancelacion'): v
   const now = nowIso()
   const newMovs: InventoryMovement[] = []
   let lots = lotsLive.current()
+  const rpcs: { lot: string; give: number }[] = []
   outs.forEach((m, i) => {
     const give = -m.change
     lots = lots.map((l) => (l.id === m.lot_id ? { ...l, quantity: l.quantity + give } : l))
     seq += 1
     newMovs.push({ id: `m-${seq}-r${i}`, lot_id: m.lot_id, change: give, reason, reference, created_by: null, created_at: now })
-    if (hasSupabase && /^[0-9a-f]{8}-/i.test(m.lot_id)) {
-      supabase.rpc('apply_lot_movement', { p_lot: m.lot_id, p_change: give, p_reason: reason, p_reference: reference }).then(({ error }) => { if (error) console.warn('[lots] restock', error.message) })
-    }
+    if (hasSupabase && /^[0-9a-f]{8}-/i.test(m.lot_id)) rpcs.push({ lot: m.lot_id, give })
   })
   lotsLive.setLocal(lots)
   movsLive.setLocal([...newMovs, ...movsLive.current()])
   refreshStock(lotsLive.current())
-  if (hasSupabase) { lotsLive.reload(); movsLive.reload(); refreshStock() }
+  if (hasSupabase) {
+    // ESPERA a que persistan los reingresos ANTES de recargar (si no, la recarga
+    // revierte la UI a las cantidades pre-restock hasta la siguiente hidratación).
+    (async () => {
+      for (const r of rpcs) {
+        const { error } = await supabase.rpc('apply_lot_movement', { p_lot: r.lot, p_change: r.give, p_reason: reason, p_reference: reference })
+        if (error) console.warn('[lots] restock', error.message)
+      }
+      lotsLive.reload(); movsLive.reload(); refreshStock()
+    })()
+  }
 }
 
 // Consumir lotes (salida): decrementa y registra un movimiento por lote.

@@ -57,6 +57,11 @@ export function canFulfill(plans: ItemPlan[]): boolean {
 
 // Confirma el surtido FEFO del pedido.
 export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemPlan[] } {
+  // Idempotencia: si el pedido YA se surtió/avanzó, no volver a descontar (evita el
+  // doble consumo por doble-click o dos usuarios de almacén sobre el mismo pedido).
+  if (['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(order.status ?? '')) {
+    return { ok: false, plans: [] }
+  }
   const plans = planSurtido(order, getSnapshotLots())
   if (!canFulfill(plans)) return { ok: false, plans }
 

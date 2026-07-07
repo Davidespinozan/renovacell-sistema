@@ -27,6 +27,7 @@ const live = makeLive<DirEntry>(async () => {
 
 export const subscribe = live.subscribe
 export const getSnapshot = live.getSnapshot
+export const reload = live.reload
 // Búsqueda rápida por id (para resolver el avatar del autor de un anuncio, etc.).
 export const avatarByIdMap = (): Record<string, string | undefined> =>
   Object.fromEntries(live.getSnapshot().map((d) => [d.id, d.avatarUrl]))

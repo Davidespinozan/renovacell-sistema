@@ -77,6 +77,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     const fields: Record<string, unknown> = { meta }
     if (patch.name != null) fields.full_name = patch.name
     await supabase.from('profiles').update(fields as never).eq('id', uid)
+    // Refresca el directorio para que tu nueva foto/nombre se vea en chat/anuncios.
+    const { reload } = await import('../data/store/directoryStore')
+    reload()
   }
 
   // Con backend conectado: rehidrata la sesión al recargar (mantiene al usuario

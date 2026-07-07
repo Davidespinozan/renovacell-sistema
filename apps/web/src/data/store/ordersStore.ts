@@ -54,12 +54,15 @@ let hydrated = !hasSupabase
 export const ready = (): boolean => hydrated
 
 // ---- Hidratación desde Supabase (RLS acota el resultado por rol) ----
+let hgen = 0 // guard de generación: una hidratación obsoleta no pisa la más nueva
 async function hydrate() {
   if (!hasSupabase) return
+  const g = ++hgen
   const { data, error } = await supabase
     .from('orders')
     .select('id, external_ref, doctor_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
     .order('created_at', { ascending: false })
+  if (g !== hgen) return // llegó una hidratación más nueva; ignora esta
   if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
   const rows = data ?? []
   orders = rows.map((r) => {
@@ -71,7 +74,6 @@ async function hydrate() {
   emit()
 }
 if (hasSupabase) {
-  hydrate()
   supabase.auth.onAuthStateChange((ev) => {
     // En login / cambio de sesión volvemos a "no hidratado" para no mostrar un
     // vacío falso; el refresco de token recarga en silencio.
@@ -194,6 +196,9 @@ export function createPosOrder(input: {
 }
 
 export function markPacked(orderId: string, itemLot: Record<string, string | null>) {
+  // Solo se empaca un pedido PAGADO y aún no empacado (no saltar pago/estado).
+  const cur = orders.find((o) => o.id === orderId)
+  if (!cur || !['paid', 'picking'].includes(cur.status ?? '')) return
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'packed' } : o))
   items = items.map((it) => (it.order_id === orderId && itemLot[it.id] !== undefined ? { ...it, lot_id: itemLot[it.id] } : it))
   emit()
@@ -212,6 +217,7 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
 
 export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {
   const merged = orders.find((o) => o.id === orderId)
+  if (!merged || merged.status !== 'packed') return // solo se envía lo ya empacado
   const nextMeta = { ...((merged?.shipping_meta as object | null) ?? {}), ...shipping_meta }
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta: nextMeta } : o))
   emit()
@@ -223,6 +229,8 @@ export function markShipped(orderId: string, shipping_meta: Record<string, unkno
 }
 
 export function markDelivered(orderId: string) {
+  const cur = orders.find((o) => o.id === orderId)
+  if (!cur || cur.status !== 'shipped') return // solo se entrega lo que salió (enviado)
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
