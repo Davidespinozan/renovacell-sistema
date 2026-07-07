@@ -16,7 +16,10 @@ import type { ProductSafe } from '../../data/types'
 export function Surtido() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
+  const { data: lots } = useLots()
   const [active, setActive] = useState<OrderWithItems | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchResult, setBatchResult] = useState<{ ok: number; fail: number } | null>(null)
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -26,41 +29,119 @@ export function Surtido() {
 
   const pending = orders.filter(isSurtible)
 
+  // ¿Cada pedido pendiente se puede surtir por COMPLETO con el stock actual? Solo
+  // esos entran al surtido en lote (los que no, se abren uno a uno para ver el detalle).
+  const fulfillable = useMemo(() => {
+    const m: Record<string, boolean> = {}
+    pending.forEach((o) => { m[o.id] = canFulfill(planSurtido(o, lots)) })
+    return m
+  }, [pending, lots])
+
+  const toggle = (id: string) => setSelected((s) => {
+    const n = new Set(s)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+
+  const selIds = pending.filter((o) => selected.has(o.id) && fulfillable[o.id]).map((o) => o.id)
+  const selUnits = pending
+    .filter((o) => selIds.includes(o.id))
+    .reduce((sum, o) => sum + o.items.reduce((a, it) => a + it.qty, 0), 0)
+  const allFulfillable = pending.filter((o) => fulfillable[o.id]).map((o) => o.id)
+
+  const selectAll = () => setSelected(new Set(allFulfillable))
+  const clearSel = () => setSelected(new Set())
+
+  // Surte cada pedido seleccionado. surtirPedido RE-PLANEA contra el cache vivo y hace
+  // el consumo local síncrono, así que dos pedidos que comparten un lote NO sobreasignan:
+  // el segundo ve el stock ya descontado por el primero y se rechaza si no alcanza.
+  const surtirLote = () => {
+    let ok = 0, fail = 0
+    pending.filter((o) => selIds.includes(o.id)).forEach((o) => {
+      const r = surtirPedido(o)
+      if (r.ok) ok += 1; else fail += 1
+    })
+    setBatchResult({ ok, fail })
+    setSelected(new Set())
+  }
+
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Preparar pedidos">
-        Pedidos que ya se pagaron y están listos para preparar. Al abrir uno, el sistema
-        te dice de qué lote tomar cada producto (siempre el que caduca primero) y descuenta el inventario.
+        Pedidos que ya se pagaron y están listos para preparar. Selecciona varios para
+        surtirlos de una, o abre uno para ver de qué lote tomar cada producto (siempre el
+        que caduca primero). Al confirmar se descuenta el inventario.
       </PageHead>
+
+      {batchResult && (
+        <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Icon name="check" />
+          <span style={{ flex: 1 }}>
+            Surtiste <b>{batchResult.ok}</b> pedido(s).{' '}
+            {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no tenían stock suficiente y quedaron pendientes.</span>}
+          </span>
+          <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setBatchResult(null)}><Icon name="x" /></button>
+        </div>
+      )}
+
+      {selIds.length > 0 && (
+        <div className="card" style={{ position: 'sticky', top: 74, zIndex: 5, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px', borderColor: 'var(--green-deep)' }}>
+          <span style={{ fontWeight: 600 }}>{selIds.length} seleccionado(s)</span>
+          <span className="mono" style={{ color: 'var(--ink-3)' }}>{selUnits} u</span>
+          <button className="btn ghost sm" type="button" onClick={clearSel}>Limpiar</button>
+          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={surtirLote}>
+            <Icon name="layers" /> Surtir seleccionados
+          </button>
+        </div>
+      )}
 
       {pending.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
           No hay pedidos por preparar. Todo al día.
         </div>
       ) : (
-        pending.map((o) => {
-          const sv = statusView(o.status)
-          return (
-            <div key={o.id} className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
-                <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
-              </div>
-              {o.items.map((it) => (
-                <div key={it.id} className="coitem">
-                  <span>
-                    {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
-                  </span>
-                  <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
+        <>
+          {allFulfillable.length > 1 && selIds.length === 0 && (
+            <button className="btn ghost sm" type="button" style={{ alignSelf: 'flex-start' }} onClick={selectAll}>
+              <Icon name="check" /> Seleccionar todos los surtibles ({allFulfillable.length})
+            </button>
+          )}
+          {pending.map((o) => {
+            const sv = statusView(o.status)
+            const canDo = fulfillable[o.id]
+            const isSel = selected.has(o.id) && canDo
+            return (
+              <div key={o.id} className="card" style={isSel ? { borderColor: 'var(--green-deep)', boxShadow: '0 0 0 1px var(--green-deep)' } : undefined}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  {canDo && (
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggle(o.id)}
+                      aria-label={`Seleccionar ${o.external_ref}`}
+                      style={{ width: 17, height: 17, accentColor: 'var(--green-deep)', cursor: 'pointer' }}
+                    />
+                  )}
+                  <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
+                  <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
+                  {!canDo && <span className="pill p-dang">Sin stock suficiente</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
                 </div>
-              ))}
-              <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>
-                <Icon name="layers" /> Preparar este pedido
-              </button>
-            </div>
-          )
-        })
+                {o.items.map((it) => (
+                  <div key={it.id} className="coitem">
+                    <span>
+                      {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
+                    </span>
+                    <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
+                  </div>
+                ))}
+                <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>
+                  <Icon name="layers" /> Preparar este pedido
+                </button>
+              </div>
+            )
+          })}
+        </>
       )}
 
       {active && <SurtirModal order={active} productsById={byId} onClose={() => setActive(null)} />}

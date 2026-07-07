@@ -53,6 +53,22 @@ export const MOCK_ORDERS: Order[] = [
     invoice_meta: null, shipping_meta: { method: 'chofer', driver: 'Chofer local Culiacán', driver_id: 'drv-1' },
     created_at: '2026-06-15T09:00:00Z',
   },
+  // PAGADOS y listos para SURTIR (alimentan "Preparar pedidos" del almacén y el
+  // surtido en lote). Sus productos tienen lotes vigentes con stock suficiente.
+  {
+    id: 'o-3801', external_ref: 'S3801', doctor_id: DOCTOR_ID, total: 3230, currency: 'MXN',
+    status: 'paid', payment_method: 'transferencia', payment_ref: 'TR-3801',
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
+    invoice_meta: null, shipping_meta: null,
+    created_at: '2026-07-01T11:00:00Z',
+  },
+  {
+    id: 'o-3802', external_ref: 'S3802', doctor_id: DOCTOR_ID, total: 1360, currency: 'MXN',
+    status: 'paid', payment_method: 'transferencia', payment_ref: 'TR-3802',
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: true,
+    invoice_meta: null, shipping_meta: null,
+    created_at: '2026-07-03T15:30:00Z',
+  },
   // Ventas POS de mostrador (junio) — dan volumen real al P&L del mes.
   ...posOrder('pos-201', 'POS-201', 13800, 'efectivo', '2026-06-04T12:00:00Z'),
   ...posOrder('pos-202', 'POS-202', 16200, 'tarjeta', '2026-06-08T13:00:00Z'),
@@ -75,6 +91,11 @@ export const MOCK_ORDER_ITEMS: OrderItem[] = [
   { id: 'oi-6', order_id: 'o-12840', product_id: 'p-gs-114', lot_id: 'l-gs-1', qty: 2, unit_price: 1890, created_at: '2025-09-25T10:00:00Z' },
   // S3640 (chofer)
   { id: 'oi-7', order_id: 'o-3640', product_id: 'p-mgp-90', lot_id: 'l-mgp-a', qty: 3, unit_price: 890, created_at: '2026-06-15T09:00:00Z' },
+  // S3801 (pagado, por surtir) — 2 productos con stock
+  { id: 'oi-8', order_id: 'o-3801', product_id: 'p-mgp-90', lot_id: null, qty: 2, unit_price: 890, created_at: '2026-07-01T11:00:00Z' },
+  { id: 'oi-9', order_id: 'o-3801', product_id: 'p-ab-50', lot_id: null, qty: 1, unit_price: 1450, created_at: '2026-07-01T11:00:00Z' },
+  // S3802 (pagado, por surtir)
+  { id: 'oi-10', order_id: 'o-3802', product_id: 'p-pl-12', lot_id: null, qty: 2, unit_price: 680, created_at: '2026-07-03T15:30:00Z' },
   // Renglones de las ventas POS de junio (lot_id real → trazabilidad/COGS).
   { id: 'oi-201', order_id: 'pos-201', product_id: 'p-gp-300', lot_id: 'l-gp-300', qty: 2, unit_price: 6900, created_at: '2026-06-04T12:00:00Z' },
   { id: 'oi-202', order_id: 'pos-202', product_id: 'p-ufs-11', lot_id: 'l-ufs-11', qty: 3, unit_price: 5400, created_at: '2026-06-08T13:00:00Z' },
