@@ -17,7 +17,7 @@ export function useUsers(opts?: { staffOnly?: boolean }): { data: DirectoryUser[
   const me = currentUserId()
   const data: DirectoryUser[] = team
     .filter((u) => u.active && u.id !== me)
-    .map((u) => ({ id: u.id, name: u.name, role: getRole(u.role).label, isStaff: true }))
+    .map((u) => ({ id: u.id, name: u.name, role: getRole(u.role).label, isStaff: true, avatarUrl: u.avatarUrl }))
   return { data }
 }
 

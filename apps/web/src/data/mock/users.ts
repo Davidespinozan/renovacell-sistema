@@ -9,6 +9,7 @@ export interface DirectoryUser {
   name: string
   role: string // etiqueta legible del rol
   isStaff: boolean
+  avatarUrl?: string
 }
 
 const STAFF: DirectoryUser[] = [

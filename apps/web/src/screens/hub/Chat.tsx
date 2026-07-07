@@ -3,17 +3,34 @@
 // con una flecha para volver. UI-first: mock detrás de useChat.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2 } from 'lucide-react'
-import { timeAgo, initials, avatarColor } from '../../lib/format'
+import { timeAgo } from '../../lib/format'
+import { UserAvatar } from '../../app/UserAvatar'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
+import { useRole } from '../../auth/RoleContext'
 import type { Conversation } from '../../data/types'
 
 export function Chat() {
   const { conversations, messagesByConv, send, ensureDirect, deleteMessage, deleteConversation, me } = useChat()
+  const { data: directory } = useUsers({ staffOnly: true })
+  const { user } = useRole()
+  // Mapa id → foto (incluye la mía) para pintar avatares de otros usuarios.
+  const avatarById = useMemo(() => {
+    const m: Record<string, string | undefined> = {}
+    directory.forEach((u) => { m[u.id] = u.avatarUrl })
+    if (me.id) m[me.id] = user?.avatarUrl
+    return m
+  }, [directory, me.id, user])
   const [selectedId, setSelectedId] = useState<string | null>(null) // ninguno abierto por default
   const [text, setText] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const conv = conversations.find((c) => c.id === selectedId) ?? null
+  // Foto del otro miembro de un DM (para la lista y la cabecera del hilo).
+  const dmAvatar = (c: Conversation): string | undefined => {
+    if (c.kind !== 'dm') return undefined
+    const otherId = c.member_ids.find((id) => id !== me.id)
+    return otherId ? avatarById[otherId] : undefined
+  }
   const msgs = useMemo(() => (conv ? messagesByConv[conv.id] ?? [] : []), [messagesByConv, conv])
 
   const endRef = useRef<HTMLDivElement>(null)
@@ -35,7 +52,7 @@ export function Chat() {
               <button className="chat-back" type="button" aria-label="Volver a conversaciones" onClick={() => setSelectedId(null)}>
                 <ArrowLeft size={18} />
               </button>
-              <ConvAvatar conv={conv} />
+              <ConvAvatar conv={conv} url={dmAvatar(conv)} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{conv.title}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{conv.kind === 'group' ? 'Grupo' : 'Mensaje directo'}</div>
@@ -102,7 +119,7 @@ export function Chat() {
               const preview = last ? `${last.sender_id === me.id ? 'Tú: ' : ''}${last.body}` : 'Sin mensajes'
               return (
                 <div key={c.id} className="conv" onClick={() => setSelectedId(c.id)}>
-                  <ConvAvatar conv={c} />
+                  <ConvAvatar conv={c} url={dmAvatar(c)} />
                   <div className="cmeta">
                     <div className="cnm">{c.title}</div>
                     <div className="clast">{preview}</div>
@@ -151,7 +168,7 @@ function NewChatModal({ onClose, onPick }: { onClose: () => void; onPick: (u: Di
             {filtered.map((u) => (
               <div key={u.id} className="lrow clickrow" style={{ cursor: 'pointer' }} onClick={() => onPick(u)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  <span className="avatar sm" style={{ background: avatarColor(u.name) }}>{initials(u.name)}</span>
+                  <UserAvatar name={u.name} url={u.avatarUrl} size={34} className="avatar sm" />
                   <div>
                     <div className="nm">{u.name}</div>
                     <div className="lt">{u.role}</div>
@@ -168,13 +185,9 @@ function NewChatModal({ onClose, onPick }: { onClose: () => void; onPick: (u: Di
   )
 }
 
-function ConvAvatar({ conv }: { conv: Conversation }) {
+function ConvAvatar({ conv, url }: { conv: Conversation; url?: string }) {
   if (conv.kind === 'group') {
-    return (
-      <div className="avatar" style={{ background: avatarColor(conv.title ?? 'g') }} aria-hidden>
-        <Users size={18} />
-      </div>
-    )
+    return <div className="avatar" style={{ background: 'var(--green-deep)' }} aria-hidden><Users size={18} /></div>
   }
-  return <div className="avatar" style={{ background: avatarColor(conv.title ?? '?') }}>{initials(conv.title ?? '?')}</div>
+  return <UserAvatar name={conv.title ?? '?'} url={url} />
 }

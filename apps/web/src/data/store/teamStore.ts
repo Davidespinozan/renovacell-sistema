@@ -21,6 +21,7 @@ export interface TeamUser {
   role: RoleKey
   capabilities: CapabilityKey[]
   active: boolean
+  avatarUrl?: string
 }
 
 const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -41,13 +42,14 @@ const live = makeLive<TeamUser>(async () => {
   if (error) throw error
   rawMeta.clear()
   return (data ?? []).map((p) => {
-    const meta = (p.meta ?? {}) as { capabilities?: string[]; name?: string; active?: boolean }
+    const meta = (p.meta ?? {}) as { capabilities?: string[]; name?: string; active?: boolean; avatar_url?: string }
     rawMeta.set(p.id, meta as Record<string, unknown>)
     return {
       id: p.id, email: p.email ?? '', name: meta.name ?? p.full_name ?? p.email ?? 'Usuario',
       role: ROLE_MAP[p.role_id ?? 'admin'] ?? 'admin',
       capabilities: (meta.capabilities ?? []) as CapabilityKey[],
       active: meta.active ?? true,
+      avatarUrl: meta.avatar_url ?? undefined,
     }
   })
 }, FALLBACK)

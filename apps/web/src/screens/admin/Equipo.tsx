@@ -4,7 +4,7 @@
 // pasan por la Edge Function `staff-admin` (service role, solo admin).
 import React, { useState } from 'react'
 import { UserPlus, X, Ban, RotateCcw, Pencil, Trash2, KeyRound, Check } from 'lucide-react'
-import { initials, avatarColor } from '../../lib/format'
+import { UserAvatar } from '../../app/UserAvatar'
 import { useTeam, type TeamUser } from '../../data/hooks/useTeam'
 import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
@@ -17,10 +17,6 @@ const randomPass = () => {
   const buf = new Uint32Array(10)
   ;(globalThis.crypto ?? { getRandomValues: (x: Uint32Array) => x }).getRandomValues(buf)
   return 'Rc' + [...buf].map((n) => a[n % a.length]).join('').slice(0, 8)
-}
-
-function Avatar({ name }: { name: string }) {
-  return <div className="avatar" style={{ background: avatarColor(name) }}>{initials(name)}</div>
 }
 
 export function Equipo() {
@@ -47,7 +43,7 @@ export function Equipo() {
       {users.map((u) => (
         <div key={u.id} className="card" style={{ opacity: u.active ? 1 : 0.6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar name={u.name} />
+            <UserAvatar name={u.name} url={u.avatarUrl} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 600 }}>{u.name}</div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{u.email}</div>

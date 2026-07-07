@@ -3,15 +3,17 @@
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import React, { useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2 } from 'lucide-react'
-import { money, fmtDate, initials, avatarColor } from '../../lib/format'
+import { money, fmtDate } from '../../lib/format'
+import { UserAvatar } from '../../app/UserAvatar'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
 
-function Avatar({ name }: { name: string }) {
-  return <div className="avatar" style={{ background: avatarColor(name) }}>{initials(name)}</div>
+const avatarOf = (d: Profile): string | undefined => ((d.meta as Record<string, unknown>)?.avatar_url as string) ?? undefined
+function Avatar({ name, url }: { name: string; url?: string }) {
+  return <UserAvatar name={name} url={url} />
 }
 
 const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
@@ -60,7 +62,7 @@ export function Doctores() {
       {sorted.map((d) => (
         <div key={d.id} className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar name={d.full_name ?? '?'} />
+            <Avatar name={d.full_name ?? '?'} url={avatarOf(d)} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 600 }}>{d.full_name}</div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
@@ -166,7 +168,7 @@ function DoctorDetail({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar name={doctor.full_name ?? '?'} />
+            <Avatar name={doctor.full_name ?? '?'} url={avatarOf(doctor)} />
             <div>
               <h3>{doctor.full_name}</h3>
               <div className="ms">{doctor.organization}{specialtyOf(doctor) ? ` · ${specialtyOf(doctor)}` : ''}</div>
