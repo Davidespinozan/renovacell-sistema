@@ -74,22 +74,26 @@ export function Chat() {
               {msgs.length === 0 && <div style={{ margin: 'auto', color: 'var(--ink-3)', fontSize: 13 }}>Inicia la conversación.</div>}
               {msgs.map((m) => {
                 const mine = m.sender_id === me.id
+                const showAvatar = !mine && conv.kind === 'group'
                 return (
-                  <div key={m.id} className={'bubble' + (mine ? ' me' : '')} style={{ position: 'relative' }}>
-                    {!mine && conv.kind === 'group' && <div className="who">{m.sender_name}</div>}
-                    <div className="btxt">{m.body}</div>
-                    <div className="bwhen">{timeAgo(m.created_at)}</div>
-                    {mine && (
-                      <button
-                        type="button"
-                        className="bubble-del"
-                        title="Eliminar mensaje"
-                        aria-label="Eliminar mensaje"
-                        onClick={() => { if (window.confirm('¿Eliminar este mensaje?')) deleteMessage(conv.id, m.id) }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                  <div key={m.id} className={'brow' + (mine ? ' me' : '')}>
+                    {showAvatar && <UserAvatar name={m.sender_name ?? '?'} url={avatarById[m.sender_id]} size={28} className="avatar sm" />}
+                    <div className={'bubble' + (mine ? ' me' : '')} style={{ position: 'relative' }}>
+                      {showAvatar && <div className="who">{m.sender_name}</div>}
+                      <div className="btxt">{m.body}</div>
+                      <div className="bwhen">{timeAgo(m.created_at)}</div>
+                      {mine && (
+                        <button
+                          type="button"
+                          className="bubble-del"
+                          title="Eliminar mensaje"
+                          aria-label="Eliminar mensaje"
+                          onClick={() => { if (window.confirm('¿Eliminar este mensaje?')) deleteMessage(conv.id, m.id) }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )
               })}
