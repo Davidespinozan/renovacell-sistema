@@ -105,9 +105,26 @@ svg{display:block}
 .screen-title{font-size:23px;font-weight:500;letter-spacing:-.012em;line-height:1.1;color:#fff}
 .screen-sub{font-size:12.5px;color:rgba(255,255,255,.7);margin-top:2px}
 .top-r{display:flex;align-items:center;gap:12px}
-.searchbox{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:var(--pill);padding:8px 14px;color:var(--ink-3);transition:.16s;width:150px}
+.searchbox{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:var(--pill);padding:8px 14px;color:var(--ink-3);transition:.16s;width:300px;max-width:38vw}
 .searchbox:focus-within{border-color:var(--green-soft);box-shadow:0 0 0 3px rgba(95,184,115,.18)}
 .searchbox svg{width:15px;height:15px}.searchbox input{border:none;outline:none;background:none;font-family:inherit;font-size:13px;width:100%}
+.kbd-hint{flex:none;font-family:var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:10.5px;line-height:1.5;color:var(--ink-3);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 5px;background:#fff}
+.searchbox:focus-within .kbd-hint{opacity:.45}
+
+/* Buscador global / paleta de comandos + dropdown de notificaciones (comparten .searchpop) */
+.searchpop{position:absolute;top:calc(100% + 8px);right:0;width:360px;max-width:84vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-lg);padding:6px;z-index:60;max-height:66vh;overflow-y:auto;animation:rise .18s var(--ease-soft) both}
+.searchpop-empty{padding:16px;font-size:13px;color:var(--ink-3);text-align:center}
+.searchpop-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font-family:inherit;background:none;border:none;border-radius:10px;padding:9px 11px;cursor:pointer;color:var(--ink)}
+.searchpop-row.active,.searchpop-row:hover{background:#EEF3EE}
+.searchpop-type{flex:none;font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--green-deep);background:var(--ok-bg);border-radius:5px;padding:3px 7px;font-weight:700;min-width:56px;text-align:center}
+.searchpop-label{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.searchpop-sub{margin-left:auto;font-size:11.5px;color:var(--ink-3);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.notif-readall{font-family:inherit;background:none;border:none;color:var(--green-deep);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0;text-transform:none}
+.notif-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-family:inherit;background:none;border:none;border-radius:10px;padding:9px 11px;cursor:pointer;color:var(--ink)}
+.notif-row:hover{background:#EEF3EE}.notif-row.unread{background:rgba(95,184,115,.07)}
+.notif-dot{flex:none;width:7px;height:7px;border-radius:50%;background:transparent}.notif-dot[data-on="true"]{background:var(--green-soft)}
+.notif-text{font-size:13px;line-height:1.35}.notif-when{margin-left:auto;font-size:10.5px;color:var(--ink-3);white-space:nowrap;flex:none}
 .icobtn{width:38px;height:38px;border-radius:50%;background:#fff;border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:.16s;position:relative}
 .icobtn:hover{color:var(--green-deep);border-color:var(--green-soft)}.icobtn svg{width:17px;height:17px}
 .icobtn .bdg{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid #fff}

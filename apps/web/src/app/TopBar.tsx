@@ -1,6 +1,6 @@
 // Barra superior del hub: hamburguesa (móvil), título/subtítulo de la pantalla,
 // buscador GLOBAL (indexado, acotado por rol) y campana.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './icons'
 import { getRole, getScreenDef, getNav, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
@@ -22,9 +22,35 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const search = useGlobalSearch()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
   const results = useMemo(() => (open ? search(q) : []), [open, q, search])
 
-  const go = (toScreen: string) => { setScreen(toScreen); setQ(''); setOpen(false) }
+  const go = (toScreen: string) => { setScreen(toScreen); setQ(''); setOpen(false); inputRef.current?.blur() }
+
+  // Atajo global ⌘K / Ctrl+K: enfoca el buscador desde cualquier pantalla.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setOpen(true)
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Mantén el índice activo dentro del rango cuando cambian los resultados.
+  useEffect(() => { setActive((a) => Math.min(a, Math.max(0, results.length - 1))) }, [results.length])
+
+  const onInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
+    else if (e.key === 'Enter') { const r = results[active]; if (r) go(r.screen) }
+    else if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur() }
+  }
 
   return (
     <header className="top">
@@ -40,20 +66,29 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
           <div className="searchbox">
             <Icon name="search" />
             <input
-              placeholder="Buscar pedidos, productos…"
+              ref={inputRef}
+              placeholder="Buscar o ir a…  (pedidos, doctores, productos, lotes)"
               value={q}
-              onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+              onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0) }}
               onFocus={() => setOpen(true)}
+              onKeyDown={onInputKey}
               onBlur={() => window.setTimeout(() => setOpen(false), 150)}
             />
+            <kbd className="kbd-hint" aria-hidden="true">⌘K</kbd>
           </div>
           {open && q.trim().length >= 2 && (
             <div className="searchpop">
               {results.length === 0 ? (
                 <div className="searchpop-empty">Sin resultados para “{q.trim()}”.</div>
               ) : (
-                results.map((res) => (
-                  <button key={res.type + res.id} type="button" className="searchpop-row" onMouseDown={() => go(res.screen)}>
+                results.map((res, i) => (
+                  <button
+                    key={res.type + res.id}
+                    type="button"
+                    className={'searchpop-row' + (i === active ? ' active' : '')}
+                    onMouseEnter={() => setActive(i)}
+                    onMouseDown={() => go(res.screen)}
+                  >
                     <span className="searchpop-type">{res.type}</span>
                     <span className="searchpop-label">{res.label}</span>
                     {res.sub && <span className="searchpop-sub">{res.sub}</span>}
