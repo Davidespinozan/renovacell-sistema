@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { fmtDate } from '../../lib/format'
-import { uploadImage } from '../../lib/uploads'
+import { uploadPrivate } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -32,7 +32,8 @@ export function MisEntregas() {
     return m
   }, [orders])
 
-  const [photos, setPhotos] = useState<Record<string, string>>({})
+  const [photos, setPhotos] = useState<Record<string, string>>({}) // preview local (data-URI)
+  const [proofPath, setProofPath] = useState<Record<string, string>>({}) // ruta privada guardada
   const [received, setReceived] = useState<Record<string, string>>({})
   const [incType, setIncType] = useState<Record<string, string>>({})
   const [incNote, setIncNote] = useState<Record<string, string>>({})
@@ -58,17 +59,17 @@ export function MisEntregas() {
 
   const onPhoto = async (shipmentId: string, file: File | undefined) => {
     if (!file) return
-    // Preview inmediato (data-URI) y en paralelo sube a Storage; al terminar,
-    // guarda la URL pública para que la prueba de entrega NO sea un data-URI.
+    // Preview local (data-URI, no se persiste) + subida al bucket PRIVADO `proofs`
+    // (evidencia sensible). Se guarda la RUTA privada, no una URL pública.
     const reader = new FileReader()
     reader.onload = () => setPhotos((p) => ({ ...p, [shipmentId]: String(reader.result) }))
     reader.readAsDataURL(file)
-    const url = await uploadImage(file, 'proofs')
-    setPhotos((p) => ({ ...p, [shipmentId]: url }))
+    const path = await uploadPrivate(file, 'proofs')
+    if (path) setProofPath((p) => ({ ...p, [shipmentId]: path }))
   }
 
   const deliver = (shipmentId: string, orderId: string, folio: string) => {
-    entregar(shipmentId, orderId, photos[shipmentId] ?? null, received[shipmentId]?.trim() || null)
+    entregar(shipmentId, orderId, proofPath[shipmentId] ?? null, received[shipmentId]?.trim() || null)
     setToast(`Entrega confirmada: ${folio}`)
     window.setTimeout(() => setToast(null), 2600)
   }
