@@ -248,6 +248,7 @@ function CheckoutModal({
       <PaymentModal
         folio={order.external_ref ?? order.id}
         amount={order.total ?? total}
+        orderId={order.id}
         onPaid={(r) => onPay(order.id, { method: r.method, id: r.id })}
         onClose={onClose}
       />

@@ -5,15 +5,17 @@ import React, { useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { processPayment, type PayMethod, type PayResult } from '../../data/payments/provider'
+import { startStripeCheckout } from '../../lib/stripe'
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
 export function PaymentModal({
-  folio, amount, onPaid, onClose,
+  folio, amount, orderId, onPaid, onClose,
 }: {
   folio: string
   amount: number
+  orderId?: string
   onPaid: (r: PayResult) => void
   onClose: () => void
 }) {
@@ -28,6 +30,12 @@ export function PaymentModal({
   const pay = async () => {
     setBusy(true); setError(null)
     try {
+      // Si Stripe está habilitado y es pago con tarjeta, cobra de VERDAD (redirige
+      // a la página de pago de Stripe). Si no está configurado, cae al flujo actual.
+      if (method === 'tarjeta' && orderId) {
+        const { redirected } = await startStripeCheckout(orderId)
+        if (redirected) return // el navegador se va a Stripe; el webhook marca pagado
+      }
       const r = await processPayment({
         orderRef: folio, amount, currency: 'MXN', method,
         card: method === 'tarjeta' ? { number: card.number, name: card.name } : undefined,

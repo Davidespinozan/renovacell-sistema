@@ -47,6 +47,7 @@ export function MisPedidos() {
         <PaymentModal
           folio={paying.external_ref ?? paying.id}
           amount={paying.total ?? 0}
+          orderId={paying.id}
           onPaid={(r) => payOrder(paying.id, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
           onClose={() => setPaying(null)}
         />
