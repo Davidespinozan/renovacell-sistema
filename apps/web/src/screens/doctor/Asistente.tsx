@@ -44,13 +44,16 @@ export function Asistente() {
 
   const push = (m: Omit<ChatMsg, 'id'>) => setMessages((prev) => [...prev, { id: nextId(), ...m }])
 
-  const send = (raw: string) => {
+  const busyRef = useRef(false)
+  const send = async (raw: string) => {
     const text = raw.trim()
-    if (!text) return
+    if (!text || busyRef.current) return
+    busyRef.current = true
     push({ role: 'user', text })
-    const reply = ask(text)
-    push({ role: 'assistant', text: reply.text, reply })
     setInput('')
+    const reply = await ask(text) // motor local instantáneo; IA real solo en charla libre
+    push({ role: 'assistant', text: reply.text, reply })
+    busyRef.current = false
   }
 
   const addToDraft = (product: ProductSafe) => {

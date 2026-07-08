@@ -3639,7 +3639,17 @@ document.addEventListener('keydown', e => {
     if(/contact|whats|teléfono|telefono|correo|email|hablar|asesor/.test(t)) return {a:'Con gusto. Deja tus datos en el formulario de acceso o escríbenos por los medios de contacto al pie de la página.',cta:true};
     return {a:'Te oriento sobre la <b>ciencia (S²RM®)</b>, el <b>cumplimiento regulatorio</b> y <b>cómo obtener acceso</b> como médico. ¿Qué te gustaría saber?'};
   }
-  function handle(q){add(q,'user');setTimeout(function(){var r=reply(q);add(r.a,'bot');if(r.cta){var d=add('','bot');d.innerHTML='';var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='2px';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;d.appendChild(b);body.scrollTop=body.scrollHeight;}defaultChips();},300);}
+  function mockAnswer(q){var r=reply(q);add(r.a,'bot');if(r.cta){var d=add('','bot');d.innerHTML='';var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='2px';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;d.appendChild(b);body.scrollTop=body.scrollHeight;}defaultChips();}
+  function handle(q){add(q,'user');
+    var U='https://amurlvlvfohwucvxfdot.supabase.co';var K="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI";
+    if(!U||!K){setTimeout(function(){mockAnswer(q);},300);return;}
+    // IA real (Edge Function assistant, modo landing). Si falla/501 → respuesta mock.
+    var t=add('…','bot');
+    fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',text:q})})
+      .then(function(r){return r.ok?r.json():Promise.reject();})
+      .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
+      .catch(function(){t.remove();mockAnswer(q);});
+  }
   function defaultChips(){chips(['¿Qué es S²RM®?','¿Cómo obtengo acceso?','¿Tienen certificaciones?']);}
   function greet(){add('Hola 👋 Soy el asistente de Renovacell. Te oriento sobre nuestra tecnología, el cumplimiento regulatorio y cómo obtener acceso como profesional de la salud.','bot');defaultChips();}
   function send(){var v=input.value.trim();if(!v)return;input.value='';handle(v);}
