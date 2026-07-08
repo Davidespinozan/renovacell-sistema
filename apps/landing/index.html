@@ -167,6 +167,8 @@
         <label>Correo</label><input name="email" type="email" required placeholder="correo@clinica.com">
         <label>Teléfono / WhatsApp</label><input name="phone" placeholder="667 000 0000">
         <label>Cédula profesional</label><input name="cedula" placeholder="Número de cédula">
+        <!-- Honeypot anti-spam: oculto para humanos; los bots lo llenan y se descarta. -->
+        <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
         <button type="submit" class="btn btn-primary" id="lead-submit">Enviar solicitud</button>
       </form>
       <div class="form-ok" id="form-ok"></div>
@@ -209,9 +211,24 @@
 
   $('lead-form').addEventListener('submit',function(e){
     e.preventDefault();
-    // SEAM Supabase: POST a /functions/lead → insert en prospects.
-    e.target.style.display='none';
-    var ok=$('form-ok'); ok.textContent=(c.lead&&c.lead.successText)||'¡Gracias! Te contactaremos.'; ok.style.display='block';
+    var f=e.target, btn=$('lead-submit');
+    var payload={ name:f.name.value, email:f.email.value, phone:f.phone.value, cedula:f.cedula.value, website:f.website.value, channel:'Landing' };
+    var done=function(){ f.style.display='none'; var ok=$('form-ok'); ok.textContent=(c.lead&&c.lead.successText)||'¡Gracias! Te contactaremos.'; ok.style.display='block'; };
+    var cap=c.capture;
+    // Motor de captación (Edge Function capture-lead): dedup + auto-asignación server-side.
+    // Requiere url + anonKey en content.json (la anon es pública). Sin config, agradece igual.
+    if(cap&&cap.url&&cap.anonKey){
+      if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+      fetch(cap.url,{ method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':cap.anonKey, 'Authorization':'Bearer '+cap.anonKey }, body:JSON.stringify(payload) })
+        .then(function(r){ return r.json().catch(function(){ return {}; }); })
+        .then(function(res){
+          if(res&&res.error){ if(btn){ btn.disabled=false; btn.textContent=(c.lead&&c.lead.submitLabel)||'Enviar solicitud'; } alert(res.error); }
+          else { done(); }
+        })
+        .catch(function(){ done(); }); // si la red falla, no bloqueamos al usuario
+    } else {
+      done(); // sin config aún: se comporta como antes
+    }
   });
 })();
 </script>

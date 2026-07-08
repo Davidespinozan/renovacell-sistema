@@ -1,4 +1,8 @@
 {
+  "capture": {
+    "url": "https://amurlvlvfohwucvxfdot.supabase.co/functions/v1/capture-lead",
+    "anonKey": ""
+  },
   "seo": {
     "title": "Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008",
     "description": "Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea."

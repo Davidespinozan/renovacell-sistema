@@ -18,6 +18,20 @@ pantalla **"Landing"** del switch "Ver como" la muestra en un iframe.
 El **logo** se extrajo a `apps/web/public/brand/logo.png` para que toda la app lo
 use (login, sidebar). Las imágenes de producto viven inline en la landing.
 
+## Captación pública (conectada)
+El formulario "Solicita tu acceso" entra por la Edge Function **`capture-lead`**
+(pública, `--no-verify-jwt`), que corre con `service_role` y hace dedup +
+auto-asignación balanceada al vendedor con menos carga + aviso a Dirección. No se
+abre `anon` a la tabla `prospects` (sigue staff-only). Incluye honeypot anti-spam.
+
+Para activarla en el deploy público, pon en `content.json → capture`:
+```json
+"capture": { "url": "https://<ref>.supabase.co/functions/v1/capture-lead", "anonKey": "<tu anon key PÚBLICA>" }
+```
+La `anonKey` es pública (la misma del sistema); se deja fuera del repo por higiene.
+Sin `anonKey`, el formulario agradece igual pero no envía (degradación segura).
+
 ## Pendiente (al conectar)
-- Agente IA + captación pública de prospectos vía Edge Function (sin abrir `anon`).
+- Agente IA de orientación (respuestas con modelo real).
+- Conectores de otros canales (WhatsApp/Meta) al mismo motor `capture-lead`.
 - Ritmo/migración de assets a Supabase Storage.
