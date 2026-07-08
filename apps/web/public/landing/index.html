@@ -3725,5 +3725,56 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+<!-- verify-first restructure: la landing NO es tienda ni "cotización". Para comprar el
+     doctor debe VERIFICARSE; la IA lo hace en MINUTOS y de ahí entra directo al portal.
+     Reencuadra #contacto (quita el form de cotización → CTA de verificación → /) y el
+     lenguaje de "cotización/24h". Aditivo, por selector/texto (robusto). -->
+<script>
+(function(){
+  var GO='/'; // el sistema: registro con verificación SEP → portal
+  function T(root,rx){return [].slice.call(document.querySelectorAll(root)).filter(function(e){return rx.test((e.textContent||'').trim())});}
+  function run(){
+    try{
+      // --- #contacto: de "Solicitar cotización" a "Verifícate y entra" ---
+      var info=document.querySelector('#contacto .contact-info');
+      if(info){
+        var k=info.querySelector('.section-kicker'); if(k) k.textContent='Acceso profesional';
+        var h3=info.querySelector('h3'); if(h3) h3.innerHTML='Verifícate y <span class="green">entra</span>.';
+        var sub=info.querySelector('p'); if(sub) sub.textContent='Para comprar necesitas verificar tu cédula. Nuestra IA la valida en minutos: si eres profesional de la salud, entras al portal al instante — no en días.';
+      }
+      var form=document.querySelector('#contacto .contact-form');
+      if(form){
+        form.innerHTML=''
+          +'<div class="form-title">Verifícate y <span class="green">accede al portal</span></div>'
+          +'<p class="form-subtitle">Validación con IA contra el registro (SEP) en minutos. Si eres profesional de la salud, tu acceso es inmediato.</p>'
+          +'<ul style="list-style:none;padding:0;margin:16px 0 20px;display:flex;flex-direction:column;gap:11px;font-size:14.5px;line-height:1.4">'
+          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Verificación <b>automática</b> de tu cédula — en minutos, no días.</span></li>'
+          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Al verificarte, <b>entras directo al portal</b> a ver catálogo y precios.</span></li>'
+          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Exclusivo para profesionales de la salud (regulado COFEPRIS).</span></li>'
+          +'</ul>'
+          +'<a href="'+GO+'" class="btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;text-decoration:none">Verificar mi cédula y entrar</a>'
+          +'<p style="font-size:12px;opacity:.62;margin-top:12px;text-align:center">¿Dudas? Escríbenos por WhatsApp (aquí al lado).</p>';
+      }
+      // --- recursos: quitar lenguaje de "cotización/24h", repuntar el CTA ---
+      T('.stat-label', /tiempo respuesta|cotizaci/i).forEach(function(e){ e.innerHTML='Verificación<br>con IA · minutos'; });
+      T('.stat-value, [class*="stat"] , .stat-num, div', /^24s*h$/i).forEach(function(e){ if((e.textContent||'').trim().toLowerCase()==='24h') e.textContent='min'; });
+      // --- CTAs "Solicitar acceso médico" / "Solicitar cotización" → verificar y entrar (a /) ---
+      [].slice.call(document.querySelectorAll('a,button')).forEach(function(el){
+        var t=(el.textContent||'').trim().toLowerCase();
+        if(/solicitar acceso m|solicitar cotiz|solicitud|solicitar acceso/.test(t)){
+          el.textContent='Verificarme y entrar →';
+          if(el.tagName==='A') el.setAttribute('href',GO);
+          else el.addEventListener('click',function(ev){ev.preventDefault();location.href=GO;},true);
+        }
+      });
+      // --- contador línea profesional: quitar "Cotización por canal" ---
+      T('span,div', /Cotización por canal/i).forEach(function(e){ if(/^\d+\s*\/\s*\d+/.test((e.textContent||'').trim())) e.textContent=e.textContent.replace(/Cotización por canal.*/i,'Solo profesionales verificados'); });
+    }catch(e){}
+  }
+  if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded',run);
+  window.addEventListener('load',run);
+})();
+</script>
+
 </body>
 </html>
