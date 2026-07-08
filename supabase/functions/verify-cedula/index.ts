@@ -49,8 +49,58 @@ function decide(enteredName: string, sep: SepRecord) {
   return { score, nameMatch, isMedical: medical, decision, reasons, sep }
 }
 
-// SEAM: consulta al registro. Simulación por último dígito (0→no existe, 9→no médico, resto→médico).
-async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord> {
+// ── Consulta al registro (SEP/RENAPO) ───────────────────────────────────────────
+// Adaptador PROVEEDOR-AGNÓSTICO. Se activa SOLO si hay `CEDULA_API_URL` configurada
+// (secreto de Supabase); si no, cae al SIMULADOR. Así "enchufar el proveedor" es meter
+// credenciales, sin tocar código. Proveedores MX: APIMarket, Kiban, Nubarium, Verifica
+// ID, KYC Systems (todos envuelven el Registro Nacional de Profesionistas).
+//
+// Env (secrets):
+//   CEDULA_API_URL          endpoint del proveedor (POST JSON)
+//   CEDULA_API_KEY          la clave/token
+//   CEDULA_API_KEY_HEADER   header de auth (default 'Authorization')
+//   CEDULA_API_AUTH_SCHEME  esquema (default 'Bearer'; usa '' si el header lleva la clave pelona)
+const norm2 = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '')
+// deno-lint-ignore no-explicit-any
+function pick(obj: any, candidates: string[]): string | undefined {
+  // deno-lint-ignore no-explicit-any
+  const scan = (o: any): string | undefined => {
+    if (!o || typeof o !== 'object') return undefined
+    for (const k of Object.keys(o)) {
+      const nk = norm2(k)
+      if (candidates.some((c) => nk.includes(norm2(c))) && (typeof o[k] === 'string' || typeof o[k] === 'number')) return String(o[k])
+    }
+    return undefined
+  }
+  return scan(obj) ?? scan(obj?.data) ?? scan(obj?.result) ?? scan(obj?.persona) ?? scan(obj?.cedula) ?? scan(obj?.registro)
+}
+// deno-lint-ignore no-explicit-any
+function mapSepResponse(body: any): SepRecord {
+  const name = pick(body, ['nombrecompleto', 'nombre', 'name', 'fullname'])
+  const profession = pick(body, ['profesion', 'profession', 'carrera'])
+  const year = pick(body, ['anodeexpedicion', 'anio', 'ano', 'year'])
+  const institution = pick(body, ['institucion', 'institution', 'universidad', 'escuela'])
+  const blob = JSON.stringify(body ?? {}).toLowerCase()
+  const notFound = /no (fueron )?encontrad|not found|sin resultado|no existe|invalid/.test(blob)
+  return { found: !!name && !notFound, name, profession, year, institution }
+}
+
+async function lookupSepHttp(cedula: string, enteredName: string): Promise<SepRecord> {
+  const url = Deno.env.get('CEDULA_API_URL')!
+  const key = Deno.env.get('CEDULA_API_KEY') ?? ''
+  const header = Deno.env.get('CEDULA_API_KEY_HEADER') ?? 'Authorization'
+  const scheme = Deno.env.get('CEDULA_API_AUTH_SCHEME') ?? 'Bearer'
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  headers[header] = header.toLowerCase() === 'authorization' && scheme ? `${scheme} ${key}` : key
+  try {
+    const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }) })
+    if (!r.ok) return { found: false }
+    return mapSepResponse(await r.json().catch(() => ({})))
+  } catch { return { found: false } }
+}
+
+// SIMULADOR (sin proveedor). Determinista por el último dígito de la cédula.
+function simulateSep(cedula: string, enteredName: string): SepRecord {
   const digits = (cedula ?? '').replace(/\D/g, '')
   if (digits.length < 5) return { found: false }
   const last = digits[digits.length - 1]
@@ -58,6 +108,11 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
   if (last === '9') return { found: true, name: enteredName, profession: 'Licenciatura en Administración', year: '2015', institution: 'UNAM' }
   if (last === '8') return { found: true, name: 'Juan Pérez García', profession: 'Médico Cirujano', year: '2013', institution: 'IPN' }
   return { found: true, name: enteredName, profession: 'Médico Cirujano', year: '2014', institution: 'UNAM' }
+}
+
+async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord> {
+  if (Deno.env.get('CEDULA_API_URL')) return lookupSepHttp(cedula, enteredName)
+  return simulateSep(cedula, enteredName)
 }
 
 Deno.serve(async (req) => {
