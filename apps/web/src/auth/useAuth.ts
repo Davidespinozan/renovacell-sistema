@@ -2,14 +2,21 @@
 // (hasSupabase); si no, cae al login mock (para entornos sin .env). La pantalla
 // de Login no cambia salvo esperar la promesa.
 import { useRole } from './RoleContext'
-import { hasSupabase } from '../lib/supabase'
+import { hasSupabase, supabase } from '../lib/supabase'
 import { signInSupabase, signOutSupabase, resetPasswordSupabase } from './supabaseAuth'
 import { MOCK_ACCOUNTS } from '../data/mock/accounts'
 import { userByEmail } from '../data/store/teamStore'
 import { verifiedByEmail } from '../data/store/doctorsStore'
+import { decideVerification, simulateSep } from '../data/verification/decide'
 
 export interface LoginResult {
   ok: boolean
+  error?: string
+}
+
+export interface RegisterResult {
+  decision: 'auto' | 'review' | 'reject' | 'exists'
+  reasons?: string[]
   error?: string
 }
 
@@ -52,11 +59,46 @@ export function useAuth() {
     // sin backend: no-op (la UI muestra el mensaje genérico igual)
   }
 
+  // AUTO-REGISTRO del doctor con verificación SEP instantánea. Si el dictamen es `auto`,
+  // crea la cuenta VERIFICADA y entra al portal al momento; si no, deja el motivo.
+  const register = async (input: { name: string; email: string; cedula: string; password: string }): Promise<RegisterResult> => {
+    const name = input.name.trim(), email = input.email.trim().toLowerCase(), cedula = input.cedula.trim(), password = input.password
+    if (name.length < 3) return { decision: 'reject', error: 'Escribe tu nombre completo.' }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { decision: 'reject', error: 'Correo inválido.' }
+    if (cedula.replace(/\D/g, '').length < 5) return { decision: 'reject', error: 'Escribe tu número de cédula profesional.' }
+    if (password.length < 6) return { decision: 'reject', error: 'La contraseña debe tener al menos 6 caracteres.' }
+
+    if (hasSupabase) {
+      const { data, error } = await supabase.functions.invoke('register-doctor', { body: { name, email, cedula, password } })
+      if (error) {
+        let msg = ''
+        try { const b = await (error as { context?: { json?: () => Promise<{ message?: string }> } }).context?.json?.(); msg = b?.message ?? '' } catch { /* noop */ }
+        return { decision: 'reject', error: msg || 'No se pudo registrar. Intenta de nuevo.' }
+      }
+      const decision = (data?.decision ?? 'review') as RegisterResult['decision']
+      if (decision === 'auto') {
+        const { session } = await signInSupabase(email, password)
+        if (session) login(session.role, session.verified, { name: session.name, email: session.email, avatarUrl: session.avatarUrl }, session.capabilities)
+        return { decision: 'auto' }
+      }
+      return { decision, reasons: data?.reasons, error: data?.message }
+    }
+
+    // MOCK (sin backend): verifica localmente; si `auto`, entra como doctor verificado.
+    const res = decideVerification(name, simulateSep(cedula, name))
+    if (res.decision === 'auto') {
+      login('doctor', true, { name, email }, [])
+      return { decision: 'auto' }
+    }
+    return { decision: res.decision, reasons: res.reasons }
+  }
+
   return {
     mode,
     role,
     verified,
     signIn,
+    register,
     logout,
     recoverPassword,
     goLogin: () => setMode('login'),
