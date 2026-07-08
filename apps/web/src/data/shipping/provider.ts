@@ -11,6 +11,8 @@
 // Empaque queda igual. Eso es lo único que hay que tocar para volverlo real.
 // ============================================================================
 
+import { hasSupabase, supabase } from '../../lib/supabase'
+
 export interface ShipAddress {
   name: string
   street: string
@@ -74,8 +76,31 @@ function seedFrom(s: string): number {
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-// COTIZAR: devuelve las tarifas disponibles para el paquete (mock realista).
+// COTIZAR: tarifas del paquete. Con backend intenta el agregador REAL (Edge Function
+// `shipping`); si no está configurado (501) o falla, cae al mock. La firma no cambia.
 export async function quoteRates(req: ShipmentRequest): Promise<RateQuote[]> {
+  if (hasSupabase) {
+    try {
+      const { data, error } = await supabase.functions.invoke('shipping', { body: { action: 'quote', origin: req.origin, destination: req.destination, parcel: req.parcel, orderRef: req.orderRef } })
+      if (!error && Array.isArray(data?.rates) && data.rates.length > 0) return data.rates as RateQuote[]
+    } catch { /* cae al mock */ }
+  }
+  return mockQuoteRates(req)
+}
+
+// GENERAR GUÍA: con backend intenta el agregador REAL; si no, mock. Firma sin cambios.
+export async function generateLabel(rate: RateQuote, req: ShipmentRequest): Promise<LabelResult> {
+  if (hasSupabase) {
+    try {
+      const { data, error } = await supabase.functions.invoke('shipping', { body: { action: 'label', rate, origin: req.origin, destination: req.destination, parcel: req.parcel, orderRef: req.orderRef } })
+      if (!error && data?.label?.tracking) return data.label as LabelResult
+    } catch { /* cae al mock */ }
+  }
+  return mockGenerateLabel(rate, req)
+}
+
+// --- Mock (fallback / demo sin credencial) --------------------------------------
+async function mockQuoteRates(req: ShipmentRequest): Promise<RateQuote[]> {
   await wait(650) // simula latencia de red del agregador
   const w = Math.max(0.5, req.parcel.weightKg)
   const volKg = (req.parcel.lengthCm * req.parcel.widthCm * req.parcel.heightCm) / 5000 // peso volumétrico
@@ -88,8 +113,7 @@ export async function quoteRates(req: ShipmentRequest): Promise<RateQuote[]> {
   ]
 }
 
-// GENERAR GUÍA: confirma la tarifa elegida y devuelve número de rastreo + etiqueta.
-export async function generateLabel(rate: RateQuote, req: ShipmentRequest): Promise<LabelResult> {
+async function mockGenerateLabel(rate: RateQuote, req: ShipmentRequest): Promise<LabelResult> {
   await wait(900) // simula la generación de guía en el agregador
   const seed = seedFrom(`${req.orderRef}-${rate.id}`)
   const prefix = rate.carrier === 'DHL' ? 'JJD' : 'ESF'
