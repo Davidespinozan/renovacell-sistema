@@ -3648,5 +3648,43 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+<!-- capture-lead wiring: el formulario de acceso entra al motor de captación
+     (Edge Function capture-lead): dedup + auto-asignación balanceada server-side.
+     Reutiliza SUPA_URL/anon ya presentes. Aditivo: el botón antes no hacía nada. -->
+<script>
+(function(){
+  var U='https://amurlvlvfohwucvxfdot.supabase.co';
+  var K="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI";
+  var card=document.querySelector('.resources-access-card');
+  if(!card) return;
+  var btn=card.querySelector('.form-submit');
+  var inputs=card.querySelectorAll('.form-input');
+  if(!btn||inputs.length<4) return;
+  var hp=document.createElement('input');
+  hp.type='text';hp.name='website';hp.tabIndex=-1;hp.setAttribute('autocomplete','off');hp.setAttribute('aria-hidden','true');
+  hp.style.cssText='position:absolute;left:-9999px;width:1px;height:1px;opacity:0';
+  card.appendChild(hp);
+  var sent=false;
+  var val=function(i){return inputs[i]&&inputs[i].value?inputs[i].value.trim():'';};
+  btn.addEventListener('click',function(e){
+    e.preventDefault();
+    if(sent) return;
+    var name=val(0),cedula=val(1),phone=val(2),email=val(3),estado=val(4),ciudad=val(5),notas=val(6);
+    if(name.length<2||(!email&&!phone)){alert('Deja tu nombre y un correo o teléfono.');return;}
+    var loc=[ciudad,estado].filter(Boolean).join(', ');
+    var payload={name:name,email:email,phone:phone,cedula:cedula,organization:loc||null,interest:notas,channel:'Landing',website:hp.value};
+    var orig=btn.textContent;btn.textContent='Enviando…';btn.disabled=true;
+    fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify(payload)})
+      .then(function(r){return r.json().catch(function(){return{};});})
+      .then(function(res){
+        if(res&&res.error){btn.textContent=orig;btn.disabled=false;alert(res.error);return;}
+        sent=true;
+        card.innerHTML='<div style="text-align:center;padding:30px 10px"><div style="font-size:42px;line-height:1;color:var(--green,#3a9)">&#10003;</div><h3 style="margin:14px 0 6px;font-size:20px">&iexcl;Gracias!</h3><p style="color:var(--mid,#6b7280);font-size:15px;line-height:1.55">Recibimos tu solicitud. Verificamos tu c&eacute;dula profesional y te contactamos para habilitar tu acceso.</p></div>';
+      })
+      .catch(function(){btn.textContent=orig;btn.disabled=false;alert('No se pudo enviar. Revisa tu conexión e intenta de nuevo.');});
+  });
+})();
+</script>
+
 </body>
 </html>
