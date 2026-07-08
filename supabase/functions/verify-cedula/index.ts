@@ -68,20 +68,35 @@ Deno.serve(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-  // Solo staff autenticado (admin) dispara verificaciones.
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
   const { data: who } = await caller.auth.getUser()
   if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: prof } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (!['admin', 'billing', 'comm'].includes(prof?.role_id ?? '')) return json(403, { error: 'Solo Dirección puede verificar.' })
+  const { data: prof } = await admin.from('profiles').select('role_id, full_name, meta').eq('id', who.user.id).single()
+  const callerRole = prof?.role_id ?? ''
+  const isStaff = ['admin', 'billing', 'comm'].includes(callerRole)
+  const isDoctor = callerRole === 'doctor'
+  if (!isStaff && !isDoctor) return json(403, { error: 'No autorizado.' })
 
   let payload: { cedula?: string; name?: string }
   try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const cedula = (payload.cedula ?? '').trim()
-  const name = (payload.name ?? '').trim()
+  // El doctor verifica SU cédula (nombre desde su perfil); el staff pasa el nombre del doctor.
+  const name = (payload.name ?? (isDoctor ? (prof?.full_name ?? '') : '')).trim()
   if (!cedula) return json(400, { error: 'Falta la cédula.' })
 
   const sep = await lookupSep(cedula, name)
-  return json(200, decide(name, sep))
+  const result = decide(name, sep)
+
+  // Auto-servicio del doctor: guarda su cédula y, si el dictamen es `auto`, se le da
+  // acceso. El flip de `verified` va con service_role porque la RLS impide que el
+  // propio doctor lo cambie. En `review`/`reject` queda el dictamen para Dirección.
+  if (isDoctor) {
+    const meta = { ...((prof?.meta ?? {}) as Record<string, unknown>), cedula, verifyResult: result }
+    const patch: Record<string, unknown> = { meta }
+    if (result.decision === 'auto') patch.verified = true
+    await admin.from('profiles').update(patch).eq('id', who.user.id)
+  }
+  // Para staff, el cliente aplica la decisión bajo su RLS de admin.
+  return json(200, result)
 })

@@ -23,8 +23,10 @@ describe('<Login>', () => {
 })
 
 describe('<ReviewPending>', () => {
-  it('muestra el aviso de cuenta en revisión (doctor no verificado)', () => {
+  it('ofrece capturar la cédula para verificación automática (doctor no verificado)', () => {
     renderWithRole(<ReviewPending />)
-    expect(screen.getByText(/en revisión/)).toBeInTheDocument()
+    expect(screen.getByText(/Verifica tu cédula profesional/)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Número de cédula profesional')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Verificar mi cédula/ })).toBeInTheDocument()
   })
 })
