@@ -1,3 +1,12 @@
+// @supabase/supabase-js v2 exige un `WebSocket` global al CREAR el cliente, y
+// lib/supabase.ts lo crea al importar. Node sin WebSocket nativo (p. ej. el Node 20
+// del CI) lanzaría al importar cualquier store. En tests operamos en modo mock (nunca
+// se abre realtime), así que un stub basta para no romper la importación. Va ANTES de
+// jest-dom para estar listo cuando el grafo de módulos del test cargue lib/supabase.
+if (typeof (globalThis as { WebSocket?: unknown }).WebSocket === 'undefined') {
+  ;(globalThis as { WebSocket?: unknown }).WebSocket = class { close() {} } as unknown as typeof WebSocket
+}
+
 // Setup de pruebas: matchers de jest-dom (toBeInTheDocument, toHaveTextContent…)
 // para los tests de componentes. Se carga en todos los archivos (inofensivo en
 // los de lógica pura).
