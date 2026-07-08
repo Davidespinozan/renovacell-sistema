@@ -3,7 +3,8 @@
 import { useSyncExternalStore } from 'react'
 import {
   subscribe, getSnapshot, addProspect, setStatus, addNote, markConverted, updateProspect, deleteProspect,
-  type ProspectStatus, type ProspectNote,
+  captureLead, reassign, openLoadBySeller, CHANNELS,
+  type ProspectStatus, type ProspectNote, type CaptureResult, type Channel,
 } from '../store/prospectsStore'
 
 export function useProspects() {
@@ -18,7 +19,11 @@ export function useProspects() {
     markConverted,
     updateProspect,
     deleteProspect,
+    captureLead,
+    reassign,
+    openLoadBySeller,
   }
 }
 
-export type { ProspectStatus, ProspectNote }
+export { CHANNELS }
+export type { ProspectStatus, ProspectNote, CaptureResult, Channel }
