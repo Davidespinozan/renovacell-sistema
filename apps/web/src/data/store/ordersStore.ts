@@ -251,13 +251,30 @@ function fakeFiscalUuid(seed: string): string {
 }
 export function markInvoiced(orderId: string) {
   const now = new Date().toISOString()
-  const meta = { status: 'emitida', uuid: fakeFiscalUuid(orderId), emitida_at: now }
+  // Optimista: folio SIMULADO (marca `simulated`). Si Facturama está configurado, se
+  // reemplaza por el UUID real del SAT; si no, queda el simulado (demo).
+  const meta: Record<string, unknown> = { status: 'emitida', uuid: fakeFiscalUuid(orderId), emitida_at: now, simulated: true }
   orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true, invoice_meta: meta } : o))
   emit()
   notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
   logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
   if (hasSupabase && isUuid(orderId)) {
-    supabase.from('orders').update({ invoice_requested: true, invoice_meta: meta }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] invoice', error.message); hydrate() })
+    (async () => {
+      // Timbrado REAL vía Facturama (Edge Function cfdi). 501=no configurado (queda el
+      // folio simulado) · 422=faltan datos fiscales (avisa) · éxito=UUID real del SAT.
+      let finalMeta: Record<string, unknown> = meta
+      const { data, error } = await supabase.functions.invoke('cfdi', { body: { order_id: orderId } })
+      if (!error && data?.uuid) {
+        finalMeta = { status: 'timbrada', uuid: data.uuid, facturama_id: data.id ?? null, emitida_at: now, simulated: false }
+      } else if (error) {
+        let reason = ''
+        try { const b = await (error as { context?: { json?: () => Promise<{ message?: string }> } }).context?.json?.(); reason = b?.message ?? '' } catch { /* noop */ }
+        if (reason && !/not_configured/.test(reason)) notify({ text: `CFDI · ${reason}`, roles: ['admin'], screen: 'av_fin' })
+        console.warn('[cfdi]', error.message, reason)
+      }
+      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: finalMeta as unknown as Json }).eq('id', orderId)
+      hydrate()
+    })()
   }
 }
 
