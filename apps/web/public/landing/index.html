@@ -3686,5 +3686,34 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+<!-- de-ecommerce layer: la landing NO es tienda. El doctor compra en el Portal DESPUÉS
+     de verificarse. Se oculta toda la UI de compra (carrito/checkout/precios/botones) y
+     cualquier CTA de compra reorienta al formulario de verificación (#contacto). Aditivo
+     y reversible: no se borra el markup original. -->
+<style id="rnc-noshop">
+  #cartFab,#cartDrawer,#checkoutModal,#cartItemCount,#cartFabBadge,
+  [id^="cart"],[class*="cart-"],[class*="checkout"],
+  [class*="card-price"],[class*="card-buy"],.buy-arrow{display:none !important;}
+</style>
+<script>
+(function(){
+  function goForm(e){ if(e){e.preventDefault();e.stopPropagation();} var f=document.getElementById('contacto'); if(f) f.scrollIntoView({behavior:'smooth'}); }
+  function repoint(){
+    var els=document.querySelectorAll('button, a');
+    els.forEach(function(el){
+      if(el.getAttribute('data-rnc-verify')) return;
+      var t=(el.textContent||'').trim().toLowerCase();
+      if(t.indexOf('cotiz')>=0 || t.indexOf('añadir')>=0 || t.indexOf('anadir')>=0 || t==='comprar' || t.indexOf('agregar al')>=0){
+        el.setAttribute('data-rnc-verify','1');
+        el.textContent='Solicitar acceso';
+        el.addEventListener('click', goForm, true);
+      }
+    });
+  }
+  if(document.readyState!=='loading') repoint(); else document.addEventListener('DOMContentLoaded', repoint);
+  window.addEventListener('load', repoint); // por si hay tarjetas renderizadas por JS
+})();
+</script>
+
 </body>
 </html>
