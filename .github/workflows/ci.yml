@@ -1,0 +1,39 @@
+# CI: valida cada push/PR ANTES de que Netlify despliegue. Corre typecheck + tests +
+# build; si algo falla, el commit queda marcado en rojo y no llega roto a producción.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela corridas viejas del mismo branch si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck · tests · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # igual que netlify.toml
+          cache: npm
+
+      - name: Install (workspaces)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @renovacell/web
+
+      - name: Tests
+        run: npm run test --workspace @renovacell/web
+
+      - name: Build
+        run: npm run build
