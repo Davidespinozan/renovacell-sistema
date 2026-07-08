@@ -9,6 +9,7 @@ import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { decideVerification, simulateSep, type VerifyDecision } from '../verification/decide'
 import type { Json } from '../database.types'
 
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -54,6 +55,45 @@ export function setCedula(id: string, cedula: string) {
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] cedula', error.message); live.reload() })
+}
+
+// VERIFICACIÓN AUTOMÁTICA (IA + SEP). Con backend llama a la Edge Function
+// `verify-cedula` (consulta el registro oficial + OCR vía proveedor y decide); en demo
+// usa el simulador. Aplica la decisión: `auto` verifica; `review`/`reject` guardan el
+// resultado de la IA en meta (cola de revisión de Dirección) sin dar acceso.
+export async function autoVerify(id: string): Promise<VerifyDecision | null> {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return null
+  const cedula = ((doc.meta?.cedula as string) ?? '').trim()
+  const name = doc.full_name ?? ''
+  if (!cedula) return null
+  let result: VerifyDecision
+  if (hasSupabase && isUuid(id)) {
+    const { data, error } = await supabase.functions.invoke('verify-cedula', { body: { cedula, name } })
+    if (error || !data) { console.warn('[verify] función', error?.message); return null }
+    result = data as VerifyDecision
+  } else {
+    result = decideVerification(name, simulateSep(cedula, name))
+  }
+  applyVerifyDecision(id, result)
+  return result
+}
+
+function applyVerifyDecision(id: string, result: VerifyDecision) {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return
+  if (result.decision === 'auto') {
+    setVerified(id, true) // ya persiste verified=true
+    logAudit({ actor: 'Verificación IA', action: 'Doctor auto-verificado (IA+SEP)', resource: doc.full_name ?? id, detail: `score ${result.score}` })
+    notify({ text: `Doctor auto-verificado: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+    return
+  }
+  // review / reject: guarda el dictamen de la IA (para la cola de revisión), sin acceso.
+  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result }
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
+  logAudit({ actor: 'Verificación IA', action: result.decision === 'review' ? 'Verificación enviada a revisión' : 'Verificación rechazada', resource: doc.full_name ?? id, detail: `score ${result.score}` })
+  if (result.decision === 'review') notify({ text: `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verifyResult', error.message); live.reload() })
 }
 
 // Editar datos del doctor (nombre, organización). Admin por RLS/guard.

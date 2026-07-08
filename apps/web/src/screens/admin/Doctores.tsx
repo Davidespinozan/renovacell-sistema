@@ -2,7 +2,7 @@
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import React, { useMemo, useState } from 'react'
-import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2 } from 'lucide-react'
+import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
 import { useDoctors } from '../../data/hooks/useDoctors'
@@ -10,6 +10,9 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
+import type { VerifyDecision } from '../../data/verification/decide'
+
+const verifyResultOf = (d: Profile): VerifyDecision | null => ((d.meta as Record<string, unknown>)?.verifyResult as VerifyDecision) ?? null
 
 const avatarOf = (d: Profile): string | undefined => ((d.meta as Record<string, unknown>)?.avatar_url as string) ?? undefined
 function Avatar({ name, url }: { name: string; url?: string }) {
@@ -20,8 +23,16 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
+  const { data: doctors, verify, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ name: string; res: VerifyDecision } | null>(null)
+  const runAutoVerify = async (id: string, name: string) => {
+    setBusyId(id)
+    const res = await autoVerify(id)
+    setBusyId(null)
+    if (res) setFlash({ name, res })
+  }
   const onDeleteDoctor = async (id: string, name: string) => {
     if (!window.confirm(`¿Eliminar a ${name}? Perderá el acceso y se borra su cuenta. Esta acción no se puede deshacer.`)) return
     const r = await deleteDoctor(id)
@@ -55,7 +66,22 @@ export function Doctores() {
       {pendientes > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>
           <div className="ico"><Clock size={20} /></div>
-          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Hasta verificarlos no pueden ordenar en el Portal.</div>
+          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Usa <b>Auto-verificar (IA + SEP)</b>: valida la cédula contra el registro oficial y aprueba sola las que coinciden.</div>
+        </div>
+      )}
+
+      {flash && (
+        <div className="sysnote" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: flash.res.decision === 'auto' ? 'var(--ok-bg)' : flash.res.decision === 'review' ? 'var(--warn-bg)' : 'var(--danger-bg)', borderColor: 'transparent' }}>
+          {flash.res.decision === 'auto' ? <ShieldCheck size={18} style={{ color: 'var(--green-deep)', flex: 'none' }} /> : <ScanSearch size={18} style={{ color: flash.res.decision === 'review' ? 'var(--warn)' : 'var(--danger)', flex: 'none' }} />}
+          <div style={{ flex: 1 }}>
+            <b>{flash.name} · {flash.res.decision === 'auto' ? 'Auto-verificado ✓' : flash.res.decision === 'review' ? 'Enviado a revisión' : 'Rechazado'}</b>
+            <span style={{ color: 'var(--ink-3)' }}> · score {flash.res.score}% · nombre {flash.res.nameMatch}% · {flash.res.isMedical ? 'profesión médica' : 'no médica'}</span>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--ink-2)' }}>
+              {flash.res.reasons.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+            {flash.res.sep.found && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>Registro SEP: {flash.res.sep.name} · {flash.res.sep.profession}{flash.res.sep.institution ? ` · ${flash.res.sep.institution}` : ''}</div>}
+          </div>
+          <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setFlash(null)}><X size={15} /></button>
         </div>
       )}
 
@@ -88,9 +114,17 @@ export function Doctores() {
                 </button>
               </>
             ) : cedulaOf(d) ? (
-              <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => verify(d.id)}>
-                <UserCheck size={14} /> Verificar
-              </button>
+              <>
+                {verifyResultOf(d)?.decision === 'review' && (
+                  <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanSearch size={12} /> Revisión IA · {verifyResultOf(d)?.score}%</span>
+                )}
+                <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busyId === d.id} onClick={() => runAutoVerify(d.id, d.full_name ?? 'Doctor')}>
+                  <Sparkles size={14} /> {busyId === d.id ? 'Validando…' : 'Auto-verificar (IA + SEP)'}
+                </button>
+                <button className="btn ghost sm" type="button" title="Aprobar manualmente" onClick={() => verify(d.id)}>
+                  <UserCheck size={14} /> Verificar
+                </button>
+              </>
             ) : (
               <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled title="Falta la cédula profesional" onClick={() => setDetailId(d.id)}>
                 <UserCheck size={14} /> Falta cédula
