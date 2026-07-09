@@ -65,7 +65,5 @@ CREATE POLICY notification_reads_own ON notification_reads
 -- Realtime: entrega los INSERT de notificaciones (el RLS filtra por rol de cada uno).
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 
--- Seed alineado con el estado inicial (hay un doctor sin verificar): no inventa.
-INSERT INTO notifications (id, body, roles, screen, created_at) VALUES
-  ('00000000-0000-4000-b000-000000000001', 'Doctores esperando verificación', ARRAY['admin'], 'av_doc', now())
-ON CONFLICT (id) DO NOTHING;
+-- (Sin seed: las notificaciones se generan solas con eventos reales de la app —
+-- stock bajo, nuevo prospecto, verificación, etc. Nada hardcodeado.)
