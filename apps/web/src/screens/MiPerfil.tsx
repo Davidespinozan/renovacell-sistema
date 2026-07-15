@@ -1,15 +1,19 @@
 // MI PERFIL — edición básica del propio usuario (no es red social): foto, nombre
 // visible y contraseña. Mock: la foto/nombre viven en la sesión; la contraseña
 // se confirma en falso. Con Supabase = update de auth + profiles.
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { X, Camera, Check } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { useRole } from '../auth/RoleContext'
 import { uploadImage } from '../lib/uploads'
-import { hasSupabase, supabase } from '../lib/supabase'
+import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
+
+// Usos de CFDI y regímenes fiscales SAT más comunes para persona física (doctor).
+const CFDI_USES = [['G03', 'Gastos en general'], ['G01', 'Adquisición de mercancías'], ['D01', 'Honorarios médicos'], ['P01', 'Por definir']] as const
+const REGIMES = [['612', 'PF con Actividad Empresarial y Profesional'], ['605', 'Sueldos y Salarios'], ['616', 'Sin obligaciones fiscales'], ['621', 'Incorporación Fiscal']] as const
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
-  const { user, updateProfile } = useRole()
+  const { user, role, updateProfile } = useRole()
   const [name, setName] = useState(user?.name ?? '')
   const [avatar, setAvatar] = useState(user?.avatarUrl ?? '')
   const [uploading, setUploading] = useState(false)
@@ -18,6 +22,18 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // Datos fiscales del doctor (para su CFDI). Se guardan en profiles.meta.fiscal.
+  const isDoctor = role === 'doctor'
+  const [fiscal, setFiscal] = useState({ rfc: '', name: '', cfdiUse: 'G03', taxRegime: '612', taxZip: '' })
+
+  useEffect(() => {
+    if (!isDoctor || !hasSupabase) return
+    const uid = currentUserId(); if (!uid) return
+    supabase.from('profiles').select('meta').eq('id', uid).single().then(({ data }) => {
+      const f = ((data?.meta ?? {}) as { fiscal?: Record<string, string> }).fiscal
+      if (f) setFiscal((cur) => ({ ...cur, ...f }))
+    })
+  }, [isDoctor])
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
@@ -41,7 +57,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       const { error: pErr } = await supabase.auth.updateUser({ password: pw })
       if (pErr) { setError(pErr.message); setBusy(false); return }
     }
-    await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined })
+    await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined, fiscal: isDoctor ? fiscal : undefined })
     setBusy(false)
     setToast(pw ? 'Perfil y contraseña actualizados.' : 'Perfil actualizado.')
     window.setTimeout(() => { setToast(null); onClose() }, 1100)
@@ -68,6 +84,33 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
 
           <label style={label}>Nombre visible</label>
           <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
+
+          {isDoctor && (
+            <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Datos fiscales (para tu factura CFDI)</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>Los usamos solo al emitir tu factura. Opcional si no la necesitas.</div>
+              <label style={label}>RFC</label>
+              <input style={input} value={fiscal.rfc} onChange={(e) => setFiscal({ ...fiscal, rfc: e.target.value.toUpperCase() })} placeholder="XAXX010101000" />
+              <label style={label}>Razón social (nombre fiscal)</label>
+              <input style={input} value={fiscal.name} onChange={(e) => setFiscal({ ...fiscal, name: e.target.value })} placeholder="Como aparece en tu constancia" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={label}>Uso de CFDI</label>
+                  <select style={input} value={fiscal.cfdiUse} onChange={(e) => setFiscal({ ...fiscal, cfdiUse: e.target.value })}>
+                    {CFDI_USES.map(([v, t]) => <option key={v} value={v}>{v} · {t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={label}>CP fiscal</label>
+                  <input style={input} inputMode="numeric" value={fiscal.taxZip} onChange={(e) => setFiscal({ ...fiscal, taxZip: e.target.value })} placeholder="80020" />
+                </div>
+              </div>
+              <label style={label}>Régimen fiscal</label>
+              <select style={input} value={fiscal.taxRegime} onChange={(e) => setFiscal({ ...fiscal, taxRegime: e.target.value })}>
+                {REGIMES.map(([v, t]) => <option key={v} value={v}>{v} · {t}</option>)}
+              </select>
+            </div>
+          )}
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Cambiar contraseña</div>

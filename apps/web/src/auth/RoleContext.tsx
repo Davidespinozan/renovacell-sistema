@@ -24,7 +24,7 @@ interface RoleState {
   setMode: (m: AppMode) => void
   login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
   logout: () => void
-  updateProfile: (patch: Partial<SessionUser>) => void
+  updateProfile: (patch: Partial<SessionUser> & { fiscal?: Record<string, string> }) => void
 }
 
 const RoleCtx = createContext<RoleState | null>(null)
@@ -65,7 +65,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   // Actualiza el perfil en la sesión Y lo PERSISTE en la base (nombre + foto).
   // La foto ya viene como URL de Storage (la sube MiPerfil). Preserva el resto del
   // meta (capabilities, cédula…) haciendo merge.
-  const updateProfile = async (patch: Partial<SessionUser>) => {
+  const updateProfile = async (patch: Partial<SessionUser> & { fiscal?: Record<string, string> }) => {
     setUser((u) => (u ? { ...u, ...patch } : u))
     if (!hasSupabase) return
     const uid = currentUserId()
@@ -74,6 +74,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     const meta = { ...((data?.meta ?? {}) as Record<string, unknown>) }
     if (patch.name != null) meta.name = patch.name
     if (patch.avatarUrl !== undefined) meta.avatar_url = patch.avatarUrl
+    if (patch.fiscal) meta.fiscal = { ...((meta.fiscal ?? {}) as Record<string, unknown>), ...patch.fiscal }
     const fields: Record<string, unknown> = { meta }
     if (patch.name != null) fields.full_name = patch.name
     await supabase.from('profiles').update(fields as never).eq('id', uid)
