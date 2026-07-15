@@ -13,6 +13,7 @@ import { useProspects, CHANNELS, type ProspectStatus, type ProspectNote } from '
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
+import { ExportButton } from '../../app/ExportButton'
 import { hasSupabase } from '../../lib/supabase'
 import type { Prospect } from '../../data/types'
 
@@ -107,7 +108,18 @@ export function Prospectos() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="eyebrow" style={{ margin: 0 }}>{isAdmin ? 'Administración' : 'Ventas'} · Prospectos</div>
-        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setCaptureOpen(true)}>
+        <ExportButton name="prospectos" rows={sorted} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'name', label: 'Nombre' },
+          { key: 'meta', label: 'Organización', format: (_v, p) => orgOf(p) },
+          { key: 'status', label: 'Estatus', format: (_v, p) => STATUS_META[statusOf(p)].label },
+          { key: 'source', label: 'Origen' },
+          { key: 'email', label: 'Correo' },
+          { key: 'phone', label: 'Teléfono' },
+          { key: 'assigned_to', label: 'Asignado a', format: (v) => sellerLabel(v as string) },
+          { key: 'meta', label: 'Interés', format: (_v, p) => interestOf(p).join(' · ') },
+          { key: 'created_at', label: 'Alta', format: (v) => (v ? fmtDate(v as string) : '') },
+        ]} />
+        <button className="btn sm" type="button" onClick={() => setCaptureOpen(true)}>
           <Zap size={14} /> Captar lead
         </button>
         <button className="btn ghost sm" type="button" onClick={() => setNewOpen(true)}>

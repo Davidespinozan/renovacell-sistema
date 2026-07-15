@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from 'react'
 import { Plus, X, PackagePlus, Undo2 } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useConsigna, remaining } from '../../data/hooks/useConsigna'
 import { useTeam } from '../../data/hooks/useTeam'
@@ -30,8 +31,20 @@ export function Consigna() {
         y queda en su saldo; el vendedor regresa lo que no venda cuando quiera.
       </PageHead>
 
-      <div style={{ display: 'flex' }}>
-        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAssignOpen(true)}><PackagePlus size={14} /> Asignar a vendedor</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <ExportButton
+          name="consignacion"
+          style={{ marginLeft: 'auto' }}
+          rows={conVendors.flatMap(([vendor, items]) => (items ?? []).map((it) => ({ vendedor: vendorName(vendor), producto: prodName[it.product_id] ?? 'Producto', asignado: it.assigned, vendido: it.sold, trae: remaining(it) })))}
+          columns={[
+            { key: 'vendedor', label: 'Vendedor' },
+            { key: 'producto', label: 'Producto' },
+            { key: 'asignado', label: 'Asignado' },
+            { key: 'vendido', label: 'Vendido' },
+            { key: 'trae', label: 'Trae (saldo)' },
+          ]}
+        />
+        <button className="btn sm" type="button" onClick={() => setAssignOpen(true)}><PackagePlus size={14} /> Asignar a vendedor</button>
       </div>
 
       {conVendors.length === 0 ? (

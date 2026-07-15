@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -143,7 +144,19 @@ function PorLote({ lots, movements, prodName, orderByRef, clientName }: {
 
       {/* A dónde llegó (recall) */}
       <div className="card">
-        <div className="eyebrow" style={{ marginBottom: 4 }}>A dónde llegó · recall</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>A dónde llegó · recall</div>
+          {destinos.length > 0 && (
+            <ExportButton name={`recall-${lot.lot_code}`} rows={destinos} style={{ marginLeft: 'auto' }} columns={[
+              { key: 'cliente', label: 'Cliente' },
+              { key: 'folio', label: 'Pedido' },
+              { key: 'qty', label: 'Cantidad' },
+              { key: 'importe', label: 'Importe', format: (v) => money(v as number) },
+              { key: 'utilidad', label: 'Utilidad', format: (v) => money(v as number) },
+              { key: 'fecha', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+            ]} />
+          )}
+        </div>
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 10 }}>
           Si este lote saliera con problema, estos son los clientes a los que tendrías que avisar.
         </div>

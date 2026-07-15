@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -30,6 +31,23 @@ export function Existencias() {
         Todo el producto guardado, agrupado por tipo y por lote. La etiqueta
         <b> Usar primero</b> marca el lote que debe salir antes, porque es el que caduca más pronto.
       </PageHead>
+      {groups.length > 0 && (
+        <div style={{ display: 'flex' }}>
+          <ExportButton
+            name="existencias"
+            style={{ marginLeft: 'auto' }}
+            rows={groups.flatMap((g) => g.lots.map((l) => ({ producto: g.product.name, linea: g.product.line, lote: l.lot_code, caducidad: l.expiry_date, cantidad: l.quantity, ubicacion: l.location })))}
+            columns={[
+              { key: 'producto', label: 'Producto' },
+              { key: 'linea', label: 'Línea', format: (v) => (v === 'cosm' ? 'Home Care' : 'Professional') },
+              { key: 'lote', label: 'Lote' },
+              { key: 'caducidad', label: 'Caducidad', format: (v) => (v ? fmtDate(v as string) : '') },
+              { key: 'cantidad', label: 'Cantidad' },
+              { key: 'ubicacion', label: 'Ubicación' },
+            ]}
+          />
+        </div>
+      )}
       {groups.map((g) => (
         <ProductStock key={g.product.id} product={g.product} lots={g.lots} />
       ))}

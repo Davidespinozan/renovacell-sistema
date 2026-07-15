@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { useAudit } from '../../data/hooks/useAudit'
+import { ExportButton } from '../../app/ExportButton'
 
 const dt = (iso: string): string => {
   try { return new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
@@ -28,7 +29,16 @@ export function Bitacora() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Administración · Bitácora</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">Administración · Bitácora</div>
+        <ExportButton name="bitacora" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'at', label: 'Fecha/hora', format: (v) => dt(v as string) },
+          { key: 'actor', label: 'Autor' },
+          { key: 'action', label: 'Acción' },
+          { key: 'resource', label: 'Recurso' },
+          { key: 'detail', label: 'Detalle' },
+        ]} />
+      </div>
 
       <div className="sysnote">
         <ShieldCheck size={18} />

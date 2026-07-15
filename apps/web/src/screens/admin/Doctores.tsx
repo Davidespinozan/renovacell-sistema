@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
+import { ExportButton } from '../../app/ExportButton'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
@@ -64,7 +65,19 @@ export function Doctores() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Administración · Doctores</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">Administración · Doctores</div>
+        <ExportButton name="doctores" rows={sorted} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'full_name', label: 'Nombre' },
+          { key: 'organization', label: 'Consultorio' },
+          { key: 'meta', label: 'Especialidad', format: (_v, d) => specialtyOf(d) },
+          { key: 'email', label: 'Correo' },
+          { key: 'meta', label: 'Cédula', format: (_v, d) => cedulaOf(d) },
+          { key: 'verified', label: 'Verificado', format: (v) => (v ? 'Sí' : 'No') },
+          { key: 'meta', label: 'Score IA', format: (_v, d) => verifyResultOf(d)?.score ?? '' },
+          { key: 'id', label: 'Pedidos', format: (v) => orderCount[v as string] ?? 0 },
+        ]} />
+      </div>
 
       {pendientes > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>

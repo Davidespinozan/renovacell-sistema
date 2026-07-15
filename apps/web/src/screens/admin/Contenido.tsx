@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react'
 import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
 import { useLanding, type LandingContent } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
@@ -55,7 +56,15 @@ function ProductsEditor() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <div className="eyebrow" style={{ margin: 0 }}>{data.length} productos</div>
-        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setEditing('new')}><Plus size={14} /> Nuevo producto</button>
+        <ExportButton name="catalogo" rows={data} style={{ marginLeft: 'auto', marginRight: 10 }} columns={[
+          { key: 'sku', label: 'SKU' },
+          { key: 'name', label: 'Nombre' },
+          { key: 'line', label: 'Línea', format: (v) => (v === 'cosm' ? 'Home Care' : 'Professional') },
+          { key: 'category', label: 'Categoría' },
+          { key: 'price', label: 'Precio', format: (v) => money(v as number) },
+          { key: 'active', label: 'Estado', format: (v) => (v ? 'Visible' : 'Oculto') },
+        ]} />
+        <button className="btn sm" type="button" onClick={() => setEditing('new')}><Plus size={14} /> Nuevo producto</button>
       </div>
 
       <Section title="Home Care" items={groups.cosm} onEdit={setEditing} onToggle={toggleActive} onDelete={onDelete} />

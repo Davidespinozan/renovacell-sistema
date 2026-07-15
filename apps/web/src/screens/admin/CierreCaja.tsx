@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react'
 import { Wallet, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useEvents } from '../../data/hooks/useEvents'
 import { useCierres } from '../../data/hooks/useFinanzas'
@@ -100,7 +101,18 @@ export function CierreCaja() {
 
         {/* Historial */}
         <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '18px 18px 0' }}><div className="eyebrow" style={{ margin: 0 }}>Cierres recientes</div></div>
+          <div style={{ padding: '18px 18px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Cierres recientes</div>
+            <ExportButton name="cierres-de-caja" rows={cierres} style={{ marginLeft: 'auto' }} columns={[
+              { key: 'fecha', label: 'Fecha', format: (v) => fmtDate(v as string) },
+              { key: 'alcance', label: 'Alcance' },
+              { key: 'esperado', label: 'Esperado', format: (v) => money(v as number) },
+              { key: 'contado', label: 'Contado', format: (v) => money(v as number) },
+              { key: 'diferencia', label: 'Diferencia', format: (v) => money(v as number) },
+              { key: 'motivo', label: 'Motivo' },
+              { key: 'usuario', label: 'Usuario' },
+            ]} />
+          </div>
           <div style={{ padding: '0 14px 8px' }}>
             <table className="tbl-cards">
               <thead><tr><th>Fecha</th><th>Alcance</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>

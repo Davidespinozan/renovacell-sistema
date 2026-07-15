@@ -10,6 +10,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
+import { ExportButton } from '../../app/ExportButton'
 import type { ProductSafe, Profile } from '../../data/types'
 
 type ChannelFilter = 'todos' | 'portal' | 'pos'
@@ -114,6 +115,17 @@ export function VentasDetalle() {
         {(from || to || channel !== 'todos' || pay !== 'todos' || q) && (
           <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setQ('') }}>Limpiar</button>
         )}
+        <ExportButton name="ventas" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'external_ref', label: 'Folio' },
+          { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+          { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
+          { key: 'id', label: 'Productos', format: (_v, o) => productsSummary(o) },
+          { key: 'id', label: 'Canal', format: (_v, o) => (channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal') },
+          { key: 'total', label: 'Total', format: (v) => money(v as number) },
+          { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o).label },
+          { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status).label },
+          { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
+        ]} />
       </div>
 
       {/* Tabla */}

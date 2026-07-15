@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { ShieldCheck, Clock, ShoppingBag, Plus } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
+import { ExportButton } from '../app/ExportButton'
 import { useDoctors } from '../data/hooks/useDoctors'
 import { useAllOrders } from '../data/hooks/useOrders'
 import { useRole } from '../auth/RoleContext'
@@ -33,7 +34,17 @@ export function Clientes() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">{role === 'admin' ? 'Administración' : 'Ventas'} · Clientes</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">{role === 'admin' ? 'Administración' : 'Ventas'} · Clientes</div>
+        <ExportButton name="clientes" rows={mine} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'full_name', label: 'Nombre' },
+          { key: 'organization', label: 'Consultorio' },
+          { key: 'meta', label: 'Especialidad', format: (_v, d) => specialtyOf(d) },
+          { key: 'email', label: 'Correo' },
+          { key: 'verified', label: 'Verificado', format: (v) => (v ? 'Sí' : 'No') },
+          { key: 'id', label: 'Pedidos', format: (v) => orderCount[v as string] ?? 0 },
+        ]} />
+      </div>
 
       {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>

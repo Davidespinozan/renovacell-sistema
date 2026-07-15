@@ -11,6 +11,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { markInvoiced, markPaid } from '../../data/store/ordersStore'
 import { billingSummary, isPosOrder } from '../../data/metrics'
+import { ExportButton } from '../../app/ExportButton'
 import type { ProductSafe, Profile } from '../../data/types'
 
 type Filter = 'todos' | 'por_emitir' | 'emitidos' | 'por_cobrar'
@@ -101,10 +102,22 @@ export function Facturacion() {
       </div>
 
       {/* Filtros */}
-      <div className="fchips">
-        {CHIPS.map((c) => (
-          <button key={c.k} type="button" className={'fchip' + (filter === c.k ? ' on' : '')} onClick={() => setFilter(c.k)}>{c.label}</button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="fchips">
+          {CHIPS.map((c) => (
+            <button key={c.k} type="button" className={'fchip' + (filter === c.k ? ' on' : '')} onClick={() => setFilter(c.k)}>{c.label}</button>
+          ))}
+        </div>
+        <ExportButton name="facturacion" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'external_ref', label: 'Folio' },
+          { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+          { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
+          { key: 'total', label: 'Total', format: (v) => money(v as number) },
+          { key: 'id', label: 'Cobro', format: (_v, o) => cobroTag(o).label },
+          { key: 'id', label: 'CFDI', format: (_v, o) => cfdiTag(o).label },
+          { key: 'id', label: 'UUID', format: (_v, o) => cfdiUuid(o) ?? '' },
+          { key: 'payment_method', label: 'Método de pago' },
+        ]} />
       </div>
 
       {/* Tabla */}
