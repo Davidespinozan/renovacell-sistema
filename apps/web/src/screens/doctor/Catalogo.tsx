@@ -6,6 +6,7 @@ import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
+import { usePricing } from '../../data/hooks/usePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
@@ -24,6 +25,9 @@ interface CartLine {
 export function Catalogo() {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
+  const { priceFor } = usePricing()
+  // Precio del doctor: el de SU lista (RLS) o el base. Se usa en todo el catálogo/carrito.
+  const priceOf = (p: ProductSafe): number | null => priceFor(p.id, p.price)
 
   const [filter, setFilter] = useState<LineFilter>('all')
   const [cart, setCart] = useState<Cart>({})
@@ -77,13 +81,13 @@ export function Catalogo() {
     [cart, products],
   )
 
-  const total = lines.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0)
+  const total = lines.reduce((sum, l) => sum + (priceOf(l.product) ?? 0) * l.qty, 0)
 
   // No se puede pedir más de lo disponible en inventario. Ni un producto sin
   // precio publicado (price null = "a consultar"): evita un pedido con renglón a $0.
   const add = (id: string) => setCart((c) => {
     const prod = products.find((p) => p.id === id)
-    if (!prod || prod.price == null) return c
+    if (!prod || priceOf(prod) == null) return c
     const info = stockInfoFor(stockMap, id)
     const max = info.tracked ? info.qty : 0
     const next = (c[id] ?? 0) + 1
@@ -102,7 +106,7 @@ export function Catalogo() {
 
   const onConfirm = (invoice: boolean) =>
     createOrder({
-      lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price })),
+      lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: priceOf(l.product) })),
       total,
       invoice_requested: invoice,
     })
@@ -135,18 +139,19 @@ export function Catalogo() {
               No hay productos disponibles en este momento.
             </div>
           ) : shown.map((p) => (
-            <ProductCard key={p.id} p={p} qty={cart[p.id] ?? 0} stock={stockInfoFor(stockMap, p.id)} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
+            <ProductCard key={p.id} p={p} price={priceOf(p)} qty={cart[p.id] ?? 0} stock={stockInfoFor(stockMap, p.id)} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
           ))}
         </div>
       </div>
 
       {/* DERECHA: pedido en curso */}
-      <CartPanel lines={lines} total={total} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
+      <CartPanel lines={lines} total={total} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
 
       {checkout && (
         <CheckoutModal
           lines={lines}
           total={total}
+          priceOf={priceOf}
           onConfirm={onConfirm}
           onPay={(orderId, r) => payOrder(orderId, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
           onDone={clear}
@@ -163,7 +168,7 @@ function StockTag({ stock }: { stock: StockInfo }) {
   return <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Agotado</span>
 }
 
-function ProductCard({ p, qty, stock, onAdd, onDec }: { p: ProductSafe; qty: number; stock: StockInfo; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, onAdd, onDec }: { p: ProductSafe; price: number | null; qty: number; stock: StockInfo; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
@@ -181,7 +186,7 @@ function ProductCard({ p, qty, stock, onAdd, onDec }: { p: ProductSafe; qty: num
           <StockTag stock={stock} />
         </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.category}</div>
-        <div className="pr">{money(p.price)}</div>
+        <div className="pr">{money(price)}</div>
         {!sellable ? (
           <button className="addb" type="button" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
             {stock.tracked ? 'Agotado' : 'Sin existencias'}
@@ -204,10 +209,11 @@ function ProductCard({ p, qty, stock, onAdd, onDec }: { p: ProductSafe; qty: num
 }
 
 function CartPanel({
-  lines, total, onInc, onDec, onClear, onReview,
+  lines, total, priceOf, onInc, onDec, onClear, onReview,
 }: {
   lines: CartLine[]
   total: number
+  priceOf: (p: ProductSafe) => number | null
   onInc: (id: string) => void
   onDec: (id: string) => void
   onClear: () => void
@@ -229,7 +235,7 @@ function CartPanel({
       {empty && <div className="empty">Agrega productos del catálogo para armar tu pedido.</div>}
 
       {lines.map((l) => (
-        <LineRow key={l.product.id} l={l} onInc={() => onInc(l.product.id)} onDec={() => onDec(l.product.id)} />
+        <LineRow key={l.product.id} l={l} price={priceOf(l.product)} onInc={() => onInc(l.product.id)} onDec={() => onDec(l.product.id)} />
       ))}
 
       {!empty && (
@@ -247,12 +253,12 @@ function CartPanel({
   )
 }
 
-function LineRow({ l, onInc, onDec }: { l: CartLine; onInc: () => void; onDec: () => void }) {
+function LineRow({ l, price, onInc, onDec }: { l: CartLine; price: number | null; onInc: () => void; onDec: () => void }) {
   return (
     <div className="titem">
       <div>
         <div>{l.product.name}</div>
-        <div className="tl">{money(l.product.price)}</div>
+        <div className="tl">{money(price)}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
@@ -264,10 +270,11 @@ function LineRow({ l, onInc, onDec }: { l: CartLine; onInc: () => void; onDec: (
 }
 
 function CheckoutModal({
-  lines, total, onConfirm, onPay, onDone, onClose,
+  lines, total, priceOf, onConfirm, onPay, onDone, onClose,
 }: {
   lines: CartLine[]
   total: number
+  priceOf: (p: ProductSafe) => number | null
   onConfirm: (invoice: boolean) => OrderWithItems
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
@@ -328,7 +335,7 @@ function CheckoutModal({
               {lines.map((l) => (
                 <div key={l.product.id} className="coitem">
                   <span>{l.product.name} <span style={{ color: 'var(--ink-3)' }}>×{l.qty}</span></span>
-                  <span className="mono">{money((l.product.price ?? 0) * l.qty)}</span>
+                  <span className="mono">{money((priceOf(l.product) ?? 0) * l.qty)}</span>
                 </div>
               ))}
 

@@ -36,6 +36,7 @@ import { Bitacora } from './admin/Bitacora'
 import { Reabastecimiento } from './admin/Reabastecimiento'
 import { Equipo } from './admin/Equipo'
 import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
+import { Precios } from './admin/Precios'
 import { Eventos } from './pos/Eventos'
 import { MiConsigna } from './sales/MiConsigna'
 import { Consigna } from './warehouse/Consigna'
@@ -78,6 +79,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   compras: () => <Reabastecimiento />,
   av_equipo: () => <Equipo />,
   av_catalogo: () => <CatalogoAdmin />,
+  av_precios: () => <Precios />,
   av_sitio: () => <SitioWeb />,
   eventos: () => <Eventos />,
   caja: () => <Caja />,

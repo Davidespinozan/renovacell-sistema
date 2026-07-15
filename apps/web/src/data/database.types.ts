@@ -797,6 +797,30 @@ export type Database = {
           },
         ]
       }
+      price_lists: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean
+          name: string
+          sort: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          sort?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          sort?: number
+        }
+        Relationships: []
+      }
       product_costs: {
         Row: {
           metadata: Json | null
@@ -834,6 +858,49 @@ export type Database = {
             foreignKeyName: "product_costs_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_prices: {
+        Row: {
+          list_id: string
+          price: number
+          product_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          list_id: string
+          price: number
+          product_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          list_id?: string
+          price?: number
+          product_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_prices_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products_safe"
             referencedColumns: ["id"]
           },
@@ -888,6 +955,7 @@ export type Database = {
           id: string
           meta: Json | null
           organization: string | null
+          price_list_id: string | null
           role_id: string | null
           verified: boolean | null
         }
@@ -897,6 +965,7 @@ export type Database = {
           id: string
           meta?: Json | null
           organization?: string | null
+          price_list_id?: string | null
           role_id?: string | null
           verified?: boolean | null
         }
@@ -906,10 +975,18 @@ export type Database = {
           id?: string
           meta?: Json | null
           organization?: string | null
+          price_list_id?: string | null
           role_id?: string | null
           verified?: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_role_id_fkey"
             columns: ["role_id"]

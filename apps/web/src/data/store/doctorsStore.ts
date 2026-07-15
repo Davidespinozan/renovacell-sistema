@@ -20,7 +20,7 @@ const live = makeLive<Profile>(async () => {
   // (nombre/org/verificado/contacto de envío, SIN correo ni cédula). Se piden ambos
   // en paralelo: si `profiles` trae filas → admin; si no → el directorio.
   const [prof, dir] = await Promise.all([
-    supabase.from('profiles').select('id, email, full_name, role_id, verified, organization, meta').eq('role_id', 'doctor').order('full_name'),
+    supabase.from('profiles').select('id, email, full_name, role_id, verified, organization, price_list_id, meta').eq('role_id', 'doctor').order('full_name'),
     supabase.from('doctor_directory').select('id, name, organization, verified, meta').order('name'),
   ])
   if ((prof.data?.length ?? 0) > 0) return prof.data as unknown as Profile[]

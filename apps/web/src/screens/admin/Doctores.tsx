@@ -7,6 +7,8 @@ import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
+import { usePricing } from '../../data/hooks/usePricing'
+import { assignDoctorList } from '../../data/store/pricingStore'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
@@ -39,6 +41,7 @@ export function Doctores() {
     if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
   }
   const { data: orders } = useAllOrders()
+  const { lists } = usePricing()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
   const detail = doctors.find((d) => d.id === detailId) ?? null // siempre el doctor vivo del store
@@ -100,7 +103,15 @@ export function Doctores() {
             </span>
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
+              Precios:
+              <select value={d.price_list_id ?? ''} onChange={(e) => assignDoctorList(d.id, e.target.value || null)}
+                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none', background: '#fff' }}>
+                <option value="">General (base)</option>
+                {lists.filter((l) => !l.is_default).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </label>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
             <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => onDeleteDoctor(d.id, d.full_name ?? 'este doctor')}><Trash2 size={14} /> Eliminar</button>

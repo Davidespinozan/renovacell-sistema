@@ -22,6 +22,7 @@ export interface Profile {
   role_id: RoleId | null
   verified: boolean
   organization: string | null
+  price_list_id?: UUID | null
   meta: Json
 }
 
