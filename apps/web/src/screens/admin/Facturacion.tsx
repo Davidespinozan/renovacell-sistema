@@ -113,7 +113,7 @@ export function Facturacion() {
             <button key={c.k} type="button" className={'fchip' + (filter === c.k ? ' on' : '')} onClick={() => setFilter(c.k)}>{c.label}</button>
           ))}
         </div>
-        <ExportButton name="facturacion" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+        <ExportButton name="facturacion" label="Por factura" rows={rows} style={{ marginLeft: 'auto' }} columns={[
           { key: 'external_ref', label: 'Folio' },
           { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
@@ -126,6 +126,33 @@ export function Facturacion() {
           { key: 'id', label: 'UUID', format: (_v, o) => cfdiUuid(o) ?? '' },
           { key: 'payment_method', label: 'Método de pago' },
         ]} />
+        <ExportButton
+          name="facturacion-partidas"
+          label="Por partida"
+          rows={rows.flatMap((o) => o.items.filter((it) => it.unit_price != null).map((it) => {
+            const p = productsById[it.product_id ?? '']
+            const fis = fiscalOf(o)
+            return {
+              folio: o.external_ref, fecha: o.created_at, cliente: clientName(o), rfc: fis.rfc,
+              sku: p?.sku ?? '', producto: p?.name ?? 'Producto',
+              cantidad: it.qty, precio_unitario: it.unit_price ?? 0, importe: (it.unit_price ?? 0) * it.qty,
+              cfdi: cfdiTag(o).label, uuid: cfdiUuid(o) ?? '',
+            }
+          }))}
+          columns={[
+            { key: 'folio', label: 'Folio' },
+            { key: 'fecha', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+            { key: 'cliente', label: 'Cliente' },
+            { key: 'rfc', label: 'RFC' },
+            { key: 'sku', label: 'SKU' },
+            { key: 'producto', label: 'Producto' },
+            { key: 'cantidad', label: 'Cantidad' },
+            { key: 'precio_unitario', label: 'Precio unitario', format: (v) => money(v as number) },
+            { key: 'importe', label: 'Importe', format: (v) => money(v as number) },
+            { key: 'cfdi', label: 'CFDI' },
+            { key: 'uuid', label: 'UUID' },
+          ]}
+        />
       </div>
 
       {/* Tabla */}
