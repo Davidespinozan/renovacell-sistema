@@ -37,6 +37,10 @@ function systemPrompt(mode: string, products: unknown[]): string {
       'Reglas: (1) NUNCA des precios ni cierres ventas. (2) NUNCA des consejo clínico, dosis',
       'ni indicaciones de uso. (3) Menciona productos solo de forma informativa. (4) Responde',
       'breve y cordial en español de México, y cierra invitando a verificarse/solicitar acceso.',
+      '(5) CAPTACIÓN: si el visitante muestra interés (quiere comprar, acceder, más info),',
+      'pídele su NOMBRE y su WhatsApp o correo. En cuanto tengas nombre + un contacto, LLAMA a',
+      'la herramienta save_prospect para canalizarlo con un asesor de ventas, y confírmale que',
+      'lo contactarán pronto y que verifique su cédula para entrar al portal.',
       '', 'Productos (informativo):', cat,
     ].join('\n')
   }
@@ -70,17 +74,44 @@ Deno.serve(async (req) => {
     : [{ role: 'user', content: String(p.text ?? '').slice(0, 2000) }]
   if (!messages.length || !messages.some((m) => m.role === 'user')) return json(400, { error: 'Falta el mensaje.' })
 
+  // En la landing, el agente CAPTA el prospecto: cuando el visitante da su nombre + un
+  // contacto, el modelo llama a esta herramienta y el cliente crea el lead (→ ventas).
+  const tools = mode === 'landing' ? [{
+    name: 'save_prospect',
+    description: 'Canaliza al visitante interesado con un asesor de ventas. Úsala SOLO cuando ya tengas su NOMBRE y un CONTACTO (WhatsApp o correo).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Nombre del profesional' },
+        phone: { type: 'string', description: 'WhatsApp/teléfono' },
+        email: { type: 'string', description: 'Correo' },
+        interest: { type: 'string', description: 'Producto o interés mencionado' },
+      },
+      required: ['name'],
+    },
+  }] : undefined
+
   try {
+    // deno-lint-ignore no-explicit-any
+    const body: any = { model, max_tokens: 500, system: systemPrompt(mode, p.products ?? []), messages }
+    if (tools) body.tools = tools
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: 500, system: systemPrompt(mode, p.products ?? []), messages }),
+      body: JSON.stringify(body),
     })
     const data = await r.json().catch(() => ({}))
     if (!r.ok) return json(502, { error: 'anthropic', message: data?.error?.message ?? 'Error del modelo.' })
     // deno-lint-ignore no-explicit-any
-    const text = (data?.content ?? []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim()
-    return json(200, { text: text || 'Con gusto te ayudo. ¿Puedes darme un poco más de detalle?' })
+    const blocks: any[] = data?.content ?? []
+    const text = blocks.filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim()
+    // ¿el modelo capturó un prospecto? (tool_use). El cliente lo manda a capture-lead.
+    const toolCall = blocks.find((c) => c.type === 'tool_use' && c.name === 'save_prospect')
+    const lead = toolCall?.input ?? null
+    return json(200, {
+      text: text || (lead ? '¡Perfecto! Ya te canalicé con un asesor; te contactará en breve. Para ver catálogo y precios, verifica tu cédula y entra al portal.' : 'Con gusto te ayudo. ¿Puedes darme un poco más de detalle?'),
+      lead,
+    })
   } catch (e) {
     return json(502, { error: `Error con el modelo: ${(e as Error).message}` })
   }

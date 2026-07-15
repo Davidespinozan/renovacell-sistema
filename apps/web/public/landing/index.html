@@ -3640,14 +3640,14 @@ document.addEventListener('keydown', e => {
     return {a:'Te oriento sobre la <b>ciencia (S²RM®)</b>, el <b>cumplimiento regulatorio</b> y <b>cómo obtener acceso</b> como médico. ¿Qué te gustaría saber?'};
   }
   function mockAnswer(q){var r=reply(q);add(r.a,'bot');if(r.cta){var d=add('','bot');d.innerHTML='';var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='2px';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;d.appendChild(b);body.scrollTop=body.scrollHeight;}defaultChips();}
-  function handle(q){add(q,'user');
+  function handle(q){add(q,'user');window.__rncHist=(window.__rncHist||[]);window.__rncHist.push({role:'user',content:q});
     var U='https://amurlvlvfohwucvxfdot.supabase.co';var K="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI";
     if(!U||!K){setTimeout(function(){mockAnswer(q);},300);return;}
     // IA real (Edge Function assistant, modo landing). Si falla/501 → respuesta mock.
     var t=add('…','bot');
-    fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',text:q})})
+    fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',messages:window.__rncHist.slice(-12)})})
       .then(function(r){return r.ok?r.json():Promise.reject();})
-      .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
+      .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;window.__rncHist.push({role:'assistant',content:txt});if(d.lead&&d.lead.name){var L=d.lead;fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({name:L.name,phone:L.phone||'',email:L.email||'',channel:'Landing · Asistente',interest:L.interest||''})}).catch(function(){});}var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
       .catch(function(){t.remove();mockAnswer(q);});
   }
   function defaultChips(){chips(['¿Qué es S²RM®?','¿Cómo obtengo acceso?','¿Tienen certificaciones?']);}
