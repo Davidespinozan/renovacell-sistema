@@ -21,3 +21,7 @@ docs/PROPOSAL.md
 *deck*
 *cotiz*
 *pricing*
+# …pero el CÓDIGO fuente sí se versiona aunque tenga esas palabras (no es material de venta).
+!apps/**/src/**/*[Pp]ricing*
+!apps/**/src/**/*[Cc]otiz*
+!apps/**/src/**/*[Dd]eck*
