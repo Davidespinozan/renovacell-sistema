@@ -54,6 +54,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Comercial' },
       { key: 'av_inv', label: 'Inventario', icon: 'box', section: 'Operación' },
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
+      { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
       { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
