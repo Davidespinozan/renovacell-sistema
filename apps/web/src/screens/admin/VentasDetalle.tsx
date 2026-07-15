@@ -115,7 +115,7 @@ export function VentasDetalle() {
         {(from || to || channel !== 'todos' || pay !== 'todos' || q) && (
           <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setQ('') }}>Limpiar</button>
         )}
-        <ExportButton name="ventas" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+        <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'auto' }} columns={[
           { key: 'external_ref', label: 'Folio' },
           { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
@@ -126,6 +126,30 @@ export function VentasDetalle() {
           { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status).label },
           { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
         ]} />
+        <ExportButton
+          name="ventas-partidas"
+          label="Por partida"
+          rows={rows.flatMap((o) => o.items.filter((it) => it.unit_price != null).map((it) => {
+            const p = productsById[it.product_id ?? '']
+            return {
+              folio: o.external_ref, fecha: o.created_at, cliente: clientName(o),
+              canal: channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal',
+              sku: p?.sku ?? '', producto: p?.name ?? 'Producto',
+              cantidad: it.qty, precio_unitario: it.unit_price ?? 0, importe: (it.unit_price ?? 0) * it.qty,
+            }
+          }))}
+          columns={[
+            { key: 'folio', label: 'Folio' },
+            { key: 'fecha', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+            { key: 'cliente', label: 'Cliente' },
+            { key: 'canal', label: 'Canal' },
+            { key: 'sku', label: 'SKU' },
+            { key: 'producto', label: 'Producto' },
+            { key: 'cantidad', label: 'Cantidad' },
+            { key: 'precio_unitario', label: 'Precio unitario', format: (v) => money(v as number) },
+            { key: 'importe', label: 'Importe', format: (v) => money(v as number) },
+          ]}
+        />
       </div>
 
       {/* Tabla */}

@@ -44,6 +44,11 @@ export function Facturacion() {
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
   const clientName = (o: OrderWithItems) => (o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
+  // Datos fiscales del doctor (viven en profiles.meta.fiscal) para el CFDI.
+  const fiscalOf = (o: OrderWithItems): { rfc: string; name: string; cfdiUse: string } => {
+    const f = ((o.doctor_id ? doctorsById[o.doctor_id]?.meta : null) as { fiscal?: Record<string, string> } | null)?.fiscal
+    return { rfc: f?.rfc ?? '', name: f?.name ?? '', cfdiUse: f?.cfdiUse ?? '' }
+  }
 
   const valid = useMemo(() => orders.filter(notCancelled), [orders])
   const bill = billingSummary(valid)
@@ -112,6 +117,9 @@ export function Facturacion() {
           { key: 'external_ref', label: 'Folio' },
           { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
+          { key: 'id', label: 'RFC', format: (_v, o) => fiscalOf(o).rfc },
+          { key: 'id', label: 'Razón social', format: (_v, o) => fiscalOf(o).name },
+          { key: 'id', label: 'Uso CFDI', format: (_v, o) => fiscalOf(o).cfdiUse },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
           { key: 'id', label: 'Cobro', format: (_v, o) => cobroTag(o).label },
           { key: 'id', label: 'CFDI', format: (_v, o) => cfdiTag(o).label },
