@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -53,6 +54,20 @@ export function Caducidades() {
       )}
 
       <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '14px 16px 0', display: 'flex' }}>
+          <ExportButton
+            name="por-caducar"
+            style={{ marginLeft: 'auto' }}
+            rows={rows.map(({ lot, d }) => ({ producto: byId[lot.product_id]?.name ?? 'Producto', lote: lot.lot_code, caduca: lot.expiry_date, estado: sevLabel(d), cantidad: lot.quantity }))}
+            columns={[
+              { key: 'producto', label: 'Producto' },
+              { key: 'lote', label: 'Lote' },
+              { key: 'caduca', label: 'Caduca', format: (v) => (v ? fmtDate(v as string) : '') },
+              { key: 'estado', label: 'Estado' },
+              { key: 'cantidad', label: 'Cantidad' },
+            ]}
+          />
+        </div>
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>

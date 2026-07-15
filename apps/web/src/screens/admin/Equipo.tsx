@@ -5,6 +5,7 @@
 import React, { useState } from 'react'
 import { UserPlus, X, Ban, RotateCcw, Pencil, Trash2, KeyRound, Check } from 'lucide-react'
 import { UserAvatar } from '../../app/UserAvatar'
+import { ExportButton } from '../../app/ExportButton'
 import { useTeam, type TeamUser } from '../../data/hooks/useTeam'
 import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
@@ -37,7 +38,14 @@ export function Equipo() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}>Administración · Equipo</div>
-        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setOpen(true)}><UserPlus size={14} /> Nuevo usuario</button>
+        <ExportButton name="equipo" rows={users} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'name', label: 'Nombre' },
+          { key: 'email', label: 'Correo' },
+          { key: 'role', label: 'Rol', format: (v) => getRole(v as RoleKey).label },
+          { key: 'active', label: 'Estado', format: (v) => (v ? 'Activo' : 'Suspendido') },
+          { key: 'capabilities', label: 'Permisos', format: (v) => (Array.isArray(v) ? v.join(', ') : '') },
+        ]} />
+        <button className="btn sm" type="button" onClick={() => setOpen(true)}><UserPlus size={14} /> Nuevo usuario</button>
       </div>
 
       {users.map((u) => (

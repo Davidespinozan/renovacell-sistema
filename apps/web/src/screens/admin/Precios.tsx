@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from 'react'
 import { Plus, Trash2, Pencil, Tag, Check } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
@@ -53,6 +54,19 @@ export function Precios() {
       {/* Tabla de precios de la lista activa */}
       {active && (
         <div className="card" style={{ padding: 0 }}>
+          <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="eyebrow" style={{ margin: 0 }}>{active.name}{active.is_default ? ' · base' : ''}</div>
+            <ExportButton
+              name={`precios-${active.name}`}
+              style={{ marginLeft: 'auto' }}
+              rows={shown.map((p) => ({ producto: p.name, base: p.price, precio: priceFor(p.id, p.price, active.is_default ? undefined : active.id) }))}
+              columns={[
+                { key: 'producto', label: 'Producto' },
+                { key: 'base', label: 'Precio base', format: (v) => money(v as number) },
+                { key: 'precio', label: `Precio en ${active.name}`, format: (v) => money(v as number) },
+              ]}
+            />
+          </div>
           <div className="tbl-scroll">
             <table className="tbl-cards">
               <thead><tr><th>Producto</th><th>Precio base</th><th>{active.is_default ? 'Precio' : `Precio en "${active.name}"`}</th></tr></thead>

@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { Plus, X, Store, PackagePlus, Check, ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { money } from '../../lib/format'
+import { ExportButton } from '../../app/ExportButton'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useEvents, remaining, type SalesEvent } from '../../data/hooks/useEvents'
 import { useTeam } from '../../data/hooks/useTeam'
@@ -30,7 +31,13 @@ export function Eventos() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}>Ventas · Eventos</div>
-        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setCreating(true)}><Plus size={14} /> Nuevo evento</button>
+        <ExportButton name="eventos" rows={mine} style={{ marginLeft: 'auto' }} columns={[
+          { key: 'name', label: 'Evento' },
+          { key: 'venue', label: 'Sede' },
+          { key: 'date', label: 'Fecha' },
+          { key: 'status', label: 'Estatus', format: (v) => (v === 'activo' ? 'Activo' : 'Cerrado') },
+        ]} />
+        <button className="btn sm" type="button" onClick={() => setCreating(true)}><Plus size={14} /> Nuevo evento</button>
       </div>
 
       {mine.length === 0 ? (
@@ -101,6 +108,20 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
           <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{event.venue} · {event.date}{memberNames ? ` · Equipo: ${memberNames}` : ''}</div>
         </div>
         <span className={'pill ' + (closed ? 'p-neu' : 'p-ok')} style={{ marginLeft: 'auto' }}>{closed ? 'Cerrado' : 'Activo'}</span>
+        {event.items.length > 0 && (
+          <ExportButton
+            name={`evento-${event.name}`}
+            rows={event.items.map((it) => { const p = byId[it.product_id]; return { producto: p?.name ?? 'Producto', precio: p?.price ?? null, asignado: it.assigned, vendido: it.sold, restante: remaining(it), valor_vendido: (p?.price ?? 0) * it.sold } })}
+            columns={[
+              { key: 'producto', label: 'Producto' },
+              { key: 'precio', label: 'Precio', format: (v) => money(v as number) },
+              { key: 'asignado', label: 'Asignado' },
+              { key: 'vendido', label: 'Vendido' },
+              { key: 'restante', label: 'En stand' },
+              { key: 'valor_vendido', label: 'Valor vendido', format: (v) => money(v as number) },
+            ]}
+          />
+        )}
         {!closed && <button className="btn ghost sm" type="button" onClick={() => setAssignOpen(true)}><PackagePlus size={14} /> Asignar inventario</button>}
         {!closed && <button className="btn ghost sm" type="button" onClick={() => setEditOpen(true)}><Pencil size={14} /> Editar</button>}
         {!closed && event.items.length > 0 && <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { closeEvent(event.id); flash('Evento cerrado · sobrante regresó al almacén') }}>Cerrar evento</button>}

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useInventory } from '../../data/hooks/useInventory'
@@ -110,9 +111,28 @@ export function Entradas() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '18px 18px 0' }}>
-          <div className="eyebrow">Historial de movimientos</div>
-          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '-8px 0 4px' }}>No se puede editar ni borrar: cada entrada y salida queda registrada (trazabilidad).</p>
+        <div style={{ padding: '18px 18px 0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <div className="eyebrow">Historial de movimientos</div>
+            <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '-8px 0 4px' }}>No se puede editar ni borrar: cada entrada y salida queda registrada (trazabilidad).</p>
+          </div>
+          <ExportButton
+            name="movimientos-inventario"
+            style={{ marginLeft: 'auto' }}
+            rows={movements.map((m) => {
+              const lot = lotById[m.lot_id]
+              const prod = lot ? prodById[lot.product_id] : undefined
+              return { fecha: m.created_at, lote: lot?.lot_code ?? m.lot_id, producto: prod?.name ?? '', motivo: reasonLabel(m.reason), referencia: m.reference ?? '', cambio: m.change }
+            })}
+            columns={[
+              { key: 'fecha', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+              { key: 'lote', label: 'Lote' },
+              { key: 'producto', label: 'Producto' },
+              { key: 'motivo', label: 'Qué pasó' },
+              { key: 'referencia', label: 'Referencia' },
+              { key: 'cambio', label: 'Cambio' },
+            ]}
+          />
         </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">

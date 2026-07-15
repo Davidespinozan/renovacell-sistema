@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useConsigna, remaining } from '../../data/hooks/useConsigna'
 import { LOW_CONSIGNA, requestRestock } from '../../data/store/consignaStore'
@@ -35,6 +36,23 @@ export function MiConsigna() {
         Lo que traes en <b>consignación</b> para vender directo a tus clientes. Almacén te lo asigna;
         para vender, entra a <b>Clientes → Venta directa</b>. Lo que no vendas, lo regresas cuando quieras.
       </PageHead>
+
+      {!mine.every(([, items]) => (items ?? []).length === 0) && (
+        <div style={{ display: 'flex' }}>
+          <ExportButton
+            name="mi-inventario"
+            style={{ marginLeft: 'auto' }}
+            rows={mine.flatMap(([vendor, items]) => (items ?? []).map((it) => ({ vendedor: vendor, producto: prodName[it.product_id] ?? 'Producto', asignado: it.assigned, vendido: it.sold, trae: remaining(it) })))}
+            columns={[
+              { key: 'vendedor', label: 'Vendedor' },
+              { key: 'producto', label: 'Producto' },
+              { key: 'asignado', label: 'Asignado' },
+              { key: 'vendido', label: 'Vendido' },
+              { key: 'trae', label: 'Trae (saldo)' },
+            ]}
+          />
+        </div>
+      )}
 
       {lowCount > 0 && (
         <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)', display: 'flex', alignItems: 'center', gap: 10 }}>

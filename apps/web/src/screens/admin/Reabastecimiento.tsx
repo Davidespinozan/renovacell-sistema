@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react'
 import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
@@ -50,6 +51,17 @@ export function Reabastecimiento() {
         <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertTriangle size={16} style={{ color: 'var(--warn)' }} />
           <div className="eyebrow" style={{ margin: 0 }}>Hay que reabastecer · stock ≤ {LOW} u</div>
+          <ExportButton
+            name="stock-bajo"
+            style={{ marginLeft: 'auto' }}
+            rows={sugerencias.map(({ p, qty }) => ({ producto: p.name, stock: qty, estado: qty <= 0 ? 'Agotado' : 'Bajo', sugerido: Math.max(TARGET - qty, 10) }))}
+            columns={[
+              { key: 'producto', label: 'Producto' },
+              { key: 'stock', label: 'Stock (u)' },
+              { key: 'estado', label: 'Estado' },
+              { key: 'sugerido', label: 'Sugerido (+u)' },
+            ]}
+          />
         </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
@@ -80,7 +92,22 @@ export function Reabastecimiento() {
 
       {/* 3) Reabastecimientos en curso → Almacén recibe */}
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '16px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Reabastecimientos · Almacén los recibe</div></div>
+        <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Reabastecimientos · Almacén los recibe</div>
+          <ExportButton
+            name="reabastecimientos"
+            style={{ marginLeft: 'auto' }}
+            rows={pos}
+            columns={[
+              { key: 'product_name', label: 'Producto' },
+              { key: 'kind', label: 'Tipo', format: (v) => (v === 'compra' ? 'Compra' : 'Producción') },
+              { key: 'supplier', label: 'Proveedor' },
+              { key: 'qty', label: 'Cantidad' },
+              { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
+              { key: 'status', label: 'Estado' },
+            ]}
+          />
+        </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>

@@ -1,6 +1,7 @@
 // Guías: envíos generados (paquetería con guía o chofer propio) con su estatus.
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -31,7 +32,25 @@ export function Guias() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Empaque · Guías</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">Empaque · Guías</div>
+        <ExportButton
+          name="guias"
+          style={{ marginLeft: 'auto' }}
+          rows={shipments.map((s) => ({
+            pedido: folioOf[s.order_id] ?? s.order_id,
+            metodo: s.driver_id ? `Chofer propio · ${driverName(s.driver_id)}` : `${s.carrier ?? ''}${s.tracking_number ? ` · guía ${s.tracking_number}` : ''}`,
+            estimada: s.estimated_delivery_at ?? '',
+            estatus: shipPill(s.status).label,
+          }))}
+          columns={[
+            { key: 'pedido', label: 'Pedido' },
+            { key: 'metodo', label: 'Método' },
+            { key: 'estimada', label: 'Estimada', format: (v) => (v ? fmtDate(v as string) : '') },
+            { key: 'estatus', label: 'Estatus' },
+          ]}
+        />
+      </div>
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">

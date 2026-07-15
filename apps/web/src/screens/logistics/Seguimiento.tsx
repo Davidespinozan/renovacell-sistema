@@ -3,6 +3,7 @@
 // salir). Es la vista para cazar el pedido que se atoró (caso S12840).
 import React, { useMemo } from 'react'
 import { Icon } from '../../app/icons'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useShipments } from '../../data/hooks/useShipments'
@@ -71,7 +72,35 @@ export function Seguimiento() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Seguimiento de envíos</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">Seguimiento de envíos</div>
+        <ExportButton
+          name="seguimiento-envios"
+          style={{ marginLeft: 'auto' }}
+          rows={rows.map((r) => {
+            const client = clientOf(r.order.doctor_id)
+            const method = r.shipment
+              ? r.shipment.driver_id ? `Chofer propio · ${driverName(r.shipment.driver_id)}` : `${r.shipment.carrier}${r.shipment.tracking_number ? ` · guía ${r.shipment.tracking_number}` : ''}`
+              : 'Sin asignar'
+            return {
+              folio: r.order.external_ref, estatus: r.statusLabel, detenido: r.stuck ? 'Sí' : 'No', motivo: r.reason,
+              cliente: client?.name ?? '', metodo: method,
+              productos: r.order.items.map((it) => prodName[it.product_id ?? ''] ?? 'Producto').join(', '),
+              estimada: r.shipment?.estimated_delivery_at ?? '',
+            }
+          })}
+          columns={[
+            { key: 'folio', label: 'Folio' },
+            { key: 'estatus', label: 'Estatus' },
+            { key: 'detenido', label: 'Detenido' },
+            { key: 'motivo', label: 'Motivo' },
+            { key: 'cliente', label: 'Cliente' },
+            { key: 'metodo', label: 'Método de envío' },
+            { key: 'productos', label: 'Productos' },
+            { key: 'estimada', label: 'Entrega estimada', format: (v) => (v ? fmtDate(v as string) : '') },
+          ]}
+        />
+      </div>
 
       {stuckCount > 0 && (
         <div className="alert">

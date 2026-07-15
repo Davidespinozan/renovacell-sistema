@@ -4,6 +4,7 @@
 // Administración como alternativa si Empaque no puede.
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
+import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useShipments } from '../../data/hooks/useShipments'
@@ -41,7 +42,19 @@ export function Despacho() {
       </PageHead>
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '16px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Por despachar</div></div>
+        <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Por despachar</div>
+          <ExportButton
+            name="por-despachar"
+            style={{ marginLeft: 'auto' }}
+            rows={porDespachar.map((s) => ({ pedido: orderById[s.order_id]?.external_ref ?? s.order_id, chofer: driverName(s.driver_id), piezas: piezas(s.order_id) }))}
+            columns={[
+              { key: 'pedido', label: 'Pedido' },
+              { key: 'chofer', label: 'Chofer' },
+              { key: 'piezas', label: 'Piezas' },
+            ]}
+          />
+        </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Pedido</th><th>Chofer</th><th>Piezas</th><th></th></tr></thead>
@@ -68,7 +81,21 @@ export function Despacho() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '16px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Despachadas / en ruta</div></div>
+        <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Despachadas / en ruta</div>
+          <ExportButton
+            name="en-ruta"
+            style={{ marginLeft: 'auto' }}
+            rows={enRuta.map((s) => ({ pedido: orderById[s.order_id]?.external_ref ?? s.order_id, chofer: driverName(s.driver_id), estado: s.status === 'out_for_delivery' ? 'En reparto' : 'Esperando confirmación', autorizo: s.dispatched_by ?? '', fecha: s.dispatched_at ?? '' }))}
+            columns={[
+              { key: 'pedido', label: 'Pedido' },
+              { key: 'chofer', label: 'Chofer' },
+              { key: 'estado', label: 'Estado' },
+              { key: 'autorizo', label: 'Autorizó' },
+              { key: 'fecha', label: 'Despachado', format: (v) => (v ? fmtDate(v as string) : '') },
+            ]}
+          />
+        </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Pedido</th><th>Chofer</th><th>Estado</th><th>Autorizó</th></tr></thead>
