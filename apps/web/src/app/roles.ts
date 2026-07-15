@@ -98,6 +98,7 @@ export const ROLES: RoleDef[] = [
     icon: 'bag', isStaff: true, ready: true,
     modules: [
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
+      { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Mi cartera' },
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },

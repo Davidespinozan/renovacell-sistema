@@ -17,7 +17,14 @@ export interface PosResult {
   shortfall?: { product_id: string; missing: number }[]
 }
 
-export function venderPOS(lines: PosLine[], total: number, paymentMethod: string): PosResult {
+// opts: cliente (doctor) y vendedor OPCIONALES. Sin cliente = venta de mostrador
+// (público general). El folio, el pago inmediato y la baja de inventario no cambian.
+export function venderPOS(
+  lines: PosLine[],
+  total: number,
+  paymentMethod: string,
+  opts: { doctorId?: string | null; seller?: string | null } = {},
+): PosResult {
   if (lines.length === 0) return { ok: false }
 
   const lots = getSnapshotLots()
@@ -36,6 +43,8 @@ export function venderPOS(lines: PosLine[], total: number, paymentMethod: string
     })),
     total,
     payment_method: paymentMethod,
+    doctor_id: opts.doctorId ?? null,
+    seller: opts.seller ?? null,
   })
 
   // Descuenta inventario por lote (salida) con referencia al folio.
