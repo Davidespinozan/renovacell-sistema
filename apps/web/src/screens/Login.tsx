@@ -18,7 +18,11 @@ export function Login() {
   const [name, setName] = useState('')
   const [cedula, setCedula] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<'login' | 'recover' | 'register'>('login')
+  // Si la landing manda al doctor con #registro, abrimos directo la verificación
+  // (no el login genérico) — el acceso es lo primero, no algo escondido abajo.
+  const [view, setView] = useState<'login' | 'recover' | 'register'>(
+    () => (typeof window !== 'undefined' && /registro/i.test(window.location.hash) ? 'register' : 'login'),
+  )
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [regMsg, setRegMsg] = useState<{ kind: 'review' | 'reject' | 'exists'; reasons?: string[]; text?: string } | null>(null)

@@ -2187,6 +2187,30 @@ body.modal-open{overflow:hidden;}
 #cartFab,.cart-fab,#cartDrawer,.cart-drawer,.cart-drawer-backdrop,#cartFabBadge,.cart-fab-badge,
 #checkoutModal,.cosm-card-buy,.buy-arrow,.cosm-card-price{display:none!important}
 </style>
+<style>
+/* ── Rediseño de acceso: hero badges + muro de acceso (el privilegio) ── */
+.hero-access-badges{display:flex;flex-wrap:wrap;gap:12px 26px;margin-top:28px}
+.hero-access-badges .hab{display:flex;flex-direction:column;gap:2px;padding-left:14px;border-left:2px solid rgba(255,255,255,.20);max-width:220px}
+.hero-access-badges .hab b{font-size:.85rem;font-weight:700;color:#fff;letter-spacing:.01em}
+.hero-access-badges .hab i{font-style:normal;font-size:.75rem;color:rgba(255,255,255,.60);line-height:1.35}
+
+.accesswall{position:relative;background:radial-gradient(130% 100% at 50% 0%, #0e150c 0%, #060905 62%);color:#eef2ea;padding:clamp(66px,9vw,124px) 24px;overflow:hidden;border-top:1px solid rgba(255,255,255,.06)}
+.accesswall .aw-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(52% 42% at 50% -4%, rgba(0,154,62,.20), transparent 70%)}
+.accesswall .aw-inner{max-width:1080px;margin:0 auto;position:relative;z-index:1}
+.accesswall .aw-kicker{font-size:.72rem;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:var(--green-mid)}
+.accesswall h2{font-size:clamp(2rem,4.6vw,3.25rem);line-height:1.08;font-weight:800;letter-spacing:-.02em;margin:16px 0 0;max-width:17ch;text-wrap:balance;color:#fff}
+.accesswall h2 .green{color:var(--green-mid)}
+.accesswall .aw-lede{font-size:1.08rem;color:rgba(238,242,234,.74);margin:20px 0 0;max-width:60ch;line-height:1.62}
+.aw-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:50px 0 0}
+.aw-step{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:28px 24px}
+.aw-step .num{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.78rem;font-weight:700;color:var(--green-mid);border:1px solid rgba(0,154,62,.42);border-radius:8px;padding:3px 9px;display:inline-block}
+.aw-step h3{font-size:1.12rem;font-weight:750;margin:16px 0 6px;color:#fff}
+.aw-step p{font-size:.92rem;color:rgba(238,242,234,.66);margin:0;line-height:1.52}
+.aw-foot{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:46px 0 0}
+.aw-foot .aw-reassure{font-size:.92rem;color:rgba(238,242,234,.6);max-width:42ch;line-height:1.5}
+.aw-foot .aw-reassure b{color:#eef2ea;font-weight:650}
+@media(max-width:820px){.aw-steps{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 
@@ -2212,6 +2236,7 @@ body.modal-open{overflow:hidden;}
       </div>
     </a>
     <div class="nav-links">
+      <a href="#acceso" class="nav-link">El acceso</a>
       <a href="#s2rm" class="nav-link">Ciencia</a>
       <a href="#cumplimiento" class="nav-link">Regulatory Compliance</a>
       <a href="#profesional" class="nav-link">Línea profesional</a>
@@ -2219,7 +2244,7 @@ body.modal-open{overflow:hidden;}
       <a href="#recursos" class="nav-link">Recursos clínicos</a>
     </div>
     <div class="nav-actions">
-      <a href="/" class="btn-primary-nav">Acceso médico</a>
+      <a href="/#registro" class="btn-primary-nav">Acceso médico</a>
       <button class="nav-burger" aria-label="Menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -2258,11 +2283,12 @@ body.modal-open{overflow:hidden;}
 <!-- MOBILE DRAWER -->
 <div class="mobile-drawer" aria-hidden="true">
   <div class="mobile-drawer-links">
-    <a href="#s2rm" class="mobile-drawer-link"><span><span class="mobile-drawer-num">01</span>Ciencia S²RM™</span></a>
-    <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">02</span>Regulatory Compliance</span></a>
-    <a href="#profesional" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Línea profesional</span></a>
-    <a href="#cosmetica" class="mobile-drawer-link"><span><span class="mobile-drawer-num">04</span>Línea cosmética</span></a>
-    <a href="#recursos" class="mobile-drawer-link"><span><span class="mobile-drawer-num">05</span>Recursos clínicos</span></a>
+    <a href="#acceso" class="mobile-drawer-link"><span><span class="mobile-drawer-num">01</span>El acceso</span></a>
+    <a href="#s2rm" class="mobile-drawer-link"><span><span class="mobile-drawer-num">02</span>Ciencia S²RM™</span></a>
+    <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Regulatory Compliance</span></a>
+    <a href="#profesional" class="mobile-drawer-link"><span><span class="mobile-drawer-num">04</span>Línea profesional</span></a>
+    <a href="#cosmetica" class="mobile-drawer-link"><span><span class="mobile-drawer-num">05</span>Línea cosmética</span></a>
+    <a href="#recursos" class="mobile-drawer-link"><span><span class="mobile-drawer-num">06</span>Recursos clínicos</span></a>
     <a href="#contacto" class="mobile-drawer-link"><span><span class="mobile-drawer-num">06</span>Professional Access</span></a>
   </div>
   <div class="mobile-drawer-foot">
@@ -2297,17 +2323,22 @@ body.modal-open{overflow:hidden;}
 
       <div class="hero-inner">
         <div class="hero-left">
-          <div class="hero-kicker rv" data-rc="heroEyebrow">Desde 2008 · Unión Europea + México</div>
+          <div class="hero-kicker rv" data-rc="heroEyebrow">Círculo médico verificado · Desde 2008 · UE + México</div>
           <h1 class="hero-headline rv d1" data-rc-html="heroTitle">
-            La nueva generación<br>
-            de <span class="green">medicina regenerativa.</span>
+            Renovacell no se vende.<br>
+            <span class="green">Se accede.</span>
           </h1>
           <p class="hero-sub rv d2" data-rc="heroSubtitle">
-            Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar.
+            La medicina regenerativa de grado europeo (tecnología celular S²RM®) está reservada a médicos con cédula avalada. Respondemos por cada profesional del círculo. Nuestra IA verifica tu cédula en minutos. ¿Calificas?
           </p>
           <div class="hero-cta-row rv d3">
-            <a href="/" class="btn-hero-primary" data-rc="ctaPrimary">Acceso médico</a>
-            <a href="#cosmetica" class="btn-hero-ghost" data-rc="ctaSecondary">Línea cosmética</a>
+            <a href="/#registro" class="btn-hero-primary" data-rc="ctaPrimary">Solicitar acceso médico</a>
+            <a href="#acceso" class="btn-hero-ghost" data-rc="ctaSecondary">Cómo funciona</a>
+          </div>
+          <div class="hero-access-badges rv d3" aria-label="Cómo es el acceso">
+            <span class="hab"><b>Verificación con IA</b><i>cédula validada en minutos, no en días</i></span>
+            <span class="hab"><b>Acceso reservado</b><i>solo médicos avalados ven catálogo y precios</i></span>
+            <span class="hab"><b>Grado europeo</b><i>S²RM® · certificación CE · registro COFEPRIS</i></span>
           </div>
         </div>
 
@@ -2337,6 +2368,24 @@ body.modal-open{overflow:hidden;}
 </div>
 
 <!-- S2RM -->
+<section class="accesswall" id="acceso">
+  <div class="aw-glow" aria-hidden="true"></div>
+  <div class="aw-inner">
+    <div class="aw-kicker">El acceso</div>
+    <h2>El catálogo no está abierto. <span class="green">Se abre para ti.</span></h2>
+    <p class="aw-lede">Renovacell trabaja con un círculo cerrado de médicos verificados. No es una tienda: es un catálogo profesional que se revela solo cuando tu cédula queda avalada. Así protegemos el estándar —y a los pacientes de quienes lo aplican—. Por eso ser verificado no es un trámite: es la puerta a un privilegio.</p>
+    <div class="aw-steps">
+      <div class="aw-step"><span class="num">01</span><h3>Solicitas acceso</h3><p>Dejas tu cédula profesional y tus datos. Treinta segundos, sin compromiso.</p></div>
+      <div class="aw-step"><span class="num">02</span><h3>La IA te avala</h3><p>Verificamos tu cédula contra el registro oficial (SEP) en minutos, no en días. Sin llamadas ni esperas.</p></div>
+      <div class="aw-step"><span class="num">03</span><h3>Entras al círculo</h3><p>Catálogo completo, precios profesionales y tu asesor. Compras cuando quieras, ya como parte de Renovacell.</p></div>
+    </div>
+    <div class="aw-foot">
+      <a href="/#registro" class="btn-hero-primary">Solicitar acceso médico</a>
+      <span class="aw-reassure">La verificación es la puerta, no el obstáculo. <b>Pertenecer es el privilegio.</b></span>
+    </div>
+  </div>
+</section>
+
 <section class="section s2rm" id="s2rm">
   <div class="section-inner">
     <div class="section-head">
@@ -3731,7 +3780,7 @@ document.addEventListener('keydown', e => {
      lenguaje de "cotización/24h". Aditivo, por selector/texto (robusto). -->
 <script>
 (function(){
-  var GO='/'; // el sistema: registro con verificación SEP → portal
+  var GO='/#registro'; // el sistema: registro con verificación SEP → portal
   function T(root,rx){return [].slice.call(document.querySelectorAll(root)).filter(function(e){return rx.test((e.textContent||'').trim())});}
   function run(){
     try{
@@ -3762,7 +3811,7 @@ document.addEventListener('keydown', e => {
       [].slice.call(document.querySelectorAll('a,button')).forEach(function(el){
         var t=(el.textContent||'').trim().toLowerCase();
         if(/solicitar acceso m|solicitar cotiz|solicitud|solicitar acceso/.test(t)){
-          el.textContent='Verificarme y entrar →';
+          el.textContent='Solicitar acceso médico →';
           if(el.tagName==='A') el.setAttribute('href',GO);
           else el.addEventListener('click',function(ev){ev.preventDefault();location.href=GO;},true);
         }
