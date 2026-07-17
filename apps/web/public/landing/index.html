@@ -934,7 +934,6 @@ footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
 .d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}.d4{transition-delay:.28s}
 
 
-
 /* SHOWCASE — Flagship Line */
 .showcase{
   background:var(--ink);
@@ -1150,7 +1149,6 @@ footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
 
 body.menu-open{overflow:hidden;}
 
-
 /* MOBILE COMPACT CARDS + PRODUCT MODAL */
 .pro-card[role="button"],.cosm-card[role="button"]{cursor:default;}
 @media(max-width:1100px){
@@ -1338,7 +1336,6 @@ body.modal-open{overflow:hidden;}
   .product-modal-cta-row{position:static;}
 }
 
-
 .product-modal::before{
   content:'';
   position:sticky;top:0;
@@ -1379,9 +1376,7 @@ body.modal-open{overflow:hidden;}
   .pro-card-cta::after{content:'→';font-size:.95rem;}
 }
 
-
 .hero-sub-mobile{display:none;}
-
 
 
 /* CTA BG EFFECT */
@@ -1562,7 +1557,6 @@ body.modal-open{overflow:hidden;}
   .nav-name b{font-size:13.5px;}
   .compliance-grid{grid-template-columns:1fr;}
 }
-
 
 
 
@@ -1766,7 +1760,6 @@ body.modal-open{overflow:hidden;}
   .hero-dark .hero-bg-effect{opacity:.5;}
 }
 
-
 /* ============================================
    REFINAMIENTO PREMIUM — fase director creativo
    ============================================ */
@@ -1853,7 +1846,6 @@ body.modal-open{overflow:hidden;}
   .hero.hero-dark::after{height:120px;}
 }
 
-
 /* TICKER como puente de transición hero-dark → claro */
 .ticker{
   background:linear-gradient(180deg, #0a1c0c 0%, #07330f 100%) !important;
@@ -1884,7 +1876,6 @@ body.modal-open{overflow:hidden;}
 .s2rm{
   background:linear-gradient(180deg, #f5f7f3 0%, var(--bone) 220px) !important;
 }
-
 
 /* ============================================
    MOBILE LUXURY REFINEMENT — fase final
@@ -1940,7 +1931,6 @@ body.modal-open{overflow:hidden;}
   /* Desactivar hover transforms en touch (no aplican, ahorran repaint) */
   .pro-card:hover, .cosm-card:hover{transform:none !important;}
 }
-
 
 /* Fix: asegurar que hero-right del dark no herede aspect/min-height viejos */
 .hero-dark .hero-right{aspect-ratio:auto !important;min-height:0 !important;}
@@ -2212,7 +2202,14 @@ body.modal-open{overflow:hidden;}
 @media(max-width:820px){.aw-steps{grid-template-columns:1fr}}
 
 /* ── Catálogo unificado (reemplaza las 2 secciones de línea) ── */
-.section.line-pro,.section.line-cosm,.showcase{display:none!important}
+.section.line-pro,.section.line-cosm,.showcase,.section.resources{display:none!important}
+.product-modal-folleto{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:11px 16px;border-radius:11px;background:var(--green);color:#fff;font-weight:700;font-size:.9rem;text-decoration:none}
+.product-modal-folleto:hover{background:var(--green-dark)}
+.cat-pager{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:34px 0 0}
+.cat-page{min-width:40px;height:40px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit}
+.cat-page:hover:not(:disabled){border-color:var(--green-mid)}
+.cat-page.on{background:var(--green);border-color:var(--green);color:#fff}
+.cat-page:disabled{opacity:.4;cursor:not-allowed}
 .product-modal-note{font-size:.8rem;color:var(--mid);line-height:1.45;flex:1;min-width:0}
 #catalogo{background:var(--bone);padding:clamp(64px,8vw,110px) 24px;border-top:1px solid var(--line);scroll-margin-top:76px}
 #acceso{scroll-margin-top:76px}
@@ -2268,7 +2265,6 @@ body.modal-open{overflow:hidden;}
       <a href="#s2rm" class="nav-link">Ciencia</a>
       <a href="#cumplimiento" class="nav-link">Regulatory Compliance</a>
       <a href="#catalogo" class="nav-link">Catálogo</a>
-      <a href="#recursos" class="nav-link">Recursos clínicos</a>
     </div>
     <div class="nav-actions">
       <a href="/#registro" class="btn-primary-nav">Acceso médico</a>
@@ -2278,7 +2274,6 @@ body.modal-open{overflow:hidden;}
     </div>
   </div>
 </nav>
-
 
 <!-- PRODUCT DETAIL MODAL -->
 <div class="product-modal-backdrop" aria-hidden="true" role="dialog">
@@ -2314,7 +2309,6 @@ body.modal-open{overflow:hidden;}
     <a href="#s2rm" class="mobile-drawer-link"><span><span class="mobile-drawer-num">02</span>Ciencia S²RM™</span></a>
     <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Regulatory Compliance</span></a>
     <a href="#catalogo" class="mobile-drawer-link"><span><span class="mobile-drawer-num">04</span>Catálogo</span></a>
-    <a href="#recursos" class="mobile-drawer-link"><span><span class="mobile-drawer-num">05</span>Recursos clínicos</span></a>
     <a href="#contacto" class="mobile-drawer-link"><span><span class="mobile-drawer-num">06</span>Professional Access</span></a>
   </div>
   <div class="mobile-drawer-foot">
@@ -2845,7 +2839,6 @@ body.modal-open{overflow:hidden;}
   </div>
 </section>
 
-
 <!-- SHOWCASE — Flagship Cosmetics -->
 <section class="showcase showcase-cosm">
   <div class="showcase-inner">
@@ -3276,7 +3269,6 @@ drawerLinks.forEach(link => link.addEventListener('click', () => toggleMenu(fals
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && drawer.classList.contains('open')) toggleMenu(false);
 });
-
 
 // PRODUCT MODAL
 const modalBackdrop = document.querySelector('.product-modal-backdrop');
@@ -3745,36 +3737,77 @@ document.addEventListener('keydown', e => {
      Reutiliza SUPA_URL/anon ya presentes. Aditivo: el botón antes no hacía nada. -->
 <script>
 (function(){
-  var U='https://amurlvlvfohwucvxfdot.supabase.co';
-  var K="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI";
-  var card=document.querySelector('.contact-form');
-  if(!card) return;
-  var btn=card.querySelector('.form-submit');
-  var inputs=card.querySelectorAll('.form-input');
-  if(!btn||inputs.length<4) return;
-  var hp=document.createElement('input');
-  hp.type='text';hp.name='website';hp.tabIndex=-1;hp.setAttribute('autocomplete','off');hp.setAttribute('aria-hidden','true');
-  hp.style.cssText='position:absolute;left:-9999px;width:1px;height:1px;opacity:0';
-  card.appendChild(hp);
-  var sent=false;
-  var val=function(i){return inputs[i]&&inputs[i].value?inputs[i].value.trim():'';};
-  btn.addEventListener('click',function(e){
-    e.preventDefault();
-    if(sent) return;
-    var name=val(0),cedula=val(1),phone=val(2),email=val(3),estado=val(4),ciudad=val(5),notas=val(6);
-    if(name.length<2||(!email&&!phone)){alert('Deja tu nombre y un correo o teléfono.');return;}
-    var loc=[ciudad,estado].filter(Boolean).join(', ');
-    var payload={name:name,email:email,phone:phone,cedula:cedula,organization:loc||null,interest:notas,channel:'Landing',website:hp.value};
-    var orig=btn.textContent;btn.textContent='Enviando…';btn.disabled=true;
-    fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify(payload)})
-      .then(function(r){return r.json().catch(function(){return{};});})
-      .then(function(res){
-        if(res&&res.error){btn.textContent=orig;btn.disabled=false;alert(res.error);return;}
-        sent=true;
-        card.innerHTML='<div style="text-align:center;padding:30px 10px"><div style="font-size:42px;line-height:1;color:var(--green,#3a9)">&#10003;</div><h3 style="margin:14px 0 6px;font-size:20px">&iexcl;Gracias!</h3><p style="color:var(--mid,#6b7280);font-size:15px;line-height:1.55">Recibimos tu solicitud. Verificamos tu c&eacute;dula profesional y te contactamos para habilitar tu acceso.</p></div>';
-      })
-      .catch(function(){btn.textContent=orig;btn.disabled=false;alert('No se pudo enviar. Revisa tu conexión e intenta de nuevo.');});
-  });
+  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  var grid=document.getElementById('catGrid'), filters=document.getElementById('catFilters'), countEl=document.getElementById('catCount');
+  if(!grid) return;
+  var pager=document.createElement('div'); pager.className='cat-pager'; grid.parentNode.appendChild(pager);
+  var IMG=['antiaging-booster','golden-placenta','golden-serum','golden-v','intimo-renovacell','mascarilla-golden-placenta','plumper','stemhair','stoplip','suero-antiedad-cellular','ultrafiltrados-ufs'];
+  function slug(x){return (x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+  function imgFor(n){var z=slug(n);var h=IMG.filter(function(i){return i===z||i.indexOf(z)===0||z.indexOf(i)===0;})[0];return h?('/products/'+h+'.webp'):'';}
+  var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};
+  var all=[], cats=[], active='Todos', PAGE=12, page=1;
+  var mb=document.querySelector('.product-modal-backdrop');
+  function openModal(pp){
+    if(!mb) return;
+    mb.querySelector('.product-modal-cat').textContent=pp.category||'';
+    mb.querySelector('.product-modal-name').textContent=pp.name||'';
+    mb.querySelector('.product-modal-desc').textContent=pp.description||'Parte del catálogo profesional Renovacell. La disponibilidad y los precios están dentro del portal, reservados a médicos verificados.';
+    var media=mb.querySelector('.product-modal-media'), img=media&&media.querySelector('img'), src=pp.image_url||imgFor(pp.name);
+    if(media){ if(src){media.style.display='';img.src=src;img.alt=pp.name;} else media.style.display='none'; }
+    var cof=mb.querySelector('.product-modal-cofepris'); if(cof) cof.style.display=(pp.line==='prof')?'inline-flex':'none';
+    var specs=mb.querySelector('.product-modal-specs'); specs.innerHTML='';
+    [['Línea',pp.line==='prof'?'Professional':'Home Care'],['Categoría',pp.category||'—'],['Disponibilidad','Para médicos verificados']].forEach(function(r){
+      var d=document.createElement('div'); d.className='product-modal-spec-row'; d.innerHTML='<label>'+esc(r[0])+'</label><b>'+esc(r[1])+'</b>'; specs.appendChild(d);
+    });
+    // Folleto oficial (PDF) dentro del popup, si el producto lo tiene
+    var body=mb.querySelector('.product-modal-body'); var fol=body.querySelector('.product-modal-folleto');
+    if(pp.brochure_url){
+      if(!fol){ fol=document.createElement('a'); fol.className='product-modal-folleto'; fol.target='_blank'; fol.rel='noopener'; body.appendChild(fol); }
+      fol.href=pp.brochure_url; fol.innerHTML='\u2193 Descargar folleto oficial (PDF)'; fol.style.display='';
+    } else if(fol){ fol.style.display='none'; }
+    mb.classList.add('open'); mb.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open');
+  }
+  function card(pp){
+    var b=document.createElement('button'); b.type='button'; b.className='cat-card';
+    var src=pp.image_url||imgFor(pp.name);
+    var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
+    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))+'</div>'
+      +'<span class="cat-line '+(pp.line==='prof'?'prof':'cosm')+'">'+(pp.line==='prof'?'Professional':'Home Care')+'</span>'
+      +'<span class="cat-name">'+esc(pp.name)+'</span>'
+      +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
+      +'<span class="cat-see">'+(pp.brochure_url?'Ficha + folleto':'Ver ficha')+' \u2192</span>';
+    b.addEventListener('click',function(){openModal(pp);});
+    return b;
+  }
+  function listNow(){ return active==='Todos'?all:all.filter(function(x){return x.category===active;}); }
+  function render(){
+    grid.innerHTML='';
+    var list=listNow(), pages=Math.max(1,Math.ceil(list.length/PAGE));
+    if(page>pages) page=pages;
+    list.slice((page-1)*PAGE,page*PAGE).forEach(function(x){grid.appendChild(card(x));});
+    countEl.textContent=list.length+' producto'+(list.length===1?'':'s')+(active==='Todos'?' en el catálogo':' \u00b7 '+active);
+    renderPager(pages);
+  }
+  function renderPager(pages){
+    pager.innerHTML='';
+    if(pages<=1) return;
+    function b(lbl,to,dis,on){var x=document.createElement('button');x.type='button';x.className='cat-page'+(on?' on':'');x.innerHTML=lbl;if(dis){x.disabled=true;}else{x.addEventListener('click',function(){page=to;render();document.getElementById('catalogo').scrollIntoView({behavior:'smooth'});});}pager.appendChild(x);}
+    b('\u2039',page-1,page===1,false);
+    for(var i=1;i<=pages;i++) b(String(i),i,false,i===page);
+    b('\u203a',page+1,page===pages,false);
+  }
+  function chips(){
+    filters.innerHTML='';
+    ['Todos'].concat(cats).forEach(function(c){
+      var x=document.createElement('button'); x.type='button'; x.className='cat-chip'+(c===active?' on':''); x.textContent=c;
+      x.addEventListener('click',function(){active=c;page=1;[].forEach.call(filters.children,function(y){y.classList.toggle('on',y.textContent===c);});render();});
+      filters.appendChild(x);
+    });
+  }
+  fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
+    .then(function(r){return r.ok?r.json():[];})
+    .then(function(rows){ all=rows||[]; cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
+    .catch(function(){ countEl.textContent='No se pudo cargar el catálogo en este momento.'; });
 })();
 </script>
 
@@ -3858,62 +3891,5 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
-<script>
-(function(){
-  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
-  var grid=document.getElementById('catGrid'), filters=document.getElementById('catFilters'), countEl=document.getElementById('catCount');
-  if(!grid) return;
-  var IMG=['antiaging-booster','golden-placenta','golden-serum','golden-v','intimo-renovacell','mascarilla-golden-placenta','plumper','stemhair','stoplip','suero-antiedad-cellular','ultrafiltrados-ufs'];
-  function slug(x){return (x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
-  function imgFor(n){var z=slug(n);var h=IMG.filter(function(i){return i===z||i.indexOf(z)===0||z.indexOf(i)===0;})[0];return h?('/products/'+h+'.webp'):'';}
-  var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};
-  var all=[], cats=[], active='Todos';
-  var mb=document.querySelector('.product-modal-backdrop');
-  function openModal(pp){
-    if(!mb) return;
-    mb.querySelector('.product-modal-cat').textContent=pp.category||'';
-    mb.querySelector('.product-modal-name').textContent=pp.name||'';
-    mb.querySelector('.product-modal-desc').textContent=pp.description||'Parte del catálogo profesional Renovacell. La ficha técnica completa está disponible dentro del portal, para médicos verificados.';
-    var media=mb.querySelector('.product-modal-media'), img=media&&media.querySelector('img'), src=pp.image_url||imgFor(pp.name);
-    if(media){ if(src){media.style.display='';img.src=src;img.alt=pp.name;} else media.style.display='none'; }
-    var cof=mb.querySelector('.product-modal-cofepris'); if(cof) cof.style.display=(pp.line==='prof')?'inline-flex':'none';
-    var specs=mb.querySelector('.product-modal-specs'); specs.innerHTML='';
-    [['Línea',pp.line==='prof'?'Professional':'Home Care'],['Categoría',pp.category||'—'],['Disponibilidad','Para médicos verificados']].forEach(function(r){
-      var d=document.createElement('div'); d.className='product-modal-spec-row'; d.innerHTML='<label>'+esc(r[0])+'</label><b>'+esc(r[1])+'</b>'; specs.appendChild(d);
-    });
-    mb.classList.add('open'); mb.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open');
-  }
-  function card(pp){
-    var b=document.createElement('button'); b.type='button'; b.className='cat-card';
-    var src=pp.image_url||imgFor(pp.name);
-    var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
-    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))+'</div>'
-      +'<span class="cat-line '+(pp.line==='prof'?'prof':'cosm')+'">'+(pp.line==='prof'?'Professional':'Home Care')+'</span>'
-      +'<span class="cat-name">'+esc(pp.name)+'</span>'
-      +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
-      +'<span class="cat-see">Ver ficha \u2192</span>';
-    b.addEventListener('click',function(){openModal(pp);});
-    return b;
-  }
-  function render(){
-    grid.innerHTML='';
-    var list=active==='Todos'?all:all.filter(function(x){return x.category===active;});
-    list.forEach(function(x){grid.appendChild(card(x));});
-    countEl.textContent=list.length+' producto'+(list.length===1?'':'s')+(active==='Todos'?' en el catálogo':' \u00b7 '+active);
-  }
-  function chips(){
-    filters.innerHTML='';
-    ['Todos'].concat(cats).forEach(function(c){
-      var b=document.createElement('button'); b.type='button'; b.className='cat-chip'+(c===active?' on':''); b.textContent=c;
-      b.addEventListener('click',function(){active=c;[].forEach.call(filters.children,function(x){x.classList.toggle('on',x.textContent===c);});render();});
-      filters.appendChild(b);
-    });
-  }
-  fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
-    .then(function(r){return r.ok?r.json():[];})
-    .then(function(rows){ all=rows||[]; cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
-    .catch(function(){ countEl.textContent='No se pudo cargar el catálogo en este momento.'; });
-})();
-</script>
 </body>
 </html>
