@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       announcement_comments: {
@@ -306,6 +281,7 @@ export type Database = {
         Row: {
           assigned: number
           id: string
+          lots: Json
           product_id: string | null
           sold: number
           updated_at: string | null
@@ -314,6 +290,7 @@ export type Database = {
         Insert: {
           assigned?: number
           id?: string
+          lots?: Json
           product_id?: string | null
           sold?: number
           updated_at?: string | null
@@ -322,12 +299,20 @@ export type Database = {
         Update: {
           assigned?: number
           id?: string
+          lots?: Json
           product_id?: string | null
           sold?: number
           updated_at?: string | null
           vendor?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "consignment_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "consignment_stock_product_id_fkey"
             columns: ["product_id"]
@@ -565,6 +550,13 @@ export type Database = {
             foreignKeyName: "lots_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -712,6 +704,13 @@ export type Database = {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -851,6 +850,13 @@ export type Database = {
             foreignKeyName: "product_costs_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_costs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -894,6 +900,13 @@ export type Database = {
             foreignKeyName: "product_prices_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -909,6 +922,7 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          brochure_url: string | null
           category: string | null
           description: string | null
           id: string
@@ -922,6 +936,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          brochure_url?: string | null
           category?: string | null
           description?: string | null
           id?: string
@@ -935,6 +950,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          brochure_url?: string | null
           category?: string | null
           description?: string | null
           id?: string
@@ -1102,6 +1118,13 @@ export type Database = {
             foreignKeyName: "replenishments_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replenishments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -1253,6 +1276,36 @@ export type Database = {
       }
     }
     Views: {
+      catalog_public: {
+        Row: {
+          brochure_url: string | null
+          category: string | null
+          description: string | null
+          id: string | null
+          image_url: string | null
+          line: string | null
+          name: string | null
+        }
+        Insert: {
+          brochure_url?: string | null
+          category?: string | null
+          description?: string | null
+          id?: string | null
+          image_url?: string | null
+          line?: string | null
+          name?: string | null
+        }
+        Update: {
+          brochure_url?: string | null
+          category?: string | null
+          description?: string | null
+          id?: string | null
+          image_url?: string | null
+          line?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       doctor_directory: {
         Row: {
           id: string | null
@@ -1283,6 +1336,13 @@ export type Database = {
           product_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lots_product_id_fkey"
             columns: ["product_id"]
@@ -1537,9 +1597,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

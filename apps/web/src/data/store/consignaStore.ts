@@ -9,8 +9,12 @@ import { createPosOrder, type OrderWithItems } from './ordersStore'
 import { logAudit } from './auditStore'
 import { notify } from './notificationsStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
+import type { Json } from '../database.types'
 
-export interface ConsignaItem { product_id: string; assigned: number; sold: number }
+// `lots` = desglose por lote del saldo NO vendido, en orden FEFO de asignación.
+// Sostiene la trazabilidad lote→cliente cuando el vendedor vende en campo.
+export interface ConsignaLot { lot_id: string; qty: number }
+export interface ConsignaItem { product_id: string; assigned: number; sold: number; lots?: ConsignaLot[] }
 export const remaining = (it: ConsignaItem): number => it.assigned - it.sold
 
 let byVendor: Record<string, ConsignaItem[]> = {}
@@ -31,12 +35,12 @@ const ref = (vendor: string) => `CONSIGNA-${vendor}`
 // ---- Hidratación desde Supabase (RLS acota por email del vendedor) ----
 async function hydrate() {
   if (!hasSupabase) return
-  const { data, error } = await supabase.from('consignment_stock').select('vendor, product_id, assigned, sold')
+  const { data, error } = await supabase.from('consignment_stock').select('vendor, product_id, assigned, sold, lots')
   if (error) { console.warn('[consigna] hydrate', error.message); return }
   const map: Record<string, ConsignaItem[]> = {}
   ;(data ?? []).forEach((r) => {
     const v = r.vendor as string
-    ;(map[v] ??= []).push({ product_id: r.product_id as string, assigned: r.assigned, sold: r.sold })
+    ;(map[v] ??= []).push({ product_id: r.product_id as string, assigned: r.assigned, sold: r.sold, lots: (r.lots as ConsignaLot[] | null) ?? [] })
   })
   byVendor = map
   emit()
@@ -67,7 +71,7 @@ function persist(vendor: string, productId: string) {
   if (!it || (it.assigned <= 0 && it.sold <= 0)) {
     supabase.from('consignment_stock').delete().eq('vendor', vendor).eq('product_id', productId).then(({ error }) => { if (error) console.warn('[consigna] delete', error.message) })
   } else {
-    supabase.from('consignment_stock').upsert({ vendor, product_id: productId, assigned: it.assigned, sold: it.sold, updated_at: new Date().toISOString() }, { onConflict: 'vendor,product_id' }).then(({ error }) => { if (error) console.warn('[consigna] upsert', error.message) })
+    supabase.from('consignment_stock').upsert({ vendor, product_id: productId, assigned: it.assigned, sold: it.sold, lots: (it.lots ?? []) as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: 'vendor,product_id' }).then(({ error }) => { if (error) console.warn('[consigna] upsert', error.message) })
   }
 }
 
@@ -77,10 +81,11 @@ export function assignToVendor(vendor: string, productId: string, qty: number): 
   const plan = allocateFEFO(productId, qty, getSnapshotLots())
   if (plan.shortfall > 0) return { ok: false, missing: plan.shortfall }
   consume(plan.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty })), ref(vendor), 'consigna')
+  const allocated: ConsignaLot[] = plan.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty }))
   const list = byVendor[vendor] ? [...byVendor[vendor]] : []
   const i = list.findIndex((x) => x.product_id === productId)
-  if (i >= 0) list[i] = { ...list[i], assigned: list[i].assigned + qty }
-  else list.push({ product_id: productId, assigned: qty, sold: 0 })
+  if (i >= 0) list[i] = { ...list[i], assigned: list[i].assigned + qty, lots: [...(list[i].lots ?? []), ...allocated] }
+  else list.push({ product_id: productId, assigned: qty, sold: 0, lots: allocated })
   byVendor = { ...byVendor, [vendor]: list }
   emit()
   persist(vendor, productId)
@@ -94,15 +99,37 @@ export function sellFromConsigna(vendor: string, lines: { product_id: string; qt
   if (!vendor || lines.length === 0) return null
   const ok = lines.every((l) => remainingFor(vendor, l.product_id) >= l.qty)
   if (!ok) return null
+  // TRAZABILIDAD: atribuye la venta a los lotes que el vendedor trae (orden FEFO de
+  // asignación). NO descuenta stock —eso ya ocurrió al asignar—: aquí solo se registra
+  // QUÉ LOTE recibió el cliente. Si una venta abarca dos lotes, se parte en dos
+  // renglones para que el rastro sea exacto.
+  const restByProduct: Record<string, ConsignaLot[]> = {}
+  const posLines: { product_id: string; qty: number; unit_price: number; lot_id: string | null }[] = []
+  lines.forEach((l) => {
+    const pool = [...((byVendor[vendor] ?? []).find((x) => x.product_id === l.product_id)?.lots ?? [])]
+    let pending = l.qty
+    while (pending > 0 && pool.length > 0) {
+      const head = pool[0]
+      const take = Math.min(head.qty, pending)
+      posLines.push({ product_id: l.product_id, qty: take, unit_price: l.unit_price, lot_id: head.lot_id })
+      pending -= take
+      if (take >= head.qty) pool.shift()
+      else pool[0] = { ...head, qty: head.qty - take }
+    }
+    // Saldo heredado sin desglose de lote (asignado antes de esta mejora): se registra
+    // sin lote en vez de perder la venta.
+    if (pending > 0) posLines.push({ product_id: l.product_id, qty: pending, unit_price: l.unit_price, lot_id: null })
+    restByProduct[l.product_id] = pool
+  })
   const order = createPosOrder({
-    lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price, lot_id: null })),
+    lines: posLines,
     total, payment_method: paymentMethod, doctor_id: doctorId, channel: 'consigna', seller: vendor,
   })
   byVendor = {
     ...byVendor,
     [vendor]: (byVendor[vendor] ?? []).map((it) => {
       const s = lines.find((l) => l.product_id === it.product_id)?.qty ?? 0
-      return s ? { ...it, sold: it.sold + s } : it
+      return s ? { ...it, sold: it.sold + s, lots: restByProduct[it.product_id] ?? it.lots } : it
     }),
   }
   emit()

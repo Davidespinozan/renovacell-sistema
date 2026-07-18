@@ -76,14 +76,14 @@ export function Trazabilidad() {
       </div>
 
       {mode === 'lote'
-        ? <PorLote lots={lots} movements={movements} prodName={prodName} orderByRef={orderByRef} clientName={clientName} />
+        ? <PorLote lots={lots} movements={movements} prodName={prodName} orders={orders} orderByRef={orderByRef} clientName={clientName} />
         : <PorPedido orders={orders} movements={movements} lotById={lotById} prodName={prodName} clientName={clientName} />}
     </div>
   )
 }
 
-function PorLote({ lots, movements, prodName, orderByRef, clientName }: {
-  lots: Lot[]; movements: InventoryMovement[]; prodName: Record<string, string>; orderByRef: Record<string, OrderWithItems | undefined>; clientName: Record<string, string>
+function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: {
+  lots: Lot[]; movements: InventoryMovement[]; prodName: Record<string, string>; orders: OrderWithItems[]; orderByRef: Record<string, OrderWithItems | undefined>; clientName: Record<string, string>
 }) {
   const [lotId, setLotId] = useState(lots[0]?.id ?? '')
   const lot = lots.find((l) => l.id === lotId) ?? lots[0]
@@ -98,14 +98,31 @@ function PorLote({ lots, movements, prodName, orderByRef, clientName }: {
   const entrada = hist.find((m) => m.change > 0)
   const salidas = hist.filter((m) => m.change < 0)
   const lotCost = lot.unit_cost ?? costOf(lot.product_id)
-  // Clientes alcanzados por el lote (para el recall) + utilidad por salida.
-  const destinos = salidas.map((m) => {
-    const o = orderByRef[m.reference ?? '']
-    const qty = -m.change
-    const precio = o?.items.find((it) => it.product_id === lot.product_id)?.unit_price ?? 0
-    const importe = precio * qty
-    return { qty, folio: m.reference ?? '—', cliente: clientLabel(o, clientName), fecha: m.created_at, importe, utilidad: importe - lotCost * qty }
-  })
+  // Clientes alcanzados por el lote (recall) + utilidad por salida.
+  // Fuente principal: el LOTE ESTAMPADO EN EL RENGLÓN del pedido (order_items.lot_id).
+  // Esto cubre por igual los cuatro canales —almacén, POS, consignación y eventos—,
+  // a diferencia de cruzar por referencia del movimiento, que solo acierta cuando la
+  // referencia es el folio (y en consignación/eventos NO lo es).
+  const porRenglon = orders.flatMap((o) =>
+    o.items.filter((it) => it.lot_id === lot.id).map((it) => {
+      const qty = it.qty
+      const importe = (it.unit_price ?? 0) * qty
+      return { qty, folio: o.external_ref ?? o.id, cliente: clientLabel(o, clientName), fecha: o.created_at, importe, utilidad: importe - lotCost * qty }
+    }),
+  )
+  // Respaldo para datos históricos (salidas anteriores a que se estampara el lote):
+  // se cruzan por referencia, omitiendo los folios ya cubiertos arriba.
+  const yaCubiertos = new Set(porRenglon.map((d) => d.folio))
+  const porMovimiento = salidas
+    .filter((m) => m.reference && !yaCubiertos.has(m.reference) && orderByRef[m.reference])
+    .map((m) => {
+      const o = orderByRef[m.reference ?? '']
+      const qty = -m.change
+      const precio = o?.items.find((it) => it.product_id === lot.product_id)?.unit_price ?? 0
+      const importe = precio * qty
+      return { qty, folio: m.reference ?? '—', cliente: clientLabel(o, clientName), fecha: m.created_at, importe, utilidad: importe - lotCost * qty }
+    })
+  const destinos = [...porRenglon, ...porMovimiento]
   const clientesUnicos = new Set(destinos.map((d) => d.cliente)).size
   const utilidadLote = destinos.reduce((s, d) => s + d.utilidad, 0)
 

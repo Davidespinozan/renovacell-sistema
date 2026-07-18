@@ -11,7 +11,10 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import type { Json } from '../database.types'
 
-export interface EventItem { product_id: string; assigned: number; sold: number }
+// `lots` = desglose por lote del stock del stand NO vendido (orden FEFO de asignación).
+// Sostiene la trazabilidad lote→cliente en la venta del evento.
+export interface EventLot { lot_id: string; qty: number }
+export interface EventItem { product_id: string; assigned: number; sold: number; lots?: EventLot[] }
 export interface SalesEvent {
   id: string
   name: string
@@ -86,8 +89,9 @@ export function assignStock(eventId: string, productId: string, qty: number): { 
     if (e.id !== eventId) return e
     const items = [...e.items]
     const i = items.findIndex((x) => x.product_id === productId)
-    if (i >= 0) items[i] = { ...items[i], assigned: items[i].assigned + qty }
-    else items.push({ product_id: productId, assigned: qty, sold: 0 })
+    const alloc: EventLot[] = plan.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty }))
+    if (i >= 0) items[i] = { ...items[i], assigned: items[i].assigned + qty, lots: [...(items[i].lots ?? []), ...alloc] }
+    else items.push({ product_id: productId, assigned: qty, sold: 0, lots: alloc })
     return { ...e, items }
   })
   emit()
@@ -104,15 +108,34 @@ export function sellAtEvent(eventId: string, lines: { product_id: string; qty: n
     return it != null && remaining(it) >= l.qty
   })
   if (!sellable) return null
+  // TRAZABILIDAD: el stock ya se descontó al asignar al stand; aquí solo se registra
+  // QUÉ LOTE recibió el cliente. Si la venta abarca dos lotes, se parte en dos renglones.
+  const restByProduct: Record<string, EventLot[]> = {}
+  const posLines: { product_id: string; qty: number; unit_price: number; lot_id: string | null }[] = []
+  lines.forEach((l) => {
+    const pool = [...(ev.items.find((x) => x.product_id === l.product_id)?.lots ?? [])]
+    let pending = l.qty
+    while (pending > 0 && pool.length > 0) {
+      const head = pool[0]
+      const take = Math.min(head.qty, pending)
+      posLines.push({ product_id: l.product_id, qty: take, unit_price: l.unit_price, lot_id: head.lot_id })
+      pending -= take
+      if (take >= head.qty) pool.shift()
+      else pool[0] = { ...head, qty: head.qty - take }
+    }
+    if (pending > 0) posLines.push({ product_id: l.product_id, qty: pending, unit_price: l.unit_price, lot_id: null })
+    restByProduct[l.product_id] = pool
+  })
   const order = createPosOrder({
-    lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price, lot_id: null })),
+    lines: posLines,
     total, payment_method: paymentMethod, event_id: eventId, seller,
   })
   events = events.map((e) => {
     if (e.id !== eventId) return e
     const items = e.items.map((it) => {
       const sold = lines.find((l) => l.product_id === it.product_id)?.qty ?? 0
-      return sold ? { ...it, sold: it.sold + sold } : it
+      // Descuenta también del desglose por lote (lo que queda en el stand).
+      return sold ? { ...it, sold: it.sold + sold, lots: restByProduct[it.product_id] ?? it.lots } : it
     })
     return { ...e, items }
   })
