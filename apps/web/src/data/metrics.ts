@@ -176,3 +176,38 @@ export function billingSummary(orders: OrderWithItems[]): BillingSummary {
   const pending = valid.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (o.total ?? 0), 0)
   return { cfdiRate: valid.length ? cfdi / valid.length : 0, paid, pending }
 }
+
+// ── LEAD TIME pedido → entrega ────────────────────────────────────────────────
+// Cuánto tarda el negocio en cumplir, de punta a punta: de que el doctor levanta
+// el pedido a que el paquete queda entregado. Es el KPI de servicio que le importa
+// a Dirección (y el que revela si el cuello está en surtido o en reparto).
+export interface LeadTime { entregados: number; promedioDias: number | null; peorDias: number | null }
+
+export function leadTime(
+  orders: OrderWithItems[],
+  shipments: { order_id: string; delivered_at: string | null }[],
+): LeadTime {
+  const entregaPorPedido = new Map<string, string>()
+  shipments.forEach((s) => { if (s.delivered_at) entregaPorPedido.set(s.order_id, s.delivered_at) })
+  const dias: number[] = []
+  orders.forEach((o) => {
+    const fin = entregaPorPedido.get(o.id)
+    if (!fin || !o.created_at) return
+    const d = (new Date(fin).getTime() - new Date(o.created_at).getTime()) / 86_400_000
+    if (Number.isFinite(d) && d >= 0) dias.push(d)
+  })
+  if (dias.length === 0) return { entregados: 0, promedioDias: null, peorDias: null }
+  const suma = dias.reduce((s, d) => s + d, 0)
+  return {
+    entregados: dias.length,
+    promedioDias: Math.round((suma / dias.length) * 10) / 10,
+    peorDias: Math.round(Math.max(...dias) * 10) / 10,
+  }
+}
+
+// ── VALOR EN RIESGO por caducidad ─────────────────────────────────────────────
+// No basta con "7 lotes por vencer": Dirección necesita saber CUÁNTO DINERO está
+// en riesgo. Se valúa a COSTO (lo que se perdería), no a precio de venta.
+export function valorEnRiesgo(lots: { quantity: number; unit_cost?: number | null }[]): number {
+  return lots.reduce((s, l) => s + l.quantity * (l.unit_cost ?? 0), 0)
+}

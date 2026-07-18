@@ -3,13 +3,14 @@
 // (atorados de Seguimiento, caducidad de Almacén). No inventa datos nuevos.
 import React, { useMemo } from 'react'
 import { Icon, type IconName } from '../../app/icons'
+import { ExportButton } from '../../app/ExportButton'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
-import { salesSummary, doctorActivity, monthlySales } from '../../data/metrics'
+import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 
@@ -35,6 +36,8 @@ export function Tablero() {
   }, [products])
 
   const sum = salesSummary(orders)
+  // Servicio: cuánto tardamos de pedido a entrega. Riesgo: cuánto dinero está por caducar.
+  const lt = useMemo(() => leadTime(orders, shipments), [orders, shipments])
   const act = doctorActivity(orders)
   // Dato hero = ventas del MES en curso + variación vs el mes anterior.
   const ms = useMemo(() => monthlySales(orders, 2), [orders])
@@ -77,7 +80,29 @@ export function Tablero() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      <div className="eyebrow">Administración · Tablero</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="eyebrow">Administración · Tablero</div>
+        <ExportButton
+          name="tablero-indicadores"
+          style={{ marginLeft: 'auto' }}
+          rows={[
+            { indicador: 'Pedidos', valor: sum.orders },
+            { indicador: 'Ventas', valor: sum.revenue },
+            { indicador: 'Ticket promedio', valor: sum.avgTicket },
+            { indicador: 'Doctores activos', valor: act.active },
+            { indicador: 'Por surtir', valor: porSurtir.length },
+            { indicador: 'Envíos atorados', valor: atorados.length },
+            { indicador: 'Lotes por caducar', valor: porCaducar.length },
+            { indicador: 'Valor en riesgo por caducidad', valor: valorEnRiesgo(porCaducar.map(({ lot }) => lot)) },
+            { indicador: 'Lead time pedido→entrega (días)', valor: lt.promedioDias ?? '' },
+            { indicador: 'Entregas medidas', valor: lt.entregados },
+          ]}
+          columns={[
+            { key: 'indicador', label: 'Indicador' },
+            { key: 'valor', label: 'Valor' },
+          ]}
+        />
+      </div>
 
       {/* Dato HERO (estilo app) */}
       <div className="grid two" style={{ gap: 16, alignItems: 'stretch' }}>
@@ -109,7 +134,8 @@ export function Tablero() {
         <Sig icon="usercheck" value={String(act.active)} k="Doctores activos" s="con compra" />
         <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
         <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
-        <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s="≤ 60 días o caducados" tone={porCaducar.length ? 'warn' : undefined} />
+        <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? `${money(valorEnRiesgo(porCaducar.map(({ lot }) => lot)))} en riesgo` : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
+        <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} entregas · peor ${lt.peorDias} d` : 'sin entregas aún'} />
       </div>
 
       {/* ALERTAS */}

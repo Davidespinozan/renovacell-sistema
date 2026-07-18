@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, Arr
 import { useProducts } from '../../data/hooks/useProducts'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCompras } from '../../data/hooks/useCompras'
 import { useInventory } from '../../data/hooks/useInventory'
@@ -77,7 +78,27 @@ export function Finanzas() {
         <button type="button" className={period === 'pasado' ? 'active' : undefined} onClick={() => setPeriod('pasado')}>Mes pasado</button>
         <button type="button" className={period === 'todo' ? 'active' : undefined} onClick={() => setPeriod('todo')}>Todo</button>
       </div>
-      <div className="eyebrow" style={{ margin: '-4px 0 0' }}>Estado de resultados · {range.label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '-4px 0 0' }}>
+        <div className="eyebrow" style={{ margin: 0 }}>Estado de resultados · {range.label}</div>
+        <ExportButton
+          name={`estado-de-resultados-${range.label}`}
+          style={{ marginLeft: 'auto' }}
+          rows={[
+            { concepto: 'Ventas', monto: er.ventas },
+            { concepto: 'Costo de ventas', monto: -er.costoVentas },
+            { concepto: 'Utilidad bruta', monto: er.utilidadBruta },
+            { concepto: 'Gastos', monto: -er.gastos },
+            { concepto: 'Mermas', monto: -er.mermas },
+            { concepto: 'Utilidad neta', monto: er.utilidadNeta },
+            { concepto: 'Margen bruto %', monto: Math.round(er.margenBruto * 10) / 10 },
+            { concepto: 'Margen neto %', monto: Math.round(er.margenNeto * 10) / 10 },
+          ]}
+          columns={[
+            { key: 'concepto', label: 'Concepto' },
+            { key: 'monto', label: 'Monto' },
+          ]}
+        />
+      </div>
 
       {/* Estado de resultados */}
       <div className="grid sigs">

@@ -13,7 +13,16 @@ export interface Features {
   chofer: boolean
 }
 
+// Se configuran por VARIABLE DE ENTORNO, para poder entregar el paquete base sin
+// los add-ons SIN recompilar ni tocar código:
+//   VITE_FEATURE_COMUNICACION=false   apaga la Vista Común y el Chat
+//   VITE_FEATURE_CHOFER=false         apaga el módulo y el rol Chofer
+// Por defecto quedan ENCENDIDOS (comportamiento actual). Para una entrega del
+// paquete base, ponerlos en 'false' en las variables del despliegue.
+const flag = (v: string | undefined, fallback: boolean): boolean =>
+  v == null || v === '' ? fallback : v !== 'false' && v !== '0'
+
 export const FEATURES: Features = {
-  comunicacionInterna: true,
-  chofer: true,
+  comunicacionInterna: flag(import.meta.env?.VITE_FEATURE_COMUNICACION as string | undefined, true),
+  chofer: flag(import.meta.env?.VITE_FEATURE_CHOFER as string | undefined, true),
 }
