@@ -16,7 +16,17 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-interface SepRecord { found: boolean; name?: string; profession?: string; year?: string; institution?: string }
+// `unavailable` distingue "no pude consultar el registro" (caída, timeout, sin
+// proveedor) de "consulté y la cédula NO existe". Confundirlos hacía que una caída
+// rechazara a un médico real diciéndole en falso que su cédula no está registrada.
+// Los campos de EVIDENCIA (provider/checkedAt/folio) se guardan con el doctor para
+// poder comprobar después que la verificación ocurrió y contra qué fuente.
+interface SepRecord {
+  found: boolean
+  unavailable?: boolean
+  name?: string; profession?: string; year?: string; institution?: string
+  provider?: string; checkedAt?: string; folio?: string
+}
 
 const norm = (s?: string): string =>
   (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -32,6 +42,15 @@ const MEDICAL = ['medic', 'cirug', 'cirujan', 'dermatolog', 'ginecolog', 'pediat
 const isMedical = (p?: string): boolean => { const n = norm(p); return n !== '' && MEDICAL.some((k) => n.includes(k)) }
 
 function decide(enteredName: string, sep: SepRecord) {
+  // NUNCA rechazar por una falla nuestra: si no se pudo consultar el registro, va a
+  // revisión manual de Dirección. Rechazar aquí acusaría en falso a un médico real.
+  if (sep.unavailable) {
+    return {
+      score: 0, nameMatch: 0, isMedical: false, decision: 'review',
+      reasons: ['No fue posible consultar el registro oficial en este momento. Dirección verificará la cédula manualmente.'],
+      sep,
+    }
+  }
   if (!sep.found) return { score: 0, nameMatch: 0, isMedical: false, decision: 'reject', reasons: ['La cédula no aparece en el registro oficial (SEP/RENAPO).'], sep }
   const nm = nameSimilarity(enteredName, sep.name)
   const medical = isMedical(sep.profession)
@@ -92,27 +111,44 @@ async function lookupSepHttp(cedula: string, enteredName: string): Promise<SepRe
   const scheme = Deno.env.get('CEDULA_API_AUTH_SCHEME') ?? 'Bearer'
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   headers[header] = header.toLowerCase() === 'authorization' && scheme ? `${scheme} ${key}` : key
+  const checkedAt = new Date().toISOString()
   try {
-    const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }) })
-    if (!r.ok) return { found: false }
-    return mapSepResponse(await r.json().catch(() => ({})))
-  } catch { return { found: false } }
+    // Timeout explícito: sin esto, un proveedor lento cuelga la verificación.
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 10_000)
+    const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }), signal: ctrl.signal })
+    clearTimeout(t)
+    // Un error del proveedor NO es "cédula inexistente": es indisponibilidad.
+    if (!r.ok) return { found: false, unavailable: true, provider: url, checkedAt }
+    const raw = await r.json().catch(() => ({}))
+    const mapped = mapSepResponse(raw)
+    return { ...mapped, provider: url, checkedAt, folio: pick(raw, ['folio', 'idconsulta', 'transaction', 'referencia']) }
+  } catch {
+    return { found: false, unavailable: true, provider: url, checkedAt }
+  }
 }
 
-// SIMULADOR (sin proveedor). Determinista por el último dígito de la cédula.
+// SIMULADOR — SOLO para demos. Determinista por el último dígito de la cédula.
+// Ya NO es el respaldo por defecto: aprobar solo porque no hay proveedor sería
+// dar acceso a alguien sin comprobar que es médico.
 function simulateSep(cedula: string, enteredName: string): SepRecord {
+  const checkedAt = new Date().toISOString()
   const digits = (cedula ?? '').replace(/\D/g, '')
-  if (digits.length < 5) return { found: false }
+  if (digits.length < 5) return { found: false, provider: 'simulador', checkedAt }
   const last = digits[digits.length - 1]
-  if (last === '0') return { found: false }
-  if (last === '9') return { found: true, name: enteredName, profession: 'Licenciatura en Administración', year: '2015', institution: 'UNAM' }
-  if (last === '8') return { found: true, name: 'Juan Pérez García', profession: 'Médico Cirujano', year: '2013', institution: 'IPN' }
-  return { found: true, name: enteredName, profession: 'Médico Cirujano', year: '2014', institution: 'UNAM' }
+  if (last === '0') return { found: false, provider: 'simulador', checkedAt }
+  if (last === '9') return { found: true, name: enteredName, profession: 'Licenciatura en Administración', year: '2015', institution: 'UNAM', provider: 'simulador', checkedAt }
+  if (last === '8') return { found: true, name: 'Juan Pérez García', profession: 'Médico Cirujano', year: '2013', institution: 'IPN', provider: 'simulador', checkedAt }
+  return { found: true, name: enteredName, profession: 'Médico Cirujano', year: '2014', institution: 'UNAM', provider: 'simulador', checkedAt }
 }
 
+// Orden: proveedor real → simulador (solo si se pide explícito) → revisión manual.
+// SIN proveedor configurado, el sistema NO inventa un veredicto: manda a revisión
+// manual. Es el comportamiento honesto y el que corresponde a la ruta manual.
 async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord> {
   if (Deno.env.get('CEDULA_API_URL')) return lookupSepHttp(cedula, enteredName)
-  return simulateSep(cedula, enteredName)
+  if (Deno.env.get('CEDULA_SIMULATE') === 'true') return simulateSep(cedula, enteredName)
+  return { found: false, unavailable: true, provider: 'sin-proveedor', checkedAt: new Date().toISOString() }
 }
 
 Deno.serve(async (req) => {

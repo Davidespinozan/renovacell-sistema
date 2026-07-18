@@ -11,10 +11,17 @@
 
 export interface SepRecord {
   found: boolean
+  // `unavailable` = NO se pudo consultar el registro (caída, timeout, sin proveedor).
+  // Es distinto de "consulté y no existe": una falla nuestra nunca debe rechazar.
+  unavailable?: boolean
   name?: string
   profession?: string
   year?: string
   institution?: string
+  // Evidencia de la consulta (para poder comprobar después que se verificó).
+  provider?: string
+  checkedAt?: string
+  folio?: string
 }
 
 export type Decision = 'auto' | 'review' | 'reject'
@@ -51,6 +58,15 @@ export function isMedicalProfession(p?: string): boolean {
 }
 
 export function decideVerification(enteredName: string, sep: SepRecord): VerifyDecision {
+  // Falla al consultar ⇒ revisión manual, NUNCA rechazo: rechazar aquí le diría en
+  // falso a un médico real que su cédula no está registrada.
+  if (sep.unavailable) {
+    return {
+      score: 0, nameMatch: 0, isMedical: false, decision: 'review',
+      reasons: ['No fue posible consultar el registro oficial en este momento. Dirección verificará la cédula manualmente.'],
+      sep,
+    }
+  }
   if (!sep.found) {
     return { score: 0, nameMatch: 0, isMedical: false, decision: 'reject', reasons: ['La cédula no aparece en el registro oficial (SEP/RENAPO).'], sep }
   }

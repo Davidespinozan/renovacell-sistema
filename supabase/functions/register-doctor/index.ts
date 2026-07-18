@@ -18,23 +18,35 @@ const cors = {
 const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 // ---- Verificación (misma lógica que verify-cedula) ----
-interface SepRecord { found: boolean; name?: string; profession?: string }
+// `unavailable` = no se pudo consultar (caída/timeout/sin proveedor) ≠ cédula inexistente.
+// provider/checkedAt/folio son la EVIDENCIA que se guarda con el doctor.
+interface SepRecord {
+  found: boolean; unavailable?: boolean
+  name?: string; profession?: string
+  provider?: string; checkedAt?: string; folio?: string
+}
 const norm = (s?: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim()
 const tokens = (s?: string) => norm(s).split(' ').filter((t) => t.length > 1 && !['dr', 'dra', 'de', 'del', 'la', 'los'].includes(t))
 function nameSim(a?: string, b?: string): number { const A = new Set(tokens(a)), B = new Set(tokens(b)); if (!A.size || !B.size) return 0; let i = 0; A.forEach((t) => { if (B.has(t)) i++ }); return i / Math.max(A.size, B.size) }
 const MED = ['medic', 'cirug', 'cirujan', 'dermatolog', 'ginecolog', 'pediatr', 'cardiolog', 'anestesiolog', 'oftalmolog', 'odontolog', 'estomatolog', 'salud', 'enferm']
 const isMed = (p?: string) => { const n = norm(p); return n !== '' && MED.some((k) => n.includes(k)) }
 function decide(name: string, sep: SepRecord) {
-  if (!sep.found) return { decision: 'reject', score: 0, reasons: ['La cédula no aparece en el registro oficial (SEP/RENAPO).'] }
+  // Falla nuestra ⇒ revisión manual, nunca rechazo (no acusar en falso a un médico real).
+  // Se devuelve `sep` para que la EVIDENCIA quede guardada con el doctor/prospecto.
+  if (sep.unavailable) {
+    return { decision: 'review', score: 0, reasons: ['No fue posible consultar el registro oficial en este momento. Dirección verificará la cédula manualmente.'], sep }
+  }
+  if (!sep.found) return { decision: 'reject', score: 0, reasons: ['La cédula no aparece en el registro oficial (SEP/RENAPO).'], sep }
   const nm = nameSim(name, sep.name), med = isMed(sep.profession)
   const reasons: string[] = []
   let decision: string
   if (med && nm >= 0.85) { decision = 'auto'; reasons.push('Cédula válida, profesión médica y nombre coincide.') }
   else { if (!med) reasons.push(`La profesión registrada ("${sep.profession ?? '—'}") no es del área médica.`); if (nm < 0.85) reasons.push(`El nombre coincide al ${Math.round(nm * 100)}% con el del registro.`); decision = nm >= 0.5 ? 'review' : 'reject'; reasons.push(decision === 'review' ? 'Requiere revisión de Dirección.' : 'El nombre no coincide con el titular de la cédula.') }
-  return { decision, score: Math.round((nm * 0.6 + (med ? 1 : 0) * 0.4) * 100), reasons }
+  return { decision, score: Math.round((nm * 0.6 + (med ? 1 : 0) * 0.4) * 100), reasons, sep }
 }
 async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord> {
   const apiUrl = Deno.env.get('CEDULA_API_URL')
+  const checkedAt = new Date().toISOString()
   if (apiUrl) {
     try {
       const key = Deno.env.get('CEDULA_API_KEY') ?? ''
@@ -42,24 +54,32 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
       const scheme = Deno.env.get('CEDULA_API_AUTH_SCHEME') ?? 'Bearer'
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       headers[header] = header.toLowerCase() === 'authorization' && scheme ? `${scheme} ${key}` : key
-      const r = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }) })
-      if (!r.ok) return { found: false }
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 10_000)
+      const r = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }), signal: ctrl.signal })
+      clearTimeout(t)
+      if (!r.ok) return { found: false, unavailable: true, provider: apiUrl, checkedAt }
       // deno-lint-ignore no-explicit-any
       const d: any = await r.json().catch(() => ({}))
       const o = d?.data ?? d?.result ?? d?.persona ?? d
       const name = o?.nombre ?? o?.nombreCompleto ?? o?.name
       const profession = o?.profesion ?? o?.profession ?? o?.carrera
-      return { found: !!name, name, profession }
-    } catch { return { found: false } }
+      const folio = o?.folio ?? o?.idConsulta ?? o?.referencia ?? d?.folio
+      return { found: !!name, name, profession, provider: apiUrl, checkedAt, folio: folio ? String(folio) : undefined }
+    } catch { return { found: false, unavailable: true, provider: apiUrl, checkedAt } }
   }
-  // SIMULADOR (sin proveedor): último dígito 0→no existe, 9→no médico, 8→otro nombre, resto→médico.
+  // SIMULADOR: solo si se habilita explícitamente (demos). Sin proveedor y sin este
+  // flag NO se inventa veredicto: se manda a revisión manual de Dirección.
+  if (Deno.env.get('CEDULA_SIMULATE') !== 'true') {
+    return { found: false, unavailable: true, provider: 'sin-proveedor', checkedAt }
+  }
   const digits = (cedula ?? '').replace(/\D/g, '')
-  if (digits.length < 5) return { found: false }
+  if (digits.length < 5) return { found: false, provider: 'simulador', checkedAt }
   const last = digits[digits.length - 1]
-  if (last === '0') return { found: false }
-  if (last === '9') return { found: true, name: enteredName, profession: 'Licenciatura en Administración' }
-  if (last === '8') return { found: true, name: 'Juan Pérez García', profession: 'Médico Cirujano' }
-  return { found: true, name: enteredName, profession: 'Médico Cirujano' }
+  if (last === '0') return { found: false, provider: 'simulador', checkedAt }
+  if (last === '9') return { found: true, name: enteredName, profession: 'Licenciatura en Administración', provider: 'simulador', checkedAt }
+  if (last === '8') return { found: true, name: 'Juan Pérez García', profession: 'Médico Cirujano', provider: 'simulador', checkedAt }
+  return { found: true, name: enteredName, profession: 'Médico Cirujano', provider: 'simulador', checkedAt }
 }
 
 Deno.serve(async (req) => {

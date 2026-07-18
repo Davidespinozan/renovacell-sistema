@@ -37,6 +37,19 @@ describe('verificación · motor de decisión', () => {
     expect(d.decision).toBe('reject')
   })
 
+  it('REVISIÓN (no rechazo) si NO se pudo consultar el registro', () => {
+    // Una caída del proveedor no debe acusar en falso a un médico real.
+    const d = decideVerification('Laura Méndez', { found: false, unavailable: true, provider: 'sin-proveedor' })
+    expect(d.decision).toBe('review')
+    expect(d.reasons.join(' ')).toMatch(/no fue posible consultar/i)
+    expect(d.reasons.join(' ')).not.toMatch(/no aparece en el registro/i)
+  })
+
+  it('conserva la evidencia de la consulta (proveedor y fecha)', () => {
+    const sep = { found: true, name: 'Laura Méndez', profession: 'Médico Cirujano', provider: 'api-x', checkedAt: '2026-07-18T10:00:00Z', folio: 'F-123' }
+    expect(decideVerification('Laura Méndez', sep).sep).toMatchObject({ provider: 'api-x', folio: 'F-123' })
+  })
+
   it('simulador SEP cubre las tres ramas por el último dígito', () => {
     expect(simulateSep('1234560', 'X').found).toBe(false) // termina en 0 → no existe
     expect(isMedicalProfession(simulateSep('1234569', 'X').profession)).toBe(false) // termina en 9 → no médico
