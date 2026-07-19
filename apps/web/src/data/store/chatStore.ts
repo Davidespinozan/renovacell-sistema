@@ -8,6 +8,8 @@ import { CURRENT_USER as MOCK_ME, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../m
 import { isStaffUser } from '../mock/users'
 import { getSnapshot as teamSnapshot } from './teamStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { notify } from './notificationsStore'
+import { CHAT_SCREEN } from '../../app/roles'
 
 const uuid = (): string => (globalThis.crypto?.randomUUID?.() ?? `c-${Math.random().toString(16).slice(2)}`)
 const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -152,8 +154,28 @@ export function sendMessage(conversationId: string, body: string) {
       .then(({ error }) => {
         // Si el envío falla (RLS/red), quita el mensaje optimista (no fingir envío).
         if (error) { console.warn('[chat] send', error.message); messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((x) => x.id !== id) }; emit() }
+        else notifyMembers(conversationId, senderId, trimmed)
       })
   }
+}
+
+// Avisa a los DEMÁS miembros de la conversación que hay mensaje nuevo.
+// - Dirigido a personas (no a roles): un directo queda entre sus participantes.
+// - Nunca se avisa a quien escribió.
+// - Lleva un adelanto corto para que el aviso sea útil sin abrir el chat. La
+//   audiencia del aviso es la misma que la del mensaje, así que no expone de más.
+function notifyMembers(conversationId: string, senderId: string, body: string) {
+  const conv = conversations.find((c) => c.id === conversationId)
+  if (!conv) return
+  const destinatarios = (conv.member_ids ?? []).filter((uid) => uid && uid !== senderId)
+  if (destinatarios.length === 0) return
+  const donde = conv.kind === 'dm' ? 'mensaje directo' : (conv.title ?? 'un grupo')
+  const adelanto = body.length > 70 ? `${body.slice(0, 70)}…` : body
+  notify({
+    text: `${CURRENT_USER.name} · ${donde}: ${adelanto}`,
+    screen: CHAT_SCREEN.key,
+    userIds: destinatarios,
+  })
 }
 
 // Abre el DM con un usuario; si no existe, lo crea. Devuelve el id o null.

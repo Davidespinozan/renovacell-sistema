@@ -11,7 +11,11 @@ export interface Notif {
   id: string
   text: string
   at: string
-  roles?: RoleKey[] // audiencia; admin ve todo. undefined = broadcast
+  roles?: RoleKey[] // audiencia por rol; admin ve todo. undefined = broadcast
+  // Destinatarios explícitos (personas). Si viene, MANDA sobre `roles`: solo ellos
+  // la ven. Se usa para avisos de chat, donde la audiencia son los miembros de la
+  // conversación y no un rol — y donde un directo debe permanecer privado.
+  userIds?: string[]
   screen?: string   // pendiente: a dónde ir a resolverlo
   read: boolean
 }
@@ -45,14 +49,14 @@ export const getSnapshot = (): Notif[] => snapshot
 async function hydrate() {
   if (!hasSupabase) return
   const [{ data: notis, error: ne }, { data: reads }] = await Promise.all([
-    supabase.from('notifications').select('id, body, roles, screen, created_at').order('created_at', { ascending: false }).limit(100),
+    supabase.from('notifications').select('id, body, roles, user_ids, screen, created_at').order('created_at', { ascending: false }).limit(100),
     supabase.from('notification_reads').select('notification_id'),
   ])
   if (ne) { console.warn('[notif] hydrate', ne.message); return }
   readSet.clear()
   ;(reads ?? []).forEach((r) => readSet.add(r.notification_id))
   items = (notis ?? []).map((n) => ({
-    id: n.id, text: n.body, at: n.created_at ?? '', roles: (n.roles ?? undefined) as RoleKey[] | undefined,
+    id: n.id, text: n.body, at: n.created_at ?? '', roles: (n.roles ?? undefined) as RoleKey[] | undefined, userIds: (n.user_ids ?? undefined) as string[] | undefined,
     screen: n.screen ?? undefined, read: readSet.has(n.id),
   }))
   emit()
@@ -68,9 +72,9 @@ async function ensureRealtime() {
   if (notifChannel) return
   notifChannel = supabase.channel('rc-notif')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-      const n = payload.new as { id: string; body: string; roles: string[] | null; screen: string | null; created_at: string }
+      const n = payload.new as { id: string; body: string; roles: string[] | null; user_ids: string[] | null; screen: string | null; created_at: string }
       if (items.some((x) => x.id === n.id)) return
-      items = [{ id: n.id, text: n.body, at: n.created_at, roles: (n.roles ?? undefined) as RoleKey[] | undefined, screen: n.screen ?? undefined, read: false }, ...items]
+      items = [{ id: n.id, text: n.body, at: n.created_at, roles: (n.roles ?? undefined) as RoleKey[] | undefined, userIds: (n.user_ids ?? undefined) as string[] | undefined, screen: n.screen ?? undefined, read: false }, ...items]
       emit()
     })
     .subscribe()
@@ -88,9 +92,9 @@ if (hasSupabase) {
 // Emitido por los stores en cada transición. Con backend inserta y deja que el
 // Realtime lo entregue a la audiencia correcta (no se agrega optimista local: el
 // emisor no siempre es audiencia, y si lo es le llega por Realtime).
-export function notify(input: { text: string; roles?: RoleKey[]; screen?: string }) {
+export function notify(input: { text: string; roles?: RoleKey[]; screen?: string; userIds?: string[] }) {
   if (hasSupabase) {
-    supabase.from('notifications').insert({ id: uuid(), body: input.text, roles: input.roles ?? null, screen: input.screen ?? null, created_by: currentUserId() })
+    supabase.from('notifications').insert({ id: uuid(), body: input.text, roles: input.roles ?? null, user_ids: input.userIds ?? null, screen: input.screen ?? null, created_by: currentUserId() })
       .then(({ error }) => { if (error) console.warn('[notif] insert', error.message) })
     return
   }

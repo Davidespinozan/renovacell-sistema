@@ -638,6 +638,7 @@ export type Database = {
           id: string
           roles: string[] | null
           screen: string | null
+          user_ids: string[] | null
         }
         Insert: {
           body: string
@@ -646,6 +647,7 @@ export type Database = {
           id?: string
           roles?: string[] | null
           screen?: string | null
+          user_ids?: string[] | null
         }
         Update: {
           body?: string
@@ -654,6 +656,7 @@ export type Database = {
           id?: string
           roles?: string[] | null
           screen?: string | null
+          user_ids?: string[] | null
         }
         Relationships: []
       }

@@ -7,6 +7,7 @@ import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
 import { useNotifications } from '../data/hooks/useNotifications'
 import { timeAgo } from '../lib/format'
+import { currentUserId } from '../lib/supabase'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen, capabilities } = useRole()
@@ -112,7 +113,12 @@ function NotifBell() {
   const navKeys = useMemo(() => new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key)), [role, capabilities])
   const visible = useMemo(
     () => data.filter((n) => {
-      const audienceOk = !n.roles || role === 'admin' || n.roles.includes(role)
+      // Si la notificación va dirigida a personas (avisos de chat), MANDA sobre el
+      // rol: solo sus destinatarios la ven, ni siquiera Dirección. Un mensaje
+      // directo es privado entre sus participantes.
+      const audienceOk = n.userIds
+        ? n.userIds.includes(currentUserId() ?? '')
+        : (!n.roles || role === 'admin' || n.roles.includes(role))
       if (!audienceOk) return false
       // Dirección ve todo (supervisión); el resto solo lo que puede abrir.
       return role === 'admin' || !n.screen || navKeys.has(n.screen)
