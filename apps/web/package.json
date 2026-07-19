@@ -14,6 +14,9 @@
   "dependencies": {
     "@renovacell/ui": "*",
     "@supabase/supabase-js": "^2.0.0",
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.454.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
