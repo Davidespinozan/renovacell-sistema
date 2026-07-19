@@ -29,12 +29,31 @@ export interface Announcement {
   endsAt: string      // 'AAAA-MM-DD' o '' (sin fecha de fin)
 }
 
+// Una diapositiva del hero. `imageMobileUrl` permite una foto distinta en
+// teléfono (las horizontales suelen cortarse mal en vertical). Vacía = usa la de
+// escritorio.
+export interface HeroSlide {
+  eyebrow: string
+  title: string        // admite HTML (p. ej. <span class="green">)
+  subtitle: string
+  imageUrl: string
+  imageMobileUrl: string
+}
+
 export interface LandingContent {
   announcement: Announcement
   seo: { title: string; description: string }
   brand: { name: string; tagline: string; logoUrl: string }
   nav: { links: NavLink[]; cta: string }
-  hero: { eyebrow: string; title: string; subtitle: string; ctaPrimary: string; ctaSecondary: string; imageUrl: string }
+  // Los botones son los mismos en todas las diapositivas (misma acción).
+  // `slides`: si trae más de una, el hero rota. `autoplayMs`: 0 = no rota solo.
+  hero: {
+    eyebrow: string; title: string; subtitle: string
+    ctaPrimary: string; ctaSecondary: string
+    imageUrl: string; imageMobileUrl: string
+    slides: HeroSlide[]
+    autoplayMs: number
+  }
   ticker: string[]
   info: { eyebrow: string; title: string; body: string; imageUrl: string }
   certifications: { eyebrow: string; title: string; items: Certification[] }
@@ -74,6 +93,11 @@ const DEFAULT: LandingContent = {
     ctaPrimary: 'Ver el catálogo',
     ctaSecondary: 'Solicitar acceso',
     imageUrl: '',
+    imageMobileUrl: '',
+    // Una sola diapositiva = el hero de siempre (no rota). Al agregar más desde
+    // Administración, el hero se convierte en carrusel automáticamente.
+    slides: [],
+    autoplayMs: 7000,
   },
   ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE · Certificación EU', 'COFEPRIS · Registro Sanitario', 'ISO 13485 · Calidad médica'],
   info: {

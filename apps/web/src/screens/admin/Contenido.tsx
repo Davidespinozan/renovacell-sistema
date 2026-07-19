@@ -8,7 +8,7 @@ import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
-import { useLanding, type LandingContent } from '../../data/hooks/useLanding'
+import { useLanding, type LandingContent, type HeroSlide } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
 
 // Pantalla "Catálogo" (Comercial): edita los productos del Portal del Doctor.
@@ -241,6 +241,10 @@ function LandingTab() {
   const up = (patch: Partial<LandingContent>) => { setDraft((d) => ({ ...d, ...patch })); setSaved(false) }
   const upSec = (k: keyof LandingContent, patch: Record<string, unknown>) => { setDraft((d) => ({ ...d, [k]: { ...(d[k] as object), ...patch } })); setSaved(false) }
 
+  // Edita una diapositiva del hero sin tocar las demás.
+  const upSlide = (i: number, patch: Partial<HeroSlide>) =>
+    upSec('hero', { slides: draft.hero.slides.map((sl, j) => (j === i ? { ...sl, ...patch } : sl)) })
+
   // listas
   const setLink = (i: number, patch: Partial<{ label: string; href: string }>) => upSec('nav', { links: draft.nav.links.map((l, j) => (j === i ? { ...l, ...patch } : l)) })
   const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((s, j) => (j === i ? v : s)) })
@@ -309,7 +313,56 @@ function LandingTab() {
           <Fld label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
           <Fld label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
         </div>
-        <Fld label="Imagen del hero (URL)" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} mono />
+        <Fld label="Imagen del hero · escritorio (URL)" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} mono />
+        <Fld label="Imagen del hero · móvil (URL, opcional)" value={draft.hero.imageMobileUrl}
+          onChange={(v) => upSec('hero', { imageMobileUrl: v })} mono
+          hint="Si la dejas vacía, en teléfono se usa la de escritorio." />
+
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>Hero rotativo</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+                Con <b>2 o más</b> diapositivas el hero rota solo, con flechas y puntos. Con una (o ninguna), se queda fijo.
+              </div>
+            </div>
+            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }}
+              onClick={() => upSec('hero', { slides: [...draft.hero.slides, { eyebrow: draft.hero.eyebrow, title: draft.hero.title, subtitle: draft.hero.subtitle, imageUrl: draft.hero.imageUrl, imageMobileUrl: draft.hero.imageMobileUrl }] })}>
+              <Plus size={14} /> Agregar diapositiva
+            </button>
+          </div>
+
+          {draft.hero.slides.length > 0 && (
+            <div className="form-grid-2" style={{ marginBottom: 10 }}>
+              <label style={{ display: 'block' }}>
+                <span style={fLabel}>Cambia cada (segundos)</span>
+                <input type="number" min={0} style={fInput}
+                  value={Math.round((draft.hero.autoplayMs ?? 7000) / 1000)}
+                  onChange={(e) => upSec('hero', { autoplayMs: Math.max(0, Number(e.target.value) || 0) * 1000 })} />
+                <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>0 = no rota sola (solo con flechas)</span>
+              </label>
+            </div>
+          )}
+
+          {draft.hero.slides.map((sl, i) => (
+            <div key={i} className="card" style={{ padding: 14, marginBottom: 10, background: 'var(--bone, #F9FAF8)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span className="pill p-neu">Diapositiva {i + 1}</span>
+                <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }}
+                  onClick={() => upSec('hero', { slides: draft.hero.slides.filter((_, k) => k !== i) })}>
+                  <Trash2 size={13} /> Quitar
+                </button>
+              </div>
+              <Fld label="Eyebrow" value={sl.eyebrow} onChange={(v) => upSlide(i, { eyebrow: v })} />
+              <Fld label="Título (admite HTML)" value={sl.title} onChange={(v) => upSlide(i, { title: v })} />
+              <Area label="Subtítulo" value={sl.subtitle} onChange={(v) => upSlide(i, { subtitle: v })} />
+              <div className="form-grid-2">
+                <Fld label="Imagen escritorio (URL)" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} mono />
+                <Fld label="Imagen móvil (URL, opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} mono />
+              </div>
+            </div>
+          ))}
+        </div>
       </SecCard>
 
       <SecCard title="Ticker (cinta)">

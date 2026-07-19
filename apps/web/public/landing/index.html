@@ -2183,6 +2183,17 @@ body.rc-has-ann .topbar{top:38px}
 body.rc-has-ann .nav{top:79px}
 @keyframes rc-ann-scroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 @media (prefers-reduced-motion: reduce){.rc-ann-track{animation:none;padding-left:0;justify-content:center;width:100%}}
+
+/* ── Hero rotativo: transición suave + controles ── */
+.rc-hero-fade{transition:opacity .45s ease}
+.rc-hero-fade.rc-out{opacity:0}
+.rc-hero-dots{display:flex;gap:8px;align-items:center;margin-top:26px}
+.rc-hero-dot{width:9px;height:9px;border-radius:50%;border:none;padding:0;cursor:pointer;background:rgba(255,255,255,.32);transition:.2s}
+.rc-hero-dot.on{background:var(--green-mid);width:26px;border-radius:999px}
+.rc-hero-arrows{display:flex;gap:8px;margin-left:14px}
+.rc-hero-arrow{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;display:grid;place-items:center;font-size:15px;line-height:1;transition:.2s}
+.rc-hero-arrow:hover{background:rgba(255,255,255,.16)}
+@media (prefers-reduced-motion: reduce){.rc-hero-fade{transition:none}}
 </style>
 <style id="renovacell-no-venta">
 /* Captación, no venta: la landing informa y capta; la compra ocurre dentro del
@@ -3942,6 +3953,79 @@ document.addEventListener('keydown', e => {
     .then(function(r){return r.ok?r.json():[]})
     .then(function(rows){ pintar(rows && rows[0] && rows[0].content ? rows[0].content.announcement : null); })
     .catch(function(){});
+})();
+</script>
+
+<script>
+// HERO ROTATIVO. Se activa solo si Administración configuró más de una diapositiva
+// en "Sitio web". Cambia el CONTENIDO del hero existente (no rehace la maqueta),
+// así conserva el diseño. Rota solo, se pausa al interactuar y respeta la
+// preferencia de "reducir movimiento" del sistema.
+(function(){
+  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  var elEyebrow=document.querySelector('[data-rc="heroEyebrow"]');
+  var elTitle=document.querySelector('[data-rc-html="heroTitle"]');
+  var elSub=document.querySelector('[data-rc="heroSubtitle"]');
+  var frame=document.querySelector('.hero-image-frame');
+  var img=frame?frame.querySelector('img'):null;
+  var ctaRow=document.querySelector('.hero-cta-row');
+  if(!elTitle||!elSub) return;
+
+  var slides=[], i=0, timer=null, autoplay=7000;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var esMovil = function(){ return window.innerWidth <= 760; };
+
+  function fotoDe(sl){ return (esMovil() && sl.imageMobileUrl) ? sl.imageMobileUrl : (sl.imageUrl||''); }
+
+  function pintar(n){
+    var sl=slides[n]; if(!sl) return;
+    [elEyebrow,elTitle,elSub].forEach(function(e){ if(e){e.classList.add('rc-hero-fade','rc-out');} });
+    if(img) { img.classList.add('rc-hero-fade','rc-out'); }
+    setTimeout(function(){
+      if(elEyebrow && sl.eyebrow) elEyebrow.textContent=sl.eyebrow;
+      if(sl.title) elTitle.innerHTML=sl.title;
+      if(sl.subtitle) elSub.textContent=sl.subtitle;
+      var f=fotoDe(sl); if(img && f){ img.src=f; }
+      [elEyebrow,elTitle,elSub,img].forEach(function(e){ if(e) e.classList.remove('rc-out'); });
+      document.querySelectorAll('.rc-hero-dot').forEach(function(d,k){ d.classList.toggle('on',k===n); });
+    }, reduce?0:450);
+    i=n;
+  }
+  function siguiente(){ pintar((i+1)%slides.length); }
+  function arrancar(){ if(reduce||autoplay<=0||slides.length<2) return; parar(); timer=setInterval(siguiente,autoplay); }
+  function parar(){ if(timer){clearInterval(timer);timer=null;} }
+
+  function controles(){
+    if(slides.length<2||!ctaRow) return;
+    var wrap=document.createElement('div'); wrap.className='rc-hero-dots';
+    slides.forEach(function(_,k){
+      var d=document.createElement('button'); d.type='button'; d.className='rc-hero-dot'+(k===0?' on':'');
+      d.setAttribute('aria-label','Ver diapositiva '+(k+1));
+      d.addEventListener('click',function(){ parar(); pintar(k); });
+      wrap.appendChild(d);
+    });
+    var arr=document.createElement('div'); arr.className='rc-hero-arrows';
+    [['\u2039',-1],['\u203a',1]].forEach(function(a){
+      var b=document.createElement('button'); b.type='button'; b.className='rc-hero-arrow';
+      b.innerHTML=a[0]; b.setAttribute('aria-label', a[1]<0?'Anterior':'Siguiente');
+      b.addEventListener('click',function(){ parar(); pintar((i+a[1]+slides.length)%slides.length); });
+      arr.appendChild(b);
+    });
+    wrap.appendChild(arr);
+    ctaRow.parentNode.insertBefore(wrap, ctaRow.nextSibling);
+    // Pausa mientras el visitante tiene el cursor sobre el hero.
+    var hero=document.querySelector('.hero'); if(hero){ hero.addEventListener('mouseenter',parar); hero.addEventListener('mouseleave',arrancar); }
+    window.addEventListener('resize', function(){ var sl=slides[i]; var f=sl&&fotoDe(sl); if(img&&f) img.src=f; });
+  }
+
+  fetch(U+'/rest/v1/landing_content?id=eq.main&select=content',{headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-store'})
+    .then(function(r){return r.ok?r.json():[]})
+    .then(function(rows){
+      var h=(rows&&rows[0]&&rows[0].content)?rows[0].content.hero:null;
+      if(!h||!Array.isArray(h.slides)||h.slides.length<2) return;  // una sola = hero de siempre
+      slides=h.slides; autoplay=(typeof h.autoplayMs==='number')?h.autoplayMs:7000;
+      controles(); pintar(0); arrancar();
+    }).catch(function(){});
 })();
 </script>
 </body>
