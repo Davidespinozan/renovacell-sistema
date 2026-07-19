@@ -9,6 +9,8 @@ import { ExportButton } from '../../app/ExportButton'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useEvents, remaining, type SalesEvent } from '../../data/hooks/useEvents'
 import { useTeam } from '../../data/hooks/useTeam'
+import { useLots } from '../../data/hooks/useLots'
+import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe } from '../../data/types'
 
@@ -209,36 +211,95 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 
 function AssignModal({ event, onClose, onDone }: { event: SalesEvent; onClose: () => void; onDone: (msg: string) => void }) {
   const { data: products } = useProducts()
+  const { data: lots } = useLots()
   const { assignStock } = useEvents()
-  const sellable = products.filter((p) => p.price != null && isActiveProduct(p))
-  const [productId, setProductId] = useState(sellable[0]?.id ?? '')
-  const [qty, setQty] = useState('')
+  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
+  const stockMap = useMemo(() => stockByProduct(lots), [lots])
+
+  // Se arma la carga tocando productos (como en el punto de venta), en vez de
+  // elegirlos uno por uno en un desplegable: con catálogo grande eso es tedioso.
+  const [cart, setCart] = useState<Record<string, number>>({})
+  const [q, setQ] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+
+  const disponible = (id: string) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }
+  const enCarga = (id: string) => cart[id] ?? 0
+  const add = (id: string) => setCart((c) => {
+    const next = (c[id] ?? 0) + 1
+    return next > disponible(id) ? c : { ...c, [id]: next }   // nunca más de lo que hay
+  })
+  const dec = (id: string) => setCart((c) => { const n = (c[id] ?? 0) - 1; if (n <= 0) { const { [id]: _x, ...r } = c; return r } return { ...c, [id]: n } })
+
+  const visibles = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    return t ? sellable.filter((p) => `${p.name} ${p.category ?? ''}`.toLowerCase().includes(t)) : sellable
+  }, [sellable, q])
+
+  const lineas = Object.entries(cart)
+  const totalU = lineas.reduce((s, [, n]) => s + n, 0)
 
   const save = () => {
-    const n = Number(qty)
-    if (!productId || n <= 0) return
-    const res = assignStock(event.id, productId, n)
-    if (!res.ok) { setErr(res.missing != null ? `Sin stock suficiente en almacén (faltan ${res.missing}).` : 'No se pudo asignar.'); return }
-    onDone(`Inventario asignado al evento (+${n} u)`)
+    if (lineas.length === 0) return
+    const fallos: string[] = []
+    lineas.forEach(([id, n]) => {
+      const res = assignStock(event.id, id, n)
+      if (!res.ok) fallos.push(`${sellable.find((p) => p.id === id)?.name ?? 'Producto'}${res.missing != null ? ` (faltan ${res.missing})` : ''}`)
+    })
+    if (fallos.length > 0) { setErr(`Sin stock suficiente en almacén: ${fallos.join(', ')}.`); return }
+    onDone(`Inventario asignado al evento · ${totalU} u en ${lineas.length} producto(s)`)
   }
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="mhead"><div><h3>Asignar inventario</h3><div className="ms">Lo que lleves al evento se descuenta del almacén.</div></div><button className="mclose" type="button" onClick={onClose}><X size={16} /></button></div>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 880, width: '94vw' }}>
+        <div className="mhead">
+          <div><h3>Asignar inventario</h3><div className="ms">Toca los productos que llevas al evento. Se descuenta del almacén.</div></div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
         <div className="mbody">
-          <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-3)' }}>Producto</label>
-          <select style={input} value={productId} onChange={(e) => setProductId(e.target.value)}>
-            {sellable.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-3)', display: 'block', marginTop: 14 }}>Cantidad a llevar</label>
-          <input style={input} type="number" min={1} value={qty} onChange={(e) => { setQty(e.target.value); setErr(null) }} placeholder="0" />
+          <div className="searchbox" style={{ width: '100%', marginBottom: 12 }}>
+            <Icon name="search" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto o categoría…" autoFocus />
+          </div>
+
+          <div className="posgrid" style={{ maxHeight: '46vh', overflow: 'auto' }}>
+            {visibles.map((p) => {
+              const disp = disponible(p.id)
+              const n = enCarga(p.id)
+              const agotado = disp <= 0
+              return (
+                <div key={p.id} className="poscard" style={agotado ? { opacity: 0.5 } : undefined} onClick={() => { if (!agotado) { add(p.id); setErr(null) } }}>
+                  <span className={'ltag ' + (p.line === 'prof' ? 'prof' : 'cosm')}>{p.line === 'prof' ? 'Professional' : 'Home Care'}</span>
+                  <h5>{p.name}</h5>
+                  <div className="lt">{p.category}</div>
+                  {agotado
+                    ? <span className="pill p-dang" style={{ marginTop: 6 }}>Sin existencia</span>
+                    : <div className="pr" style={{ fontSize: 13 }}>{disp} disponibles</div>}
+                  {n > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
+                      <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Icon name="minus" /></button>
+                      <span className="mono" style={{ minWidth: 20, textAlign: 'center' }}>{n}</span>
+                      <button className="btn sm" type="button" disabled={n >= disp} onClick={() => add(p.id)}><Icon name="plus" /></button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {visibles.length === 0 && <div style={{ color: 'var(--ink-3)', fontSize: 13, padding: 8 }}>Ningún producto coincide.</div>}
+          </div>
+
           {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
-          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
-            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" onClick={save}><PackagePlus size={15} /> Asignar</button>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+              {totalU > 0 ? <><b style={{ color: 'var(--ink)' }}>{totalU} u</b> en {lineas.length} producto(s)</> : 'Nada seleccionado todavía'}
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+              <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+              <button className="btn" type="button" disabled={totalU === 0} style={totalU === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={save}>
+                <PackagePlus size={15} /> Asignar {totalU > 0 ? `${totalU} u` : ''}
+              </button>
+            </div>
           </div>
         </div>
       </div>
