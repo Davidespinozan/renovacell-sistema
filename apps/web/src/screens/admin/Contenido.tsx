@@ -7,6 +7,7 @@ import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
+import { ImageField } from '../../app/ImageField'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
 import { useLanding, type LandingContent, type HeroSlide } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
@@ -180,8 +181,10 @@ function ProductModal({ product, onClose, onSave }: {
             </div>
           </div>
 
-          <label style={label}>Imagen (URL)</label>
-          <input style={input} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="/products/archivo.webp" />
+          <div style={{ marginTop: 14 }}>
+            <ImageField label="Imagen del producto" value={imageUrl} onChange={setImageUrl} folder="catalog" ratio="4 / 3"
+              hint="Se ve en el catálogo del doctor y en la ficha de la página pública." />
+          </div>
 
           <label style={label}>Descripción</label>
           <textarea style={{ ...input, minHeight: 70, resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción que ve el doctor" />
@@ -290,7 +293,7 @@ function LandingTab() {
           <Fld label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} />
           <Fld label="Tagline" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
         </div>
-        <Fld label="Logo (URL)" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} mono hint="Pega una URL de imagen. El subir archivo llega con Storage." />
+        <ImageField label="Logo" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1" />
       </SecCard>
 
       <SecCard title="Navegación">
@@ -313,9 +316,9 @@ function LandingTab() {
           <Fld label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
           <Fld label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
         </div>
-        <Fld label="Imagen del hero · escritorio (URL)" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} mono />
-        <Fld label="Imagen del hero · móvil (URL, opcional)" value={draft.hero.imageMobileUrl}
-          onChange={(v) => upSec('hero', { imageMobileUrl: v })} mono
+        <ImageField label="Imagen del hero · escritorio" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} folder="landing" />
+        <ImageField label="Imagen del hero · móvil (opcional)" value={draft.hero.imageMobileUrl}
+          onChange={(v) => upSec('hero', { imageMobileUrl: v })} folder="landing" ratio="3 / 4"
           hint="Si la dejas vacía, en teléfono se usa la de escritorio." />
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
@@ -357,8 +360,8 @@ function LandingTab() {
               <Fld label="Título (admite HTML)" value={sl.title} onChange={(v) => upSlide(i, { title: v })} />
               <Area label="Subtítulo" value={sl.subtitle} onChange={(v) => upSlide(i, { subtitle: v })} />
               <div className="form-grid-2">
-                <Fld label="Imagen escritorio (URL)" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} mono />
-                <Fld label="Imagen móvil (URL, opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} mono />
+                <ImageField label="Imagen escritorio" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} folder="landing" />
+                <ImageField label="Imagen móvil (opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} folder="landing" ratio="3 / 4" />
               </div>
             </div>
           ))}
@@ -379,7 +382,7 @@ function LandingTab() {
         <Fld label="Eyebrow" value={draft.info.eyebrow} onChange={(v) => upSec('info', { eyebrow: v })} />
         <Fld label="Título" value={draft.info.title} onChange={(v) => upSec('info', { title: v })} />
         <Area label="Texto" value={draft.info.body} onChange={(v) => upSec('info', { body: v })} />
-        <Fld label="Imagen (URL)" value={draft.info.imageUrl} onChange={(v) => upSec('info', { imageUrl: v })} mono />
+        <ImageField label="Imagen" value={draft.info.imageUrl} onChange={(v) => upSec('info', { imageUrl: v })} folder="landing" />
       </SecCard>
 
       <SecCard title="Certificaciones">
