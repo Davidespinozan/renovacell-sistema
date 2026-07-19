@@ -2167,6 +2167,22 @@ body.modal-open{overflow:hidden;}
   .checkout-modal{align-items:flex-end;padding:0;}
   .cart-fab{bottom:18px;right:18px;width:56px;height:56px;}
 }
+
+/* ── Banda de anuncios superior (promos, festejos). La enciende Administración ── */
+.rc-annbar{display:none;position:fixed;top:0;left:0;right:0;z-index:560;background:linear-gradient(90deg,var(--green-dark),var(--green),var(--green-mid),var(--green));color:#fff;overflow:hidden;height:38px;align-items:center}
+.rc-annbar.on{display:flex}
+.rc-annbar a,.rc-annbar span{color:#fff;text-decoration:none}
+.rc-ann-track{display:flex;gap:64px;white-space:nowrap;will-change:transform;animation:rc-ann-scroll 26s linear infinite;padding-left:100%}
+.rc-annbar:hover .rc-ann-track{animation-play-state:paused}
+.rc-ann-item{font-size:13px;font-weight:600;letter-spacing:.02em;display:inline-flex;align-items:center;gap:9px}
+.rc-ann-item b{font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;opacity:.85}
+.rc-ann-close{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.16);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center}
+.rc-ann-close:hover{background:rgba(255,255,255,.28)}
+body.rc-has-ann{padding-top:38px}
+body.rc-has-ann .topbar{top:38px}
+body.rc-has-ann .nav{top:79px}
+@keyframes rc-ann-scroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@media (prefers-reduced-motion: reduce){.rc-ann-track{animation:none;padding-left:0;justify-content:center;width:100%}}
 </style>
 <style id="renovacell-no-venta">
 /* Captación, no venta: la landing informa y capta; la compra ocurre dentro del
@@ -2235,6 +2251,11 @@ body.modal-open{overflow:hidden;}
 </style>
 </head>
 <body>
+<div class="rc-annbar" id="rcAnnBar" role="region" aria-label="Anuncio">
+  <div class="rc-ann-track" id="rcAnnTrack"></div>
+  <button class="rc-ann-close" id="rcAnnClose" aria-label="Cerrar anuncio">&times;</button>
+</div>
+
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -3891,5 +3912,37 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+
+<script>
+// Banda de anuncios: la enciende Administración desde "Sitio web". Respeta la
+// ventana de fechas (vacías = sin límite) y recuerda si el visitante la cerró.
+(function(){
+  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  var bar=document.getElementById('rcAnnBar'), track=document.getElementById('rcAnnTrack'), close=document.getElementById('rcAnnClose');
+  if(!bar||!track) return;
+  function dentroDeVentana(a){
+    var hoy=new Date().toISOString().slice(0,10);
+    if(a.startsAt && hoy < a.startsAt) return false;
+    if(a.endsAt && hoy > a.endsAt) return false;
+    return true;
+  }
+  function pintar(a){
+    if(!a || !a.enabled || !String(a.text||'').trim() || !dentroDeVentana(a)) return;
+    // Si el visitante ya la cerró (mismo texto), no reaparece.
+    try { if(sessionStorage.getItem('rcAnnClosed')===a.text) return; } catch(e){}
+    var esc=function(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML;};
+    // Se repite el mensaje para que la cinta sea continua al desplazarse.
+    var pieza='<span class="rc-ann-item"><b>Renovacell</b>'+esc(a.text)+'</span>';
+    var contenido=pieza+pieza+pieza;
+    track.innerHTML = a.link ? '<a href="'+esc(a.link)+'" style="display:flex;gap:64px">'+contenido+'</a>' : contenido;
+    bar.classList.add('on'); document.body.classList.add('rc-has-ann');
+    if(close) close.addEventListener('click',function(){ bar.classList.remove('on'); document.body.classList.remove('rc-has-ann'); try{sessionStorage.setItem('rcAnnClosed',a.text);}catch(e){} });
+  }
+  fetch(U+'/rest/v1/landing_content?id=eq.main&select=content',{headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-store'})
+    .then(function(r){return r.ok?r.json():[]})
+    .then(function(rows){ pintar(rows && rows[0] && rows[0].content ? rows[0].content.announcement : null); })
+    .catch(function(){});
+})();
+</script>
 </body>
 </html>

@@ -207,11 +207,11 @@ function ProductModal({ product, onClose, onSave }: {
 const fInput: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 5 }
 const fLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 12 }
 
-function Fld({ label, value, onChange, hint, mono }: { label: string; value: string; onChange: (v: string) => void; hint?: string; mono?: boolean }) {
+function Fld({ label, value, onChange, hint, mono, type }: { label: string; value: string; onChange: (v: string) => void; hint?: string; mono?: boolean; type?: string }) {
   return (
     <label style={{ display: 'block' }}>
       <span style={fLabel}>{label}</span>
-      <input style={{ ...fInput, fontFamily: mono ? 'monospace' : 'inherit' }} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input type={type} style={{ ...fInput, fontFamily: mono ? 'monospace' : 'inherit' }} value={value} onChange={(e) => onChange(e.target.value)} />
       {hint && <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{hint}</span>}
     </label>
   )
@@ -256,6 +256,25 @@ function LandingTab() {
           Imágenes/logo por URL hoy; subir archivo entra con Storage.
         </span>
       </div>
+
+      <SecCard title="Banda de anuncios (arriba de todo)">
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
+          Cinta animada en la parte superior de la página, para promociones, festejos o avisos.
+          Si dejas las fechas vacías, se muestra siempre mientras esté encendida; si las pones,
+          <b> se enciende y se apaga sola</b>.
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', marginBottom: 12 }}>
+          <input type="checkbox" checked={draft.announcement.enabled}
+            onChange={(e) => upSec('announcement', { enabled: e.target.checked })} />
+          <span>Mostrar la banda en la página pública</span>
+        </label>
+        <Fld label="Mensaje" value={draft.announcement.text} onChange={(v) => upSec('announcement', { text: v })} />
+        <Fld label="Enlace al hacer clic (opcional)" value={draft.announcement.link} onChange={(v) => upSec('announcement', { link: v })} mono />
+        <div className="form-grid-2">
+          <Fld label="Desde (opcional)" value={draft.announcement.startsAt} onChange={(v) => upSec('announcement', { startsAt: v })} type="date" />
+          <Fld label="Hasta (opcional)" value={draft.announcement.endsAt} onChange={(v) => upSec('announcement', { endsAt: v })} type="date" />
+        </div>
+      </SecCard>
 
       <SecCard title="SEO (buscadores)">
         <Fld label="Título de pestaña" value={draft.seo.title} onChange={(v) => upSec('seo', { title: v })} />

@@ -18,7 +18,19 @@ export interface NavLink { label: string; href: string }
 export interface Certification { label: string; sub: string }
 export interface Feature { title: string; body: string }
 
+// Banda de anuncios de la parte superior (promociones, festejos, avisos).
+// `enabled` la enciende; las fechas son OPCIONALES: vacías = sin límite. Así se
+// puede programar una promo y que se apague sola, sin depender de nadie.
+export interface Announcement {
+  enabled: boolean
+  text: string
+  link: string        // opcional: a dónde lleva al hacer clic
+  startsAt: string    // 'AAAA-MM-DD' o '' (sin fecha de inicio)
+  endsAt: string      // 'AAAA-MM-DD' o '' (sin fecha de fin)
+}
+
 export interface LandingContent {
+  announcement: Announcement
   seo: { title: string; description: string }
   brand: { name: string; tagline: string; logoUrl: string }
   nav: { links: NavLink[]; cta: string }
@@ -34,6 +46,13 @@ export interface LandingContent {
 
 // Valores REALES (mismos que apps/landing/content.json).
 const DEFAULT: LandingContent = {
+  announcement: {
+    enabled: false,
+    text: 'Envío sin costo en pedidos mayores a $5,000 · Solo para médicos verificados',
+    link: '',
+    startsAt: '',
+    endsAt: '',
+  },
   seo: {
     title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008',
     description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.',
@@ -41,19 +60,19 @@ const DEFAULT: LandingContent = {
   brand: { name: 'Renovacell®', tagline: 'Tecnologías Antiedad', logoUrl: '' },
   nav: {
     links: [
-      { label: 'Ciencia', href: '#ciencia' },
-      { label: 'Cumplimiento', href: '#cumplimiento' },
-      { label: 'Para médicos', href: '#medicos' },
-      { label: 'Contacto', href: '#contacto' },
+      { label: 'Ciencia', href: '#s2rm' },
+      { label: 'Regulatory Compliance', href: '#cumplimiento' },
+      { label: 'Catálogo', href: '#catalogo' },
+      { label: 'El acceso', href: '#acceso' },
     ],
     cta: 'Acceso médico',
   },
   hero: {
-    eyebrow: 'Desde 2008 · Unión Europea + México',
-    title: 'La nueva generación de <span class="green">medicina regenerativa.</span>',
-    subtitle: 'Tecnología celular S²RM®, desarrollada en Europa para los profesionales que definen el estándar. Acceso exclusivo para médicos verificados.',
-    ctaPrimary: 'Solicitar acceso médico',
-    ctaSecondary: 'Conocer la ciencia',
+    eyebrow: 'Tecnología celular S²RM® · Grado europeo · Desde 2008',
+    title: 'La regeneración celular<br><span class="green">que respalda tu práctica.</span>',
+    subtitle: 'El arsenal regenerativo y estético más completo de México: péptidos y ultrafiltrados celulares, toxinas, rellenos, metabólicos y más — con tecnología S²RM®, certificación CE y registro COFEPRIS. Disponible para médicos verificados.',
+    ctaPrimary: 'Ver el catálogo',
+    ctaSecondary: 'Solicitar acceso',
     imageUrl: '',
   },
   ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE · Certificación EU', 'COFEPRIS · Registro Sanitario', 'ISO 13485 · Calidad médica'],
