@@ -260,7 +260,7 @@ function LandingTab() {
         <span>
           La landing es <b>data-driven</b>: todo lo que ves abajo dibuja la página pública. Es de <b>captación</b>
           (info + formulario + contacto), no de venta. Embudo: <b>landing → Prospectos → verificación → Portal</b>.
-          Imágenes/logo por URL hoy; subir archivo entra con Storage.
+          Las imágenes se suben desde aquí (o pegas una dirección, si la tienes).
         </span>
       </div>
 
