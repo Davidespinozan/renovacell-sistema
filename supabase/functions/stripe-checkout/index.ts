@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
       quantity: 1,
     }],
     metadata: { order_id: order.id },
-    success_url: payload.success_url ?? `${origin}/?pago=ok`,
-    cancel_url: payload.cancel_url ?? `${origin}/?pago=cancelado`,
+    success_url: payload.success_url ?? `${origin}/sistema?pago=ok`,
+    cancel_url: payload.cancel_url ?? `${origin}/sistema?pago=cancelado`,
   })
 
   return json(200, { url: session.url, id: session.id })

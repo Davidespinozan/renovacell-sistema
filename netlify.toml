@@ -1,25 +1,50 @@
 # Configuración de despliegue en Netlify.
 # El sistema dejó de ser un .html estático: ahora es un monorepo Vite + React
 # (workspaces npm). Netlify instala en la raíz, compila el workspace web y publica
-# la carpeta resultante. La regla SPA evita 404 en rutas/recargas.
+# la carpeta resultante.
 
 [build]
   command = "npm run build"      # raíz → compila @renovacell/web (vite build)
-  publish = "apps/web/dist"      # salida del build (contiene index.html, assets, products, brand, landing)
+  publish = "apps/web/dist"      # salida del build (index.html, assets, products, brand, landing)
 
 [build.environment]
   NODE_VERSION = "20"
 
-# Landing (sitio público) servida desde el mismo deploy en /landing/. Forzamos la
-# diagonal final para que el content.json (ruta relativa) cargue bien. Va ANTES
-# del catch-all del SPA para que no la absorba.
+# ── Quién vive en qué dirección ──────────────────────────────────────────────
+# La LANDING es la cara pública: el doctor teclea el dominio y debe verla.
+# El SISTEMA vive bajo /sistema — se instala en el celular y se abre desde su
+# ícono, así que su dirección no necesita ser corta ni memorizable.
+
+# 1) Raíz → landing. `force` es indispensable: sin él Netlify sirve el
+#    index.html del sistema (que existe en disco) e ignora esta regla.
+[[redirects]]
+  from = "/"
+  to = "/landing/index.html"
+  status = 200
+  force = true
+
+# 2) El sistema. Cualquier ruta bajo /sistema entra a la app, que enruta del
+#    lado del cliente (no usa rutas de servidor).
+[[redirects]]
+  from = "/sistema"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/sistema/*"
+  to = "/index.html"
+  status = 200
+
+# 3) /landing sigue sirviéndose como archivo (lo usa la vista previa del editor
+#    en Administración), pero ya no es la dirección pública.
 [[redirects]]
   from = "/landing"
-  to = "/landing/"
+  to = "/"
   status = 301
 
-# SPA: cualquier ruta cae en index.html (la app enruta del lado del cliente).
+# 4) Cualquier otra ruta cae en la landing, no en un 404 crudo. Los archivos
+#    reales (/assets, /products, /brand) se sirven antes que esta regla.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/landing/index.html"
   status = 200

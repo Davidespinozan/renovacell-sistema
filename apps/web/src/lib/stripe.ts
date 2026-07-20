@@ -9,7 +9,7 @@ export async function startStripeCheckout(orderId: string): Promise<{ redirected
   if (!hasSupabase) return { redirected: false }
   try {
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-      body: { order_id: orderId, success_url: `${location.origin}/?pago=ok`, cancel_url: location.href },
+      body: { order_id: orderId, success_url: `${location.origin}/sistema?pago=ok`, cancel_url: location.href },
     })
     if (error) return { redirected: false } // 501 no_configurado u otro → usa el flujo actual
     const url = (data as { url?: string } | null)?.url

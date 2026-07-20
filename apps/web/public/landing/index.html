@@ -2056,7 +2056,7 @@ body.rc-has-ann .nav{top:79px}
       <a href="#acceso" class="nav-link">El acceso</a>
     </div>
     <div class="nav-actions">
-      <a href="/#registro" class="btn-primary-nav">Acceso médico</a>
+      <a href="/sistema" class="btn-primary-nav">Iniciar sesión</a>
       <button class="nav-burger" aria-label="Menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -2142,7 +2142,7 @@ body.rc-has-ann .nav{top:79px}
           </p>
           <div class="hero-cta-row rv d3">
             <a href="#catalogo" class="btn-hero-primary" data-rc="ctaPrimary">Ver el catálogo</a>
-            <a href="/#registro" class="btn-hero-ghost" data-rc="ctaSecondary">Solicitar acceso</a>
+            <a href="#contacto" class="btn-hero-ghost" data-rc="ctaSecondary">Solicitar acceso</a>
           </div>
           <div class="hero-access-badges rv d3" aria-label="Respaldo">
             <span class="hab"><b>Tecnología S²RM®</b><i>moléculas liberadas por células madre · desde 2008</i></span>
@@ -2459,7 +2459,7 @@ body.rc-has-ann .nav{top:79px}
       <div class="aw-step"><span class="num">03</span><h3>Entras al círculo</h3><p>Catálogo completo, precios profesionales y tu asesor. Compras cuando quieras, ya como parte de Renovacell.</p></div>
     </div>
     <div class="aw-foot">
-      <a href="/#registro" class="btn-hero-primary">Solicitar acceso médico</a>
+      <a href="#contacto" class="btn-hero-primary">Solicitar acceso médico</a>
       <span class="aw-reassure">La verificación es la puerta, no el obstáculo. <b>Pertenecer es el privilegio.</b></span>
     </div>
   </div>
@@ -2555,50 +2555,45 @@ body.rc-has-ann .nav{top:79px}
       </div>
 
       <div class="contact-form rv d1">
-        <div class="form-title">Solicitar <span class="green">acceso médico</span></div>
-        <p class="form-subtitle">Verificamos tu cédula contra el registro oficial. Datos confidenciales.</p>
+        <div class="form-title">Verifícate y <span class="green">accede al portal</span></div>
+        <p class="form-subtitle">Validamos tu cédula contra el registro oficial. Si eres profesional de la salud, tu acceso es inmediato — aquí mismo, sin salir de esta página.</p>
 
-        <div class="form-row">
+        <form id="rncVerifyForm" autocomplete="on" novalidate>
           <div class="form-field">
             <label>— Nombre completo</label>
-            <input type="text" class="form-input" placeholder="Dr. / Dra. nombre">
+            <input name="nombre" type="text" class="form-input" placeholder="Dr. / Dra. nombre y apellidos" required>
           </div>
-          <div class="form-field">
-            <label>— Cédula profesional</label>
-            <input type="text" class="form-input" placeholder="Número de cédula">
+          <div class="form-row">
+            <div class="form-field">
+              <label>— Cédula profesional</label>
+              <input name="cedula" type="text" class="form-input" placeholder="Número de cédula" required>
+            </div>
+            <div class="form-field">
+              <label>— Consultorio <span style="opacity:.55">(opcional)</span></label>
+              <input name="consultorio" type="text" class="form-input" placeholder="Nombre de su clínica">
+            </div>
           </div>
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label>— Teléfono</label>
-            <input type="tel" class="form-input" placeholder="+52 ...">
+          <div class="form-row">
+            <div class="form-field">
+              <label>— Correo</label>
+              <input name="correo" type="email" class="form-input" placeholder="ejemplo@correo.com" required>
+            </div>
+            <div class="form-field">
+              <label>— Cree su contraseña</label>
+              <input name="clave" type="password" class="form-input" placeholder="Mínimo 6 caracteres" required>
+            </div>
           </div>
-          <div class="form-field">
-            <label>— Correo</label>
-            <input type="email" class="form-input" placeholder="ejemplo@correo.com">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label>— Estado</label>
-            <input type="text" class="form-input" placeholder="Sinaloa, CDMX...">
-          </div>
-          <div class="form-field">
-            <label>— Ciudad</label>
-            <input type="text" class="form-input" placeholder="Culiacán">
-          </div>
-        </div>
-        <div class="form-field">
-          <label>— Productos de interés</label>
-          <textarea class="form-input form-textarea" placeholder="Cuéntanos de tu práctica y qué líneas te interesan..."></textarea>
-        </div>
 
-        <div class="form-check">
-          <div class="form-check-box checked"></div>
-          <span class="form-check-label"><b>¿Es usted Dr.?</b> &nbsp;Confirmo que soy profesional de la salud certificado.</span>
-        </div>
+          <!-- Trampa antispam: los robots la llenan, las personas no la ven. -->
+          <input name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true"
+                 style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
-        <button class="form-submit">Enviar solicitud</button>
+          <button type="submit" class="form-submit">Verificar mi cédula</button>
+          <div id="rncVerifyOut" class="rnc-vout" role="status"></div>
+          <p style="font-size:11.5px;color:var(--soft);margin-top:12px;line-height:1.5">
+            Exclusivo para profesionales de la salud. Sus datos se tratan de forma confidencial.
+          </p>
+        </form>
       </div>
     </div>
   </div>
@@ -2843,7 +2838,7 @@ document.addEventListener('keydown', e => {
     } catch (e) { return null; }
   }
   async function fromJson(){
-    try { var r = await fetch('./content.json', { cache: 'no-store' }); return r.ok ? flatten(await r.json()) : null; }
+    try { var r = await fetch('/landing/content.json', { cache: 'no-store' }); return r.ok ? flatten(await r.json()) : null; }
     catch (e) { return null; }
   }
   try {
@@ -2882,8 +2877,14 @@ document.addEventListener('keydown', e => {
      fase backend se conecta a un modelo real (Claude/GPT) vía endpoint con la
      llave protegida en el servidor; el widget no cambia. -->
 <style>
-.rnc-ai-fab{position:fixed;right:22px;bottom:22px;z-index:9999;display:flex;align-items:center;gap:9px;background:linear-gradient(135deg,#0a8f1f,#006a10);color:#fff;border:none;border-radius:999px;padding:13px 18px;font:600 14px/1 'Inter',system-ui,sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:.15s}
-.rnc-ai-fab svg{width:18px;height:18px}
+.rnc-fabs{position:fixed;right:22px;bottom:22px;z-index:9999;display:flex;flex-direction:column;gap:11px;align-items:center}
+.rnc-ai-fab,.rnc-fab-wa{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.30);transition:transform .18s,filter .18s;color:#fff;text-decoration:none}
+.rnc-ai-fab{background:linear-gradient(135deg,#0a8f1f,#006a10)}
+.rnc-fab-wa{background:#25D366}
+.rnc-ai-fab svg{width:25px;height:25px}
+.rnc-fab-wa svg{width:27px;height:27px}
+.rnc-ai-fab:hover,.rnc-fab-wa:hover{filter:brightness(1.08);transform:translateY(-2px)}
+@media(max-width:640px){.rnc-fabs{right:16px;bottom:16px;gap:9px}.rnc-ai-fab,.rnc-fab-wa{width:48px;height:48px}}
 .rnc-ai-fab:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .rnc-ai-panel{position:fixed;right:22px;bottom:22px;z-index:10000;width:min(382px,calc(100vw - 28px));height:min(566px,calc(100vh - 36px));background:#0b1410;border:1px solid rgba(255,255,255,.1);border-radius:20px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.55);font-family:'Inter',system-ui,sans-serif}
 .rnc-ai-panel.open{display:flex}
@@ -2902,10 +2903,21 @@ document.addEventListener('keydown', e => {
 .rnc-ai-send{background:#0a8f1f;border:none;color:#fff;border-radius:11px;padding:0 14px;cursor:pointer;font-size:16px}
 .rnc-ai-note{font-size:10.5px;color:#6b7d70;text-align:center;padding:0 16px 11px}
 </style>
-<button class="rnc-ai-fab" id="rncAiFab" aria-label="Abrir asistente">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2z"/></svg>
-  Asistente
-</button>
+<div class="rnc-fabs">
+  <a class="rnc-fab-wa" href="https://wa.me/526675310910" target="_blank" rel="noreferrer"
+     aria-label="Escribir por WhatsApp" title="WhatsApp">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5 0-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.2 5.1 4.4.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18.2c-1.6 0-3-.4-4.3-1.2l-.3-.2-3.1.8.8-3-.2-.3c-.8-1.3-1.3-2.8-1.3-4.4C3.6 7.4 7.4 3.6 12 3.6S20.4 7.4 20.4 12 16.6 20.2 12 20.2z"/></svg>
+  </a>
+  <button class="rnc-ai-fab" id="rncAiFab" aria-label="Abrir asistente" title="Asistente">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="8" width="16" height="11" rx="3.2"/>
+      <path d="M12 4.2v3.8M9.4 2.9a2.6 2.6 0 0 1 5.2 0"/>
+      <circle cx="9.2" cy="13" r="1.15" fill="currentColor" stroke="none"/>
+      <circle cx="14.8" cy="13" r="1.15" fill="currentColor" stroke="none"/>
+      <path d="M9.6 16.4h4.8M1.9 11.6v3.6M22.1 11.6v3.6"/>
+    </svg>
+  </button>
+</div>
 <div class="rnc-ai-panel" id="rncAiPanel" role="dialog" aria-label="Asistente Renovacell">
   <div class="rnc-ai-head">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="width:20px;height:20px"><path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2z"/></svg>
@@ -3072,7 +3084,7 @@ document.addEventListener('keydown', e => {
      lenguaje de "cotización/24h". Aditivo, por selector/texto (robusto). -->
 <script>
 (function(){
-  var GO='/#registro'; // el sistema: registro con verificación SEP → portal
+  var GO='#contacto'; // el sistema: registro con verificación SEP → portal
   function T(root,rx){return [].slice.call(document.querySelectorAll(root)).filter(function(e){return rx.test((e.textContent||'').trim())});}
   function run(){
     try{
@@ -3083,19 +3095,8 @@ document.addEventListener('keydown', e => {
         var h3=info.querySelector('h3'); if(h3) h3.innerHTML='Verifícate y <span class="green">entra</span>.';
         var sub=info.querySelector('p'); if(sub) sub.textContent='Para comprar necesitas verificar tu cédula. Nuestra IA la valida en minutos: si eres profesional de la salud, entras al portal al instante — no en días.';
       }
-      var form=document.querySelector('#contacto .contact-form');
-      if(form){
-        form.innerHTML=''
-          +'<div class="form-title">Verifícate y <span class="green">accede al portal</span></div>'
-          +'<p class="form-subtitle">Validación con IA contra el registro (SEP) en minutos. Si eres profesional de la salud, tu acceso es inmediato.</p>'
-          +'<ul style="list-style:none;padding:0;margin:16px 0 20px;display:flex;flex-direction:column;gap:11px;font-size:14.5px;line-height:1.4">'
-          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Verificación <b>automática</b> de tu cédula — en minutos, no días.</span></li>'
-          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Al verificarte, <b>entras directo al portal</b> a ver catálogo y precios.</span></li>'
-          +'<li style="display:flex;gap:10px;align-items:flex-start"><b style="color:#2fae6a">✓</b><span>Exclusivo para profesionales de la salud (regulado COFEPRIS).</span></li>'
-          +'</ul>'
-          +'<a href="'+GO+'" class="btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;text-decoration:none">Verificar mi cédula y entrar</a>'
-          +'<p style="font-size:12px;opacity:.62;margin-top:12px;text-align:center">¿Dudas? Escríbenos por WhatsApp (aquí al lado).</p>';
-      }
+      // El formulario de verificación vive en el HTML (no se reemplaza aquí):
+      // el doctor se registra sin salir de la landing.
       // --- recursos: quitar lenguaje de "cotización/24h", repuntar el CTA ---
       T('.stat-label', /tiempo respuesta|cotizaci/i).forEach(function(e){ e.innerHTML='Verificación<br>con IA · minutos'; });
       T('.stat-value, [class*="stat"] , .stat-num, div', /^24s*h$/i).forEach(function(e){ if((e.textContent||'').trim().toLowerCase()==='24h') e.textContent='min'; });
@@ -3225,5 +3226,72 @@ document.addEventListener('keydown', e => {
     }).catch(function(){});
 })();
 </script>
+<style>
+/* Resultado de la verificación de cédula (formulario de la landing) */
+.rnc-vout{display:none;margin-top:14px;padding:13px 15px;border-radius:11px;font-size:13.5px;line-height:1.5}
+.rnc-vout.ok{display:block;background:#E8F6EC;border:1px solid #BFE4C9;color:#12571F}
+.rnc-vout.wait{display:block;background:#FBF3DA;border:1px solid #EEDDB6;color:#7A5F09}
+.rnc-vout.err{display:block;background:#FDECEC;border:1px solid #F3C9C9;color:#8C1F1F}
+.rnc-vout a{color:inherit;font-weight:700;text-decoration:underline}
+.rnc-vout ul{margin:8px 0 0;padding-left:18px}
+.rnc-vout li{margin-bottom:4px}
+</style>
+<script>
+/* REGISTRO EN LA MISMA PÁGINA. Antes el doctor era enviado al sistema para
+   registrarse: un salto de página que costaba conversión. Ahora la landing
+   llama directo a la Edge Function `register-doctor`, que consulta el registro
+   oficial y decide. Si la cédula pasa, la cuenta queda creada y verificada. */
+(function(){
+  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  var f=document.getElementById('rncVerifyForm'); if(!f) return;
+  var out=document.getElementById('rncVerifyOut');
+  var btn=f.querySelector('.form-submit');
+  var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};
+  function say(kind,html){ out.className='rnc-vout '+kind; out.innerHTML=html; }
+  function listo(){ btn.disabled=false; btn.textContent='Verificar mi cédula'; }
+
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var d={
+      name:(f.nombre.value||'').trim(), email:(f.correo.value||'').trim(),
+      cedula:(f.cedula.value||'').trim(), password:f.clave.value||'',
+      organization:(f.consultorio.value||'').trim(), website:f.website.value||''
+    };
+    if(d.name.length<3) return say('err','Escriba su nombre completo.');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return say('err','El correo no parece válido.');
+    if(d.cedula.replace(/\D/g,'').length<5) return say('err','Escriba su número de cédula profesional.');
+    if(d.password.length<6) return say('err','La contraseña debe tener al menos 6 caracteres.');
+
+    btn.disabled=true; btn.textContent='Verificando…';
+    say('wait','Consultando el registro oficial…');
+
+    fetch(U+'/functions/v1/register-doctor',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},
+      body:JSON.stringify(d)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      listo();
+      if(r && r.error) return say('err', esc(r.error));
+      if(r && r.decision==='auto'){
+        f.reset();
+        return say('ok','<b>Cédula verificada.</b> Su cuenta ya está activa. <a href="/sistema">Entrar al portal →</a>');
+      }
+      if(r && r.decision==='exists'){
+        return say('wait', esc(r.message||'Ese correo ya tiene una cuenta.')+' <a href="/sistema">Iniciar sesión →</a>');
+      }
+      var rs=(r&&r.reasons||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join('');
+      f.reset();
+      say('wait','<b>Su solicitud quedó registrada.</b> Dirección revisará su cédula y le avisaremos por correo.'+(rs?'<ul>'+rs+'</ul>':''));
+    })
+    .catch(function(){
+      listo();
+      say('err','No pudimos enviar su solicitud en este momento. Intente de nuevo o escríbanos por WhatsApp.');
+    });
+  });
+})();
+</script>
+
 </body>
 </html>

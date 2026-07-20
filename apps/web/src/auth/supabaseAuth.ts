@@ -71,6 +71,6 @@ export async function signOutSupabase(): Promise<void> {
 // Recuperación de contraseña (envía el correo real de restablecimiento).
 export async function resetPasswordSupabase(email: string): Promise<void> {
   await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${window.location.origin}/`,
+    redirectTo: `${window.location.origin}/sistema`,
   })
 }
