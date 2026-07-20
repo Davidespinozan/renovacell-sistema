@@ -70,17 +70,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
   color:rgba(255,255,255,.5);
 }
 .topbar-cert b{color:var(--green-mid);font-weight:700;}
-.topbar-lang{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;display:flex;gap:14px;}
-.topbar-lang a{position:relative;padding-bottom:2px;}
-.topbar-lang a.active{color:var(--white);font-weight:600;}
-.topbar-lang a.active::after{content:'';position:absolute;bottom:-3px;left:0;right:0;height:1px;background:var(--green-mid);}
-.topbar-lang a:not(.active){color:rgba(255,255,255,.45);}
-.topbar-lang a img{
-  width:16px;height:auto;display:inline-block;vertical-align:middle;
-  margin-right:6px;border-radius:2px;
-  box-shadow:0 0 0 1px rgba(255,255,255,.15);
-  position:relative;top:-1px;
-}
 
 /* NAVBAR */
 .nav{
@@ -1431,8 +1420,7 @@ body.modal-open{overflow:hidden;}
   .topbar{padding:8px 14px;font-size:10px;}
   .topbar-left{gap:10px;}
   .topbar-link{font-size:10px;}
-  .topbar-lang a{font-size:9.5px;}
-  .nav-inner{padding:12px 14px;gap:10px;}
+    .nav-inner{padding:12px 14px;gap:10px;}
   .nav-name span{display:none;}
   .nav-name b{font-size:14.5px;}
   .btn-primary-nav{padding:9px 14px;font-size:12px;}
@@ -2047,11 +2035,8 @@ body.rc-has-ann .nav{top:79px}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="topbar-left">
-    <a href="#" class="topbar-link">Más información</a>
+    <a href="#contacto" class="topbar-link">Más información</a>
   </div>
-  <div class="topbar-lang">
-    <a href="#" class="active"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAiCAYAAAADILqZAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAD9UlEQVR42u2YW0wcZRTHf983u1xmF1iWsmuX0N1NgVRLjJVAGiukMaFN09aotWlISvrWGuOLT8aYGA2JvvlifPDW+Gwk1lgjRmy1KPSmguVSWizZIlguZQvdZRZ2Zj4fdiltn4yVlcU9mczjzPzmnO/8z/8IXtiteMAQQqBME5/bw6W2j/G5irGVhRTaP3ugUiAE5vQ0vU88jePGFCovH5T9oJ+K5H8WOeAccA44B5wD/lvKc9c9k+HI7OtsUGmZlRLbTumqlMv/XqwfYKUUKIFCpAFBytRgYtk2Qmam3DIGLISA1MXAjyfo7/qGAt3L1qbdVG1rwlIqEwlebWALECSX4iwYMZam/qC3o51Fppgb+Y1vf73Cl1+08+yRY+w98jK2ZYGUiFUsbsdql7EQGoZh8PvlU+jzvVixy0RnF7FsNxsDIUZnDI63vYZTc7Hr8FFM20JDrhrxqh2b5f5rJRdwF7kJB7exIL3UNDaTjAn6ro1jJAy8pW7CoY2c+vQ9ZsZHcUjtXzEJmZclBUI4SCxNMh45x+jEdcqqDzF0YZjb5i2uTc9RXOalXDfRS3SMuRnOdn6NUgrbNrMDWCmRPrcgJCQSt3G5wliyhOhkP0XWEIVlfiKT8zQ9XElRRTV7jr5Osb+GuPSQMNPNDS1LMixMVLqWrw6f58K5rzAifXgSiocCm+k//xG6HKbU6SIyH+NMVzfjNxO0vvoOtTuaqayq5ezFzxgc+mFFytZ00xLqTn915Eu8Gxw4CwO8caKdndvD1IeeQea5cObN8HnnT0R/7uJ420sM7z3I9n2H2bS5iut/Rih2h7JElpQTIVJZCYceo+fMVaI+g4KaIJ9cjDDo0lF+HyWhCvY9b9JQD1ZJPVNjcTYVChasMRILiwTr6rCXtXstA4u7TokkH7vAwdClk7y550VODpylY2SWubEIA30ThIRBUWk1JXGdmFvn2OONnO7+gKQpQYosyTArJW1ZNo0NB7ky2Ml3p98lVN2CHhY0eDp5KzrJ+4Pz+CqewxkI8JQvn++72/GVh9j6SDPKtpFSYq/5pnXPKKkwlUZl9ZPcmo2hpjto8Y7jWpREZ6Ic8oJPi7OlUMO9NMbYxC/4/bUopaVMRvbZQ4FUNvnOPA4ceIVib5DBnnZKnfMMB3Zxo3I/5fImIz0f4iyooLXlbTaUBYAkQmjZUtL3duzUmlaigGCwkYpAHbFkgqmRUUTcwL+lnh07WynIc6WGKyEQwglKZSHwfc1MKYXm0PE4dTyPerHT5aXuzNwCxDrywwiBwlomRCBRQq5Yx/W28UhZPg0r7f201CiVkS3Hf7jiuW9KFiLTr89tLXPAOeAccA54TcdfhyVu33Jjt8cAAAAASUVORK5CYII=" alt="MX"> ES</a>
-    </div>
 </div>
 
 <!-- NAVBAR -->
@@ -2066,7 +2051,7 @@ body.rc-has-ann .nav{top:79px}
     </a>
     <div class="nav-links">
       <a href="#s2rm" class="nav-link">Ciencia</a>
-      <a href="#cumplimiento" class="nav-link">Regulatory Compliance</a>
+      <a href="#cumplimiento" class="nav-link">Cumplimiento</a>
       <a href="#catalogo" class="nav-link">Catálogo</a>
       <a href="#acceso" class="nav-link">El acceso</a>
     </div>
@@ -2111,7 +2096,7 @@ body.rc-has-ann .nav{top:79px}
   <div class="mobile-drawer-links">
     <a href="#acceso" class="mobile-drawer-link"><span><span class="mobile-drawer-num">01</span>El acceso</span></a>
     <a href="#s2rm" class="mobile-drawer-link"><span><span class="mobile-drawer-num">02</span>Ciencia S²RM™</span></a>
-    <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Regulatory Compliance</span></a>
+    <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Cumplimiento</span></a>
     <a href="#catalogo" class="mobile-drawer-link"><span><span class="mobile-drawer-num">04</span>Catálogo</span></a>
     <a href="#contacto" class="mobile-drawer-link"><span><span class="mobile-drawer-num">06</span>Professional Access</span></a>
   </div>
@@ -2259,7 +2244,7 @@ body.rc-has-ann .nav{top:79px}
   <div class="compliance-inner">
     <div class="compliance-head">
       <div class="compliance-head-left">
-        <span class="section-kicker rv">Regulatory Compliance</span>
+        <span class="section-kicker rv">Cumplimiento regulatorio</span>
         <h3 class="rv d1">Cumplimiento <span class="green">europeo y mexicano</span></h3>
       </div>
       <span class="compliance-head-right rv">02 / 05 · Certificaciones vigentes</span>
@@ -2450,8 +2435,8 @@ body.rc-has-ann .nav{top:79px}
             <div class="resources-stat-label">Folletos clínicos<br>oficiales disponibles</div>
           </div>
           <div class="resources-stat-item">
-            <div class="resources-stat-num">24h</div>
-            <div class="resources-stat-label">Tiempo respuesta<br>cotización promedio</div>
+            <div class="resources-stat-num">min</div>
+            <div class="resources-stat-label">Verificación<br>con IA · minutos</div>
           </div>
         </div>
 
@@ -2556,12 +2541,12 @@ body.rc-has-ann .nav{top:79px}
             <div class="contact-channel-text"><b>Correo facturación</b><small data-rc="email">facturacion@goldenplacenta.com</small></div>
             <div class="contact-channel-arrow">→</div>
           </a>
-          <a href="#" class="contact-channel rv d2">
+          <a href="https://www.google.com/maps/search/?api=1&query=Blvd.+Pedro+Infante+2911-E,+Tres+R%C3%ADos,+Culiac%C3%A1n,+Sinaloa" target="_blank" rel="noreferrer" class="contact-channel rv d2">
             <div class="contact-channel-icon">MX</div>
             <div class="contact-channel-text"><b>Showroom Culiacán</b><small>Blvd. Pedro Infante 2911-E · Tres Ríos</small></div>
             <div class="contact-channel-arrow">→</div>
           </a>
-          <a href="#" class="contact-channel rv d3">
+          <a href="https://www.google.com/maps/search/?api=1&query=Chr%C3%A1%C5%A1%C5%A5any+47,+25219,+Rep%C3%BAblica+Checa" target="_blank" rel="noreferrer" class="contact-channel rv d3">
             <div class="contact-channel-icon">EU</div>
             <div class="contact-channel-text"><b>Sede Europa · Praga</b><small>č.p. 47, 25219 Chrášťany · Rep. Checa</small></div>
             <div class="contact-channel-arrow">→</div>
@@ -2570,8 +2555,8 @@ body.rc-has-ann .nav{top:79px}
       </div>
 
       <div class="contact-form rv d1">
-        <div class="form-title">Solicitar <span class="green">cotización profesional</span></div>
-        <p class="form-subtitle">Respuesta en 24 horas. Datos confidenciales.</p>
+        <div class="form-title">Solicitar <span class="green">acceso médico</span></div>
+        <p class="form-subtitle">Verificamos tu cédula contra el registro oficial. Datos confidenciales.</p>
 
         <div class="form-row">
           <div class="form-field">
@@ -2605,7 +2590,7 @@ body.rc-has-ann .nav{top:79px}
         </div>
         <div class="form-field">
           <label>— Productos de interés</label>
-          <textarea class="form-input form-textarea" placeholder="Productos que le interesan, volumen estimado, dudas técnicas..."></textarea>
+          <textarea class="form-input form-textarea" placeholder="Cuéntanos de tu práctica y qué líneas te interesan..."></textarea>
         </div>
 
         <div class="form-check">
@@ -2642,12 +2627,12 @@ body.rc-has-ann .nav{top:79px}
       <div class="foot-col">
         <h5>— Catálogo</h5>
         <div class="foot-col-list">
-          <a href="#">Línea profesional</a>
-          <a href="#">Línea cosmética</a>
-          <a href="#">Peptides</a>
-          <a href="#">Anti-aging</a>
-          <a href="#">Face masks</a>
-          <a href="#">Peeling</a>
+          <a href="#catalogo">Péptidos</a>
+          <a href="#catalogo">Toxinas</a>
+          <a href="#catalogo">Rellenos</a>
+          <a href="#catalogo">Vitaminas</a>
+          <a href="#catalogo">Peeling</a>
+          <a href="#catalogo">Aparatología</a>
         </div>
       </div>
 
