@@ -787,7 +787,10 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 
 /* CONTACT */
 .contact{background:var(--bone);}
-.contact-grid{display:grid;grid-template-columns:1fr 1.05fr;gap:64px;align-items:start;}
+.contact-grid{display:block;max-width:660px;margin:0 auto;}
+.contact-info{text-align:center;margin-bottom:34px}
+.contact-info .section-kicker{justify-content:center}
+.contact-info p{max-width:520px;margin-left:auto;margin-right:auto}
 .contact-info h3{
   font-family:'Inter',sans-serif;
   font-size:clamp(1.7rem,2.6vw,2.4rem);
@@ -1412,7 +1415,7 @@ body.modal-open{overflow:hidden;}
   .resources-grid{grid-template-columns:1fr;gap:32px;}
   .resources-list{grid-template-columns:1fr;}
   .cta-final{padding:60px 20px;}
-  .contact-grid{grid-template-columns:1fr;gap:32px;}
+  .contact-grid{max-width:none;}
   .contact-form{padding:28px 22px;}
   .foot-top{grid-template-columns:1fr 1fr;gap:32px;}
 }
@@ -2526,38 +2529,14 @@ body.rc-has-ann .nav{top:79px}
   <div class="section-inner">
     <div class="contact-grid">
       <div class="contact-info">
-        <div class="section-kicker rv" style="margin-bottom:20px;">Contacto profesional</div>
-        <h3 class="rv d1">Contacto <span class="green">directo</span>.</h3>
-        <p class="rv d2">Respuesta directa del equipo clínico de Renovacell.</p>
+        <div class="section-kicker rv" style="margin-bottom:20px;">Acceso profesional</div>
+        <h3 class="rv d1">Verifícate y <span class="green">entra</span>.</h3>
+        <p class="rv d2">Validamos tu cédula contra el registro oficial. Si eres profesional de la salud,
+        tu acceso es inmediato — aquí mismo, sin salir de esta página.</p>
 
-        <div class="contact-channels">
-          <a href="https://wa.me/526675310910" class="contact-channel rv" data-rc-wa="whatsapp">
-            <div class="contact-channel-icon">W</div>
-            <div class="contact-channel-text"><b>WhatsApp profesional</b><small>+52 667 531 0910</small></div>
-            <div class="contact-channel-arrow">→</div>
-          </a>
-          <a href="mailto:facturacion@goldenplacenta.com" class="contact-channel rv d1" data-rc-mail="email">
-            <div class="contact-channel-icon">@</div>
-            <div class="contact-channel-text"><b>Correo facturación</b><small data-rc="email">facturacion@goldenplacenta.com</small></div>
-            <div class="contact-channel-arrow">→</div>
-          </a>
-          <a href="https://www.google.com/maps/search/?api=1&query=Blvd.+Pedro+Infante+2911-E,+Tres+R%C3%ADos,+Culiac%C3%A1n,+Sinaloa" target="_blank" rel="noreferrer" class="contact-channel rv d2">
-            <div class="contact-channel-icon">MX</div>
-            <div class="contact-channel-text"><b>Showroom Culiacán</b><small>Blvd. Pedro Infante 2911-E · Tres Ríos</small></div>
-            <div class="contact-channel-arrow">→</div>
-          </a>
-          <a href="https://www.google.com/maps/search/?api=1&query=Chr%C3%A1%C5%A1%C5%A5any+47,+25219,+Rep%C3%BAblica+Checa" target="_blank" rel="noreferrer" class="contact-channel rv d3">
-            <div class="contact-channel-icon">EU</div>
-            <div class="contact-channel-text"><b>Sede Europa · Praga</b><small>č.p. 47, 25219 Chrášťany · Rep. Checa</small></div>
-            <div class="contact-channel-arrow">→</div>
-          </a>
-        </div>
       </div>
 
       <div class="contact-form rv d1">
-        <div class="form-title">Verifícate y <span class="green">accede al portal</span></div>
-        <p class="form-subtitle">Validamos tu cédula contra el registro oficial. Si eres profesional de la salud, tu acceso es inmediato — aquí mismo, sin salir de esta página.</p>
-
         <form id="rncVerifyForm" autocomplete="on" novalidate>
           <div class="form-field">
             <label>— Nombre completo</label>
@@ -3089,12 +3068,6 @@ document.addEventListener('keydown', e => {
   function run(){
     try{
       // --- #contacto: de "Solicitar cotización" a "Verifícate y entra" ---
-      var info=document.querySelector('#contacto .contact-info');
-      if(info){
-        var k=info.querySelector('.section-kicker'); if(k) k.textContent='Acceso profesional';
-        var h3=info.querySelector('h3'); if(h3) h3.innerHTML='Verifícate y <span class="green">entra</span>.';
-        var sub=info.querySelector('p'); if(sub) sub.textContent='Para comprar necesitas verificar tu cédula. Nuestra IA la valida en minutos: si eres profesional de la salud, entras al portal al instante — no en días.';
-      }
       // El formulario de verificación vive en el HTML (no se reemplaza aquí):
       // el doctor se registra sin salir de la landing.
       // --- recursos: quitar lenguaje de "cotización/24h", repuntar el CTA ---
