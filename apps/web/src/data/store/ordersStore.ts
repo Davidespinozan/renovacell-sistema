@@ -230,14 +230,17 @@ export function markShipped(orderId: string, shipping_meta: Record<string, unkno
   }
 }
 
-export function markDelivered(orderId: string) {
+// `remote: false` actualiza solo la pantalla: lo usa ops/entregar, donde quien
+// escribe en la base es el RPC `confirmar_entrega` (el chofer no tiene permiso
+// de escribir `orders` directamente).
+export function markDelivered(orderId: string, opts: { remote?: boolean } = {}) {
   const cur = orders.find((o) => o.id === orderId)
   if (!cur || cur.status !== 'shipped') return // solo se entrega lo que salió (enviado)
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor: 'Chofer', action: 'Entrega confirmada', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId)) {
+  if (opts.remote !== false && hasSupabase && isUuid(orderId)) {
     supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] deliver', error.message); hydrate() })
   }
 }

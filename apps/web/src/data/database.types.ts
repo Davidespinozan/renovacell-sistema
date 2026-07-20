@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       announcement_comments: {
@@ -1444,6 +1469,14 @@ export type Database = {
       }
       auth_role: { Args: never; Returns: string }
       can_access_conversation: { Args: { cid: string }; Returns: boolean }
+      confirmar_entrega: {
+        Args: {
+          p_proof_path?: string
+          p_received_by?: string
+          p_shipment_id: string
+        }
+        Returns: undefined
+      }
       event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       has_cap: { Args: { cap: string }; Returns: boolean }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
@@ -1600,6 +1633,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

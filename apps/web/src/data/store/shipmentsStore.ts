@@ -57,9 +57,11 @@ export function createShipment(input: ShipmentInput): Shipment {
   return sh
 }
 
-function patch(id: string, fields: Partial<Shipment>) {
+// `remote: false` actualiza solo la pantalla: se usa cuando quien escribe en la
+// base es un RPC (ver ops/entregar), para no mandar dos veces lo mismo.
+function patch(id: string, fields: Partial<Shipment>, opts: { remote?: boolean } = {}) {
   live.setLocal(live.current().map((s) => (s.id === id ? { ...s, ...fields } : s)))
-  if (hasSupabase && isUuid(id)) {
+  if (opts.remote !== false && hasSupabase && isUuid(id)) {
     supabase.from('shipments').update(fields as unknown as never).eq('id', id).then(({ error }) => { if (error) console.warn('[shipments] update', error.message); live.reload() })
   }
 }
@@ -93,6 +95,6 @@ export function resolveIncident(shipmentId: string, folio: string) {
   logAudit({ actor: 'Administración', action: 'Incidencia resuelta', resource: folio })
 }
 
-export function markDelivered(shipmentId: string, proofUrl: string | null, receivedBy: string | null = null) {
-  patch(shipmentId, { status: 'delivered', delivered_at: new Date().toISOString(), proof_image_url: proofUrl, received_by: receivedBy })
+export function markDelivered(shipmentId: string, proofUrl: string | null, receivedBy: string | null = null, opts: { remote?: boolean } = {}) {
+  patch(shipmentId, { status: 'delivered', delivered_at: new Date().toISOString(), proof_image_url: proofUrl, received_by: receivedBy }, opts)
 }

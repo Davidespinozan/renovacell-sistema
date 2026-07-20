@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "npm run dev --workspace @renovacell/web",
     "build": "npm run build --workspace @renovacell/web",
-    "preview": "npm run preview --workspace @renovacell/web"
+    "preview": "npm run preview --workspace @renovacell/web",
+    "test": "npm run test --workspace @renovacell/web",
+    "typecheck": "npm run typecheck --workspace @renovacell/web"
   }
 }
