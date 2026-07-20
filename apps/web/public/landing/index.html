@@ -2256,38 +2256,38 @@ body.rc-has-ann .nav{top:79px}
       <div class="compliance-card rv">
         <div class="compliance-card-top">
           <span class="compliance-card-code" data-rc="cert1Codigo">CE</span>
-          <span class="compliance-card-status">Vigente</span>
+          <span class="compliance-card-status" data-rc="cert1Estado">Vigente</span>
         </div>
         <div class="compliance-card-name" data-rc="cert1Nombre">Certificación Comunidad Europea</div>
         <div class="compliance-card-desc" data-rc="cert1Texto">Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.</div>
-        <div class="compliance-card-num"><b>Ref.</b> <span data-rc="cert1Ref">CE-RNVC-2008</span></div>
+        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert1Ref">CE-RNVC-2008</span></div>
       </div>
       <div class="compliance-card rv d1">
         <div class="compliance-card-top">
           <span class="compliance-card-code" data-rc="cert2Codigo">COFEPRIS</span>
-          <span class="compliance-card-status">Vigente</span>
+          <span class="compliance-card-status" data-rc="cert2Estado">Vigente</span>
         </div>
         <div class="compliance-card-name" data-rc="cert2Nombre">Registro Sanitario México</div>
         <div class="compliance-card-desc" data-rc="cert2Texto">Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.</div>
-        <div class="compliance-card-num"><b>Ref.</b> <span data-rc="cert2Ref">COFEPRIS-2024</span></div>
+        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert2Ref">COFEPRIS-2024</span></div>
       </div>
       <div class="compliance-card rv d2">
         <div class="compliance-card-top">
           <span class="compliance-card-code" data-rc="cert3Codigo">ISO 13485</span>
-          <span class="compliance-card-status">Vigente</span>
+          <span class="compliance-card-status" data-rc="cert3Estado">Vigente</span>
         </div>
         <div class="compliance-card-name" data-rc="cert3Nombre">Sistema de gestión de calidad</div>
         <div class="compliance-card-desc" data-rc="cert3Texto">Norma internacional específica para fabricación de dispositivos y productos médicos.</div>
-        <div class="compliance-card-num"><b>Ref.</b> <span data-rc="cert3Ref">ISO-13485:2016</span></div>
+        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert3Ref">ISO-13485:2016</span></div>
       </div>
       <div class="compliance-card rv d3">
         <div class="compliance-card-top">
           <span class="compliance-card-code" data-rc="cert4Codigo">GMP</span>
-          <span class="compliance-card-status">Vigente</span>
+          <span class="compliance-card-status" data-rc="cert4Estado">Vigente</span>
         </div>
         <div class="compliance-card-name" data-rc="cert4Nombre">Buenas Prácticas de Manufactura</div>
         <div class="compliance-card-desc" data-rc="cert4Texto">Producción bajo Good Manufacturing Practices certificadas a nivel internacional.</div>
-        <div class="compliance-card-num"><b>Ref.</b> <span data-rc="cert4Ref">GMP-RNVC-EU</span></div>
+        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert4Ref">GMP-RNVC-EU</span></div>
       </div>
     </div>
   </div>
@@ -2815,7 +2815,7 @@ document.addEventListener('keydown', e => {
       ctaPrimary: he.ctaPrimary, ctaSecondary: he.ctaSecondary,
       cienciaKicker: ci.kicker, cienciaMeta: ci.meta, cienciaSmall: ci.small,
       cienciaTitle: ci.title, cienciaBody: ci.body, cienciaFoto: ci.foto,
-      cumplKicker: cu.kicker, cumplTitle: cu.title, cumplMeta: cu.meta,
+      cumplKicker: cu.kicker, cumplTitle: cu.title, cumplMeta: cu.meta, certRefEtiqueta: cu.refEtiqueta,
       catalogoKicker: ca.kicker, catalogoTitle: ca.title, catalogoBody: ca.body,
       recursosKicker: re.kicker, recursosMeta: re.meta, recursosDisplay: re.display, recursosTitle: re.title,
       accesoKicker: ac.kicker, accesoTitle: ac.title, accesoBody: ac.body,
@@ -2835,7 +2835,7 @@ document.addEventListener('keydown', e => {
     A(ci.especs).forEach(function(x,k){ o['espec'+(k+1)+'Nombre']=x.nombre; o['espec'+(k+1)+'Valor']=x.valor; });
     A(ci.puntos).forEach(function(x,k){ o['punto'+(k+1)+'Titulo']=x.titulo; o['punto'+(k+1)+'Texto']=x.texto; });
     A(cu.certs).forEach(function(x,k){ var i=k+1;
-      o['cert'+i+'Codigo']=x.codigo; o['cert'+i+'Nombre']=x.nombre; o['cert'+i+'Texto']=x.texto; o['cert'+i+'Ref']=x.ref; });
+      o['cert'+i+'Codigo']=x.codigo; o['cert'+i+'Estado']=x.estado; o['cert'+i+'Nombre']=x.nombre; o['cert'+i+'Texto']=x.texto; o['cert'+i+'Ref']=x.ref; });
     A(ac.pasos).forEach(function(x,k){ o['paso'+(k+1)+'Titulo']=x.titulo; o['paso'+(k+1)+'Texto']=x.texto; });
     A(pi.regs).forEach(function(x,k){ o['pieReg'+(k+1)+'Nombre']=x.nombre; o['pieReg'+(k+1)+'Valor']=x.valor; });
     A(pi.categorias).forEach(function(t,k){ o['pieCat'+(k+1)] = t; });

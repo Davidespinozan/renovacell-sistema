@@ -455,11 +455,13 @@ function LandingTab() {
           <T label="Nota a la derecha" value={draft.cumplimiento.meta} onChange={(v) => upSec('cumplimiento', { meta: v })} />
         </div>
         <A label="Título" value={draft.cumplimiento.title} onChange={(v) => upSec('cumplimiento', { title: v })} hint="Admite HTML." />
+        <T label="Etiqueta de referencia" value={draft.cumplimiento.refEtiqueta} onChange={(v) => upSec('cumplimiento', { refEtiqueta: v })} hint="El texto antes del número, en las cuatro tarjetas." />
         {draft.cumplimiento.certs.map((c, i) => (
           <div key={i} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
             <div className="eyebrow" style={{ margin: 0 }}>Certificación {i + 1}</div>
             <div className="form-grid-2">
               <T label="Sigla" value={c.codigo} onChange={(v) => setCert(i, { codigo: v })} />
+              <T label="Estado" value={c.estado} onChange={(v) => setCert(i, { estado: v })} hint="P. ej. Vigente, En trámite." />
               <T label="Referencia" value={c.ref} onChange={(v) => setCert(i, { ref: v })} />
             </div>
             <T label="Nombre" value={c.nombre} onChange={(v) => setCert(i, { nombre: v })} />

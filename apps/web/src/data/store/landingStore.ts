@@ -43,7 +43,7 @@ export interface HeroSlide {
 export interface Paso { titulo: string; texto: string }
 export interface Par { nombre: string; valor: string }
 export interface Insignia { titulo: string; texto: string }
-export interface Certificacion { codigo: string; nombre: string; texto: string; ref: string }
+export interface Certificacion { codigo: string; estado: string; nombre: string; texto: string; ref: string }
 
 // El modelo sigue las SECCIONES REALES de la landing, en el mismo orden en que
 // se ven. Antes describía una página anterior (info/certifications/features/
@@ -68,7 +68,7 @@ export interface LandingContent {
     kicker: string; meta: string; small: string; title: string; body: string
     foto: string; especs: Par[]; puntos: Paso[]
   }
-  cumplimiento: { kicker: string; title: string; meta: string; certs: Certificacion[] }
+  cumplimiento: { kicker: string; title: string; meta: string; refEtiqueta: string; certs: Certificacion[] }
   catalogo: { kicker: string; title: string; body: string }
   recursos: { kicker: string; meta: string; display: string; title: string }
   acceso: { kicker: string; title: string; body: string; pasos: Paso[]; cta: string; nota: string }
@@ -123,8 +123,8 @@ const DEFAULT: LandingContent = {
     puntos: [{ titulo: 'Rangos médicos especializados', texto: 'Líneas exclusivas para uso clínico — tópico, inyectable e implantable.' }, { titulo: 'Resultados visibles y seguros', texto: 'Ingredientes biocompatibles respaldados por evidencia clínica.' }, { titulo: 'Estándares Comunidad Europea', texto: 'Cumplimos los más altos estándares de calidad de la CE desde 2008.' }],
   },
   cumplimiento: {
-    kicker: 'Cumplimiento regulatorio', title: 'Cumplimiento <span class="green">europeo y mexicano</span>', meta: '02 / 05 · Certificaciones vigentes',
-    certs: [{ codigo: 'CE', nombre: 'Certificación Comunidad Europea', texto: 'Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.', ref: 'CE-RNVC-2008' }, { codigo: 'COFEPRIS', nombre: 'Registro Sanitario México', texto: 'Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.', ref: 'COFEPRIS-2024' }, { codigo: 'ISO 13485', nombre: 'Sistema de gestión de calidad', texto: 'Norma internacional específica para fabricación de dispositivos y productos médicos.', ref: 'ISO-13485:2016' }, { codigo: 'GMP', nombre: 'Buenas Prácticas de Manufactura', texto: 'Producción bajo Good Manufacturing Practices certificadas a nivel internacional.', ref: 'GMP-RNVC-EU' }],
+    kicker: 'Cumplimiento regulatorio', title: 'Cumplimiento <span class="green">europeo y mexicano</span>', meta: '02 / 05 · Certificaciones vigentes', refEtiqueta: 'Ref.',
+    certs: [{ codigo: 'CE', estado: 'Vigente', nombre: 'Certificación Comunidad Europea', texto: 'Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.', ref: 'CE-RNVC-2008' }, { codigo: 'COFEPRIS', estado: 'Vigente', nombre: 'Registro Sanitario México', texto: 'Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.', ref: 'COFEPRIS-2024' }, { codigo: 'ISO 13485', estado: 'Vigente', nombre: 'Sistema de gestión de calidad', texto: 'Norma internacional específica para fabricación de dispositivos y productos médicos.', ref: 'ISO-13485:2016' }, { codigo: 'GMP', estado: 'Vigente', nombre: 'Buenas Prácticas de Manufactura', texto: 'Producción bajo Good Manufacturing Practices certificadas a nivel internacional.', ref: 'GMP-RNVC-EU' }],
   },
   catalogo: { kicker: 'El catálogo', title: 'Todo el arsenal regenerativo y estético, en un solo lugar.', body: 'Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.' },
   recursos: {
