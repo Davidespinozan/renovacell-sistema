@@ -27,15 +27,21 @@ export function Reabastecimiento() {
   const stock = useMemo(() => stockByProduct(lots), [lots])
   const stockOf = (id: string) => stock[id]?.qty ?? 0
 
-  // Sugerencias: productos con stock ≤ umbral (con lotes o con precio definido).
-  const sugerencias = useMemo(
+  // La pantalla se llama "Inventario", así que muestra TODO el inventario,
+  // ordenado de menor a mayor existencia: lo que urge queda arriba solo. Antes
+  // listaba únicamente lo que estaba bajo, y quien entraba veía tres renglones
+  // de un catálogo de decenas y creía que faltaban productos.
+  const filas = useMemo(
     () => products
       .map((p) => ({ p, qty: stockOf(p.id), tracked: Boolean(stock[p.id]) }))
-      .filter((x) => (x.tracked || x.p.price != null) && x.qty <= LOW)
+      .filter((x) => x.tracked || x.p.price != null)
       .sort((a, b) => a.qty - b.qty),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [products, stock],
   )
+  const bajos = useMemo(() => filas.filter((x) => x.qty <= LOW), [filas])
+  const [soloBajos, setSoloBajos] = useState(false)
+  const visibles = soloBajos ? bajos : filas
 
   const enCurso = (productId: string) => pos.some((o) => o.product_id === productId && o.status === 'pendiente')
 
@@ -49,12 +55,18 @@ export function Reabastecimiento() {
       {/* 1+2) Stock bajo → Dirección reabastece */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AlertTriangle size={16} style={{ color: 'var(--warn)' }} />
-          <div className="eyebrow" style={{ margin: 0 }}>Hay que reabastecer · stock ≤ {LOW} u</div>
+          <AlertTriangle size={16} style={{ color: bajos.length ? 'var(--warn)' : 'var(--ink-3)' }} />
+          <div className="eyebrow" style={{ margin: 0 }}>
+            {filas.length} productos · {bajos.length} por reabastecer (≤ {LOW} u)
+          </div>
+          <button className={'btn sm' + (soloBajos ? '' : ' ghost')} type="button"
+            style={{ marginLeft: 12 }} onClick={() => setSoloBajos((v) => !v)}>
+            {soloBajos ? 'Ver todos' : 'Solo los bajos'}
+          </button>
           <ExportButton
-            name="stock-bajo"
+            name={soloBajos ? 'stock-bajo' : 'inventario'}
             style={{ marginLeft: 'auto' }}
-            rows={sugerencias.map(({ p, qty }) => ({ producto: p.name, stock: qty, estado: qty <= 0 ? 'Agotado' : 'Bajo', sugerido: Math.max(TARGET - qty, 10) }))}
+            rows={visibles.map(({ p, qty }) => ({ producto: p.name, stock: qty, estado: qty <= 0 ? 'Agotado' : qty <= LOW ? 'Bajo' : 'Suficiente', sugerido: qty <= LOW ? Math.max(TARGET - qty, 10) : 0 }))}
             columns={[
               { key: 'producto', label: 'Producto' },
               { key: 'stock', label: 'Stock (u)' },
@@ -67,24 +79,38 @@ export function Reabastecimiento() {
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Stock</th><th>Estado</th><th>Sugerido</th><th></th></tr></thead>
             <tbody>
-              {sugerencias.map(({ p, qty }) => {
+              {visibles.map(({ p, qty }) => {
                 const sugerido = Math.max(TARGET - qty, 10)
                 const agotado = qty <= 0
+                const bajo = qty <= LOW
                 return (
                   <tr key={p.id}>
                     <td data-label="Producto">{p.name}</td>
                     <td data-label="Stock" className="mono">{qty} u</td>
-                    <td data-label="Estado"><span className={'pill ' + (agotado ? 'p-dang' : 'p-warn')}>{agotado ? 'Agotado' : 'Bajo'}</span></td>
-                    <td data-label="Sugerido" className="mono">+{sugerido} u</td>
+                    <td data-label="Estado">
+                      <span className={'pill ' + (agotado ? 'p-dang' : bajo ? 'p-warn' : 'p-ok')}>
+                        {agotado ? 'Agotado' : bajo ? 'Bajo' : 'Suficiente'}
+                      </span>
+                    </td>
+                    <td data-label="Sugerido" className="mono" style={bajo ? undefined : { color: 'var(--ink-3)' }}>
+                      {bajo ? `+${sugerido} u` : '—'}
+                    </td>
                     <td data-label="">
                       {enCurso(p.id)
                         ? <span className="pill p-blue">En curso</span>
-                        : <button className="btn sm" type="button" onClick={() => setReplen({ product: p, suggested: sugerido })}><ShoppingCart size={14} /> Reabastecer</button>}
+                        : <button className={'btn sm' + (bajo ? '' : ' ghost')} type="button"
+                            onClick={() => setReplen({ product: p, suggested: sugerido })}>
+                            <ShoppingCart size={14} /> Reabastecer
+                          </button>}
                     </td>
                   </tr>
                 )
               })}
-              {sugerencias.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Inventario saludable · nada por reabastecer. 🎉</td></tr>}
+              {visibles.length === 0 && (
+                <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>
+                  {soloBajos ? 'Inventario saludable · nada por reabastecer.' : 'Todavía no hay productos con inventario.'}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -2,13 +2,15 @@
 // mil interfaces: el CATÁLOGO del Portal del Doctor (hoy, editable de punta a
 // punta) y la LANDING pública (siguiente paso, mismo editor). El acceso se da
 // con la capability "contenido" desde Equipo.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
 import { ImageField } from '../../app/ImageField'
 import { useCatalogAdmin, type ProductInput } from '../../data/hooks/useProducts'
+import { getProductCost, setProductCost } from '../../data/store/productsStore'
+import { reloadInventory } from '../../data/store/lotsStore'
 import { useLanding, type LandingContent, type HeroSlide } from '../../data/hooks/useLanding'
 import type { ProductSafe } from '../../data/types'
 
@@ -139,6 +141,15 @@ function ProductModal({ product, onClose, onSave }: {
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
   const [active, setActive] = useState(product?.active !== false)
+  // El costo no viene con el producto: vive en otra tabla y se pide aparte.
+  const [cost, setCost] = useState('')
+  const [costLoading, setCostLoading] = useState(Boolean(product))
+  useEffect(() => {
+    if (!product) { setCostLoading(false); return }
+    let vivo = true
+    getProductCost(product.id).then((c) => { if (vivo) { setCost(c == null ? '' : String(c)); setCostLoading(false) } })
+    return () => { vivo = false }
+  }, [product])
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
@@ -181,6 +192,17 @@ function ProductModal({ product, onClose, onSave }: {
             </div>
           </div>
 
+          <div className="form-grid-2">
+            <div>
+              <label style={label}>Costo (MXN)</label>
+              <input style={input} type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)}
+                placeholder={costLoading ? 'Cargando…' : 'Sin costo registrado'} disabled={costLoading} />
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5, lineHeight: 1.45 }}>
+                Solo lo ven Dirección y Facturación. Alimenta el margen en Finanzas; el doctor nunca lo ve.
+              </div>
+            </div>
+          </div>
+
           <div style={{ marginTop: 14 }}>
             <ImageField label="Imagen del producto" value={imageUrl} onChange={setImageUrl} folder="catalog" ratio="4 / 3"
               hint="Se ve en el catálogo del doctor y en la ficha de la página pública." />
@@ -196,7 +218,16 @@ function ProductModal({ product, onClose, onSave }: {
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              onClick={() => onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active })}>
+              onClick={() => {
+                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active })
+                // El costo va a `product_costs`, no a `products`: se guarda aparte.
+                if (product) {
+                  const c = cost.trim() === '' ? null : Number(cost)
+                  if (c == null || Number.isFinite(c)) {
+                    void setProductCost(product.id, c, name.trim()).then(reloadInventory)
+                  }
+                }
+              }}>
               {product ? 'Guardar cambios' : 'Crear producto'}
             </button>
           </div>

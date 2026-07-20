@@ -136,3 +136,30 @@ export async function importCatalog(rows: ImportRow[]): Promise<ImportResult> {
   await live.reload()
   return res
 }
+
+// ── COSTO POR PRODUCTO ───────────────────────────────────────────────────────
+// Vive en `product_costs`, tabla aparte que por RLS solo pueden leer Dirección y
+// Facturación. Nunca viaja al catálogo del doctor, ni siquiera por descuido: no
+// es una columna de `products`, así que ningún SELECT del catálogo lo arrastra.
+// Hasta ahora solo se podía cargar por archivo (Importar/Migración); esto
+// permite corregir uno suelto sin volver a subir todo.
+export async function getProductCost(productId: string): Promise<number | null> {
+  if (!hasSupabase || !isUuidP(productId)) return null
+  const { data, error } = await supabase
+    .from('product_costs').select('unit_cost').eq('product_id', productId).maybeSingle()
+  if (error) { console.warn('[costos] leer', error.message); return null }
+  return data?.unit_cost ?? null
+}
+
+export async function setProductCost(productId: string, cost: number | null, productName = ''): Promise<void> {
+  if (!hasSupabase || !isUuidP(productId)) return
+  const q = cost == null
+    ? supabase.from('product_costs').delete().eq('product_id', productId)
+    : supabase.from('product_costs').upsert({ product_id: productId, unit_cost: cost }, { onConflict: 'product_id' })
+  const { error } = await q
+  if (error) { console.warn('[costos] guardar', error.message); return }
+  logAudit({
+    actor: 'Administración', action: cost == null ? 'Costo eliminado' : 'Costo actualizado',
+    resource: productName || productId, detail: cost == null ? undefined : `$${cost}`,
+  })
+}
