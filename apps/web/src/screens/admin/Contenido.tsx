@@ -519,6 +519,7 @@ function LandingTab() {
         <A label="Título" value={draft.verificacion.title} onChange={(v) => upSec('verificacion', { title: v })} hint="Admite HTML." />
         <A label="Texto" value={draft.verificacion.body} onChange={(v) => upSec('verificacion', { body: v })} />
         <T label="Botón" value={draft.verificacion.boton} onChange={(v) => upSec('verificacion', { boton: v })} />
+        <A label="Nota al pie del formulario" value={draft.verificacion.nota} onChange={(v) => upSec('verificacion', { nota: v })} />
       </SecCard>
 
       <SecCard title="Contacto">

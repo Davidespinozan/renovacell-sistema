@@ -2568,8 +2568,8 @@ body.rc-has-ann .nav{top:79px}
 
           <button type="submit" class="form-submit" data-rc="verifBoton">Verificar mi cédula</button>
           <div id="rncVerifyOut" class="rnc-vout" role="status"></div>
-          <p style="font-size:11.5px;color:var(--soft);margin-top:12px;line-height:1.5">
-            Exclusivo para profesionales de la salud. Sus datos se tratan de forma confidencial.
+          <p "font-size:11.5px;color:var(--soft);margin-top:12px;line-height:1.5">
+            <span data-rc="verifNota">Exclusivo para profesionales de la salud. Sus datos se tratan de forma confidencial.</span>
           </p>
         </form>
       </div>
@@ -2822,7 +2822,7 @@ document.addEventListener('keydown', e => {
       accesoCta: ac.cta, accesoNota: ac.nota,
       ctaDisplay: cl.display, ctaTitle: cl.title, ctaBody: cl.body,
       ctaBtnPrimary: cl.btnPrimary, ctaBtnSecondary: cl.btnSecondary, cierreSello: cl.sello,
-      verifKicker: ve.kicker, verifTitle: ve.title, verifBody: ve.body, verifBoton: ve.boton,
+      verifKicker: ve.kicker, verifTitle: ve.title, verifBody: ve.body, verifBoton: ve.boton, verifNota: ve.nota,
       whatsapp: co.whatsapp, whatsappTexto: co.whatsappTexto, email: co.email,
       pieDesc: pi.desc, pieCol1Titulo: pi.col1Titulo, pieCol2Titulo: pi.col2Titulo, pieCol3Titulo: pi.col3Titulo,
       pieMxNombre: pi.mxNombre, pieMxDir: pi.mxDir,

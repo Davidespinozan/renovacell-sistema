@@ -74,7 +74,7 @@ export interface LandingContent {
   acceso: { kicker: string; title: string; body: string; pasos: Paso[]; cta: string; nota: string }
   cierre: { display: string; title: string; body: string; btnPrimary: string; btnSecondary: string; sello: string }
   topbar: { link: string }
-  verificacion: { kicker: string; title: string; body: string; boton: string }
+  verificacion: { kicker: string; title: string; body: string; boton: string; nota: string }
   contacto: { whatsapp: string; email: string }
   pie: {
     desc: string; regs: Par[]
@@ -143,6 +143,7 @@ const DEFAULT: LandingContent = {
   verificacion: {
     kicker: 'Acceso profesional', title: 'Verifícate y <span class="green">entra</span>.',
     body: 'Validamos tu cédula contra el registro oficial. Si eres profesional de la salud, tu acceso es inmediato — aquí mismo, sin salir de esta página.', boton: 'Verificar mi cédula',
+    nota: 'Exclusivo para profesionales de la salud. Sus datos se tratan de forma confidencial.',
   },
   contacto: { whatsapp: '526675310910', email: 'Facturacion@goldenplacenta.com' },
   pie: {
