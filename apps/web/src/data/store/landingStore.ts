@@ -40,12 +40,17 @@ export interface HeroSlide {
   imageMobileUrl: string
 }
 
+export interface Paso { titulo: string; texto: string }
+
+// El modelo sigue las SECCIONES REALES de la landing, en el mismo orden en que
+// se ven. Antes describía una página anterior (info/certifications/features/
+// lead) que el rediseño dejó atrás: el editor mostraba campos que ya no
+// correspondían a nada y por eso nadie notó que no estaban conectados.
 export interface LandingContent {
   announcement: Announcement
   seo: { title: string; description: string }
   brand: { name: string; tagline: string; logoUrl: string }
-  nav: { links: NavLink[]; cta: string }
-  // Los botones son los mismos en todas las diapositivas (misma acción).
+  nav: { ciencia: string; cumplimiento: string; catalogo: string; acceso: string; cta: string }
   // `slides`: si trae más de una, el hero rota. `autoplayMs`: 0 = no rota solo.
   hero: {
     eyebrow: string; title: string; subtitle: string
@@ -55,84 +60,70 @@ export interface LandingContent {
     autoplayMs: number
   }
   ticker: string[]
-  info: { eyebrow: string; title: string; body: string; imageUrl: string }
-  certifications: { eyebrow: string; title: string; items: Certification[] }
-  features: { eyebrow: string; title: string; items: Feature[] }
-  lead: { eyebrow: string; title: string; body: string; submitLabel: string; successText: string }
-  contact: { title: string; whatsapp: string; email: string; address: string }
+  ciencia: { kicker: string; meta: string }
+  cumplimiento: { kicker: string }
+  catalogo: { kicker: string; title: string; body: string }
+  recursos: { kicker: string; meta: string; display: string; title: string }
+  acceso: { kicker: string; title: string; body: string; pasos: Paso[]; cta: string; nota: string }
+  cierre: { display: string; title: string; body: string; btnPrimary: string; btnSecondary: string }
+  verificacion: { kicker: string; title: string; body: string; boton: string }
+  contacto: { whatsapp: string; email: string }
   footer: { text: string }
 }
 
-// Valores REALES (mismos que apps/landing/content.json).
+
+// Valores por DEFECTO: son exactamente los textos que hoy tiene la landing.
+// Se extrajeron de index.html, no se escribieron a mano, para que la primera vez
+// que Administración guarde no cambie nada sin querer.
 const DEFAULT: LandingContent = {
   announcement: {
     enabled: false,
     text: 'Envío sin costo en pedidos mayores a $5,000 · Solo para médicos verificados',
-    link: '',
-    startsAt: '',
-    endsAt: '',
+    link: '', startsAt: '', endsAt: '',
   },
-  seo: {
-    title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008',
-    description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.',
-  },
-  brand: { name: 'Renovacell®', tagline: 'Tecnologías Antiedad', logoUrl: '' },
+  seo: { title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008', description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.' },
+  brand: { name: 'RENOVACELL<sup>®</sup>', tagline: 'Tecnologías Antiedad', logoUrl: '' },
   nav: {
-    links: [
-      { label: 'Ciencia', href: '#s2rm' },
-      { label: 'Regulatory Compliance', href: '#cumplimiento' },
-      { label: 'Catálogo', href: '#catalogo' },
-      { label: 'El acceso', href: '#acceso' },
-    ],
-    cta: 'Acceso médico',
+    ciencia: 'Ciencia', cumplimiento: 'Cumplimiento',
+    catalogo: 'Catálogo', acceso: 'El acceso', cta: 'Iniciar sesión',
   },
   hero: {
     eyebrow: 'Tecnología celular S²RM® · Grado europeo · Desde 2008',
-    title: 'La regeneración celular<br><span class="green">que respalda tu práctica.</span>',
+    title: 'La regeneración celular<br> <span class="green">que respalda tu práctica.</span>',
     subtitle: 'El arsenal regenerativo y estético más completo de México: péptidos y ultrafiltrados celulares, toxinas, rellenos, metabólicos y más — con tecnología S²RM®, certificación CE y registro COFEPRIS. Disponible para médicos verificados.',
-    ctaPrimary: 'Ver el catálogo',
-    ctaSecondary: 'Solicitar acceso',
-    imageUrl: '',
-    imageMobileUrl: '',
+    ctaPrimary: 'Ver el catálogo', ctaSecondary: 'Solicitar acceso',
+    imageUrl: '', imageMobileUrl: '',
     // Una sola diapositiva = el hero de siempre (no rota). Al agregar más desde
     // Administración, el hero se convierte en carrusel automáticamente.
-    slides: [],
-    autoplayMs: 7000,
+    slides: [], autoplayMs: 7000,
   },
   ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE · Certificación EU', 'COFEPRIS · Registro Sanitario', 'ISO 13485 · Calidad médica'],
-  info: {
-    eyebrow: '01 · La ciencia',
-    title: 'Tecnología celular S²RM®',
-    body: 'Moléculas liberadas por células madre, en líneas exclusivas para uso clínico — tópico, inyectable e implantable. Ingredientes biocompatibles respaldados por evidencia clínica.',
-    imageUrl: '',
+  ciencia: { kicker: 'La ciencia', meta: '01 / 05 · Tecnología propietaria registrada' },
+  cumplimiento: { kicker: 'Cumplimiento regulatorio' },
+  catalogo: { kicker: 'El catálogo', title: 'Todo el arsenal regenerativo y estético, en un solo lugar.', body: 'Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.' },
+  recursos: {
+    kicker: 'Recursos clínicos', meta: '05 / 05 · Acceso libre profesionales',
+    display: 'Recursos clínicos', title: 'Protocolos y bibliografía <span class="green">científica</span>',
   },
-  certifications: {
-    eyebrow: '02 · Cumplimiento regulatorio',
-    title: 'Estándares europeo y mexicano',
-    items: [
-      { label: 'CE', sub: 'Certificación EU' },
-      { label: 'COFEPRIS', sub: 'Registro Sanitario' },
-      { label: 'ISO 13485', sub: 'Calidad médica' },
+  acceso: {
+    kicker: 'El acceso', title: 'Ya conoces el arsenal. <span class="green">Así entras.</span>', body: 'Renovacell vende solo a profesionales de la salud. No es una tienda abierta: el catálogo y los precios se activan cuando tu cédula queda avalada — así protegemos el estándar y a los pacientes de quienes lo aplican. La verificación es rápida; el acceso, permanente.',
+    pasos: [
+      { titulo: 'Solicitas acceso', texto: 'Dejas tu cédula profesional y tus datos. Treinta segundos, sin compromiso.' },
+      { titulo: 'La IA te avala', texto: 'Verificamos tu cédula contra el registro oficial (SEP) en minutos, no en días. Sin llamadas ni esperas.' },
+      { titulo: 'Entras al círculo', texto: 'Catálogo completo, precios profesionales y tu asesor. Compras cuando quieras, ya como parte de Renovacell.' },
     ],
+    cta: 'Solicitar acceso médico', nota: 'La verificación es la puerta, no el obstáculo. <b>Pertenecer es el privilegio.</b>',
   },
-  features: {
-    eyebrow: '03 · Para médicos',
-    title: 'Acceso exclusivo para profesionales de la salud',
-    items: [
-      { title: 'Sin venta directa', body: 'El catálogo y los precios solo se muestran a médicos verificados con cédula profesional.' },
-      { title: 'Asesoría clínica', body: 'Acompañamiento y fichas técnicas para cada línea de producto.' },
-      { title: 'Logística propia', body: 'Surtido por lotes con trazabilidad y entrega a tu clínica.' },
-    ],
+  cierre: {
+    display: 'Red profesional', title: 'No solicitas un producto.<br>Solicitas pertenecer.', body: 'El acceso al estándar regenerativo europeo se gana con tu cédula. La IA la verifica en minutos.',
+    btnPrimary: 'Solicitar acceso médico', btnSecondary: 'Contactar al equipo clínico',
   },
-  lead: {
-    eyebrow: 'Acceso médico',
-    title: 'Solicita tu acceso',
-    body: 'Exclusivo para profesionales de la salud. Verificamos tu cédula antes de habilitar el portal de compra.',
-    submitLabel: 'Enviar solicitud',
-    successText: '¡Gracias! Recibimos tu solicitud. Te contactaremos para verificar tu cédula y habilitar tu acceso.',
+  verificacion: {
+    kicker: 'Acceso profesional', title: 'Verifícate y <span class="green">entra</span>.',
+    body: 'Validamos tu cédula contra el registro oficial. Si eres profesional de la salud, tu acceso es inmediato — aquí mismo, sin salir de esta página.', boton: 'Verificar mi cédula',
   },
-  contact: { title: 'Contacto', whatsapp: '526675310910', email: 'facturacion@goldenplacenta.com', address: 'Culiacán, Sinaloa · México' },
-  footer: { text: '© Renovacell® · Tecnologías Antiedad · Operado por STRYV' },
+  contacto: { whatsapp: '526675310910', email: 'facturacion@goldenplacenta.com' },
+  footer: { text: '© 2026 Renovacell® · Todos los derechos reservados' },
 }
 
 const clone = (c: LandingContent): LandingContent => JSON.parse(JSON.stringify(c))

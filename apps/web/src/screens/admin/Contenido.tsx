@@ -273,205 +273,215 @@ function LandingTab() {
   const [saved, setSaved] = useState(false)
 
   const up = (patch: Partial<LandingContent>) => { setDraft((d) => ({ ...d, ...patch })); setSaved(false) }
-  const upSec = (k: keyof LandingContent, patch: Record<string, unknown>) => { setDraft((d) => ({ ...d, [k]: { ...(d[k] as object), ...patch } })); setSaved(false) }
-
-  // Edita una diapositiva del hero sin tocar las demás.
+  const upSec = (k: keyof LandingContent, patch: Record<string, unknown>) => {
+    setDraft((d) => ({ ...d, [k]: { ...(d[k] as object), ...patch } })); setSaved(false)
+  }
   const upSlide = (i: number, patch: Partial<HeroSlide>) =>
     upSec('hero', { slides: draft.hero.slides.map((sl, j) => (j === i ? { ...sl, ...patch } : sl)) })
+  const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((t, j) => (j === i ? v : t)) })
+  const setPaso = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
+    upSec('acceso', { pasos: draft.acceso.pasos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
 
-  // listas
-  const setLink = (i: number, patch: Partial<{ label: string; href: string }>) => upSec('nav', { links: draft.nav.links.map((l, j) => (j === i ? { ...l, ...patch } : l)) })
-  const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((s, j) => (j === i ? v : s)) })
-  const setCert = (i: number, patch: Partial<{ label: string; sub: string }>) => upSec('certifications', { items: draft.certifications.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
-  const setFeat = (i: number, patch: Partial<{ title: string; body: string }>) => upSec('features', { items: draft.features.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+  const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const area: React.CSSProperties = { ...inp, minHeight: 74, resize: 'vertical' }
+
+  // Campo de texto de una línea.
+  const T = ({ label, value, onChange, hint, placeholder }: {
+    label: string; value: string; onChange: (v: string) => void; hint?: string; placeholder?: string
+  }) => (
+    <div>
+      <label style={lbl}>{label}</label>
+      <input style={inp} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      {hint && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>{hint}</div>}
+    </div>
+  )
+  // Campo de texto largo.
+  const A = ({ label, value, onChange, hint }: {
+    label: string; value: string; onChange: (v: string) => void; hint?: string
+  }) => (
+    <div>
+      <label style={lbl}>{label}</label>
+      <textarea style={area} value={value} onChange={(e) => onChange(e.target.value)} />
+      {hint && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>{hint}</div>}
+    </div>
+  )
 
   return (
     <div className="grid" style={{ gap: 14 }}>
       <div className="sysnote" style={{ alignItems: 'flex-start' }}>
         <span>
-          La landing es <b>data-driven</b>: todo lo que ves abajo dibuja la página pública. Es de <b>captación</b>
-          (info + formulario + contacto), no de venta. Embudo: <b>landing → Prospectos → verificación → Portal</b>.
-          Las imágenes se suben desde aquí (o pegas una dirección, si la tienes).
+          Las secciones de abajo son <b>las mismas que ves en la página pública</b>, en el mismo orden.
+          Lo que escribas aquí se publica al guardar. Las imágenes se suben desde aquí.
         </span>
       </div>
 
       <SecCard title="Banda de anuncios (arriba de todo)">
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-          Cinta animada en la parte superior de la página, para promociones, festejos o avisos.
-          Si dejas las fechas vacías, se muestra siempre mientras esté encendida; si las pones,
-          <b> se enciende y se apaga sola</b>.
+          Cinta animada en la parte superior, para promociones, festejos o avisos. Si dejas las fechas
+          vacías se muestra siempre mientras esté encendida; si las pones, <b>se enciende y se apaga sola</b>.
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', marginBottom: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer' }}>
           <input type="checkbox" checked={draft.announcement.enabled}
             onChange={(e) => upSec('announcement', { enabled: e.target.checked })} />
-          <span>Mostrar la banda en la página pública</span>
+          Mostrar la banda en la página pública
         </label>
-        <Fld label="Mensaje" value={draft.announcement.text} onChange={(v) => upSec('announcement', { text: v })} />
-        <Fld label="Enlace al hacer clic (opcional)" value={draft.announcement.link} onChange={(v) => upSec('announcement', { link: v })} mono />
+        <T label="Mensaje" value={draft.announcement.text} onChange={(v) => upSec('announcement', { text: v })} />
+        <T label="Enlace al hacer clic (opcional)" value={draft.announcement.link} onChange={(v) => upSec('announcement', { link: v })} />
         <div className="form-grid-2">
-          <Fld label="Desde (opcional)" value={draft.announcement.startsAt} onChange={(v) => upSec('announcement', { startsAt: v })} type="date" />
-          <Fld label="Hasta (opcional)" value={draft.announcement.endsAt} onChange={(v) => upSec('announcement', { endsAt: v })} type="date" />
+          <div><label style={lbl}>Desde (opcional)</label>
+            <input type="date" style={inp} value={draft.announcement.startsAt} onChange={(e) => upSec('announcement', { startsAt: e.target.value })} /></div>
+          <div><label style={lbl}>Hasta (opcional)</label>
+            <input type="date" style={inp} value={draft.announcement.endsAt} onChange={(e) => upSec('announcement', { endsAt: e.target.value })} /></div>
         </div>
       </SecCard>
 
-      <SecCard title="SEO (buscadores)">
-        <Fld label="Título de pestaña" value={draft.seo.title} onChange={(v) => upSec('seo', { title: v })} />
-        <Area label="Descripción" value={draft.seo.description} onChange={(v) => upSec('seo', { description: v })} />
-      </SecCard>
-
-      <SecCard title="Marca y logo">
+      <SecCard title="Marca y menú">
         <div className="form-grid-2">
-          <Fld label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} />
-          <Fld label="Tagline" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
+          <T label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} hint="Admite HTML, p. ej. RENOVACELL<sup>®</sup>" />
+          <T label="Bajada" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
         </div>
-        <ImageField label="Logo" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1" />
-      </SecCard>
-
-      <SecCard title="Navegación">
-        {draft.nav.links.map((l, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={l.label} onChange={(e) => setLink(i, { label: e.target.value })} placeholder="Etiqueta" />
-            <input style={{ ...fInput, marginTop: 0, flex: 1, fontFamily: 'monospace' }} value={l.href} onChange={(e) => setLink(i, { href: e.target.value })} placeholder="#seccion" />
-            <button className="btn ghost sm" type="button" onClick={() => upSec('nav', { links: draft.nav.links.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
-          </div>
-        ))}
-        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('nav', { links: [...draft.nav.links, { label: '', href: '#' }] })}><Plus size={13} /> Agregar enlace</button>
-        <Fld label="Botón (CTA)" value={draft.nav.cta} onChange={(v) => upSec('nav', { cta: v })} />
-      </SecCard>
-
-      <SecCard title="Hero (encabezado)">
-        <Fld label="Eyebrow" value={draft.hero.eyebrow} onChange={(v) => upSec('hero', { eyebrow: v })} />
-        <Fld label="Título (admite HTML, p. ej. <span class=&quot;green&quot;>)" value={draft.hero.title} onChange={(v) => upSec('hero', { title: v })} />
-        <Area label="Subtítulo" value={draft.hero.subtitle} onChange={(v) => upSec('hero', { subtitle: v })} />
+        <ImageField label="Logo" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1"
+          hint="Se usa en la barra superior y en el pie." />
         <div className="form-grid-2">
-          <Fld label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
-          <Fld label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
+          <T label="Menú · Ciencia" value={draft.nav.ciencia} onChange={(v) => upSec('nav', { ciencia: v })} />
+          <T label="Menú · Cumplimiento" value={draft.nav.cumplimiento} onChange={(v) => upSec('nav', { cumplimiento: v })} />
+          <T label="Menú · Catálogo" value={draft.nav.catalogo} onChange={(v) => upSec('nav', { catalogo: v })} />
+          <T label="Menú · El acceso" value={draft.nav.acceso} onChange={(v) => upSec('nav', { acceso: v })} />
         </div>
-        <ImageField label="Imagen del hero · escritorio" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} folder="landing" />
-        <ImageField label="Imagen del hero · móvil (opcional)" value={draft.hero.imageMobileUrl}
-          onChange={(v) => upSec('hero', { imageMobileUrl: v })} folder="landing" ratio="3 / 4"
-          hint="Si la dejas vacía, en teléfono se usa la de escritorio." />
+        <T label="Botón del menú" value={draft.nav.cta} onChange={(v) => upSec('nav', { cta: v })} hint="Lleva al sistema (/sistema). Es para quien ya tiene cuenta." />
+      </SecCard>
+
+      <SecCard title="Hero (lo primero que se ve)">
+        <T label="Antetítulo" value={draft.hero.eyebrow} onChange={(v) => upSec('hero', { eyebrow: v })} />
+        <A label="Título" value={draft.hero.title} onChange={(v) => upSec('hero', { title: v })}
+          hint="Admite HTML: <br> corta línea y <span class=&quot;green&quot;>…</span> pinta de verde." />
+        <A label="Subtítulo" value={draft.hero.subtitle} onChange={(v) => upSec('hero', { subtitle: v })} />
+        <div className="form-grid-2">
+          <T label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
+          <T label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
+        </div>
+        <ImageField label="Imagen · escritorio" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} folder="landing" />
+        <ImageField label="Imagen · móvil (opcional)" value={draft.hero.imageMobileUrl} onChange={(v) => upSec('hero', { imageMobileUrl: v })} folder="landing" ratio="3 / 4"
+          hint="Si la dejas vacía, en celular se usa la de escritorio." />
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>Hero rotativo</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-                Con <b>2 o más</b> diapositivas el hero rota solo, con flechas y puntos. Con una (o ninguna), se queda fijo.
-              </div>
-            </div>
-            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }}
-              onClick={() => upSec('hero', { slides: [...draft.hero.slides, { eyebrow: draft.hero.eyebrow, title: draft.hero.title, subtitle: draft.hero.subtitle, imageUrl: draft.hero.imageUrl, imageMobileUrl: draft.hero.imageMobileUrl }] })}>
-              <Plus size={14} /> Agregar diapositiva
-            </button>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
+            <b>Hero rotativo (opcional).</b> Con dos diapositivas o más, el hero rota solo. Con una o ninguna,
+            se queda fijo con lo de arriba.
           </div>
-
-          {draft.hero.slides.length > 0 && (
-            <div className="form-grid-2" style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block' }}>
-                <span style={fLabel}>Cambia cada (segundos)</span>
-                <input type="number" min={0} style={fInput}
-                  value={Math.round((draft.hero.autoplayMs ?? 7000) / 1000)}
-                  onChange={(e) => upSec('hero', { autoplayMs: Math.max(0, Number(e.target.value) || 0) * 1000 })} />
-                <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>0 = no rota sola (solo con flechas)</span>
-              </label>
-            </div>
-          )}
-
           {draft.hero.slides.map((sl, i) => (
-            <div key={i} className="card" style={{ padding: 14, marginBottom: 10, background: 'var(--bone, #F9FAF8)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <span className="pill p-neu">Diapositiva {i + 1}</span>
+            <div key={i} className="card" style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="eyebrow" style={{ margin: 0 }}>Diapositiva {i + 1}</div>
                 <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }}
-                  onClick={() => upSec('hero', { slides: draft.hero.slides.filter((_, k) => k !== i) })}>
+                  onClick={() => upSec('hero', { slides: draft.hero.slides.filter((_, j) => j !== i) })}>
                   <Trash2 size={13} /> Quitar
                 </button>
               </div>
-              <Fld label="Eyebrow" value={sl.eyebrow} onChange={(v) => upSlide(i, { eyebrow: v })} />
-              <Fld label="Título (admite HTML)" value={sl.title} onChange={(v) => upSlide(i, { title: v })} />
-              <Area label="Subtítulo" value={sl.subtitle} onChange={(v) => upSlide(i, { subtitle: v })} />
-              <div className="form-grid-2">
-                <ImageField label="Imagen escritorio" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} folder="landing" />
-                <ImageField label="Imagen móvil (opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} folder="landing" ratio="3 / 4" />
-              </div>
+              <T label="Antetítulo" value={sl.eyebrow} onChange={(v) => upSlide(i, { eyebrow: v })} />
+              <A label="Título" value={sl.title} onChange={(v) => upSlide(i, { title: v })} />
+              <A label="Subtítulo" value={sl.subtitle} onChange={(v) => upSlide(i, { subtitle: v })} />
+              <ImageField label="Imagen escritorio" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} folder="landing" />
+              <ImageField label="Imagen móvil (opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} folder="landing" ratio="3 / 4" />
             </div>
           ))}
+          <button className="btn ghost sm" type="button"
+            onClick={() => upSec('hero', { slides: [...draft.hero.slides, { eyebrow: '', title: '', subtitle: '', imageUrl: '', imageMobileUrl: '' }] })}>
+            <Plus size={14} /> Agregar diapositiva
+          </button>
         </div>
       </SecCard>
 
-      <SecCard title="Ticker (cinta)">
-        {draft.ticker.map((s, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={s} onChange={(e) => setTick(i, e.target.value)} />
-            <button className="btn ghost sm" type="button" onClick={() => up({ ticker: draft.ticker.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
-          </div>
+      <SecCard title="Cinta de sellos">
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 4 }}>
+          La cinta que se desplaza bajo el hero.
+        </div>
+        {draft.ticker.map((t, i) => (
+          <input key={i} style={inp} value={t} onChange={(e) => setTick(i, e.target.value)} />
         ))}
-        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => up({ ticker: [...draft.ticker, ''] })}><Plus size={13} /> Agregar</button>
       </SecCard>
 
-      <SecCard title="Ciencia / Info">
-        <Fld label="Eyebrow" value={draft.info.eyebrow} onChange={(v) => upSec('info', { eyebrow: v })} />
-        <Fld label="Título" value={draft.info.title} onChange={(v) => upSec('info', { title: v })} />
-        <Area label="Texto" value={draft.info.body} onChange={(v) => upSec('info', { body: v })} />
-        <ImageField label="Imagen" value={draft.info.imageUrl} onChange={(v) => upSec('info', { imageUrl: v })} folder="landing" />
+      <SecCard title="Ciencia">
+        <T label="Antetítulo" value={draft.ciencia.kicker} onChange={(v) => upSec('ciencia', { kicker: v })} />
+        <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
       </SecCard>
 
-      <SecCard title="Certificaciones">
-        <Fld label="Eyebrow" value={draft.certifications.eyebrow} onChange={(v) => upSec('certifications', { eyebrow: v })} />
-        <Fld label="Título" value={draft.certifications.title} onChange={(v) => upSec('certifications', { title: v })} />
-        {draft.certifications.items.map((c, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input style={{ ...fInput, marginTop: 0, flex: '0 0 34%' }} value={c.label} onChange={(e) => setCert(i, { label: e.target.value })} placeholder="CE" />
-            <input style={{ ...fInput, marginTop: 0, flex: 1 }} value={c.sub} onChange={(e) => setCert(i, { sub: e.target.value })} placeholder="Certificación EU" />
-            <button className="btn ghost sm" type="button" onClick={() => upSec('certifications', { items: draft.certifications.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
-          </div>
-        ))}
-        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('certifications', { items: [...draft.certifications.items, { label: '', sub: '' }] })}><Plus size={13} /> Agregar</button>
+      <SecCard title="Cumplimiento">
+        <T label="Antetítulo" value={draft.cumplimiento.kicker} onChange={(v) => upSec('cumplimiento', { kicker: v })} />
       </SecCard>
 
-      <SecCard title="Para médicos (features)">
-        <Fld label="Eyebrow" value={draft.features.eyebrow} onChange={(v) => upSec('features', { eyebrow: v })} />
-        <Fld label="Título" value={draft.features.title} onChange={(v) => upSec('features', { title: v })} />
-        {draft.features.items.map((c, i) => (
-          <div key={i} style={{ borderTop: '1px solid var(--line)', marginTop: 10, paddingTop: 6 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}><Fld label={`Tarjeta ${i + 1}`} value={c.title} onChange={(v) => setFeat(i, { title: v })} /></div>
-              <button className="btn ghost sm" type="button" onClick={() => upSec('features', { items: draft.features.items.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
-            </div>
-            <Area label="Texto" value={c.body} onChange={(v) => setFeat(i, { body: v })} />
-          </div>
-        ))}
-        <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => upSec('features', { items: [...draft.features.items, { title: '', body: '' }] })}><Plus size={13} /> Agregar tarjeta</button>
+      <SecCard title="Catálogo">
+        <T label="Antetítulo" value={draft.catalogo.kicker} onChange={(v) => upSec('catalogo', { kicker: v })} />
+        <A label="Título" value={draft.catalogo.title} onChange={(v) => upSec('catalogo', { title: v })} />
+        <A label="Texto de entrada" value={draft.catalogo.body} onChange={(v) => upSec('catalogo', { body: v })} />
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 10 }}>
+          Los productos que aparecen abajo salen del <b>Catálogo</b>, no de aquí.
+        </div>
       </SecCard>
 
-      <SecCard title="Captación (formulario)">
-        <Fld label="Eyebrow" value={draft.lead.eyebrow} onChange={(v) => upSec('lead', { eyebrow: v })} />
-        <Fld label="Título" value={draft.lead.title} onChange={(v) => upSec('lead', { title: v })} />
-        <Area label="Texto" value={draft.lead.body} onChange={(v) => upSec('lead', { body: v })} />
+      <SecCard title="Recursos clínicos">
         <div className="form-grid-2">
-          <Fld label="Botón de envío" value={draft.lead.submitLabel} onChange={(v) => upSec('lead', { submitLabel: v })} />
-          <Fld label="Mensaje de éxito" value={draft.lead.successText} onChange={(v) => upSec('lead', { successText: v })} />
+          <T label="Antetítulo" value={draft.recursos.kicker} onChange={(v) => upSec('recursos', { kicker: v })} />
+          <T label="Nota a la derecha" value={draft.recursos.meta} onChange={(v) => upSec('recursos', { meta: v })} />
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>El formulario captará leads hacia Prospectos al conectar el backend.</div>
+        <T label="Rótulo grande" value={draft.recursos.display} onChange={(v) => upSec('recursos', { display: v })} />
+        <A label="Título" value={draft.recursos.title} onChange={(v) => upSec('recursos', { title: v })} hint="Admite HTML." />
       </SecCard>
 
-      <SecCard title="Contacto">
-        <Fld label="Título" value={draft.contact.title} onChange={(v) => upSec('contact', { title: v })} />
+      <SecCard title="El acceso (los tres pasos)">
+        <T label="Antetítulo" value={draft.acceso.kicker} onChange={(v) => upSec('acceso', { kicker: v })} />
+        <A label="Título" value={draft.acceso.title} onChange={(v) => upSec('acceso', { title: v })} hint="Admite HTML." />
+        <A label="Texto de entrada" value={draft.acceso.body} onChange={(v) => upSec('acceso', { body: v })} />
+        {draft.acceso.pasos.map((ps, i) => (
+          <div key={i} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Paso {i + 1}</div>
+            <T label="Título" value={ps.titulo} onChange={(v) => setPaso(i, { titulo: v })} />
+            <A label="Texto" value={ps.texto} onChange={(v) => setPaso(i, { texto: v })} />
+          </div>
+        ))}
+        <T label="Botón" value={draft.acceso.cta} onChange={(v) => upSec('acceso', { cta: v })} />
+        <A label="Frase de cierre" value={draft.acceso.nota} onChange={(v) => upSec('acceso', { nota: v })} hint="Admite HTML." />
+      </SecCard>
+
+      <SecCard title="Cierre (franja verde)">
+        <T label="Rótulo grande" value={draft.cierre.display} onChange={(v) => upSec('cierre', { display: v })} />
+        <A label="Título" value={draft.cierre.title} onChange={(v) => upSec('cierre', { title: v })} hint="Admite HTML." />
+        <A label="Texto" value={draft.cierre.body} onChange={(v) => upSec('cierre', { body: v })} />
         <div className="form-grid-2">
-          <Fld label="WhatsApp (número)" value={draft.contact.whatsapp} onChange={(v) => upSec('contact', { whatsapp: v })} mono />
-          <Fld label="Correo" value={draft.contact.email} onChange={(v) => upSec('contact', { email: v })} />
+          <T label="Botón principal" value={draft.cierre.btnPrimary} onChange={(v) => upSec('cierre', { btnPrimary: v })} />
+          <T label="Botón secundario" value={draft.cierre.btnSecondary} onChange={(v) => upSec('cierre', { btnSecondary: v })} />
         </div>
-        <Fld label="Ubicación" value={draft.contact.address} onChange={(v) => upSec('contact', { address: v })} />
       </SecCard>
 
-      <SecCard title="Footer">
-        <Fld label="Texto" value={draft.footer.text} onChange={(v) => upSec('footer', { text: v })} />
+      <SecCard title="Verificación de cédula (el formulario)">
+        <T label="Antetítulo" value={draft.verificacion.kicker} onChange={(v) => upSec('verificacion', { kicker: v })} />
+        <A label="Título" value={draft.verificacion.title} onChange={(v) => upSec('verificacion', { title: v })} hint="Admite HTML." />
+        <A label="Texto" value={draft.verificacion.body} onChange={(v) => upSec('verificacion', { body: v })} />
+        <T label="Botón" value={draft.verificacion.boton} onChange={(v) => upSec('verificacion', { boton: v })} />
+      </SecCard>
+
+      <SecCard title="Contacto y pie">
+        <div className="form-grid-2">
+          <T label="WhatsApp" value={draft.contacto.whatsapp} onChange={(v) => upSec('contacto', { whatsapp: v })} hint="Solo dígitos con clave de país, p. ej. 526675310910" />
+          <T label="Correo" value={draft.contacto.email} onChange={(v) => upSec('contacto', { email: v })} />
+        </div>
+        <T label="Texto del pie" value={draft.footer.text} onChange={(v) => upSec('footer', { text: v })} />
+      </SecCard>
+
+      <SecCard title="Buscadores (SEO)">
+        <T label="Título de pestaña" value={draft.seo.title} onChange={(v) => upSec('seo', { title: v })} />
+        <A label="Descripción" value={draft.seo.description} onChange={(v) => upSec('seo', { description: v })} />
       </SecCard>
 
       <div className="card" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn ghost sm" type="button" onClick={() => { setDraft(resetLanding()); setSaved(false) }}><RotateCcw size={14} /> Restaurar</button>
-        <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>El sitio público es un deploy aparte; los cambios se publican al conectar el backend.</span>
-        <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>Guardar y publicar</button>
+        <button className="btn ghost sm" type="button" onClick={() => { setDraft(resetLanding()); setSaved(false) }}>
+          <RotateCcw size={14} /> Restaurar
+        </button>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Los cambios se ven en la página pública al recargarla.</span>
+        <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>
+          Guardar y publicar
+        </button>
         {saved && <span style={{ fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>Guardado ✓</span>}
       </div>
     </div>
