@@ -2947,7 +2947,7 @@ document.addEventListener('keydown', e => {
     if(!U||!K){setTimeout(function(){mockAnswer(q);},300);return;}
     // IA real (Edge Function assistant, modo landing). Si falla/501 → respuesta mock.
     var t=add('…','bot');
-    fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',messages:window.__rncHist.slice(-12)})})
+    fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',messages:window.__rncHist.slice(-12),products:window.__rncCatalog||[]})})
       .then(function(r){return r.ok?r.json():Promise.reject();})
       .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;window.__rncHist.push({role:'assistant',content:txt});if(d.lead&&d.lead.name){var L=d.lead;fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({name:L.name,phone:L.phone||'',email:L.email||'',channel:'Landing · Asistente',interest:L.interest||''})}).catch(function(){});}var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
       .catch(function(){t.remove();mockAnswer(q);});
@@ -3034,7 +3034,7 @@ document.addEventListener('keydown', e => {
   }
   fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
     .then(function(r){return r.ok?r.json():[];})
-    .then(function(rows){ all=rows||[]; cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
+    .then(function(rows){ all=rows||[]; window.__rncCatalog=all.map(function(x){return {name:x.name,line:x.line,category:x.category};}); cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
     .catch(function(){ countEl.textContent='No se pudo cargar el catálogo en este momento.'; });
 })();
 </script>
