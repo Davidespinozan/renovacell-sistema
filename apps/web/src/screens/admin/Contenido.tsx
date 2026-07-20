@@ -287,7 +287,7 @@ function LandingTab() {
     upSec('ciencia', { especs: draft.ciencia.especs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
   const setPunto = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
     upSec('ciencia', { puntos: draft.ciencia.puntos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
-  const setCert = (i: number, patch: Partial<{ codigo: string; nombre: string; texto: string; ref: string }>) =>
+  const setCert = (i: number, patch: Partial<{ codigo: string; estado: string; nombre: string; texto: string; ref: string }>) =>
     upSec('cumplimiento', { certs: draft.cumplimiento.certs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
   const setReg = (i: number, patch: Partial<{ nombre: string; valor: string }>) =>
     upSec('pie', { regs: draft.pie.regs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
