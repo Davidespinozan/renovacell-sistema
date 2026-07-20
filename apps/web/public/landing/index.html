@@ -3266,5 +3266,50 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+<script>
+/* IMÁGENES EDITABLES DESDE ADMINISTRACIÓN.
+   El editor de "Sitio web" ya guardaba imagen de hero (escritorio y móvil) y
+   logo, pero la landing solo leía TEXTOS: se subían y no cambiaba nada. El hero
+   rotativo sí las usaba, pero únicamente con dos o más diapositivas, así que
+   poner una sola imagen no surtía efecto.
+   Aquí se aplica el caso de una sola imagen. Si hay carrusel (2+), este bloque
+   se aparta y manda el otro. */
+(function(){
+  var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
+  var movil = function(){ return window.matchMedia('(max-width:760px)').matches; };
+
+  function aplicar(c){
+    if(!c) return;
+    var h = c.hero || {};
+    var b = c.brand || {};
+
+    // Logo: barra superior y pie.
+    if(b.logoUrl){
+      [].slice.call(document.querySelectorAll('.nav-logo img,.foot-logo img'))
+        .forEach(function(img){ img.src = b.logoUrl; });
+    }
+
+    // Hero de una sola imagen. Con carrusel configurado, no intervenimos.
+    var hayCarrusel = Array.isArray(h.slides) && h.slides.length >= 2;
+    if(hayCarrusel) return;
+
+    var frame = document.querySelector('.hero-image-frame img');
+    if(!frame) return;
+    var pon = function(){
+      var url = (movil() && h.imageMobileUrl) ? h.imageMobileUrl : h.imageUrl;
+      if(url) frame.src = url;
+    };
+    pon();
+    window.addEventListener('resize', pon);
+  }
+
+  fetch(U+'/rest/v1/landing_content?id=eq.main&select=content',
+        {headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(rows){ aplicar(rows && rows[0] ? rows[0].content : null); })
+    .catch(function(){});
+})();
+</script>
+
 </body>
 </html>
