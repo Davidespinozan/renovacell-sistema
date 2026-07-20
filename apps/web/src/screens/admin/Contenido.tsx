@@ -281,6 +281,18 @@ function LandingTab() {
   const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((t, j) => (j === i ? v : t)) })
   const setPaso = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
     upSec('acceso', { pasos: draft.acceso.pasos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setIns = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
+    upSec('hero', { insignias: draft.hero.insignias.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setEspec = (i: number, patch: Partial<{ nombre: string; valor: string }>) =>
+    upSec('ciencia', { especs: draft.ciencia.especs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setPunto = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
+    upSec('ciencia', { puntos: draft.ciencia.puntos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setCert = (i: number, patch: Partial<{ codigo: string; nombre: string; texto: string; ref: string }>) =>
+    upSec('cumplimiento', { certs: draft.cumplimiento.certs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setReg = (i: number, patch: Partial<{ nombre: string; valor: string }>) =>
+    upSec('pie', { regs: draft.pie.regs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const setCat = (i: number, v: string) =>
+    upSec('pie', { categorias: draft.pie.categorias.map((x, j) => (j === i ? v : x)) })
 
   const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
@@ -366,6 +378,16 @@ function LandingTab() {
           hint="Si la dejas vacía, en celular se usa la de escritorio." />
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Insignias bajo el hero</div>
+          {draft.hero.insignias.map((x, i) => (
+            <div key={i} className="form-grid-2">
+              <T label={`Insignia ${i + 1}`} value={x.titulo} onChange={(v) => setIns(i, { titulo: v })} />
+              <T label="Texto" value={x.texto} onChange={(v) => setIns(i, { texto: v })} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
             <b>Hero rotativo (opcional).</b> Con dos diapositivas o más, el hero rota solo. Con una o ninguna,
             se queda fijo con lo de arriba.
@@ -403,12 +425,47 @@ function LandingTab() {
       </SecCard>
 
       <SecCard title="Ciencia">
-        <T label="Antetítulo" value={draft.ciencia.kicker} onChange={(v) => upSec('ciencia', { kicker: v })} />
-        <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
+        <div className="form-grid-2">
+          <T label="Antetítulo" value={draft.ciencia.kicker} onChange={(v) => upSec('ciencia', { kicker: v })} />
+          <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
+        </div>
+        <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} />
+        <A label="Título" value={draft.ciencia.title} onChange={(v) => upSec('ciencia', { title: v })} hint="Admite HTML." />
+        <A label="Texto" value={draft.ciencia.body} onChange={(v) => upSec('ciencia', { body: v })} hint="Admite HTML." />
+        <T label="Pie de la imagen" value={draft.ciencia.foto} onChange={(v) => upSec('ciencia', { foto: v })} />
+        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Ficha sobre la imagen</div>
+        {draft.ciencia.especs.map((x, i) => (
+          <div key={i} className="form-grid-2">
+            <T label={`Dato ${i + 1}`} value={x.nombre} onChange={(v) => setEspec(i, { nombre: v })} />
+            <T label="Valor" value={x.valor} onChange={(v) => setEspec(i, { valor: v })} />
+          </div>
+        ))}
+        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Puntos numerados</div>
+        {draft.ciencia.puntos.map((x, i) => (
+          <div key={i} style={{ marginTop: 10 }}>
+            <T label={`Punto ${i + 1}`} value={x.titulo} onChange={(v) => setPunto(i, { titulo: v })} />
+            <A label="Texto" value={x.texto} onChange={(v) => setPunto(i, { texto: v })} />
+          </div>
+        ))}
       </SecCard>
 
       <SecCard title="Cumplimiento">
-        <T label="Antetítulo" value={draft.cumplimiento.kicker} onChange={(v) => upSec('cumplimiento', { kicker: v })} />
+        <div className="form-grid-2">
+          <T label="Antetítulo" value={draft.cumplimiento.kicker} onChange={(v) => upSec('cumplimiento', { kicker: v })} />
+          <T label="Nota a la derecha" value={draft.cumplimiento.meta} onChange={(v) => upSec('cumplimiento', { meta: v })} />
+        </div>
+        <A label="Título" value={draft.cumplimiento.title} onChange={(v) => upSec('cumplimiento', { title: v })} hint="Admite HTML." />
+        {draft.cumplimiento.certs.map((c, i) => (
+          <div key={i} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Certificación {i + 1}</div>
+            <div className="form-grid-2">
+              <T label="Sigla" value={c.codigo} onChange={(v) => setCert(i, { codigo: v })} />
+              <T label="Referencia" value={c.ref} onChange={(v) => setCert(i, { ref: v })} />
+            </div>
+            <T label="Nombre" value={c.nombre} onChange={(v) => setCert(i, { nombre: v })} />
+            <A label="Descripción" value={c.texto} onChange={(v) => setCert(i, { texto: v })} />
+          </div>
+        ))}
       </SecCard>
 
       <SecCard title="Catálogo">
@@ -452,6 +509,7 @@ function LandingTab() {
           <T label="Botón principal" value={draft.cierre.btnPrimary} onChange={(v) => upSec('cierre', { btnPrimary: v })} />
           <T label="Botón secundario" value={draft.cierre.btnSecondary} onChange={(v) => upSec('cierre', { btnSecondary: v })} />
         </div>
+        <T label="Sello bajo los botones" value={draft.cierre.sello} onChange={(v) => upSec('cierre', { sello: v })} />
       </SecCard>
 
       <SecCard title="Verificación de cédula (el formulario)">
@@ -461,12 +519,43 @@ function LandingTab() {
         <T label="Botón" value={draft.verificacion.boton} onChange={(v) => upSec('verificacion', { boton: v })} />
       </SecCard>
 
-      <SecCard title="Contacto y pie">
+      <SecCard title="Contacto">
         <div className="form-grid-2">
           <T label="WhatsApp" value={draft.contacto.whatsapp} onChange={(v) => upSec('contacto', { whatsapp: v })} hint="Solo dígitos con clave de país, p. ej. 526675310910" />
           <T label="Correo" value={draft.contacto.email} onChange={(v) => upSec('contacto', { email: v })} />
         </div>
-        <T label="Texto del pie" value={draft.footer.text} onChange={(v) => upSec('footer', { text: v })} />
+        <T label="Enlace de la barra superior" value={draft.topbar.link} onChange={(v) => upSec('topbar', { link: v })} />
+      </SecCard>
+
+      <SecCard title="Pie de página">
+        <A label="Descripción de la marca" value={draft.pie.desc} onChange={(v) => upSec('pie', { desc: v })} />
+        <div className="eyebrow" style={{ marginTop: 14, marginBottom: 0 }}>Sellos</div>
+        {draft.pie.regs.map((x, i) => (
+          <div key={i} className="form-grid-2">
+            <T label={`Sello ${i + 1}`} value={x.nombre} onChange={(v) => setReg(i, { nombre: v })} />
+            <T label="Valor" value={x.valor} onChange={(v) => setReg(i, { valor: v })} />
+          </div>
+        ))}
+        <T label="Columna 1 · título" value={draft.pie.col1Titulo} onChange={(v) => upSec('pie', { col1Titulo: v })} />
+        <div className="form-grid-2">
+          {draft.pie.categorias.map((c, i) => (
+            <T key={i} label={`Categoría ${i + 1}`} value={c} onChange={(v) => setCat(i, v)} />
+          ))}
+        </div>
+        <T label="Columna 2 · título" value={draft.pie.col2Titulo} onChange={(v) => upSec('pie', { col2Titulo: v })} />
+        <div className="form-grid-2">
+          <T label="Sede México · nombre" value={draft.pie.mxNombre} onChange={(v) => upSec('pie', { mxNombre: v })} />
+          <T label="Sede México · dirección" value={draft.pie.mxDir} onChange={(v) => upSec('pie', { mxDir: v })} hint="Admite <br> para cortar línea." />
+        </div>
+        <T label="Columna 3 · título" value={draft.pie.col3Titulo} onChange={(v) => upSec('pie', { col3Titulo: v })} />
+        <div className="form-grid-2">
+          <T label="Sede Europa · nombre" value={draft.pie.euNombre} onChange={(v) => upSec('pie', { euNombre: v })} />
+          <T label="Sede Europa · dirección" value={draft.pie.euDir} onChange={(v) => upSec('pie', { euDir: v })} hint="Admite <br>." />
+          <T label="Certificación · nombre" value={draft.pie.euCertNombre} onChange={(v) => upSec('pie', { euCertNombre: v })} />
+          <T label="Certificación · texto" value={draft.pie.euCert} onChange={(v) => upSec('pie', { euCert: v })} hint="Admite <br>." />
+        </div>
+        <T label="Aviso legal" value={draft.footer.text} onChange={(v) => upSec('footer', { text: v })} />
+        <T label="Crédito" value={draft.pie.credito} onChange={(v) => upSec('pie', { credito: v })} hint="Admite HTML." />
       </SecCard>
 
       <SecCard title="Buscadores (SEO)">
