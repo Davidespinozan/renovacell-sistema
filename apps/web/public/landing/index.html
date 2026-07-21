@@ -2027,6 +2027,73 @@ body.rc-has-ann .nav{top:79px}
 .cat-see{font-size:.78rem;color:var(--green);font-weight:600;margin-top:11px;display:inline-flex;align-items:center;gap:4px}
 @media(max-width:560px){.cat-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
 </style>
+<style id="rnc-arsenal">
+/* EL ARSENAL — catálogo en lenguaje de laboratorio.
+   Sin tarjetas ni sombras: retícula, líneas finas, tipografía grande y aire.
+   Las cajas redondeadas con sombra eran lo que hacía que la página oliera a
+   plantilla comprada, y ninguna fotografía lo habría arreglado. */
+.arsenal{background:var(--bone);padding:132px 0 128px;position:relative}
+.ars-inner{max-width:1180px;margin:0 auto;padding:0 40px}
+
+.ars-head{display:flex;align-items:baseline;gap:20px;padding-bottom:14px;border-bottom:1px solid var(--ink);margin-bottom:44px}
+.ars-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--green);font-weight:600}
+.ars-count{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--mid);text-transform:uppercase}
+
+.ars-title{font-size:clamp(2.1rem,4.4vw,3.5rem);line-height:1.06;letter-spacing:-.028em;font-weight:700;margin:0 0 30px;max-width:17ch}
+.ars-lede{font-size:1.06rem;line-height:1.65;color:var(--mid);max-width:60ch;margin:0 0 72px}
+
+/* Índice de categorías: renglones, no botones. */
+.ars-index{border-top:1px solid var(--line)}
+.ars-row{display:flex;align-items:center;gap:22px;width:100%;background:none;border:none;
+  border-bottom:1px solid var(--line);padding:19px 4px;cursor:pointer;text-align:left;
+  font-family:inherit;transition:background .22s var(--ease),padding .22s var(--ease)}
+.ars-row:hover{background:rgba(0,115,17,.035);padding-left:14px}
+.ars-row.on{background:rgba(0,115,17,.055);padding-left:14px}
+.ars-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--soft);letter-spacing:.1em;width:26px;flex:none}
+.ars-row.on .ars-num{color:var(--green)}
+.ars-name{font-size:1.22rem;font-weight:600;letter-spacing:-.012em;color:var(--ink);flex:1}
+.ars-row.on .ars-name{color:var(--green-dark)}
+.ars-qty{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mid);letter-spacing:.06em;white-space:nowrap}
+.ars-arrow{font-size:1rem;color:var(--soft);transition:transform .25s var(--ease),color .25s}
+.ars-row:hover .ars-arrow,.ars-row.on .ars-arrow{color:var(--green);transform:translateX(4px)}
+.ars-row.on .ars-arrow{transform:rotate(90deg)}
+
+/* Panel de productos: LISTA, no rejilla de tarjetas.
+   Una rejilla de tarjetas sin fotografía es 90% espacio vacío; una lista es
+   100% información, y cuando lleguen las fotos sigue funcionando igual. */
+.ars-panel{margin-top:38px}
+.ars-panel:empty{margin-top:0}
+.ars-plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:0 40px}
+.ars-item{display:flex;align-items:center;gap:16px;padding:15px 4px;border-bottom:1px solid var(--line);
+  background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer;
+  text-align:left;font-family:inherit;transition:background .18s,padding .18s var(--ease)}
+.ars-item:hover{background:rgba(0,115,17,.04);padding-left:12px}
+.ars-thumb{width:44px;height:44px;border-radius:3px;flex:none;object-fit:cover;background:#fff;border:1px solid var(--line)}
+.ars-mono{width:44px;height:44px;border-radius:3px;flex:none;display:grid;place-items:center;
+  background:#fff;border:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--green);letter-spacing:.06em}
+.ars-info{flex:1;min-width:0}
+.ars-pname{display:block;font-size:.95rem;font-weight:600;color:var(--ink);line-height:1.3}
+.ars-pcat{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--soft);margin-top:3px}
+.ars-go{font-size:.95rem;color:var(--soft);transition:color .2s,transform .2s var(--ease)}
+.ars-item:hover .ars-go{color:var(--green);transform:translateX(3px)}
+
+.ars-panel-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
+.ars-panel-title{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.ars-panel-meta{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mid);letter-spacing:.1em;text-transform:uppercase}
+.ars-hint{font-size:.9rem;color:var(--soft);font-style:italic;padding:26px 4px 0}
+
+@media(max-width:900px){
+  .arsenal{padding:88px 0 84px}
+  .ars-inner{padding:0 22px}
+  .ars-lede{margin-bottom:44px}
+  .ars-row{padding:16px 2px;gap:14px}
+  .ars-name{font-size:1.05rem}
+  .ars-qty{font-size:11px}
+  .ars-plist{grid-template-columns:1fr;gap:0}
+}
+</style>
 </head>
 <body>
 <div class="rc-annbar" id="rcAnnBar" role="region" aria-label="Anuncio">
@@ -2300,14 +2367,23 @@ body.rc-has-ann .nav{top:79px}
      "Añadir" legibles en el código fuente de una página que promete que los
      precios solo viven dentro del portal. Eliminadas. -->
 <!-- RESOURCES -->
-<section id="catalogo">
-  <div class="cat-inner">
-    <div class="cat-kicker" data-rc="catalogoKicker">El catálogo</div>
-    <h2 data-rc="catalogoTitle">Todo el arsenal regenerativo y estético, en un solo lugar.</h2>
-    <p class="cat-lede" data-rc="catalogoBody">Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.</p>
-    <div class="cat-filters" id="catFilters"></div>
-    <div class="cat-count" id="catCount">Cargando catálogo…</div>
-    <div class="cat-grid" id="catGrid"></div>
+<section id="catalogo" class="arsenal">
+  <div class="ars-inner">
+
+    <div class="ars-head">
+      <div class="ars-kicker" data-rc="catalogoKicker">El catálogo</div>
+      <div class="ars-count" id="catCount">Cargando…</div>
+    </div>
+
+    <h2 class="ars-title" data-rc="catalogoTitle">Todo el arsenal regenerativo y estético, en un solo lugar.</h2>
+    <p class="ars-lede" data-rc="catalogoBody">Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más.</p>
+
+    <!-- Índice de categorías: es la navegación principal del catálogo. Cada
+         renglón abre su lista de productos. Sustituye a las 64 tarjetas
+         paginadas en seis páginas, que se leían como listado, no como arsenal. -->
+    <div class="ars-index" id="catFilters"></div>
+
+    <div class="ars-panel" id="catGrid"></div>
   </div>
 </section>
 
@@ -2994,70 +3070,86 @@ document.addEventListener('keydown', e => {
   var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
   var grid=document.getElementById('catGrid'), filters=document.getElementById('catFilters'), countEl=document.getElementById('catCount');
   if(!grid) return;
-  var pager=document.createElement('div'); pager.className='cat-pager'; grid.parentNode.appendChild(pager);
+  // (el paginador se retiró: el catálogo se navega por categoría)
   var IMG=['antiaging-booster','golden-placenta','golden-serum','golden-v','intimo-renovacell','mascarilla-golden-placenta','plumper','stemhair','stoplip','suero-antiedad-cellular','ultrafiltrados-ufs'];
   function slug(x){return (x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
   function imgFor(n){var z=slug(n);var h=IMG.filter(function(i){return i===z||i.indexOf(z)===0||z.indexOf(i)===0;})[0];return h?('/products/'+h+'.webp'):'';}
   var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};
-  var all=[], cats=[], active='Todos', PAGE=12, page=1;
-  var mb=document.querySelector('.product-modal-backdrop');
-  function openModal(pp){
-    if(!mb) return;
-    mb.querySelector('.product-modal-cat').textContent=pp.category||'';
-    mb.querySelector('.product-modal-name').textContent=pp.name||'';
-    mb.querySelector('.product-modal-desc').textContent=pp.description||'Parte del catálogo profesional Renovacell. La disponibilidad y los precios están dentro del portal, reservados a médicos verificados.';
-    var media=mb.querySelector('.product-modal-media'), img=media&&media.querySelector('img'), src=pp.image_url||imgFor(pp.name);
-    if(media){ if(src){media.style.display='';img.src=src;img.alt=pp.name;} else media.style.display='none'; }
-    var cof=mb.querySelector('.product-modal-cofepris'); if(cof) cof.style.display=(pp.line==='prof')?'inline-flex':'none';
-    var specs=mb.querySelector('.product-modal-specs'); specs.innerHTML='';
-    [['Línea',pp.line==='prof'?'Professional':'Home Care'],['Categoría',pp.category||'—'],['Disponibilidad','Para médicos verificados']].forEach(function(r){
-      var d=document.createElement('div'); d.className='product-modal-spec-row'; d.innerHTML='<label>'+esc(r[0])+'</label><b>'+esc(r[1])+'</b>'; specs.appendChild(d);
-    });
-    // Folleto oficial (PDF) dentro del popup, si el producto lo tiene
-    var body=mb.querySelector('.product-modal-body'); var fol=body.querySelector('.product-modal-folleto');
-    if(pp.brochure_url){
-      if(!fol){ fol=document.createElement('a'); fol.className='product-modal-folleto'; fol.target='_blank'; fol.rel='noopener'; body.appendChild(fol); }
-      fol.href=pp.brochure_url; fol.innerHTML='\u2193 Descargar folleto oficial (PDF)'; fol.style.display='';
-    } else if(fol){ fol.style.display='none'; }
-    mb.classList.add('open'); mb.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open');
+  var all=[], cats=[], active=null;
+
+  // El catálogo se navega por CATEGORÍA, no por páginas. Antes eran 64 tarjetas
+  // repartidas en seis páginas: se leía como listado de base de datos. Ahora el
+  // índice de categorías es lo primero, y cada una abre su lista.
+  function slugCat(c){ return (c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'); }
+
+  function inicialesDe(n){
+    var partes=(n||'').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g,' ').trim().split(/\s+/);
+    return (partes.slice(0,2).map(function(x){return x[0]||'';}).join('') || '·').toUpperCase();
   }
-  function card(pp){
-    var b=document.createElement('button'); b.type='button'; b.className='cat-card';
-    var src=pp.image_url||imgFor(pp.name);
-    var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
-    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))+'</div>'
-      +'<span class="cat-line '+(pp.line==='prof'?'prof':'cosm')+'">'+(pp.line==='prof'?'Professional':'Home Care')+'</span>'
-      +'<span class="cat-name">'+esc(pp.name)+'</span>'
-      +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
-      +'<span class="cat-see">'+(pp.brochure_url?'Ficha + folleto':'Ver ficha')+' \u2192</span>';
-    b.addEventListener('click',function(){openModal(pp);});
+
+  function itemDe(pp){
+    var b=document.createElement('button'); b.type='button'; b.className='ars-item';
+    var src = pp.image_url || imgFor(pp.name);
+    var visual = src
+      ? '<img class="ars-thumb" src="'+esc(src)+'" alt="" loading="lazy">'
+      : '<span class="ars-mono" aria-hidden="true">'+esc(inicialesDe(pp.name))+'</span>';
+    b.innerHTML = visual
+      + '<span class="ars-info">'
+      +   '<span class="ars-pname">'+esc(pp.name||'')+'</span>'
+      +   '<span class="ars-pcat">'+esc(pp.line==='prof'?'Línea profesional':'Home care')+'</span>'
+      + '</span>'
+      + '<span class="ars-go" aria-hidden="true">\u2192</span>';
+    b.addEventListener('click', function(){ openModal(pp); });
     return b;
   }
-  function listNow(){ return active==='Todos'?all:all.filter(function(x){return x.category===active;}); }
-  function render(){
+
+  function pintarPanel(){
     grid.innerHTML='';
-    var list=listNow(), pages=Math.max(1,Math.ceil(list.length/PAGE));
-    if(page>pages) page=pages;
-    list.slice((page-1)*PAGE,page*PAGE).forEach(function(x){grid.appendChild(card(x));});
-    countEl.textContent=list.length+' producto'+(list.length===1?'':'s')+(active==='Todos'?' en el catálogo':' \u00b7 '+active);
-    renderPager(pages);
+    if(!active) return;
+    var list = all.filter(function(x){ return x.category===active; });
+
+    var head=document.createElement('div'); head.className='ars-panel-head';
+    head.innerHTML='<span class="ars-panel-title">'+esc(active)+'</span>'
+      + '<span class="ars-panel-meta">'+list.length+' referencia'+(list.length===1?'':'s')+'</span>';
+    grid.appendChild(head);
+
+    var wrap=document.createElement('div'); wrap.className='ars-plist';
+    list.forEach(function(x){ wrap.appendChild(itemDe(x)); });
+    grid.appendChild(wrap);
   }
-  function renderPager(pages){
-    pager.innerHTML='';
-    if(pages<=1) return;
-    function b(lbl,to,dis,on){var x=document.createElement('button');x.type='button';x.className='cat-page'+(on?' on':'');x.innerHTML=lbl;if(dis){x.disabled=true;}else{x.addEventListener('click',function(){page=to;render();document.getElementById('catalogo').scrollIntoView({behavior:'smooth'});});}pager.appendChild(x);}
-    b('\u2039',page-1,page===1,false);
-    for(var i=1;i<=pages;i++) b(String(i),i,false,i===page);
-    b('\u203a',page+1,page===pages,false);
-  }
+
   function chips(){
     filters.innerHTML='';
-    ['Todos'].concat(cats).forEach(function(c){
-      var x=document.createElement('button'); x.type='button'; x.className='cat-chip'+(c===active?' on':''); x.textContent=c;
-      x.addEventListener('click',function(){active=c;page=1;[].forEach.call(filters.children,function(y){y.classList.toggle('on',y.textContent===c);});render();});
-      filters.appendChild(x);
+    cats.forEach(function(c,k){
+      var n = all.filter(function(x){ return x.category===c; }).length;
+      var b=document.createElement('button'); b.type='button';
+      b.className='ars-row'+(c===active?' on':'');
+      b.setAttribute('data-cat', slugCat(c));
+      b.innerHTML='<span class="ars-num">'+String(k+1).padStart(2,'0')+'</span>'
+        + '<span class="ars-name">'+esc(c)+'</span>'
+        + '<span class="ars-qty">'+n+' referencia'+(n===1?'':'s')+'</span>'
+        + '<span class="ars-arrow" aria-hidden="true">\u2192</span>';
+      b.addEventListener('click', function(){
+        active = (active===c) ? null : c;      // volver a tocar cierra
+        [].forEach.call(filters.children, function(y){
+          y.classList.toggle('on', y.getAttribute('data-cat')===slugCat(active||''));
+        });
+        pintarPanel();
+        if(active) grid.scrollIntoView({behavior:'smooth', block:'nearest'});
+      });
+      filters.appendChild(b);
     });
+
+    var hint=document.createElement('div'); hint.className='ars-hint';
+    hint.textContent='Toca una categoría para ver sus referencias. Cada ficha es informativa: la disponibilidad y los precios viven dentro del portal.';
+    filters.appendChild(hint);
   }
+
+  function render(){
+    countEl.textContent = all.length+' referencias · '+cats.length+' categorías';
+    chips(); pintarPanel();
+  }
+
   fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
     .then(function(r){return r.ok?r.json():[];})
     .then(function(rows){ all=rows||[]; window.__rncCatalog=all.map(function(x){return {name:x.name,line:x.line,category:x.category};}); cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
