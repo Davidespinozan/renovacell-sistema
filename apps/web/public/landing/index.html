@@ -2110,25 +2110,31 @@ body.rc-has-ann .nav{top:79px}
 </div>
 
 <!-- HERO INSTITUCIONAL -->
-<section class="hero hero-shot" id="hero">
-      <!-- Fondo rotativo: las diapositivas se apilan y hacen fundido cruzado,
-           con un Ken Burns lento en la activa. Lo llena el guion desde
-           Administración; con una sola imagen simplemente no rota. -->
-      <div class="shot-bg" id="heroBg" aria-hidden="true"></div>
-      <div class="shot-veil" aria-hidden="true"></div>
-
-      <div class="shot-inner">
-        <div class="shot-kicker rv" data-rc="heroEyebrow">Tecnología celular S²RM® · Grado europeo · Desde 2008</div>
-        <h1 class="shot-headline rv d1" data-rc-html="heroTitle">
-          La regeneración celular<br>
-          <span class="green">que respalda tu práctica.</span>
-        </h1>
-        <div class="shot-cta rv d2">
-          <a href="#catalogo" class="btn-hero-primary" data-rc="ctaPrimary">Ver el catálogo</a>
-        </div>
+<section class="hero hero-split" id="hero">
+      <div class="hero-ambient" aria-hidden="true">
+        <div class="hero-glow-orb hero-glow-1"></div>
+        <div class="hero-glow-orb hero-glow-2"></div>
       </div>
 
-      <div class="shot-dots" id="heroDots"></div>
+      <div class="split-inner">
+        <div class="split-text">
+          <div class="split-kicker rv" data-rc="heroEyebrow">Tecnología celular S²RM® · Grado europeo · Desde 2008</div>
+          <h1 class="split-headline rv d1" data-rc-html="heroTitle">
+            La regeneración celular<br>
+            <span class="green">que respalda tu práctica.</span>
+          </h1>
+          <div class="split-cta rv d2">
+            <a href="#catalogo" class="btn-hero-primary" data-rc="ctaPrimary">Ver el catálogo</a>
+          </div>
+        </div>
+
+        <div class="split-media rv d1">
+          <div class="split-frame">
+            <div class="shot-bg" id="heroBg" aria-hidden="true"></div>
+          </div>
+          <div class="shot-dots" id="heroDots"></div>
+        </div>
+      </div>
     </section>
 
 <!-- TICKER -->
@@ -3238,49 +3244,42 @@ document.addEventListener('keydown', e => {
    Referencia: el hero de Healthy Space. La imagen ocupa todo, el texto se
    ancla abajo y es mínimo: antetítulo, titular y un botón. Se fueron el
    párrafo de cinco líneas, las tres insignias y el segundo botón. */
-.hero-shot{position:relative;min-height:88vh;display:flex;align-items:flex-end;
-  overflow:hidden;background:#061109;isolation:isolate}
-@media(max-width:900px){ .hero-shot{min-height:82vh} }
+.hero-split{position:relative;background:#061109;overflow:hidden;
+  padding:104px 0 96px;display:flex;align-items:center;min-height:76vh}
+.split-inner{position:relative;z-index:2;width:100%;max-width:1180px;margin:0 auto;padding:0 40px;
+  display:grid;grid-template-columns:1fr 1.06fr;gap:64px;align-items:center}
 
-.shot-bg{position:absolute;inset:0;z-index:0}
+.split-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.24em;
+  text-transform:uppercase;color:#7BE8A4;margin-bottom:24px;display:flex;align-items:center;gap:14px}
+.split-kicker::before{content:'';width:34px;height:1px;background:#7BE8A4;opacity:.75;flex:none}
+.hero-split .split-headline{font-size:clamp(2.2rem,4.3vw,3.9rem);line-height:1.04;letter-spacing:-.03em;
+  font-weight:700;color:#fff;margin:0 0 36px;text-wrap:balance;max-width:13ch}
+.hero-split .split-headline .green{color:#5FE08C}
+.split-cta{display:flex;gap:14px;flex-wrap:wrap}
+
+/* La imagen va CONTENIDA en su marco, no a sangre. */
+.split-frame{position:relative;aspect-ratio:4/3.05;border-radius:18px;overflow:hidden;
+  background:#0a1c0c;box-shadow:0 34px 70px rgba(0,0,0,.44);border:1px solid rgba(255,255,255,.07)}
+.shot-bg{position:absolute;inset:0}
 .shot-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   opacity:0;transform:scale(1);transition:opacity 1s var(--ease),transform 7s ease-out}
-.shot-bg img.on{opacity:1;transform:scale(1.07)}
+.shot-bg img.on{opacity:1;transform:scale(1.06)}
 
-/* Velo para que el texto se lea sobre cualquier foto. */
-.shot-veil{position:absolute;inset:0;z-index:1;pointer-events:none;
-  background:
-    linear-gradient(100deg, rgba(4,14,8,.94) 0%, rgba(4,14,8,.80) 34%, rgba(4,14,8,.42) 62%, rgba(4,14,8,.30) 100%),
-    linear-gradient(180deg, rgba(4,14,8,.55) 0%, rgba(4,14,8,.20) 34%, rgba(4,14,8,.72) 100%)}
-@media(max-width:900px){
-  .shot-veil{background:linear-gradient(180deg, rgba(4,14,8,.62) 0%, rgba(4,14,8,.48) 34%, rgba(4,14,8,.92) 100%)}
-}
-
-.shot-inner{position:relative;z-index:2;width:100%;max-width:1180px;margin:0 auto;
-  padding:0 40px 104px}
-.shot-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.24em;
-  text-transform:uppercase;color:#7BE8A4;margin-bottom:22px;display:flex;align-items:center;gap:14px}
-.shot-kicker::before{content:'';width:34px;height:1px;background:#7BE8A4;opacity:.75;flex:none}
-.shot-headline{font-size:clamp(2.4rem,6vw,4.9rem);line-height:1.03;letter-spacing:-.032em;
-  font-weight:700;color:#fff;margin:0 0 34px;max-width:19ch;text-wrap:balance}
-.hero-shot .shot-headline .green{color:#5FE08C}
-.shot-cta{display:flex;gap:14px;flex-wrap:wrap}
-
-/* Puntitos: el activo se alarga, como en la referencia. */
-.shot-dots{position:absolute;z-index:3;left:50%;transform:translateX(-50%);bottom:34px;
-  display:flex;gap:7px}
+/* Puntitos fuera de la imagen, bajo el marco. */
+.shot-dots{display:flex;gap:7px;justify-content:center;margin-top:20px}
 .shot-dots:empty{display:none}
 .shot-dots button{width:7px;height:7px;border-radius:999px;border:none;padding:0;cursor:pointer;
-  background:rgba(255,255,255,.42);transition:width .34s var(--ease),background .34s}
+  background:rgba(255,255,255,.30);transition:width .34s var(--ease),background .34s}
 .shot-dots button.on{width:22px;background:#5FE08C}
 
 @media(max-width:900px){
-  .shot-inner{padding:0 22px 82px}
-  .shot-kicker{font-size:10px;letter-spacing:.16em;margin-bottom:16px;line-height:1.6}
-  .shot-kicker::before{display:none}
-  .shot-headline{margin-bottom:26px;max-width:none}
-  .shot-cta .btn-hero-primary{width:100%;justify-content:center}
-  .shot-dots{bottom:26px}
+  .hero-split{padding:64px 0 66px;min-height:0}
+  .split-inner{grid-template-columns:1fr;gap:34px;padding:0 22px}
+  .split-kicker{font-size:10px;letter-spacing:.16em;margin-bottom:16px;line-height:1.6}
+  .split-kicker::before{display:none}
+  .split-headline{margin-bottom:26px}
+  .split-cta .btn-hero-primary{width:100%;justify-content:center}
+  .split-frame{aspect-ratio:4/3.4}
 }
 </style>
 <script>
