@@ -2246,50 +2246,35 @@ body.rc-has-ann .nav{top:38px}
 </section>
 
 <!-- COMPLIANCE / REGULATORIO -->
-<section class="compliance" id="cumplimiento">
-  <div class="compliance-inner">
-    <div class="compliance-head">
-      <div class="compliance-head-left">
-        <span class="section-kicker rv" data-rc="cumplKicker">Cumplimiento regulatorio</span>
-        <h3 class="rv d1" data-rc-html="cumplTitle">Cumplimiento <span class="green">europeo y mexicano</span></h3>
-      </div>
+<section class="credenciales" id="cumplimiento">
+  <div class="cred-inner">
+    <div class="cred-titulo">
+      <span class="cred-kicker" data-rc="cumplKicker">Cumplimiento regulatorio</span>
+      <h2 data-rc-html="cumplTitle">Cumplimiento <span class="green">europeo y mexicano</span></h2>
     </div>
-    <div class="compliance-grid">
-      <div class="compliance-card rv">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert1Codigo">CE</span>
-          <span class="compliance-card-status" data-rc="cert1Estado">Vigente</span>
-        </div>
-        <div class="compliance-card-name" data-rc="cert1Nombre">Certificación Comunidad Europea</div>
-        <div class="compliance-card-desc" data-rc="cert1Texto">Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert1Ref">CE-RNVC-2008</span></div>
+    <!-- Franja de credenciales, no cuatro tarjetas con párrafo. Un médico sabe
+         qué es CE: la sigla y la referencia comunican todo. Las descripciones
+         eran 44 de las 89 palabras de la sección y nadie las leía. -->
+    <div class="cred-fila">
+      <div class="cred">
+        <span class="cred-sigla" data-rc="cert1Codigo">CE</span>
+        <span class="cred-nombre" data-rc="cert1Nombre">Certificación Comunidad Europea</span>
+        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert1Ref">CE-RNVC-2008</span></span>
       </div>
-      <div class="compliance-card rv d1">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert2Codigo">COFEPRIS</span>
-          <span class="compliance-card-status" data-rc="cert2Estado">Vigente</span>
-        </div>
-        <div class="compliance-card-name" data-rc="cert2Nombre">Registro Sanitario México</div>
-        <div class="compliance-card-desc" data-rc="cert2Texto">Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert2Ref">COFEPRIS-2024</span></div>
+      <div class="cred">
+        <span class="cred-sigla" data-rc="cert2Codigo">COFEPRIS</span>
+        <span class="cred-nombre" data-rc="cert2Nombre">Registro Sanitario México</span>
+        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert2Ref">COFEPRIS-2024</span></span>
       </div>
-      <div class="compliance-card rv d2">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert3Codigo">ISO 13485</span>
-          <span class="compliance-card-status" data-rc="cert3Estado">Vigente</span>
-        </div>
-        <div class="compliance-card-name" data-rc="cert3Nombre">Sistema de gestión de calidad</div>
-        <div class="compliance-card-desc" data-rc="cert3Texto">Norma internacional específica para fabricación de dispositivos y productos médicos.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert3Ref">ISO-13485:2016</span></div>
+      <div class="cred">
+        <span class="cred-sigla" data-rc="cert3Codigo">ISO 13485</span>
+        <span class="cred-nombre" data-rc="cert3Nombre">Sistema de gestión de calidad</span>
+        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert3Ref">ISO-13485:2016</span></span>
       </div>
-      <div class="compliance-card rv d3">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert4Codigo">GMP</span>
-          <span class="compliance-card-status" data-rc="cert4Estado">Vigente</span>
-        </div>
-        <div class="compliance-card-name" data-rc="cert4Nombre">Buenas Prácticas de Manufactura</div>
-        <div class="compliance-card-desc" data-rc="cert4Texto">Producción bajo Good Manufacturing Practices certificadas a nivel internacional.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert4Ref">GMP-RNVC-EU</span></div>
+      <div class="cred">
+        <span class="cred-sigla" data-rc="cert4Codigo">GMP</span>
+        <span class="cred-nombre" data-rc="cert4Nombre">Buenas Prácticas de Manufactura</span>
+        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert4Ref">GMP-RNVC-EU</span></span>
       </div>
     </div>
   </div>
@@ -3453,6 +3438,34 @@ document.addEventListener('keydown', e => {
   .rnc-ai-fab,.rnc-fab-wa{width:44px;height:44px}
   .rnc-ai-fab svg{width:21px;height:21px}
   .rnc-fab-wa svg{width:23px;height:23px}
+}
+</style>
+<style id="rnc-credenciales">
+/* CREDENCIALES — franja compacta. Reemplaza cuatro tarjetas con descripción. */
+.credenciales{background:var(--bone-warm);padding:78px 0 74px}
+.cred-inner{max-width:1180px;margin:0 auto;padding:0 40px;
+  display:grid;grid-template-columns:minmax(280px,.9fr) 1.6fr;gap:56px;align-items:center}
+.cred-kicker{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:14px}
+.cred-titulo h2{font-size:clamp(1.6rem,2.7vw,2.3rem);line-height:1.1;letter-spacing:-.026em;
+  font-weight:700;margin:0}
+
+.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--ink)}
+.cred{padding:22px 22px 0 0;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+.cred:last-child{border-right:none;padding-right:0}
+.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.18rem;font-weight:700;
+  color:var(--green-dark);letter-spacing:-.02em;line-height:1}
+.cred-nombre{font-size:.88rem;line-height:1.4;color:var(--ink-2);font-weight:500}
+.cred-ref{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--soft)}
+.cred-ref i{font-style:normal}
+
+@media(max-width:900px){
+  .credenciales{padding:52px 0 50px}
+  .cred-inner{grid-template-columns:1fr;gap:28px;padding:0 22px}
+  .cred-fila{grid-template-columns:1fr 1fr}
+  .cred{padding:18px 16px 16px 0;border-bottom:1px solid var(--line)}
+  .cred:nth-child(2n){border-right:none;padding-right:0}
+  .cred:nth-last-child(-n+2){border-bottom:none}
 }
 </style>
 </body>
