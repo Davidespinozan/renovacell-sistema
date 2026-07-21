@@ -3423,10 +3423,15 @@ document.addEventListener('keydown', e => {
    cualquier imagen, huecos muertos, y la banda cortada a media palabra. */
 @media(max-width:900px){
 
-  /* 1 · La imagen va PRIMERO. Lo primero que ve el doctor es visual, no letras. */
-  .split-inner{gap:26px}
-  .split-media{order:-1}
-  .split-text{order:1}
+  /* 1 · Orden en celular: antetítulo y titular, luego la imagen, y el botón al
+     final. `display:contents` disuelve el bloque de texto para que sus tres
+     hijos entren en la retícula y se puedan ordenar por separado. */
+  .split-inner{gap:22px}
+  .split-text{display:contents}
+  .split-kicker{order:1;margin-bottom:0}
+  .hero-split .split-headline{order:2;margin-bottom:0}
+  .split-media{order:3}
+  .split-cta{order:4}
 
   /* 3 · Espaciado más apretado y titular que no se parta en cuatro líneas. */
   .hero-split .split-headline{font-size:clamp(1.85rem,7.4vw,2.5rem);line-height:1.08;
