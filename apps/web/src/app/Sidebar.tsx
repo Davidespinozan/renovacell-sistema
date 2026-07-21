@@ -9,6 +9,7 @@ import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
 import { Ajustes } from '../screens/Ajustes'
+import { BrandLogo } from './BrandLogo'
 
 const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
@@ -43,7 +44,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <aside className="side">
       <div className="brand">
         <span className="lw">
-          <img src="/brand/logo.png" alt="Renovacell" />
+          <BrandLogo />
         </span>
         <div>
           <div className="bn">Renovacell</div>

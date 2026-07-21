@@ -9,6 +9,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { PageHead } from '../../app/PageHead'
 import { driverName } from '../../data/mock/shipments'
+import { BrandLogo } from '../../app/BrandLogo'
 
 export function Recibo() {
   const { data: shipments } = useShipments()
@@ -73,7 +74,7 @@ export function Recibo() {
       <div className="recibo">
         <div className="rhead">
           <div className="rbrand">
-            <img src="/brand/logo.png" alt="Renovacell" />
+            <BrandLogo />
             <div>
               <div className="rbn">Renovacell</div>
               <div className="rbs">Sistema operativo</div>

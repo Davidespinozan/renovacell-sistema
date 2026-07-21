@@ -10,6 +10,7 @@ import { useAuth } from '../auth/useAuth'
 import { useRole } from '../auth/RoleContext'
 import { hasSupabase, supabase } from '../lib/supabase'
 import { decideVerification, simulateSep, type VerifyDecision } from '../data/verification/decide'
+import { BrandLogo } from '../app/BrandLogo'
 
 export function ReviewPending() {
   const { logout } = useAuth()
@@ -41,7 +42,7 @@ export function ReviewPending() {
   return (
     <div className="login-wrap">
       <div className="login-card" style={{ textAlign: 'center' }}>
-        <img src="/brand/logo.png" alt="Renovacell" style={{ width: 56, height: 56, borderRadius: 14, boxShadow: 'var(--sh-md)' }} />
+        <BrandLogo style={{ width: 56, height: 56, borderRadius: 14, boxShadow: 'var(--sh-md)' }} />
 
         {res?.decision === 'auto' ? (
           <>

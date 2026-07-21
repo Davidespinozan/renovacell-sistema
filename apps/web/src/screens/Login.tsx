@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Mail, Lock, LogIn, Sparkles, User, IdCard, ShieldCheck, ScanSearch } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
+import { BrandLogo } from '../app/BrandLogo'
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px 11px 38px', border: '1px solid var(--line)',
@@ -65,7 +66,7 @@ export function Login() {
       {/* Panel de marca (desktop) */}
       <aside className="login-brand">
         <div className="lb-top">
-          <img src="/brand/logo.png" alt="Renovacell" />
+          <BrandLogo />
           <div>
             <div className="bn">Renovacell</div>
             <div className="bs">Sistema operativo</div>
@@ -82,7 +83,7 @@ export function Login() {
       <div className="login-panel">
         <div className="login-card">
           <div className="login-mini-brand">
-            <img src="/brand/logo.png" alt="Renovacell" />
+            <BrandLogo />
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>Renovacell</div>
               <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Sistema operativo</div>
