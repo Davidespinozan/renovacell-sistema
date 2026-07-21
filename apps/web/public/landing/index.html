@@ -3313,7 +3313,7 @@ document.addEventListener('keydown', e => {
 .shot-dots button.on{width:22px;background:#5FE08C}
 
 @media(max-width:900px){
-  .hero-split{padding:calc(var(--nav-space, 76px) + 28px) 0 62px;min-height:0}
+  .hero-split{padding:calc(var(--nav-space, 76px) + 12px) 0 40px;min-height:0}
   .split-inner{grid-template-columns:1fr;gap:34px;padding:0 22px}
   .split-kicker{font-size:10px;letter-spacing:.16em;margin-bottom:16px;line-height:1.6}
   .split-kicker::before{display:none}
@@ -3417,5 +3417,41 @@ document.addEventListener('keydown', e => {
   setTimeout(medir, 1200); setTimeout(medir, 2600);
 })();
 </script>
+<style id="rnc-movil">
+/* AJUSTES DE CELULAR.
+   En pantalla angosta se veía: un muro de texto y un botón enorme antes de
+   cualquier imagen, huecos muertos, y la banda cortada a media palabra. */
+@media(max-width:900px){
+
+  /* 1 · La imagen va PRIMERO. Lo primero que ve el doctor es visual, no letras. */
+  .split-inner{gap:26px}
+  .split-media{order:-1}
+  .split-text{order:1}
+
+  /* 3 · Espaciado más apretado y titular que no se parta en cuatro líneas. */
+  .hero-split .split-headline{font-size:clamp(1.85rem,7.4vw,2.5rem);line-height:1.08;
+    margin-bottom:22px;max-width:none;letter-spacing:-.028em}
+  .split-kicker{margin-bottom:14px}
+  .split-frame{aspect-ratio:16/11}
+  .shot-dots{margin-top:14px}
+
+  /* 2 · Botón a su medida, no de borde a borde. */
+  .split-cta .btn-hero-primary{width:auto;align-self:flex-start;padding:14px 26px;font-size:14.5px}
+  .split-cta{justify-content:flex-start}
+
+  /* 4 · La banda: letra más chica para que quepa más mensaje, y más lenta
+     para poder leerlo. Cortada a media palabra se veía como error. */
+  .rc-annbar{height:34px}
+  .rc-ann-track{animation-duration:34s;gap:44px;font-size:11px}
+  body.rc-has-ann{padding-top:34px}
+  body.rc-has-ann .nav{top:34px}
+
+  /* 5 · Flotantes más chicos y despegados de la imagen. */
+  .rnc-fabs{right:12px;bottom:12px;gap:8px}
+  .rnc-ai-fab,.rnc-fab-wa{width:44px;height:44px}
+  .rnc-ai-fab svg{width:21px;height:21px}
+  .rnc-fab-wa svg{width:23px;height:23px}
+}
+</style>
 </body>
 </html>
