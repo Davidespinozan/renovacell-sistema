@@ -5,6 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title data-rc="metaTitle">Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008</title>
 <meta name="description" data-rc-meta="metaDescription" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.">
+<!-- Identidad en pestaña, buscadores y al compartir. No existía nada de esto:
+     la pestaña salía con el ícono genérico y al pegar el enlace en WhatsApp o
+     redes no aparecía ni título ni imagen. -->
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/brand/icon-180.png">
+<meta name="theme-color" content="#007311">
+<link rel="canonical" href="https://renovacell.mx/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Renovacell">
+<meta property="og:locale" content="es_MX">
+<meta property="og:url" content="https://renovacell.mx/">
+<meta property="og:title" data-rc-meta="metaTitle" content="Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008">
+<meta property="og:description" data-rc-meta="metaDescription" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.">
+<meta property="og:image" content="https://renovacell.mx/brand/og-renovacell.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Renovacell · Tecnologías Antiedad">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" data-rc-meta="metaTitle" content="Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008">
+<meta name="twitter:description" data-rc-meta="metaDescription" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS.">
+<meta name="twitter:image" content="https://renovacell.mx/brand/og-renovacell.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Special+Gothic+Expanded+One&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -73,24 +96,29 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 
 /* NAVBAR */
 .nav{
-  position:fixed;top:41px;left:0;right:0;z-index:540;
+  position:fixed;top:0;left:0;right:0;z-index:540;
   background:rgba(249,250,248,.78);
   backdrop-filter:blur(20px) saturate(1.6);
   -webkit-backdrop-filter:blur(20px) saturate(1.6);
   border-bottom:1px solid rgba(229,232,225,.7);
 }
+/* La marca va CENTRADA y arriba; el menú, debajo. Dos filas en vez de una. */
 .nav-inner{
-  max-width:1440px;margin:0 auto;padding:14px 28px;
-  display:flex;align-items:center;justify-content:space-between;gap:32px;
+  max-width:1440px;margin:0 auto;padding:14px 28px 12px;
+  display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:auto auto;
+  align-items:center;gap:12px 24px;
 }
-.nav-brand{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.nav-brand{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:center;gap:7px;justify-self:center}
+.nav-links{grid-column:1 / -1;grid-row:2;justify-self:center}
+.nav-actions{grid-column:3;grid-row:1;justify-self:end}
+.nav-burger{grid-column:3;grid-row:1;justify-self:end}
 .nav-logo{
   width:42px;height:42px;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
 }
 .nav-logo img{width:100%;height:100%;object-fit:contain;display:block;}
-.nav-name{display:flex;flex-direction:column;line-height:1;}
+.nav-name{display:flex;flex-direction:column;line-height:1;align-items:center;text-align:center}
 .nav-name b{font-family:'Inter',sans-serif;font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.01em;}
 .nav-name b sup{font-size:9px;color:var(--green);vertical-align:super;margin-left:1px;}
 .nav-name span{
@@ -98,6 +126,12 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
   font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--mid);font-weight:500;margin-top:5px;
 }
 .nav-links{display:flex;gap:32px;align-items:center;}
+@media(max-width:900px){
+  .nav-inner{grid-template-columns:auto 1fr auto;grid-template-rows:auto;padding:10px 16px}
+  .nav-brand{grid-column:1;grid-row:1;flex-direction:row;justify-self:start;gap:11px}
+  .nav-name{align-items:flex-start;text-align:left}
+  .nav-actions,.nav-burger{grid-column:3;grid-row:1}
+}
 .nav-link{font-size:13.5px;font-weight:500;color:var(--ink-2);position:relative;padding:6px 0;transition:color .25s;}
 .nav-link::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1.5px;background:var(--green);transform:scaleX(0);transform-origin:left;transition:transform .3s var(--ease);}
 .nav-link:hover{color:var(--green);}
@@ -1946,8 +1980,7 @@ body.modal-open{overflow:hidden;}
 .rc-ann-close{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.16);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center}
 .rc-ann-close:hover{background:rgba(255,255,255,.28)}
 body.rc-has-ann{padding-top:38px}
-body.rc-has-ann .topbar{top:38px}
-body.rc-has-ann .nav{top:79px}
+body.rc-has-ann .nav{top:38px}
 @keyframes rc-ann-scroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 @media (prefers-reduced-motion: reduce){.rc-ann-track{animation:none;padding-left:0;justify-content:center;width:100%}}
 
@@ -2036,10 +2069,7 @@ body.rc-has-ann .nav{top:79px}
 
 
 <!-- TOPBAR -->
-<div class="topbar">
-  <div class="topbar-left">
-    <a href="#contacto" class="topbar-link" data-rc="topbarLink">Más información</a>
-  </div>
+<!-- (se retiró la barra superior: solo contenía un enlace suelto) -->
 </div>
 
 <!-- NAVBAR -->
@@ -3245,7 +3275,8 @@ document.addEventListener('keydown', e => {
    ancla abajo y es mínimo: antetítulo, titular y un botón. Se fueron el
    párrafo de cinco líneas, las tres insignias y el segundo botón. */
 .hero-split{position:relative;background:#061109;overflow:hidden;
-  padding:104px 0 96px;display:flex;align-items:center;min-height:76vh}
+  padding:calc(var(--nav-space, 152px) + 56px) 0 96px;
+  display:flex;align-items:center;min-height:76vh}
 .split-inner{position:relative;z-index:2;width:100%;max-width:1180px;margin:0 auto;padding:0 40px;
   display:grid;grid-template-columns:1fr 1.06fr;gap:64px;align-items:center}
 
@@ -3273,7 +3304,7 @@ document.addEventListener('keydown', e => {
 .shot-dots button.on{width:22px;background:#5FE08C}
 
 @media(max-width:900px){
-  .hero-split{padding:64px 0 66px;min-height:0}
+  .hero-split{padding:calc(var(--nav-space, 76px) + 28px) 0 62px;min-height:0}
   .split-inner{grid-template-columns:1fr;gap:34px;padding:0 22px}
   .split-kicker{font-size:10px;letter-spacing:.16em;margin-bottom:16px;line-height:1.6}
   .split-kicker::before{display:none}
@@ -3359,5 +3390,23 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
+<script>
+/* El menú es fijo y su altura cambia (una fila en celular, dos en escritorio, y
+   se recorre si la banda de anuncios está encendida). El hero reserva ese
+   espacio con una variable que se mide en vivo. */
+(function(){
+  var nav=document.querySelector('.nav'); if(!nav) return;
+  function medir(){
+    var r=nav.getBoundingClientRect();
+    document.documentElement.style.setProperty('--nav-space', Math.round(r.bottom)+'px');
+  }
+  medir();
+  window.addEventListener('resize', medir);
+  window.addEventListener('load', medir);
+  if(window.ResizeObserver) new ResizeObserver(medir).observe(nav);
+  // la banda de anuncios aparece después de consultar la base
+  setTimeout(medir, 1200); setTimeout(medir, 2600);
+})();
+</script>
 </body>
 </html>
