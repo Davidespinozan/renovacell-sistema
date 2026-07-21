@@ -2219,7 +2219,7 @@ body.rc-has-ann .nav{top:38px}
             <div class="s2rm-bullet-num">01</div>
             <div class="s2rm-bullet-text">
               <b data-rc="punto1Titulo">Rangos médicos especializados</b>
-              <span data-rc="punto1Texto">Líneas exclusivas para uso clínico — tópico, inyectable e implantable.</span>
+              <span data-rc="punto1Texto">tópico, inyectable e implantable</span>
             </div>
             
           </div>
@@ -2227,7 +2227,7 @@ body.rc-has-ann .nav{top:38px}
             <div class="s2rm-bullet-num">02</div>
             <div class="s2rm-bullet-text">
               <b data-rc="punto2Titulo">Resultados visibles y seguros</b>
-              <span data-rc="punto2Texto">Ingredientes biocompatibles respaldados por evidencia clínica.</span>
+              <span data-rc="punto2Texto">biocompatibles, con evidencia clínica</span>
             </div>
             
           </div>
@@ -2235,7 +2235,7 @@ body.rc-has-ann .nav{top:38px}
             <div class="s2rm-bullet-num">03</div>
             <div class="s2rm-bullet-text">
               <b data-rc="punto3Titulo">Estándares Comunidad Europea</b>
-              <span data-rc="punto3Texto">Cumplimos los más altos estándares de calidad de la CE desde 2008.</span>
+              <span data-rc="punto3Texto">certificados desde 2008</span>
             </div>
             
           </div>
@@ -3466,6 +3466,29 @@ document.addEventListener('keydown', e => {
   .cred{padding:18px 16px 16px 0;border-bottom:1px solid var(--line)}
   .cred:nth-child(2n){border-right:none;padding-right:0}
   .cred:nth-last-child(-n+2){border-bottom:none}
+}
+</style>
+<style id="rnc-s2rm-compacto">
+/* Cada punto en UN renglón: antes eran título arriba y explicación abajo, dos
+   líneas por punto y seis en total. Ahora van en línea, separados por una raya.
+   Y la imagen deja de ser una columna de 520 px de alto. */
+.s2rm-bullet-text{flex-direction:row!important;align-items:baseline;gap:9px;flex-wrap:wrap}
+.s2rm-bullet-text b{white-space:nowrap}
+.s2rm-bullet-text span{font-size:.92rem;color:var(--mid);line-height:1.4}
+.s2rm-bullet-text span::before{content:'—';margin-right:9px;color:var(--soft)}
+.s2rm-bullet{padding:14px 0!important;align-items:center}
+.s2rm-bullet-num{width:30px!important;height:30px!important;font-size:11px!important}
+.s2rm-bullet{grid-template-columns:30px 1fr auto!important;gap:14px!important}
+
+/* La imagen baja de peso: menos alto y menos ancho en la retícula. */
+.s2rm-grid{grid-template-columns:.68fr 1.32fr!important;gap:52px!important;align-items:start!important}
+.s2rm-visual{min-height:0!important;aspect-ratio:4/4.6;box-shadow:0 16px 36px rgba(8,20,27,.15)!important}
+
+@media(max-width:900px){
+  .s2rm-grid{grid-template-columns:1fr!important;gap:26px!important}
+  .s2rm-visual{aspect-ratio:16/10}
+  .s2rm-bullet-text{flex-direction:column!important;gap:3px}
+  .s2rm-bullet-text span::before{content:none}
 }
 </style>
 </body>
