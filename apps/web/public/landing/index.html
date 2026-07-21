@@ -2233,53 +2233,58 @@ body.rc-has-ann .nav{top:38px}
 </section>
 
 <!-- COMPLIANCE / REGULATORIO -->
-<section class="compliance" id="cumplimiento">
-  <div class="compliance-inner">
-    <div class="compliance-head">
-      <div class="compliance-head-left">
-        <span class="section-kicker rv" data-rc="cumplKicker">Cumplimiento regulatorio</span>
-        <h3 class="rv d1" data-rc-html="cumplTitle">Cumplimiento <span class="green">europeo y mexicano</span></h3>
-      </div>
-      <span class="compliance-head-right rv" data-rc="cumplMeta">02 / 05 · Certificaciones vigentes</span>
+<section class="cumplimiento" id="cumplimiento">
+  <div class="cum-inner">
+
+    <div class="cum-head">
+      <span class="cum-kicker" data-rc="cumplKicker">Cumplimiento regulatorio</span>
+      <span class="cum-meta" data-rc="cumplMeta">02 / 05 · Certificaciones vigentes</span>
     </div>
-    <div class="compliance-grid">
-      <div class="compliance-card rv">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert1Codigo">CE</span>
-          <span class="compliance-card-status" data-rc="cert1Estado">Vigente</span>
+
+    <h2 class="cum-title" data-rc-html="cumplTitle">Cumplimiento <span class="green">europeo y mexicano</span></h2>
+
+    <!-- Registro de certificaciones, no cuatro tarjetas en fila: la sigla a la
+         izquierda, el detalle en medio, la referencia y el estado a la derecha.
+         Se lee como un documento oficial, que es lo que un médico quiere ver. -->
+    <div class="cum-registro">
+      <div class="cum-fila">
+        <span class="cum-sigla" data-rc="cert1Codigo">CE</span>
+        <div class="cum-cuerpo">
+          <b data-rc="cert1Nombre">Certificación Comunidad Europea</b>
+          <span data-rc="cert1Texto">Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.</span>
         </div>
-        <div class="compliance-card-name" data-rc="cert1Nombre">Certificación Comunidad Europea</div>
-        <div class="compliance-card-desc" data-rc="cert1Texto">Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert1Ref">CE-RNVC-2008</span></div>
+        <span class="cum-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert1Ref">CE-RNVC-2008</span></span>
+        <span class="cum-estado" data-rc="cert1Estado">Vigente</span>
       </div>
-      <div class="compliance-card rv d1">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert2Codigo">COFEPRIS</span>
-          <span class="compliance-card-status" data-rc="cert2Estado">Vigente</span>
+      <div class="cum-fila">
+        <span class="cum-sigla" data-rc="cert2Codigo">COFEPRIS</span>
+        <div class="cum-cuerpo">
+          <b data-rc="cert2Nombre">Registro Sanitario México</b>
+          <span data-rc="cert2Texto">Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.</span>
         </div>
-        <div class="compliance-card-name" data-rc="cert2Nombre">Registro Sanitario México</div>
-        <div class="compliance-card-desc" data-rc="cert2Texto">Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert2Ref">COFEPRIS-2024</span></div>
+        <span class="cum-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert2Ref">COFEPRIS-2024</span></span>
+        <span class="cum-estado" data-rc="cert2Estado">Vigente</span>
       </div>
-      <div class="compliance-card rv d2">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert3Codigo">ISO 13485</span>
-          <span class="compliance-card-status" data-rc="cert3Estado">Vigente</span>
+      <div class="cum-fila">
+        <span class="cum-sigla" data-rc="cert3Codigo">ISO 13485</span>
+        <div class="cum-cuerpo">
+          <b data-rc="cert3Nombre">Sistema de gestión de calidad</b>
+          <span data-rc="cert3Texto">Norma internacional específica para fabricación de dispositivos y productos médicos.</span>
         </div>
-        <div class="compliance-card-name" data-rc="cert3Nombre">Sistema de gestión de calidad</div>
-        <div class="compliance-card-desc" data-rc="cert3Texto">Norma internacional específica para fabricación de dispositivos y productos médicos.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert3Ref">ISO-13485:2016</span></div>
+        <span class="cum-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert3Ref">ISO-13485:2016</span></span>
+        <span class="cum-estado" data-rc="cert3Estado">Vigente</span>
       </div>
-      <div class="compliance-card rv d3">
-        <div class="compliance-card-top">
-          <span class="compliance-card-code" data-rc="cert4Codigo">GMP</span>
-          <span class="compliance-card-status" data-rc="cert4Estado">Vigente</span>
+      <div class="cum-fila">
+        <span class="cum-sigla" data-rc="cert4Codigo">GMP</span>
+        <div class="cum-cuerpo">
+          <b data-rc="cert4Nombre">Buenas Prácticas de Manufactura</b>
+          <span data-rc="cert4Texto">Producción bajo Good Manufacturing Practices certificadas a nivel internacional.</span>
         </div>
-        <div class="compliance-card-name" data-rc="cert4Nombre">Buenas Prácticas de Manufactura</div>
-        <div class="compliance-card-desc" data-rc="cert4Texto">Producción bajo Good Manufacturing Practices certificadas a nivel internacional.</div>
-        <div class="compliance-card-num"><b data-rc="certRefEtiqueta">Ref.</b> <span data-rc="cert4Ref">GMP-RNVC-EU</span></div>
+        <span class="cum-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert4Ref">GMP-RNVC-EU</span></span>
+        <span class="cum-estado" data-rc="cert4Estado">Vigente</span>
       </div>
     </div>
+
   </div>
 </section>
 
@@ -3509,6 +3514,50 @@ section[id], #catalogo, #s2rm, #cumplimiento, #acceso, #contacto, #recursos {
 }
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+</style>
+<style id="rnc-cumplimiento">
+/* CUMPLIMIENTO — registro, no tarjetas.
+   Eran cuatro cajas blancas con sombra en fila: el mismo patrón de plantilla
+   que se quitó de Ciencia. Ahora es un registro con renglones y líneas finas. */
+.cumplimiento{background:var(--bone-warm);padding:104px 0 100px}
+.cum-inner{max-width:1180px;margin:0 auto;padding:0 40px}
+
+.cum-head{display:flex;align-items:baseline;gap:20px;
+  padding-bottom:13px;border-bottom:1px solid var(--ink);margin-bottom:34px}
+.cum-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--green);font-weight:600}
+.cum-meta{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:.13em;color:var(--mid);text-transform:uppercase}
+.cum-title{font-size:clamp(1.9rem,3.4vw,2.9rem);line-height:1.06;letter-spacing:-.028em;
+  font-weight:700;margin:0 0 54px;max-width:20ch}
+
+.cum-registro{border-top:1px solid var(--line)}
+.cum-fila{display:grid;grid-template-columns:132px minmax(260px,1.25fr) 190px 96px;
+  gap:26px;align-items:start;padding:24px 2px;border-bottom:1px solid var(--line);
+  transition:background .2s}
+.cum-fila:hover{background:rgba(0,115,17,.03)}
+.cum-sigla{font-family:'JetBrains Mono',monospace;font-size:1.02rem;font-weight:700;
+  color:var(--green-dark);letter-spacing:-.01em;padding-top:2px}
+.cum-cuerpo{display:flex;flex-direction:column;gap:6px}
+.cum-cuerpo b{font-size:1rem;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.cum-cuerpo span{font-size:.94rem;line-height:1.58;color:var(--mid)}
+.cum-ref{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--mid);
+  letter-spacing:.06em;padding-top:4px}
+.cum-ref i{font-style:normal;color:var(--soft)}
+.cum-estado{justify-self:end;font-family:'JetBrains Mono',monospace;font-size:9.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--green-dark);font-weight:600;
+  padding:5px 11px;border:1px solid rgba(0,115,17,.28);border-radius:3px;white-space:nowrap}
+
+@media(max-width:900px){
+  .cumplimiento{padding:64px 0 62px}
+  .cum-inner{padding:0 22px}
+  .cum-title{margin-bottom:32px}
+  .cum-fila{grid-template-columns:1fr auto;gap:8px 14px;padding:20px 0}
+  .cum-sigla{grid-column:1;grid-row:1;font-size:.95rem}
+  .cum-estado{grid-column:2;grid-row:1;justify-self:end}
+  .cum-cuerpo{grid-column:1 / -1;grid-row:2}
+  .cum-ref{grid-column:1 / -1;grid-row:3;padding-top:2px}
+}
 </style>
 </body>
 </html>
