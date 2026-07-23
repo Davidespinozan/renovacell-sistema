@@ -3223,8 +3223,8 @@ document.addEventListener('keydown', e => {
 .hero-split{position:relative;background:#061109;overflow:hidden;
   padding:calc(var(--nav-space, 152px) + 56px) 0 96px;
   display:flex;align-items:center;min-height:76vh}
-.split-inner{position:relative;z-index:2;width:100%;max-width:1180px;margin:0 auto;padding:0 40px;
-  display:grid;grid-template-columns:1fr 1.06fr;gap:64px;align-items:center}
+.split-inner{position:relative;z-index:2;width:100%;max-width:1280px;margin:0 auto;padding:0 40px;
+  display:grid;grid-template-columns:.82fr 1.18fr;gap:56px;align-items:center}
 
 .split-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.24em;
   text-transform:uppercase;color:rgba(154,201,166,.82);margin-bottom:24px;display:flex;align-items:center;gap:14px}
@@ -3235,7 +3235,7 @@ document.addEventListener('keydown', e => {
 .split-cta{display:flex;gap:14px;flex-wrap:wrap}
 
 /* La imagen va CONTENIDA en su marco, no a sangre. */
-.split-frame{position:relative;aspect-ratio:4/3.05;border-radius:6px;overflow:hidden;
+.split-frame{position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;
   background:#0a1c0c;box-shadow:0 34px 70px rgba(0,0,0,.44);border:1px solid rgba(255,255,255,.07)}
 .shot-bg{position:absolute;inset:0}
 .shot-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
@@ -3256,7 +3256,7 @@ document.addEventListener('keydown', e => {
   .split-kicker::before{display:none}
   .split-headline{margin-bottom:26px}
   .split-cta .btn-hero-primary{width:100%;justify-content:center}
-  .split-frame{aspect-ratio:4/3.4}
+  .split-frame{aspect-ratio:16/9}
 }
 </style>
 <script>
@@ -3374,7 +3374,7 @@ document.addEventListener('keydown', e => {
   .hero-split .split-headline{font-size:clamp(1.85rem,7.4vw,2.5rem);line-height:1.08;
     margin-bottom:22px;max-width:none;letter-spacing:-.028em}
   .split-kicker{margin-bottom:14px}
-  .split-frame{aspect-ratio:16/11}
+  .split-frame{aspect-ratio:16/9}
   .shot-dots{margin-top:14px}
 
   /* 2 · Botón a su medida, no de borde a borde. */
@@ -3496,7 +3496,7 @@ document.addEventListener('keydown', e => {
      Y el aire de arriba (58 px) contra el de abajo (29) descuadraba el bloque. */
   .split-inner{padding:0 26px!important}
   .split-media{margin:0}
-  .split-frame{aspect-ratio:16/10!important}
+  .split-frame{aspect-ratio:16/9!important}
 
   /* Ritmo vertical: el hero respira arriba y abajo por igual. */
   .hero-split{padding:calc(var(--nav-space, 76px) + 46px) 0 54px!important}
