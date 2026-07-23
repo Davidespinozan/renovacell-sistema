@@ -3667,17 +3667,22 @@ body.rnc-drawer-abierto{overflow:hidden}
 }
 </style>
 <style id="rnc-fotos-producto">
-/* Las fotos de producto vienen sobre fondo blanco y con el producto centrado.
-   Con object-fit:cover el navegador recortaba el centro —que es puro fondo— y
-   las tarjetas se veían vacías. Deben verse COMPLETAS. */
+/* FOTOS DE PRODUCTO.
+   56 de las 64 son 1:1; ocho no (Saxenda 1.24, los Xelaju 1.33, Mounjaro 0.67).
+   El marco es cuadrado, así que:
+   · `contain` para que ninguna se recorte — vienen con el producto centrado
+     sobre fondo blanco y `cover` cortaba justo el centro, que es el fondo.
+   · fondo blanco, para que las ocho que no son cuadradas rellenen sin costura.
+   · un margen interior parejo, para que el producto no toque el borde. */
 .cat-thumb, .cat-card img{
+  aspect-ratio:1/1!important;
   object-fit:contain!important;
   background:#fff!important;
-  padding:14px!important;
-  aspect-ratio:1/1!important;
+  padding:12px!important;
 }
-.product-modal-media img{object-fit:contain!important;background:#fff!important;padding:22px!important}
-.product-modal-media{background:#fff!important}
+.product-modal-media{background:#fff!important;aspect-ratio:1/1!important;display:block}
+.product-modal-media img{width:100%!important;height:100%!important;
+  object-fit:contain!important;background:#fff!important;padding:26px!important}
 </style>
 </body>
 </html>
