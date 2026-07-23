@@ -3427,7 +3427,7 @@ document.addEventListener('keydown', e => {
 /* El marco toma la proporción REAL de la foto (16:9), así `cover` ya no recorta
    nada: la imagen encaja exacta. Antes el marco era vertical 4/4.6 y le cortaba
    los lados a una foto apaisada. */
-.s2rm-visual img{width:100%!important;height:100%!important;object-fit:cover!important}
+.s2rm-visual img,.s2rm-visual video{width:100%!important;height:100%!important;display:block;object-fit:cover!important}
 /* Cada punto en UN renglón: antes eran título arriba y explicación abajo, dos
    líneas por punto y seis en total. Ahora van en línea, separados por una raya.
    Y la imagen deja de ser una columna de 520 px de alto. */
