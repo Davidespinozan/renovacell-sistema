@@ -3789,11 +3789,16 @@ body.rnc-drawer-abierto{overflow:hidden}
   }
   /* El contenedor y la rejilla vuelven a lo de siempre: el TEXTO no se mueve. */
   .hero-split .split-inner{
-    max-width:1280px!important;margin:0 auto!important;padding:0 40px!important;
-    grid-template-columns:.86fr 1.14fr!important;gap:56px!important;align-items:center!important;
+    max-width:1320px!important;margin:0 auto!important;padding:0 40px!important;
+    grid-template-columns:.7fr 1.3fr!important;gap:44px!important;align-items:center!important;
   }
   .hero-split .split-text{
     align-self:center!important;justify-self:start!important;max-width:none!important;padding:0!important;
+  }
+  /* La columna del texto quedó más angosta al crecer la imagen: se ajusta el
+     titular para que "La regeneración" no parta con "La" huérfano. */
+  .hero-split .split-headline{
+    font-size:clamp(2rem,3.5vw,3.3rem)!important;max-width:none!important;text-wrap:balance!important;
   }
   /* La imagen queda CONTENIDA dentro del layout (ya no sangra al borde), con un
      halo verde suave detrás para separarla del fondo. */
@@ -3814,9 +3819,18 @@ body.rnc-drawer-abierto{overflow:hidden}
   }
   .hero-split .split-frame .shot-bg img{object-fit:cover!important}
   .hero-split .split-frame::after{display:none!important}
+  /* Puntitos centrados respecto a la imagen (viven dentro de la columna media). */
   .hero-split .shot-dots{
-    position:static!important;margin:16px 0 0!important;justify-content:flex-start!important;padding-left:2px;
+    position:static!important;margin:16px 0 0!important;justify-content:center!important;padding-left:0!important;
   }
+}
+/* Viñeta del hero: oscurece los bordes para que el texto y la imagen resalten
+   más al centro. Va encima del fondo (z-index 1) y debajo del contenido (z-index 2). */
+.hero-split::after{
+  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(125% 115% at 50% 38%, transparent 42%, rgba(2,10,5,.30) 72%, rgba(1,7,3,.62) 100%),
+    linear-gradient(180deg, rgba(2,10,5,.34) 0%, transparent 22%, transparent 74%, rgba(1,7,3,.42) 100%);
 }
 @media(max-width:900px){
   /* En celular la imagen queda CONTENIDA (no sangra) y con esquinas más
