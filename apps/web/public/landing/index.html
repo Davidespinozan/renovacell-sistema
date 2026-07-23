@@ -3527,5 +3527,72 @@ document.addEventListener('keydown', e => {
 body.rnc-drawer-abierto{overflow:hidden}
 </style>
 <!-- (el menú de celular ya tenía su guion más arriba; aquí solo van sus estilos) -->
+<style id="rnc-catalogo-editorial">
+/* CATÁLOGO — lenguaje de la referencia de marca: ligero, espaciado y con aire.
+   Lo que lo hacía ver barato no era el orden ni las palabras: era el PESO.
+   Nombres en negrita 700 y apretados, tarjetas a 14 px una de otra, descriptores
+   en gris chico. Lo caro se lee ligero y separado, no grueso y compacto. */
+
+.arsenal-look #catalogo,
+#catalogo{background:var(--bone);padding:120px 0 116px}
+.cat-inner{max-width:1240px!important;padding:0 40px}
+
+/* Encabezado: el título respira y el antetítulo se vuelve versalita espaciada. */
+.cat-kicker{font-family:'JetBrains Mono',monospace!important;font-size:10.5px!important;
+  letter-spacing:.28em!important;text-transform:uppercase;color:var(--green)!important;
+  font-weight:500!important;margin-bottom:26px!important}
+#catalogo h2{font-weight:400!important;letter-spacing:-.022em!important;
+  font-size:clamp(2rem,4vw,3.1rem)!important;line-height:1.12!important;
+  margin:0 0 26px!important;max-width:22ch}
+.cat-lede{font-size:1rem!important;line-height:1.7!important;color:var(--mid);
+  max-width:58ch!important;margin:0 0 52px!important}
+
+/* Filtros: sin caja, como índice. */
+.cat-filters{gap:0!important;margin-bottom:8px!important;border-bottom:1px solid var(--line);
+  padding-bottom:0!important;flex-wrap:wrap}
+.cat-chip{background:none!important;border:none!important;border-radius:0!important;
+  font-size:11px!important;font-weight:500!important;letter-spacing:.13em!important;
+  text-transform:uppercase;font-family:'JetBrains Mono',monospace!important;
+  color:var(--soft)!important;padding:12px 18px 14px 0!important;
+  border-bottom:1.5px solid transparent!important;margin-bottom:-1px}
+.cat-chip:hover{color:var(--ink-2)!important}
+.cat-chip.on{color:var(--green)!important;border-bottom-color:var(--green)!important}
+.cat-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--soft);margin:22px 0 0!important}
+
+/* Tarjetas: sin borde ni fondo, con aire. La imagen manda. */
+.cat-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))!important;
+  gap:56px 40px!important;margin-top:44px!important}
+.cat-card{background:none!important;border:none!important;border-radius:0!important;
+  padding:0!important;gap:0!important}
+.cat-thumb{border-radius:2px!important;margin-bottom:22px!important;
+  background:#fff!important;border:1px solid var(--line)!important}
+
+/* Tipografía del producto: ligera y espaciada, como en la referencia. */
+.cat-name{font-weight:400!important;font-size:1.06rem!important;letter-spacing:.005em!important;
+  line-height:1.35!important;color:var(--ink)!important}
+.cat-cat{font-family:'JetBrains Mono',monospace!important;font-size:9.5px!important;
+  letter-spacing:.19em!important;text-transform:uppercase;color:var(--soft)!important;
+  margin-top:9px!important;display:block}
+.cat-see{font-family:'JetBrains Mono',monospace!important;font-size:9.5px!important;
+  letter-spacing:.16em!important;text-transform:uppercase;font-weight:500!important;
+  color:var(--mid)!important;margin-top:16px!important;
+  padding-top:14px;border-top:1px solid var(--line);width:100%}
+.cat-card:hover .cat-see{color:var(--green)!important}
+
+/* La insignia de línea deja de ser etiqueta de color. */
+.cat-card .pill,.cat-card [class*="badge"],.cat-line{background:none!important;
+  border:none!important;padding:0!important;
+  font-family:'JetBrains Mono',monospace!important;font-size:9px!important;
+  letter-spacing:.2em!important;color:var(--soft)!important;font-weight:500!important}
+
+@media(max-width:900px){
+  #catalogo{padding:70px 0 66px}
+  .cat-inner{padding:0 26px}
+  .cat-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:38px 22px!important}
+  .cat-lede{margin-bottom:34px!important}
+  .cat-chip{font-size:10px!important;padding:10px 14px 12px 0!important}
+}
+</style>
 </body>
 </html>
