@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
-import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
+import { useProducts, isActiveProduct, isPortalProduct } from '../../data/hooks/useProducts'
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useStock } from '../../data/hooks/useStock'
@@ -69,7 +69,7 @@ export function Catalogo() {
   }, [products, stockMap])
 
   const shown = useMemo(
-    () => products.filter(isActiveProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
+    () => products.filter(isPortalProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
     [products, filter],
   )
 

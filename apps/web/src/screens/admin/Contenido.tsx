@@ -141,6 +141,8 @@ function ProductModal({ product, onClose, onSave }: {
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
   const [active, setActive] = useState(product?.active !== false)
+  const [showLanding, setShowLanding] = useState(product?.show_landing !== false)
+  const [showPortal, setShowPortal] = useState(product?.show_portal !== false)
   // El costo no viene con el producto: vive en otra tabla y se pide aparte.
   const [cost, setCost] = useState('')
   const [costLoading, setCostLoading] = useState(Boolean(product))
@@ -211,15 +213,31 @@ function ProductModal({ product, onClose, onSave }: {
           <label style={label}>Descripción</label>
           <textarea style={{ ...input, minHeight: 70, resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción que ve el doctor" />
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Visible en el catálogo del doctor
-          </label>
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Dónde se muestra</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 11, fontSize: 13.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+              <span><b>Activo</b> — si lo apagas, no se vende ni se ve en ningún lado.</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 9, fontSize: 13.5, cursor: 'pointer', opacity: active ? 1 : 0.45 }}>
+              <input type="checkbox" checked={showLanding} disabled={!active} onChange={(e) => setShowLanding(e.target.checked)} />
+              <span>En la <b>página pública</b></span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 9, fontSize: 13.5, cursor: 'pointer', opacity: active ? 1 : 0.45 }}>
+              <input type="checkbox" checked={showPortal} disabled={!active} onChange={(e) => setShowPortal(e.target.checked)} />
+              <span>En el <b>Portal del Doctor</b></span>
+            </label>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 9, lineHeight: 1.5 }}>
+              Ocultarlo de la página o del portal <b>no impide venderlo</b>: Ventas lo sigue teniendo
+              en el mostrador. Útil mientras un producto no tiene fotografía.
+            </div>
+          </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               onClick={() => {
-                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active })
+                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal })
                 // El costo va a `product_costs`, no a `products`: se guarda aparte.
                 if (product) {
                   const c = cost.trim() === '' ? null : Number(cost)

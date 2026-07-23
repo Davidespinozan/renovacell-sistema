@@ -19,6 +19,12 @@ export function useProducts(): QueryResult<ProductSafe[]> {
 
 export const isActiveProduct = (p: ProductSafe): boolean => p.active !== false
 
+// Visible en el Portal del Doctor. Ocultarlo NO impide venderlo en mostrador:
+// para eso está `active`. Sirve para productos que aún no deben mostrarse al
+// cliente — por ejemplo, mientras no tienen fotografía.
+export const isPortalProduct = (p: ProductSafe): boolean =>
+  p.active !== false && p.show_portal !== false
+
 // Catálogo COMPLETO (Admin/Contenido): incluye los ocultos + mutaciones.
 export function useCatalogAdmin() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

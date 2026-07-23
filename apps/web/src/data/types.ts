@@ -38,6 +38,10 @@ export interface Product {
   image_url: string | null // imagen real del producto (Storage en el futuro)
   active?: boolean         // visible en el catálogo del doctor (default: true)
   metadata: Json           // interno (NO visible para no-admin)
+  // Visibilidad por canal. `active` manda sobre ambas: si es falso, no se ve
+  // en ningún lado. Estas solo deciden en qué escaparate aparece.
+  show_landing?: boolean
+  show_portal?: boolean
 }
 
 // Forma de la vista segura `products_safe` (sin metadata/costo/proveedor).

@@ -959,6 +959,8 @@ export type Database = {
           metadata: Json | null
           name: string
           price: number | null
+          show_landing: boolean
+          show_portal: boolean
           sku: string
           unit: string | null
         }
@@ -973,6 +975,8 @@ export type Database = {
           metadata?: Json | null
           name: string
           price?: number | null
+          show_landing?: boolean
+          show_portal?: boolean
           sku: string
           unit?: string | null
         }
@@ -987,6 +991,8 @@ export type Database = {
           metadata?: Json | null
           name?: string
           price?: number | null
+          show_landing?: boolean
+          show_portal?: boolean
           sku?: string
           unit?: string | null
         }
@@ -1397,6 +1403,8 @@ export type Database = {
           line: string | null
           name: string | null
           price: number | null
+          show_landing: boolean | null
+          show_portal: boolean | null
           sku: string | null
           unit: string | null
         }
@@ -1409,6 +1417,8 @@ export type Database = {
           line?: string | null
           name?: string | null
           price?: number | null
+          show_landing?: boolean | null
+          show_portal?: boolean | null
           sku?: string | null
           unit?: string | null
         }
@@ -1421,6 +1431,8 @@ export type Database = {
           line?: string | null
           name?: string | null
           price?: number | null
+          show_landing?: boolean | null
+          show_portal?: boolean | null
           sku?: string | null
           unit?: string | null
         }
