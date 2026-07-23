@@ -2125,11 +2125,11 @@ body.rc-has-ann .nav{top:38px}
 <!-- MOBILE DRAWER -->
 <div class="mobile-drawer" aria-hidden="true">
   <div class="mobile-drawer-links">
-    <a href="#acceso" class="mobile-drawer-link"><span><span class="mobile-drawer-num">01</span>El acceso</span></a>
-    <a href="#s2rm" class="mobile-drawer-link"><span><span class="mobile-drawer-num">02</span>Ciencia S²RM™</span></a>
-    <a href="#cumplimiento" class="mobile-drawer-link"><span><span class="mobile-drawer-num">03</span>Cumplimiento</span></a>
-    <a href="#catalogo" class="mobile-drawer-link"><span><span class="mobile-drawer-num">04</span>Catálogo</span></a>
-    <a href="#contacto" class="mobile-drawer-link"><span><span class="mobile-drawer-num">06</span>Professional Access</span></a>
+    <a href="#s2rm" class="mobile-drawer-link" data-rc="navCiencia">Ciencia</a>
+    <a href="#cumplimiento" class="mobile-drawer-link" data-rc="navCumplimiento">Cumplimiento</a>
+    <a href="#catalogo" class="mobile-drawer-link" data-rc="navCatalogo">Catálogo</a>
+    <a href="#acceso" class="mobile-drawer-link" data-rc="navAcceso">El acceso</a>
+    <a href="/sistema" class="mobile-drawer-link mobile-drawer-cta" data-rc="navCta">Iniciar sesión</a>
   </div>
   <div class="mobile-drawer-foot">
     <span>RENOVACELL® · <b>Tecnologías antiedad</b></span>
@@ -3511,5 +3511,21 @@ document.addEventListener('keydown', e => {
   .split-kicker{font-size:9.5px!important;letter-spacing:.2em!important;opacity:.9}
 }
 </style>
+<style id="rnc-drawer">
+/* El panel del menú existía en el HTML pero NADIE lo abría: no había guion.
+   El botón hamburguesa no hacía nada en celular. */
+.mobile-drawer.open{display:flex;flex-direction:column;justify-content:center}
+.mobile-drawer-links{display:flex;flex-direction:column;gap:2px;padding:0 26px;align-items:stretch;width:100%}
+.mobile-drawer-link{display:block;width:100%;text-align:left;padding:16px 0;font-size:1.45rem;font-weight:600;
+  color:var(--ink);letter-spacing:-.02em;border-bottom:1px solid var(--line);
+  text-decoration:none;transition:color .2s,padding-left .2s var(--ease)}
+.mobile-drawer-link:active{color:var(--green);padding-left:8px}
+.mobile-drawer-cta{color:var(--green);border-bottom:none;margin-top:18px}
+.mobile-drawer-foot{padding:26px;display:flex;flex-direction:column;gap:5px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;
+  color:var(--soft);text-transform:uppercase;margin-top:auto}
+body.rnc-drawer-abierto{overflow:hidden}
+</style>
+<!-- (el menú de celular ya tenía su guion más arriba; aquí solo van sus estilos) -->
 </body>
 </html>
