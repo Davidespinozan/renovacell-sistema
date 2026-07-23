@@ -2205,12 +2205,6 @@ body.rc-has-ann .nav{top:38px}
 
 <section class="section s2rm" id="s2rm">
   <div class="section-inner">
-    <div class="section-head">
-      <div class="section-meta-row">
-        <span class="section-kicker rv" data-rc="cienciaKicker">La ciencia</span>
-      </div>
-    </div>
-
     <div class="s2rm-grid">
       <div class="s2rm-visual">
         <video class="s2rm-video" muted loop playsinline preload="none" poster="https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/heroseccion2.webp" data-src="https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/videohero2_comprimido.mp4" aria-label="Tecnología celular S²RM en movimiento"></video>
@@ -2258,32 +2252,24 @@ body.rc-has-ann .nav{top:38px}
 <section class="credenciales" id="cumplimiento">
   <div class="cred-inner">
     <div class="cred-titulo">
-      <span class="cred-kicker" data-rc="cumplKicker">Cumplimiento regulatorio</span>
       <h2 data-rc-html="cumplTitle">Cumplimiento <span class="green">europeo y mexicano</span></h2>
     </div>
-    <!-- Franja de credenciales, no cuatro tarjetas con párrafo. Un médico sabe
-         qué es CE: la sigla y la referencia comunican todo. Las descripciones
-         eran 44 de las 89 palabras de la sección y nadie las leía. -->
     <div class="cred-fila">
       <div class="cred">
         <span class="cred-sigla" data-rc="cert1Codigo">CE</span>
         <span class="cred-nombre" data-rc="cert1Nombre">Certificación Comunidad Europea</span>
-        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert1Ref">CE-RNVC-2008</span></span>
       </div>
       <div class="cred">
         <span class="cred-sigla" data-rc="cert2Codigo">COFEPRIS</span>
         <span class="cred-nombre" data-rc="cert2Nombre">Registro Sanitario México</span>
-        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert2Ref">COFEPRIS-2024</span></span>
       </div>
       <div class="cred">
         <span class="cred-sigla" data-rc="cert3Codigo">ISO 13485</span>
         <span class="cred-nombre" data-rc="cert3Nombre">Sistema de gestión de calidad</span>
-        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert3Ref">ISO-13485:2016</span></span>
       </div>
       <div class="cred">
         <span class="cred-sigla" data-rc="cert4Codigo">GMP</span>
         <span class="cred-nombre" data-rc="cert4Nombre">Buenas Prácticas de Manufactura</span>
-        <span class="cred-ref"><i data-rc="certRefEtiqueta">Ref.</i> <span data-rc="cert4Ref">GMP-RNVC-EU</span></span>
       </div>
     </div>
   </div>
@@ -2298,11 +2284,9 @@ body.rc-has-ann .nav{top:38px}
 <!-- RESOURCES -->
 <section id="catalogo">
   <div class="cat-inner">
-    <div class="cat-kicker" data-rc="catalogoKicker">El catálogo</div>
     <h2 data-rc="catalogoTitle">Todo el arsenal regenerativo y estético, en un solo lugar.</h2>
     <p class="cat-lede" data-rc="catalogoBody">Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.</p>
     <div class="cat-filters" id="catFilters"></div>
-    <div class="cat-count" id="catCount">Cargando catálogo…</div>
     <div class="cat-grid" id="catGrid"></div>
   </div>
 </section>
@@ -2448,7 +2432,6 @@ body.rc-has-ann .nav{top:38px}
 <section class="accesswall" id="acceso">
   <div class="aw-glow" aria-hidden="true"></div>
   <div class="aw-inner">
-    <div class="aw-kicker" data-rc="accesoKicker">El acceso</div>
     <h2 data-rc-html="accesoTitle">Ya conoces el arsenal. <span class="green">Así entras.</span></h2>
     <p class="aw-lede" data-rc="accesoBody">Renovacell vende solo a profesionales de la salud. No es una tienda abierta: el catálogo y los precios se activan cuando tu cédula queda avalada — así protegemos el estándar y a los pacientes de quienes lo aplican. La verificación es rápida; el acceso, permanente.</p>
     <div class="aw-steps">
@@ -2934,7 +2917,7 @@ document.addEventListener('keydown', e => {
 <script>
 (function(){
   var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
-  var grid=document.getElementById('catGrid'), filters=document.getElementById('catFilters'), countEl=document.getElementById('catCount');
+  var grid=document.getElementById('catGrid'), filters=document.getElementById('catFilters');
   if(!grid) return;
   var pager=document.createElement('div'); pager.className='cat-pager'; grid.parentNode.appendChild(pager);
   var IMG=['antiaging-booster','golden-placenta','golden-serum','golden-v','intimo-renovacell','mascarilla-golden-placenta','plumper','stemhair','stoplip','suero-antiedad-cellular','ultrafiltrados-ufs'];
@@ -2967,10 +2950,9 @@ document.addEventListener('keydown', e => {
     var b=document.createElement('button'); b.type='button'; b.className='cat-card';
     var src=pp.image_url||imgFor(pp.name);
     var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
-    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))+'</div>'
-      +'<span class="cat-name">'+esc(pp.name)+'</span>'
-      +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
-      +'<span class="cat-see">'+(pp.brochure_url?'Ficha + folleto':'Ver ficha')+' \u2192</span>';
+    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
+      +'<span class="cat-arrow" aria-hidden="true">\u2197</span></div>'
+      +'<span class="cat-name">'+esc(pp.name)+'</span>';
     b.addEventListener('click',function(){openModal(pp);});
     return b;
   }
@@ -2980,7 +2962,6 @@ document.addEventListener('keydown', e => {
     var list=listNow(), pages=Math.max(1,Math.ceil(list.length/PAGE));
     if(page>pages) page=pages;
     list.slice((page-1)*PAGE,page*PAGE).forEach(function(x){grid.appendChild(card(x));});
-    countEl.textContent=list.length+' producto'+(list.length===1?'':'s')+(active==='Todos'?' en el catálogo':' \u00b7 '+active);
     renderPager(pages);
   }
   function renderPager(pages){
@@ -3002,7 +2983,7 @@ document.addEventListener('keydown', e => {
   fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
     .then(function(r){return r.ok?r.json():[];})
     .then(function(rows){ all=rows||[]; window.__rncCatalog=all.map(function(x){return {name:x.name,line:x.line,category:x.category};}); cats=all.map(function(x){return x.category;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).sort(); chips(); render(); })
-    .catch(function(){ countEl.textContent='No se pudo cargar el catálogo en este momento.'; });
+    .catch(function(){ grid.innerHTML='<p style="color:var(--soft);font-size:.9rem">No se pudo cargar el catálogo en este momento.</p>'; });
 })();
 </script>
 
@@ -3401,52 +3382,36 @@ document.addEventListener('keydown', e => {
    columnas planas separadas por líneas; se sentían un pie de página. */
 .credenciales{
   background:
-    radial-gradient(1100px 520px at 12% -10%, rgba(0,154,62,.20), transparent 58%),
-    radial-gradient(900px 480px at 100% 120%, rgba(0,132,54,.16), transparent 62%),
-    linear-gradient(158deg,#0E3A24 0%, #0B2E1D 52%, #103C26 100%);
+    radial-gradient(120% 92% at 50% -8%, rgba(0,154,62,.15), transparent 60%),
+    radial-gradient(130% 100% at 50% 0%, #12180f 0%, #080b06 64%);
   color:#fff;padding:92px 0 96px;position:relative;
 }
 .cred-inner{max-width:1180px;margin:0 auto;padding:0 40px;display:block}
-.cred-titulo{max-width:620px;margin-bottom:46px}
-.cred-kicker{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;
-  letter-spacing:.24em;text-transform:uppercase;color:#5FD08F;font-weight:600;margin-bottom:16px}
+.cred-titulo{max-width:620px;margin-bottom:44px}
 .cred-titulo h2{font-size:clamp(1.6rem,2.7vw,2.35rem);line-height:1.12;letter-spacing:-.026em;
   font-weight:700;margin:0;color:#fff}
-.cred-titulo h2 .green{color:#5FD08F}
+.cred-titulo h2 .green{color:var(--green-mid)}
 
-.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;border-top:none}
+.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;border-top:none}
 .cred{
-  position:relative;overflow:hidden;
-  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.022));
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:20px;padding:26px 24px 24px;
-  display:flex;flex-direction:column;gap:11px;
-  min-height:200px;transition:border-color .3s var(--ease),transform .3s var(--ease);
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:20px;padding:28px 26px;
+  display:flex;flex-direction:column;gap:9px;
+  transition:border-color .3s var(--ease),transform .3s var(--ease);
 }
-.cred:hover{border-color:rgba(95,208,143,.45);transform:translateY(-3px)}
-/* Sello de verificado: comunica "certificación real, vigente". */
-.cred::after{
-  content:'';position:absolute;top:24px;right:24px;width:28px;height:28px;border-radius:50%;
-  background:rgba(0,154,62,.18);border:1px solid rgba(95,208,143,.5);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235FD08F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:center;
-}
-.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.32rem;font-weight:700;
-  color:#fff;letter-spacing:-.02em;line-height:1;padding-right:40px}
-.cred-nombre{font-size:.86rem;line-height:1.45;color:rgba(255,255,255,.6);font-weight:400}
-.cred-ref{margin-top:auto;align-self:flex-start;
-  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:#8FE0B0;
-  background:rgba(0,154,62,.14);border:1px solid rgba(95,208,143,.28);
-  padding:5px 11px;border-radius:999px}
-.cred-ref i{font-style:normal;opacity:.7}
+.cred:hover{border-color:rgba(0,154,62,.42);transform:translateY(-3px)}
+.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;
+  color:#fff;letter-spacing:-.02em;line-height:1.05}
+.cred-nombre{font-size:.9rem;line-height:1.5;color:rgba(238,242,234,.62);font-weight:400}
 
 @media(max-width:900px){
   .credenciales{padding:60px 0 62px}
   .cred-inner{padding:0 22px}
   .cred-titulo{margin-bottom:30px}
   .cred-fila{grid-template-columns:1fr 1fr;gap:14px}
-  .cred{min-height:0;padding:22px 18px 18px}
-  .cred-sigla{font-size:1.15rem}
+  .cred{padding:22px 20px}
+  .cred-sigla{font-size:1.25rem}
 }
 </style>
 <style id="rnc-s2rm-compacto">
@@ -3603,11 +3568,16 @@ body.rnc-drawer-abierto{overflow:hidden}
 .cat-cat{font-family:'JetBrains Mono',monospace!important;font-size:9.5px!important;
   letter-spacing:.19em!important;text-transform:uppercase;color:var(--soft)!important;
   margin-top:9px!important;display:block}
-.cat-see{font-family:'JetBrains Mono',monospace!important;font-size:9.5px!important;
-  letter-spacing:.16em!important;text-transform:uppercase;font-weight:500!important;
-  color:var(--mid)!important;margin-top:16px!important;
-  padding-top:14px;border-top:1px solid var(--line);width:100%}
-.cat-card:hover .cat-see{color:var(--green)!important}
+/* La categoría bajo la imagen y el "Ver ficha" se retiraron: se ven dentro de la
+   ficha o al filtrar por categoría. Basta el nombre + una flechita en la esquina. */
+.cat-cat,.cat-see{display:none!important}
+.cat-tile{position:relative!important}
+.cat-arrow{
+  position:absolute!important;top:12px;right:12px;width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;font-size:16px;line-height:1;z-index:2;
+  color:var(--green-dark);background:rgba(255,255,255,.82);border:1px solid var(--line);
+  backdrop-filter:blur(4px);transition:transform .22s var(--ease),background .22s,color .22s,border-color .22s}
+.cat-card:hover .cat-arrow{background:var(--green);color:#fff;border-color:var(--green);transform:translateY(-2px)}
 
 /* La insignia de línea deja de ser etiqueta de color. */
 .cat-card .pill,.cat-card [class*="badge"],.cat-line{background:none!important;

@@ -443,10 +443,7 @@ function LandingTab() {
       </SecCard>
 
       <SecCard title="Ciencia">
-        <div className="form-grid-2">
-          <T label="Antetítulo" value={draft.ciencia.kicker} onChange={(v) => upSec('ciencia', { kicker: v })} />
-          <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
-        </div>
+        <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
         <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} />
         <A label="Título" value={draft.ciencia.title} onChange={(v) => upSec('ciencia', { title: v })} hint="Admite HTML." />
         <A label="Texto" value={draft.ciencia.body} onChange={(v) => upSec('ciencia', { body: v })} hint="Admite HTML." />
@@ -468,19 +465,14 @@ function LandingTab() {
       </SecCard>
 
       <SecCard title="Cumplimiento">
-        <div className="form-grid-2">
-          <T label="Antetítulo" value={draft.cumplimiento.kicker} onChange={(v) => upSec('cumplimiento', { kicker: v })} />
-          <T label="Nota a la derecha" value={draft.cumplimiento.meta} onChange={(v) => upSec('cumplimiento', { meta: v })} />
-        </div>
+        <T label="Nota a la derecha" value={draft.cumplimiento.meta} onChange={(v) => upSec('cumplimiento', { meta: v })} />
         <A label="Título" value={draft.cumplimiento.title} onChange={(v) => upSec('cumplimiento', { title: v })} hint="Admite HTML." />
-        <T label="Etiqueta de referencia" value={draft.cumplimiento.refEtiqueta} onChange={(v) => upSec('cumplimiento', { refEtiqueta: v })} hint="El texto antes del número, en las cuatro tarjetas." />
         {draft.cumplimiento.certs.map((c, i) => (
           <div key={i} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
             <div className="eyebrow" style={{ margin: 0 }}>Certificación {i + 1}</div>
             <div className="form-grid-2">
               <T label="Sigla" value={c.codigo} onChange={(v) => setCert(i, { codigo: v })} />
               <T label="Estado" value={c.estado} onChange={(v) => setCert(i, { estado: v })} hint="P. ej. Vigente, En trámite." />
-              <T label="Referencia" value={c.ref} onChange={(v) => setCert(i, { ref: v })} />
             </div>
             <T label="Nombre" value={c.nombre} onChange={(v) => setCert(i, { nombre: v })} />
             <A label="Descripción" value={c.texto} onChange={(v) => setCert(i, { texto: v })} />
@@ -489,7 +481,6 @@ function LandingTab() {
       </SecCard>
 
       <SecCard title="Catálogo">
-        <T label="Antetítulo" value={draft.catalogo.kicker} onChange={(v) => upSec('catalogo', { kicker: v })} />
         <A label="Título" value={draft.catalogo.title} onChange={(v) => upSec('catalogo', { title: v })} />
         <A label="Texto de entrada" value={draft.catalogo.body} onChange={(v) => upSec('catalogo', { body: v })} />
         <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 10 }}>
@@ -507,7 +498,6 @@ function LandingTab() {
       </SecCard>
 
       <SecCard title="El acceso (los tres pasos)">
-        <T label="Antetítulo" value={draft.acceso.kicker} onChange={(v) => upSec('acceso', { kicker: v })} />
         <A label="Título" value={draft.acceso.title} onChange={(v) => upSec('acceso', { title: v })} hint="Admite HTML." />
         <A label="Texto de entrada" value={draft.acceso.body} onChange={(v) => upSec('acceso', { body: v })} />
         {draft.acceso.pasos.map((ps, i) => (
