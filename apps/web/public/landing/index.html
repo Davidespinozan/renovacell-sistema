@@ -3666,5 +3666,18 @@ body.rnc-drawer-abierto{overflow:hidden}
   font-weight:500!important; letter-spacing:.01em!important;
 }
 </style>
+<style id="rnc-fotos-producto">
+/* Las fotos de producto vienen sobre fondo blanco y con el producto centrado.
+   Con object-fit:cover el navegador recortaba el centro —que es puro fondo— y
+   las tarjetas se veían vacías. Deben verse COMPLETAS. */
+.cat-thumb, .cat-card img{
+  object-fit:contain!important;
+  background:#fff!important;
+  padding:14px!important;
+  aspect-ratio:1/1!important;
+}
+.product-modal-media img{object-fit:contain!important;background:#fff!important;padding:22px!important}
+.product-modal-media{background:#fff!important}
+</style>
 </body>
 </html>

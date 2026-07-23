@@ -151,7 +151,7 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
               return (
                 <div key={it.product_id} className="pcard">
                   <div className="ptile cosm" style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
-                    {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="leaf" />}
+                    {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: 8 }} /> : <Icon name="leaf" />}
                   </div>
                   <div className="pb">
                     <h5>{p.name}</h5>
