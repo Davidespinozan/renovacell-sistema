@@ -2150,7 +2150,7 @@ body.rc-has-ann .nav{top:38px}
         <svg class="hero-bg-effect" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
           <defs>
             <linearGradient id="hero-dna-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#7BE8A4" stop-opacity="0.95"/>
+              <stop offset="0%" stop-color="#33AE64" stop-opacity="0.95"/>
               <stop offset="100%" stop-color="#22c55e" stop-opacity="0.14"/>
             </linearGradient>
           </defs>
@@ -3231,11 +3231,11 @@ document.addEventListener('keydown', e => {
   display:grid;grid-template-columns:1fr 1.06fr;gap:64px;align-items:center}
 
 .split-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.24em;
-  text-transform:uppercase;color:#7BE8A4;margin-bottom:24px;display:flex;align-items:center;gap:14px}
-.split-kicker::before{content:'';width:34px;height:1px;background:#7BE8A4;opacity:.75;flex:none}
+  text-transform:uppercase;color:rgba(154,201,166,.82);margin-bottom:24px;display:flex;align-items:center;gap:14px}
+.split-kicker::before{content:'';width:34px;height:1px;background:rgba(154,201,166,.5);flex:none}
 .hero-split .split-headline{font-size:clamp(2.2rem,4.3vw,3.9rem);line-height:1.04;letter-spacing:-.03em;
   font-weight:700;color:#fff;margin:0 0 36px;text-wrap:balance;max-width:13ch}
-.hero-split .split-headline .green{color:#5FE08C}
+.hero-split .split-headline .green{color:#33AE64}
 .split-cta{display:flex;gap:14px;flex-wrap:wrap}
 
 /* La imagen va CONTENIDA en su marco, no a sangre. */
@@ -3251,7 +3251,7 @@ document.addEventListener('keydown', e => {
 .shot-dots:empty{display:none}
 .shot-dots button{width:7px;height:7px;border-radius:999px;border:none;padding:0;cursor:pointer;
   background:rgba(255,255,255,.30);transition:width .34s var(--ease),background .34s}
-.shot-dots button.on{width:22px;background:#5FE08C}
+.shot-dots button.on{width:22px;background:#33AE64}
 
 @media(max-width:900px){
   .hero-split{padding:calc(var(--nav-space, 76px) + 12px) 0 40px;min-height:0}
@@ -3486,6 +3486,23 @@ document.addEventListener('keydown', e => {
 /* El marco de la foto se integra al fondo en vez de flotar como recorte. */
 .split-frame{border-color:rgba(123,232,164,.16)!important;
   box-shadow:0 30px 64px rgba(0,0,0,.40), 0 0 0 1px rgba(123,232,164,.05)!important}
+</style>
+<style id="rnc-hero-movil2">
+@media(max-width:900px){
+  /* El hero en celular se sentía de plantilla: bloques centrados, marco con
+     esquina redonda flotando y todo del mismo peso. Se le da estructura:
+     la imagen sangra a los bordes y el texto respira. */
+  .split-inner{padding:0!important}
+  .split-kicker,.hero-split .split-headline,.split-cta{padding:0 22px}
+  .split-media{margin:0 22px}
+  .split-frame{aspect-ratio:16/10!important}
+  .shot-dots{margin-top:16px}
+
+  /* El titular manda: más grande y más apretado. */
+  .hero-split .split-headline{font-size:clamp(2rem,8.6vw,2.9rem)!important;line-height:1.04!important;
+    letter-spacing:-.032em!important;margin-bottom:26px!important}
+  .split-kicker{font-size:9.5px!important;letter-spacing:.2em!important;opacity:.9}
+}
 </style>
 </body>
 </html>
