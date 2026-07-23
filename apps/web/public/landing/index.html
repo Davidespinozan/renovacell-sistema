@@ -3748,5 +3748,45 @@ body.rnc-drawer-abierto{overflow:hidden}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
+<style id="rnc-ciencia-sangrado">
+/* CIENCIA — la imagen deja de ser tarjeta flotante y SANGRA al borde izquierdo.
+   El look de "rectángulo redondeado con sombra, centrado, a media pantalla" es
+   lo que hacía sentir la sección como una diapositiva. Ahora la imagen ancla al
+   filo de la pantalla y el texto respira en el blanco de la derecha. */
+.s2rm{padding-left:0!important}
+.s2rm .section-inner{max-width:none!important;padding:0!important}
+.s2rm .section-head{padding-left:clamp(32px,5vw,88px)!important}
+.s2rm-grid{
+  grid-template-columns:52vw 1fr!important;
+  gap:0!important; align-items:stretch!important;
+}
+.s2rm-visual{
+  aspect-ratio:auto!important;
+  min-height:min(78vh,640px)!important;
+  border-radius:0 8px 8px 0!important;
+  box-shadow:none!important;
+  position:relative!important;
+}
+/* Halo verde detrás para despegarla del fondo plano. */
+.s2rm-visual::before{
+  content:''!important;position:absolute!important;inset:-40px -60px -40px -100vw!important;
+  z-index:-1!important;pointer-events:none!important;
+  background:radial-gradient(60% 70% at 65% 45%, rgba(0,154,62,.14), transparent 70%)!important;
+}
+.s2rm-content{
+  padding:0 clamp(32px,5vw,88px)!important;
+  max-width:640px!important;
+}
+
+@media(max-width:900px){
+  .s2rm-grid{grid-template-columns:1fr!important;gap:22px!important}
+  .s2rm-visual{
+    aspect-ratio:16/10!important;min-height:0!important;
+    border-radius:0!important;margin:0 -22px!important;   /* sangra a ambos lados en celular */
+    width:calc(100% + 44px)!important;
+  }
+  .s2rm-content{padding:0 22px!important;max-width:none!important}
+}
+</style>
 </body>
 </html>
