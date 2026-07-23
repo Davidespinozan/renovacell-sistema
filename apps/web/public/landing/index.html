@@ -1458,9 +1458,10 @@ body.modal-open{overflow:hidden;}
   .topbar-left{gap:10px;}
   .topbar-link{font-size:10px;}
     .nav-inner{padding:12px 14px;gap:10px;}
-  .nav-name span{display:none;}
+  .nav-name span{font-size:7.6px;letter-spacing:.16em;margin-top:3px;}
   .nav-name b{font-size:14.5px;}
-  .btn-primary-nav{padding:9px 14px;font-size:12px;}
+  .btn-primary-nav{padding:9px 14px;font-size:12px;white-space:nowrap;}
+  .nav-name span{font-size:7.4px;letter-spacing:.13em;}
   .hero{padding:118px 16px 40px;}
   
   .hero-right::after{display:none;}
@@ -2079,8 +2080,7 @@ body.rc-has-ann .nav{top:38px}
       <div class="nav-logo"><img src="/brand/logo.png" alt="Renovacell"></div>
       <div class="nav-name">
         <b data-rc-html="brandName">RENOVACELL<sup>®</sup></b>
-        <span data-rc="brandTagline">Tecnologías Antiedad</span>
-      </div>
+        <span data-rc="brandTagline">Tecnologías Antiedad</span>      </div>
     </a>
     <div class="nav-links">
       <a href="#s2rm" class="nav-link" data-rc="navCiencia">Ciencia</a>
@@ -2175,21 +2175,6 @@ body.rc-has-ann .nav{top:38px}
             <line x1="1218" y1="590" x2="1280" y2="590" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
             <line x1="1218" y1="700" x2="1280" y2="700" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
             <line x1="1218" y1="810" x2="1280" y2="810" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
-          </g>
-          <g class="hero-dna hero-dna--movil" opacity="1">
-            <path d="M 600 -60 Q 662 220 600 500 T 600 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
-            <path d="M 662 -60 Q 600 220 662 500 T 662 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
-            <line x1="600" y1="30" x2="656" y2="30" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
-            <line x1="600" y1="140" x2="656" y2="140" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.7"/>
-            <line x1="600" y1="250" x2="656" y2="250" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
-            <line x1="600" y1="360" x2="656" y2="360" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.26"/>
-            <line x1="600" y1="470" x2="656" y2="470" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
-            <line x1="600" y1="580" x2="656" y2="580" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.7"/>
-            <line x1="600" y1="690" x2="656" y2="690" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
-            <line x1="600" y1="800" x2="656" y2="800" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.26"/>
-            <line x1="600" y1="910" x2="656" y2="910" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
-            <path d="M 880 -60 Q 942 220 880 500 T 880 1000" stroke="url(#hero-dna-grad)" stroke-width="1.4" fill="none" opacity=".7"/>
-            <path d="M 942 -60 Q 880 220 942 500 T 942 1000" stroke="url(#hero-dna-grad)" stroke-width="1.4" fill="none" opacity=".7"/>
           </g>
         </svg>
       </div>
@@ -3489,10 +3474,12 @@ document.addEventListener('keydown', e => {
 .hero-split .hero-dna{animation:rnc-dna 9s ease-in-out infinite}
 /* Las hélices de los costados se recortan en pantalla angosta; ahí manda el par
    central. En escritorio es al revés. */
-.hero-dna--movil{display:none}
 @media(max-width:900px){
-  .hero-dna--lados{display:none}
-  .hero-dna--movil{display:block}
+  .hero-split .hero-bg-effect{display:none}
+  /* En celular no va la hélice: con 390 px de ancho no se lee como tal y
+     compite con el texto. Queda el verde en capas, que sí funciona ahí. */
+  .hero-split{isolation:isolate;overflow:hidden;position:relative}
+  .hero-split .hero-bg-effect{display:none}
 }
 @media (prefers-reduced-motion: reduce){ .hero-split .hero-dna{animation:none} }
 
