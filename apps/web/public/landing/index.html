@@ -2112,7 +2112,6 @@ body.rc-has-ann .nav{top:38px}
     </div>
     <div class="product-modal-body">
       <p class="product-modal-desc"></p>
-      <div class="product-modal-specs-title">— Especificaciones</div>
       <div class="product-modal-specs"></div>
     </div>
     <div class="product-modal-cta-row">
@@ -2952,10 +2951,10 @@ document.addEventListener('keydown', e => {
     var media=mb.querySelector('.product-modal-media'), img=media&&media.querySelector('img'), src=pp.image_url||imgFor(pp.name);
     if(media){ if(src){media.style.display='';img.src=src;img.alt=pp.name;} else media.style.display='none'; }
     var cof=mb.querySelector('.product-modal-cofepris'); if(cof) cof.style.display=(pp.line==='prof')?'inline-flex':'none';
-    var specs=mb.querySelector('.product-modal-specs'); specs.innerHTML='';
-    [['Línea',pp.line==='prof'?'Professional':'Home Care'],['Categoría',pp.category||'—'],['Disponibilidad','Para médicos verificados']].forEach(function(r){
-      var d=document.createElement('div'); d.className='product-modal-spec-row'; d.innerHTML='<label>'+esc(r[0])+'</label><b>'+esc(r[1])+'</b>'; specs.appendChild(d);
-    });
+    // Sin tabla de especificaciones: repetía la categoría (ya está sobre el
+    // nombre), la línea comercial (etiqueta interna, no le sirve al doctor) y
+    // la disponibilidad (ya lo dice la nota del pie).
+    var specs=mb.querySelector('.product-modal-specs'); if(specs) specs.innerHTML='';
     // Folleto oficial (PDF) dentro del popup, si el producto lo tiene
     var body=mb.querySelector('.product-modal-body'); var fol=body.querySelector('.product-modal-folleto');
     if(pp.brochure_url){
@@ -2969,7 +2968,6 @@ document.addEventListener('keydown', e => {
     var src=pp.image_url||imgFor(pp.name);
     var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
     b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))+'</div>'
-      +'<span class="cat-line '+(pp.line==='prof'?'prof':'cosm')+'">'+(pp.line==='prof'?'Professional':'Home Care')+'</span>'
       +'<span class="cat-name">'+esc(pp.name)+'</span>'
       +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
       +'<span class="cat-see">'+(pp.brochure_url?'Ficha + folleto':'Ver ficha')+' \u2192</span>';
@@ -3593,6 +3591,33 @@ body.rnc-drawer-abierto{overflow:hidden}
   .cat-lede{margin-bottom:34px!important}
   .cat-chip{font-size:10px!important;padding:10px 14px 12px 0!important}
 }
+</style>
+<style id="rnc-popup">
+/* Ficha de producto: sin la tabla que repetía categoría, línea y
+   disponibilidad. Queda categoría, nombre, descripción y la nota legal. */
+.product-modal-specs:empty{display:none}
+.product-modal-body{padding:26px 28px 22px!important}
+.product-modal-desc{font-size:.98rem!important;line-height:1.65!important;color:var(--mid)!important;margin:0!important}
+
+/* El botón de cerrar se perdía sobre el fondo blanco. */
+.product-modal-close{position:absolute!important;top:18px;right:18px;z-index:3;
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+  background:#fff;color:var(--ink-3);font-size:15px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.2s}
+.product-modal-close:hover{border-color:var(--ink-3);color:var(--ink)}
+
+/* Encabezado con el mismo lenguaje del catálogo: versalita + nombre ligero. */
+.product-modal-header{padding:30px 60px 0 28px!important}
+.product-modal-cat{font-family:'JetBrains Mono',monospace!important;font-size:9.5px!important;
+  letter-spacing:.2em!important;text-transform:uppercase;color:var(--green)!important;
+  font-weight:500!important;display:block;margin-bottom:10px}
+.product-modal-name{font-weight:400!important;font-size:1.5rem!important;
+  letter-spacing:-.015em!important;line-height:1.2!important;margin:0!important}
+
+/* La nota legal al pie, discreta. */
+.product-modal-cta-row{padding:18px 28px 26px!important;border-top:1px solid var(--line)}
+.product-modal-note{font-size:.78rem!important;line-height:1.55!important;color:var(--soft)!important}
+.product-modal-cta-ghost{display:none}
 </style>
 </body>
 </html>
