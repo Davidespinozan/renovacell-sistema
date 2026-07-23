@@ -3619,5 +3619,52 @@ body.rnc-drawer-abierto{overflow:hidden}
 .product-modal-note{font-size:.78rem!important;line-height:1.55!important;color:var(--soft)!important}
 .product-modal-cta-ghost{display:none}
 </style>
+<style id="rnc-lenguaje-marca">
+/* LENGUAJE DE MARCA, APLICADO A TODA LA PÁGINA.
+   El catálogo ya lo tenía; el resto seguía en negrita 700/800 con antetítulos
+   que no coincidían entre sí. Referencia: logotipo ligero, letras espaciadas,
+   mucho aire. Lo caro se lee ligero, no grueso. */
+
+/* ── Antetítulos: todos iguales, monoespaciada en versalita espaciada ── */
+.section-kicker, .cred-kicker, .aw-kicker, .cat-kicker, .contact .section-kicker{
+  font-family:'JetBrains Mono',monospace!important;
+  font-size:10.5px!important; font-weight:500!important;
+  letter-spacing:.26em!important; text-transform:uppercase!important;
+  color:var(--green)!important;
+}
+
+/* ── Títulos de sección: peso normal, no negrita ── */
+.s2rm-content h3, .cred-titulo h2, .resources h2,
+.accesswall h2, .contact h3, .aw-step h3{
+  font-weight:400!important; letter-spacing:-.022em!important;
+}
+.s2rm-content h3 b, .accesswall h2 b, .contact h3 b{font-weight:500!important}
+
+/* ── Cuerpos de texto: un respiro más ── */
+.s2rm-content p, .aw-lede, .resources p, .contact-info p, .cat-lede{
+  line-height:1.7!important;
+}
+
+/* ── Datos y etiquetas: versalita monoespaciada, como en el catálogo ── */
+.s2rm-spec-row label, .cred-nombre, .cred-ref, .aw-step .num,
+.resources-stat-label, .foot-col h5, .foot-regs-item span{
+  font-family:'JetBrains Mono',monospace!important;
+  font-size:9.5px!important; letter-spacing:.19em!important;
+  text-transform:uppercase!important; font-weight:500!important;
+}
+
+/* ── Los pasos de "El acceso": mismo peso ligero ── */
+.aw-step h3{font-size:1.12rem!important}
+.aw-step p{line-height:1.6!important}
+
+/* ── Recursos y pie: sin negritas de más ── */
+.resources-stat-num, .foot-brand-name b{font-weight:500!important}
+.foot-col-list a, .foot-col-list span{font-weight:400!important}
+
+/* ── Botones: el texto también baja de peso ── */
+.btn-hero-primary, .btn-primary-nav, .form-submit, .btn-cta-primary{
+  font-weight:500!important; letter-spacing:.01em!important;
+}
+</style>
 </body>
 </html>
