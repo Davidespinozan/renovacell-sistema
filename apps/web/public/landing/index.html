@@ -2144,6 +2144,43 @@ body.rc-has-ann .nav{top:38px}
       <div class="hero-ambient" aria-hidden="true">
         <div class="hero-glow-orb hero-glow-1"></div>
         <div class="hero-glow-orb hero-glow-2"></div>
+        <!-- Retícula de puntos + hélices de ADN. Da la lectura de laboratorio
+             sin costar una imagen: es SVG, pesa nada y escala a cualquier
+             pantalla. Va sobre el verde translúcido, no sobre negro plano. -->
+        <svg class="hero-bg-effect" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <pattern id="hero-dotgrid" x="0" y="0" width="46" height="46" patternUnits="userSpaceOnUse">
+              <circle cx="23" cy="23" r="1.15" fill="#5FE08C" opacity="0.20"/>
+            </pattern>
+            <linearGradient id="hero-dna-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7BE8A4" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#22c55e" stop-opacity="0.14"/>
+            </linearGradient>
+          </defs>
+          <rect width="1440" height="900" fill="url(#hero-dotgrid)"/>
+          <g class="hero-dna" opacity="0.9">
+            <path d="M 118 -60 Q 180 220 118 500 T 118 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+            <path d="M 180 -60 Q 118 220 180 500 T 180 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+            <line x1="118" y1="40" x2="180" y2="40" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="118" y1="150" x2="180" y2="150" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
+            <line x1="118" y1="260" x2="180" y2="260" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="118" y1="370" x2="180" y2="370" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
+            <line x1="118" y1="480" x2="180" y2="480" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="118" y1="590" x2="180" y2="590" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
+            <line x1="118" y1="700" x2="180" y2="700" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="118" y1="810" x2="180" y2="810" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
+            <path d="M 1218 -60 Q 1280 220 1218 500 T 1218 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+            <path d="M 1280 -60 Q 1218 220 1280 500 T 1280 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+            <line x1="1218" y1="40" x2="1280" y2="40" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="1218" y1="150" x2="1280" y2="150" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
+            <line x1="1218" y1="260" x2="1280" y2="260" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="1218" y1="370" x2="1280" y2="370" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
+            <line x1="1218" y1="480" x2="1280" y2="480" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="1218" y1="590" x2="1280" y2="590" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
+            <line x1="1218" y1="700" x2="1280" y2="700" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
+            <line x1="1218" y1="810" x2="1280" y2="810" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
+          </g>
+        </svg>
       </div>
 
       <div class="split-inner">
@@ -3417,6 +3454,33 @@ document.addEventListener('keydown', e => {
   .s2rm-bullet-text{display:flex!important;flex-direction:column!important;gap:3px}
   .s2rm-bullet-text span::before{content:none}
 }
+</style>
+<style id="rnc-hero-fondo">
+/* FONDO DEL HERO — verde profundo translúcido, no negro plano.
+   El #061109 anterior leía como negro; el verde de marca con capas de
+   luz da la sensación de laboratorio. El ADN en SVG completa la lectura
+   sin costar una imagen. */
+.hero-split{
+  background:
+    radial-gradient(1100px 620px at 18% 12%, rgba(0,154,62,.20) 0%, transparent 62%),
+    radial-gradient(900px 560px at 88% 86%, rgba(0,115,17,.24) 0%, transparent 66%),
+    linear-gradient(158deg, #0A2412 0%, #08301A 46%, #06210F 100%) !important;
+}
+.hero-split .hero-ambient{z-index:0}
+.hero-split .hero-bg-effect{position:absolute;inset:0;width:100%;height:100%}
+.hero-split .hero-glow-orb{opacity:.34}
+.hero-split .hero-glow-1{width:640px;height:640px;top:-190px;left:-140px;background:radial-gradient(circle,rgba(0,154,62,.5),transparent 68%)}
+.hero-split .hero-glow-2{width:760px;height:760px;bottom:-300px;right:-190px;background:radial-gradient(circle,rgba(0,115,17,.42),transparent 70%)}
+.hero-split .split-inner{position:relative;z-index:2}
+
+/* La hélice respira despacio. Se detiene si el sistema pide menos movimiento. */
+@keyframes rnc-dna{0%,100%{opacity:.62}50%{opacity:1}}
+.hero-split .hero-dna{animation:rnc-dna 9s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){ .hero-split .hero-dna{animation:none} }
+
+/* El marco de la foto se integra al fondo en vez de flotar como recorte. */
+.split-frame{border-color:rgba(123,232,164,.16)!important;
+  box-shadow:0 30px 64px rgba(0,0,0,.40), 0 0 0 1px rgba(123,232,164,.05)!important}
 </style>
 </body>
 </html>
