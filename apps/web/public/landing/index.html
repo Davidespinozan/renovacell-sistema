@@ -3802,44 +3802,39 @@ body.rnc-drawer-abierto{overflow:hidden}
    derecho de la pantalla y se apoya en un halo verde. El texto se queda contenido
    a la izquierda. En celular sangra a los dos bordes, como en Ciencia. */
 @media(min-width:901px){
+  /* Aire parejo arriba y abajo, contenido centrado (no pegado al borde inferior). */
   .hero-split{
-    align-items:stretch!important;
-    padding:calc(var(--nav-space,152px) + 20px) 0 0 0!important;
-    min-height:min(90vh,780px)!important;
+    align-items:center!important;
+    padding:calc(var(--nav-space,152px) + 44px) 0 44px!important;
+    min-height:0!important;
   }
+  /* El contenedor y la rejilla vuelven a lo de siempre: el TEXTO no se mueve. */
   .hero-split .split-inner{
-    max-width:none!important;padding:0!important;
-    grid-template-columns:minmax(380px,1fr) 52vw!important;
-    gap:0!important;align-items:stretch!important;
+    max-width:1280px!important;margin:0 auto!important;padding:0 40px!important;
+    grid-template-columns:.86fr 1.14fr!important;gap:56px!important;align-items:center!important;
   }
   .hero-split .split-text{
-    align-self:center!important;justify-self:start!important;
-    max-width:560px!important;
-    padding:40px clamp(40px,4vw,72px) 40px clamp(32px,6vw,96px)!important;
+    align-self:center!important;justify-self:start!important;max-width:none!important;padding:0!important;
   }
+  /* La imagen sangra SOLO al borde derecho de la pantalla, con altura acotada
+     (ya no gigante) y centrada verticalmente. */
   .hero-split .split-media{
-    position:relative!important;align-self:stretch!important;
-    display:flex!important;margin:0!important;
+    position:relative!important;align-self:center!important;display:block!important;
+    margin-right:calc(50% - 50vw)!important;
   }
-  /* Halo verde detrás, sangrando fuera de pantalla a la derecha. */
   .hero-split .split-media::before{
     content:''!important;position:absolute!important;
-    inset:-40px -100vw -40px -60px!important;z-index:0!important;pointer-events:none!important;
-    background:radial-gradient(58% 68% at 42% 46%, rgba(51,174,100,.22), transparent 72%)!important;
+    inset:-30px 0 -30px -50px!important;z-index:0!important;pointer-events:none!important;
+    background:radial-gradient(56% 68% at 42% 46%, rgba(51,174,100,.18), transparent 72%)!important;
   }
   .hero-split .split-frame{
     position:relative!important;z-index:1!important;
-    aspect-ratio:auto!important;width:100%!important;height:auto!important;align-self:stretch!important;
-    border-radius:16px 0 0 16px!important;box-shadow:none!important;border:none!important;
+    aspect-ratio:auto!important;width:100%!important;height:min(58vh,480px)!important;align-self:center!important;
+    border-radius:20px 0 0 20px!important;box-shadow:0 28px 60px rgba(0,0,0,.32)!important;border:none!important;
   }
-  /* Velo inferior para que los puntitos se lean sobre cualquier foto. */
-  .hero-split .split-frame::after{
-    content:''!important;position:absolute!important;inset:auto 0 0 0!important;height:96px!important;
-    background:linear-gradient(transparent, rgba(6,17,9,.42))!important;z-index:1!important;pointer-events:none!important;
-  }
+  .hero-split .split-frame::after{display:none!important}
   .hero-split .shot-dots{
-    position:absolute!important;left:0!important;right:0!important;bottom:22px!important;
-    margin:0!important;z-index:2!important;
+    position:static!important;margin:16px 0 0!important;justify-content:flex-start!important;padding-left:2px;
   }
 }
 @media(max-width:900px){
