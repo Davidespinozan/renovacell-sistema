@@ -3424,6 +3424,10 @@ document.addEventListener('keydown', e => {
 }
 </style>
 <style id="rnc-s2rm-compacto">
+/* El marco toma la proporción REAL de la foto (16:9), así `cover` ya no recorta
+   nada: la imagen encaja exacta. Antes el marco era vertical 4/4.6 y le cortaba
+   los lados a una foto apaisada. */
+.s2rm-visual img{width:100%!important;height:100%!important;object-fit:cover!important}
 /* Cada punto en UN renglón: antes eran título arriba y explicación abajo, dos
    líneas por punto y seis en total. Ahora van en línea, separados por una raya.
    Y la imagen deja de ser una columna de 520 px de alto. */
@@ -3437,12 +3441,12 @@ document.addEventListener('keydown', e => {
 .s2rm-bullet{grid-template-columns:30px 1fr auto!important;gap:14px!important}
 
 /* La imagen baja de peso: menos alto y menos ancho en la retícula. */
-.s2rm-grid{grid-template-columns:.68fr 1.32fr!important;gap:52px!important;align-items:start!important}
-.s2rm-visual{min-height:0!important;aspect-ratio:4/4.6;box-shadow:0 16px 36px rgba(8,20,27,.15)!important}
+.s2rm-grid{grid-template-columns:1fr 1.08fr!important;gap:56px!important;align-items:center!important}
+.s2rm-visual{min-height:0!important;aspect-ratio:16/9!important;box-shadow:0 16px 36px rgba(8,20,27,.15)!important}
 
 @media(max-width:900px){
   .s2rm-grid{grid-template-columns:1fr!important;gap:26px!important}
-  .s2rm-visual{aspect-ratio:16/10}
+  .s2rm-visual{aspect-ratio:16/9!important}
   .s2rm-bullet-text{display:flex!important;flex-direction:column!important;gap:3px}
   .s2rm-bullet-text span::before{content:none}
 }
