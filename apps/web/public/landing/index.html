@@ -3667,18 +3667,25 @@ body.rnc-drawer-abierto{overflow:hidden}
 }
 </style>
 <style id="rnc-fotos-producto">
-/* FOTOS DE PRODUCTO.
-   56 de las 64 son 1:1; ocho no (Saxenda 1.24, los Xelaju 1.33, Mounjaro 0.67).
-   El marco es cuadrado, así que:
-   · `contain` para que ninguna se recorte — vienen con el producto centrado
-     sobre fondo blanco y `cover` cortaba justo el centro, que es el fondo.
-   · fondo blanco, para que las ocho que no son cuadradas rellenen sin costura.
-   · un margen interior parejo, para que el producto no toque el borde. */
-.cat-thumb, .cat-card img{
+/* FOTOS DE PRODUCTO — la clase real del contenedor es .cat-tile, no .cat-thumb.
+   Mis reglas anteriores apuntaban a una clase que no existe en el markup, así
+   que seguía mandando la de origen: 16/10 con object-fit:cover, que recortaba
+   arriba y abajo. Los productos altos (Golden Placenta, Ultrafiltrados) salían
+   cortados por la mitad.
+   Las fotos vienen sobre fondo blanco y con el producto centrado: van
+   completas dentro de un marco 1:1. */
+.cat-tile{
   aspect-ratio:1/1!important;
-  object-fit:contain!important;
   background:#fff!important;
+  border:1px solid var(--line)!important;
+  border-radius:2px!important;
+  overflow:hidden;
+}
+.cat-tile img{
+  width:100%!important; height:100%!important;
+  object-fit:contain!important;
   padding:12px!important;
+  background:#fff!important;
 }
 .product-modal-media{background:#fff!important;aspect-ratio:1/1!important;display:block}
 .product-modal-media img{width:100%!important;height:100%!important;
