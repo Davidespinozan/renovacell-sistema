@@ -9,3 +9,9 @@
 @tailwind utilities;
 
 html,body,#root{height:100%}
+
+/* Miniatura del producto en el Punto de Venta. Sale de products.image_url, la
+   misma fuente que alimenta el catálogo del doctor y la landing: una imagen
+   subida desde Administración aparece en los tres lados. */
+.posthumb{width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;
+  border:1px solid var(--line);border-radius:6px;margin-bottom:9px;padding:6px}

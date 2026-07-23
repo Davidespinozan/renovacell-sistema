@@ -85,7 +85,9 @@ export function Caja() {
             const out = !stock.tracked || stock.qty <= 0
             return (
               <div key={p.id} className="poscard" style={out ? { opacity: 0.55 } : undefined} onClick={() => { if (!out) add(p.id) }}>
-                <span className={'ltag ' + (p.line === 'prof' ? 'prof' : 'cosm')}>{p.line === 'prof' ? 'Professional' : 'Home Care'}</span>
+                {p.image_url && (
+                  <img src={p.image_url} alt="" loading="lazy" className="posthumb" />
+                )}
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
                 <div className="pr">{money(p.price)}</div>
