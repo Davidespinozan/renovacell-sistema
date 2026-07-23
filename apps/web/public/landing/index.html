@@ -3695,5 +3695,28 @@ body.rnc-drawer-abierto{overflow:hidden}
 .product-modal-media img{width:100%!important;height:100%!important;
   object-fit:contain!important;background:#fff!important;padding:26px!important}
 </style>
+<style id="rnc-padding-secciones">
+/* RITMO VERTICAL PAREJO.
+   Las secciones iban de 78 a 140 px de padding, sin criterio. Ciencia sumaba
+   140 de padding + 168 hasta el antetítulo = ~310 px de aire antes de nada.
+   Se unifica a 88 px arriba y abajo, y se recorta el hueco interno del
+   encabezado de cada sección. */
+.s2rm, #catalogo, .resources, .accesswall, .contact{
+  padding-top:88px!important; padding-bottom:88px!important;
+}
+.credenciales{padding-top:72px!important;padding-bottom:72px!important}
+
+/* El encabezado de cada sección dejaba demasiado hueco antes del contenido. */
+.s2rm .section-head{margin-bottom:34px!important}
+.cat-inner .cat-lede{margin-bottom:40px!important}
+.resources .section-head{margin-bottom:34px!important}
+
+@media(max-width:900px){
+  .s2rm, #catalogo, .resources, .accesswall, .contact{
+    padding-top:56px!important; padding-bottom:56px!important;
+  }
+  .credenciales{padding-top:48px!important;padding-bottom:48px!important}
+}
+</style>
 </body>
 </html>
