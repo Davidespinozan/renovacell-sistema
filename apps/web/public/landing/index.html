@@ -3843,11 +3843,13 @@ body.rnc-drawer-abierto{overflow:hidden}
   }
 }
 @media(max-width:900px){
+  /* En celular la imagen queda CONTENIDA (no sangra) y con esquinas más
+     redondeadas: a sangre y cuadrada se sentía dura. */
   .hero-split .split-media{
     position:relative!important;
-    margin:0 -26px 34px!important;width:calc(100% + 52px)!important;
+    margin:0 0 34px!important;width:100%!important;
   }
-  .hero-split .split-frame{border-radius:0!important;box-shadow:none!important;border:none!important}
+  .hero-split .split-frame{border-radius:20px!important;box-shadow:none!important;border:none!important}
 }
 </style>
 </body>
