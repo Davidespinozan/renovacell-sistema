@@ -3396,31 +3396,57 @@ document.addEventListener('keydown', e => {
 }
 </style>
 <style id="rnc-credenciales">
-/* CREDENCIALES — franja compacta. Reemplaza cuatro tarjetas con descripción. */
-.credenciales{background:var(--bone-warm);padding:78px 0 74px}
-.cred-inner{max-width:1180px;margin:0 auto;padding:0 40px;
-  display:grid;grid-template-columns:minmax(280px,.9fr) 1.6fr;gap:56px;align-items:center}
+/* CREDENCIALES — banda verde profunda (médica, no negra) con las certificaciones
+   en badges elegantes, cada uno con su sello de verificado. Antes eran cuatro
+   columnas planas separadas por líneas; se sentían un pie de página. */
+.credenciales{
+  background:
+    radial-gradient(1100px 520px at 12% -10%, rgba(0,154,62,.20), transparent 58%),
+    radial-gradient(900px 480px at 100% 120%, rgba(0,132,54,.16), transparent 62%),
+    linear-gradient(158deg,#0E3A24 0%, #0B2E1D 52%, #103C26 100%);
+  color:#fff;padding:92px 0 96px;position:relative;
+}
+.cred-inner{max-width:1180px;margin:0 auto;padding:0 40px;display:block}
+.cred-titulo{max-width:620px;margin-bottom:46px}
 .cred-kicker{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;
-  letter-spacing:.22em;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:14px}
-.cred-titulo h2{font-size:clamp(1.6rem,2.7vw,2.3rem);line-height:1.1;letter-spacing:-.026em;
-  font-weight:700;margin:0}
+  letter-spacing:.24em;text-transform:uppercase;color:#5FD08F;font-weight:600;margin-bottom:16px}
+.cred-titulo h2{font-size:clamp(1.6rem,2.7vw,2.35rem);line-height:1.12;letter-spacing:-.026em;
+  font-weight:700;margin:0;color:#fff}
+.cred-titulo h2 .green{color:#5FD08F}
 
-.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--ink)}
-.cred{padding:22px 22px 0 0;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
-.cred:last-child{border-right:none;padding-right:0}
-.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.18rem;font-weight:700;
-  color:var(--green-dark);letter-spacing:-.02em;line-height:1}
-.cred-nombre{font-size:.88rem;line-height:1.4;color:var(--ink-2);font-weight:500}
-.cred-ref{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--soft)}
-.cred-ref i{font-style:normal}
+.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;border-top:none}
+.cred{
+  position:relative;overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.022));
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;padding:26px 24px 24px;
+  display:flex;flex-direction:column;gap:11px;
+  min-height:200px;transition:border-color .3s var(--ease),transform .3s var(--ease);
+}
+.cred:hover{border-color:rgba(95,208,143,.45);transform:translateY(-3px)}
+/* Sello de verificado: comunica "certificación real, vigente". */
+.cred::after{
+  content:'';position:absolute;top:24px;right:24px;width:28px;height:28px;border-radius:50%;
+  background:rgba(0,154,62,.18);border:1px solid rgba(95,208,143,.5);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235FD08F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:center;
+}
+.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.32rem;font-weight:700;
+  color:#fff;letter-spacing:-.02em;line-height:1;padding-right:40px}
+.cred-nombre{font-size:.86rem;line-height:1.45;color:rgba(255,255,255,.6);font-weight:400}
+.cred-ref{margin-top:auto;align-self:flex-start;
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:#8FE0B0;
+  background:rgba(0,154,62,.14);border:1px solid rgba(95,208,143,.28);
+  padding:5px 11px;border-radius:999px}
+.cred-ref i{font-style:normal;opacity:.7}
 
 @media(max-width:900px){
-  .credenciales{padding:52px 0 50px}
-  .cred-inner{grid-template-columns:1fr;gap:28px;padding:0 22px}
-  .cred-fila{grid-template-columns:1fr 1fr}
-  .cred{padding:18px 16px 16px 0;border-bottom:1px solid var(--line)}
-  .cred:nth-child(2n){border-right:none;padding-right:0}
-  .cred:nth-last-child(-n+2){border-bottom:none}
+  .credenciales{padding:60px 0 62px}
+  .cred-inner{padding:0 22px}
+  .cred-titulo{margin-bottom:30px}
+  .cred-fila{grid-template-columns:1fr 1fr;gap:14px}
+  .cred{min-height:0;padding:22px 18px 18px}
+  .cred-sigla{font-size:1.15rem}
 }
 </style>
 <style id="rnc-s2rm-compacto">
