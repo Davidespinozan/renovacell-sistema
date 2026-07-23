@@ -2213,7 +2213,7 @@ body.rc-has-ann .nav{top:38px}
 
     <div class="s2rm-grid">
       <div class="s2rm-visual">
-        <img src="https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/heroseccion2.webp" alt="Microscopía celular S2RM Renovacell" class="s2rm-real-img">
+        <video class="s2rm-video" muted loop playsinline preload="none" poster="https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/heroseccion2.webp" data-src="https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/videohero2_comprimido.mp4" aria-label="Tecnología celular S²RM en movimiento"></video>
       </div>
 
       <div class="s2rm-content rv d1">
@@ -3719,5 +3719,34 @@ body.rnc-drawer-abierto{overflow:hidden}
   .credenciales{padding-top:48px!important;padding-bottom:48px!important}
 }
 </style>
+<script>
+/* Video de la sección de Ciencia. Carga y arranca solo cuando entra en vista
+   (no gasta 8 MB a quien no baja). Silenciado y en loop —los celulares no dejan
+   autoplay con audio—. Con "reducir movimiento" activo, queda el póster fijo. */
+(function(){
+  function init(){
+    var v=document.querySelector('.s2rm-video'); if(!v) return;
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    function arranca(){
+      if(!v.getAttribute('src')) v.setAttribute('src', v.getAttribute('data-src'));
+      var pr=v.play(); if(pr && pr.catch) pr.catch(function(){});
+    }
+    function enVista(){
+      var r=v.getBoundingClientRect();
+      return r.top < window.innerHeight+250 && r.bottom > -250;
+    }
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es){
+        es.forEach(function(e){ e.isIntersecting ? arranca() : v.pause(); });
+      },{threshold:0, rootMargin:'250px 0px'}).observe(v);
+    }
+    if(enVista()) arranca();
+    window.addEventListener('scroll', function s(){
+      if(enVista()){ arranca(); window.removeEventListener('scroll', s); }
+    }, {passive:true});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
 </body>
 </html>
