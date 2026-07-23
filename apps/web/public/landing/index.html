@@ -2149,18 +2149,14 @@ body.rc-has-ann .nav{top:38px}
              pantalla. Va sobre el verde translúcido, no sobre negro plano. -->
         <svg class="hero-bg-effect" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
           <defs>
-            <pattern id="hero-dotgrid" x="0" y="0" width="46" height="46" patternUnits="userSpaceOnUse">
-              <circle cx="23" cy="23" r="1.15" fill="#5FE08C" opacity="0.20"/>
-            </pattern>
             <linearGradient id="hero-dna-grad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#7BE8A4" stop-opacity="0.95"/>
               <stop offset="100%" stop-color="#22c55e" stop-opacity="0.14"/>
             </linearGradient>
           </defs>
-          <rect width="1440" height="900" fill="url(#hero-dotgrid)"/>
-          <g class="hero-dna" opacity="0.9">
-            <path d="M 118 -60 Q 180 220 118 500 T 118 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
-            <path d="M 180 -60 Q 118 220 180 500 T 180 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+          <g class="hero-dna hero-dna--lados" opacity="1">
+            <path d="M 118 -60 Q 180 220 118 500 T 118 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
+            <path d="M 180 -60 Q 118 220 180 500 T 180 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
             <line x1="118" y1="40" x2="180" y2="40" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
             <line x1="118" y1="150" x2="180" y2="150" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
             <line x1="118" y1="260" x2="180" y2="260" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
@@ -2169,8 +2165,8 @@ body.rc-has-ann .nav{top:38px}
             <line x1="118" y1="590" x2="180" y2="590" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
             <line x1="118" y1="700" x2="180" y2="700" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
             <line x1="118" y1="810" x2="180" y2="810" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
-            <path d="M 1218 -60 Q 1280 220 1218 500 T 1218 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
-            <path d="M 1280 -60 Q 1218 220 1280 500 T 1280 1000" stroke="url(#hero-dna-grad)" stroke-width="1.5" fill="none"/>
+            <path d="M 1218 -60 Q 1280 220 1218 500 T 1218 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
+            <path d="M 1280 -60 Q 1218 220 1280 500 T 1280 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
             <line x1="1218" y1="40" x2="1280" y2="40" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
             <line x1="1218" y1="150" x2="1280" y2="150" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
             <line x1="1218" y1="260" x2="1280" y2="260" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
@@ -2179,6 +2175,21 @@ body.rc-has-ann .nav{top:38px}
             <line x1="1218" y1="590" x2="1280" y2="590" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.75"/>
             <line x1="1218" y1="700" x2="1280" y2="700" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.5"/>
             <line x1="1218" y1="810" x2="1280" y2="810" stroke="url(#hero-dna-grad)" stroke-width="1" opacity="0.28"/>
+          </g>
+          <g class="hero-dna hero-dna--movil" opacity="1">
+            <path d="M 600 -60 Q 662 220 600 500 T 600 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
+            <path d="M 662 -60 Q 600 220 662 500 T 662 1000" stroke="url(#hero-dna-grad)" stroke-width="1.7" fill="none"/>
+            <line x1="600" y1="30" x2="656" y2="30" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
+            <line x1="600" y1="140" x2="656" y2="140" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.7"/>
+            <line x1="600" y1="250" x2="656" y2="250" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
+            <line x1="600" y1="360" x2="656" y2="360" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.26"/>
+            <line x1="600" y1="470" x2="656" y2="470" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
+            <line x1="600" y1="580" x2="656" y2="580" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.7"/>
+            <line x1="600" y1="690" x2="656" y2="690" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
+            <line x1="600" y1="800" x2="656" y2="800" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.26"/>
+            <line x1="600" y1="910" x2="656" y2="910" stroke="url(#hero-dna-grad)" stroke-width="1.1" opacity="0.45"/>
+            <path d="M 880 -60 Q 942 220 880 500 T 880 1000" stroke="url(#hero-dna-grad)" stroke-width="1.4" fill="none" opacity=".7"/>
+            <path d="M 942 -60 Q 880 220 942 500 T 942 1000" stroke="url(#hero-dna-grad)" stroke-width="1.4" fill="none" opacity=".7"/>
           </g>
         </svg>
       </div>
@@ -3476,6 +3487,13 @@ document.addEventListener('keydown', e => {
 /* La hélice respira despacio. Se detiene si el sistema pide menos movimiento. */
 @keyframes rnc-dna{0%,100%{opacity:.62}50%{opacity:1}}
 .hero-split .hero-dna{animation:rnc-dna 9s ease-in-out infinite}
+/* Las hélices de los costados se recortan en pantalla angosta; ahí manda el par
+   central. En escritorio es al revés. */
+.hero-dna--movil{display:none}
+@media(max-width:900px){
+  .hero-dna--lados{display:none}
+  .hero-dna--movil{display:block}
+}
 @media (prefers-reduced-motion: reduce){ .hero-split .hero-dna{animation:none} }
 
 /* El marco de la foto se integra al fondo en vez de flotar como recorte. */
