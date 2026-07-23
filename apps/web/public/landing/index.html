@@ -3679,10 +3679,14 @@ body.rnc-drawer-abierto{overflow:hidden}
    cortados por la mitad.
    Las fotos vienen sobre fondo blanco y con el producto centrado: van
    completas dentro de un marco 1:1. */
+/* Las fotos se distinguen del fondo por CONTRASTE DE COLOR, no por una línea:
+   la sección lleva un fondo verde-gris suave y la foto (fondo blanco) resalta
+   sobre él sin contorno. */
+#catalogo{background:#EAEEE6!important}
 .cat-tile{
   aspect-ratio:1/1!important;
   background:#fff!important;
-  border:1px solid var(--line)!important;
+  border:none!important;
   border-radius:20px!important;
   overflow:hidden;
 }
@@ -3749,34 +3753,9 @@ body.rnc-drawer-abierto{overflow:hidden}
 })();
 </script>
 <style id="rnc-ciencia-sangrado">
-/* CIENCIA — la imagen deja de ser tarjeta flotante y SANGRA al borde izquierdo.
-   El look de "rectángulo redondeado con sombra, centrado, a media pantalla" es
-   lo que hacía sentir la sección como una diapositiva. Ahora la imagen ancla al
-   filo de la pantalla y el texto respira en el blanco de la derecha. */
-.s2rm{padding-left:0!important}
-.s2rm .section-inner{max-width:none!important;padding:0!important}
-.s2rm .section-head{padding-left:clamp(32px,5vw,88px)!important}
-.s2rm-grid{
-  grid-template-columns:52vw 1fr!important;
-  gap:0!important; align-items:stretch!important;
-}
-.s2rm-visual{
-  aspect-ratio:auto!important;
-  min-height:min(78vh,640px)!important;
-  border-radius:0 20px 20px 0!important;
-  box-shadow:none!important;
-  position:relative!important;
-}
-/* Halo verde detrás para despegarla del fondo plano. */
-.s2rm-visual::before{
-  content:''!important;position:absolute!important;inset:-40px -60px -40px -100vw!important;
-  z-index:-1!important;pointer-events:none!important;
-  background:radial-gradient(60% 70% at 65% 45%, rgba(0,154,62,.14), transparent 70%)!important;
-}
-.s2rm-content{
-  padding:0 clamp(32px,5vw,88px)!important;
-  max-width:640px!important;
-}
+/* CIENCIA — en ESCRITORIO la imagen va CONTENIDA dentro del layout (ya no sangra
+   al borde: salirse se veía mal). Se apoya en la base: rejilla de dos columnas,
+   imagen a 20px de esquina y sombra. En CELULAR sí sangra a los lados (abajo). */
 
 @media(max-width:900px){
   .s2rm{padding-top:44px!important}
@@ -3816,23 +3795,22 @@ body.rnc-drawer-abierto{overflow:hidden}
   .hero-split .split-text{
     align-self:center!important;justify-self:start!important;max-width:none!important;padding:0!important;
   }
-  /* La imagen sangra SOLO al borde derecho de la pantalla, con altura acotada
-     (ya no gigante) y centrada verticalmente. */
+  /* La imagen queda CONTENIDA dentro del layout (ya no sangra al borde), con un
+     halo verde suave detrás para separarla del fondo. */
   .hero-split .split-media{
-    position:relative!important;align-self:center!important;display:block!important;
-    margin-right:calc(50% - 50vw)!important;
+    position:relative!important;align-self:center!important;display:block!important;margin:0!important;
   }
   .hero-split .split-media::before{
     content:''!important;position:absolute!important;
-    inset:-30px 0 -30px -50px!important;z-index:0!important;pointer-events:none!important;
-    background:radial-gradient(56% 68% at 42% 46%, rgba(51,174,100,.18), transparent 72%)!important;
+    inset:-28px -28px!important;z-index:0!important;pointer-events:none!important;
+    background:radial-gradient(60% 70% at 50% 46%, rgba(51,174,100,.16), transparent 72%)!important;
   }
   /* Marco a 16:9 (la proporción real de las fotos) para que se vean COMPLETAS,
-     sin recorte, llegando al borde derecho. */
+     sin recorte. Redondeo de 20px en las cuatro esquinas. */
   .hero-split .split-frame{
     position:relative!important;z-index:1!important;
     aspect-ratio:16/9!important;width:100%!important;height:auto!important;max-height:none!important;align-self:center!important;
-    border-radius:20px 0 0 20px!important;box-shadow:0 28px 60px rgba(0,0,0,.32)!important;border:none!important;
+    border-radius:20px!important;box-shadow:0 28px 60px rgba(0,0,0,.32)!important;border:none!important;
   }
   .hero-split .split-frame .shot-bg img{object-fit:cover!important}
   .hero-split .split-frame::after{display:none!important}
