@@ -109,7 +109,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
   align-items:center;gap:9px 24px;
 }
 .nav-brand{grid-column:2;grid-row:1;display:flex;flex-direction:row;align-items:center;gap:13px;justify-self:center}
-.nav-links{grid-column:1 / -1;grid-row:2;justify-self:center}
+.nav-links{grid-column:1 / -1;grid-row:2;justify-self:end}
 .nav-actions{grid-column:3;grid-row:1;justify-self:end}
 .nav-burger{grid-column:3;grid-row:1;justify-self:end}
 .nav-logo{
@@ -3492,10 +3492,19 @@ document.addEventListener('keydown', e => {
   /* El hero en celular se sentía de plantilla: bloques centrados, marco con
      esquina redonda flotando y todo del mismo peso. Se le da estructura:
      la imagen sangra a los bordes y el texto respira. */
-  .split-inner{padding:0!important}
-  .split-kicker,.hero-split .split-headline,.split-cta{padding:0 22px}
-  .split-media{margin:0 22px}
+  /* El texto medía 0 px de margen lateral: pegaba al borde de la pantalla.
+     Y el aire de arriba (58 px) contra el de abajo (29) descuadraba el bloque. */
+  .split-inner{padding:0 26px!important}
+  .split-media{margin:0}
   .split-frame{aspect-ratio:16/10!important}
+
+  /* Ritmo vertical: el hero respira arriba y abajo por igual. */
+  .hero-split{padding:calc(var(--nav-space, 76px) + 46px) 0 54px!important}
+  .split-inner{gap:0!important}
+  .split-kicker{margin-bottom:20px!important}
+  .hero-split .split-headline{margin-bottom:38px!important}
+  .split-media{margin-bottom:34px!important}
+  .shot-dots{margin-top:18px!important;margin-bottom:0!important}
   .shot-dots{margin-top:16px}
 
   /* El titular manda: más grande y más apretado. */
