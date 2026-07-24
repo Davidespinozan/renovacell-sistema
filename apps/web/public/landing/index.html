@@ -3394,15 +3394,33 @@ document.addEventListener('keydown', e => {
 
 .cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-top:none}
 .cred{
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.09);
+  position:relative;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.10);
   border-radius:20px;padding:19px 21px;
   display:flex;flex-direction:column;gap:6px;
-  transition:border-color .3s var(--ease),transform .3s var(--ease);
+  /* Filo de luz arriba: da el aire de vidrio sin engrosar el borde. */
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  transition:border-color .35s var(--ease),transform .35s var(--ease),
+             box-shadow .35s var(--ease),background .35s var(--ease);
 }
-.cred:hover{border-color:rgba(0,154,62,.42);transform:translateY(-3px)}
+/* Sello dorado discreto: línea fina, sin relleno, al filo superior derecho. */
+.cred::after{
+  content:'';position:absolute;top:17px;right:19px;width:19px;height:19px;
+  opacity:.5;transition:opacity .35s var(--ease);pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C9A961' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='M15.477 12.89 17 22l-5-3-5 3 1.523-9.11'/%3E%3C/svg%3E") no-repeat center/contain;
+}
+.cred:hover{
+  border-color:rgba(0,154,62,.5);
+  transform:translateY(-3px);
+  background:linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.02));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),
+             0 0 0 1px rgba(0,154,62,.22),
+             0 18px 44px -18px rgba(0,154,62,.55);
+}
+.cred:hover::after{opacity:.92}
 .cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.22rem;font-weight:700;
-  color:#fff;letter-spacing:-.02em;line-height:1.05}
+  color:#fff;letter-spacing:-.02em;line-height:1.05;padding-right:28px}
 .cred-nombre{font-size:.82rem;line-height:1.45;color:rgba(238,242,234,.6);font-weight:400}
 
 @media(max-width:900px){
