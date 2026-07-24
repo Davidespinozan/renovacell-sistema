@@ -3887,5 +3887,39 @@ body.rnc-drawer-abierto{overflow:hidden}
   border-top:1px solid rgba(20,30,15,.055);
 }
 </style>
+<style id="rnc-acceso-imagen">
+/* SECCIÓN DE ACCESO ("Verifícate y entra") — la foto de laboratorio va de fondo,
+   a todo lo ancho. Un velo claro la baja de intensidad hacia el centro para que
+   el texto oscuro y el formulario se lean sin pelear con la imagen. */
+.contact{
+  position:relative;
+  background-color:var(--bone)!important;
+  background-image:
+    radial-gradient(78% 88% at 50% 46%, rgba(249,250,248,.90) 0%, rgba(249,250,248,.62) 52%, rgba(249,250,248,.28) 100%),
+    url("https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/imagenseccioncuestionario.webp")!important;
+  background-size:auto, cover!important;
+  background-position:center, center!important;
+  background-repeat:no-repeat, no-repeat!important;
+}
+/* El formulario, de vidrio: deja entrever la foto por detrás. */
+.contact-form{
+  background:rgba(255,255,255,.90)!important;
+  backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  box-shadow:0 24px 60px -28px rgba(15,40,20,.34)!important;
+}
+@media(max-width:900px){
+  /* En pantalla angosta la foto se recorta mucho: se sube el velo para no perder
+     contraste en el texto. */
+  .contact{
+    background-image:
+      radial-gradient(135% 78% at 50% 36%, rgba(249,250,248,.86) 0%, rgba(249,250,248,.64) 56%, rgba(249,250,248,.32) 100%),
+      url("https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/imagenseccioncuestionario.webp")!important;
+    /* La foto es apaisada: en pantalla angosta el recorte central cae en la zona
+       pálida, así que se desplaza hacia el frasco. */
+    background-position:center, 74% center!important;
+  }
+}
+</style>
 </body>
 </html>
