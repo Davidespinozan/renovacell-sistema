@@ -2537,7 +2537,17 @@ body.rc-has-ann .nav{top:38px}
       <div class="foot-col">
         <h5 data-rc="pieCol2Titulo">— México</h5>
         <div class="foot-col-list">
-          <span><b data-rc="pieMxNombre">Sede Culiacán</b><span data-rc-html="pieMxDir">Blvd. Pedro Infante 2911-E<br>Tres Ríos · 80020 Sinaloa</span></span>
+          <span><b data-rc="pieMxNombre">Sede Culiacán</b><span data-rc-html="pieMxDir">Blvd. Pedro Infante 2911-E<br>Tres Ríos · 80020 Sinaloa</span>
+            <span class="foot-map">
+              <iframe class="foot-map-frame" title="Mapa de Sede Culiacán" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                src="https://maps.google.com/maps?q=Blvd.%20Pedro%20Infante%202911-E%2C%20Tres%20R%C3%ADos%2C%2080020%20Culiac%C3%A1n%2C%20Sinaloa&z=15&output=embed"></iframe>
+              <a class="foot-map-hit" target="_blank" rel="noopener"
+                 href="https://www.google.com/maps/dir/?api=1&destination=Blvd.%20Pedro%20Infante%202911-E%2C%20Tres%20R%C3%ADos%2C%2080020%20Culiac%C3%A1n%2C%20Sinaloa"
+                 aria-label="Cómo llegar a Sede Culiacán en Google Maps">
+                <span class="foot-map-cta">Cómo llegar <b>→</b></span>
+              </a>
+            </span>
+          </span>
           <span><b>WhatsApp</b><span data-rc-watext="whatsappTexto">+52 667 531 0910</span></span>
           <span><b>Email</b><span data-rc="email">Facturacion@goldenplacenta.com</span></span>
         </div>
@@ -3916,6 +3926,39 @@ body.rnc-drawer-abierto{overflow:hidden}
      de la tarjeta bajo la franja. Con flex:1 la franja llena hasta el fondo. */
   flex:1 1 auto!important;
 }
+</style>
+<style id="rnc-mapa-culiacan">
+/* Mini mapa de Google bajo la dirección de Culiacán. El iframe queda inerte
+   (pointer-events:none) y encima va una capa-enlace: cualquier clic abre Google
+   Maps con la ruta hacia la sede. */
+.foot-map{
+  position:relative;display:block;margin-top:12px;
+  border-radius:14px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+  aspect-ratio:16/9;max-width:260px;
+  background:#0d140c;
+}
+.foot-map-frame{
+  position:absolute;inset:0;width:100%;height:100%;border:0;
+  pointer-events:none;filter:grayscale(.25) contrast(1.02);
+}
+.foot-map-hit{
+  position:absolute;inset:0;z-index:2;display:flex;align-items:flex-start;justify-content:flex-start;
+  text-decoration:none;
+  background:linear-gradient(180deg, rgba(6,17,9,.30) 0%, transparent 34%, transparent 100%);
+  transition:background .25s var(--ease);
+}
+.foot-map-hit:hover{background:linear-gradient(180deg, rgba(6,17,9,.42) 0%, transparent 46%, transparent 100%);}
+/* Chip arriba a la izquierda: no tapa la atribución de Google (que queda abajo). */
+.foot-map-cta{
+  margin:9px;padding:6px 10px;border-radius:20px;
+  background:rgba(6,17,9,.82);backdrop-filter:blur(3px);
+  font-family:'JetBrains Mono',monospace;
+  font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;
+  color:#fff;display:inline-flex;gap:6px;align-items:center;
+}
+.foot-map-cta b{color:var(--green-mid);transition:transform .25s var(--ease)}
+.foot-map-hit:hover .foot-map-cta b{transform:translateX(3px)}
 </style>
 <style id="rnc-catalogo-oscuro">
 /* CATÁLOGO SOBRE EL VERDE DEL HERO — mismo fondo que el hero para que las
