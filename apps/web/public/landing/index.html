@@ -2334,8 +2334,8 @@ body.rc-has-ann .nav{top:38px}
     </svg>
   </div>
   <div class="cat-inner">
-    <h2 data-rc="catalogoTitle">Todo el arsenal regenerativo y estético, en un solo lugar.</h2>
-    <p class="cat-lede" data-rc="catalogoBody">Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.</p>
+    <h2 data-rc="catalogoTitle">Catálogo profesional.</h2>
+    <p class="cat-lede" data-rc="catalogoBody">Acceso exclusivo para profesionales de la salud.</p>
     <div class="cat-filters" id="catFilters"></div>
     <div class="cat-grid" id="catGrid"></div>
   </div>
@@ -4068,12 +4068,6 @@ body.rnc-drawer-abierto{overflow:hidden}
 #catalogo .cat-inner{position:relative;z-index:1}
 @media(max-width:900px){
   .cat-bg-effect{display:none}
-  /* Mismo acento que el hero en celular: línea vertical tenue del verde de marca
-     por el costado derecho (arranca arriba y se desvanece hacia los productos). */
-  #catalogo::before{
-    content:'';position:absolute;top:74px;right:18px;width:1.5px;height:min(50vh,440px);z-index:0;pointer-events:none;
-    background:linear-gradient(180deg, transparent, rgba(51,174,100,.55) 22%, rgba(51,174,100,.14) 78%, transparent);
-  }
 }
 @media (prefers-reduced-motion: reduce){ .cat-bg-effect .hero-dna{animation:none} }
 
@@ -4228,13 +4222,8 @@ body.rnc-drawer-abierto{overflow:hidden}
   .split-cta{justify-content:center!important;width:100%!important}
   .split-cta .btn-hero-primary{min-width:220px}
 
-  /* En celular las hélices van ocultas y el hero quedaba muy plano. Se agrega un
-     acento: una línea vertical tenue del verde de marca por un costado y un halo
-     suave arriba, para darle profundidad sin saturar. */
-  .hero-split::before{
-    content:'';position:absolute;top:14%;bottom:16%;right:20px;width:1.5px;z-index:1;pointer-events:none;
-    background:linear-gradient(180deg, transparent, rgba(51,174,100,.6) 26%, rgba(51,174,100,.16) 68%, transparent);
-  }
+  /* En celular las hélices van ocultas; se deja un halo verde suave para dar algo
+     de profundidad sin la línea vertical (que no convenció). */
   .hero-split .hero-ambient{display:block!important;z-index:0}
   .hero-split .hero-glow-1{opacity:.5!important;width:420px!important;height:420px!important;top:-120px!important;left:-140px!important}
   .hero-split .hero-glow-2{opacity:.4!important;width:460px!important;height:460px!important;bottom:auto!important;top:8%!important;right:-200px!important}
