@@ -1,10 +1,10 @@
 // Hook de solicitudes de recurso. Mock; con Supabase = tabla resource_requests.
 import { useSyncExternalStore } from 'react'
-import { subscribe, getSnapshot, addRequest, setStatus, deliver, type ResourceRequest, type ResourceStatus, type ResourceOrigin } from '../store/resourcesStore'
+import { subscribe, getSnapshot, addRequest, setStatus, deliver, remove, type ResourceRequest, type ResourceStatus, type ResourceOrigin } from '../store/resourcesStore'
 
 export function useResources() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-  return { data, addRequest, setStatus, deliver }
+  return { data, addRequest, setStatus, deliver, remove }
 }
 
 export type { ResourceRequest, ResourceStatus, ResourceOrigin }

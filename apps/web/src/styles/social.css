@@ -84,6 +84,10 @@
 .libtile { height: 92px; display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #E9F4EC, #CFE6D6); color: var(--green-deep); }
 .libtile svg { width: 30px; height: 30px; }
 .libbody { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+/* Botón eliminar del asset (solo Diseño): esquina superior derecha de la tarjeta. */
+.libdel { position: absolute; top: 8px; right: 8px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line); background: rgba(255,255,255,.94); border-radius: 8px; cursor: pointer; box-shadow: var(--sh-sm); opacity: .55; transition: opacity .15s, transform .15s; }
+.libcard:hover .libdel { opacity: 1; }
+.libdel:hover { transform: translateY(-1px); border-color: #E4B8B4; }
 
 /* Bottom-sheet (comentarios) */
 .sheet-wrap { position: fixed; inset: 0; background: rgba(18,22,15,.5); backdrop-filter: blur(3px); z-index: 60; display: flex; align-items: flex-end; justify-content: center; animation: fade .2s; }

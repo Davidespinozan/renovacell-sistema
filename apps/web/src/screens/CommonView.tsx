@@ -39,6 +39,13 @@ export function CommonView() {
   const { role, user, capabilities } = useRole()
   const r = getRole(role)
   const canManage = canManageHub(role) || capabilities.includes('anuncios')
+  // Quien gestiona Diseño (admin o capability 'diseno') puede pasar una solicitud
+  // entregada a la Biblioteca y eliminar tanto assets como solicitudes.
+  const canDesign = canManageHub(role) || capabilities.includes('diseno')
+  const toLibrary = (rr: { title: string; assetUrl?: string }) => {
+    if (!rr.assetUrl) return
+    assets.create({ key: rr.title, url: rr.assetUrl, tags: ['solicitud'] })
+  }
   const hi = user?.name?.split('·')[0].trim() || 'Equipo'
   const ann = useAnnouncements()
   const assets = useAssets()
@@ -122,7 +129,15 @@ export function CommonView() {
         </div>
         <div className="libgrid" style={{ width: '100%' }}>
           {assets.data.map((as) => (
-            <div key={as.id} className="libcard">
+            <div key={as.id} className="libcard" style={{ position: 'relative' }}>
+              {canDesign && (
+                <button
+                  type="button" className="libdel" title="Eliminar de la biblioteca"
+                  onClick={() => { if (window.confirm('¿Eliminar este asset de la biblioteca?')) assets.remove(as.id) }}
+                >
+                  <Trash2 size={15} color="var(--danger)" />
+                </button>
+              )}
               {as.url && (as.url.startsWith('data:image') || /^https?:\/\//.test(as.url)) ? (
                 <img src={as.url} alt={as.key ?? ''} style={{ width: '100%', height: 92, objectFit: 'cover', display: 'block' }} />
               ) : (
@@ -159,7 +174,18 @@ export function CommonView() {
                 {rr.status === 'entregado' && rr.assetUrl && (
                   <a className="btn ghost sm" href={rr.assetUrl} target="_blank" rel="noreferrer" download><Eye size={14} /> Ver</a>
                 )}
+                {canDesign && rr.status === 'entregado' && rr.assetUrl && (
+                  <button className="btn sm" type="button" title="Pasar a la Biblioteca" onClick={() => toLibrary(rr)}>
+                    <ImageIcon size={14} /> A biblioteca
+                  </button>
+                )}
                 <span className={'pill ' + pill}>{lbl}</span>
+                {canDesign && (
+                  <button className="fbtn" type="button" title="Eliminar solicitud"
+                    onClick={() => { if (window.confirm('¿Eliminar esta solicitud de recurso?')) resources.remove(rr.id) }}>
+                    <Trash2 size={15} color="var(--danger)" />
+                  </button>
+                )}
               </div>
             )
           })}

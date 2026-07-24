@@ -75,3 +75,10 @@ export function deliver(id: string, assetUrl: string) {
   live.setLocal(live.current().map((r) => (r.id === id ? { ...r, status: 'entregado', assetUrl } : r)))
   if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status: 'entregado', asset_url: assetUrl }).eq('id', id).then(({ error }) => { if (error) console.warn('[resources] deliver', error.message); live.reload() })
 }
+
+// Eliminar una solicitud. Reservado a quien gestiona Diseño (RLS lo respalda:
+// solo admin o cap 'diseno').
+export function remove(id: string) {
+  live.setLocal(live.current().filter((r) => r.id !== id))
+  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[resources] remove', error.message); live.reload() })
+}
