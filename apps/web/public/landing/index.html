@@ -3012,9 +3012,21 @@ document.addEventListener('keydown', e => {
        pocas miniaturas en el DOM. Las diferidas que se insertan ya dentro del
        viewport (al cambiar de página) a veces no cargaban hasta hacer scroll y
        la tarjeta se quedaba en blanco. */
-    b.innerHTML='<div class="cat-tile">'+(src?('<img decoding="async" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
-      +'<span class="cat-arrow" aria-hidden="true">\u2197</span></div>'
-      +'<span class="cat-name">'+esc(pp.name)+'</span>';
+    var md=pp.metadata||{};
+    var badge = md.badge ? '<span class="cat-badge">'+esc(md.badge)+'</span>' : '';
+    var tagTxt = md.tagline || pp.description || '';
+    var tag = tagTxt ? '<span class="cat-tag">'+esc(tagTxt)+'</span>' : '';
+    var chips = (md.chips && md.chips.length)
+      ? '<div class="cat-meta">'+md.chips.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>' : '';
+    b.innerHTML='<div class="cat-tile">'
+      +(src?('<img decoding="async" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
+      +badge+'</div>'
+      +'<div class="cat-body">'
+        +'<span class="cat-cat">'+esc(pp.category||'')+'</span>'
+        +'<span class="cat-name">'+esc(pp.name)+'</span>'
+        +tag+chips
+        +'<span class="cat-arrow" aria-hidden="true">\u2192</span>'
+      +'</div>';
     b.addEventListener('click',function(){openModal(pp);});
     return b;
   }
@@ -3042,7 +3054,7 @@ document.addEventListener('keydown', e => {
       filters.appendChild(x);
     });
   }
-  fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
+  fetch(U+'/rest/v1/catalog_public?select=name,line,category,description,image_url,brochure_url,metadata&order=category,name',{headers:{apikey:K,Authorization:'Bearer '+K}})
     .then(function(r){return r.ok?r.json():[];})
     .then(function(rows){
       all=rows||[];
@@ -4199,6 +4211,72 @@ body.rnc-drawer-abierto{overflow:hidden}
 }
 @media(max-width:900px){
   .s2rm-icons{grid-template-columns:1fr 1fr;gap:26px 14px;margin-top:18px;padding-top:20px}
+}
+</style>
+<style id="rnc-tarjeta-rica">
+/* TARJETA DE PRODUCTO RICA — foto arriba, cuerpo blanco con categoría, nombre,
+   descripción, fila de datos y flecha. Reemplaza la franja verde de nombre.
+   Va al final para ganarle a los bloques de tarjeta anteriores. */
+.cat-card{
+  background:#fff!important;border:none!important;border-radius:20px!important;
+  padding:0!important;gap:0!important;overflow:hidden!important;
+  display:flex!important;flex-direction:column!important;text-align:left!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.16), 0 20px 44px -26px rgba(0,0,0,.5)!important;
+  transition:transform .25s var(--ease),box-shadow .25s var(--ease)!important;
+}
+.cat-card:hover{
+  transform:translateY(-3px)!important;
+  box-shadow:0 0 0 1px rgba(47,174,106,.4), 0 24px 54px -22px rgba(0,120,45,.5)!important;
+}
+.cat-tile{
+  position:relative!important;aspect-ratio:1/1!important;background:#fff!important;
+  border:none!important;border-radius:0!important;margin:0!important;overflow:hidden!important;
+}
+/* Badge de esquina (solo si el producto lo trae en metadata.badge). */
+.cat-badge{
+  position:absolute;top:13px;right:13px;z-index:2;
+  background:#f1f3ee;color:var(--ink-2);
+  font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.14em;
+  text-transform:uppercase;font-weight:600;padding:6px 11px;border-radius:20px;
+}
+.cat-body{
+  position:relative;display:flex;flex-direction:column;flex:1 1 auto;
+  padding:15px 17px 16px!important;background:#fff!important;
+}
+.cat-cat{
+  display:block!important;   /* una regla vieja la ocultaba con display:none */
+  font-family:'JetBrains Mono',monospace!important;font-size:9px!important;letter-spacing:.16em!important;
+  text-transform:uppercase;color:var(--green)!important;font-weight:600!important;margin:0 0 7px!important;
+}
+.cat-name{
+  font-weight:700!important;font-size:1.02rem!important;color:var(--ink)!important;
+  line-height:1.25!important;letter-spacing:-.01em!important;
+  background:none!important;padding:0!important;margin:0!important;border:none!important;
+}
+.cat-tag{
+  display:block;font-size:.8rem;color:var(--mid);line-height:1.4;margin:5px 0 0;
+  padding-right:8px;
+}
+.cat-meta{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  margin-top:14px;padding:12px 44px 0 0;border-top:1px solid var(--line);
+}
+.cat-meta span{font-size:10.5px;color:var(--soft);font-weight:500;white-space:nowrap}
+.cat-meta span:not(:last-child)::after{content:'·';margin-left:9px;color:#c9cec4}
+/* Flecha en círculo, abajo a la derecha. */
+.cat-arrow{
+  position:absolute!important;bottom:15px;right:15px;top:auto!important;left:auto!important;
+  width:34px;height:34px;border-radius:50%;display:grid!important;place-items:center;
+  font-size:15px;color:var(--green-dark);background:#fff;border:1px solid var(--line);
+  transition:all .2s var(--ease);z-index:2;
+}
+.cat-card:hover .cat-arrow{background:var(--green);color:#fff;border-color:var(--green)}
+/* Si la tarjeta no trae fila de datos, la flecha se apoya en el nombre. */
+.cat-body:not(:has(.cat-meta)) .cat-arrow{bottom:15px}
+@media(max-width:900px){
+  .cat-body{padding:14px 15px 15px!important}
+  .cat-name{font-size:.98rem!important}
+  .cat-meta{padding-right:40px}
 }
 </style>
 <style id="rnc-hero-editorial">
