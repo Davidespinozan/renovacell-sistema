@@ -22,9 +22,11 @@ svg{display:block}
 /* Login / pantallas de sesión centradas */
 /* Login de dos paneles: marca (verde profundo) + formulario */
 .login-wrap{min-height:100%;display:grid;grid-template-columns:1.05fr .95fr}
-.login-brand{position:relative;overflow:hidden;background:radial-gradient(120% 90% at 100% 0%,rgba(95,184,115,.12),transparent 55%),linear-gradient(160deg,#23272e 0%,#14171b 46%,#0a0c0f 100%);color:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:52px 48px;box-shadow:inset 0 1px 0 var(--chrome-edge)}
-.login-brand::before{content:"";position:absolute;top:-120px;right:-100px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(95,184,115,.22),transparent 70%)}
-.login-brand::after{content:"";position:absolute;bottom:-140px;left:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(95,184,115,.12),transparent 70%)}
+/* Fondo del login alineado a la LANDING: verde-negro del hero (#0A2412…#06210F)
+   con brillos del verde de marca, no el gris-negro neutro anterior. */
+.login-brand{position:relative;overflow:hidden;background:radial-gradient(120% 90% at 100% 0%,rgba(0,154,62,.18),transparent 55%),linear-gradient(158deg,#0E3020 0%,#0A2412 46%,#06210F 100%);color:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:52px 48px;box-shadow:inset 0 1px 0 var(--chrome-edge)}
+.login-brand::before{content:"";position:absolute;top:-120px;right:-100px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(51,174,100,.24),transparent 70%)}
+.login-brand::after{content:"";position:absolute;bottom:-140px;left:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(0,154,62,.14),transparent 70%)}
 .lb-top{position:relative;z-index:1;display:flex;align-items:center;gap:13px}
 .lb-top img{width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.1);padding:5px}
 .lb-top .bn{font-weight:700;font-size:18px;line-height:1}
@@ -33,7 +35,7 @@ svg{display:block}
 .lb-mid h2{font-size:30px;font-weight:600;line-height:1.15;letter-spacing:-.02em}
 .lb-mid p{font-size:14.5px;color:rgba(255,255,255,.78);line-height:1.6;margin-top:14px}
 .lb-foot{position:relative;z-index:1;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.6);font-weight:600}
-.login-panel{display:grid;place-items:center;padding:32px;background:radial-gradient(120% 90% at 50% 0%,#16191e 0%,#0c0e11 70%)}
+.login-panel{display:grid;place-items:center;padding:32px;background:radial-gradient(120% 90% at 50% 0%,#0C2A18 0%,#06210F 70%)}
 .login-card{position:relative;width:min(380px,100%);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:28px;box-shadow:0 20px 50px -20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
 .login-mini-brand{display:none}
 @media (max-width:860px){
