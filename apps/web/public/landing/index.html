@@ -4066,7 +4066,15 @@ body.rnc-drawer-abierto{overflow:hidden}
 .cat-bg-effect{position:absolute;inset:0;width:100%;height:100%}
 .cat-bg-effect .hero-dna{animation:rnc-dna 9s ease-in-out infinite}
 #catalogo .cat-inner{position:relative;z-index:1}
-@media(max-width:900px){ .cat-bg-effect{display:none} }
+@media(max-width:900px){
+  .cat-bg-effect{display:none}
+  /* Mismo acento que el hero en celular: línea vertical tenue del verde de marca
+     por el costado derecho (arranca arriba y se desvanece hacia los productos). */
+  #catalogo::before{
+    content:'';position:absolute;top:74px;right:18px;width:1.5px;height:min(50vh,440px);z-index:0;pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(51,174,100,.55) 22%, rgba(51,174,100,.14) 78%, transparent);
+  }
+}
 @media (prefers-reduced-motion: reduce){ .cat-bg-effect .hero-dna{animation:none} }
 
 #catalogo h2{color:#fff!important}
