@@ -3969,10 +3969,10 @@ body.rnc-drawer-abierto{overflow:hidden}
 .cat-name{
   display:block;margin:0!important;
   padding:14px 18px 16px!important;
-  background:rgba(0,154,62,.10)!important;
-  color:#0A2412!important;
+  background:#33AE64!important;   /* el verde del hero ("medicina regenerativa") */
+  color:#fff!important;
   border-top:none!important;
-  font-weight:500!important;
+  font-weight:600!important;
   /* La rejilla iguala la altura de la fila. Si un vecino parte su nombre en dos
      renglones, en las tarjetas de nombre corto sobraba altura y asomaba el blanco
      de la tarjeta bajo la franja. Con flex:1 la franja llena hasta el fondo. */
@@ -4219,6 +4219,17 @@ body.rnc-drawer-abierto{overflow:hidden}
   .hero-split .split-media{width:100%!important;justify-self:stretch!important}
   .split-cta{justify-content:center!important;width:100%!important}
   .split-cta .btn-hero-primary{min-width:220px}
+
+  /* En celular las hélices van ocultas y el hero quedaba muy plano. Se agrega un
+     acento: una línea vertical tenue del verde de marca por un costado y un halo
+     suave arriba, para darle profundidad sin saturar. */
+  .hero-split::before{
+    content:'';position:absolute;top:14%;bottom:16%;right:20px;width:1.5px;z-index:1;pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(51,174,100,.6) 26%, rgba(51,174,100,.16) 68%, transparent);
+  }
+  .hero-split .hero-ambient{display:block!important;z-index:0}
+  .hero-split .hero-glow-1{opacity:.5!important;width:420px!important;height:420px!important;top:-120px!important;left:-140px!important}
+  .hero-split .hero-glow-2{opacity:.4!important;width:460px!important;height:460px!important;bottom:auto!important;top:8%!important;right:-200px!important}
 }
 </style>
 </body>
