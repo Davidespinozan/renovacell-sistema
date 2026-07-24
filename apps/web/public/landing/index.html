@@ -3837,6 +3837,12 @@ body.rnc-drawer-abierto{overflow:hidden}
   }
   .hero-split .split-frame{border-radius:20px!important;box-shadow:none!important;border:none!important}
 }
+/* Las fotos de celular son 1:1 (1254x1254): el marco toma esa proporción para que
+   se vean completas y no recortadas a 16:9. El corte va en 760px porque ese es el
+   mismo punto en el que el script cambia a la foto de celular (imageMobileUrl). */
+@media(max-width:760px){
+  .hero-split .split-frame{aspect-ratio:1/1!important}
+}
 </style>
 <style id="rnc-tarjeta-producto">
 /* TARJETA DE PRODUCTO — una sola pieza blanca: la foto arriba y el nombre DENTRO
