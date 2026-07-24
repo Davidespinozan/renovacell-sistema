@@ -1520,6 +1520,13 @@ body.modal-open{overflow:hidden;}
   .contact-form{padding:24px 18px;border-radius:20px;}
   .form-row{grid-template-columns:1fr;gap:0;}
   .foot-top{grid-template-columns:1fr;gap:28px;}
+  /* En celular el pie se apila: la tienda (México/Culiacán, con su mapa) sube
+     justo debajo de la marca, antes del catálogo y de Praga, para que no quede
+     hasta el fondo. */
+  .foot-top > :nth-child(1){order:0}   /* marca */
+  .foot-top > :nth-child(3){order:1}   /* México · la tienda */
+  .foot-top > :nth-child(2){order:2}   /* catálogo */
+  .foot-top > :nth-child(4){order:3}   /* Unión Europea */
   .foot-bottom{flex-direction:column;text-align:left;gap:10px;align-items:flex-start;}
   .ticker-item{font-size:10px;padding:0 22px;gap:22px;}
   .s2rm-grid{gap:24px;}
