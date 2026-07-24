@@ -3014,9 +3014,13 @@ document.addEventListener('keydown', e => {
        la tarjeta se quedaba en blanco. */
     var md=pp.metadata||{};
     var badge = md.badge ? '<span class="cat-badge">'+esc(md.badge)+'</span>' : '';
+    /* Ficha rica (tagline + datos) SOLO cuando TODOS los productos la tengan, para
+       no mezclar tarjetas con y sin datos. Mientras tanto, todas van uniformes:
+       categor\u00eda + nombre + flecha. Los datos siguen guardados en products.metadata. */
+    var RICO = false;
     var tagTxt = md.tagline || pp.description || '';
-    var tag = tagTxt ? '<span class="cat-tag">'+esc(tagTxt)+'</span>' : '';
-    var chips = (md.chips && md.chips.length)
+    var tag = (RICO && tagTxt) ? '<span class="cat-tag">'+esc(tagTxt)+'</span>' : '';
+    var chips = (RICO && md.chips && md.chips.length)
       ? '<div class="cat-meta">'+md.chips.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>' : '';
     b.innerHTML='<div class="cat-tile">'
       +(src?('<img decoding="async" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
