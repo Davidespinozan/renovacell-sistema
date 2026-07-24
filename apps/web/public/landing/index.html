@@ -3384,34 +3384,34 @@ document.addEventListener('keydown', e => {
   background:
     radial-gradient(120% 92% at 50% -8%, rgba(0,154,62,.15), transparent 60%),
     radial-gradient(130% 100% at 50% 0%, #12180f 0%, #080b06 64%);
-  color:#fff;padding:92px 0 96px;position:relative;
+  color:#fff;padding:56px 0 60px;position:relative;
 }
 .cred-inner{max-width:1180px;margin:0 auto;padding:0 40px;display:block}
-.cred-titulo{max-width:620px;margin-bottom:44px}
-.cred-titulo h2{font-size:clamp(1.6rem,2.7vw,2.35rem);line-height:1.12;letter-spacing:-.026em;
+.cred-titulo{max-width:620px;margin-bottom:28px}
+.cred-titulo h2{font-size:clamp(1.4rem,2.25vw,1.95rem);line-height:1.14;letter-spacing:-.024em;
   font-weight:700;margin:0;color:#fff}
 .cred-titulo h2 .green{color:var(--green-mid)}
 
-.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;border-top:none}
+.cred-fila{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-top:none}
 .cred{
   background:rgba(255,255,255,.03);
   border:1px solid rgba(255,255,255,.09);
-  border-radius:20px;padding:28px 26px;
-  display:flex;flex-direction:column;gap:9px;
+  border-radius:20px;padding:19px 21px;
+  display:flex;flex-direction:column;gap:6px;
   transition:border-color .3s var(--ease),transform .3s var(--ease);
 }
 .cred:hover{border-color:rgba(0,154,62,.42);transform:translateY(-3px)}
-.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;
+.cred-sigla{font-family:'JetBrains Mono',monospace;font-size:1.22rem;font-weight:700;
   color:#fff;letter-spacing:-.02em;line-height:1.05}
-.cred-nombre{font-size:.9rem;line-height:1.5;color:rgba(238,242,234,.62);font-weight:400}
+.cred-nombre{font-size:.82rem;line-height:1.45;color:rgba(238,242,234,.6);font-weight:400}
 
 @media(max-width:900px){
-  .credenciales{padding:60px 0 62px}
+  .credenciales{padding:42px 0 46px}
   .cred-inner{padding:0 22px}
-  .cred-titulo{margin-bottom:30px}
-  .cred-fila{grid-template-columns:1fr 1fr;gap:14px}
-  .cred{padding:22px 20px}
-  .cred-sigla{font-size:1.25rem}
+  .cred-titulo{margin-bottom:20px}
+  .cred-fila{grid-template-columns:1fr 1fr;gap:12px}
+  .cred{padding:16px 16px}
+  .cred-sigla{font-size:1.05rem}
 }
 </style>
 <style id="rnc-s2rm-compacto">
@@ -3836,6 +3836,30 @@ body.rnc-drawer-abierto{overflow:hidden}
     margin:0 0 34px!important;width:100%!important;
   }
   .hero-split .split-frame{border-radius:20px!important;box-shadow:none!important;border:none!important}
+}
+</style>
+<style id="rnc-tarjeta-producto">
+/* TARJETA DE PRODUCTO — una sola pieza blanca: la foto arriba y el nombre DENTRO
+   del mismo marco. Antes el nombre colgaba fuera y, al pasar el cursor, la sombra
+   envolvía un rectángulo invisible que se veía como una mancha. */
+.cat-card{
+  background:#fff!important;border:none!important;border-radius:20px!important;
+  padding:0!important;gap:0!important;overflow:hidden!important;
+}
+.cat-card:hover{
+  box-shadow:0 16px 38px -18px rgba(0,60,20,.34)!important;
+  transform:translateY(-3px)!important;
+}
+/* La foto ya no lleva su propio marco: lo da la tarjeta. */
+.cat-tile{
+  border-radius:0!important;border:none!important;margin-bottom:0!important;
+  aspect-ratio:1/1!important;background:#fff!important;
+}
+/* Franja del nombre, dentro del marco. */
+.cat-name{
+  display:block;margin:0!important;
+  padding:13px 18px 17px!important;
+  border-top:1px solid rgba(20,30,15,.055);
 }
 </style>
 </body>
