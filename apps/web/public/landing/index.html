@@ -3904,6 +3904,12 @@ body.rnc-drawer-abierto{overflow:hidden}
   border-top:1px solid rgba(20,30,15,.055);
 }
 </style>
+<style id="rnc-antetitulo-vacio">
+/* Un antetítulo vacío (se vacían desde Administración) dejaba su guion decorativo
+   flotando solo, como una rayita suelta. Si no hay texto, no se dibuja nada. */
+.section-kicker:empty,.cred-kicker:empty,.cat-kicker:empty,
+.aw-kicker:empty,.kicker:empty{display:none!important}
+</style>
 <style id="rnc-acceso-imagen">
 /* SECCIÓN DE ACCESO ("Verifícate y entra") — la foto de laboratorio va de fondo,
    a todo lo ancho. Un velo claro la baja de intensidad hacia el centro para que
@@ -3925,16 +3931,27 @@ body.rnc-drawer-abierto{overflow:hidden}
   border:1px solid rgba(255,255,255,.72)!important;
   box-shadow:0 24px 60px -28px rgba(15,40,20,.34)!important;
 }
-@media(max-width:900px){
-  /* En pantalla angosta la foto se recorta mucho: se sube el velo para no perder
-     contraste en el texto. */
+@media(max-width:760px){
+  /* En celular manda su propia foto vertical (853x1844): la apaisada se recortaba
+     en la zona pálida. Va a ancho completo y alto natural, anclada arriba, para
+     que se vea tal cual se diseñó (con `cover` se escalaba y el frasco caía
+     encima del texto). */
   .contact{
     background-image:
-      radial-gradient(135% 78% at 50% 36%, rgba(249,250,248,.86) 0%, rgba(249,250,248,.64) 56%, rgba(249,250,248,.32) 100%),
-      url("https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/imagenseccioncuestionario.webp")!important;
-    /* La foto es apaisada: en pantalla angosta el recorte central cae en la zona
-       pálida, así que se desplaza hacia el frasco. */
-    background-position:center, 74% center!important;
+      linear-gradient(180deg,
+        rgba(249,250,248,.05) 0%,
+        rgba(249,250,248,.10) 22%,
+        rgba(249,250,248,.55) 34%,
+        rgba(249,250,248,.86) 48%,
+        rgba(249,250,248,.97) 68%,
+        rgba(249,250,248,1) 100%),
+      url("https://amurlvlvfohwucvxfdot.supabase.co/storage/v1/object/public/LANDING%20PAGE/heroseccionaccesomovil.webp")!important;
+    background-size:auto, 100% auto!important;
+    background-position:center, center top!important;
+    background-repeat:no-repeat, no-repeat!important;
+    /* El frasco baja hasta ~42% de la foto, y la foto mide 216vw de alto
+       (853x1844): el texto arranca en 92vw para quedar limpio debajo de él. */
+    padding-top:clamp(280px, 92vw, 500px)!important;
   }
 }
 </style>
