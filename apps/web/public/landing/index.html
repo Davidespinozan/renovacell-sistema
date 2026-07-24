@@ -4135,6 +4135,16 @@ body.rnc-drawer-abierto{overflow:hidden}
   .split-sub{order:2!important;font-size:1.02rem!important;line-height:1.5!important;margin:0!important;max-width:none!important}
   .split-media{margin-top:6px!important}
   .split-cta{margin-top:4px!important}
+
+  /* CENTRADO EN CELULAR — como "La nueva referencia en" no cabe en un renglón sin
+     encogerla, se centra todo el hero: los tres bloques del título quedan
+     centrados y se leen como composición, no como corte accidental. */
+  .hero-split .split-inner{justify-items:center!important;text-align:center!important}
+  .split-kicker{justify-content:center!important}
+  .hero-split .split-headline,.hero-split .split-sub{margin-left:auto!important;margin-right:auto!important}
+  .hero-split .split-media{width:100%!important;justify-self:stretch!important}
+  .split-cta{justify-content:center!important;width:100%!important}
+  .split-cta .btn-hero-primary{min-width:220px}
 }
 </style>
 </body>
