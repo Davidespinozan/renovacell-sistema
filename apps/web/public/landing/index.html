@@ -2224,30 +2224,39 @@ body.rc-has-ann .nav{top:38px}
         </h3>
         <p data-rc-html="cienciaBody">Moléculas bioactivas liberadas por células madre que promueven la comunicación celular y los procesos naturales de reparación y regeneración de los tejidos. Tecnología propietaria de Renovacell desde 2008.</p>
 
-        <div class="s2rm-bullets">
-          <div class="s2rm-bullet">
-            <div class="s2rm-bullet-num">01</div>
-            <div class="s2rm-bullet-text">
-              <b data-rc="punto1Titulo">Rangos médicos especializados</b>
-              <span data-rc="punto1Texto">tópico, inyectable e implantable</span>
-            </div>
-            
+        <div class="s2rm-icons">
+          <div class="s2rm-icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="17" cy="24" r="3.2" fill="currentColor" stroke="none"/>
+              <path d="M13 20.5a5.5 5.5 0 000 7"/>
+              <path d="M23.5 19a7.5 7.5 0 010 10"/>
+              <path d="M27.5 15a13 13 0 010 18"/>
+            </svg>
+            <span>Comunicación<br>celular</span>
           </div>
-          <div class="s2rm-bullet">
-            <div class="s2rm-bullet-num">02</div>
-            <div class="s2rm-bullet-text">
-              <b data-rc="punto2Titulo">Resultados visibles y seguros</b>
-              <span data-rc="punto2Texto">biocompatibles, con evidencia clínica</span>
-            </div>
-            
+          <div class="s2rm-icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="24" cy="24" r="11"/>
+              <path d="M24 17v14M17 24h14M19.4 19.4l9.2 9.2M28.6 19.4l-9.2 9.2"/>
+            </svg>
+            <span>Reparación<br>profunda</span>
           </div>
-          <div class="s2rm-bullet">
-            <div class="s2rm-bullet-num">03</div>
-            <div class="s2rm-bullet-text">
-              <b data-rc="punto3Titulo">Estándares Comunidad Europea</b>
-              <span data-rc="punto3Texto">certificación vigente</span>
-            </div>
-            
+          <div class="s2rm-icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="24" cy="24" r="11"/>
+              <path d="M24 17c.7 3.6 2.7 5.6 6 6-3.3.4-5.3 2.4-6 6-.7-3.6-2.7-5.6-6-6 3.3-.4 5.3-2.4 6-6z"/>
+              <circle cx="30.5" cy="17.5" r=".9" fill="currentColor" stroke="none"/>
+              <circle cx="17.5" cy="30.5" r=".9" fill="currentColor" stroke="none"/>
+            </svg>
+            <span>Regeneración<br>tejidual</span>
+          </div>
+          <div class="s2rm-icon">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 19c5-4 8 4 13 1s7-5 13-1"/>
+              <path d="M11 29c5-4 8 4 13 1s7-5 13-1"/>
+              <circle cx="24" cy="24" r="1.6" fill="currentColor" stroke="none"/>
+            </svg>
+            <span>Biotecnología<br>avanzada</span>
           </div>
         </div>
       </div>
@@ -4095,6 +4104,29 @@ body.rnc-drawer-abierto{overflow:hidden}
        (853x1844): el texto arranca en 92vw para quedar limpio debajo de él. */
     padding-top:clamp(280px, 92vw, 500px)!important;
   }
+}
+</style>
+<style id="rnc-s2rm-iconos">
+/* CIENCIA — fila de iconos de línea (estilo dorado) en vez de los puntos 01/02/03.
+   Más limpio y editorial: icono minimalista + etiqueta en dos palabras. */
+.s2rm-icons{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+  margin-top:22px;padding-top:24px;border-top:1px solid var(--line);
+}
+.s2rm-icon{
+  display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
+}
+.s2rm-icon svg{
+  width:44px;height:44px;color:#C2A76E;flex:none;
+  transition:transform .3s var(--ease),color .3s var(--ease);
+}
+.s2rm-icon:hover svg{color:#B08F52;transform:translateY(-2px)}
+.s2rm-icon span{
+  font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;
+  color:var(--ink-2);line-height:1.45;
+}
+@media(max-width:900px){
+  .s2rm-icons{grid-template-columns:1fr 1fr;gap:26px 14px;margin-top:18px;padding-top:20px}
 }
 </style>
 <style id="rnc-hero-editorial">
