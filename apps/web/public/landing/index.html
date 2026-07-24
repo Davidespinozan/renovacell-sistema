@@ -4151,25 +4151,25 @@ body.rnc-drawer-abierto{overflow:hidden}
   background-position:center, center!important;
   background-repeat:no-repeat, no-repeat!important;
 }
-/* El formulario, tarjeta OSCURA: el vidrio translúcido se sentía muy transparente
-   sobre la foto clara; en negro resalta y se lee como una pieza sólida. Los campos
-   y etiquetas se voltean a tema oscuro. */
+/* El formulario, tarjeta BLANCA SÓLIDA (no translúcida): el vidrio lavaba el texto
+   y le quitaba profundidad. Ahora es blanco opaco, con sombra marcada para
+   despegarlo de la foto, y las letras firmes (etiquetas e inputs con buen
+   contraste). */
 .contact-form{
-  background:linear-gradient(180deg, rgba(16,22,14,.96), rgba(9,13,8,.97))!important;
-  backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important;
-  border:1px solid rgba(255,255,255,.10)!important;
-  box-shadow:0 34px 70px -30px rgba(0,0,0,.7)!important;
+  background:#ffffff!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  border:1px solid rgba(20,30,15,.08)!important;
+  box-shadow:0 34px 72px -26px rgba(8,30,15,.55), 0 3px 10px rgba(0,0,0,.07)!important;
 }
-.contact-form .form-field label{color:rgba(238,242,234,.55)!important}
+.contact-form .form-field label{color:var(--ink-3)!important;font-weight:700!important}
 .contact-form .form-input{
-  background:rgba(255,255,255,.055)!important;border-color:rgba(255,255,255,.14)!important;color:#fff!important;
+  background:#fff!important;border-color:var(--line)!important;color:var(--ink)!important;
 }
-.contact-form .form-input::placeholder{color:rgba(238,242,234,.4)!important}
+.contact-form .form-input::placeholder{color:var(--soft)!important}
 .contact-form .form-input:focus{
-  border-color:var(--green-mid)!important;box-shadow:0 0 0 4px rgba(0,154,62,.16)!important;
-  background:rgba(255,255,255,.08)!important;
+  border-color:var(--green)!important;box-shadow:0 0 0 4px rgba(0,115,17,.10)!important;background:#fff!important;
 }
-.contact-form p span[data-rc="verifNota"]{color:rgba(238,242,234,.5)!important}
+.contact-form p span[data-rc="verifNota"]{color:var(--mid)!important}
 @media(max-width:760px){
   /* En celular manda su propia foto vertical (853x1844): la apaisada se recortaba
      en la zona pálida. Va a ancho completo y alto natural, anclada arriba, para
