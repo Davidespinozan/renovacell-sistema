@@ -4119,14 +4119,22 @@ body.rnc-drawer-abierto{overflow:hidden}
   }
 }
 @media(max-width:900px){
+  /* Ritmo vertical apretado: se quita el hueco muerto de arriba (~80px) y se
+     acercan antetítulo, título, subtítulo e imagen para que el hero se sienta
+     compuesto, no suelto. */
+  .hero-split{padding-top:calc(var(--nav-space,76px) + 12px)!important;padding-bottom:34px!important}
+  .hero-split .split-inner{gap:13px!important}
+  .split-kicker{margin:0!important}
   .hero-split .split-headline{
-    font-size:clamp(2.1rem,8.6vw,2.85rem)!important;line-height:1.08!important;
-    letter-spacing:-.025em!important;margin:0 0 16px!important;max-width:none!important;
+    font-size:clamp(2.1rem,8.6vw,2.8rem)!important;line-height:1.07!important;
+    letter-spacing:-.025em!important;margin:0!important;max-width:none!important;
   }
   /* En celular .split-text es display:contents y los hijos se ordenan sueltos.
      El subtítulo va justo después del título (mismo order que el h1, el DOM lo
      coloca después), antes de la imagen. Sin esto brincaba al inicio. */
-  .split-sub{order:2!important;font-size:1.02rem!important;margin:2px 0 4px!important;max-width:none!important}
+  .split-sub{order:2!important;font-size:1.02rem!important;line-height:1.5!important;margin:0!important;max-width:none!important}
+  .split-media{margin-top:6px!important}
+  .split-cta{margin-top:4px!important}
 }
 </style>
 </body>
