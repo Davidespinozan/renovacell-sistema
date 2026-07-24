@@ -2436,20 +2436,19 @@ body.rc-has-ann .nav{top:38px}
 </section>
 
 <!-- CTA FINAL -->
-<section class="accesswall" id="acceso">
+<section class="accesswall accesswall--slim" id="acceso">
   <div class="aw-glow" aria-hidden="true"></div>
   <div class="aw-inner">
-    <h2 data-rc-html="accesoTitle">Ya conoces el arsenal. <span class="green">Así entras.</span></h2>
-    <p class="aw-lede" data-rc="accesoBody">Renovacell vende solo a profesionales de la salud. No es una tienda abierta: el catálogo y los precios se activan cuando tu cédula queda avalada — así protegemos el estándar y a los pacientes de quienes lo aplican. La verificación es rápida; el acceso, permanente.</p>
-    <div class="aw-steps">
-      <div class="aw-step"><span class="num">01</span><h3 data-rc="paso1Titulo">Solicitas acceso</h3><p data-rc="paso1Texto">Dejas tu cédula profesional y tus datos. Treinta segundos, sin compromiso.</p></div>
-      <div class="aw-step"><span class="num">02</span><h3 data-rc="paso2Titulo">La IA te avala</h3><p data-rc="paso2Texto">Verificamos tu cédula contra el registro oficial (SEP) en minutos, no en días. Sin llamadas ni esperas.</p></div>
-      <div class="aw-step"><span class="num">03</span><h3 data-rc="paso3Titulo">Entras al círculo</h3><p data-rc="paso3Texto">Catálogo completo, precios profesionales y tu asesor. Compras cuando quieras, ya como parte de Renovacell.</p></div>
+    <div class="aw-slim-head">
+      <span class="aw-kicker" data-rc="accesoKicker">Acceso exclusivo</span>
+      <h2 data-rc-html="accesoTitle">Solo 3 pasos</h2>
     </div>
-    <div class="aw-foot">
-      <a href="#contacto" class="btn-hero-primary" data-rc="accesoCta">Solicitar acceso médico</a>
-      <span class="aw-reassure" data-rc-html="accesoNota">La verificación es la puerta, no el obstáculo. <b>Pertenecer es el privilegio.</b></span>
-    </div>
+    <ol class="aw-slim-steps">
+      <li><span class="aw-n">1</span><span data-rc="paso1Titulo">Solicita acceso</span></li>
+      <li><span class="aw-n">2</span><span data-rc="paso2Titulo">Verificamos tu cédula automáticamente</span></li>
+      <li><span class="aw-n">3</span><span data-rc="paso3Titulo">Accedes al catálogo profesional</span></li>
+    </ol>
+    <a href="#contacto" class="btn-hero-primary aw-slim-cta" data-rc="accesoCta">Solicitar acceso</a>
   </div>
 </section>
 
@@ -3073,6 +3072,9 @@ document.addEventListener('keydown', e => {
         // NO tocar botones de formulario (ej. "Enviar solicitud" del contacto): esos
         // envían el lead a capture-lead, no son CTAs de compra.
         if(el.type==='submit' || (el.className||'').indexOf('form-submit')>=0 || el.closest('form')) return;
+        // NO tocar CTAs gestionados desde Administración (data-rc): su texto y destino
+        // ya vienen de la base; este normalizador es solo para restos de lenguaje viejo.
+        if(el.hasAttribute('data-rc')) return;
         var t=(el.textContent||'').trim().toLowerCase();
         if(/solicitar acceso m|solicitar cotiz|solicitud|solicitar acceso/.test(t)){
           el.textContent='Solicitar acceso médico →';
@@ -3932,6 +3934,44 @@ body.rnc-drawer-abierto{overflow:hidden}
      renglones, en las tarjetas de nombre corto sobraba altura y asomaba el blanco
      de la tarjeta bajo la franja. Con flex:1 la franja llena hasta el fondo. */
   flex:1 1 auto!important;
+}
+</style>
+<style id="rnc-acceso-franja">
+/* ACCESO — franja compacta. La sección era un muro negro enorme para decir "tres
+   pasos"; ahora es una tira delgada: rótulo + "Solo 3 pasos", los pasos en línea
+   y el botón, todo en una fila. */
+.accesswall--slim{padding:34px 24px!important}
+.accesswall--slim .aw-inner{max-width:1200px}
+.accesswall--slim .aw-glow{background:radial-gradient(60% 120% at 50% 0%, rgba(0,154,62,.16), transparent 72%)!important}
+.aw-slim{}
+.accesswall--slim .aw-inner{
+  display:flex;align-items:center;justify-content:space-between;gap:30px 44px;flex-wrap:wrap;
+}
+.aw-slim-head{flex:0 0 auto}
+.aw-slim-head .aw-kicker{display:block;font-size:.66rem;letter-spacing:.26em;margin-bottom:5px}
+.accesswall--slim h2{font-size:clamp(1.35rem,2.4vw,1.85rem)!important;margin:0!important;max-width:none!important;line-height:1.1!important}
+
+.aw-slim-steps{
+  list-style:none;margin:0;padding:0;
+  display:flex;align-items:center;gap:12px 26px;flex-wrap:wrap;flex:1 1 auto;justify-content:center;
+}
+.aw-slim-steps li{
+  display:flex;align-items:center;gap:10px;
+  font-size:.92rem;color:rgba(238,242,234,.82);line-height:1.3;
+}
+.aw-slim-steps .aw-n{
+  flex:none;width:26px;height:26px;border-radius:50%;
+  display:grid;place-items:center;
+  font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:700;
+  color:var(--green-mid);background:rgba(0,154,62,.12);border:1px solid rgba(0,154,62,.4);
+}
+.aw-slim-cta{flex:0 0 auto;white-space:nowrap}
+
+@media(max-width:900px){
+  .accesswall--slim{padding:30px 22px!important}
+  .accesswall--slim .aw-inner{flex-direction:column;align-items:flex-start;gap:20px}
+  .aw-slim-steps{flex-direction:column;align-items:flex-start;gap:12px;justify-content:flex-start}
+  .aw-slim-cta{width:100%;justify-content:center}
 }
 </style>
 <style id="rnc-mapa-culiacan">
