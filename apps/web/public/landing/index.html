@@ -3897,11 +3897,15 @@ body.rnc-drawer-abierto{overflow:hidden}
   border-radius:0!important;border:none!important;margin-bottom:0!important;
   aspect-ratio:1/1!important;background:#fff!important;
 }
-/* Franja del nombre, dentro del marco. */
+/* Franja del nombre, dentro del marco: negra con el nombre en blanco. Remata la
+   tarjeta y separa la foto del texto sin necesidad de una línea. */
 .cat-name{
   display:block;margin:0!important;
-  padding:13px 18px 17px!important;
-  border-top:1px solid rgba(20,30,15,.055);
+  padding:14px 18px 16px!important;
+  background:var(--ink)!important;
+  color:#fff!important;
+  border-top:none!important;
+  font-weight:500!important;
 }
 </style>
 <style id="rnc-catalogo-oscuro">
