@@ -21,10 +21,12 @@ svg{display:block}
 
 /* Login / pantallas de sesión centradas */
 /* Login de dos paneles: marca (verde profundo) + formulario */
-.login-wrap{min-height:100%;display:grid;grid-template-columns:1.05fr .95fr}
+/* Login CENTRADO (una sola columna), sin el panel de marca dividido. El logo va
+   arriba del formulario (login-mini-brand); se quita el texto descriptivo. */
+.login-wrap{min-height:100%;display:grid;grid-template-columns:1fr}
 /* Fondo del login alineado a la LANDING: verde-negro del hero (#0A2412…#06210F)
    con brillos del verde de marca, no el gris-negro neutro anterior. */
-.login-brand{position:relative;overflow:hidden;background:radial-gradient(120% 90% at 100% 0%,rgba(0,154,62,.18),transparent 55%),linear-gradient(158deg,#0E3020 0%,#0A2412 46%,#06210F 100%);color:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:52px 48px;box-shadow:inset 0 1px 0 var(--chrome-edge)}
+.login-brand{display:none}
 .login-brand::before{content:"";position:absolute;top:-120px;right:-100px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(51,174,100,.24),transparent 70%)}
 .login-brand::after{content:"";position:absolute;bottom:-140px;left:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(0,154,62,.14),transparent 70%)}
 .lb-top{position:relative;z-index:1;display:flex;align-items:center;gap:13px}
@@ -37,12 +39,10 @@ svg{display:block}
 .lb-foot{position:relative;z-index:1;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.6);font-weight:600}
 .login-panel{display:grid;place-items:center;padding:32px;background:radial-gradient(120% 90% at 50% 0%,#0C2A18 0%,#06210F 70%)}
 .login-card{position:relative;width:min(380px,100%);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:28px;box-shadow:0 20px 50px -20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
-.login-mini-brand{display:none}
+.login-mini-brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:22px}
+.login-mini-brand img{width:60px;height:60px;border-radius:16px;box-shadow:var(--sh-md)}
 @media (max-width:860px){
   .login-wrap{grid-template-columns:1fr}
-  .login-brand{display:none}
-  .login-mini-brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:22px}
-  .login-mini-brand img{width:60px;height:60px;border-radius:16px;box-shadow:var(--sh-md)}
 }
 
 .app{display:grid;grid-template-columns:252px 1fr;grid-template-rows:1fr;height:100%;overflow:hidden}

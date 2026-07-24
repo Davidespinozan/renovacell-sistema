@@ -5,7 +5,7 @@
    ============================================================================ */
 
 /* Columna de feed centrada y respirada */
-.feed { display: grid; gap: 16px; max-width: 720px; width: 100%; }
+.feed { display: grid; gap: 16px; max-width: 1040px; width: 100%; }
 
 /* Encabezado personalizado: saluda por nombre y deja VISIBLE el rol */
 .feed-head { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 13px 16px; box-shadow: var(--sh-sm); }
