@@ -3907,6 +3907,10 @@ body.rnc-drawer-abierto{overflow:hidden}
   color:#0A2412!important;
   border-top:none!important;
   font-weight:500!important;
+  /* La rejilla iguala la altura de la fila. Si un vecino parte su nombre en dos
+     renglones, en las tarjetas de nombre corto sobraba altura y asomaba el blanco
+     de la tarjeta bajo la franja. Con flex:1 la franja llena hasta el fondo. */
+  flex:1 1 auto!important;
 }
 </style>
 <style id="rnc-catalogo-oscuro">
