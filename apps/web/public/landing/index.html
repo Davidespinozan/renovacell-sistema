@@ -4135,13 +4135,25 @@ body.rnc-drawer-abierto{overflow:hidden}
   background-position:center, center!important;
   background-repeat:no-repeat, no-repeat!important;
 }
-/* El formulario, de vidrio: deja entrever la foto por detrás. */
+/* El formulario, tarjeta OSCURA: el vidrio translúcido se sentía muy transparente
+   sobre la foto clara; en negro resalta y se lee como una pieza sólida. Los campos
+   y etiquetas se voltean a tema oscuro. */
 .contact-form{
-  background:rgba(255,255,255,.90)!important;
-  backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important;
-  border:1px solid rgba(255,255,255,.72)!important;
-  box-shadow:0 24px 60px -28px rgba(15,40,20,.34)!important;
+  background:linear-gradient(180deg, rgba(16,22,14,.96), rgba(9,13,8,.97))!important;
+  backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 34px 70px -30px rgba(0,0,0,.7)!important;
 }
+.contact-form .form-field label{color:rgba(238,242,234,.55)!important}
+.contact-form .form-input{
+  background:rgba(255,255,255,.055)!important;border-color:rgba(255,255,255,.14)!important;color:#fff!important;
+}
+.contact-form .form-input::placeholder{color:rgba(238,242,234,.4)!important}
+.contact-form .form-input:focus{
+  border-color:var(--green-mid)!important;box-shadow:0 0 0 4px rgba(0,154,62,.16)!important;
+  background:rgba(255,255,255,.08)!important;
+}
+.contact-form p span[data-rc="verifNota"]{color:rgba(238,242,234,.5)!important}
 @media(max-width:760px){
   /* En celular manda su propia foto vertical (853x1844): la apaisada se recortaba
      en la zona pálida. Va a ancho completo y alto natural, anclada arriba, para
