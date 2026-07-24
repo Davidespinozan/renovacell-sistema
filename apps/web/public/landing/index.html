@@ -3675,10 +3675,10 @@ body.rnc-drawer-abierto{overflow:hidden}
    cortados por la mitad.
    Las fotos vienen sobre fondo blanco y con el producto centrado: van
    completas dentro de un marco 1:1. */
-/* Las fotos se distinguen del fondo por CONTRASTE DE COLOR, no por una línea:
-   la sección lleva un fondo verde-gris suave y la foto (fondo blanco) resalta
-   sobre él sin contorno. */
-#catalogo{background:#EAEEE6!important}
+/* El catálogo comparte el fondo de la sección de contacto (--bone): se lee más
+   elegante que el verde-gris. Las tarjetas blancas se despegan con una elevación
+   muy tenue, no con contorno. */
+#catalogo{background:var(--bone)!important}
 .cat-tile{
   aspect-ratio:1/1!important;
   background:#fff!important;
@@ -3845,6 +3845,7 @@ body.rnc-drawer-abierto{overflow:hidden}
 .cat-card{
   background:#fff!important;border:none!important;border-radius:20px!important;
   padding:0!important;gap:0!important;overflow:hidden!important;
+  box-shadow:0 1px 2px rgba(20,35,15,.05), 0 10px 26px -20px rgba(20,45,15,.22)!important;
 }
 .cat-card:hover{
   box-shadow:0 16px 38px -18px rgba(0,60,20,.34)!important;
