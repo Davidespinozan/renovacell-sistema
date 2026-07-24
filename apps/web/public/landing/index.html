@@ -2185,13 +2185,13 @@ body.rc-has-ann .nav{top:38px}
 
       <div class="split-inner">
         <div class="split-text">
-          <div class="split-kicker rv" data-rc="heroEyebrow">Tecnología celular S²RM® · Grado europeo · Desde 2008</div>
+          <div class="split-kicker rv" data-rc="heroEyebrow">Tecnología celular S²RM®</div>
           <h1 class="split-headline rv d1" data-rc-html="heroTitle">
-            La regeneración celular<br>
-            <span class="green">que respalda tu práctica.</span>
+            La nueva referencia<br>en <span class="green">medicina regenerativa</span>.
           </h1>
-          <div class="split-cta rv d2">
-            <a href="#catalogo" class="btn-hero-primary" data-rc="ctaPrimary">Ver el catálogo</a>
+          <p class="split-sub rv d2" data-rc="heroSubtitle">Tecnología desarrollada bajo estándares europeos para profesionales que buscan seguridad clínica.</p>
+          <div class="split-cta rv d3">
+            <a href="#catalogo" class="btn-hero-primary" data-rc="ctaPrimary">Ver catálogo</a>
           </div>
         </div>
 
@@ -4095,6 +4095,38 @@ body.rnc-drawer-abierto{overflow:hidden}
        (853x1844): el texto arranca en 92vw para quedar limpio debajo de él. */
     padding-top:clamp(280px, 92vw, 500px)!important;
   }
+}
+</style>
+<style id="rnc-hero-editorial">
+/* HERO EDITORIAL — el título gana presencia: el bloque de texto se ensancha
+   (~600px), la fuente sube y el interlineado se ajusta para leerse en 2 bloques.
+   Se estiliza el subtítulo nuevo. Al final del documento, gana en cascada a los
+   bloques de hero anteriores. */
+.split-sub{
+  color:rgba(238,242,234,.72);font-size:1rem;line-height:1.6;margin:0 0 26px;max-width:460px;
+}
+@media(min-width:901px){
+  /* Más aire para el texto: la rejilla se reequilibra (antes .7/1.3). */
+  .hero-split .split-inner{grid-template-columns:1fr 1.08fr!important;gap:50px!important}
+  .hero-split .split-text{max-width:600px!important}
+  .hero-split .split-headline{
+    font-size:clamp(2.5rem,4vw,3.6rem)!important;line-height:1.06!important;
+    letter-spacing:-.026em!important;max-width:none!important;margin:0 0 22px!important;
+    font-weight:700!important;text-wrap:balance!important;
+  }
+  .hero-split .split-sub{
+    font-size:1.12rem!important;line-height:1.6!important;max-width:470px!important;margin:0 0 32px!important;
+  }
+}
+@media(max-width:900px){
+  .hero-split .split-headline{
+    font-size:clamp(2.1rem,8.6vw,2.85rem)!important;line-height:1.08!important;
+    letter-spacing:-.025em!important;margin:0 0 16px!important;max-width:none!important;
+  }
+  /* En celular .split-text es display:contents y los hijos se ordenan sueltos.
+     El subtítulo va justo después del título (mismo order que el h1, el DOM lo
+     coloca después), antes de la imagen. Sin esto brincaba al inicio. */
+  .split-sub{order:2!important;font-size:1.02rem!important;margin:2px 0 4px!important;max-width:none!important}
 }
 </style>
 </body>
