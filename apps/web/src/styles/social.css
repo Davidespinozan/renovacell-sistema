@@ -76,7 +76,9 @@
 .fchip.on { background: var(--grad-green); color: #fff; border-color: transparent; box-shadow: var(--glow); }
 
 /* Biblioteca: tarjetas visuales */
-.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+/* Fila de acciones de la tarjeta de biblioteca: que "Descargar" no se recorte. */
+.libbody .btn { min-width: 0; }
 .libcard { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--sh-sm); transition: .16s; display: flex; flex-direction: column; }
 .libcard:hover { transform: translateY(-2px); box-shadow: var(--sh-md); border-color: #dde1d8; }
 .libtile { height: 92px; display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #E9F4EC, #CFE6D6); color: var(--green-deep); }

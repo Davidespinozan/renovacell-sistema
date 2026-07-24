@@ -131,9 +131,9 @@ export function CommonView() {
               <div className="libbody">
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-                  <a className="btn ghost sm" href={as.url || '#'} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
-                  <a className="btn sm" href={as.url || '#'} download><Download size={14} /> Descargar</a>
+                <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
+                  <a className="btn ghost sm" style={{ flex: '1 1 auto' }} href={as.url || '#'} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
+                  <a className="btn sm" style={{ flex: '1 1 auto' }} href={as.url || '#'} download><Download size={14} /> Descargar</a>
                 </div>
               </div>
             </div>
