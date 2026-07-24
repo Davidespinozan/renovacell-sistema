@@ -2950,7 +2950,11 @@ document.addEventListener('keydown', e => {
     var b=document.createElement('button'); b.type='button'; b.className='cat-card';
     var src=pp.image_url||imgFor(pp.name);
     var mono=(pp.name||'?').split(/\s+/).slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase();
-    b.innerHTML='<div class="cat-tile">'+(src?('<img loading="lazy" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
+    /* Sin loading="lazy": el catálogo pagina de 12 en 12, así que solo hay unas
+       pocas miniaturas en el DOM. Las diferidas que se insertan ya dentro del
+       viewport (al cambiar de página) a veces no cargaban hasta hacer scroll y
+       la tarjeta se quedaba en blanco. */
+    b.innerHTML='<div class="cat-tile">'+(src?('<img decoding="async" src="'+src+'" alt="'+esc(pp.name)+'">'):('<span class="cat-mono">'+esc(mono)+'</span>'))
       +'<span class="cat-arrow" aria-hidden="true">\u2197</span></div>'
       +'<span class="cat-name">'+esc(pp.name)+'</span>';
     b.addEventListener('click',function(){openModal(pp);});
