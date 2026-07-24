@@ -3904,6 +3904,44 @@ body.rnc-drawer-abierto{overflow:hidden}
   border-top:1px solid rgba(20,30,15,.055);
 }
 </style>
+<style id="rnc-catalogo-oscuro">
+/* CATÁLOGO SOBRE EL VERDE DEL HERO — mismo fondo que el hero para que las
+   tarjetas blancas de producto resalten. Al invertir el fondo hay que invertir
+   también títulos, filtros y paginación, que estaban pensados para fondo claro. */
+#catalogo{
+  background:
+    radial-gradient(1100px 620px at 18% 12%, rgba(0,154,62,.20) 0%, transparent 62%),
+    radial-gradient(900px 560px at 88% 86%, rgba(0,115,17,.24) 0%, transparent 66%),
+    linear-gradient(158deg, #0A2412 0%, #08301A 46%, #06210F 100%)!important;
+}
+#catalogo h2{color:#fff!important}
+#catalogo .cat-lede{color:rgba(238,242,234,.64)!important}
+
+/* Pestañas de categoría */
+.cat-filters{border-bottom-color:rgba(255,255,255,.13)!important}
+.cat-chip{color:rgba(238,242,234,.55)!important}
+.cat-chip:hover{color:rgba(255,255,255,.92)!important}
+.cat-chip.on{color:var(--green-mid)!important;border-bottom-color:var(--green-mid)!important}
+
+/* Paginación */
+.cat-page{
+  background:rgba(255,255,255,.06)!important;
+  border-color:rgba(255,255,255,.15)!important;
+  color:rgba(238,242,234,.85)!important;
+}
+.cat-page:hover:not(:disabled){border-color:var(--green-mid)!important;color:#fff!important}
+.cat-page.on{background:var(--green-mid)!important;border-color:var(--green-mid)!important;color:#062012!important}
+
+/* La tarjeta blanca sobre fondo oscuro: sombra profunda en reposo y glow verde
+   al pasar el cursor (la sombra clara anterior no se veía sobre el verde). */
+.cat-card{
+  box-shadow:0 2px 6px rgba(0,0,0,.20), 0 20px 44px -26px rgba(0,0,0,.6)!important;
+}
+.cat-card:hover{
+  box-shadow:0 0 0 1px rgba(47,174,106,.35),
+             0 22px 50px -20px rgba(0,120,45,.55)!important;
+}
+</style>
 <style id="rnc-antetitulo-vacio">
 /* Un antetítulo vacío (se vacían desde Administración) dejaba su guion decorativo
    flotando solo, como una rayita suelta. Si no hay texto, no se dibuja nada. */
