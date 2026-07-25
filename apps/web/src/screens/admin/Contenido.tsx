@@ -296,15 +296,8 @@ function LandingTab() {
   }
   const upSlide = (i: number, patch: Partial<HeroSlide>) =>
     upSec('hero', { slides: draft.hero.slides.map((sl, j) => (j === i ? { ...sl, ...patch } : sl)) })
-  const setTick = (i: number, v: string) => up({ ticker: draft.ticker.map((t, j) => (j === i ? v : t)) })
   const setPaso = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
     upSec('acceso', { pasos: draft.acceso.pasos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
-  const setIns = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
-    upSec('hero', { insignias: draft.hero.insignias.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
-  const setEspec = (i: number, patch: Partial<{ nombre: string; valor: string }>) =>
-    upSec('ciencia', { especs: draft.ciencia.especs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
-  const setPunto = (i: number, patch: Partial<{ titulo: string; texto: string }>) =>
-    upSec('ciencia', { puntos: draft.ciencia.puntos.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
   const setCert = (i: number, patch: Partial<{ codigo: string; estado: string; nombre: string; texto: string; ref: string }>) =>
     upSec('cumplimiento', { certs: draft.cumplimiento.certs.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
   const setReg = (i: number, patch: Partial<{ nombre: string; valor: string }>) =>
@@ -371,8 +364,8 @@ function LandingTab() {
           <T label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} hint="Admite HTML, p. ej. RENOVACELL<sup>®</sup>" />
           <T label="Bajada" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
         </div>
-        <ImageField label="Logo" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1"
-          hint="Se usa en la barra superior y en el pie." />
+        <ImageField label="Isotipo (ícono de marca)" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1"
+          hint="El ícono verde de la marca. Se usa en el menú, el pie de página, el favicon y al compartir el enlace. El nombre RENOVACELL va como texto (campo Nombre)." />
         <div className="form-grid-2">
           <T label="Menú · Ciencia" value={draft.nav.ciencia} onChange={(v) => upSec('nav', { ciencia: v })} />
           <T label="Menú · Cumplimiento" value={draft.nav.cumplimiento} onChange={(v) => upSec('nav', { cumplimiento: v })} />
@@ -387,81 +380,40 @@ function LandingTab() {
         <A label="Título" value={draft.hero.title} onChange={(v) => upSec('hero', { title: v })}
           hint="Admite HTML: <br> corta línea y <span class=&quot;green&quot;>…</span> pinta de verde." />
         <A label="Subtítulo" value={draft.hero.subtitle} onChange={(v) => upSec('hero', { subtitle: v })} />
-        <div className="form-grid-2">
-          <T label="Botón principal" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} />
-          <T label="Botón secundario" value={draft.hero.ctaSecondary} onChange={(v) => upSec('hero', { ctaSecondary: v })} />
-        </div>
-        <ImageField label="Imagen · escritorio" value={draft.hero.imageUrl} onChange={(v) => upSec('hero', { imageUrl: v })} folder="landing" />
-        <ImageField label="Imagen · móvil (opcional)" value={draft.hero.imageMobileUrl} onChange={(v) => upSec('hero', { imageMobileUrl: v })} folder="landing" ratio="3 / 4"
-          hint="Si la dejas vacía, en celular se usa la de escritorio." />
-
-        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Insignias bajo el hero</div>
-          {draft.hero.insignias.map((x, i) => (
-            <div key={i} className="form-grid-2">
-              <T label={`Insignia ${i + 1}`} value={x.titulo} onChange={(v) => setIns(i, { titulo: v })} />
-              <T label="Texto" value={x.texto} onChange={(v) => setIns(i, { texto: v })} />
-            </div>
-          ))}
-        </div>
+        <T label="Botón" value={draft.hero.ctaPrimary} onChange={(v) => upSec('hero', { ctaPrimary: v })} hint="Lleva al catálogo." />
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-            <b>Hero rotativo (opcional).</b> Con dos diapositivas o más, el hero rota solo. Con una o ninguna,
-            se queda fijo con lo de arriba.
+            <b>Fotos del hero.</b> El texto de arriba es fijo; lo que cambia son las <b>fotos</b>. Con dos o más
+            el hero rota solo; con una, se queda fija. Cada foto lleva su versión de escritorio (16:9) y la de
+            celular (1:1). Solo fotos — sin títulos por foto.
           </div>
           {draft.hero.slides.map((sl, i) => (
             <div key={i} className="card" style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="eyebrow" style={{ margin: 0 }}>Diapositiva {i + 1}</div>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                <div className="eyebrow" style={{ margin: 0 }}>Foto {i + 1}</div>
                 <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }}
                   onClick={() => upSec('hero', { slides: draft.hero.slides.filter((_, j) => j !== i) })}>
                   <Trash2 size={13} /> Quitar
                 </button>
               </div>
-              <T label="Antetítulo" value={sl.eyebrow} onChange={(v) => upSlide(i, { eyebrow: v })} />
-              <A label="Título" value={sl.title} onChange={(v) => upSlide(i, { title: v })} />
-              <A label="Subtítulo" value={sl.subtitle} onChange={(v) => upSlide(i, { subtitle: v })} />
-              <ImageField label="Imagen escritorio" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} folder="landing" />
-              <ImageField label="Imagen móvil (opcional)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} folder="landing" ratio="3 / 4" />
+              <div className="form-grid-2">
+                <ImageField label="Escritorio (16:9)" value={sl.imageUrl} onChange={(v) => upSlide(i, { imageUrl: v })} folder="landing" ratio="16 / 9" />
+                <ImageField label="Celular (1:1)" value={sl.imageMobileUrl} onChange={(v) => upSlide(i, { imageMobileUrl: v })} folder="landing" ratio="1 / 1" />
+              </div>
             </div>
           ))}
           <button className="btn ghost sm" type="button"
             onClick={() => upSec('hero', { slides: [...draft.hero.slides, { eyebrow: '', title: '', subtitle: '', imageUrl: '', imageMobileUrl: '' }] })}>
-            <Plus size={14} /> Agregar diapositiva
+            <Plus size={14} /> Agregar foto
           </button>
         </div>
       </SecCard>
 
-      <SecCard title="Cinta de sellos">
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 4 }}>
-          La cinta que se desplaza bajo el hero.
-        </div>
-        {draft.ticker.map((t, i) => (
-          <input key={i} style={inp} value={t} onChange={(e) => setTick(i, e.target.value)} />
-        ))}
-      </SecCard>
-
       <SecCard title="Ciencia">
-        <T label="Nota a la derecha" value={draft.ciencia.meta} onChange={(v) => upSec('ciencia', { meta: v })} />
-        <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} />
+        <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} hint="El rótulo chico sobre el título (p. ej. Stem Cell Released Molecules)." />
         <A label="Título" value={draft.ciencia.title} onChange={(v) => upSec('ciencia', { title: v })} hint="Admite HTML." />
         <A label="Texto" value={draft.ciencia.body} onChange={(v) => upSec('ciencia', { body: v })} hint="Admite HTML." />
-        <T label="Pie de la imagen" value={draft.ciencia.foto} onChange={(v) => upSec('ciencia', { foto: v })} />
-        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Ficha sobre la imagen</div>
-        {draft.ciencia.especs.map((x, i) => (
-          <div key={i} className="form-grid-2">
-            <T label={`Dato ${i + 1}`} value={x.nombre} onChange={(v) => setEspec(i, { nombre: v })} />
-            <T label="Valor" value={x.valor} onChange={(v) => setEspec(i, { valor: v })} />
-          </div>
-        ))}
-        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Puntos numerados</div>
-        {draft.ciencia.puntos.map((x, i) => (
-          <div key={i} style={{ marginTop: 10 }}>
-            <T label={`Punto ${i + 1}`} value={x.titulo} onChange={(v) => setPunto(i, { titulo: v })} />
-            <A label="Texto" value={x.texto} onChange={(v) => setPunto(i, { texto: v })} />
-          </div>
-        ))}
       </SecCard>
 
       <SecCard title="Cumplimiento">
