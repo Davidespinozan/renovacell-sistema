@@ -290,7 +290,6 @@ function LandingTab() {
   const [draft, setDraft] = useState<LandingContent>(data)
   const [saved, setSaved] = useState(false)
 
-  const up = (patch: Partial<LandingContent>) => { setDraft((d) => ({ ...d, ...patch })); setSaved(false) }
   const upSec = (k: keyof LandingContent, patch: Record<string, unknown>) => {
     setDraft((d) => ({ ...d, [k]: { ...(d[k] as object), ...patch } })); setSaved(false)
   }
@@ -414,6 +413,13 @@ function LandingTab() {
         <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} hint="El rótulo chico sobre el título (p. ej. Stem Cell Released Molecules)." />
         <A label="Título" value={draft.ciencia.title} onChange={(v) => upSec('ciencia', { title: v })} hint="Admite HTML." />
         <A label="Texto" value={draft.ciencia.body} onChange={(v) => upSec('ciencia', { body: v })} hint="Admite HTML." />
+        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Etiquetas de los 4 iconos</div>
+        <div className="form-grid-2">
+          {[0, 1, 2, 3].map((i) => (
+            <T key={i} label={`Icono ${i + 1}`} value={(draft.ciencia.iconos ?? [])[i] ?? ''}
+              onChange={(v) => { const arr = [...(draft.ciencia.iconos ?? ['', '', '', ''])]; arr[i] = v; upSec('ciencia', { iconos: arr }) }} />
+          ))}
+        </div>
       </SecCard>
 
       <SecCard title="Cumplimiento">

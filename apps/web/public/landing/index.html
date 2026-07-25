@@ -2232,14 +2232,14 @@ body.rc-has-ann .nav{top:38px}
               <path d="M23.5 19a7.5 7.5 0 010 10"/>
               <path d="M27.5 15a13 13 0 010 18"/>
             </svg>
-            <span>Comunicación<br>celular</span>
+            <span data-rc="cienciaIcono1">Comunicación celular</span>
           </div>
           <div class="s2rm-icon">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="24" cy="24" r="11"/>
               <path d="M24 17v14M17 24h14M19.4 19.4l9.2 9.2M28.6 19.4l-9.2 9.2"/>
             </svg>
-            <span>Reparación<br>profunda</span>
+            <span data-rc="cienciaIcono2">Reparación profunda</span>
           </div>
           <div class="s2rm-icon">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2248,7 +2248,7 @@ body.rc-has-ann .nav{top:38px}
               <circle cx="30.5" cy="17.5" r=".9" fill="currentColor" stroke="none"/>
               <circle cx="17.5" cy="30.5" r=".9" fill="currentColor" stroke="none"/>
             </svg>
-            <span>Regeneración<br>tejidual</span>
+            <span data-rc="cienciaIcono3">Regeneración tejidual</span>
           </div>
           <div class="s2rm-icon">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2256,7 +2256,7 @@ body.rc-has-ann .nav{top:38px}
               <path d="M11 29c5-4 8 4 13 1s7-5 13-1"/>
               <circle cx="24" cy="24" r="1.6" fill="currentColor" stroke="none"/>
             </svg>
-            <span>Biotecnología<br>avanzada</span>
+            <span data-rc="cienciaIcono4">Biotecnología avanzada</span>
           </div>
         </div>
       </div>
@@ -2817,6 +2817,7 @@ document.addEventListener('keydown', e => {
     A(he.insignias).forEach(function(x,k){ o['insignia'+(k+1)+'Titulo']=x.titulo; o['insignia'+(k+1)+'Texto']=x.texto; });
     A(ci.especs).forEach(function(x,k){ o['espec'+(k+1)+'Nombre']=x.nombre; o['espec'+(k+1)+'Valor']=x.valor; });
     A(ci.puntos).forEach(function(x,k){ o['punto'+(k+1)+'Titulo']=x.titulo; o['punto'+(k+1)+'Texto']=x.texto; });
+    A(ci.iconos).forEach(function(t,k){ o['cienciaIcono'+(k+1)]=t; });
     A(cu.certs).forEach(function(x,k){ var i=k+1;
       o['cert'+i+'Codigo']=x.codigo; o['cert'+i+'Estado']=x.estado; o['cert'+i+'Nombre']=x.nombre; o['cert'+i+'Texto']=x.texto; o['cert'+i+'Ref']=x.ref; });
     A(ac.pasos).forEach(function(x,k){ o['paso'+(k+1)+'Titulo']=x.titulo; o['paso'+(k+1)+'Texto']=x.texto; });

@@ -66,7 +66,7 @@ export interface LandingContent {
   ticker: string[]
   ciencia: {
     kicker: string; meta: string; small: string; title: string; body: string
-    foto: string; especs: Par[]; puntos: Paso[]
+    foto: string; especs: Par[]; puntos: Paso[]; iconos?: string[]
   }
   cumplimiento: { kicker: string; title: string; meta: string; refEtiqueta: string; certs: Certificacion[] }
   catalogo: { kicker: string; title: string; body: string }
@@ -121,6 +121,7 @@ const DEFAULT: LandingContent = {
     foto: 'Microscopía oficial Renovacell',
     especs: [{ nombre: 'Tecnología', valor: 'S²RM™' }, { nombre: 'Registro', valor: '2008 · EU' }, { nombre: 'Origen', valor: 'Stem Cells' }, { nombre: 'Aplicación', valor: 'Clínica' }],
     puntos: [{ titulo: 'Rangos médicos especializados', texto: 'Líneas exclusivas para uso clínico — tópico, inyectable e implantable.' }, { titulo: 'Resultados visibles y seguros', texto: 'Ingredientes biocompatibles respaldados por evidencia clínica.' }, { titulo: 'Estándares Comunidad Europea', texto: 'Cumplimos los más altos estándares de calidad de la CE desde 2008.' }],
+    iconos: ['Comunicación celular', 'Reparación profunda', 'Regeneración tejidual', 'Biotecnología avanzada'],
   },
   cumplimiento: {
     kicker: 'Cumplimiento regulatorio', title: 'Cumplimiento <span class="green">europeo y mexicano</span>', meta: '02 / 05 · Certificaciones vigentes', refEtiqueta: 'Ref.',
