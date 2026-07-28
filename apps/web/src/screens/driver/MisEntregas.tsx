@@ -57,6 +57,22 @@ export function MisEntregas() {
   }, 0)
   const incidencias = mine.filter((s) => s.incident && !s.incident.resolved).length
 
+  // Ruta completa: abre Google Maps con TODAS las paradas pendientes como
+  // waypoints (en el orden asignado por Empaque; el chofer puede reordenar en la
+  // app). Sin origen → usa su ubicación actual. No requiere API key.
+  const routeStops = mine
+    .map((s) => { const o = orderById[s.order_id]; return o ? clientOf(o.doctor_id) : null })
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .map((c) => `${c.address}, ${c.city}`)
+    .filter((a) => a.replace(/[, ]/g, '').length > 0)
+  const routeUrl = (() => {
+    if (routeStops.length === 0) return null
+    const dest = routeStops[routeStops.length - 1]
+    const wp = routeStops.slice(0, -1)
+    const base = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest)
+    return wp.length ? base + '&waypoints=' + wp.map(encodeURIComponent).join('%7C') : base
+  })()
+
   const onPhoto = async (shipmentId: string, file: File | undefined) => {
     if (!file) return
     // Preview local (data-URI, no se persiste) + subida al bucket PRIVADO `proofs`
@@ -84,6 +100,12 @@ export function MisEntregas() {
         <div className="card sig"><div className="chip"><Icon name="check" /></div><div className="v">{entregadas.length}</div><div className="k">Entregadas</div><div className="s">de tu ruta</div></div>
         <div className={'card sig' + (incidencias ? ' dang' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{incidencias}</div><div className="k">Con incidencia</div><div className="s">requieren atención</div></div>
       </div>
+
+      {routeUrl && (
+        <a className="btn" href={routeUrl} target="_blank" rel="noreferrer" style={{ justifyContent: 'center' }}>
+          <Icon name="truck" /> Abrir ruta completa en Google Maps ({routeStops.length} parada{routeStops.length === 1 ? '' : 's'})
+        </a>
+      )}
 
       {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
