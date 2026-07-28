@@ -897,6 +897,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 .form-submit:hover{background:var(--green-dark);transform:translateY(-1px);box-shadow:0 22px 32px rgba(0,115,17,.24);}
 .form-submit::after{content:'→';transition:transform .3s var(--ease);}
 .form-submit:hover::after{transform:translateX(4px);}
+.form-consent{display:flex;align-items:flex-start;gap:9px;margin:2px 0 14px;font-size:12px;line-height:1.45;color:var(--mid);cursor:pointer;}
+.form-consent input{margin-top:2px;flex:none;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
+.form-consent a{color:var(--green);font-weight:600;}
 
 /* FOOTER */
 footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
@@ -944,6 +947,8 @@ footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
   font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,250,248,.4);font-weight:500;
 }
 .foot-bottom b{color:var(--green-mid);font-weight:600;}
+.foot-legal{color:var(--green-mid);font-weight:600;text-decoration:none;}
+.foot-legal:hover{text-decoration:underline;}
 
 /* REVEAL */
 .rv{opacity:0;transform:translateY(28px);transition:opacity 1s var(--ease),transform 1s var(--ease);}
@@ -2539,6 +2544,10 @@ body.rc-has-ann .nav{top:38px}
           <input name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true"
                  style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
+          <label class="form-consent">
+            <input type="checkbox" id="rncConsent">
+            <span>He leído y acepto el <a href="/landing/privacidad.html" target="_blank" rel="noopener">Aviso de privacidad</a>.</span>
+          </label>
           <button type="submit" class="form-submit" data-rc="verifBoton">Verificar mi cédula</button>
           <div id="rncVerifyOut" class="rnc-vout" role="status"></div>
           <p style="font-size:11.5px;color:var(--soft);margin-top:18px;line-height:1.5;text-align:center">
@@ -2612,6 +2621,7 @@ body.rc-has-ann .nav{top:38px}
 
     <div class="foot-bottom">
       <span data-rc="footerText">© 2026 Renovacell® · Todos los derechos reservados</span>
+      <a href="/landing/privacidad.html" class="foot-legal">Aviso de privacidad</a>
       <span data-rc-html="pieCredito">Construido con <b>STRYV Studio</b> · Valencia</span>
     </div>
   </div>
@@ -3211,6 +3221,8 @@ document.addEventListener('keydown', e => {
 
   f.addEventListener('submit', function(e){
     e.preventDefault();
+    var consent=document.getElementById('rncConsent');
+    if(consent && !consent.checked) return say('err','Para continuar, acepta el Aviso de privacidad.');
     var d={
       name:(f.nombre.value||'').trim(), email:(f.correo.value||'').trim(),
       cedula:(f.cedula.value||'').trim(), password:f.clave.value||'',
