@@ -10,7 +10,7 @@ import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useEvents } from '../../data/hooks/useEvents'
-import { useCierres } from '../../data/hooks/useFinanzas'
+import { useCierres, useRefunds } from '../../data/hooks/useFinanzas'
 import { useRole } from '../../auth/RoleContext'
 import { efectivoEsperado } from '../../data/ops/finanzas'
 import type { Cierre } from '../../data/store/cierresStore'
@@ -60,6 +60,7 @@ export function CierreCaja() {
   const { data: orders } = useAllOrders()
   const { data: events } = useEvents()
   const { data: cierres, registrarCierre } = useCierres()
+  const { data: refunds } = useRefunds()
   const { user } = useRole()
 
   const today = new Date().toISOString().slice(0, 10)
@@ -69,8 +70,8 @@ export function CierreCaja() {
   const alcance = ev ? ev.name : 'Caja del día'
 
   const esperado = useMemo(
-    () => (ev ? efectivoEsperado(orders, { eventId: ev.id }) : efectivoEsperado(orders, { day: today })),
-    [orders, ev, today],
+    () => (ev ? efectivoEsperado(orders, { eventId: ev.id }, refunds) : efectivoEsperado(orders, { day: today }, refunds)),
+    [orders, ev, today, refunds],
   )
 
   const [contado, setContado] = useState('')

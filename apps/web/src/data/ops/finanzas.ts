@@ -14,8 +14,13 @@ const COGS_IN = new Set(['cancelacion', 'evento-regreso', 'consigna-regreso'])
 // Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad/daño.
 const MERMA = new Set(['merma', 'baja'])
 
+// Renglón mínimo de devolución que necesitan los reportes (evita acoplar a refundsStore).
+export interface RefundLine { order_id: string; monto: number; metodo?: string | null }
+
 export interface EstadoResultados {
-  ventas: number
+  ventas: number        // ventas BRUTAS del periodo
+  devoluciones: number  // devoluciones/correcciones de esos pedidos
+  ventasNetas: number   // ventas − devoluciones (la base real del margen)
   costoVentas: number
   utilidadBruta: number
   gastos: number
@@ -25,12 +30,16 @@ export interface EstadoResultados {
   margenNeto: number    // %
 }
 
-// Estado de resultados del periodo: ventas − costo de ventas − gastos = utilidad.
+// Estado de resultados del periodo: ventas netas − costo de ventas − gastos = utilidad.
 // El COSTO DE VENTAS sale del LEDGER valuado al costo REAL de cada lote que salió
-// (no un costo plano): trazabilidad de costo lote por lote.
-export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], movements: InventoryMovement[], lots: Lot[]): EstadoResultados {
+// (no un costo plano): trazabilidad de costo lote por lote. Las DEVOLUCIONES de los
+// pedidos del periodo se restan de las ventas (neto), no inflan el ingreso.
+export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], movements: InventoryMovement[], lots: Lot[], refunds: RefundLine[] = []): EstadoResultados {
   const sales = orders.filter(isSale)
   const ventas = sales.reduce((s, o) => s + (o.total ?? 0), 0)
+  const saleIds = new Set(sales.map((o) => o.id))
+  const devoluciones = refunds.filter((r) => saleIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
+  const ventasNetas = ventas - devoluciones
   const lotById: Record<string, Lot | undefined> = Object.fromEntries(lots.map((l) => [l.id, l]))
   const lotCost = (lotId: string): number => {
     const l = lotById[lotId]
@@ -44,17 +53,19 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
   }, 0)
   const mermas = movements.reduce((s, m) => (MERMA.has(m.reason ?? '') && m.change < 0 ? s + (-m.change) * lotCost(m.lot_id) : s), 0)
   const gastosTotal = gastos.reduce((s, g) => s + g.monto, 0)
-  const utilidadBruta = ventas - costoVentas
+  const utilidadBruta = ventasNetas - costoVentas
   const utilidadNeta = utilidadBruta - gastosTotal - mermas
   return {
     ventas,
+    devoluciones,
+    ventasNetas,
     costoVentas,
     utilidadBruta,
     gastos: gastosTotal,
     mermas,
     utilidadNeta,
-    margenBruto: ventas > 0 ? (utilidadBruta / ventas) * 100 : 0,
-    margenNeto: ventas > 0 ? (utilidadNeta / ventas) * 100 : 0,
+    margenBruto: ventasNetas > 0 ? (utilidadBruta / ventasNetas) * 100 : 0,
+    margenNeto: ventasNetas > 0 ? (utilidadNeta / ventasNetas) * 100 : 0,
   }
 }
 
@@ -84,9 +95,10 @@ export function gastosPorCategoria(gastos: Gasto[]): { categoria: string; monto:
 }
 
 // ---- Arqueo / cierre de caja (POS efectivo) -------------------------------
-// Esperado = ventas POS en EFECTIVO dentro del alcance (día u evento).
-export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string }): number {
-  return orders
+// Esperado = ventas POS en EFECTIVO dentro del alcance (día u evento), MENOS las
+// devoluciones en efectivo de esos pedidos (el dinero salió del cajón).
+export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string }, refunds: RefundLine[] = []): number {
+  const inScope = orders
     .filter((o) => isPosOrder(o) && (o.payment_method === 'efectivo'))
     .filter((o) => {
       const meta = (o.shipping_meta ?? {}) as { event_id?: string | null }
@@ -94,5 +106,10 @@ export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string;
       if (opts.day) return o.created_at.slice(0, 10) === opts.day
       return true
     })
-    .reduce((s, o) => s + (o.total ?? 0), 0)
+  const bruto = inScope.reduce((s, o) => s + (o.total ?? 0), 0)
+  const ids = new Set(inScope.map((o) => o.id))
+  const devueltoEfectivo = refunds
+    .filter((r) => ids.has(r.order_id) && (r.metodo ?? 'efectivo') === 'efectivo')
+    .reduce((s, r) => s + (r.monto ?? 0), 0)
+  return bruto - devueltoEfectivo
 }

@@ -3,11 +3,13 @@
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
 import React, { useMemo, useState } from 'react'
-import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useRefunds } from '../../data/hooks/useFinanzas'
+import { useRole } from '../../auth/RoleContext'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { ExportButton } from '../../app/ExportButton'
@@ -208,6 +210,13 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
   onCancel: () => void
 }) {
   const p = payInfo(order); const sv = statusView(order.status)
+  const { user } = useRole()
+  const { data: refunds, refundedByOrder } = useRefunds()
+  const misDevs = refunds.filter((r) => r.order_id === order.id)
+  const yaDevuelto = refundedByOrder(refunds)[order.id] ?? 0
+  const restante = (order.total ?? 0) - yaDevuelto
+  const puedeDevolver = order.status !== 'cancelled' && order.status !== 'draft' && restante > 0.0001
+  const [showForm, setShowForm] = useState(false)
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -240,6 +249,35 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
           </table>
 
           <div className="cototal" style={{ marginTop: 12 }}><span>Total</span><b>{money(order.total)}</b></div>
+          {yaDevuelto > 0 && (
+            <>
+              <div className="cototal" style={{ color: 'var(--danger)' }}><span>Devoluciones</span><b>− {money(yaDevuelto)}</b></div>
+              <div className="cototal" style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}><span>Neto cobrado</span><b>{money(restante)}</b></div>
+            </>
+          )}
+
+          {misDevs.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>Devoluciones y correcciones</div>
+              {misDevs.map((r) => (
+                <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+                  <span className={'pill ' + (r.tipo === 'correccion' ? 'p-warn' : 'p-neu')}>{r.tipo === 'correccion' ? 'Corrección' : 'Devolución'}</span>
+                  <span className="mono" style={{ color: 'var(--danger)' }}>− {money(r.monto)}</span>
+                  <span style={{ color: 'var(--ink-2)', flex: 1 }}>{r.motivo}</span>
+                  <span style={{ color: 'var(--ink-3)', fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)} · {r.usuario}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {puedeDevolver && !showForm && (
+            <div style={{ marginTop: 14 }}>
+              <button className="btn ghost sm" type="button" onClick={() => setShowForm(true)}><Undo2 size={14} /> Devolver / Corregir</button>
+            </div>
+          )}
+          {puedeDevolver && showForm && (
+            <DevolverForm order={order} restante={restante} usuario={user?.name ?? 'Administración'} onClose={() => setShowForm(false)} />
+          )}
 
           {order.invoice_requested && (
             <div className="sysnote" style={{ marginTop: 14 }}>
@@ -254,6 +292,72 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Formulario de Devolver/Corregir: mismo movimiento contable, distinta semántica.
+// El monto tiene TOPE (lo que resta del pedido) y el motivo es obligatorio. La RPC
+// reimpone ambas validaciones del lado servidor.
+const PRESETS_CORR = ['Cobro duplicado', 'No pagó (era cortesía)', 'Error de captura']
+const PRESETS_DEV = ['Producto devuelto', 'Cliente canceló', 'Producto dañado']
+function DevolverForm({ order, restante, usuario, onClose }: {
+  order: OrderWithItems
+  restante: number
+  usuario: string
+  onClose: () => void
+}) {
+  const { registrarDevolucion } = useRefunds()
+  const [tipo, setTipo] = useState<'devolucion' | 'correccion'>('devolucion')
+  const [monto, setMonto] = useState(String(restante))
+  const [motivo, setMotivo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const montoN = Math.max(0, Number(monto) || 0)
+  const valid = montoN > 0 && montoN <= restante + 0.0001 && motivo.trim().length >= 3
+  const presets = tipo === 'correccion' ? PRESETS_CORR : PRESETS_DEV
+
+  const submit = async () => {
+    if (!valid || busy) return
+    setBusy(true); setErr('')
+    const r = await registrarDevolucion({ orderId: order.id, tipo, monto: montoN, motivo, usuario })
+    setBusy(false)
+    if (!r.ok) { setErr(r.error ?? 'No se pudo registrar.'); return }
+    onClose()
+  }
+
+  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none' }
+  return (
+    <div style={{ marginTop: 14, padding: 14, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }}>
+      <div className="seg" style={{ marginBottom: 12 }}>
+        <button type="button" className={tipo === 'devolucion' ? 'active' : undefined} onClick={() => setTipo('devolucion')}>Devolución al cliente</button>
+        <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>Corrección de error</button>
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
+        {tipo === 'devolucion' ? 'Se le regresó dinero al cliente (producto devuelto, etc.).' : 'El cobro estuvo mal (no entró dinero de verdad). Corrige el neto.'}
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+        <div style={{ flex: '0 0 140px' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Monto (máx {money(restante)})</label>
+          <input type="number" min={0} max={restante} style={{ ...fld, marginTop: 5 }} value={monto} onChange={(e) => setMonto(e.target.value)} />
+        </div>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Motivo</label>
+          <input style={{ ...fld, marginTop: 5 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        {presets.map((pz) => (
+          <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: '#fff', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
+        ))}
+      </div>
+      {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginBottom: 10 }}><span>{err}</span></div>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button className="btn ghost sm" type="button" onClick={onClose}>Cancelar</button>
+        <button className="btn sm" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
+          {busy ? 'Registrando…' : `Registrar ${tipo === 'correccion' ? 'corrección' : 'devolución'}`}
+        </button>
       </div>
     </div>
   )

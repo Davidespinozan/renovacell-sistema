@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react'
 import { subscribe as subG, getSnapshot as snapG, addGasto, removeGasto, type Gasto, type GastoCategoria } from '../store/gastosStore'
 import { subscribe as subC, getSnapshot as snapC, registrarCierre, type Cierre } from '../store/cierresStore'
+import { subscribe as subR, getSnapshot as snapR, registrarDevolucion, refundedByOrder, type Refund } from '../store/refundsStore'
 
 export function useGastos() {
   const data = useSyncExternalStore(subG, snapG, snapG)
@@ -14,4 +15,9 @@ export function useCierres() {
   return { data, registrarCierre }
 }
 
-export type { Gasto, GastoCategoria, Cierre }
+export function useRefunds() {
+  const data = useSyncExternalStore(subR, snapR, snapR)
+  return { data, registrarDevolucion, refundedByOrder }
+}
+
+export type { Gasto, GastoCategoria, Cierre, Refund }

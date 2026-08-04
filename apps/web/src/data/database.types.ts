@@ -302,6 +302,42 @@ export type Database = {
         }
         Relationships: []
       }
+      refunds: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          metodo: string | null
+          monto: number
+          motivo: string
+          order_id: string
+          tipo: string
+          usuario: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metodo?: string | null
+          monto: number
+          motivo: string
+          order_id: string
+          tipo: string
+          usuario?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metodo?: string | null
+          monto?: number
+          motivo?: string
+          order_id?: string
+          tipo?: string
+          usuario?: string | null
+        }
+        Relationships: []
+      }
       consignment_stock: {
         Row: {
           assigned: number
@@ -1507,6 +1543,16 @@ export type Database = {
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
+      }
+      registrar_devolucion: {
+        Args: {
+          p_monto: number
+          p_motivo: string
+          p_order_id: string
+          p_tipo: string
+          p_usuario?: string
+        }
+        Returns: Json
       }
       surtir_pedido: {
         Args: {

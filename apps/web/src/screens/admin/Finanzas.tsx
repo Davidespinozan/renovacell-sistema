@@ -11,7 +11,7 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCompras } from '../../data/hooks/useCompras'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
-import { useGastos, type GastoCategoria } from '../../data/hooks/useFinanzas'
+import { useGastos, useRefunds, type GastoCategoria } from '../../data/hooks/useFinanzas'
 import { GASTO_CATEGORIAS } from '../../data/store/gastosStore'
 import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria } from '../../data/ops/finanzas'
 
@@ -50,7 +50,8 @@ export function Finanzas() {
   const fMov = useMemo(() => movements.filter((m) => inRange(m.created_at)), [movements, range])
 
   // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
-  const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots), [fOrders, fGastos, fMov, lots])
+  const { data: refunds } = useRefunds()
+  const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots, refunds), [fOrders, fGastos, fMov, lots, refunds])
   const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
   const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
@@ -85,6 +86,8 @@ export function Finanzas() {
           style={{ marginLeft: 'auto' }}
           rows={[
             { concepto: 'Ventas', monto: er.ventas },
+            { concepto: 'Devoluciones', monto: -er.devoluciones },
+            { concepto: 'Ventas netas', monto: er.ventasNetas },
             { concepto: 'Costo de ventas', monto: -er.costoVentas },
             { concepto: 'Utilidad bruta', monto: er.utilidadBruta },
             { concepto: 'Gastos', monto: -er.gastos },
@@ -103,6 +106,9 @@ export function Finanzas() {
       {/* Estado de resultados */}
       <div className="grid sigs">
         <Stat icon={<TrendingUp size={18} />} v={money(er.ventas)} k="Ventas" s="del periodo" />
+        {er.devoluciones > 0 && (
+          <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventasNetas)}`} accent="dang" />
+        )}
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.costoVentas)} k="Costo de ventas" s={`margen bruto ${pct(er.margenBruto)}`} />
         <Stat icon={<Wallet size={18} />} v={money(er.utilidadBruta)} k="Utilidad bruta" s="ventas − costo" />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
