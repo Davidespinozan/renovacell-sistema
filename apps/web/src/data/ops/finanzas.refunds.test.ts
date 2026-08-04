@@ -1,7 +1,7 @@
 // Pruebas del ajuste por DEVOLUCIONES en los reportes: las devoluciones se restan
 // del neto (estado de resultados) y del efectivo esperado del arqueo.
 import { describe, it, expect } from 'vitest'
-import { estadoResultados, efectivoEsperado, type RefundLine } from './finanzas'
+import { estadoResultados, efectivoEsperado, cobranza, type RefundLine } from './finanzas'
 import { mkOrder } from '../../test/factories'
 
 describe('estadoResultados — devoluciones', () => {
@@ -41,5 +41,26 @@ describe('efectivoEsperado — devoluciones en efectivo', () => {
   })
   it('ignora devoluciones de pedidos fuera del alcance', () => {
     expect(efectivoEsperado(orders, { day }, [dev({ order_id: 'otro' })])).toBe(300)
+  })
+})
+
+describe('cobranza — vendido vs cobrado real', () => {
+  it('separa lo vendido del dinero pagado y calcula por cobrar', () => {
+    const orders = [
+      mkOrder({ id: '1', external_ref: 'S-1', status: 'paid', payment_status: 'paid', total: 1000 }),
+      mkOrder({ id: '2', external_ref: 'S-2', status: 'shipped', payment_status: 'pending', total: 400 }), // contra pedido sin pagar
+    ]
+    const c = cobranza(orders)
+    expect(c.vendido).toBe(1400)
+    expect(c.cobrado).toBe(1000)
+    expect(c.porCobrar).toBe(400)
+    expect(Math.round(c.tasaCobro)).toBe(71) // 1000/1400
+  })
+  it('las devoluciones de pedidos pagados bajan el cobrado real, no el por cobrar', () => {
+    const orders = [mkOrder({ id: '1', external_ref: 'S-1', status: 'paid', payment_status: 'paid', total: 1000 })]
+    const c = cobranza(orders, [{ order_id: '1', monto: 300 }])
+    expect(c.vendido).toBe(1000)
+    expect(c.cobrado).toBe(700)
+    expect(c.porCobrar).toBe(0)
   })
 })

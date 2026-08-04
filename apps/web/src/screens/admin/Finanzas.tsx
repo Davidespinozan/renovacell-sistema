@@ -2,7 +2,7 @@
 // posición financiera (por cobrar / por pagar) y registro de gastos. Datos
 // SENSIBLES (costos/utilidad): solo Dirección. Lógica pura en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle, Receipt } from 'lucide-react'
 import { useProducts } from '../../data/hooks/useProducts'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
@@ -13,7 +13,7 @@ import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
 import { useGastos, useRefunds, type GastoCategoria } from '../../data/hooks/useFinanzas'
 import { GASTO_CATEGORIAS } from '../../data/store/gastosStore'
-import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria } from '../../data/ops/finanzas'
+import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria, cobranza } from '../../data/ops/finanzas'
 
 const pct = (n: number) => `${n.toFixed(1)}%`
 
@@ -52,6 +52,7 @@ export function Finanzas() {
   // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
   const { data: refunds } = useRefunds()
   const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots, refunds), [fOrders, fGastos, fMov, lots, refunds])
+  const cob = useMemo(() => cobranza(fOrders, refunds), [fOrders, refunds])
   const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
   const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
@@ -114,6 +115,22 @@ export function Finanzas() {
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.mermas)} k="Mermas" s="caducidad / daño" accent={er.mermas > 0 ? 'dang' : undefined} />
         <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={money(er.utilidadNeta)} k="Utilidad neta" s={`margen neto ${pct(er.margenNeto)}`} accent={er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
+      </div>
+
+      {/* Cobranza real: vendido vs dinero que de verdad entró */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Cobranza · {range.label}</div>
+          <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>Tasa de cobro <b style={{ color: cob.tasaCobro >= 80 ? 'var(--green-deep)' : cob.tasaCobro >= 50 ? 'var(--warn)' : 'var(--danger)' }}>{pct(cob.tasaCobro)}</b></span>
+        </div>
+        <div style={{ height: 10, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ width: `${Math.min(100, Math.max(0, cob.tasaCobro))}%`, height: '100%', background: 'var(--grad-green, linear-gradient(90deg,#009A3E,#007311))' }} />
+        </div>
+        <div className="grid sigs">
+          <Stat icon={<Receipt size={18} />} v={money(cob.vendido)} k="Vendido" s="facturado del periodo" />
+          <Stat icon={<TrendingUp size={18} />} v={money(cob.cobrado)} k="Cobrado real" s="dinero que entró (neto)" accent="ok" />
+          <Stat icon={<ArrowDownCircle size={18} />} v={money(cob.porCobrar)} k="Por cobrar" s="del periodo (contra pedido)" />
+        </div>
       </div>
 
       {/* Posición financiera */}
