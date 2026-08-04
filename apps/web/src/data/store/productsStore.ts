@@ -106,12 +106,16 @@ export async function deleteProduct(id: string): Promise<{ ok: boolean; error?: 
 
 // ---- MIGRACIÓN: importación masiva del catálogo (Odoo → CSV) ----
 export interface ImportRow { sku: string; name: string; line: 'cosm' | 'prof'; category: string | null; price: number | null; cost: number | null }
-export interface ImportResult { created: number; skipped: number; errors: string[] }
+// `rejected` guarda la fila que NO entró + el motivo, para poder "Descargar no importados"
+// (el cliente corrige ese CSV y lo reimporta). Es distinto de `skipped` (ya existía, ok).
+export interface RejectedRow { motivo: string; fila: Record<string, unknown> }
+export interface ImportResult { created: number; skipped: number; errors: string[]; rejected: RejectedRow[] }
 
 // Importa productos (+ precio base y costo). Idempotente por SKU: los que ya existen se
 // omiten (no duplica). El costo va a product_costs (protegido por RLS admin/billing).
 export async function importCatalog(rows: ImportRow[]): Promise<ImportResult> {
-  const res: ImportResult = { created: 0, skipped: 0, errors: [] }
+  const res: ImportResult = { created: 0, skipped: 0, errors: [], rejected: [] }
+  const reject = (fila: ImportRow, motivo: string) => { res.errors.push(motivo); res.rejected.push({ motivo, fila: fila as unknown as Record<string, unknown> }) }
   if (!hasSupabase) {
     rows.forEach((r) => { if (r.name.trim()) { createProduct({ sku: r.sku, name: r.name, line: r.line, category: r.category ?? '', description: '', price: r.price, image_url: null, active: true }); res.created += 1 } })
     return res
@@ -121,12 +125,12 @@ export async function importCatalog(rows: ImportRow[]): Promise<ImportResult> {
   let n = 0
   for (const r of rows) {
     n += 1
-    if (!r.name.trim()) { res.errors.push('Fila sin nombre (omitida)'); continue }
+    if (!r.name.trim()) { reject(r, 'Fila sin nombre (omitida)'); continue }
     let sku = (r.sku || '').trim()
     if (sku && have.has(sku.toLowerCase())) { res.skipped += 1; continue }
     if (!sku) sku = `IMP-${String(n).padStart(4, '0')}` // sin SKU en el origen → uno estable
     const ins = await supabase.from('products').insert({ sku, name: r.name.trim(), line: r.line, category: r.category ?? '', price: r.price, unit: 'unit', active: true }).select('id').single()
-    if (ins.error || !ins.data) { res.errors.push(`${r.name}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
+    if (ins.error || !ins.data) { reject(r, `${r.name}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
     res.created += 1
     if (sku) have.add(sku.toLowerCase())
     if (r.cost != null && !Number.isNaN(r.cost)) {

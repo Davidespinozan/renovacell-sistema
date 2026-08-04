@@ -11,14 +11,18 @@
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { logAudit } from './auditStore'
 import { reloadInventory } from './lotsStore'
+import type { RejectedRow } from './productsStore'
 
 export interface MigrationResult {
   created: number
   skipped: number   // ya existía (idempotencia)
   errors: string[]
+  rejected: RejectedRow[]  // filas que NO entraron (para "Descargar no importados")
 }
 
-const empty = (): MigrationResult => ({ created: 0, skipped: 0, errors: [] })
+const empty = (): MigrationResult => ({ created: 0, skipped: 0, errors: [], rejected: [] })
+// Registra una fila rechazada: mensaje humano + la fila para poder reexportarla y corregir.
+const rej = (res: MigrationResult, fila: Record<string, unknown>, motivo: string) => { res.errors.push(motivo); res.rejected.push({ motivo, fila }) }
 
 // ── DOCTORES / CLIENTES ───────────────────────────────────────────────────────
 export interface DoctorRow {
@@ -44,7 +48,7 @@ export async function importDoctores(rows: DoctorRow[]): Promise<MigrationResult
 
   for (const r of rows) {
     const email = (r.email || '').trim().toLowerCase()
-    if (!email) { res.errors.push(`${r.name || 'Sin nombre'}: falta el correo (es la llave de la cuenta)`); continue }
+    if (!email) { rej(res, r as unknown as Record<string, unknown>, `${r.name || 'Sin nombre'}: falta el correo (es la llave de la cuenta)`); continue }
     if (conocidos.has(email)) { res.skipped += 1; continue }
     const { data, error } = await supabase.functions.invoke('invite-doctor', {
       body: {
@@ -61,7 +65,7 @@ export async function importDoctores(rows: DoctorRow[]): Promise<MigrationResult
       },
     })
     const err = error?.message ?? (data as { error?: string } | null)?.error
-    if (err) { res.errors.push(`${r.name || email}: ${err}`); continue }
+    if (err) { rej(res, r as unknown as Record<string, unknown>, `${r.name || email}: ${err}`); continue }
     conocidos.add(email)
     res.created += 1
   }
@@ -93,10 +97,10 @@ export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   for (const r of rows) {
     const sku = (r.sku || '').trim()
     const productId = porSku.get(sku.toLowerCase())
-    if (!productId) { res.errors.push(`Lote ${r.lote || '?'}: no existe un producto con SKU "${sku}" (importa primero el catálogo)`); continue }
+    if (!productId) { rej(res, r as unknown as Record<string, unknown>, `Lote ${r.lote || '?'}: no existe un producto con SKU "${sku}" (importa primero el catálogo)`); continue }
     const code = (r.lote || '').trim()
-    if (!code) { res.errors.push(`SKU ${sku}: falta el código de lote`); continue }
-    if (!Number.isFinite(r.cantidad) || r.cantidad <= 0) { res.errors.push(`Lote ${code}: cantidad inválida`); continue }
+    if (!code) { rej(res, r as unknown as Record<string, unknown>, `SKU ${sku}: falta el código de lote`); continue }
+    if (!Number.isFinite(r.cantidad) || r.cantidad <= 0) { rej(res, r as unknown as Record<string, unknown>, `Lote ${code}: cantidad inválida`); continue }
     if (existentes.has(`${productId}|${code.toLowerCase()}`)) { res.skipped += 1; continue }
 
     const ins = await supabase.from('lots').insert({
@@ -105,7 +109,7 @@ export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
       quantity: r.cantidad,
       location: r.ubicacion?.trim() || 'Bodega central',
     }).select('id').single()
-    if (ins.error || !ins.data) { res.errors.push(`Lote ${code}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
+    if (ins.error || !ins.data) { rej(res, r as unknown as Record<string, unknown>, `Lote ${code}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
 
     const mv = await supabase.from('inventory_movements').insert({
       lot_id: ins.data.id, change: r.cantidad, reason: 'entrada', reference: 'MIGRACION',
@@ -134,10 +138,10 @@ export async function importCostos(rows: CostoRow[]): Promise<MigrationResult> {
   for (const r of rows) {
     const sku = (r.sku || '').trim()
     const productId = porSku.get(sku.toLowerCase())
-    if (!productId) { res.errors.push(`No existe un producto con SKU "${sku}"`); continue }
-    if (!Number.isFinite(r.costo) || r.costo < 0) { res.errors.push(`SKU ${sku}: costo inválido`); continue }
+    if (!productId) { rej(res, r as unknown as Record<string, unknown>, `No existe un producto con SKU "${sku}"`); continue }
+    if (!Number.isFinite(r.costo) || r.costo < 0) { rej(res, r as unknown as Record<string, unknown>, `SKU ${sku}: costo inválido`); continue }
     const { error } = await supabase.from('product_costs').upsert({ product_id: productId, unit_cost: r.costo }, { onConflict: 'product_id' })
-    if (error) { res.errors.push(`SKU ${sku}: ${error.message}`); continue }
+    if (error) { rej(res, r as unknown as Record<string, unknown>, `SKU ${sku}: ${error.message}`); continue }
     res.created += 1
   }
   logAudit({ actor: 'Administración', action: 'Costos migrados', resource: `${res.created} productos`, detail: `${res.created} costos cargados` })

@@ -5,9 +5,10 @@
 // confirmar. Y todas son IDEMPOTENTES: volver a correr el mismo archivo no
 // duplica, así se puede migrar por partes y reintentar tras corregir.
 import React, { useState } from 'react'
-import { Upload, FileUp, Check, AlertTriangle, Table } from 'lucide-react'
+import { Upload, FileUp, Check, AlertTriangle, Table, Download } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
 import { money } from '../../lib/format'
+import { exportRows } from '../../lib/exportCsv'
 import { importCatalog } from '../../data/store/productsStore'
 import { importDoctores, importLotes, importCostos, type MigrationResult } from '../../data/store/migrationStore'
 
@@ -109,6 +110,15 @@ export function Importar() {
   const preview = () => { setResult(null); setRows(parse(text, def)) }
   const onFile = (f: File | undefined) => { if (!f) return; f.text().then((t) => { setText(t); setRows(parse(t, def)); setResult(null) }) }
 
+  // Descarga un CSV con SOLO las filas que no entraron + el motivo, para que el
+  // cliente lo corrija y lo reimporte (idempotente: lo que ya entró no se duplica).
+  const descargarNoImportados = () => {
+    if (!result?.rejected?.length) return
+    const rows = result.rejected.map((x) => ({ ...x.fila, motivo: x.motivo }))
+    const cols = [...def.campos.map((c) => ({ key: c.key, label: c.label })), { key: 'motivo', label: 'Motivo' }]
+    exportRows(`no-importados-${def.tipo}`, rows, cols)
+  }
+
   const doImport = async () => {
     if (!rows?.length || busy) return
     setBusy(true)
@@ -120,7 +130,7 @@ export function Importar() {
         category: String(x.category ?? '') || null,
         price: Number(x.price) || null, cost: Number(x.cost) || null,
       })))
-      r = { created: res.created, skipped: res.skipped, errors: res.errors }
+      r = { created: res.created, skipped: res.skipped, errors: res.errors, rejected: res.rejected }
     } else if (tipo === 'clientes') {
       r = await importDoctores(rows.map((x) => ({
         name: String(x.name ?? ''), email: String(x.email ?? ''), phone: String(x.phone ?? ''),
@@ -201,6 +211,11 @@ export function Importar() {
               {result.errors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
               {result.errors.length > 10 && <li>…y {result.errors.length - 10} más.</li>}
             </ul>
+          )}
+          {result.rejected.length > 0 && (
+            <button className="btn ghost sm" type="button" style={{ marginTop: 10 }} onClick={descargarNoImportados}>
+              <Download size={14} /> Descargar no importados ({result.rejected.length})
+            </button>
           )}
         </div>
       )}
