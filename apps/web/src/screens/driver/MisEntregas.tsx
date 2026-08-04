@@ -1,6 +1,7 @@
 // CHOFER: solo SUS entregas (driver_id = chofer logueado). Marca entregado +
 // sube foto de prueba. Al confirmar, envío y pedido pasan a Entregado (cierra el ciclo).
 import { useMemo, useState } from 'react'
+// Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
 import { fmtDate } from '../../lib/format'
 import { uploadPrivate } from '../../lib/uploads'
@@ -57,10 +58,44 @@ export function MisEntregas() {
   }, 0)
   const incidencias = mine.filter((s) => s.incident && !s.incident.resolved).length
 
-  // Ruta completa: abre Google Maps con TODAS las paradas pendientes como
-  // waypoints (en el orden asignado por Empaque; el chofer puede reordenar en la
-  // app). Sin origen → usa su ubicación actual. No requiere API key.
-  const routeStops = mine
+  // ORDEN de la ruta elegido por el chofer (él conoce su ciudad mejor que un
+  // algoritmo simple). Se guarda por chofer en el navegador para que sobreviva
+  // recargas del día. La optimización automática por cercanía queda para cuando
+  // haya API key de Maps (necesita coordenadas; hoy solo tenemos direcciones).
+  const KEY = `rnc-ruta-${driverId ?? 'anon'}`
+  const [routeOrder, setRouteOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') as string[] } catch { return [] }
+  })
+  // Orden efectivo: respeta lo elegido, agrega paradas nuevas al final y descarta
+  // las que ya se entregaron o se reasignaron.
+  const orderedIds = useMemo(() => {
+    const ids = mine.map((s) => s.id)
+    const kept = routeOrder.filter((id) => ids.includes(id))
+    const nuevos = ids.filter((id) => !kept.includes(id))
+    return [...kept, ...nuevos]
+  }, [routeOrder, mine])
+  const orderedMine = useMemo(
+    () => orderedIds.map((id) => mine.find((s) => s.id === id)).filter((s): s is (typeof mine)[number] => Boolean(s)),
+    [orderedIds, mine],
+  )
+  const move = (id: string, dir: -1 | 1) => {
+    const seq = [...orderedIds]
+    const i = seq.indexOf(id); const j = i + dir
+    if (i < 0 || j < 0 || j >= seq.length) return
+    ;[seq[i], seq[j]] = [seq[j], seq[i]]
+    setRouteOrder(seq)
+    try { localStorage.setItem(KEY, JSON.stringify(seq)) } catch { /* almacenamiento no disponible */ }
+  }
+  // Etiqueta de una parada (cliente + dirección) para la lista de la ruta.
+  const stopInfo = (s: (typeof mine)[number]) => {
+    const o = orderById[s.order_id]
+    const c = o ? clientOf(o.doctor_id) : null
+    return c ? { name: c.name, addr: `${c.address}, ${c.city}`, folio: o?.external_ref ?? '' } : null
+  }
+
+  // Ruta completa en Google Maps, EN EL ORDEN del chofer. Sin origen → usa su
+  // ubicación actual. Direcciones en texto (no requiere API key).
+  const routeStops = orderedMine
     .map((s) => { const o = orderById[s.order_id]; return o ? clientOf(o.doctor_id) : null })
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
     .map((c) => `${c.address}, ${c.city}`)
@@ -101,6 +136,34 @@ export function MisEntregas() {
         <div className={'card sig' + (incidencias ? ' dang' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{incidencias}</div><div className="k">Con incidencia</div><div className="s">requieren atención</div></div>
       </div>
 
+      {orderedMine.length > 1 && (
+        <div className="card" style={{ padding: 0 }}>
+          <div style={{ padding: '14px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Orden de tu ruta</div>
+            <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Acomódalas como te convenga · se guarda</span>
+          </div>
+          <div style={{ padding: '0 10px 10px' }}>
+            {orderedMine.map((s, i) => {
+              const info = stopInfo(s)
+              if (!info) return null
+              return (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 6px', borderBottom: i < orderedMine.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <span className="mono" style={{ width: 22, height: 22, borderRadius: 7, background: 'var(--green-deep)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flex: 'none' }}>{i + 1}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.addr}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
+                    <button type="button" className="btn ghost sm" aria-label="Subir" disabled={i === 0} style={i === 0 ? { opacity: 0.35 } : undefined} onClick={() => move(s.id, -1)}>▲</button>
+                    <button type="button" className="btn ghost sm" aria-label="Bajar" disabled={i === orderedMine.length - 1} style={i === orderedMine.length - 1 ? { opacity: 0.35 } : undefined} onClick={() => move(s.id, 1)}>▼</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {routeUrl && (
         <a className="btn" href={routeUrl} target="_blank" rel="noreferrer" style={{ justifyContent: 'center' }}>
           <Icon name="truck" /> Abrir ruta completa en Google Maps ({routeStops.length} parada{routeStops.length === 1 ? '' : 's'})
@@ -112,7 +175,7 @@ export function MisEntregas() {
           No tienes entregas asignadas pendientes.
         </div>
       ) : (
-        mine.map((s) => {
+        orderedMine.map((s) => {
           const order = orderById[s.order_id]
           if (!order) return null
           const client = clientOf(order.doctor_id)
