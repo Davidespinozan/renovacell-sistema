@@ -420,5 +420,14 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   body.printing-corte > :not(.corte-print-root){display:none !important}
   body.printing-corte .corte-print-root{display:block !important}
   body.printing-corte .corte-ticket{max-width:100%;box-shadow:none}
-  @page{margin:14mm}
 }
+/* Recibo de venta del POS: mismo patrón de impresión aislada, reutiliza .corte-ticket. */
+.ct-item{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:3px 0}
+.ct-item .n{color:#1a1f1c}.ct-item .n small{color:#7a857c}
+.venta-print-root{display:none}
+@media print{
+  body.printing-venta > :not(.venta-print-root){display:none !important}
+  body.printing-venta .venta-print-root{display:block !important}
+  body.printing-venta .corte-ticket{max-width:100%;box-shadow:none}
+}
+@media print{ @page{margin:14mm} }

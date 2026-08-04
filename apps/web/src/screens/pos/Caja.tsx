@@ -2,8 +2,10 @@
 // cobra (efectivo/tarjeta) y completa. Al cobrar: crea orden POS pagada/entregada
 // y descuenta inventario por lote (FEFO de Almacén, reutilizada).
 import React, { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '../../app/icons'
-import { money } from '../../lib/format'
+import { money, fmtDate } from '../../lib/format'
+import { montoEnLetras } from '../../lib/enLetras'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
@@ -25,6 +27,7 @@ export function Caja() {
   // Solo productos activos y con precio (no se vende lo oculto).
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
+  const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<PayMethod>('efectivo')
@@ -179,14 +182,57 @@ export function Caja() {
                   {' · '}{done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador'}.
                   Inventario descontado por lote. Ya suma en el Tablero.
                 </p>
-                <button className="btn" type="button" style={{ marginTop: 16 }} onClick={() => setDone(null)}>Nueva venta</button>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
+                  <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>
+                </div>
               </div>
             </div>
           </div>
+          <VentaTicketPrint order={done} productName={productName} clientName={done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general'} />
         </div>
       )}
     </div>
   )
+}
+
+// Imprime SOLO el recibo (marca el body, imprime, limpia la clase en afterprint).
+function imprimirVenta() {
+  document.body.classList.add('printing-venta')
+  const cleanup = () => { document.body.classList.remove('printing-venta'); window.removeEventListener('afterprint', cleanup) }
+  window.addEventListener('afterprint', cleanup)
+  window.print()
+}
+
+// Recibo de venta para el cliente (comprobante interno, NO es CFDI).
+function VentaTicketView({ order, productName, clientName }: { order: OrderWithItems; productName: Record<string, string>; clientName: string }) {
+  const items = order.items.filter((it) => it.unit_price != null)
+  return (
+    <div className="corte-ticket">
+      <div className="ct-head">
+        <div className="ct-brand">RENOVACELL</div>
+        <div className="ct-sub">Comprobante de venta</div>
+      </div>
+      <div className="ct-row"><span className="k">Folio</span><span className="v">{order.external_ref}</span></div>
+      <div className="ct-row"><span className="k">Fecha</span><span className="v">{fmtDate(order.created_at)}</span></div>
+      <div className="ct-row"><span className="k">Cliente</span><span className="v">{clientName}</span></div>
+      <div className="ct-sep" />
+      {items.map((it) => (
+        <div key={it.id} className="ct-item">
+          <span className="n">{productName[it.product_id ?? ''] ?? 'Producto'} <small>× {it.qty}</small></span>
+          <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
+        </div>
+      ))}
+      <div className="ct-sep" />
+      <div className="ct-dif"><span>Total</span><span>{money(order.total)}</span></div>
+      <div className="ct-letra">Son: {montoEnLetras(order.total ?? 0)}</div>
+      <div className="ct-row" style={{ marginTop: 6 }}><span className="k">Pago</span><span className="v">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}</span></div>
+      <div className="ct-foot">No es un comprobante fiscal (CFDI){order.invoice_requested ? ' · CFDI solicitado aparte' : ''}</div>
+    </div>
+  )
+}
+function VentaTicketPrint(props: { order: OrderWithItems; productName: Record<string, string>; clientName: string }) {
+  return createPortal(<div className="venta-print-root"><VentaTicketView {...props} /></div>, document.body)
 }
 
 // Selector de cliente para la Caja: buscar un doctor verificado, o dejar Mostrador.
