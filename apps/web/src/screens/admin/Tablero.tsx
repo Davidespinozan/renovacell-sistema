@@ -1,7 +1,7 @@
 // TABLERO de Administración: centro de mando. Solo lectura; AGREGA de los stores
 // compartidos (orders, shipments, lots) y reutiliza los detectores existentes
 // (atorados de Seguimiento, caducidad de Almacén). No inventa datos nuevos.
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
 import { money, fmtDate } from '../../lib/format'
@@ -9,8 +9,9 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
+import { useDoctors } from '../../data/hooks/useDoctors'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
-import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo } from '../../data/metrics'
+import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo, doctoresEnRiesgo } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 
@@ -186,6 +187,78 @@ export function Tablero() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <DoctoresRiesgo />
+    </div>
+  )
+}
+
+// Retención: doctores verificados que ya compraban y llevan tiempo sin pedir.
+// Lista para LLAMAR antes de perderlos, ordenada por urgencia, con contacto directo.
+function DoctoresRiesgo() {
+  const { data: orders } = useAllOrders()
+  const { data: doctors } = useDoctors()
+  const [days, setDays] = useState(30)
+  const enRiesgo = useMemo(() => doctoresEnRiesgo(orders, doctors, { days }), [orders, doctors, days])
+  const OPCIONES = [30, 45, 60, 90]
+
+  return (
+    <div className="card" style={{ padding: 0 }}>
+      <div style={{ padding: '18px 18px 0', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="eyebrow" style={{ margin: 0 }}>Doctores en riesgo · llámalos</div>
+        <div className="seg" style={{ marginLeft: 'auto' }}>
+          {OPCIONES.map((d) => (
+            <button key={d} type="button" className={days === d ? 'active' : undefined} onClick={() => setDays(d)}>+{d}d</button>
+          ))}
+        </div>
+        {enRiesgo.length > 0 && (
+          <ExportButton name={`doctores-en-riesgo-${days}d`} rows={enRiesgo} columns={[
+            { key: 'name', label: 'Doctor' },
+            { key: 'organization', label: 'Consultorio' },
+            { key: 'diasSinPedir', label: 'Días sin pedir' },
+            { key: 'lastOrder', label: 'Último pedido', format: (v) => fmtDate(v as string) },
+            { key: 'orders', label: 'Pedidos' },
+            { key: 'total', label: 'Gasto histórico', format: (v) => money(v as number) },
+            { key: 'phone', label: 'Teléfono' },
+            { key: 'email', label: 'Correo' },
+          ]} />
+        )}
+      </div>
+      <div style={{ padding: '10px 18px 6px', fontSize: 12.5, color: 'var(--ink-3)' }}>
+        Compraban antes y llevan <b>+{days} días</b> sin pedir. Contáctalos antes de perderlos.
+      </div>
+      <div style={{ padding: '0 14px 8px' }}>
+        {enRiesgo.length === 0 ? (
+          <div style={{ padding: '14px 4px', color: 'var(--ink-3)', fontSize: 13 }}>Ningún doctor con +{days} días sin pedir. 👍</div>
+        ) : (
+          <table className="tbl-cards">
+            <thead><tr><th>Doctor</th><th>Sin pedir</th><th>Histórico</th><th>Contacto</th></tr></thead>
+            <tbody>
+              {enRiesgo.slice(0, 20).map((d) => (
+                <tr key={d.id}>
+                  <td data-label="Doctor">
+                    <div style={{ fontWeight: 600 }}>{d.name}</div>
+                    {d.organization && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{d.organization}</div>}
+                  </td>
+                  <td data-label="Sin pedir">
+                    <span className={'pill ' + (d.diasSinPedir >= 90 ? 'p-dang' : d.diasSinPedir >= 60 ? 'p-warn' : 'p-neu')}>{d.diasSinPedir} días</span>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>últ. {fmtDate(d.lastOrder)}</div>
+                  </td>
+                  <td data-label="Histórico" className="mono">{money(d.total)}<div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{d.orders} pedido(s)</div></td>
+                  <td data-label="Contacto">
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {d.phone && <a className="btn ghost sm" href={`tel:${d.phone}`}><Icon name="usercheck" /> Llamar</a>}
+                      {d.email && <a className="btn ghost sm" href={`mailto:${d.email}`}>Correo</a>}
+                      {!d.phone && !d.email && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Sin contacto</span>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {enRiesgo.length > 20 && <div style={{ padding: '8px 4px', fontSize: 12, color: 'var(--ink-3)' }}>…y {enRiesgo.length - 20} más (usa Exportar para verlos todos).</div>}
       </div>
     </div>
   )

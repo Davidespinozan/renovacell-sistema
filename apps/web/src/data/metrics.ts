@@ -72,6 +72,62 @@ export function topDoctors(orders: OrderWithItems[], doctorsById: Record<string,
     .slice(0, limit)
 }
 
+// DOCTORES EN RIESGO (retención): doctores VERIFICADOS que ya compraban pero llevan
+// >= `days` sin pedir. Lista accionable para que Ventas los llame ANTES de perderlos.
+// Ordenada por urgencia (más días sin pedir primero). Pura y testeable: recibe `now`.
+export interface DoctorRiesgo {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+  organization?: string
+  lastOrder: string       // ISO del último pedido
+  diasSinPedir: number
+  orders: number          // pedidos históricos (señal de qué tan valioso era)
+  total: number           // gasto histórico
+}
+export function doctoresEnRiesgo(
+  orders: OrderWithItems[],
+  doctors: Profile[],
+  opts: { days?: number; now?: Date } = {},
+): DoctorRiesgo[] {
+  const days = opts.days ?? 30
+  const now = opts.now ?? new Date()
+  const DAY = 86_400_000
+  // Último pedido, conteo y total por doctor (solo ventas reales).
+  const m = new Map<string, { last: number; orders: number; total: number }>()
+  orders.filter(isSale).forEach((o) => {
+    if (!o.doctor_id) return
+    const t = Date.parse(o.created_at)
+    if (Number.isNaN(t)) return
+    const cur = m.get(o.doctor_id) ?? { last: 0, orders: 0, total: 0 }
+    cur.last = Math.max(cur.last, t)
+    cur.orders += 1
+    cur.total += o.total ?? 0
+    m.set(o.doctor_id, cur)
+  })
+  const byId = new Map(doctors.map((d) => [d.id, d]))
+  const out: DoctorRiesgo[] = []
+  m.forEach((v, id) => {
+    const d = byId.get(id)
+    if (!d || !d.verified) return // solo doctores verificados (clientes reales)
+    const diasSinPedir = Math.floor((now.getTime() - v.last) / DAY)
+    if (diasSinPedir < days) return // aún activo
+    out.push({
+      id,
+      name: d.full_name ?? 'Doctor',
+      phone: (d.meta?.phone as string) ?? undefined,
+      email: d.email ?? undefined,
+      organization: d.organization ?? undefined,
+      lastOrder: new Date(v.last).toISOString(),
+      diasSinPedir,
+      orders: v.orders,
+      total: v.total,
+    })
+  })
+  return out.sort((a, b) => b.diasSinPedir - a.diasSinPedir)
+}
+
 export interface ProductSales {
   id: string
   name: string
