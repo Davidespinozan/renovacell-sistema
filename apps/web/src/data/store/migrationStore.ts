@@ -85,37 +85,31 @@ export interface LoteRow {
 // Da de alta las existencias iniciales igual que lo haría Almacén: crea el lote y
 // SU MOVIMIENTO DE ENTRADA. Sin el movimiento, la trazabilidad no podría responder
 // "de dónde vino" este lote.
+// Traduce los códigos de la RPC importar_lote a mensajes claros.
+function traducirLote(msg: string): string {
+  if (msg.includes('SKU_INEXISTENTE')) return 'no existe un producto con ese SKU (importa primero el catálogo)'
+  if (msg.includes('LOTE_REQUERIDO')) return 'falta el código de lote'
+  if (msg.includes('CANTIDAD_INVALIDA')) return 'cantidad inválida'
+  if (msg.includes('NO_AUTORIZADO')) return 'no tienes permiso para importar inventario'
+  return msg
+}
 export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   const res = empty()
   if (!hasSupabase) { res.errors.push('Sin conexión al sistema: la migración requiere el backend.'); return res }
 
-  const { data: prods } = await supabase.from('products').select('id, sku')
-  const porSku = new Map((prods ?? []).map((p) => [String(p.sku ?? '').trim().toLowerCase(), p.id as string]))
-  const { data: lotesYa } = await supabase.from('lots').select('lot_code, product_id')
-  const existentes = new Set((lotesYa ?? []).map((l) => `${l.product_id}|${String(l.lot_code ?? '').trim().toLowerCase()}`))
-
+  // Cada lote entra por la RPC `importar_lote`: crea el lote y su movimiento de
+  // entrada en UNA transacción (nunca un lote huérfano sin movimiento) y es
+  // idempotente (si ya existe, lo omite). Una fila mala no tumba las demás.
   for (const r of rows) {
-    const sku = (r.sku || '').trim()
-    const productId = porSku.get(sku.toLowerCase())
-    if (!productId) { rej(res, r as unknown as Record<string, unknown>, `Lote ${r.lote || '?'}: no existe un producto con SKU "${sku}" (importa primero el catálogo)`); continue }
-    const code = (r.lote || '').trim()
-    if (!code) { rej(res, r as unknown as Record<string, unknown>, `SKU ${sku}: falta el código de lote`); continue }
-    if (!Number.isFinite(r.cantidad) || r.cantidad <= 0) { rej(res, r as unknown as Record<string, unknown>, `Lote ${code}: cantidad inválida`); continue }
-    if (existentes.has(`${productId}|${code.toLowerCase()}`)) { res.skipped += 1; continue }
-
-    const ins = await supabase.from('lots').insert({
-      product_id: productId, lot_code: code,
-      expiry_date: r.caducidad?.trim() || null,
-      quantity: r.cantidad,
-      location: r.ubicacion?.trim() || 'Bodega central',
-    }).select('id').single()
-    if (ins.error || !ins.data) { rej(res, r as unknown as Record<string, unknown>, `Lote ${code}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
-
-    const mv = await supabase.from('inventory_movements').insert({
-      lot_id: ins.data.id, change: r.cantidad, reason: 'entrada', reference: 'MIGRACION',
+    const { data, error } = await supabase.rpc('importar_lote', {
+      p_sku: (r.sku || '').trim(),
+      p_lote: (r.lote || '').trim(),
+      p_caducidad: (r.caducidad || '').trim(),
+      p_cantidad: Math.trunc(Number(r.cantidad) || 0),
+      p_ubicacion: (r.ubicacion || '').trim(),
     })
-    if (mv.error) res.errors.push(`Lote ${code}: se creó, pero falló su movimiento de entrada (${mv.error.message})`)
-    existentes.add(`${productId}|${code.toLowerCase()}`)
+    if (error) { rej(res, r as unknown as Record<string, unknown>, `Lote ${r.lote || '?'}: ${traducirLote(error.message)}`); continue }
+    if ((data as { result?: string } | null)?.result === 'skipped') { res.skipped += 1; continue }
     res.created += 1
   }
   reloadInventory()

@@ -1527,6 +1527,16 @@ export type Database = {
       }
       event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       has_cap: { Args: { cap: string }; Returns: boolean }
+      importar_lote: {
+        Args: {
+          p_caducidad: string
+          p_cantidad: number
+          p_lote: string
+          p_sku: string
+          p_ubicacion: string
+        }
+        Returns: Json
+      }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
       is_verified: { Args: never; Returns: boolean }
       log_audit: {
