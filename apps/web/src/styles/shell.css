@@ -396,3 +396,29 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   .alert{padding:13px 15px;margin-bottom:12px}
   .coitem{padding:8px 0}
 }
+
+/* TICKET DE CORTE DE CAJA — comprobante imprimible.
+   Se monta como portal en <body> (.corte-print-root, oculto en pantalla) y solo
+   aparece al imprimir, aislando el ticket del resto de la app (patrón que evita el
+   "todo el sistema en el PDF" y las hojas en blanco). El preview en pantalla usa
+   la misma plantilla .corte-ticket dentro de una card normal. */
+.corte-ticket{max-width:420px;margin:0 auto;background:#fff;color:#1a1f1c;padding:22px 24px;font-variant-numeric:tabular-nums}
+.corte-ticket .ct-head{text-align:center;border-bottom:1px dashed #cfd4cd;padding-bottom:12px;margin-bottom:12px}
+.corte-ticket .ct-brand{font-weight:800;font-size:17px;letter-spacing:.02em}
+.corte-ticket .ct-sub{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7a857c;margin-top:3px}
+.corte-ticket .ct-title{text-align:center;font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:6px 0 12px}
+.corte-ticket .ct-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0}
+.corte-ticket .ct-row .k{color:#5b665d}
+.corte-ticket .ct-row .v{font-weight:600}
+.corte-ticket .ct-sep{border-top:1px dashed #cfd4cd;margin:10px 0}
+.corte-ticket .ct-dif{display:flex;justify-content:space-between;font-weight:700;font-size:14px;padding:8px 0}
+.corte-ticket .ct-dif.ok{color:#0a7d2c}.corte-ticket .ct-dif.bad{color:#b3261e}
+.corte-ticket .ct-letra{font-size:11px;color:#5b665d;font-style:italic;margin-top:8px;line-height:1.4}
+.corte-ticket .ct-foot{text-align:center;font-size:10px;color:#98a09a;margin-top:14px;border-top:1px dashed #cfd4cd;padding-top:10px}
+.corte-print-root{display:none}
+@media print{
+  body.printing-corte > :not(.corte-print-root){display:none !important}
+  body.printing-corte .corte-print-root{display:block !important}
+  body.printing-corte .corte-ticket{max-width:100%;box-shadow:none}
+  @page{margin:14mm}
+}

@@ -2,8 +2,10 @@
 // contra lo CONTADO por el cajero, registra la diferencia y su motivo. Da control
 // de efectivo del día o del evento. Lógica de esperado en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
-import { Wallet, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Wallet, AlertTriangle, CheckCircle2, Printer } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
+import { montoEnLetras } from '../../lib/enLetras'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -11,6 +13,48 @@ import { useEvents } from '../../data/hooks/useEvents'
 import { useCierres } from '../../data/hooks/useFinanzas'
 import { useRole } from '../../auth/RoleContext'
 import { efectivoEsperado } from '../../data/ops/finanzas'
+import type { Cierre } from '../../data/store/cierresStore'
+
+// Imprime SOLO el ticket: marca el <body>, imprime, y limpia la clase en `afterprint`
+// (nunca por timer — quitarla antes reintroduce la app y salen hojas en blanco).
+function imprimirCorte() {
+  document.body.classList.add('printing-corte')
+  const cleanup = () => { document.body.classList.remove('printing-corte'); window.removeEventListener('afterprint', cleanup) }
+  window.addEventListener('afterprint', cleanup)
+  window.print()
+}
+
+// Plantilla del ticket (se usa en el preview en pantalla y en el portal de impresión).
+function CorteTicketView({ c }: { c: Cierre }) {
+  const cuadra = c.diferencia === 0
+  return (
+    <div className="corte-ticket">
+      <div className="ct-head">
+        <div className="ct-brand">RENOVACELL</div>
+        <div className="ct-sub">Comprobante interno de caja</div>
+      </div>
+      <div className="ct-title">Corte de caja</div>
+      <div className="ct-row"><span className="k">Alcance</span><span className="v">{c.alcance}</span></div>
+      <div className="ct-row"><span className="k">Fecha</span><span className="v">{fmtDate(c.fecha)}</span></div>
+      <div className="ct-row"><span className="k">Realizó</span><span className="v">{c.usuario}</span></div>
+      <div className="ct-sep" />
+      <div className="ct-row"><span className="k">Efectivo esperado</span><span className="v">{money(c.esperado)}</span></div>
+      <div className="ct-row"><span className="k">Efectivo contado</span><span className="v">{money(c.contado)}</span></div>
+      <div className={'ct-dif ' + (cuadra ? 'ok' : 'bad')}>
+        <span>{cuadra ? 'La caja cuadra' : c.diferencia > 0 ? 'Sobrante' : 'Faltante'}</span>
+        <span>{cuadra ? money(0) : money(Math.abs(c.diferencia))}</span>
+      </div>
+      <div className="ct-letra">Efectivo contado, son: {montoEnLetras(c.contado)}</div>
+      {c.motivo && <div className="ct-row" style={{ marginTop: 6 }}><span className="k">Motivo</span><span className="v" style={{ maxWidth: '60%', textAlign: 'right', fontWeight: 500 }}>{c.motivo}</span></div>}
+      <div className="ct-foot">No es un comprobante fiscal (CFDI) · {fmtDate(c.created_at)}</div>
+    </div>
+  )
+}
+
+// Copia oculta montada en <body> que solo se ve al imprimir.
+function CorteTicketPrint({ c }: { c: Cierre }) {
+  return createPortal(<div className="corte-print-root"><CorteTicketView c={c} /></div>, document.body)
+}
 
 export function CierreCaja() {
   const { data: orders } = useAllOrders()
@@ -34,15 +78,24 @@ export function CierreCaja() {
   const diferencia = contadoN - esperado
   const [motivo, setMotivo] = useState('')
   const [done, setDone] = useState(false)
+  const [ticket, setTicket] = useState<Cierre | null>(null) // último corte, para el ticket imprimible
 
   const needsMotivo = contado !== '' && diferencia !== 0
   const valid = contado !== '' && (!needsMotivo || motivo.trim() !== '')
 
   const cerrar = () => {
     if (!valid) return
-    registrarCierre({ fecha: today, alcance, esperado, contado: contadoN, motivo: motivo.trim() || null, usuario: user?.name ?? 'Cajero' })
+    const c = registrarCierre({ fecha: today, alcance, esperado, contado: contadoN, motivo: motivo.trim() || null, usuario: user?.name ?? 'Cajero' })
+    setTicket(c)
     setDone(true); setContado(''); setMotivo('')
     window.setTimeout(() => setDone(false), 2600)
+  }
+
+  // Reimprimir un corte del historial: primero se monta su ticket, luego se imprime
+  // (doble rAF asegura que el portal ya pintó antes de abrir el diálogo).
+  const printCierre = (c: Cierre) => {
+    setTicket(c)
+    requestAnimationFrame(() => requestAnimationFrame(() => imprimirCorte()))
   }
 
   const sel: React.CSSProperties = { padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }
@@ -115,7 +168,7 @@ export function CierreCaja() {
           </div>
           <div style={{ padding: '0 14px 8px' }}>
             <table className="tbl-cards">
-              <thead><tr><th>Fecha</th><th>Alcance</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Alcance</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th></th></tr></thead>
               <tbody>
                 {cierres.map((c) => (
                   <tr key={c.id}>
@@ -124,14 +177,30 @@ export function CierreCaja() {
                     <td data-label="Esperado" className="mono">{money(c.esperado)}</td>
                     <td data-label="Contado" className="mono">{money(c.contado)}</td>
                     <td data-label="Diferencia"><span className={'pill ' + (c.diferencia === 0 ? 'p-ok' : 'p-dang')}>{c.diferencia === 0 ? 'Cuadra' : (c.diferencia > 0 ? '+' : '') + money(c.diferencia)}</span></td>
+                    <td data-label="" style={{ textAlign: 'right' }}>
+                      <button className="btn ghost sm" type="button" title="Imprimir ticket" onClick={() => printCierre(c)}><Printer size={14} /></button>
+                    </td>
                   </tr>
                 ))}
-                {cierres.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Aún no hay cierres.</td></tr>}
+                {cierres.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-3)' }}>Aún no hay cierres.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {ticket && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Ticket del corte</div>
+            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={imprimirCorte}><Printer size={14} /> Imprimir</button>
+          </div>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 6, background: 'var(--hueso)' }}>
+            <CorteTicketView c={ticket} />
+          </div>
+        </div>
+      )}
+      {ticket && <CorteTicketPrint c={ticket} />}
     </div>
   )
 }
