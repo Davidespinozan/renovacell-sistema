@@ -1,8 +1,8 @@
 // DOCTORES (Administración): gate del canal comercial. El admin verifica/revoca
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
-import React, { useMemo, useState } from 'react'
-import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
 import { ExportButton } from '../../app/ExportButton'
@@ -10,12 +10,22 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { assignDoctorList } from '../../data/store/pricingStore'
+import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
 import type { VerifyDecision } from '../../data/verification/decide'
 
 const verifyResultOf = (d: Profile): VerifyDecision | null => ((d.meta as Record<string, unknown>)?.verifyResult as VerifyDecision) ?? null
+
+// ---- Verificación de IDENTIDAD (KYC · Nubarium): resultado + evidencia guardada en `proofs`. ----
+interface IdentityRecord {
+  attempted?: boolean; unavailable?: boolean; status?: 'approved' | 'pending' | 'rejected'
+  live?: boolean; ineValid?: boolean; faceMatch?: number; ineName?: string
+  provider?: string; checkedAt?: string
+  evidence?: Record<string, string>
+}
+const identityOf = (d: Profile): IdentityRecord | null => ((d.meta as Record<string, unknown>)?.identity as IdentityRecord) ?? null
 
 const avatarOf = (d: Profile): string | undefined => ((d.meta as Record<string, unknown>)?.avatar_url as string) ?? undefined
 function Avatar({ name, url }: { name: string; url?: string }) {
@@ -139,6 +149,9 @@ export function Doctores() {
               </>
             ) : cedulaOf(d) ? (
               <>
+                {identityOf(d)?.attempted && identityOf(d)?.status !== 'approved' && (
+                  <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanFace size={12} /> Identidad por revisar</span>
+                )}
                 {verifyResultOf(d)?.decision === 'review' && (
                   <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanSearch size={12} /> Revisión IA · {verifyResultOf(d)?.score}%</span>
                 )}
@@ -206,6 +219,77 @@ function EditDoctorModal({ initial, onClose, onSave }: { initial: { name: string
   )
 }
 
+// Panel de identidad: muestra el dictamen del proveedor KYC (prueba de vida, INE, match
+// biométrico) y la EVIDENCIA (selfie + INE) con URL firmada del bucket privado `proofs`.
+// El botón "Verificar doctor" del modal es el que aprueba tras revisar esto.
+const EVID_LABELS: Record<string, string> = { selfie: 'Selfie', 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso' }
+function IdentityReview({ doctor }: { doctor: Profile }) {
+  const id = identityOf(doctor)
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const evidence = id?.evidence ?? {}
+  const evidenceKey = JSON.stringify(evidence)
+  useEffect(() => {
+    let alive = true
+    const entries = Object.entries(evidence)
+    if (entries.length === 0) { setUrls({}); return }
+    Promise.all(entries.map(([k, path]) =>
+      supabase.storage.from('proofs').createSignedUrl(path, 600).then((r) => [k, r.data?.signedUrl ?? ''] as const),
+    )).then((res) => {
+      if (!alive) return
+      const m: Record<string, string> = {}
+      res.forEach(([k, u]) => { if (u) m[k] = u })
+      setUrls(m)
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctor.id, evidenceKey])
+
+  if (!id || !id.attempted) return null
+  const fm = Math.round((id.faceMatch ?? 0) * 100)
+  const chip = (ok: boolean | undefined, label: string) => (
+    <span className={'pill ' + (ok === true ? 'p-ok' : ok === false ? 'p-dang' : 'p-warn')} style={{ display: 'inline-flex', gap: 5 }}>
+      {ok === true ? '✓' : ok === false ? '✕' : '—'} {label}
+    </span>
+  )
+  const manual = id.unavailable || id.provider === 'sin-proveedor'
+  return (
+    <div className="sysnote" style={{ display: 'block', background: '#F7F8F5', color: 'var(--ink-2)', border: '1px solid var(--line)', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <ScanFace size={16} style={{ color: 'var(--green-deep)' }} />
+        <b style={{ fontSize: 13 }}>Verificación de identidad (KYC)</b>
+        <span className={'pill ' + (id.status === 'approved' ? 'p-ok' : 'p-warn')} style={{ marginLeft: 'auto' }}>
+          {id.status === 'approved' ? 'Aprobada' : 'En revisión'}
+        </span>
+      </div>
+      {manual ? (
+        <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 10 }}>
+          <IdCard size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+          Revisión manual — el proveedor biométrico (Nubarium) aún no está configurado. Compara la selfie con la foto del INE antes de aprobar.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {chip(id.live, 'Prueba de vida')}
+          {chip(id.ineValid, 'INE válido')}
+          {chip((id.faceMatch ?? 0) >= 0.85, `Rostro ${fm}%`)}
+          {id.provider && <span className="pill p-neu">{id.provider}</span>}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        {['selfie', 'ine-front', 'ine-back'].filter((k) => evidence[k]).map((k) => (
+          <a key={k} href={urls[k] ?? undefined} target="_blank" rel="noopener" title={`Abrir ${EVID_LABELS[k]}`}
+            style={{ display: 'block', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', background: '#000', aspectRatio: '3/4', position: 'relative' }}>
+            {urls[k]
+              ? <img src={urls[k]} alt={EVID_LABELS[k]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 11 }}>Cargando…</div>}
+            <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10.5, padding: '3px 6px', textAlign: 'center' }}>{EVID_LABELS[k]}</span>
+          </a>
+        ))}
+      </div>
+      {id.ineName && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Nombre en el INE: <b>{id.ineName}</b></div>}
+    </div>
+  )
+}
+
 function DoctorDetail({
   doctor, orders, onClose, onVerify, onRevoke, onSetCedula, onInvite,
 }: {
@@ -246,6 +330,8 @@ function DoctorDetail({
             </div>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Pedidos</div>{history.length}</div>
           </div>
+
+          <IdentityReview doctor={doctor} />
 
           {!doctor.verified && (
             <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)', marginBottom: 14 }}>

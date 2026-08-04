@@ -901,6 +901,27 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 .form-consent input{margin-top:2px;flex:none;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
 .form-consent a{color:var(--green);font-weight:600;}
 
+/* VERIFICACIÓN DE IDENTIDAD (INE + selfie) */
+.id-verify{margin:4px 0 14px;padding:16px;border:1px solid var(--line);border-radius:14px;background:rgba(0,115,17,.03);}
+.id-verify-head{display:flex;flex-direction:column;gap:2px;margin-bottom:12px;}
+.id-verify-head span{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:.01em;}
+.id-verify-head small{font-size:11.5px;color:var(--soft);}
+.id-tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
+.id-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;
+  aspect-ratio:3/4;padding:10px 6px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;cursor:pointer;overflow:hidden;
+  transition:border-color .2s var(--ease),box-shadow .2s var(--ease);}
+.id-tile:hover{border-color:var(--green);box-shadow:0 8px 20px rgba(0,115,17,.10);}
+.id-tile .id-ico{font-size:24px;line-height:1;}
+.id-tile .id-lbl{font-size:11.5px;font-weight:600;color:var(--ink);}
+.id-tile .id-hint{font-size:10px;color:var(--soft);line-height:1.2;}
+.id-tile.done{border-style:solid;border-color:var(--green);}
+.id-tile.done .id-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.id-tile.done .id-check{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--green);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2;}
+.id-tile.done .id-ico,.id-tile.done .id-lbl,.id-tile.done .id-hint{opacity:0;}
+.id-note{font-size:10.5px;color:var(--soft);margin:10px 0 0;line-height:1.4;}
+@media(max-width:420px){.id-tile .id-lbl{font-size:11px;}.id-tile .id-hint{display:none;}}
+
 /* FOOTER */
 footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
 .foot-inner{max-width:1440px;margin:0 auto;}
@@ -2509,7 +2530,7 @@ body.rc-has-ann .nav{top:38px}
       <div class="contact-info">
         <div class="section-kicker rv" style="margin-bottom:20px;" data-rc="verifKicker">Acceso profesional</div>
         <h3 class="rv d1" data-rc-html="verifTitle">Verifícate y <span class="green">entra</span>.</h3>
-        <p class="rv d2" data-rc="verifBody">Tu registro profesional será validado por nuestro equipo clínico para brindarte acceso al catálogo exclusivo de Renovacell.</p>
+        <p class="rv d2" data-rc="verifBody">Validamos tu <b>cédula profesional</b> y tu <b>identidad</b> (INE + prueba de vida) para darte acceso al catálogo exclusivo. Rápido, seguro y confidencial.</p>
 
       </div>
 
@@ -2540,6 +2561,35 @@ body.rc-has-ann .nav{top:38px}
             </div>
           </div>
 
+          <!-- VERIFICACIÓN DE IDENTIDAD: INE (frente/reverso) + selfie con prueba de vida. -->
+          <div class="id-verify">
+            <div class="id-verify-head">
+              <span>— Verificación de identidad</span>
+              <small>Confirmamos que eres tú, no solo tus documentos.</small>
+            </div>
+            <div class="id-tiles">
+              <label class="id-tile" data-for="ineFront">
+                <input type="file" accept="image/*" capture="environment" hidden>
+                <span class="id-ico">🪪</span>
+                <span class="id-lbl">INE — frente</span>
+                <span class="id-hint">Toca para tomar la foto</span>
+              </label>
+              <label class="id-tile" data-for="ineBack">
+                <input type="file" accept="image/*" capture="environment" hidden>
+                <span class="id-ico">🪪</span>
+                <span class="id-lbl">INE — reverso</span>
+                <span class="id-hint">Toca para tomar la foto</span>
+              </label>
+              <label class="id-tile" data-for="selfie">
+                <input type="file" accept="image/*" capture="user" hidden>
+                <span class="id-ico">🤳</span>
+                <span class="id-lbl">Selfie</span>
+                <span class="id-hint">Mira a la cámara</span>
+              </label>
+            </div>
+            <p class="id-note">Tus fotos se tratan de forma confidencial y solo se usan para verificar tu identidad.</p>
+          </div>
+
           <!-- Trampa antispam: los robots la llenan, las personas no la ven. -->
           <input name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true"
                  style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
@@ -2548,7 +2598,7 @@ body.rc-has-ann .nav{top:38px}
             <input type="checkbox" id="rncConsent">
             <span>He leído y acepto el <a href="/landing/privacidad.html" target="_blank" rel="noopener">Aviso de privacidad</a>.</span>
           </label>
-          <button type="submit" class="form-submit" data-rc="verifBoton">Verificar mi cédula</button>
+          <button type="submit" class="form-submit" data-rc="verifBoton">Enviar mi verificación</button>
           <div id="rncVerifyOut" class="rnc-vout" role="status"></div>
           <p style="font-size:11.5px;color:var(--soft);margin-top:18px;line-height:1.5;text-align:center">
             <span data-rc="verifNota">Sus datos se tratan de forma confidencial.</span>
@@ -3217,7 +3267,40 @@ document.addEventListener('keydown', e => {
   var btn=f.querySelector('.form-submit');
   var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};
   function say(kind,html){ out.className='rnc-vout '+kind; out.innerHTML=html; }
-  function listo(){ btn.disabled=false; btn.textContent='Verificar mi cédula'; }
+  function listo(){ btn.disabled=false; btn.textContent='Enviar mi verificación'; }
+
+  // --- Captura de identidad: INE (frente/reverso) + selfie. Cada foto se reduce en el
+  //     navegador (canvas) a ~1200px JPEG antes de enviarse, para no mandar megas de más. ---
+  var captured={ineFront:null,ineBack:null,selfie:null};
+  function downscale(file,cb){
+    var img=new Image(); var url=URL.createObjectURL(file);
+    img.onload=function(){
+      var max=1200, w=img.width, h=img.height;
+      if(w>h && w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w && h>max){ w=Math.round(w*max/h); h=max; }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      try{ cb(c.toDataURL('image/jpeg',0.82)); }catch(_){ cb(null); }
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); cb(null); };
+    img.src=url;
+  }
+  Array.prototype.forEach.call(f.querySelectorAll('.id-tile'),function(tile){
+    var key=tile.getAttribute('data-for'); var input=tile.querySelector('input[type=file]');
+    input.addEventListener('change',function(){
+      var file=input.files&&input.files[0]; if(!file) return;
+      downscale(file,function(dataUrl){
+        if(!dataUrl){ return; }
+        captured[key]=dataUrl;
+        tile.classList.add('done');
+        if(!tile.querySelector('.id-thumb')){
+          var im=document.createElement('img'); im.className='id-thumb'; im.alt=''; tile.appendChild(im);
+          var ck=document.createElement('span'); ck.className='id-check'; ck.textContent='✓'; tile.appendChild(ck);
+        }
+        tile.querySelector('.id-thumb').src=dataUrl;
+      });
+    });
+  });
 
   f.addEventListener('submit', function(e){
     e.preventDefault();
@@ -3226,15 +3309,17 @@ document.addEventListener('keydown', e => {
     var d={
       name:(f.nombre.value||'').trim(), email:(f.correo.value||'').trim(),
       cedula:(f.cedula.value||'').trim(), password:f.clave.value||'',
-      organization:(f.consultorio.value||'').trim(), website:f.website.value||''
+      organization:(f.consultorio.value||'').trim(), website:f.website.value||'',
+      selfie:captured.selfie, ineFront:captured.ineFront, ineBack:captured.ineBack
     };
     if(d.name.length<3) return say('err','Escriba su nombre completo.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return say('err','El correo no parece válido.');
     if(d.cedula.replace(/\D/g,'').length<5) return say('err','Escriba su número de cédula profesional.');
     if(d.password.length<6) return say('err','La contraseña debe tener al menos 6 caracteres.');
+    if(!d.ineFront || !d.selfie) return say('err','Sube la foto de tu INE (frente) y una selfie para verificar tu identidad.');
 
     btn.disabled=true; btn.textContent='Verificando…';
-    say('wait','Consultando el registro oficial…');
+    say('wait','Validando tu cédula e identidad…');
 
     fetch(U+'/functions/v1/register-doctor',{
       method:'POST',
@@ -3247,18 +3332,22 @@ document.addEventListener('keydown', e => {
       if(r && r.error) return say('err', esc(r.error));
       if(r && r.decision==='auto'){
         f.reset();
-        return say('ok','<b>Cédula verificada.</b> Su cuenta ya está activa. <a href="/sistema">Entrar al portal →</a>');
+        return say('ok','<b>Identidad verificada.</b> Tu cuenta ya está activa. <a href="/sistema">Entrar al portal →</a>');
       }
       if(r && r.decision==='exists'){
         return say('wait', esc(r.message||'Ese correo ya tiene una cuenta.')+' <a href="/sistema">Iniciar sesión →</a>');
       }
       var rs=(r&&r.reasons||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join('');
+      if(r && r.decision==='pending'){
+        f.reset();
+        return say('ok','<b>Recibimos tu registro.</b> Estás <b>en revisión</b>: validaremos tu identidad y te avisaremos por correo cuando se active tu acceso.'+(rs?'<ul>'+rs+'</ul>':''));
+      }
       f.reset();
-      say('wait','<b>Su solicitud quedó registrada.</b> Dirección revisará su cédula y le avisaremos por correo.'+(rs?'<ul>'+rs+'</ul>':''));
+      say('wait','<b>Tu solicitud quedó registrada.</b> Dirección revisará tu verificación y te avisaremos por correo.'+(rs?'<ul>'+rs+'</ul>':''));
     })
     .catch(function(){
       listo();
-      say('err','No pudimos enviar su solicitud en este momento. Intente de nuevo o escríbanos por WhatsApp.');
+      say('err','No pudimos enviar tu solicitud en este momento. Intenta de nuevo o escríbenos por WhatsApp.');
     });
   });
 })();

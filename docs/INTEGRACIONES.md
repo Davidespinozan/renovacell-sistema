@@ -93,6 +93,30 @@ correo con el enlace mágico (el usuario de auth SÍ se crea vía `invite-doctor
 
 ---
 
+## 6. Verificación de identidad (KYC · Nubarium) — que quien se registra ES el doctor
+
+**Hoy:** el registro valida la **cédula** contra el registro oficial (seam `CEDULA_API_*`
+en `register-doctor`) y captura **selfie + INE**, pero la capa **biométrica** (prueba de
+vida + validez del INE + match selfie↔INE) corre en modo *sin proveedor*: toda cuenta
+con identidad adjunta queda **EN REVISIÓN** para que Dirección apruebe viendo la evidencia
+(selfie + INE) en **Administración → Doctores → Ver detalle**.
+
+**Para activarlo (Nubarium):**
+1. Contratar Nubarium y obtener las llaves de sus servicios (liveness + INE + biometría).
+2. En Supabase → **Edge Functions → Secrets**, configura:
+   - `IDENTITY_API_URL` — endpoint del flujo de verificación de Nubarium.
+   - `IDENTITY_API_KEY` (+ opcional `IDENTITY_API_KEY_HEADER`, `IDENTITY_API_AUTH_SCHEME`).
+3. Listo. `register-doctor` empieza a llamar a Nubarium: los casos 100% verdes
+   (persona viva + INE válido + rostro ≥85% + nombre del INE ≈ cédula) se **auto-verifican**;
+   los dudosos siguen cayendo a revisión manual. **No se toca código.**
+
+La cédula la seguimos validando nosotros (SEP) para abaratar consultas. Ver
+`docs/verificacion-kyc.md` para el flujo completo y la matriz de decisión.
+
+Secretos: `IDENTITY_API_URL`, `IDENTITY_API_KEY`. Simulador para demos: `IDENTITY_SIMULATE=true`.
+
+---
+
 ### Resumen de secretos por servicio
 | Servicio | Secretos |
 |---|---|
@@ -101,3 +125,5 @@ correo con el enlace mágico (el usuario de auth SÍ se crea vía `invite-doctor
 | Paquetería | `SHIPPING_API_KEY` |
 | IA | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 | Correo | SMTP en Supabase Auth |
+| Cédula (SEP) | `CEDULA_API_URL`, `CEDULA_API_KEY` |
+| Identidad KYC (Nubarium) | `IDENTITY_API_URL`, `IDENTITY_API_KEY` |
