@@ -9,7 +9,6 @@ import { ExportButton } from '../../app/ExportButton'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
-import { assignDoctorList } from '../../data/store/pricingStore'
 import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
@@ -36,7 +35,7 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
+  const { data: doctors, verify, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ name: string; res: VerifyDecision } | null>(null)
@@ -129,7 +128,7 @@ export function Doctores() {
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
               Precios:
-              <select value={d.price_list_id ?? ''} onChange={(e) => assignDoctorList(d.id, e.target.value || null)}
+              <select value={d.price_list_id ?? ''} onChange={(e) => setPriceList(d.id, e.target.value || null)}
                 style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none', background: '#fff' }}>
                 <option value="">General (base)</option>
                 {lists.filter((l) => !l.is_default).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}

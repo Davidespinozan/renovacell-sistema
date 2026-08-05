@@ -187,9 +187,15 @@ function ProductCard({ p, price, qty, stock, onAdd, onDec }: { p: ProductSafe; p
         </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.category}</div>
         <div className="pr">{money(price)}</div>
-        {!sellable ? (
+        {price == null ? (
+          // Precio "a consultar": antes mostraba un "Agregar" habilitado que no hacía
+          // nada (add() sale temprano). Ahora es un estado claro y no engañoso.
+          <button className="addb" type="button" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} title="Este producto se cotiza aparte">
+            Precio a consultar
+          </button>
+        ) : !sellable ? (
           <button className="addb" type="button" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-            {stock.tracked ? 'Agotado' : 'Sin existencias'}
+            {stock.tracked ? 'Agotado' : 'No disponible'}
           </button>
         ) : qty === 0 ? (
           <button className="addb" type="button" onClick={onAdd}>

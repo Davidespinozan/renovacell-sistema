@@ -48,6 +48,18 @@ export function setVerified(id: string, verified: boolean): boolean {
   return true
 }
 
+// Asigna la lista de precios del doctor. Antes vivía en pricingStore y NO actualizaba
+// el estado local ni en mock hacía nada → el <select> no reflejaba el cambio y Dirección
+// creía que había asignado "Mayoreo" (el doctor pagaba el precio equivocado). Ahora es
+// optimista local + persiste + recarga, y queda en bitácora (acción de dinero sensible).
+export function setPriceList(id: string, listId: string | null): void {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, price_list_id: listId } : d)))
+  logAudit({ actor: 'Administración', action: 'Lista de precios asignada', resource: doc.full_name ?? id, detail: listId ?? 'General (base)' })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ price_list_id: listId }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] price_list', error.message); live.reload() })
+}
+
 export function setCedula(id: string, cedula: string) {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return
