@@ -206,10 +206,22 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
 }) {
   const [orderId, setOrderId] = useState(orders[0]?.id ?? '')
   const order = orders.find((o) => o.id === orderId) ?? orders[0]
-  const salidas = useMemo(
-    () => (order ? movements.filter((m) => m.reference === order.external_ref && m.change < 0) : []),
-    [movements, order],
-  )
+  // Lotes con que se surtió el pedido. Fuente PRIMARIA: el lote estampado en cada
+  // renglón (order_items.lot_id) — cubre almacén, POS, consignación y eventos por igual.
+  // Cruzar por referencia del movimiento fallaba en consignación/eventos, donde la
+  // referencia NO es el folio (ej. 'CONSIGNA-<vendedor>'). Respaldo: movimientos por
+  // referencia para datos históricos anteriores a que se estampara el lote.
+  const surtidos = useMemo(() => {
+    if (!order) return []
+    const porRenglon = order.items
+      .filter((it) => it.lot_id)
+      .map((it) => ({ key: `it-${it.id}`, lot_id: it.lot_id as string, qty: it.qty }))
+    const cubiertos = new Set(porRenglon.map((r) => r.lot_id))
+    const porMovimiento = movements
+      .filter((m) => m.reference === order.external_ref && m.change < 0 && !cubiertos.has(m.lot_id))
+      .map((m) => ({ key: `m-${m.id}`, lot_id: m.lot_id, qty: -m.change }))
+    return [...porRenglon, ...porMovimiento]
+  }, [movements, order])
   if (!order) return <div className="card">No hay pedidos registrados.</div>
   const sv = statusView(order.status)
 
@@ -230,7 +242,7 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
         </div>
 
         <div className="eyebrow" style={{ marginBottom: 4 }}>Con qué lotes se surtió</div>
-        {salidas.length === 0 ? (
+        {surtidos.length === 0 ? (
           <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
             <Icon name="fingerprint" />
             <span>Todavía sin salidas de inventario. Aparecerá aquí en cuanto Almacén lo surta (o si es POS, al cobrar).</span>
@@ -239,13 +251,13 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
           <table className="tbl-cards">
             <thead><tr><th>Lote</th><th>Producto</th><th>Cantidad</th><th>Caduca</th></tr></thead>
             <tbody>
-              {salidas.map((m) => {
-                const lot = lotById[m.lot_id]
+              {surtidos.map((s) => {
+                const lot = lotById[s.lot_id]
                 return (
-                  <tr key={m.id}>
-                    <td data-label="Lote"><span className="lc">{lot?.lot_code ?? m.lot_id}</span></td>
+                  <tr key={s.key}>
+                    <td data-label="Lote"><span className="lc">{lot?.lot_code ?? s.lot_id}</span></td>
                     <td data-label="Producto">{lot ? prodName[lot.product_id] ?? 'Producto' : '—'}</td>
-                    <td data-label="Cantidad" className="mono">{-m.change} u</td>
+                    <td data-label="Cantidad" className="mono">{s.qty} u</td>
                     <td data-label="Caduca">{lot ? fmtDate(lot.expiry_date ?? '') : '—'}</td>
                   </tr>
                 )
