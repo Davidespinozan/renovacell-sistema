@@ -9,6 +9,7 @@ import { montoEnLetras } from '../../lib/enLetras'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useEvents } from '../../data/hooks/useEvents'
 import { useRole } from '../../auth/RoleContext'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { venderPOS } from '../../data/ops/pos'
@@ -23,7 +24,12 @@ export function Caja() {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
+  const { data: events } = useEvents()
   const { user } = useRole()
+  const eventosActivos = useMemo(() => events.filter((e) => e.status === 'activo'), [events])
+  // Contexto de venta: mostrador (null) o un evento activo. Se asigna a la venta para
+  // que el arqueo por evento y "Ventas del evento" cuadren (antes nunca se asignaba).
+  const [eventId, setEventId] = useState<string | null>(null)
   // Solo productos activos y con precio (no se vende lo oculto).
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
@@ -86,7 +92,7 @@ export function Caja() {
       lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price ?? 0 })),
       total,
       method,
-      { doctorId: client?.id ?? null, seller: user?.email ?? null },
+      { doctorId: client?.id ?? null, seller: user?.email ?? null, eventId },
     )
     setCobrando(false)
     if (res.ok && res.order) {
@@ -162,6 +168,18 @@ export function Caja() {
           <h3 style={{ fontSize: 16, fontWeight: 600 }}>Venta</h3>
           {lines.length > 0 && <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setCart({})}>Vaciar</button>}
         </div>
+
+        {eventosActivos.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12.5, color: 'var(--ink-3)' }}>
+            <Icon name="store" style={{ width: 15, height: 15, color: eventId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
+            <span style={{ whiteSpace: 'nowrap' }}>Vendiendo en</span>
+            <select value={eventId ?? ''} onChange={(e) => setEventId(e.target.value || null)}
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none', fontWeight: eventId ? 600 : 400 }}>
+              <option value="">Mostrador (sin evento)</option>
+              {eventosActivos.map((e) => <option key={e.id} value={e.id}>Evento · {e.name}</option>)}
+            </select>
+          </label>
+        )}
 
         {/* Cliente OPCIONAL: por defecto mostrador; no obliga a entrar por un cliente */}
         <button type="button" onClick={() => setPickOpen(true)}

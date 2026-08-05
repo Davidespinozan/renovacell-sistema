@@ -31,7 +31,7 @@ export async function venderPOS(
   lines: PosLine[],
   total: number,
   paymentMethod: string,
-  opts: { doctorId?: string | null; seller?: string | null } = {},
+  opts: { doctorId?: string | null; seller?: string | null; eventId?: string | null } = {},
 ): Promise<PosResult> {
   if (lines.length === 0) return { ok: false }
 
@@ -53,7 +53,7 @@ export async function venderPOS(
   // la escritura suelta: la persistencia real la hace la RPC atómica de abajo.
   const order = createPosOrder({
     lines: posLines, total, payment_method: paymentMethod,
-    doctor_id: opts.doctorId ?? null, seller: opts.seller ?? null,
+    doctor_id: opts.doctorId ?? null, seller: opts.seller ?? null, event_id: opts.eventId ?? null,
   }, hasSupabase)
 
   if (hasSupabase) {
