@@ -307,6 +307,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          items: Json | null
           metodo: string | null
           monto: number
           motivo: string
@@ -318,6 +319,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          items?: Json | null
           metodo?: string | null
           monto: number
           motivo: string
@@ -329,6 +331,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          items?: Json | null
           metodo?: string | null
           monto?: number
           motivo?: string
@@ -1556,6 +1559,7 @@ export type Database = {
       }
       registrar_devolucion: {
         Args: {
+          p_items?: Json
           p_monto: number
           p_motivo: string
           p_order_id: string

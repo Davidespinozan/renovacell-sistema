@@ -10,7 +10,7 @@ import type { InventoryMovement, Lot } from '../types'
 
 // Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
 const COGS_OUT = new Set(['surtido', 'venta', 'evento', 'consigna'])
-const COGS_IN = new Set(['cancelacion', 'evento-regreso', 'consigna-regreso'])
+const COGS_IN = new Set(['cancelacion', 'evento-regreso', 'consigna-regreso', 'devolucion'])
 // Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad/daño.
 const MERMA = new Set(['merma', 'baja'])
 

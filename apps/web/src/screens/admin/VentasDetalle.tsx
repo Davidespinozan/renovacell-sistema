@@ -276,7 +276,7 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
             </div>
           )}
           {puedeDevolver && showForm && (
-            <DevolverForm order={order} restante={restante} usuario={user?.name ?? 'Administración'} onClose={() => setShowForm(false)} />
+            <DevolverForm order={order} restante={restante} usuario={user?.name ?? 'Administración'} productsById={productsById} onClose={() => setShowForm(false)} />
           )}
 
           {order.invoice_requested && (
@@ -302,26 +302,38 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
 // reimpone ambas validaciones del lado servidor.
 const PRESETS_CORR = ['Cobro duplicado', 'No pagó (era cortesía)', 'Error de captura']
 const PRESETS_DEV = ['Producto devuelto', 'Cliente canceló', 'Producto dañado']
-function DevolverForm({ order, restante, usuario, onClose }: {
+function DevolverForm({ order, restante, usuario, productsById, onClose }: {
   order: OrderWithItems
   restante: number
   usuario: string
+  productsById: Record<string, ProductSafe | undefined>
   onClose: () => void
 }) {
-  const { registrarDevolucion } = useRefunds()
+  const { data: refunds, registrarDevolucion, returnedByItem } = useRefunds()
   const [tipo, setTipo] = useState<'devolucion' | 'correccion'>('devolucion')
-  const [monto, setMonto] = useState(String(restante))
+  const [qtys, setQtys] = useState<Record<string, number>>({})   // piezas a regresar por renglón
+  const [montoCorr, setMontoCorr] = useState(String(restante))    // monto libre para corrección
   const [motivo, setMotivo] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const montoN = Math.max(0, Number(monto) || 0)
+
+  const sellable = order.items.filter((it) => it.unit_price != null)
+  const returned = returnedByItem(refunds, order.id)
+  const returnable = (it: (typeof sellable)[number]) => Math.max(0, it.qty - (returned[it.id] ?? 0))
+  const setQ = (id: string, v: number, max: number) => setQtys((q) => ({ ...q, [id]: Math.max(0, Math.min(max, v)) }))
+
+  // Devolución: el monto se DERIVA de los renglones que regresan (no se teclea).
+  const montoDev = sellable.reduce((s, it) => s + (qtys[it.id] ?? 0) * (it.unit_price ?? 0), 0)
+  const montoN = tipo === 'devolucion' ? montoDev : Math.max(0, Number(montoCorr) || 0)
   const valid = montoN > 0 && montoN <= restante + 0.0001 && motivo.trim().length >= 3
-  const presets = tipo === 'correccion' ? PRESETS_CORR : PRESETS_DEV
 
   const submit = async () => {
     if (!valid || busy) return
     setBusy(true); setErr('')
-    const r = await registrarDevolucion({ orderId: order.id, tipo, monto: montoN, motivo, usuario })
+    const items = tipo === 'devolucion'
+      ? sellable.filter((it) => (qtys[it.id] ?? 0) > 0).map((it) => ({ item_id: it.id, lot_id: it.lot_id ?? null, qty: qtys[it.id] }))
+      : undefined
+    const r = await registrarDevolucion({ orderId: order.id, tipo, monto: montoN, motivo, usuario, items })
     setBusy(false)
     if (!r.ok) { setErr(r.error ?? 'No se pudo registrar.'); return }
     onClose()
@@ -335,20 +347,43 @@ function DevolverForm({ order, restante, usuario, onClose }: {
         <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>Corrección de error</button>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        {tipo === 'devolucion' ? 'Se le regresó dinero al cliente (producto devuelto, etc.).' : 'El cobro estuvo mal (no entró dinero de verdad). Corrige el neto.'}
+        {tipo === 'devolucion' ? 'El producto regresó: elige qué renglones y cuántas piezas. Se reingresan al inventario.' : 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'}
       </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
-        <div style={{ flex: '0 0 140px' }}>
+
+      {tipo === 'devolucion' ? (
+        <div style={{ marginBottom: 12 }}>
+          {sellable.map((it) => {
+            const max = returnable(it); const q = qtys[it.id] ?? 0
+            const yaDev = it.qty - max
+            return (
+              <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13 }}>{productsById[it.product_id ?? '']?.name ?? 'Producto'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{money(it.unit_price ?? 0)} · comprado {it.qty}{yaDev > 0 ? ` · ya devuelto ${yaDev}` : ''}</div>
+                </div>
+                {max === 0 ? <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Devuelto</span> : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button type="button" className="btn ghost sm" disabled={q <= 0} onClick={() => setQ(it.id, q - 1, max)}>−</button>
+                    <span className="mono" style={{ minWidth: 24, textAlign: 'center' }}>{q}<span style={{ color: 'var(--ink-3)' }}>/{max}</span></span>
+                    <button type="button" className="btn ghost sm" disabled={q >= max} onClick={() => setQ(it.id, q + 1, max)}>+</button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          <div className="cototal" style={{ marginTop: 10 }}><span>A devolver</span><b>{money(montoDev)}</b></div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Monto (máx {money(restante)})</label>
-          <input type="number" min={0} max={restante} style={{ ...fld, marginTop: 5 }} value={monto} onChange={(e) => setMonto(e.target.value)} />
+          <input type="number" min={0} max={restante} style={{ ...fld, marginTop: 5, maxWidth: 200 }} value={montoCorr} onChange={(e) => setMontoCorr(e.target.value)} />
         </div>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Motivo</label>
-          <input style={{ ...fld, marginTop: 5 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
-        </div>
-      </div>
+      )}
+
+      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Motivo</label>
+      <input style={{ ...fld, marginTop: 5, marginBottom: 8 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {presets.map((pz) => (
+        {(tipo === 'correccion' ? PRESETS_CORR : PRESETS_DEV).map((pz) => (
           <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: '#fff', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
         ))}
       </div>
