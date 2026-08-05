@@ -31,11 +31,13 @@ const lotsLive = makeLive<Lot>(async () => {
   ])
   if (lotsRes.error) throw lotsRes.error
   const costMap = new Map<string, number>((costsRes.data ?? []).map((c) => [c.product_id as string, Number(c.unit_cost) || 0]))
-  return (lotsRes.data ?? []).map((l) => ({
+  const mapped = (lotsRes.data ?? []).map((l) => ({
     id: l.id, product_id: l.product_id ?? '', lot_code: l.lot_code,
     manufacture_date: l.manufacture_date, expiry_date: l.expiry_date, quantity: l.quantity,
     location: l.location, unit_cost: costMap.get(l.product_id ?? '') ?? 0, metadata: (l.metadata ?? null) as Lot['metadata'],
   }))
+  flagExpiring(mapped) // avisa de lotes por caducar / caducados al cargar inventario
+  return mapped
 }, lotsFallback)
 
 const movsLive = makeLive<InventoryMovement>(async () => {
@@ -76,10 +78,34 @@ function flagLowStock(before: Record<string, number>, ids: Set<string>) {
   ids.forEach((pid) => {
     const b = before[pid] ?? 0, a = after[pid] ?? 0
     if (b > LOW_STOCK_REORDER && a <= LOW_STOCK_REORDER) {
-      notify({ text: a <= 0 ? `Agotado: ${names[pid] ?? 'producto'} · reabastece` : `Stock bajo: ${names[pid] ?? 'producto'} (${a} u) · reabastece`, roles: ['admin'], screen: 'av_inv' })
+      notify({ text: a <= 0 ? `Agotado: ${names[pid] ?? 'producto'} · reabastece` : `Stock bajo: ${names[pid] ?? 'producto'} (${a} u) · reabastece`, roles: ['warehouse', 'admin'], screen: 'av_inv' })
     }
   })
 }
+
+// Alerta de CADUCIDAD: producto médico regulado por vencer/vencido. Antes era pull-only
+// (había que abrir la pantalla para enterarse). Se avisa a Almacén + Dirección UNA sola
+// vez por lote y por sesión (dedup), cuando el lote está crítico (≤60 días) o vencido.
+const notifiedExpiry = new Set<string>()
+function flagExpiring(lots: Lot[]): void {
+  const names = Object.fromEntries(productsSnapshot().map((p) => [p.id, p.name]))
+  lots.forEach((l) => {
+    if (l.quantity <= 0 || !l.expiry_date) return
+    const days = Math.ceil((Date.parse(l.expiry_date) - Date.now()) / 86_400_000)
+    if (Number.isNaN(days) || days > 60) return // solo crítico (≤60) o vencido (<0)
+    if (notifiedExpiry.has(l.id)) return
+    notifiedExpiry.add(l.id)
+    const nombre = names[l.product_id] ?? l.lot_code
+    notify({
+      text: days < 0
+        ? `Lote CADUCADO: ${nombre} (${l.lot_code}) · ${l.quantity} u — dar de baja`
+        : `Por caducar: ${nombre} (${l.lot_code}) en ${days} día${days === 1 ? '' : 's'} · ${l.quantity} u`,
+      roles: ['warehouse', 'admin'], screen: 'caduc',
+    })
+  })
+}
+// En modo demo (sin backend) el loader no corre; revisa el mock una vez al arrancar.
+if (!hasSupabase) setTimeout(() => flagExpiring(lotsLive.current()), 0)
 
 let seq = 1000
 const nowIso = () => new Date().toISOString()
