@@ -65,6 +65,12 @@ export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemP
   if (['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(order.status ?? '')) {
     return { ok: false, plans: [] }
   }
+  // Debe estar en estado EMPACABLE (pagado). markPacked exige lo mismo; validarlo ANTES
+  // de consumir evita descontar inventario de un pedido que luego no se empacaría
+  // (dejaba stock descontado, el pedido sin surtir y un falso "ok").
+  if (!['paid', 'picking'].includes(order.status ?? '')) {
+    return { ok: false, plans: [] }
+  }
   const plans = planSurtido(order, getSnapshotLots())
   if (!canFulfill(plans)) return { ok: false, plans }
 

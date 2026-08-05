@@ -282,7 +282,10 @@ export function markInvoiced(orderId: string) {
 }
 
 export function markPaid(orderId: string) {
-  orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid' } : o))
+  // Avanza el estado igual que payOrder: un contra-pedido que se paga pasa de
+  // 'pending_payment' a 'paid'. Si no, el pedido se queda pending_payment, markPacked
+  // lo rechaza en silencio y sigue apareciendo "por surtir" (se re-surtiría en bucle).
+  orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid', status: o.status === 'pending_payment' ? 'paid' : o.status } : o))
   emit()
   notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
   logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
