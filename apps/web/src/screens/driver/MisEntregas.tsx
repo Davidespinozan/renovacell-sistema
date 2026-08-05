@@ -35,6 +35,8 @@ export function MisEntregas() {
 
   const [photos, setPhotos] = useState<Record<string, string>>({}) // preview local (data-URI)
   const [proofPath, setProofPath] = useState<Record<string, string>>({}) // ruta privada guardada
+  const [uploading, setUploading] = useState<Record<string, boolean>>({}) // subida de la foto en curso
+  const [upErr, setUpErr] = useState<Record<string, boolean>>({}) // la subida falló (reintentar)
   const [received, setReceived] = useState<Record<string, string>>({})
   const [incType, setIncType] = useState<Record<string, string>>({})
   const [incNote, setIncNote] = useState<Record<string, string>>({})
@@ -112,11 +114,18 @@ export function MisEntregas() {
     if (!file) return
     // Preview local (data-URI, no se persiste) + subida al bucket PRIVADO `proofs`
     // (evidencia sensible). Se guarda la RUTA privada, no una URL pública.
+    // Clave: NO se puede marcar entregado hasta que la subida CONFIRME (proofPath) —
+    // si no, con mala señal se cerraba la entrega sin evidencia guardada.
     const reader = new FileReader()
     reader.onload = () => setPhotos((p) => ({ ...p, [shipmentId]: String(reader.result) }))
     reader.readAsDataURL(file)
+    setProofPath((p) => { const { [shipmentId]: _drop, ...rest } = p; return rest }) // invalida ruta previa
+    setUpErr((e) => ({ ...e, [shipmentId]: false }))
+    setUploading((u) => ({ ...u, [shipmentId]: true }))
     const path = await uploadPrivate(file, 'proofs')
+    setUploading((u) => ({ ...u, [shipmentId]: false }))
     if (path) setProofPath((p) => ({ ...p, [shipmentId]: path }))
+    else setUpErr((e) => ({ ...e, [shipmentId]: true }))
   }
 
   const deliver = (shipmentId: string, orderId: string, folio: string) => {
@@ -243,9 +252,13 @@ export function MisEntregas() {
                   <Icon name="image" /> {photo ? 'Cambiar foto' : 'Foto de entrega'}
                   <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
                 </label>
-                {photo && <img src={photo} alt="prueba" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }} />}
+                {photo && <img src={photo} alt="prueba" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)', opacity: uploading[s.id] ? 0.5 : 1 }} />}
+                {uploading[s.id] && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Subiendo foto…</span>}
+                {proofPath[s.id] && !uploading[s.id] && <span style={{ fontSize: 12, color: 'var(--green-deep)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="check" style={{ width: 13, height: 13 }} /> Foto guardada</span>}
                 {(() => {
-                  const ready = Boolean(photo) && Boolean(received[s.id]?.trim())
+                  // Gate en la foto REALMENTE subida (proofPath), no en el preview local:
+                  // así no se cierra una entrega sin que la evidencia haya quedado guardada.
+                  const ready = Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim()) && !uploading[s.id]
                   return (
                     <button
                       className="btn"
@@ -259,8 +272,13 @@ export function MisEntregas() {
                   )
                 })()}
               </div>
-              {!(Boolean(photo) && Boolean(received[s.id]?.trim())) && (
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Prueba de entrega: foto del <b>paquete en el sitio</b> (no de la persona) + el nombre de quién recibió.</div>
+              {upErr[s.id] && (
+                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 8 }}>
+                  <Icon name="x" /><span>No se pudo subir la foto (revisa tu señal). Vuelve a tomarla — la entrega no se cierra sin la evidencia guardada.</span>
+                </div>
+              )}
+              {!(Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim())) && !upErr[s.id] && (
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Prueba de entrega: foto del <b>paquete en el sitio</b> (no de la persona) + el nombre de quién recibió. El botón se habilita cuando la <b>foto queda guardada</b>.</div>
               )}
 
               <details style={{ marginTop: 10 }}>

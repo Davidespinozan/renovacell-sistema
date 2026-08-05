@@ -1,10 +1,12 @@
 // SEGUIMIENTO (admin + staff de logística): todos los envíos —propios y
 // paquetería— con su estatus, y DETECCIÓN DE ATORADOS (vencidos o surtidos sin
 // salir). Es la vista para cazar el pedido que se atoró (caso S12840).
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
+import { signedProofUrl } from '../../lib/uploads'
+import { entregar } from '../../data/ops/entregar'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -148,6 +150,24 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       : `${shipment.carrier}${shipment.tracking_number ? ` · guía ${shipment.tracking_number}` : ''}`
     : 'Sin asignar'
 
+  const [recibio, setRecibio] = useState('')
+  const [marcando, setMarcando] = useState(false)
+  // Paquetería (envío sin chofer, en tránsito): staff cierra la entrega — antes no había
+  // forma y quedaban "enviados" para siempre. confirmar_entrega autoriza a admin/almacén.
+  const puedeCerrarPaqueteria = !!shipment && !shipment.driver_id && shipment.status !== 'delivered' && order.status === 'shipped'
+  // Prueba de entrega visible (recall/disputa): antes la foto se guardaba y nadie la veía.
+  const tienePrueba = !!shipment && shipment.status === 'delivered' && !!shipment.proof_image_url
+  const abrirPrueba = async () => {
+    const url = await signedProofUrl(shipment?.proof_image_url ?? null)
+    if (url) window.open(url, '_blank', 'noopener')
+    else window.alert('No se pudo abrir la evidencia de entrega.')
+  }
+  const cerrarPaqueteria = () => {
+    if (!shipment || !recibio.trim()) return
+    entregar(shipment.id, order.id, null, recibio.trim())
+    setMarcando(false)
+  }
+
   return (
     <div className="card" style={stuck ? { borderLeft: '4px solid var(--danger)' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -172,6 +192,27 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Método</div>{method}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
       </div>
+
+      {(tienePrueba || puedeCerrarPaqueteria) && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+          {tienePrueba && (
+            <button className="btn ghost sm" type="button" onClick={abrirPrueba}><Icon name="image" /> Ver prueba de entrega</button>
+          )}
+          {shipment?.status === 'delivered' && shipment.received_by && (
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Recibió: {shipment.received_by}</span>
+          )}
+          {puedeCerrarPaqueteria && (marcando ? (
+            <>
+              <input value={recibio} onChange={(e) => setRecibio(e.target.value)} placeholder="¿Quién recibió? (acuse de paquetería)"
+                style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+              <button className="btn sm" type="button" disabled={!recibio.trim()} style={!recibio.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={cerrarPaqueteria}><Icon name="check" /> Confirmar entrega</button>
+              <button className="btn ghost sm" type="button" onClick={() => setMarcando(false)}>Cancelar</button>
+            </>
+          ) : (
+            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setMarcando(true)}><Icon name="check" /> Marcar entregado (paquetería)</button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
