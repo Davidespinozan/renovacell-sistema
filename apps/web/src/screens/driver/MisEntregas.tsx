@@ -80,13 +80,22 @@ export function MisEntregas() {
     () => orderedIds.map((id) => mine.find((s) => s.id === id)).filter((s): s is (typeof mine)[number] => Boolean(s)),
     [orderedIds, mine],
   )
+  const persistOrder = (seq: string[]) => {
+    setRouteOrder(seq)
+    try { localStorage.setItem(KEY, JSON.stringify(seq)) } catch { /* almacenamiento no disponible */ }
+  }
   const move = (id: string, dir: -1 | 1) => {
     const seq = [...orderedIds]
     const i = seq.indexOf(id); const j = i + dir
     if (i < 0 || j < 0 || j >= seq.length) return
     ;[seq[i], seq[j]] = [seq[j], seq[i]]
-    setRouteOrder(seq)
-    try { localStorage.setItem(KEY, JSON.stringify(seq)) } catch { /* almacenamiento no disponible */ }
+    persistOrder(seq)
+  }
+  // Mover la parada al inicio o al fin en UN toque (en el celular, subir la parada 8 al 1
+  // con flechitas eran 7 toques). Más cómodo que arrastrar en pantalla táctil.
+  const moveEnd = (id: string, edge: 'top' | 'bottom') => {
+    const rest = orderedIds.filter((x) => x !== id)
+    persistOrder(edge === 'top' ? [id, ...rest] : [...rest, id])
   }
   // Etiqueta de una parada (cliente + dirección) para la lista de la ruta.
   const stopInfo = (s: (typeof mine)[number]) => {
@@ -162,10 +171,18 @@ export function MisEntregas() {
                     <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.name}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.addr}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
-                    <button type="button" className="btn ghost sm" aria-label="Subir" disabled={i === 0} style={i === 0 ? { opacity: 0.35 } : undefined} onClick={() => move(s.id, -1)}>▲</button>
-                    <button type="button" className="btn ghost sm" aria-label="Bajar" disabled={i === orderedMine.length - 1} style={i === orderedMine.length - 1 ? { opacity: 0.35 } : undefined} onClick={() => move(s.id, 1)}>▼</button>
-                  </div>
+                  {(() => {
+                    const first = i === 0, last = i === orderedMine.length - 1
+                    const b: React.CSSProperties = { minWidth: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, padding: 0 }
+                    return (
+                      <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
+                        <button type="button" className="btn ghost sm" aria-label="Mover al inicio" title="Al inicio" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'top')}>⤒</button>
+                        <button type="button" className="btn ghost sm" aria-label="Subir" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, -1)}>▲</button>
+                        <button type="button" className="btn ghost sm" aria-label="Bajar" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, 1)}>▼</button>
+                        <button type="button" className="btn ghost sm" aria-label="Mover al fin" title="Al fin" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'bottom')}>⤓</button>
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })}
