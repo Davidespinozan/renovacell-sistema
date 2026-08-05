@@ -157,7 +157,7 @@ export function createPosOrder(input: {
   seller?: string | null
   doctor_id?: string | null
   channel?: string
-}): OrderWithItems {
+}, localOnly = false): OrderWithItems {
   const id = hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`
   const folio = `POS-${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
@@ -180,7 +180,9 @@ export function createPosOrder(input: {
   notify({ text: `Venta POS ${folio} cobrada`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor: 'Punto de Venta', action: 'Venta POS', resource: folio, detail: input.payment_method })
 
-  if (hasSupabase) {
+  // localOnly: la venta POS atómica (vender_pos RPC) persiste orden+renglones+inventario
+  // en una transacción; aquí solo se refleja localmente para respuesta instantánea.
+  if (hasSupabase && !localOnly) {
     (async () => {
       const oi = await supabase.from('orders').insert({
         id, external_ref: folio, doctor_id: isUuid(input.doctor_id) ? input.doctor_id : null, total: input.total,

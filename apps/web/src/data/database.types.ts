@@ -1573,6 +1573,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      vender_pos: {
+        Args: {
+          p_allocations: Json
+          p_doctor_id: string
+          p_folio: string
+          p_lines: Json
+          p_order_id: string
+          p_payment_method: string
+          p_shipping_meta: Json
+          p_total: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

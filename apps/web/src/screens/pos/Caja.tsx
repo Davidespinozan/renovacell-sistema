@@ -35,6 +35,7 @@ export function Caja() {
   const [pickOpen, setPickOpen] = useState(false)
   const [done, setDone] = useState<OrderWithItems | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [cobrando, setCobrando] = useState(false)
 
   const lines: Line[] = useMemo(
     () =>
@@ -59,20 +60,24 @@ export function Caja() {
       return { ...c, [id]: q }
     })
 
-  const cobrar = () => {
-    const res = venderPOS(
+  const cobrar = async () => {
+    if (cobrando) return
+    setCobrando(true)
+    const res = await venderPOS(
       lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price ?? 0 })),
       total,
       method,
       { doctorId: client?.id ?? null, seller: user?.email ?? null },
     )
+    setCobrando(false)
     if (res.ok && res.order) {
       setDone(res.order)
       setCart({})
       setClient(null)
     } else {
-      setErr('Sin stock suficiente para uno o más productos. Registra una entrada en Almacén.')
-      window.setTimeout(() => setErr(null), 3000)
+      // La RPC atómica falla ANTES de cobrar si el inventario no alcanza: no hay venta fantasma.
+      setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
+      window.setTimeout(() => setErr(null), 4000)
     }
   }
 
@@ -152,8 +157,8 @@ export function Caja() {
               <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
             </div>
 
-            <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={cobrar}>
-              <Icon name="check" /> Cobrar {money(total)}
+            <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(cobrando ? { opacity: 0.6, cursor: 'wait' } : {}) }} onClick={cobrar} disabled={cobrando}>
+              <Icon name="check" /> {cobrando ? 'Cobrando…' : `Cobrar ${money(total)}`}
             </button>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Pago inmediato · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
           </>
