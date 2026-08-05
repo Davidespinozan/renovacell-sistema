@@ -32,6 +32,9 @@ export function Finanzas() {
     const zero = new Set(lots.filter((l) => (l.unit_cost ?? 0) === 0).map((l) => l.product_id))
     return products.filter((p) => zero.has(p.id)).map((p) => p.name)
   }, [lots, products])
+  // Con costos incompletos, el costo de ventas se subestima → utilidad y margen NO son
+  // confiables. No se muestran como número firme ni se exportan como reales.
+  const costosIncompletos = missingCost.length > 0
 
   const [period, setPeriod] = useState<'mes' | 'pasado' | 'todo'>('mes')
   const range = useMemo(() => {
@@ -86,16 +89,17 @@ export function Finanzas() {
           name={`estado-de-resultados-${range.label}`}
           style={{ marginLeft: 'auto' }}
           rows={[
-            { concepto: 'Ventas', monto: er.ventas },
+            ...(costosIncompletos ? [{ concepto: 'AVISO: costos incompletos — utilidad y margen NO son confiables', monto: '' as number | string }] : []),
+            { concepto: 'Ventas', monto: er.ventas as number | string },
             { concepto: 'Devoluciones', monto: -er.devoluciones },
             { concepto: 'Ventas netas', monto: er.ventasNetas },
-            { concepto: 'Costo de ventas', monto: -er.costoVentas },
-            { concepto: 'Utilidad bruta', monto: er.utilidadBruta },
+            { concepto: 'Costo de ventas', monto: costosIncompletos ? 'incompleto' : -er.costoVentas },
+            { concepto: 'Utilidad bruta', monto: costosIncompletos ? 'no confiable' : er.utilidadBruta },
             { concepto: 'Gastos', monto: -er.gastos },
             { concepto: 'Mermas', monto: -er.mermas },
-            { concepto: 'Utilidad neta', monto: er.utilidadNeta },
-            { concepto: 'Margen bruto %', monto: Math.round(er.margenBruto * 10) / 10 },
-            { concepto: 'Margen neto %', monto: Math.round(er.margenNeto * 10) / 10 },
+            { concepto: 'Utilidad neta', monto: costosIncompletos ? 'no confiable' : er.utilidadNeta },
+            { concepto: 'Margen bruto %', monto: costosIncompletos ? 'no confiable' : Math.round(er.margenBruto * 10) / 10 },
+            { concepto: 'Margen neto %', monto: costosIncompletos ? 'no confiable' : Math.round(er.margenNeto * 10) / 10 },
           ]}
           columns={[
             { key: 'concepto', label: 'Concepto' },
@@ -110,11 +114,11 @@ export function Finanzas() {
         {er.devoluciones > 0 && (
           <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventasNetas)}`} accent="dang" />
         )}
-        <Stat icon={<ArrowDownCircle size={18} />} v={money(er.costoVentas)} k="Costo de ventas" s={`margen bruto ${pct(er.margenBruto)}`} />
-        <Stat icon={<Wallet size={18} />} v={money(er.utilidadBruta)} k="Utilidad bruta" s="ventas − costo" />
+        <Stat icon={<ArrowDownCircle size={18} />} v={costosIncompletos ? '—' : money(er.costoVentas)} k="Costo de ventas" s={costosIncompletos ? 'faltan costos' : `margen bruto ${pct(er.margenBruto)}`} accent={costosIncompletos ? 'warn' : undefined} />
+        <Stat icon={<Wallet size={18} />} v={costosIncompletos ? 'No confiable' : money(er.utilidadBruta)} k="Utilidad bruta" s={costosIncompletos ? 'captura costos para verla' : 'ventas − costo'} accent={costosIncompletos ? 'warn' : undefined} />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.mermas)} k="Mermas" s="caducidad / daño" accent={er.mermas > 0 ? 'dang' : undefined} />
-        <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={money(er.utilidadNeta)} k="Utilidad neta" s={`margen neto ${pct(er.margenNeto)}`} accent={er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
+        <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={costosIncompletos ? 'No confiable' : money(er.utilidadNeta)} k="Utilidad neta" s={costosIncompletos ? 'captura costos para verla' : `margen neto ${pct(er.margenNeto)}`} accent={costosIncompletos ? 'warn' : er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
       </div>
 
       {/* Cobranza real: vendido vs dinero que de verdad entró */}
@@ -205,11 +209,14 @@ export function Finanzas() {
   )
 }
 
-function Stat({ icon, v, k, s, accent }: { icon: React.ReactNode; v: string; k: string; s: string; accent?: 'ok' | 'dang' }) {
+function Stat({ icon, v, k, s, accent }: { icon: React.ReactNode; v: string; k: string; s: string; accent?: 'ok' | 'dang' | 'warn' }) {
+  const chipStyle = accent === 'dang' ? { background: 'var(--danger-bg)', color: 'var(--danger)' }
+    : accent === 'warn' ? { background: 'var(--warn-bg)', color: 'var(--warn)' } : undefined
+  const vColor = accent === 'dang' ? 'var(--danger)' : accent === 'warn' ? 'var(--warn)' : accent === 'ok' ? 'var(--green-deep)' : undefined
   return (
     <div className="card sig">
-      <div className="chip" style={accent === 'dang' ? { background: 'var(--danger-bg)', color: 'var(--danger)' } : undefined}>{icon}</div>
-      <div className="v" style={{ fontSize: 18, color: accent === 'dang' ? 'var(--danger)' : accent === 'ok' ? 'var(--green-deep)' : undefined }}>{v}</div>
+      <div className="chip" style={chipStyle}>{icon}</div>
+      <div className="v" style={{ fontSize: 18, color: vColor }}>{v}</div>
       <div className="k">{k}</div>
       <div className="s">{s}</div>
     </div>

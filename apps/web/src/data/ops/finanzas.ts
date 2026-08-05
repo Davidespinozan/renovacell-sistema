@@ -117,6 +117,13 @@ export function gastosPorCategoria(gastos: Gasto[]): { categoria: string; monto:
 }
 
 // ---- Arqueo / cierre de caja (POS efectivo) -------------------------------
+// Día LOCAL (del dispositivo, = zona del negocio) en formato AAAA-MM-DD. Antes se
+// usaba el día UTC (`toISOString`), cuya frontera cae ~18:00 en México: un corte de
+// la tarde/noche perdía casi todas las ventas del día y marcaba un faltante falso.
+export function localDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // Esperado = ventas POS en EFECTIVO dentro del alcance (día u evento), MENOS las
 // devoluciones en efectivo de esos pedidos (el dinero salió del cajón).
 export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string }, refunds: RefundLine[] = []): number {
@@ -125,7 +132,7 @@ export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string;
     .filter((o) => {
       const meta = (o.shipping_meta ?? {}) as { event_id?: string | null }
       if (opts.eventId) return meta.event_id === opts.eventId
-      if (opts.day) return o.created_at.slice(0, 10) === opts.day
+      if (opts.day) return localDay(new Date(o.created_at)) === opts.day
       return true
     })
   const bruto = inScope.reduce((s, o) => s + (o.total ?? 0), 0)

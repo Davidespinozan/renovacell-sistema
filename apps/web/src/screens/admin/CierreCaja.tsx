@@ -12,7 +12,7 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useEvents } from '../../data/hooks/useEvents'
 import { useCierres, useRefunds } from '../../data/hooks/useFinanzas'
 import { useRole } from '../../auth/RoleContext'
-import { efectivoEsperado } from '../../data/ops/finanzas'
+import { efectivoEsperado, localDay } from '../../data/ops/finanzas'
 import type { Cierre } from '../../data/store/cierresStore'
 
 // Imprime SOLO el ticket: marca el <body>, imprime, y limpia la clase en `afterprint`
@@ -63,7 +63,7 @@ export function CierreCaja() {
   const { data: refunds } = useRefunds()
   const { user } = useRole()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDay(new Date()) // día LOCAL del negocio (no UTC), para que el corte no pierda ventas
   // Alcance: caja del día o un evento específico.
   const [scope, setScope] = useState<string>('dia') // 'dia' | eventId
   const ev = events.find((e) => e.id === scope)
