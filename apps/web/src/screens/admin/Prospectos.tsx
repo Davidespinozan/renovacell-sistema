@@ -87,6 +87,13 @@ export function Prospectos() {
   const nuevos = visible.filter((p) => statusOf(p) === 'nuevo').length
 
   const convert = (p: Prospect) => {
+    // El correo es la LLAVE de la cuenta del doctor (invite-doctor lo necesita). Sin él,
+    // se creaba un "doctor fantasma" local que desaparecía al recargar y el prospecto
+    // salía del pipeline como convertido → lead perdido. Se bloquea y se pide el correo.
+    if (!p.email?.trim()) {
+      window.alert('Este prospecto no tiene correo. Agrégalo con "Editar" antes de convertirlo — el correo es la llave de la cuenta del doctor.')
+      return
+    }
     const doc = addPending({
       full_name: p.name ?? 'Doctor',
       email: p.email,

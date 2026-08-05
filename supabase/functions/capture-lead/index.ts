@@ -89,5 +89,13 @@ Deno.serve(async (req) => {
     body: `Lead nuevo desde el sitio: ${name}`, roles: ['admin'], screen: 'av_prosp',
   }).then(() => {}, () => {})
 
+  // 5) Aviso DIRIGIDO al vendedor asignado (user_ids: solo él lo ve). Antes solo se
+  // avisaba a admin y el vendedor asignado nunca se enteraba de su lead.
+  if (assigned) {
+    await admin.from('notifications').insert({
+      body: `Lead nuevo para ti: ${name}`, user_ids: [assigned], screen: 'av_prosp',
+    }).then(() => {}, () => {})
+  }
+
   return json(200, { ok: true })
 })

@@ -11,6 +11,7 @@ import { useShipments } from '../data/hooks/useShipments'
 import { useLots } from '../data/hooks/useLots'
 import { useDoctors } from '../data/hooks/useDoctors'
 import { useProspects } from '../data/hooks/useProspects'
+import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
 
@@ -57,7 +58,10 @@ export function Bandeja() {
     }
 
     if (role === 'pos') {
-      const prospNuevos = prospects.filter((p) => p.assigned_to === user?.email && (p.status ?? 'nuevo') === 'nuevo')
+      // `assigned_to` es UUID con backend (email en demo). Antes se comparaba SIEMPRE
+      // contra el email → en producción nunca coincidía y el vendedor veía "todo al día".
+      const mineId = hasSupabase ? currentUserId() : user?.email
+      const prospNuevos = prospects.filter((p) => p.assigned_to === mineId && (p.status ?? 'nuevo') === 'nuevo')
       if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
     }
 

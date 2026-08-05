@@ -121,8 +121,8 @@ export function Doctores() {
                 {d.organization}{specialtyOf(d) ? ` · ${specialtyOf(d)}` : ''}
               </div>
             </div>
-            <span className={'pill ' + (d.verified ? 'p-ok' : 'p-warn')}>
-              {d.verified ? <ShieldCheck size={12} /> : <Clock size={12} />} {d.verified ? 'Verificado' : 'Pendiente'}
+            <span className={'pill ' + (d.verified ? 'p-ok' : verifyResultOf(d)?.decision === 'reject' ? 'p-dang' : 'p-warn')}>
+              {d.verified ? <ShieldCheck size={12} /> : verifyResultOf(d)?.decision === 'reject' ? <Ban size={12} /> : <Clock size={12} />} {d.verified ? 'Verificado' : verifyResultOf(d)?.decision === 'reject' ? 'Rechazado' : 'Pendiente'}
             </span>
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
