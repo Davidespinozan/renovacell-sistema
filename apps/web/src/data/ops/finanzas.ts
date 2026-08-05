@@ -76,19 +76,22 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
 export interface Cobranza {
   vendido: number     // ventas del periodo (bruto, incluye no pagadas)
   cobrado: number     // de esas ventas, lo realmente pagado, neto de devoluciones
+  devuelto: number    // reembolsos sobre pedidos YA pagados (salieron del cajón)
   porCobrar: number   // vendido − lo pagado (lo que falta cobrar del periodo)
   tasaCobro: number   // % cobrado / vendido
 }
+// Reconcilia: Vendido = Cobrado + Devuelto + Por cobrar. Antes el "devuelto" (reembolso
+// de pedidos ya pagados) no aparecía en ningún renglón y Dirección no veía a dónde se fue.
 export function cobranza(orders: OrderWithItems[], refunds: RefundLine[] = []): Cobranza {
   const sales = orders.filter(isSale)
   const vendido = sales.reduce((s, o) => s + (o.total ?? 0), 0)
   const pagadas = sales.filter((o) => o.payment_status === 'paid')
   const paidIds = new Set(pagadas.map((o) => o.id))
   const cobradoBruto = pagadas.reduce((s, o) => s + (o.total ?? 0), 0)
-  const devPagadas = refunds.filter((r) => paidIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
-  const cobrado = cobradoBruto - devPagadas
+  const devuelto = refunds.filter((r) => paidIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
+  const cobrado = cobradoBruto - devuelto
   const porCobrar = vendido - cobradoBruto
-  return { vendido, cobrado, porCobrar, tasaCobro: vendido > 0 ? (cobrado / vendido) * 100 : 0 }
+  return { vendido, cobrado, devuelto, porCobrar, tasaCobro: vendido > 0 ? (cobrado / vendido) * 100 : 0 }
 }
 
 // Cuentas por COBRAR: pedidos del Portal confirmados (contra pedido) que el

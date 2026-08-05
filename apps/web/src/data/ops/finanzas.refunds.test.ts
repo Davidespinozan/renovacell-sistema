@@ -61,6 +61,15 @@ describe('cobranza — vendido vs cobrado real', () => {
     const c = cobranza(orders, [{ order_id: '1', monto: 300 }])
     expect(c.vendido).toBe(1000)
     expect(c.cobrado).toBe(700)
+    expect(c.devuelto).toBe(300)
     expect(c.porCobrar).toBe(0)
+  })
+  it('reconcilia: Vendido = Cobrado + Devuelto + Por cobrar', () => {
+    const orders = [
+      mkOrder({ id: '1', external_ref: 'S-1', status: 'paid', payment_status: 'paid', total: 1000 }),
+      mkOrder({ id: '2', external_ref: 'S-2', status: 'shipped', payment_status: 'pending', total: 400 }),
+    ]
+    const c = cobranza(orders, [{ order_id: '1', monto: 250 }])
+    expect(c.cobrado + c.devuelto + c.porCobrar).toBe(c.vendido)
   })
 })

@@ -133,6 +133,9 @@ export function Finanzas() {
         <div className="grid sigs">
           <Stat icon={<Receipt size={18} />} v={money(cob.vendido)} k="Vendido" s="facturado del periodo" />
           <Stat icon={<TrendingUp size={18} />} v={money(cob.cobrado)} k="Cobrado real" s="dinero que entró (neto)" accent="ok" />
+          {cob.devuelto > 0 && (
+            <Stat icon={<TrendingDown size={18} />} v={money(cob.devuelto)} k="Devuelto" s="reembolsado de pagadas" accent="dang" />
+          )}
           <Stat icon={<ArrowDownCircle size={18} />} v={money(cob.porCobrar)} k="Por cobrar" s="del periodo (contra pedido)" />
         </div>
       </div>
