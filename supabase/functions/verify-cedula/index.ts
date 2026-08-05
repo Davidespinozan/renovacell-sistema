@@ -182,11 +182,31 @@ Deno.serve(async (req) => {
   // Auto-servicio del doctor: guarda su cédula y, si el dictamen es `auto`, se le da
   // acceso. El flip de `verified` va con service_role porque la RLS impide que el
   // propio doctor lo cambie. En `review`/`reject` queda el dictamen para Dirección.
+  //
+  // CANDADO KYC: si el doctor subió INE+selfie y su IDENTIDAD está en revisión
+  // (`identity.status==='pending'`), la cédula sola NO le da acceso — eso anularía la
+  // verificación biométrica que lo tiene en revisión. La cédula válida se guarda (para
+  // que Dirección la vea), pero el `verified` lo decide Dirección tras revisar la
+  // evidencia. Si NO hay captura de identidad (flujo viejo solo-cédula), se conserva
+  // el auto-acceso por cédula.
   if (isDoctor) {
-    const meta = { ...((prof?.meta ?? {}) as Record<string, unknown>), cedula, verifyResult: result }
+    const existingMeta = (prof?.meta ?? {}) as Record<string, unknown>
+    const identity = existingMeta.identity as { status?: string } | undefined
+    const identityPending = identity?.status === 'pending'
+    const meta = { ...existingMeta, cedula, verifyResult: result }
     const patch: Record<string, unknown> = { meta }
-    if (result.decision === 'auto') patch.verified = true
+    if (result.decision === 'auto' && !identityPending) patch.verified = true
     await admin.from('profiles').update(patch).eq('id', who.user.id)
+    // La cédula pasó pero la identidad sigue en revisión → se le informa que aún NO
+    // tiene acceso (que no crea que ya entró por teclear su cédula).
+    if (result.decision === 'auto' && identityPending) {
+      return json(200, {
+        ...result,
+        decision: 'review',
+        identityPending: true,
+        reasons: ['Tu cédula es válida. Tu identidad (INE + prueba de vida) sigue en revisión; te daremos acceso en cuanto la aprobemos.'],
+      })
+    }
   }
   // Para staff, el cliente aplica la decisión bajo su RLS de admin.
   return json(200, result)
