@@ -36,6 +36,8 @@ export function Caja() {
   const [done, setDone] = useState<OrderWithItems | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [cobrando, setCobrando] = useState(false)
+  const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
+  const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
 
   const lines: Line[] = useMemo(
     () =>
@@ -45,6 +47,10 @@ export function Caja() {
     [cart, sellable],
   )
   const total = lines.reduce((s, l) => s + (l.product.price ?? 0) * l.qty, 0)
+  const recibidoN = Math.max(0, Number(recibido) || 0)
+  const cambio = recibidoN - total
+  // En efectivo, no se cobra hasta que el recibido alcance el total (evita cambio negativo).
+  const efectivoOk = method !== 'efectivo' || recibido === '' ? true : recibidoN >= total
 
   // No vender más de lo disponible en inventario.
   const add = (id: string) => setCart((c) => {
@@ -71,9 +77,11 @@ export function Caja() {
     )
     setCobrando(false)
     if (res.ok && res.order) {
+      setLastPago(method === 'efectivo' && recibido !== '' ? { recibido: recibidoN, cambio } : null)
       setDone(res.order)
       setCart({})
       setClient(null)
+      setRecibido('')
     } else {
       // La RPC atómica falla ANTES de cobrar si el inventario no alcanza: no hay venta fantasma.
       setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
@@ -157,7 +165,22 @@ export function Caja() {
               <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
             </div>
 
-            <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(cobrando ? { opacity: 0.6, cursor: 'wait' } : {}) }} onClick={cobrar} disabled={cobrando}>
+            {method === 'efectivo' && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 56 }}>Recibí</span>
+                  <input type="number" min={0} value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="¿con cuánto paga? (opcional)"
+                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, outline: 'none', background: '#fff' }} />
+                </div>
+                {recibido !== '' && (
+                  <div className="tket-total" style={{ marginTop: 8, color: cambio < 0 ? 'var(--danger)' : 'var(--green-deep)' }}>
+                    <span>{cambio < 0 ? 'Falta' : 'Cambio'}</span><b>{money(Math.abs(cambio))}</b>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(cobrando || !efectivoOk ? { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' } : {}) }} onClick={cobrar} disabled={cobrando || !efectivoOk}>
               <Icon name="check" /> {cobrando ? 'Cobrando…' : `Cobrar ${money(total)}`}
             </button>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Pago inmediato · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
@@ -194,7 +217,7 @@ export function Caja() {
               </div>
             </div>
           </div>
-          <VentaTicketPrint order={done} productName={productName} clientName={done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general'} />
+          <VentaTicketPrint order={done} productName={productName} pago={lastPago} clientName={done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general'} />
         </div>
       )}
     </div>
@@ -210,7 +233,7 @@ function imprimirVenta() {
 }
 
 // Recibo de venta para el cliente (comprobante interno, NO es CFDI).
-function VentaTicketView({ order, productName, clientName }: { order: OrderWithItems; productName: Record<string, string>; clientName: string }) {
+function VentaTicketView({ order, productName, clientName, pago }: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: { recibido: number; cambio: number } | null }) {
   const items = order.items.filter((it) => it.unit_price != null)
   return (
     <div className="corte-ticket">
@@ -232,11 +255,15 @@ function VentaTicketView({ order, productName, clientName }: { order: OrderWithI
       <div className="ct-dif"><span>Total</span><span>{money(order.total)}</span></div>
       <div className="ct-letra">Son: {montoEnLetras(order.total ?? 0)}</div>
       <div className="ct-row" style={{ marginTop: 6 }}><span className="k">Pago</span><span className="v">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}</span></div>
+      {pago && (<>
+        <div className="ct-row"><span className="k">Recibí</span><span className="v">{money(pago.recibido)}</span></div>
+        <div className="ct-row"><span className="k">Cambio</span><span className="v">{money(pago.cambio)}</span></div>
+      </>)}
       <div className="ct-foot">No es un comprobante fiscal (CFDI){order.invoice_requested ? ' · CFDI solicitado aparte' : ''}</div>
     </div>
   )
 }
-function VentaTicketPrint(props: { order: OrderWithItems; productName: Record<string, string>; clientName: string }) {
+function VentaTicketPrint(props: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: { recibido: number; cambio: number } | null }) {
   return createPortal(<div className="venta-print-root"><VentaTicketView {...props} /></div>, document.body)
 }
 

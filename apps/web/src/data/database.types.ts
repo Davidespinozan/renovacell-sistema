@@ -272,6 +272,7 @@ export type Database = {
           diferencia: number
           esperado: number
           fecha: string
+          fondo: number
           id: string
           motivo: string | null
           usuario: string | null
@@ -284,6 +285,7 @@ export type Database = {
           diferencia: number
           esperado: number
           fecha: string
+          fondo?: number
           id?: string
           motivo?: string | null
           usuario?: string | null
@@ -296,6 +298,7 @@ export type Database = {
           diferencia?: number
           esperado?: number
           fecha?: string
+          fondo?: number
           id?: string
           motivo?: string | null
           usuario?: string | null

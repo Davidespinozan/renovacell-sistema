@@ -26,7 +26,7 @@ function imprimirCorte() {
 
 // Plantilla del ticket (se usa en el preview en pantalla y en el portal de impresión).
 function CorteTicketView({ c }: { c: Cierre }) {
-  const cuadra = c.diferencia === 0
+  const cuadra = Math.abs(Math.round(c.diferencia * 100)) === 0
   return (
     <div className="corte-ticket">
       <div className="ct-head">
@@ -38,7 +38,9 @@ function CorteTicketView({ c }: { c: Cierre }) {
       <div className="ct-row"><span className="k">Fecha</span><span className="v">{fmtDate(c.fecha)}</span></div>
       <div className="ct-row"><span className="k">Realizó</span><span className="v">{c.usuario}</span></div>
       <div className="ct-sep" />
-      <div className="ct-row"><span className="k">Efectivo esperado</span><span className="v">{money(c.esperado)}</span></div>
+      <div className="ct-row"><span className="k">Ventas en efectivo</span><span className="v">{money(c.esperado)}</span></div>
+      {c.fondo > 0 && <div className="ct-row"><span className="k">Fondo inicial</span><span className="v">{money(c.fondo)}</span></div>}
+      <div className="ct-row"><span className="k">Esperado en cajón</span><span className="v">{money(c.esperado + c.fondo)}</span></div>
       <div className="ct-row"><span className="k">Efectivo contado</span><span className="v">{money(c.contado)}</span></div>
       <div className={'ct-dif ' + (cuadra ? 'ok' : 'bad')}>
         <span>{cuadra ? 'La caja cuadra' : c.diferencia > 0 ? 'Sobrante' : 'Faltante'}</span>
@@ -74,21 +76,28 @@ export function CierreCaja() {
     [orders, ev, today, refunds],
   )
 
+  // Fondo de caja inicial (el efectivo de cambio con el que abre el cajón). El cajón
+  // físico trae fondo + ventas en efectivo, así que el esperado a contar es la suma.
+  const [fondo, setFondo] = useState('')
+  const fondoN = Math.max(0, Number(fondo) || 0)
   const [contado, setContado] = useState('')
   const contadoN = Math.max(0, Number(contado) || 0)
-  const diferencia = contadoN - esperado
+  const esperadoEnCajon = esperado + fondoN
+  const diferencia = contadoN - esperadoEnCajon
+  // Tolerancia de centavos: un descuadre de sub-centavo por redondeo NO es faltante.
+  const cuadra = Math.abs(Math.round(diferencia * 100)) === 0
   const [motivo, setMotivo] = useState('')
   const [done, setDone] = useState(false)
   const [ticket, setTicket] = useState<Cierre | null>(null) // último corte, para el ticket imprimible
 
-  const needsMotivo = contado !== '' && diferencia !== 0
+  const needsMotivo = contado !== '' && !cuadra
   const valid = contado !== '' && (!needsMotivo || motivo.trim() !== '')
 
   const cerrar = () => {
     if (!valid) return
-    const c = registrarCierre({ fecha: today, alcance, esperado, contado: contadoN, motivo: motivo.trim() || null, usuario: user?.name ?? 'Cajero' })
+    const c = registrarCierre({ fecha: today, alcance, esperado, fondo: fondoN, contado: contadoN, motivo: motivo.trim() || null, usuario: user?.name ?? 'Cajero' })
     setTicket(c)
-    setDone(true); setContado(''); setMotivo('')
+    setDone(true); setContado(''); setMotivo('') // el fondo se conserva (mismo cajón)
     window.setTimeout(() => setDone(false), 2600)
   }
 
@@ -125,18 +134,25 @@ export function CierreCaja() {
           </select>
 
           <div className="tket-total" style={{ marginTop: 16 }}>
-            <span>Efectivo esperado</span><b className="mono">{money(esperado)}</b>
+            <span>Ventas en efectivo</span><b className="mono">{money(esperado)}</b>
+          </div>
+
+          <label style={lbl}>Fondo inicial (efectivo de cambio)</label>
+          <input type="number" min={0} style={fld} value={fondo} onChange={(e) => setFondo(e.target.value)} placeholder="0" />
+
+          <div className="tket-total" style={{ marginTop: 14, fontWeight: 700 }}>
+            <span>Esperado en el cajón</span><b className="mono">{money(esperadoEnCajon)}</b>
           </div>
 
           <label style={lbl}>Efectivo contado</label>
           <input type="number" min={0} style={fld} value={contado} onChange={(e) => setContado(e.target.value)} placeholder="0" />
 
           {contado !== '' && (
-            <div className="sysnote" style={{ marginTop: 14, ...(diferencia === 0
+            <div className="sysnote" style={{ marginTop: 14, ...(cuadra
               ? { background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }
               : { background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }) }}>
-              {diferencia === 0 ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-              <span>{diferencia === 0 ? 'Cuadra exacto.' : `${diferencia > 0 ? 'Sobrante' : 'Faltante'} de ${money(Math.abs(diferencia))}.`}</span>
+              {cuadra ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+              <span>{cuadra ? 'Cuadra.' : `${diferencia > 0 ? 'Sobrante' : 'Faltante'} de ${money(Math.abs(diferencia))}.`}</span>
             </div>
           )}
 
@@ -160,7 +176,8 @@ export function CierreCaja() {
             <ExportButton name="cierres-de-caja" rows={cierres} style={{ marginLeft: 'auto' }} columns={[
               { key: 'fecha', label: 'Fecha', format: (v) => fmtDate(v as string) },
               { key: 'alcance', label: 'Alcance' },
-              { key: 'esperado', label: 'Esperado', format: (v) => money(v as number) },
+              { key: 'esperado', label: 'Ventas efectivo', format: (v) => money(v as number) },
+              { key: 'fondo', label: 'Fondo', format: (v) => money(v as number) },
               { key: 'contado', label: 'Contado', format: (v) => money(v as number) },
               { key: 'diferencia', label: 'Diferencia', format: (v) => money(v as number) },
               { key: 'motivo', label: 'Motivo' },
