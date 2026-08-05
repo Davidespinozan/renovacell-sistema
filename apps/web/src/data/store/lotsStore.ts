@@ -10,8 +10,9 @@ import { costOf } from '../mock/costs'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { refreshStock } from './stockStore'
+import { REORDER_THRESHOLD } from '../ops/stock'
 
-const LOW_STOCK_REORDER = 20
+const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
 function sortDesc(m: InventoryMovement[]): InventoryMovement[] {
   return [...m].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))

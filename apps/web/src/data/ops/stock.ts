@@ -3,7 +3,8 @@
 // Disponible — y para no dejar pedir más de lo que hay.
 import type { Lot } from '../types'
 
-export const LOW_STOCK = 10 // umbral "quedan pocas"
+export const LOW_STOCK = 10 // umbral "quedan pocas" (aviso al doctor en el catálogo)
+export const REORDER_THRESHOLD = 20 // umbral de REORDEN (alerta a Almacén / Reabastecimiento)
 
 export type StockStatus = 'ok' | 'low' | 'out' | 'untracked'
 export interface StockInfo {

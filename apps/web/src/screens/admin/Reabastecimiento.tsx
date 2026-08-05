@@ -10,11 +10,11 @@ import { ExportButton } from '../../app/ExportButton'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
-import { stockByProduct } from '../../data/ops/stock'
+import { stockByProduct, REORDER_THRESHOLD } from '../../data/ops/stock'
 import { costOf } from '../../data/mock/costs'
 import type { ProductSafe } from '../../data/types'
 
-const LOW = 20      // umbral de stock bajo (reorden)
+const LOW = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 const TARGET = 60   // stock objetivo tras reabastecer
 
 export function Reabastecimiento() {
