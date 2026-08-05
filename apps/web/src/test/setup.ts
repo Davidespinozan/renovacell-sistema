@@ -9,7 +9,8 @@ if (typeof (globalThis as { WebSocket?: unknown }).WebSocket === 'undefined') {
 
 // Setup de pruebas: matchers de jest-dom (toBeInTheDocument, toHaveTextContent…)
 // para los tests de componentes. Se carga en todos los archivos (inofensivo en
-// los de lógica pura).
+// los de lógica pura). Nota: correr la suite DESDE apps/web (npm run test --workspace
+// @renovacell/web); desde la raíz no se toma este setupFiles y jest-dom no cargaría.
 import '@testing-library/jest-dom/vitest'
 
 // jsdom no implementa scrollIntoView (lo usan hilos/listas con auto-scroll).
