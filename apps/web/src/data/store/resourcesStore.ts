@@ -4,7 +4,7 @@
 // hidrata de `resource_requests` (RLS: staff lee/crea; solo admin o cap 'diseno'
 // avanza el estatus) y las mutaciones escriben write-through. Sin backend, mock.
 import { notify } from './notificationsStore'
-import { hasSupabase, supabase } from '../../lib/supabase'
+import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 
 export type ResourceStatus = 'solicitado' | 'en_proceso' | 'entregado'
@@ -20,6 +20,7 @@ export interface ResourceRequest {
   status: ResourceStatus
   at: string
   assetUrl?: string
+  requestedById?: string | null // user_id del solicitante, para avisarle al entregar
 }
 
 const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -33,13 +34,13 @@ const SEED: ResourceRequest[] = [
 
 const live = makeLive<ResourceRequest>(async () => {
   const { data, error } = await supabase.from('resource_requests')
-    .select('id, title, description, requested_by, origin, status, asset_url, created_at')
+    .select('id, title, description, requested_by, requested_by_id, origin, status, asset_url, created_at')
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: r.id, title: r.title, description: r.description ?? '', requestedBy: r.requested_by ?? '',
     origin: (r.origin as ResourceOrigin) ?? 'equipo', status: (r.status as ResourceStatus) ?? 'solicitado',
-    at: r.created_at ?? '', assetUrl: r.asset_url ?? undefined,
+    at: r.created_at ?? '', assetUrl: r.asset_url ?? undefined, requestedById: (r as { requested_by_id?: string | null }).requested_by_id ?? null,
   }))
 }, SEED)
 
@@ -51,6 +52,7 @@ export function addRequest(input: { title: string; description: string; requeste
   const r: ResourceRequest = {
     id: hasSupabase ? uuid() : `rr-${Date.now()}`, title: input.title, description: input.description,
     requestedBy: input.requestedBy, origin, status: input.status ?? 'solicitado', at: new Date().toISOString(),
+    requestedById: currentUserId(),
   }
   live.setLocal([r, ...live.current()])
   // Solo avisamos cuando es una solicitud del equipo; un pendiente propio de
@@ -59,7 +61,7 @@ export function addRequest(input: { title: string; description: string; requeste
   if (hasSupabase) {
     supabase.from('resource_requests').insert({
       id: r.id, title: r.title, description: r.description, requested_by: r.requestedBy,
-      origin: r.origin, status: r.status,
+      requested_by_id: r.requestedById, origin: r.origin, status: r.status,
     }).then(({ error }) => { if (error) console.warn('[resources] insert', error.message); live.reload() })
   }
   return r
@@ -70,9 +72,12 @@ export function setStatus(id: string, status: ResourceStatus) {
   if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status }).eq('id', id).then(({ error }) => { if (error) console.warn('[resources] status', error.message); live.reload() })
 }
 
-// Entregar el recurso: adjunta el archivo subido y marca entregado.
+// Entregar el recurso: adjunta el archivo subido y marca entregado. AVISA al solicitante
+// (antes se entregaba y nadie le decía; tenía que volver a entrar a revisar).
 export function deliver(id: string, assetUrl: string) {
+  const req = live.current().find((r) => r.id === id)
   live.setLocal(live.current().map((r) => (r.id === id ? { ...r, status: 'entregado', assetUrl } : r)))
+  if (req?.requestedById) notify({ text: `Tu recurso ya está listo: ${req.title}`, userIds: [req.requestedById], screen: 'comun' })
   if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status: 'entregado', asset_url: assetUrl }).eq('id', id).then(({ error }) => { if (error) console.warn('[resources] deliver', error.message); live.reload() })
 }
 

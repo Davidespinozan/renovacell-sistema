@@ -1222,6 +1222,7 @@ export type Database = {
           id: string
           origin: string
           requested_by: string | null
+          requested_by_id: string | null
           status: string
           title: string
         }
@@ -1233,6 +1234,7 @@ export type Database = {
           id?: string
           origin?: string
           requested_by?: string | null
+          requested_by_id?: string | null
           status?: string
           title: string
         }
@@ -1244,6 +1246,7 @@ export type Database = {
           id?: string
           origin?: string
           requested_by?: string | null
+          requested_by_id?: string | null
           status?: string
           title?: string
         }
