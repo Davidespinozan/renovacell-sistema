@@ -28,6 +28,14 @@ export function Caja() {
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
+  const [buscar, setBuscar] = useState('')
+  // Buscador: por nombre, categoría o SKU (útil en un evento con fila; también sirve para
+  // teclear/escanear el código y encontrarlo sin scrollear 64 productos).
+  const filtered = useMemo(() => {
+    const s = buscar.trim().toLowerCase()
+    if (!s) return sellable
+    return sellable.filter((p) => `${p.name} ${p.category ?? ''} ${p.sku ?? ''}`.toLowerCase().includes(s))
+  }, [sellable, buscar])
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<PayMethod>('efectivo')
@@ -94,8 +102,17 @@ export function Caja() {
       {/* Catálogo POS (solo productos con precio) */}
       <div className="grid" style={{ gap: 16 }}>
         <div className="eyebrow">Punto de Venta · Caja</div>
+        <input
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+          placeholder="Buscar producto por nombre, categoría o SKU…"
+          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+        />
+        {filtered.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ningún producto coincide con “{buscar}”.</div>
+        ) : (
         <div className="posgrid">
-          {sellable.map((p) => {
+          {filtered.map((p) => {
             const qty = cart[p.id] ?? 0
             const stock = stockInfoFor(stockMap, p.id)
             const out = !stock.tracked || stock.qty <= 0
@@ -120,6 +137,7 @@ export function Caja() {
             )
           })}
         </div>
+        )}
       </div>
 
       {/* Ticket */}
