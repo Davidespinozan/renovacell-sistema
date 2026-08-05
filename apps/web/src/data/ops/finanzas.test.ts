@@ -67,4 +67,12 @@ describe('efectivoEsperado — arqueo POS', () => {
     ]
     expect(efectivoEsperado(orders, { eventId: 'ev1' })).toBe(400)
   })
+  it('filtra por cajero (seller) — corte por cajero', () => {
+    const day = '2026-06-15'
+    const orders = [
+      mkOrder({ id: '1', external_ref: 'POS-1', payment_method: 'efectivo', total: 300, created_at: `${day}T15:00:00Z`, shipping_meta: { seller: 'a@x.mx' } }),
+      mkOrder({ id: '2', external_ref: 'POS-2', payment_method: 'efectivo', total: 500, created_at: `${day}T16:00:00Z`, shipping_meta: { seller: 'b@x.mx' } }),
+    ]
+    expect(efectivoEsperado(orders, { day, seller: 'a@x.mx' })).toBe(300)
+  })
 })
