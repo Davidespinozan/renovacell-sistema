@@ -46,6 +46,11 @@ export function Caja() {
   const [cobrando, setCobrando] = useState(false)
   const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
+  // Ventas del turno (en memoria) para poder REIMPRIMIR el recibo si el cliente vuelve.
+  type VentaTurno = { order: OrderWithItems; clientName: string; pago: { recibido: number; cambio: number } | null }
+  const [ventasTurno, setVentasTurno] = useState<VentaTurno[]>([])
+  const [reprint, setReprint] = useState<VentaTurno | null>(null)
+  const clientNameFor = (o: OrderWithItems) => (o.doctor_id ? (doctors.find((d) => d.id === o.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general')
 
   const lines: Line[] = useMemo(
     () =>
@@ -85,8 +90,12 @@ export function Caja() {
     )
     setCobrando(false)
     if (res.ok && res.order) {
-      setLastPago(method === 'efectivo' && recibido !== '' ? { recibido: recibidoN, cambio } : null)
-      setDone(res.order)
+      const order = res.order
+      const pago = method === 'efectivo' && recibido !== '' ? { recibido: recibidoN, cambio } : null
+      setLastPago(pago)
+      setVentasTurno((v) => [{ order, clientName: clientNameFor(order), pago }, ...v].slice(0, 50))
+      setReprint(null)
+      setDone(order)
       setCart({})
       setClient(null)
       setRecibido('')
@@ -95,6 +104,12 @@ export function Caja() {
       setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
       window.setTimeout(() => setErr(null), 4000)
     }
+  }
+
+  // Reimprime el recibo de una venta del turno: monta su ticket y abre el diálogo.
+  const reimprimir = (v: VentaTurno) => {
+    setReprint(v)
+    requestAnimationFrame(() => requestAnimationFrame(() => imprimirVenta()))
   }
 
   return (
@@ -206,7 +221,26 @@ export function Caja() {
         )}
 
         {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><Icon name="x" /><span>{err}</span></div>}
+
+        {ventasTurno.length > 0 && (
+          <details style={{ marginTop: 14 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-3)' }}>Ventas del turno ({ventasTurno.length}) · reimprimir recibo</summary>
+            <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
+              {ventasTurno.slice(0, 15).map((v) => (
+                <div key={v.order.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+                  <span className="mono" style={{ minWidth: 76 }}>{v.order.external_ref}</span>
+                  <span className="mono" style={{ flex: 1, textAlign: 'right' }}>{money(v.order.total)}</span>
+                  <button className="btn ghost sm" type="button" title="Reimprimir recibo" onClick={() => reimprimir(v)}><Icon name="download" /></button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
+
+      {!done && reprint && (
+        <VentaTicketPrint order={reprint.order} productName={productName} pago={reprint.pago} clientName={reprint.clientName} />
+      )}
 
       {pickOpen && (
         <ClientPicker
