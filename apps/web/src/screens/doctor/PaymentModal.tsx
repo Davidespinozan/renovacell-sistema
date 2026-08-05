@@ -6,6 +6,8 @@ import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { processPayment, type PayMethod, type PayResult } from '../../data/payments/provider'
 import { startStripeCheckout } from '../../lib/stripe'
+import { hasSupabase } from '../../lib/supabase'
+import { notify } from '../../data/store/notificationsStore'
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
@@ -29,17 +31,30 @@ export function PaymentModal({
 
   const pay = async () => {
     setBusy(true); setError(null)
+
+    // TRANSFERENCIA: no se cobra en línea. El doctor informa el pago y Dirección lo
+    // confirma al recibir el dinero — el pedido NO se marca pagado aquí (antes se
+    // marcaba pagado sin comprobante). Se avisa a Dirección para que lo confirme.
+    if (method === 'transferencia') {
+      notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
+      setDone({ ok: true, method: 'transferencia' } as PayResult)
+      setBusy(false)
+      return
+    }
+
     try {
-      // Si Stripe está habilitado y es pago con tarjeta, cobra de VERDAD (redirige
-      // a la página de pago de Stripe). Si no está configurado, cae al flujo actual.
-      if (method === 'tarjeta' && orderId) {
+      // Con Stripe habilitado, cobra de VERDAD (redirige a su página). Si NO redirige
+      // y estamos en producción, Stripe aún no está configurado → NO se finge el cobro.
+      // En demo (sin backend) sí se simula para poder mostrar el flujo.
+      if (orderId) {
         const { redirected } = await startStripeCheckout(orderId)
         if (redirected) return // el navegador se va a Stripe; el webhook marca pagado
+        if (hasSupabase) {
+          setError('El pago con tarjeta en línea aún no está disponible. Por favor usa Transferencia.')
+          setBusy(false); return
+        }
       }
-      const r = await processPayment({
-        orderRef: folio, amount, currency: 'MXN', method,
-        card: method === 'tarjeta' ? { number: card.number, name: card.name } : undefined,
-      })
+      const r = await processPayment({ orderRef: folio, amount, currency: 'MXN', method, card: { number: card.number, name: card.name } })
       if (!r.ok) { setError(r.error ?? 'No se pudo procesar el pago.'); setBusy(false); return }
       onPaid(r)        // actualiza el pedido en el store
       setDone(r)
@@ -55,13 +70,25 @@ export function PaymentModal({
         {done ? (
           <div className="mbody">
             <div className="success">
-              <div className="ck"><Icon name="check" /></div>
-              <h3>Pago confirmado</h3>
-              <p>
-                Pagaste <b>{money(amount)}</b> del pedido <b>{folio}</b>
-                {done.last4 ? <> con {done.brand} ···· {done.last4}</> : ' por transferencia'}.
-                Tu pedido ya pasó a <b>preparación</b>.
-              </p>
+              <div className="ck"><Icon name={done.method === 'transferencia' ? 'receipt' : 'check'} /></div>
+              {done.method === 'transferencia' ? (
+                <>
+                  <h3>Transferencia registrada</h3>
+                  <p>
+                    Transfiere <b>{money(amount)}</b> con el folio <b>{folio}</b> como referencia.
+                    En cuanto <b>confirmemos</b> tu pago, tu pedido pasa a preparación — te avisaremos.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>Pago confirmado</h3>
+                  <p>
+                    Pagaste <b>{money(amount)}</b> del pedido <b>{folio}</b>
+                    {done.last4 ? <> con {done.brand} ···· {done.last4}</> : ''}.
+                    Tu pedido ya pasó a <b>preparación</b>.
+                  </p>
+                </>
+              )}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
@@ -100,7 +127,7 @@ export function PaymentModal({
               ) : (
                 <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
                   <Icon name="receipt" />
-                  <span>Transfiere <b>{money(amount)}</b> a la cuenta de Renovacell e indica el folio <b>{folio}</b> como referencia. Al confirmar, registramos tu pago.</span>
+                  <span>Transfiere <b>{money(amount)}</b> a la cuenta de Renovacell e indica el folio <b>{folio}</b> como referencia. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
                 </div>
               )}
 
@@ -113,13 +140,15 @@ export function PaymentModal({
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose} disabled={busy}>Cancelar</button>
                 <button className="btn" type="button" onClick={pay} disabled={busy || !cardOk} style={(busy || !cardOk) ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
-                  <Icon name="check" /> {busy ? 'Procesando…' : `Pagar ${money(amount)}`}
+                  <Icon name="check" /> {busy ? 'Procesando…' : method === 'transferencia' ? 'Ya realicé la transferencia' : `Pagar ${money(amount)}`}
                 </button>
               </div>
 
-              <p style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', marginTop: 12 }}>
-                Cobro de demostración. En producción se procesa con Stripe; los datos de tu tarjeta nunca pasan por nuestros servidores.
-              </p>
+              {method === 'tarjeta' && (
+                <p style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', marginTop: 12 }}>
+                  Tus datos de tarjeta se procesan de forma segura; no pasan por nuestros servidores.
+                </p>
+              )}
             </div>
           </>
         )}
