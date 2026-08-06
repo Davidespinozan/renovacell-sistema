@@ -301,6 +301,9 @@ export function markPaid(orderId: string) {
   // puede surtir. Antes markPaid no pingaba a Almacén y el pedido solo aparecía en su
   // lista por estatus, sin aviso — inconsistente con el pago por tarjeta.
   notify({ text: `Pago confirmado · ${o?.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+  // Aviso DIRIGIDO al doctor dueño: su pago quedó confirmado (RLS permite avisos por
+  // user_ids a doctores; lo ve en la campana → Mis pedidos).
+  if (o?.doctor_id) notify({ text: `Tu pago del pedido ${o?.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
   logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
   if (hasSupabase && isUuid(orderId)) {
     supabase.rpc('pay_order', { p_order: orderId, p_method: 'registrado', p_ref: 'ADM' }).then(({ error }) => { if (error) console.warn('[orders] markPaid', error.message); hydrate() })
