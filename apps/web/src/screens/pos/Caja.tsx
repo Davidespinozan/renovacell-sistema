@@ -13,6 +13,7 @@ import { useEvents } from '../../data/hooks/useEvents'
 import { useRole } from '../../auth/RoleContext'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { venderPOS } from '../../data/ops/pos'
+import { clientOf } from '../../data/mock/profiles'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe, Profile } from '../../data/types'
 
@@ -282,6 +283,9 @@ export function Caja() {
                 </p>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
+                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, done.doctor_id ? clientOf(done.doctor_id).phone : undefined)}>
+                    <Icon name="chat" /> Enviar por WhatsApp
+                  </button>
                   <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>
                 </div>
               </div>
@@ -292,6 +296,26 @@ export function Caja() {
       )}
     </div>
   )
+}
+
+// Recibo en TEXTO para enviar por WhatsApp (wa.me abre el chat con el mensaje listo).
+// No adjunta PDF —eso necesita la API de WhatsApp— pero manda el comprobante legible.
+function reciboTexto(order: OrderWithItems, productName: Record<string, string>, pago: { recibido: number; cambio: number } | null): string {
+  const L: string[] = ['*RENOVACELL* · Comprobante de venta', `Folio: ${order.external_ref}`, fmtDate(order.created_at), '']
+  order.items.filter((it) => it.unit_price != null).forEach((it) => {
+    L.push(`${productName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty} — ${money((it.unit_price ?? 0) * it.qty)}`)
+  })
+  L.push('', `*Total: ${money(order.total)}*`, `Son: ${montoEnLetras(order.total ?? 0)}`, `Pago: ${order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}`)
+  if (pago) L.push(`Recibí: ${money(pago.recibido)} · Cambio: ${money(pago.cambio)}`)
+  L.push('', 'No es un comprobante fiscal (CFDI).')
+  return L.join('\n')
+}
+// Abre WhatsApp con el recibo. Con teléfono del cliente va directo; sin él, se elige contacto.
+function enviarReciboWhatsApp(order: OrderWithItems, productName: Record<string, string>, pago: { recibido: number; cambio: number } | null, phone?: string) {
+  const digits = (phone ?? '').replace(/\D/g, '')
+  const to = digits.length >= 10 ? (digits.length === 10 ? '52' + digits : digits) : ''
+  const url = `https://wa.me/${to}?text=${encodeURIComponent(reciboTexto(order, productName, pago))}`
+  window.open(url, '_blank')
 }
 
 // Imprime SOLO el recibo (marca el body, imprime, limpia la clase en afterprint).
