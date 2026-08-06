@@ -1,5 +1,5 @@
 // Existencias: stock por producto y por LOTE (lote + caducidad + cantidad).
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
@@ -7,11 +7,15 @@ import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, sevLabel } from './expiry'
+import { MermaModal } from './MermaModal'
 import type { Lot, ProductSafe } from '../../data/types'
+
+type MermaLot = { id: string; lot_code: string; quantity: number; producto?: string }
 
 export function Existencias() {
   const { data: lots } = useLots()
   const { data: products } = useProducts()
+  const [mermaLot, setMermaLot] = useState<MermaLot | null>(null)
 
   const groups = useMemo(() => {
     const byProduct = new Map<string, Lot[]>()
@@ -49,18 +53,20 @@ export function Existencias() {
         </div>
       )}
       {groups.map((g) => (
-        <ProductStock key={g.product.id} product={g.product} lots={g.lots} />
+        <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} />
       ))}
       {groups.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
           Todavía no hay producto en almacén. Regístralo en “Registrar entradas”.
         </div>
       )}
+
+      {mermaLot && <MermaModal lot={mermaLot} onClose={() => setMermaLot(null)} />}
     </div>
   )
 }
 
-function ProductStock({ product, lots }: { product: ProductSafe; lots: Lot[] }) {
+function ProductStock({ product, lots, onMerma }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void }) {
   const total = lots.reduce((s, l) => s + l.quantity, 0)
   const isProf = product.line === 'prof'
   // El lote FEFO = el primero con stock que no esté caducado.
@@ -89,6 +95,10 @@ function ProductStock({ product, lots }: { product: ProductSafe; lots: Lot[] }) 
               <span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
               <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
+              {l.quantity > 0 && (
+                <button className="btn ghost sm" type="button" title="Dar de baja por merma (parcial o total)" style={{ color: 'var(--danger)', marginLeft: 'auto' }}
+                  onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}>Merma</button>
+              )}
             </div>
           )
         })}

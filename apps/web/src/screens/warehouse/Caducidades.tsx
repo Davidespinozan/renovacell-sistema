@@ -1,6 +1,6 @@
 // Caducidades: lotes ordenados por fecha de caducidad, con alerta de los más
 // cercanos (y de los ya caducados).
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
@@ -8,17 +8,14 @@ import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, sevLabel } from './expiry'
+import { MermaModal } from './MermaModal'
 import type { ProductSafe } from '../../data/types'
 
 export function Caducidades() {
-  const { data: lots, adjust } = useLots()
+  const { data: lots } = useLots()
   const { data: products } = useProducts()
-
-  const darDeBaja = (lotId: string, code: string, qty: number) => {
-    if (window.confirm(`¿Dar de baja el lote ${code}? Se retiran ${qty} u del inventario (merma).`)) {
-      adjust(lotId, -qty, 'merma', code)
-    }
-  }
+  // Baja por merma: parcial o total, con motivo (antes solo el lote completo).
+  const [mermaLot, setMermaLot] = useState<{ id: string; lot_code: string; quantity: number; producto?: string } | null>(null)
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -84,7 +81,7 @@ export function Caducidades() {
                     <td data-label="Estado"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
                     <td data-label="Cantidad" className="mono">{lot.quantity} {lot.quantity === 1 ? 'pza' : 'pzas'}</td>
                     <td data-label="" style={{ textAlign: 'right' }}>
-                      <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => darDeBaja(lot.id, lot.lot_code, lot.quantity)}>Dar de baja</button>
+                      <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setMermaLot({ id: lot.id, lot_code: lot.lot_code, quantity: lot.quantity, producto: byId[lot.product_id]?.name })}>Dar de baja</button>
                     </td>
                   </tr>
                 )
@@ -93,6 +90,8 @@ export function Caducidades() {
           </table>
         </div>
       </div>
+
+      {mermaLot && <MermaModal lot={mermaLot} onClose={() => setMermaLot(null)} />}
     </div>
   )
 }
