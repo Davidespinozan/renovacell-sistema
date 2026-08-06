@@ -4,6 +4,7 @@
 // pago pasa por la función segura pay_order (como el webhook de Stripe); el staff
 // avanza el estado. Sin backend, opera sobre las semillas mock. La API no cambia.
 import type { Order, OrderItem } from '../types'
+import type { ShippingAddress } from '../ops/shippingAddress'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -90,6 +91,7 @@ export function createOrder(input: {
   invoice_requested: boolean
   doctor_id?: string
   placedBy?: string
+  shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
 }): OrderWithItems {
   const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
   const folio = `S${Date.now().toString().slice(-6)}`
@@ -100,7 +102,11 @@ export function createOrder(input: {
     id, external_ref: folio, doctor_id: doctorId, total: input.total, currency: 'MXN',
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
-    invoice_meta: null, shipping_meta: input.placedBy ? { placed_by: input.placedBy } : null, created_at: now,
+    invoice_meta: null,
+    shipping_meta: (input.placedBy || input.shipping)
+      ? { ...(input.placedBy ? { placed_by: input.placedBy } : {}), ...(input.shipping ? { address: input.shipping } : {}) }
+      : null,
+    created_at: now,
   }
   const newItems: OrderItem[] = input.lines.map((l, i) => ({
     id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: null,
