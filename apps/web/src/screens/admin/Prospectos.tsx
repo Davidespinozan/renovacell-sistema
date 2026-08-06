@@ -6,10 +6,10 @@
 import React, { useMemo, useState } from 'react'
 import {
   Plus, X, UserPlus, Send, Clock, ArrowRight, Ban, MessageSquare, CheckCircle2, Pencil, Trash2,
-  Zap, Users, TrendingUp, Shuffle, Radio,
+  Zap, Users, TrendingUp, Shuffle, Radio, MessageCircle,
 } from 'lucide-react'
-import { fmtDate, initials, avatarColor } from '../../lib/format'
-import { useProspects, CHANNELS, type ProspectStatus, type ProspectNote } from '../../data/hooks/useProspects'
+import { fmtDate, timeAgo, initials, avatarColor } from '../../lib/format'
+import { useProspects, CHANNELS, messagesOf, type ProspectStatus, type ProspectNote, type ProspectMessage } from '../../data/hooks/useProspects'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
@@ -23,6 +23,14 @@ const SELLER_NAMES: Record<string, string> = {
   'ventas2@renovacell.mx': 'Diego · Ventas',
 }
 const sellerLabel = (id?: string | null): string => (id ? (SELLER_NAMES[id] ?? id) : 'Sin asignar')
+
+// Color de marca por canal para el hilo de conversación (bandeja multicanal).
+const CHANNEL_COLOR: Record<string, string> = {
+  WhatsApp: '#25D366', Instagram: '#C13584', Facebook: '#1877F2', Landing: '#2C6E8F',
+}
+// Canales de MENSAJERÍA (chat de ida y vuelta): tienen conversación. Landing/Evento
+// generan un lead pero no un hilo. Estos son los que entran por el webhook de Meta.
+const isChatChannel = (src?: string | null): boolean => src === 'WhatsApp' || src === 'Instagram' || src === 'Facebook'
 
 const PIPELINE: ProspectStatus[] = ['nuevo', 'contactado', 'cotizado', 'descartado']
 const STATUS_META: Record<ProspectStatus, { label: string; pill: string }> = {
@@ -45,7 +53,7 @@ function Avatar({ name }: { name: string }) {
 }
 
 export function Prospectos() {
-  const { data: prospects, addProspect, setStatus, addNote, markConverted, updateProspect, deleteProspect, captureLead, reassign } = useProspects()
+  const { data: prospects, addProspect, setStatus, addNote, markConverted, updateProspect, deleteProspect, captureLead, reassign, replyProspect } = useProspects()
   const [editP, setEditP] = useState<{ id: string; name: string; email: string; phone: string; org: string } | null>(null)
   const onDeleteProspect = async (id: string, name: string) => {
     if (!window.confirm(`¿Eliminar el prospecto "${name}"?`)) return
@@ -190,6 +198,7 @@ export function Prospectos() {
           onClose={() => setDetailId(null)}
           onStatus={(s) => setStatus(detail.id, s)}
           onNote={(t) => addNote(detail.id, t)}
+          onReply={(t) => replyProspect(detail.id, t)}
           onConvert={() => convert(detail)}
         />
       )}
@@ -212,7 +221,7 @@ export function Prospectos() {
 }
 
 function DetailModal({
-  p, canReassign, roster, onReassign, onClose, onStatus, onNote, onConvert,
+  p, canReassign, roster, onReassign, onClose, onStatus, onNote, onReply, onConvert,
 }: {
   p: Prospect
   canReassign: boolean
@@ -221,14 +230,19 @@ function DetailModal({
   onClose: () => void
   onStatus: (s: ProspectStatus) => void
   onNote: (text: string) => void
+  onReply: (text: string) => void
   onConvert: () => void
 }) {
   const [note, setNote] = useState('')
+  const [reply, setReply] = useState('')
   const status = statusOf(p)
   const notes = notesOf(p)
+  const messages = messagesOf(p)
+  const chat = isChatChannel(p.source)
   const interest = interestOf(p)
   const convertedDoc = convertedDoctorOf(p)
   const send = () => { if (note.trim()) { onNote(note.trim()); setNote('') } }
+  const sendReply = () => { if (reply.trim()) { onReply(reply.trim()); setReply('') } }
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -300,7 +314,52 @@ function DetailModal({
             </div>
           )}
 
-          {/* Notas de seguimiento */}
+          {/* Conversación multicanal (WhatsApp / Instagram / Facebook, directo a Meta).
+              El hilo REAL con el prospecto — distinto de las notas internas de abajo. */}
+          {(chat || messages.length > 0) && (
+            <>
+              <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <MessageCircle size={13} style={{ color: CHANNEL_COLOR[p.source ?? ''] ?? 'var(--ink-3)' }} />
+                Conversación{p.source ? ` · ${p.source}` : ''}
+              </div>
+              <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 10, background: '#FBFBFA', maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {messages.length === 0 ? (
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-3)', textAlign: 'center', padding: '8px 0' }}>
+                    Aún no hay mensajes. Los que lleguen por {p.source} entrarán aquí.
+                  </div>
+                ) : messages.map((m, i) => (
+                  <div key={i} style={{ alignSelf: m.dir === 'out' ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
+                    <div style={{
+                      padding: '8px 11px', borderRadius: 12,
+                      background: m.dir === 'out' ? 'var(--green-deep)' : '#fff',
+                      color: m.dir === 'out' ? '#fff' : 'var(--ink-1)',
+                      border: m.dir === 'out' ? 'none' : '1px solid var(--line)',
+                      fontSize: 13.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>{m.text}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 3, display: 'flex', gap: 5, alignItems: 'center', justifyContent: m.dir === 'out' ? 'flex-end' : 'flex-start' }}>
+                      {timeAgo(m.at)}
+                      {m.dir === 'out' && m.pending && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#B5730E' }}><Clock size={10} /> por enviar</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <input
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendReply()}
+                  placeholder={`Responder por ${p.source ?? 'el canal'}…`}
+                  style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+                />
+                <button className="btn sm" type="button" onClick={sendReply} disabled={!reply.trim()} style={!reply.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Send size={14} /> Responder</button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Zap size={11} /> Se entrega por {p.source ?? 'el canal'} en cuanto se conecten las cuentas de Meta.
+              </div>
+            </>
+          )}
+
+          {/* Notas de seguimiento (internas del vendedor — no las ve el prospecto) */}
           <div className="eyebrow">Seguimiento</div>
           {notes.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 10 }}>Sin notas todavía.</div>

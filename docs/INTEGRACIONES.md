@@ -117,6 +117,47 @@ Secretos: `IDENTITY_API_URL`, `IDENTITY_API_KEY`. Simulador para demos: `IDENTIT
 
 ---
 
+## 7. Multicanal — WhatsApp / Instagram / Facebook directo a Meta (reemplazo de Leadsales)
+
+**El objetivo:** que Renovacell **deje de pagar y depender de Leadsales**. Leadsales no
+es más que una capa que cobra por sentarse encima de las APIs de Meta; nosotros nos
+conectamos **directo a Meta**, sin intermediario.
+
+**Hoy:** la bandeja de prospectos ya tiene el **hilo de conversación** por canal
+(Administración/Ventas → Prospectos → Ver detalle): mensajes de entrada y respuestas del
+vendedor, con el mismo motor de **dedup + auto-asignación** que la landing. En modo demo
+se puede captar un lead con su primer mensaje y responder (la respuesta queda **"por
+enviar"** hasta conectar Meta). La ingesta real corre por la Edge Function `meta-webhook`.
+
+**Para activarlo:**
+1. El cliente aporta sus **activos de Meta**: número de **WhatsApp Business** (dedicado a
+   la API, no en la app normal), **página de Facebook** y **cuenta de Instagram Business**
+   vinculada a la página. Requiere **verificación de Meta Business** (la hace Meta).
+2. Crear un **app de Meta** (developers.facebook.com) con los productos *WhatsApp*,
+   *Messenger* e *Instagram*, y suscribir el webhook a:
+   `https://amurlvlvfohwucvxfdot.supabase.co/functions/v1/meta-webhook`
+   con un **Verify Token** que tú eliges.
+3. En Supabase → **Edge Functions → Secrets**:
+   ```
+   supabase secrets set META_VERIFY_TOKEN=<el-que-elegiste>
+   supabase secrets set META_APP_SECRET=<App Secret del app de Meta>
+   ```
+   Desplegar con `--no-verify-jwt` (Meta no manda JWT de Supabase).
+4. Meta llama al webhook (GET) para verificar → responde el challenge. A partir de ahí,
+   cada mensaje entrante crea/actualiza el prospecto y **abre su hilo** — sin Leadsales.
+
+**Envío de respuestas (salida):** para entregar de verdad las respuestas del vendedor por
+WhatsApp falta agregar el token de envío (`WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID`) y una
+función `meta-send`. Mientras tanto la respuesta se guarda en el hilo marcada "por enviar".
+Regla de Meta: fuera de la ventana de **24 h** del último mensaje del cliente, la salida
+requiere **plantillas pre-aprobadas**. Recibir es gratis; WhatsApp cobra por conversación.
+
+> **App Review de Meta:** para recibir de CUALQUIER usuario (no solo cuentas con rol en el
+> app) Meta pide revisar los permisos de mensajería una vez (gratis, tarda días). Para la
+> demo funciona ya con las cuentas del propio cliente. Ver `docs/multicanal-meta.md`.
+
+---
+
 ### Resumen de secretos por servicio
 | Servicio | Secretos |
 |---|---|
@@ -127,3 +168,5 @@ Secretos: `IDENTITY_API_URL`, `IDENTITY_API_KEY`. Simulador para demos: `IDENTIT
 | Correo | SMTP en Supabase Auth |
 | Cédula (SEP) | `CEDULA_API_URL`, `CEDULA_API_KEY` |
 | Identidad KYC (Nubarium) | `IDENTITY_API_URL`, `IDENTITY_API_KEY` |
+| Multicanal Meta (entrada) | `META_VERIFY_TOKEN`, `META_APP_SECRET` |
+| Multicanal Meta (salida, pendiente) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` |

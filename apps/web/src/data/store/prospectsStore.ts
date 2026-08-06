@@ -12,6 +12,17 @@ import type { Json } from '../database.types'
 export type ProspectStatus = 'nuevo' | 'contactado' | 'cotizado' | 'convertido' | 'descartado'
 export interface ProspectNote { text: string; at: string }
 
+// Mensaje de la CONVERSACIÓN (bandeja multicanal, reemplazo de Leadsales). A
+// diferencia de las notas —que son internas del vendedor— esto es el chat REAL
+// con el prospecto por su canal (WhatsApp/Instagram/Facebook). `dir` = 'in' lo
+// mandó el prospecto (entra por el webhook de Meta), 'out' lo respondió el
+// vendedor. `pending` en un 'out' = aún no se entregó por Meta (falta credencial):
+// se ve en la bandeja pero se envía de verdad cuando se conecten las cuentas.
+export interface ProspectMessage { dir: 'in' | 'out'; text: string; at: string; channel?: string; pending?: boolean }
+export function messagesOf(p: Prospect): ProspectMessage[] {
+  return ((p.meta as Record<string, unknown>)?.messages as ProspectMessage[]) ?? []
+}
+
 // Canales de captación (motor multicanal estilo Leadsales). Los que traen `webhook:true`
 // pueden entrar automáticamente por integración externa (seam WhatsApp/Meta/landing);
 // el resto se capturan a mano. Todos pasan por el MISMO motor: dedup + auto-asignación.
@@ -123,6 +134,28 @@ export function addNote(id: string, text: string) {
   if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] note', error.message); live.reload() })
 }
 
+// Agrega un mensaje al HILO de conversación del prospecto (bandeja multicanal).
+// Uso interno: la entrada real la mete el webhook de Meta en el servidor; aquí es
+// para reflejarlo en modo mock/demo y para las respuestas del vendedor.
+function pushMessage(id: string, msg: ProspectMessage) {
+  const cur = live.current().find((p) => p.id === id)
+  const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>) }
+  meta.messages = [...(((meta.messages as ProspectMessage[]) ?? [])), msg]
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, meta } : p)))
+  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] message', error.message); live.reload() })
+}
+
+// RESPUESTA del vendedor en la conversación. Se agrega al hilo al instante (queda
+// en la bandeja como enviada) marcada `pending` hasta que Meta esté conectado: la
+// entrega real por WhatsApp/IG/FB la hará la función de salida cuando existan las
+// credenciales. Así la bandeja YA es usable en demo sin mentir sobre el envío.
+export function replyProspect(id: string, text: string) {
+  const cur = live.current().find((p) => p.id === id)
+  const channel = cur?.source ?? undefined
+  pushMessage(id, { dir: 'out', text, at: new Date().toISOString(), channel, pending: true })
+  logAudit({ actor: 'Ventas', action: 'Respuesta en conversación', resource: cur?.name ?? id, detail: channel ?? '' })
+}
+
 // Editar datos del prospecto (nombre, contacto, organización, interés).
 export function updateProspect(id: string, patch: { name?: string; email?: string | null; phone?: string | null; organization?: string | null; interest?: string[] }) {
   const cur = live.current().find((p) => p.id === id)
@@ -174,8 +207,10 @@ export function captureLead(input: {
   organization?: string | null
   channel: string
   interest?: string[]
+  message?: string  // primer mensaje del canal (WhatsApp/IG/FB) → abre el hilo
 }, roster?: string[]): CaptureResult {
   const current = live.current()
+  const inbound = (input.message ?? '').trim()
 
   // 1) Deduplicación por teléfono (≥7 dígitos) o correo.
   const ph = digitsOf(input.phone)
@@ -183,6 +218,8 @@ export function captureLead(input: {
   const dup = current.find((p) => (ph.length >= 7 && digitsOf(p.phone) === ph) || (em !== '' && emailNorm(p.email) === em))
   if (dup) {
     addNote(dup.id, `Nuevo contacto por ${input.channel}${input.name && input.name !== dup.name ? ` (se presentó como ${input.name})` : ''}.`)
+    // El mensaje entrante se enhebra en SU conversación (no se pierde en el dedup).
+    if (inbound) pushMessage(dup.id, { dir: 'in', text: inbound, at: new Date().toISOString(), channel: input.channel })
     logAudit({ actor: 'Captación', action: 'Lead duplicado detectado', resource: dup.name ?? '', detail: `canal ${input.channel}` })
     return { prospect: dup, assignedTo: dup.assigned_to ?? null, duplicate: true }
   }
@@ -191,7 +228,8 @@ export function captureLead(input: {
   const assigned = pickSeller(current, sellerRoster(current, roster))
 
   seq += 1
-  const meta = { organization: input.organization ?? null, interest: input.interest ?? [], notes: [] as ProspectNote[] }
+  const messages: ProspectMessage[] = inbound ? [{ dir: 'in', text: inbound, at: new Date().toISOString(), channel: input.channel }] : []
+  const meta = { organization: input.organization ?? null, interest: input.interest ?? [], notes: [] as ProspectNote[], messages }
   const p: Prospect = {
     id: hasSupabase ? (globalThis.crypto?.randomUUID?.() ?? `pr-lead-${seq}`) : `pr-lead-${seq}`,
     name: input.name, email: input.email ?? null, phone: input.phone ?? null, cedula: null,
