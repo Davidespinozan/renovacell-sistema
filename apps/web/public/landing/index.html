@@ -2552,6 +2552,32 @@ body.rc-has-ann .nav{top:38px}
           </div>
           <div class="form-row">
             <div class="form-field">
+              <label>— Domicilio de entrega <span style="opacity:.55">(base para sus envíos · opcional)</span></label>
+              <input name="calle" type="text" class="form-input" placeholder="Calle y número">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label>— Colonia</label>
+              <input name="colonia" type="text" class="form-input" placeholder="Colonia">
+            </div>
+            <div class="form-field">
+              <label>— C.P.</label>
+              <input name="cp" type="text" class="form-input" placeholder="Código postal" inputmode="numeric">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label>— Ciudad</label>
+              <input name="ciudad" type="text" class="form-input" placeholder="Ciudad">
+            </div>
+            <div class="form-field">
+              <label>— Estado</label>
+              <input name="estado" type="text" class="form-input" placeholder="Estado">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
               <label>— Correo</label>
               <input name="correo" type="email" class="form-input" placeholder="ejemplo@correo.com" required>
             </div>
@@ -3310,6 +3336,8 @@ document.addEventListener('keydown', e => {
       name:(f.nombre.value||'').trim(), email:(f.correo.value||'').trim(),
       cedula:(f.cedula.value||'').trim(), password:f.clave.value||'',
       organization:(f.consultorio.value||'').trim(), website:f.website.value||'',
+      address:(f.calle&&f.calle.value||'').trim(), colonia:(f.colonia&&f.colonia.value||'').trim(),
+      cp:(f.cp&&f.cp.value||'').trim(), city:(f.ciudad&&f.ciudad.value||'').trim(), state:(f.estado&&f.estado.value||'').trim(),
       selfie:captured.selfie, ineFront:captured.ineFront, ineBack:captured.ineBack
     };
     if(d.name.length<3) return say('err','Escriba su nombre completo.');

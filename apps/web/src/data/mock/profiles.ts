@@ -24,7 +24,15 @@ export const DOCTOR_PROFILE: ClientInfo = {
   city: 'Culiacán, Sin.',
 }
 
-const metaOf = (d?: { meta?: unknown }) => (d?.meta ?? {}) as { phone?: string; address?: string; city?: string }
+const metaOf = (d?: { meta?: unknown }) => (d?.meta ?? {}) as { phone?: string; address?: string; city?: string; shipping?: ShippingAddress }
+// Deriva address/city/phone del domicilio BASE estructurado (`meta.shipping`) si existe;
+// si no, de los campos sueltos legacy. Así el domicilio capturado en el registro fluye
+// al checkout (pre-llenado) y al chofer.
+const addrFromMeta = (m: ReturnType<typeof metaOf>): { address: string; city: string; phone: string } => {
+  const s = m.shipping
+  if (s?.line1) return { address: s.line1, city: [s.colonia, s.cp, s.city, s.state].filter(Boolean).join(', '), phone: s.phone ?? m.phone ?? '' }
+  return { address: m.address ?? '', city: m.city ?? '', phone: m.phone ?? '' }
+}
 
 // Cliente (destino) por doctor_id. Con Supabase: del perfil REAL (nombre/clínica, y
 // tel/dirección de su meta si existen; si no, "—", nunca un dato inventado). En demo:
@@ -32,28 +40,28 @@ const metaOf = (d?: { meta?: unknown }) => (d?.meta ?? {}) as { phone?: string; 
 export const clientOf = (doctorId: string | null): ClientInfo => {
   if (hasSupabase) {
     const d = doctorId ? doctorsSnapshot().find((x) => x.id === doctorId) : undefined
-    const m = metaOf(d)
+    const a = addrFromMeta(metaOf(d))
     return {
       id: doctorId ?? '',
       name: d?.full_name ?? 'Doctor',
       clinic: d?.organization ?? '',
-      phone: m.phone ?? '—',
-      address: m.address ?? '—',
-      city: m.city ?? '—',
+      phone: a.phone || '—',
+      address: a.address || '—',
+      city: a.city || '—',
     }
   }
   // Demo (sin backend).
   if (!doctorId) return DOCTOR_PROFILE
   const d = MOCK_DOCTORS.find((x) => x.id === doctorId)
   if (!d) return DOCTOR_PROFILE
-  const m = metaOf(d)
+  const a = addrFromMeta(metaOf(d))
   return {
     id: d.id,
     name: d.full_name ?? 'Doctor',
     clinic: d.organization ?? '',
-    phone: m.phone ?? DOCTOR_PROFILE.phone,
-    address: m.address ?? DOCTOR_PROFILE.address,
-    city: m.city ?? DOCTOR_PROFILE.city,
+    phone: a.phone || DOCTOR_PROFILE.phone,
+    address: a.address || DOCTOR_PROFILE.address,
+    city: a.city || DOCTOR_PROFILE.city,
   }
 }
 

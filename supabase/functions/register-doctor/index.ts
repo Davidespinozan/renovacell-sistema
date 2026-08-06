@@ -177,9 +177,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
-  let p: { name?: string; email?: string; cedula?: string; password?: string; organization?: string; phone?: string; website?: string; selfie?: string; ineFront?: string; ineBack?: string }
+  let p: { name?: string; email?: string; cedula?: string; password?: string; organization?: string; phone?: string; website?: string; selfie?: string; ineFront?: string; ineBack?: string; address?: string; colonia?: string; cp?: string; city?: string; state?: string }
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   if ((p.website ?? '').trim() !== '') return json(200, { decision: 'review' }) // honeypot
+
+  // Domicilio BASE de entrega (opcional al registrarse; si falta, se pide al pedir).
+  const line1 = (p.address ?? '').trim().slice(0, 160)
+  const shipping = line1
+    ? { line1, colonia: (p.colonia ?? '').trim().slice(0, 80), cp: (p.cp ?? '').trim().slice(0, 10), city: (p.city ?? '').trim().slice(0, 80), state: (p.state ?? '').trim().slice(0, 80), phone: (p.phone ?? '').trim().slice(0, 40) }
+    : null
 
   const name = (p.name ?? '').trim().slice(0, 120)
   const email = (p.email ?? '').trim().toLowerCase().slice(0, 160)
@@ -238,7 +244,7 @@ Deno.serve(async (req) => {
   await admin.from('profiles').upsert({
     id: uid, email, full_name: name, role_id: 'doctor', verified: instant,
     organization: p.organization ?? null,
-    meta: { cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence }, capturedVia: 'auto-registro' },
+    meta: { cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence }, capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}) },
   })
 
   if (instant) {
