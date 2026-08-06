@@ -287,9 +287,14 @@ export function markPaid(orderId: string) {
   // Avanza el estado igual que payOrder: un contra-pedido que se paga pasa de
   // 'pending_payment' a 'paid'. Si no, el pedido se queda pending_payment, markPacked
   // lo rechaza en silencio y sigue apareciendo "por surtir" (se re-surtiría en bucle).
-  orders = orders.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid', status: o.status === 'pending_payment' ? 'paid' : o.status } : o))
+  const o = orders.find((x) => x.id === orderId)
+  orders = orders.map((x) => (x.id === orderId ? { ...x, payment_status: 'paid', status: x.status === 'pending_payment' ? 'paid' : x.status } : x))
   emit()
   notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+  // Igual que un cobro en línea (payOrder): al confirmarlo, avisa a Almacén que ya se
+  // puede surtir. Antes markPaid no pingaba a Almacén y el pedido solo aparecía en su
+  // lista por estatus, sin aviso — inconsistente con el pago por tarjeta.
+  notify({ text: `Pago confirmado · ${o?.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
   logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
   if (hasSupabase && isUuid(orderId)) {
     supabase.rpc('pay_order', { p_order: orderId, p_method: 'registrado', p_ref: 'ADM' }).then(({ error }) => { if (error) console.warn('[orders] markPaid', error.message); hydrate() })
