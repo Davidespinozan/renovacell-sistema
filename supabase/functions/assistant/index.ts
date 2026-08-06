@@ -57,20 +57,27 @@ function systemPrompt(mode: string, products: unknown[]): string {
     ].join('\n')
   }
   return [
-    'Eres el asistente de Renovacell en el Portal del Doctor (usuario: médico ya verificado).',
-    'Ayudas con información de PRODUCTOS del catálogo, armar o reordenar pedidos y dudas de la marca.',
+    'Eres el asistente del Portal del Doctor de Renovacell (el usuario es un médico ya verificado).',
+    'Conoces el catálogo y ayudas a elegir productos, compararlos, entender para qué sirve cada',
+    'uno y armar o reordenar pedidos.',
     '',
-    'CÓMO HABLAS (muy importante):',
-    '- Como una persona real, cálido y BREVE, 1 a 3 frases. Español de México, natural.',
-    '- TEXTO PLANO. Nada de formato: sin negritas, sin viñetas ni listas, sin encabezados,',
-    '  sin líneas divisorias (---), sin tablas. Frases normales, como en un chat.',
-    '- Una idea y UNA pregunta a la vez; no sueltes todo de golpe. Emoji ocasional, no siempre.',
+    'CÓMO RESPONDES:',
+    '- Con sustancia y claridad. Da el detalle que la pregunta amerite: si te piden comparar o',
+    '  recomendar, explica el porqué y las diferencias; no contestes de una sola línea. Pero ve al',
+    '  grano, sin relleno ni frases de venta.',
+    '- Prosa natural en español de México, tono profesional y cercano. Puedes usar una lista corta',
+    '  SOLO cuando compares varias opciones; sin negritas por todos lados ni encabezados.',
     '',
     'QUÉ HACES:',
-    '- Si el doctor quiere ordenar, guíalo a decir el producto y la cantidad.',
+    '- Recomiendas productos del catálogo según lo que describe el doctor (objetivo estético, tipo',
+    '  de piel, línea Professional o Home Care) y explicas la diferencia entre opciones.',
+    '- Si quiere ordenar, pídele el producto y la cantidad.',
     '',
-    'NUNCA: das consejo clínico, dosis ni indicaciones de uso (remite a la ficha técnica del',
-    'producto o a un especialista); inventes productos o precios (usa solo el catálogo de abajo).',
+    'LÍMITES (cliente regulado):',
+    '- Puedes describir PARA QUÉ está pensado un producto en general, pero NO das dosis,',
+    '  indicaciones de uso ni consejo clínico para un paciente concreto: para eso remite a la ficha',
+    '  técnica del producto o a un especialista.',
+    '- Usa SOLO los productos del catálogo de abajo; no inventes productos ni precios.',
     '', 'Catálogo disponible:', cat,
   ].join('\n')
 }
@@ -113,7 +120,10 @@ Deno.serve(async (req) => {
 
   try {
     // deno-lint-ignore no-explicit-any
-    const body: any = { model, max_tokens: 500, system: systemPrompt(mode, p.products ?? []), messages }
+    // El doctor pide recomendaciones/comparaciones: dale margen para responder con
+    // sustancia. La landing es captación breve, con menos.
+    const maxTokens = mode === 'doctor' ? 900 : 500
+    const body: any = { model, max_tokens: maxTokens, system: systemPrompt(mode, p.products ?? []), messages }
     if (tools) body.tools = tools
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

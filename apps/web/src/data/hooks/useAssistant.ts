@@ -17,12 +17,14 @@ export function useAssistant() {
   const ctx = useRef({ products: visible, orders })
   ctx.current = { products: visible, orders }
 
-  // El motor local resuelve lo ESTRUCTURADO y lo clínico (acciones + seguridad
-  // deterministas). Solo la conversación libre (`out_of_scope`) va a la IA real; si no
-  // está configurada (501) o falla, se queda la respuesta local. La UI recibe la MISMA forma.
+  // El motor local resuelve lo DETERMINISTA (estatus y reordenar: datos reales + botones)
+  // y el guardarraíl CLÍNICO (rechazo seguro, no negociable). TODA la conversación —
+  // recomendar, comparar, explicar, dudas libres— va a la IA real. Si trae productos del
+  // catálogo (descubrir), se conservan las tarjetas y el texto lo escribe la IA. Si la IA
+  // no está configurada (501) o falla, se queda la respuesta local. Misma forma para la UI.
   const ask = useCallback(async (text: string): Promise<AssistantReply> => {
     const local = answer(text, ctx.current)
-    if (local.intent !== 'out_of_scope') return local
+    if (local.intent === 'status' || local.intent === 'reorder' || local.intent === 'clinical') return local
     const llm = await askLLM(text, ctx.current, 'doctor')
     return llm ? { ...local, text: llm } : local
   }, [])
