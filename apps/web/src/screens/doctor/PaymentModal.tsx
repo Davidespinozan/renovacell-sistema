@@ -6,8 +6,13 @@ import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { processPayment, type PayMethod, type PayResult } from '../../data/payments/provider'
 import { startStripeCheckout } from '../../lib/stripe'
-import { hasSupabase } from '../../lib/supabase'
+import { hasSupabase, supabase } from '../../lib/supabase'
 import { notify } from '../../data/store/notificationsStore'
+
+// Lee un archivo de imagen como data-URL (para mandar el comprobante a la función).
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file) })
+}
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
@@ -26,6 +31,7 @@ export function PaymentModal({
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<PayResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [proof, setProof] = useState<string | null>(null) // comprobante de transferencia (data-URL)
 
   const cardOk = method !== 'tarjeta' || (card.number.replace(/\D/g, '').length >= 15 && card.name.trim().length > 2)
 
@@ -36,7 +42,14 @@ export function PaymentModal({
     // confirma al recibir el dinero — el pedido NO se marca pagado aquí (antes se
     // marcaba pagado sin comprobante). Se avisa a Dirección para que lo confirme.
     if (method === 'transferencia') {
-      notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
+      // Con backend: la función servidor marca el pedido, guarda el comprobante y avisa
+      // a Dirección (el doctor no puede insertar avisos por RLS). En demo: notify local.
+      if (hasSupabase && orderId) {
+        const { error: e } = await supabase.functions.invoke('report-transfer', { body: { orderId, reference: folio, proof } })
+        if (e) { setError('No se pudo registrar tu transferencia. Intenta de nuevo.'); setBusy(false); return }
+      } else {
+        notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
+      }
       setDone({ ok: true, method: 'transferencia' } as PayResult)
       setBusy(false)
       return
@@ -125,10 +138,18 @@ export function PaymentModal({
                   </div>
                 </>
               ) : (
-                <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
-                  <Icon name="receipt" />
-                  <span>Transfiere <b>{money(amount)}</b> a la cuenta de Renovacell e indica el folio <b>{folio}</b> como referencia. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
-                </div>
+                <>
+                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
+                    <Icon name="receipt" />
+                    <span>Transfiere <b>{money(amount)}</b> a la cuenta de Renovacell e indica el folio <b>{folio}</b> como referencia. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
+                  </div>
+                  <label style={{ display: 'block', marginTop: 12 }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Adjunta el comprobante <span style={{ opacity: .7 }}>(opcional · agiliza la confirmación)</span></span>
+                    <input type="file" accept="image/*" style={{ display: 'block', marginTop: 6, fontSize: 12.5 }}
+                      onChange={async (e) => { const f = e.target.files?.[0]; if (f) setProof(await fileToDataUrl(f)) }} />
+                    {proof && <span style={{ fontSize: 12, color: 'var(--green-deep)', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Icon name="check" style={{ width: 13, height: 13 }} /> Comprobante adjunto</span>}
+                  </label>
+                </>
               )}
 
               {error && (

@@ -10,11 +10,21 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { markInvoiced, markPaid } from '../../data/store/ordersStore'
+import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
+
+// Transferencia informada por el cliente (reportada vía report-transfer): vive en
+// shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
+// esperando, su referencia y el comprobante — antes no había señal alguna.
+interface TransferInfo { reported?: boolean; at?: string; reference?: string; proof_path?: string | null }
+const transferOf = (o: OrderWithItems): TransferInfo | null => {
+  const t = (o.shipping_meta as { transfer?: TransferInfo } | null)?.transfer
+  return t?.reported ? t : null
+}
 import { ExportButton } from '../../app/ExportButton'
 import type { ProductSafe, Profile } from '../../data/types'
 
-type Filter = 'todos' | 'por_emitir' | 'emitidos' | 'por_cobrar'
+type Filter = 'todos' | 'por_emitir' | 'emitidos' | 'por_cobrar' | 'transfer'
 
 const isEmitida = (o: OrderWithItems): boolean =>
   ((o.invoice_meta as Record<string, unknown> | null)?.status as string) === 'emitida'
@@ -55,12 +65,14 @@ export function Facturacion() {
   const solicitados = valid.filter((o) => o.invoice_requested).length
   const porEmitir = valid.filter((o) => o.invoice_requested && !isEmitida(o)).length
   const emitidos = valid.filter(isEmitida).length
+  const transferPend = valid.filter((o) => !!transferOf(o) && o.payment_status !== 'paid').length
 
   const rows = useMemo(() => {
     const base = valid.filter((o) => {
       if (filter === 'por_emitir') return o.invoice_requested && !isEmitida(o)
       if (filter === 'emitidos') return isEmitida(o)
       if (filter === 'por_cobrar') return o.payment_status !== 'paid'
+      if (filter === 'transfer') return !!transferOf(o) && o.payment_status !== 'paid'
       return true
     })
     return base.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
@@ -91,6 +103,7 @@ export function Facturacion() {
     { k: 'por_emitir', label: `Por emitir${porEmitir ? ` · ${porEmitir}` : ''}` },
     { k: 'emitidos', label: 'Emitidos' },
     { k: 'por_cobrar', label: 'Por cobrar' },
+    { k: 'transfer', label: `Transferencias por confirmar${transferPend ? ` · ${transferPend}` : ''}` },
   ]
 
   return (
@@ -236,6 +249,8 @@ function BillDetail({ order, productsById, clientName, onClose }: {
   const cob = cobroTag(order); const cf = cfdiTag(order)
   const emitida = isEmitida(order); const uuid = cfdiUuid(order)
   const paid = order.payment_status === 'paid'
+  const transfer = transferOf(order)
+  const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -251,7 +266,18 @@ function BillDetail({ order, productsById, clientName, onClose }: {
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             <span className={'pill ' + cob.pill}>{cob.label}</span>
             <span className={'pill ' + cf.pill}>{cf.label}</span>
+            {transfer && !paid && <span className="pill p-warn">Transferencia por confirmar</span>}
           </div>
+
+          {transfer && !paid && (
+            <div className="sysnote" style={{ marginBottom: 14, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
+              <BadgeDollarSign size={16} />
+              <span style={{ flex: 1 }}>
+                <b>El cliente informó su transferencia.</b>{transfer.reference ? ` Referencia: ${transfer.reference}.` : ''} Verifica que cayó y márcala cobrada para liberar el pedido.
+                {transfer.proof_path && <> · <button type="button" onClick={() => verProof(transfer.proof_path!)} style={{ color: 'var(--green-deep)', fontWeight: 700, background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>Ver comprobante</button></>}
+              </span>
+            </div>
+          )}
 
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Cant.</th><th>Importe</th></tr></thead>

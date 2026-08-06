@@ -51,6 +51,8 @@ export function Bandeja() {
 
       if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_doc' })
       if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos y muévelos por el pipeline.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
+      const transferPend = orders.filter((o) => notCancelled(o) && o.payment_status !== 'paid' && !!(o.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported)
+      if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Transferencias por confirmar', detail: 'El cliente informó su pago; verifícalo y márcalo cobrado.', count: transferPend.length, tone: 'warn', screen: 'av_fin' })
       if (atorados.length) t.push({ id: 'atorados', icon: 'truck', title: 'Envíos atorados', detail: 'Requieren atención en seguimiento.', count: atorados.length, tone: 'dang', screen: 'seguimiento' })
       if (porEmitir.length) t.push({ id: 'cfdi', icon: 'receipt', title: 'CFDI por emitir', detail: 'Pedidos con factura solicitada.', count: porEmitir.length, tone: 'warn', screen: 'av_fin' })
       if (porCobrar.length) t.push({ id: 'cobrar', icon: 'receipt', title: 'Por cobrar', detail: 'Cuentas por cobrar (contra pedido / pendiente).', count: porCobrar.length, tone: 'neu', screen: 'av_fin' })
