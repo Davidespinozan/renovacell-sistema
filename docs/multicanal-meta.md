@@ -60,13 +60,23 @@ Ver `docs/INTEGRACIONES.md` §7. Resumen:
 3. `supabase secrets set META_VERIFY_TOKEN=… META_APP_SECRET=…`
 4. Desplegar: `supabase functions deploy meta-webhook --no-verify-jwt`.
 
-## Lo que falta para el envío real (salida)
-Recibir ya queda cubierto. **Enviar** respuestas por WhatsApp requiere:
-- `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` (del app de Meta del cliente).
-- Una función `meta-send` que llame a la Graph API y, al confirmar, quite el `pending`
-  del mensaje saliente.
-- Regla de Meta: fuera de la **ventana de 24 h** del último mensaje del cliente, la salida
-  exige **plantillas pre-aprobadas**.
+## Envío de salida (`meta-send`) — construido, a falta de token
+La función `meta-send` ya está construida: entrega la respuesta del vendedor por Graph
+API (WhatsApp / Messenger / Instagram) y, al confirmar, quita el `pending` del mensaje en
+el hilo. `replyProspect` la invoca con backend; si no está configurada (seam 501) o falla,
+el mensaje queda "por enviar" (honesto). Requiere JWT (desplegar SIN `--no-verify-jwt`):
+solo staff autenticado —no un doctor— puede responder.
+
+**Para encender la salida:**
+```
+supabase secrets set WHATSAPP_TOKEN=<token del app de Meta>
+supabase secrets set WHATSAPP_PHONE_ID=<phone_number_id de WhatsApp Business>
+# Messenger / Instagram (opcional):
+supabase secrets set META_PAGE_TOKEN=<page access token>
+supabase functions deploy meta-send        # CON verificación de JWT
+```
+- Regla de Meta: fuera de la **ventana de 24 h** del último mensaje del cliente, WhatsApp
+  exige **plantillas pre-aprobadas** (este envío de texto libre aplica dentro de la ventana).
 
 ## App Review de Meta
 Para recibir de **cualquier** usuario (no solo cuentas con rol en el app) Meta exige

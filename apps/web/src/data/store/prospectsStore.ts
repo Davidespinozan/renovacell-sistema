@@ -145,15 +145,27 @@ function pushMessage(id: string, msg: ProspectMessage) {
   if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] message', error.message); live.reload() })
 }
 
-// RESPUESTA del vendedor en la conversación. Se agrega al hilo al instante (queda
-// en la bandeja como enviada) marcada `pending` hasta que Meta esté conectado: la
-// entrega real por WhatsApp/IG/FB la hará la función de salida cuando existan las
-// credenciales. Así la bandeja YA es usable en demo sin mentir sobre el envío.
-export function replyProspect(id: string, text: string) {
+// RESPUESTA del vendedor en la conversación. Se agrega al hilo AL INSTANTE (optimista)
+// marcada `pending`, y —con backend— pide la entrega real a Meta vía `meta-send`; al
+// confirmar, la función quita `pending` en BD y recargamos. Si Meta no está configurado
+// (seam 501) o falla, el mensaje queda "por enviar": la bandeja es usable en demo sin
+// mentir sobre el envío. En modo mock, siempre queda "por enviar".
+export async function replyProspect(id: string, text: string) {
   const cur = live.current().find((p) => p.id === id)
   const channel = cur?.source ?? undefined
-  pushMessage(id, { dir: 'out', text, at: new Date().toISOString(), channel, pending: true })
+  const at = new Date().toISOString()
+  const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>) }
+  meta.messages = [...(((meta.messages as ProspectMessage[]) ?? [])), { dir: 'out', text, at, channel, pending: true } as ProspectMessage]
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, meta } : p)))
   logAudit({ actor: 'Ventas', action: 'Respuesta en conversación', resource: cur?.name ?? id, detail: channel ?? '' })
+  if (!hasSupabase) return
+
+  // Persistir el saliente (pending) ANTES de invocar, para que meta-send lo encuentre.
+  const { error: upErr } = await supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id)
+  if (upErr) { console.warn('[prospects] reply persist', upErr.message); return }
+  const { data, error } = await supabase.functions.invoke('meta-send', { body: { prospectId: id, at } })
+  if (error) { console.warn('[prospects] meta-send', error.message); return } // seam/sin credenciales: queda pending
+  if ((data as { delivered?: boolean })?.delivered) live.reload() // la función ya quitó "pending" en BD
 }
 
 // Editar datos del prospecto (nombre, contacto, organización, interés).

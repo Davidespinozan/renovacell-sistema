@@ -146,11 +146,15 @@ enviar"** hasta conectar Meta). La ingesta real corre por la Edge Function `meta
 4. Meta llama al webhook (GET) para verificar → responde el challenge. A partir de ahí,
    cada mensaje entrante crea/actualiza el prospecto y **abre su hilo** — sin Leadsales.
 
-**Envío de respuestas (salida):** para entregar de verdad las respuestas del vendedor por
-WhatsApp falta agregar el token de envío (`WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID`) y una
-función `meta-send`. Mientras tanto la respuesta se guarda en el hilo marcada "por enviar".
-Regla de Meta: fuera de la ventana de **24 h** del último mensaje del cliente, la salida
-requiere **plantillas pre-aprobadas**. Recibir es gratis; WhatsApp cobra por conversación.
+**Envío de respuestas (salida):** la Edge Function `meta-send` ya está construida (entrega
+por Graph API y quita el "por enviar" al confirmar). Solo falta el **token de salida**:
+```
+supabase secrets set WHATSAPP_TOKEN=xxx WHATSAPP_PHONE_ID=xxx
+supabase functions deploy meta-send        # CON JWT (solo staff responde)
+```
+Messenger/Instagram usan además `META_PAGE_TOKEN`. Sin token, la respuesta queda "por
+enviar". Regla de Meta: fuera de la ventana de **24 h** del último mensaje del cliente, la
+salida requiere **plantillas pre-aprobadas**. Recibir es gratis; WhatsApp cobra por conversación.
 
 > **App Review de Meta:** para recibir de CUALQUIER usuario (no solo cuentas con rol en el
 > app) Meta pide revisar los permisos de mensajería una vez (gratis, tarda días). Para la
