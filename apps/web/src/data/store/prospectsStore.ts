@@ -250,7 +250,9 @@ export function captureLead(input: {
   live.setLocal([p, ...current])
 
   // 3) Avisos + bitácora.
-  if (assigned) notify({ text: `Lead nuevo por ${input.channel} para ${assigned}: ${p.name}`, roles: ['pos'], screen: 'av_prosp' })
+  // Aviso DIRIGIDO al vendedor asignado (userIds): solo él lo ve. Antes iba a
+  // roles:['pos'] → TODOS los vendedores veían la asignación ajena (auditoría H8).
+  if (assigned) notify({ text: `Lead nuevo por ${input.channel} para ti: ${p.name}`, userIds: [assigned], screen: 'av_prosp' })
   notify({ text: `Lead ${input.channel}: ${p.name}${assigned ? ` → ${assigned}` : ' (sin asignar)'}`, roles: ['admin'], screen: 'av_prosp' })
   logAudit({ actor: 'Captación', action: `Lead capturado (${input.channel})`, resource: p.name ?? '', detail: assigned ? `asignado a ${assigned}` : 'sin asignar' })
 

@@ -99,7 +99,7 @@ export function notify(input: { text: string; roles?: RoleKey[]; screen?: string
     return
   }
   seq += 1
-  items = [{ id: `n-${seq}`, text: input.text, at: new Date().toISOString(), roles: input.roles, screen: input.screen, read: false }, ...items]
+  items = [{ id: `n-${seq}`, text: input.text, at: new Date().toISOString(), roles: input.roles, userIds: input.userIds, screen: input.screen, read: false }, ...items]
   emit()
 }
 
