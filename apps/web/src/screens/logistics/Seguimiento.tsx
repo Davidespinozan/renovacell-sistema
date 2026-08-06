@@ -13,7 +13,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useRole } from '../../auth/RoleContext'
 import { driverName } from '../../data/mock/shipments'
-import { clientOf } from '../../data/mock/profiles'
+import { clientOf, deliveryOf } from '../../data/mock/profiles'
 import { diagnoseShipment } from '../../data/ops/seguimiento'
 import type { Shipment } from '../../data/types'
 
@@ -143,6 +143,7 @@ export function Seguimiento() {
 function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, string> }) {
   const { order, shipment, stuck, reason, statusLabel, statusPill } = row
   const client = clientOf(order.doctor_id)
+  const deliv = deliveryOf(order) // dirección de ENTREGA del pedido (respaldo al perfil)
   const items = order.items.filter((it) => it.unit_price != null)
   const method = shipment
     ? shipment.driver_id
@@ -188,7 +189,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13 }}>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name} · {client.clinic}</div>
-        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>{client.address}, {client.city}</div>
+        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>{deliv.addr}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Método</div>{method}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
       </div>

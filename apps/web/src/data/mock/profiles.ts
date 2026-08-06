@@ -3,6 +3,7 @@
 import { hasSupabase } from '../../lib/supabase'
 import { getSnapshot as doctorsSnapshot } from '../store/doctorsStore'
 import { MOCK_DOCTORS } from './doctores'
+import { formatAddress, type ShippingAddress } from '../ops/shippingAddress'
 
 export interface ClientInfo {
   id: string
@@ -54,4 +55,15 @@ export const clientOf = (doctorId: string | null): ClientInfo => {
     address: m.address ?? DOCTOR_PROFILE.address,
     city: m.city ?? DOCTOR_PROFILE.city,
   }
+}
+
+// Destino de ENTREGA de un pedido: la dirección que se eligió EN LA VENTA (viaja en
+// `order.shipping_meta.address`) tiene prioridad; si el pedido es viejo/sin dirección,
+// cae al domicilio del cliente (perfil). El chofer y logística deben usar ESTO, no
+// `clientOf` a secas — así una entrega "a otra dirección" llega a donde el cliente pidió.
+export function deliveryOf(order: { doctor_id: string | null; shipping_meta?: unknown }): { name: string; addr: string; phone: string } {
+  const c = clientOf(order.doctor_id)
+  const a = (order.shipping_meta as { address?: ShippingAddress } | null)?.address
+  const addr = a?.line1 ? formatAddress(a) : `${c.address}, ${c.city}`
+  return { name: c.name, addr, phone: (a?.phone && a.phone.trim()) || c.phone }
 }

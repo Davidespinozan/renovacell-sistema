@@ -10,7 +10,7 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { entregar } from '../../data/ops/entregar'
 import { driverIdByEmail, driverName } from '../../data/mock/shipments'
-import { clientOf } from '../../data/mock/profiles'
+import { clientOf, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
@@ -100,17 +100,16 @@ export function MisEntregas() {
   // Etiqueta de una parada (cliente + dirección) para la lista de la ruta.
   const stopInfo = (s: (typeof mine)[number]) => {
     const o = orderById[s.order_id]
-    const c = o ? clientOf(o.doctor_id) : null
-    return c ? { name: c.name, addr: `${c.address}, ${c.city}`, folio: o?.external_ref ?? '' } : null
+    if (!o) return null
+    const d = deliveryOf(o)
+    return { name: d.name, addr: d.addr, folio: o.external_ref ?? '' }
   }
 
   // Ruta completa en Google Maps, EN EL ORDEN del chofer. Sin origen → usa su
   // ubicación actual. Direcciones en texto (no requiere API key).
   const routeStops = orderedMine
-    .map((s) => { const o = orderById[s.order_id]; return o ? clientOf(o.doctor_id) : null })
-    .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => `${c.address}, ${c.city}`)
-    .filter((a) => a.replace(/[, ]/g, '').length > 0)
+    .map((s) => { const o = orderById[s.order_id]; return o ? deliveryOf(o).addr : null })
+    .filter((a): a is string => a != null && a.replace(/[, ]/g, '').length > 0)
   const routeUrl = (() => {
     if (routeStops.length === 0) return null
     const dest = routeStops[routeStops.length - 1]
@@ -205,6 +204,7 @@ export function MisEntregas() {
           const order = orderById[s.order_id]
           if (!order) return null
           const client = clientOf(order.doctor_id)
+          const deliv = deliveryOf(order) // dirección/teléfono de ENTREGA (del pedido; respaldo al perfil)
           const items = order.items.filter((it) => it.unit_price != null)
           const photo = photos[s.id]
           return (
@@ -227,14 +227,14 @@ export function MisEntregas() {
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name} · {client.clinic}</div>
                 <div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Teléfono</div>
-                  <a href={`tel:+52${client.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
-                    {client.phone} · Llamar
+                  <a href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
+                    {deliv.phone} · Llamar
                   </a>
                 </div>
                 <div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>
-                  {client.address}, {client.city}{' '}
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.city}`)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap' }}>· Ver en mapa</a>
+                  {deliv.addr}{' '}
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap' }}>· Ver en mapa</a>
                 </div>
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
               </div>

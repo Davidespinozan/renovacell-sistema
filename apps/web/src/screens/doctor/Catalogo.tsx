@@ -11,6 +11,11 @@ import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
 import { PaymentModal } from './PaymentModal'
+import { AddressPicker } from '../../app/AddressPicker'
+import { clientOf } from '../../data/mock/profiles'
+import { DOCTOR_ID } from '../../data/mock/orders'
+import { hasSupabase, currentUserId } from '../../lib/supabase'
+import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 
@@ -104,11 +109,20 @@ export function Catalogo() {
     })
   const clear = () => setCart({})
 
-  const onConfirm = (invoice: boolean) =>
+  // Domicilio base del doctor (si lo tiene registrado). Si no, el checkout pide la
+  // dirección de entrega — el pedido siempre viaja con una dirección.
+  const myId = hasSupabase ? currentUserId() : DOCTOR_ID
+  const ci = clientOf(myId)
+  const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
+    ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
+    : null
+
+  const onConfirm = (invoice: boolean, shipping: ShippingAddress | null) =>
     createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: priceOf(l.product) })),
       total,
       invoice_requested: invoice,
+      shipping,
     })
 
   if (loading) return <div className="card">Cargando catálogo…</div>
@@ -152,6 +166,7 @@ export function Catalogo() {
           lines={lines}
           total={total}
           priceOf={priceOf}
+          base={baseAddr}
           onConfirm={onConfirm}
           onPay={(orderId, r) => payOrder(orderId, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
           onDone={clear}
@@ -276,22 +291,25 @@ function LineRow({ l, price, onInc, onDec }: { l: CartLine; price: number | null
 }
 
 function CheckoutModal({
-  lines, total, priceOf, onConfirm, onPay, onDone, onClose,
+  lines, total, priceOf, base, onConfirm, onPay, onDone, onClose,
 }: {
   lines: CartLine[]
   total: number
   priceOf: (p: ProductSafe) => number | null
-  onConfirm: (invoice: boolean) => OrderWithItems
+  base: ShippingAddress | null
+  onConfirm: (invoice: boolean, shipping: ShippingAddress | null) => OrderWithItems
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
 }) {
   const [invoice, setInvoice] = useState(false)
+  const [shipping, setShipping] = useState<ShippingAddress | null>(base)
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [payNow, setPayNow] = useState(false)
 
   const confirm = () => {
-    const created = onConfirm(invoice)
+    if (!shipping) return // el pedido es a domicilio: exige dirección de entrega
+    const created = onConfirm(invoice, shipping)
     setOrder(created)
     onDone() // limpia el carrito
   }
@@ -350,13 +368,16 @@ function CheckoutModal({
                 <b>{money(total)}</b>
               </div>
 
+              <div className="eyebrow" style={{ marginTop: 16 }}>Dirección de entrega</div>
+              <AddressPicker base={base} value={shipping} onChange={setShipping} />
+
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm}><Icon name="check" /> Crear pedido</button>
+                <button className="btn" type="button" onClick={confirm} disabled={!shipping} style={!shipping ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> Crear pedido</button>
               </div>
             </div>
           </>
