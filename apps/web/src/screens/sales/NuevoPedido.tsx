@@ -8,6 +8,9 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
+import { AddressPicker } from '../../app/AddressPicker'
+import { clientOf } from '../../data/mock/profiles'
+import type { ShippingAddress } from '../../data/ops/shippingAddress'
 
 export function NuevoPedido({ doctor, placedBy, onClose }: {
   doctor: { id: string; name: string }
@@ -20,8 +23,15 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
 
+  // Domicilio base del cliente (si lo tiene). Siempre se pregunta si el envío va ahí o a otra.
+  const ci = clientOf(doctor.id)
+  const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
+    ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
+    : null
+
   const [cart, setCart] = useState<Record<string, number>>({})
   const [invoice, setInvoice] = useState(false)
+  const [shipping, setShipping] = useState<ShippingAddress | null>(baseAddr)
   const [folio, setFolio] = useState<string | null>(null)
 
   const add = (id: string) => setCart((c) => {
@@ -40,13 +50,14 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
   const total = lines.reduce((s, l) => s + (l.p!.price ?? 0) * l.qty, 0)
 
   const crear = () => {
-    if (lines.length === 0) return
+    if (lines.length === 0 || !shipping) return
     const order = createOrder({
       lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price })),
       total,
       invoice_requested: invoice,
       doctor_id: doctor.id,
       placedBy,
+      shipping,
     })
     setFolio(order.external_ref ?? '—')
   }
@@ -90,13 +101,17 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
               </div>
 
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b>{money(total)}</b></div>
+
+              <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega</div>
+              <AddressPicker base={baseAddr} value={shipping} onChange={setShipping} />
+
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0} style={lines.length === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
+                <button className="btn" type="button" disabled={lines.length === 0 || !shipping} style={(lines.length === 0 || !shipping) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
               </div>
             </div>
           </>
