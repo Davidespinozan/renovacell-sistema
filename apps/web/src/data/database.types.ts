@@ -1267,6 +1267,27 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_targets: {
+        Row: {
+          commission_rate: number
+          seller: string
+          target: number
+          updated_at: string
+        }
+        Insert: {
+          commission_rate?: number
+          seller: string
+          target?: number
+          updated_at?: string
+        }
+        Update: {
+          commission_rate?: number
+          seller?: string
+          target?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           carrier: string | null

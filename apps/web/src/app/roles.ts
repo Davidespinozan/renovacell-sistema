@@ -48,6 +48,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Inicio' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
+      { key: 'av_comisiones', label: 'Comisiones', icon: 'chart', section: 'Comercial' },
       { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
       { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Comercial' },
       { key: 'av_precios', label: 'Precios', icon: 'receipt', section: 'Comercial' },
