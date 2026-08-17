@@ -28,6 +28,8 @@ const live = makeLive<ProductSafe>(async () => {
     unit: r.unit ?? 'unit',
     image_url: r.image_url,
     active: r.active ?? true,
+    show_landing: r.show_landing ?? true,
+    show_portal: r.show_portal ?? true,
   }))
 }, fallback)
 
@@ -46,35 +48,50 @@ export interface ProductInput {
   active: boolean
   show_landing?: boolean
   show_portal?: boolean
+  cost?: number | null // NO es columna de `products`: se guarda aparte en product_costs
 }
 
 let seq = 0
 
 export function createProduct(input: ProductInput): ProductSafe {
   seq += 1
+  const showLanding = input.show_landing ?? true
+  const showPortal = input.show_portal ?? true
   const temp: ProductSafe = {
     id: `p-new-${seq}`, sku: input.sku || `SKU-${seq}`, name: input.name,
     line: input.line, category: input.category, description: input.description,
     price: input.price, unit: 'unit', image_url: input.image_url, active: input.active,
+    show_landing: showLanding, show_portal: showPortal,
   }
   live.setLocal([temp, ...live.current()]) // optimista
   logAudit({ actor: 'Administración', action: 'Producto creado', resource: input.name })
   if (hasSupabase) {
+    // .select('id') para conocer el id REAL y poder guardar el costo (product_costs) —
+    // antes el costo capturado al CREAR se descartaba y las casillas de visibilidad se ignoraban.
     supabase.from('products').insert({
       sku: temp.sku, name: input.name, line: input.line, category: input.category,
       description: input.description, price: input.price, unit: 'unit',
       image_url: input.image_url, active: input.active,
-    }).then(({ error }) => { if (error) console.warn('[products] insert', error.message); live.reload() })
+      show_landing: showLanding, show_portal: showPortal,
+    }).select('id').single().then(({ data, error }) => {
+      if (error) { console.warn('[products] insert', error.message); live.reload(); return }
+      if (input.cost != null && !Number.isNaN(input.cost) && data?.id) {
+        void setProductCost(data.id, input.cost, input.name).finally(() => live.reload())
+      } else live.reload()
+    })
   }
   return temp
 }
 
 export function updateProduct(id: string, patch: Partial<ProductInput>) {
   const before = live.current().find((p) => p.id === id)
-  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, ...patch } : p)))
+  // `cost` no es columna de products (va a product_costs, lo maneja el modal aparte);
+  // se excluye del UPDATE para no romper el escritura con una columna inexistente.
+  const { cost: _cost, ...cols } = patch
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, ...cols } : p)))
   if (before) logAudit({ actor: 'Administración', action: 'Producto editado', resource: before.name })
   if (hasSupabase) {
-    supabase.from('products').update(patch).eq('id', id).then(({ error }) => { if (error) console.warn('[products] update', error.message); live.reload() })
+    supabase.from('products').update(cols).eq('id', id).then(({ error }) => { if (error) console.warn('[products] update', error.message); live.reload() })
   }
 }
 

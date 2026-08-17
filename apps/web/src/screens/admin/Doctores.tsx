@@ -314,7 +314,9 @@ function DoctorDetail({
 }) {
   // doctor.verified puede cambiar mientras el modal está abierto; leemos del store vía prop.
   const history = orders.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-  const [ced, setCed] = useState('')
+  // Precargado con la cédula actual: mientras el doctor NO esté verificado se puede
+  // CORREGIR una cédula mal capturada, no solo registrar la primera.
+  const [ced, setCed] = useState(cedulaOf(doctor))
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -355,7 +357,7 @@ function DoctorDetail({
             </div>
           )}
 
-          {!doctor.verified && !cedulaOf(doctor) && (
+          {!doctor.verified && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input
                 value={ced}
@@ -363,7 +365,7 @@ function DoctorDetail({
                 placeholder="Cédula profesional"
                 style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
               />
-              <button className="btn sm" type="button" disabled={!ced.trim()} style={!ced.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => { onSetCedula(ced.trim()); setCed('') }}>Registrar cédula</button>
+              <button className="btn sm" type="button" disabled={!ced.trim() || ced.trim() === cedulaOf(doctor)} style={(!ced.trim() || ced.trim() === cedulaOf(doctor)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSetCedula(ced.trim())}>{cedulaOf(doctor) ? 'Actualizar cédula' : 'Registrar cédula'}</button>
             </div>
           )}
 

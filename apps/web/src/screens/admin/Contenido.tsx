@@ -237,13 +237,13 @@ function ProductModal({ product, onClose, onSave }: {
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               onClick={() => {
-                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal })
-                // El costo va a `product_costs`, no a `products`: se guarda aparte.
-                if (product) {
-                  const c = cost.trim() === '' ? null : Number(cost)
-                  if (c == null || Number.isFinite(c)) {
-                    void setProductCost(product.id, c, name.trim()).then(reloadInventory)
-                  }
+                const c = cost.trim() === '' ? null : Number(cost)
+                const cValid = c == null || Number.isFinite(c)
+                // El costo va a `product_costs`, no a `products`: se guarda aparte. Al CREAR,
+                // createProduct lo persiste con el id real; al EDITAR, aquí con setProductCost.
+                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
+                if (product && cValid) {
+                  void setProductCost(product.id, c, name.trim()).then(reloadInventory)
                 }
               }}>
               {product ? 'Guardar cambios' : 'Crear producto'}

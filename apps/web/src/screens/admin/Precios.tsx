@@ -72,7 +72,7 @@ export function Precios() {
               <thead><tr><th>Producto</th><th>Precio base</th><th>{active.is_default ? 'Precio' : `Precio en "${active.name}"`}</th></tr></thead>
               <tbody>
                 {shown.map((p) => (
-                  <PriceRow key={p.id} name={p.name} base={p.price} listId={active.id} isDefault={active.is_default}
+                  <PriceRow key={active.id + ':' + p.id} name={p.name} base={p.price} listId={active.id} isDefault={active.is_default}
                     current={priceFor(p.id, p.price, active.is_default ? undefined : active.id)}
                     onSet={(v) => setListPrice(p.id, active.id, v)} />
                 ))}
