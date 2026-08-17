@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
 import { fmtDate } from '../../lib/format'
-import { uploadPrivate } from '../../lib/uploads'
+import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -14,6 +14,8 @@ import { clientOf, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
+// Problemas al CONTAR la carga (antes de salir a reparto): distintos de las incidencias de entrega.
+const LOAD_INCIDENT_TYPES = ['Faltan piezas', 'Producto equivocado', 'Caja dañada', 'Otro']
 
 export function MisEntregas() {
   const { data: shipments, reportIncident, confirmLoad } = useShipments()
@@ -40,11 +42,39 @@ export function MisEntregas() {
   const [received, setReceived] = useState<Record<string, string>>({})
   const [incType, setIncType] = useState<Record<string, string>>({})
   const [incNote, setIncNote] = useState<Record<string, string>>({})
+  const [noPhoto, setNoPhoto] = useState<Record<string, string>>({}) // motivo para entregar sin foto (mala señal)
+  const [loadOpen, setLoadOpen] = useState<Record<string, boolean>>({}) // form de problema con la carga abierto
+  const [loadType, setLoadType] = useState<Record<string, string>>({})
+  const [loadNote, setLoadNote] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<string | null>(null)
 
   const reportInc = (shipmentId: string, folio: string) => {
     reportIncident(shipmentId, incType[shipmentId] ?? INCIDENT_TYPES[0], incNote[shipmentId]?.trim() || null, folio)
     setToast(`Incidencia reportada: ${folio}`)
+    window.setTimeout(() => setToast(null), 2600)
+  }
+
+  // Problema al contar la carga (faltan piezas / producto equivocado): avisa a Almacén
+  // para que corrija ANTES de que el chofer salga a reparto — no confirmar a ciegas.
+  const reportLoad = (shipmentId: string, folio: string) => {
+    reportIncident(shipmentId, loadType[shipmentId] ?? LOAD_INCIDENT_TYPES[0], loadNote[shipmentId]?.trim() || null, folio, { toWarehouse: true })
+    setLoadOpen((m) => ({ ...m, [shipmentId]: false }))
+    setToast(`Problema de carga reportado a Almacén: ${folio}`)
+    window.setTimeout(() => setToast(null), 2600)
+  }
+
+  // Ver la prueba de una entrega YA cerrada (foto en bucket privado → URL firmada temporal).
+  const verPrueba = async (path: string | null) => {
+    const url = await signedProofUrl(path)
+    if (url) window.open(url, '_blank', 'noopener')
+    else setToast('No se pudo abrir la prueba (revisa tu señal).')
+  }
+
+  // Entregar SIN foto cuando la subida falla por mala señal: exige un motivo y lo deja en
+  // el registro (received_by) para que Almacén/Dirección reclamen la evidencia después.
+  const deliverNoPhoto = (shipmentId: string, orderId: string, folio: string, who: string, motivo: string) => {
+    entregar(shipmentId, orderId, null, `${who} (sin foto: ${motivo})`)
+    setToast(`Entrega registrada sin foto: ${folio}`)
     window.setTimeout(() => setToast(null), 2600)
   }
 
@@ -248,9 +278,32 @@ export function MisEntregas() {
                   <div className="sysnote" style={{ marginBottom: 10 }}>
                     <Icon name="truck" /><span>Almacén despachó tu carga{s.dispatched_by ? ` (autorizó ${s.dispatched_by})` : ''}. Cuenta tus paquetes y confirma que los recibiste.</span>
                   </div>
-                  <button className="btn" type="button" onClick={() => confirmLoad(s.id, driverName(driverId), order.external_ref ?? order.id)}>
-                    <Icon name="check" /> Confirmar que recibí mi carga
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn" type="button" onClick={() => confirmLoad(s.id, driverName(driverId), order.external_ref ?? order.id)}>
+                      <Icon name="check" /> Confirmar que recibí mi carga
+                    </button>
+                    <button className="btn ghost" type="button" onClick={() => setLoadOpen((m) => ({ ...m, [s.id]: !m[s.id] }))}>
+                      <Icon name="x" /> Reportar problema con la carga
+                    </button>
+                  </div>
+                  {loadOpen[s.id] && (
+                    <div className="field-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                      <select
+                        value={loadType[s.id] ?? LOAD_INCIDENT_TYPES[0]}
+                        onChange={(e) => setLoadType((m) => ({ ...m, [s.id]: e.target.value }))}
+                        style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }}
+                      >
+                        {LOAD_INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <input
+                        value={loadNote[s.id] ?? ''}
+                        onChange={(e) => setLoadNote((m) => ({ ...m, [s.id]: e.target.value }))}
+                        placeholder="Detalle (ej. faltan 2 cajas del producto X)"
+                        style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                      />
+                      <button className="btn sm" type="button" onClick={() => reportLoad(s.id, order.external_ref ?? order.id)}>Avisar a Almacén</button>
+                    </div>
+                  )}
                 </div>
               ) : (
               <>
@@ -290,8 +343,26 @@ export function MisEntregas() {
                 })()}
               </div>
               {upErr[s.id] && (
-                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 8 }}>
-                  <Icon name="x" /><span>No se pudo subir la foto (revisa tu señal). Vuelve a tomarla — la entrega no se cierra sin la evidencia guardada.</span>
+                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                  <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Icon name="x" /> No se pudo subir la foto (revisa tu señal). Vuelve a intentarlo, o si ya entregaste, ciérrala registrando el motivo.</span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      value={noPhoto[s.id] ?? ''}
+                      onChange={(e) => setNoPhoto((m) => ({ ...m, [s.id]: e.target.value }))}
+                      placeholder="Motivo (obligatorio): ej. sin señal en la zona"
+                      style={{ flex: 1, minWidth: 180, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', color: 'var(--ink)' }}
+                    />
+                    {(() => {
+                      const ok = Boolean(noPhoto[s.id]?.trim()) && Boolean(received[s.id]?.trim())
+                      return (
+                        <button className="btn sm" type="button" disabled={!ok} style={!ok ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                          onClick={() => deliverNoPhoto(s.id, order.id, order.external_ref ?? order.id, received[s.id]!.trim(), noPhoto[s.id]!.trim())}>
+                          Entregar sin foto
+                        </button>
+                      )
+                    })()}
+                  </div>
+                  <span style={{ fontSize: 11, opacity: 0.85 }}>Requiere el nombre de quién recibió (arriba) y un motivo. Queda registrado para que Almacén/Dirección pidan la evidencia después.</span>
                 </div>
               )}
               {!(Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim())) && !upErr[s.id] && (
@@ -322,6 +393,32 @@ export function MisEntregas() {
             </div>
           )
         })
+      )}
+
+      {entregadas.length > 0 && (
+        <div className="card" style={{ padding: 0 }}>
+          <div style={{ padding: '14px 16px 8px' }}>
+            <div className="eyebrow" style={{ margin: 0 }}>Entregas cerradas ({entregadas.length})</div>
+          </div>
+          <div style={{ padding: '0 12px 12px' }}>
+            {entregadas.map((s, i) => {
+              const o = orderById[s.order_id]
+              return (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 6px', borderBottom: i < entregadas.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <span className="mono" style={{ fontSize: 13 }}>{o?.external_ref ?? '—'}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{clientOf(o?.doctor_id ?? null).name}</div>
+                    {s.received_by && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Recibió: {s.received_by}</div>}
+                  </div>
+                  {s.delivered_at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fmtDate(s.delivered_at)}</span>}
+                  {s.proof_image_url && (
+                    <button className="btn ghost sm" type="button" onClick={() => verPrueba(s.proof_image_url)}><Icon name="image" /> Ver prueba</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {toast && <div className="toast show"><Icon name="check" /> {toast}</div>}

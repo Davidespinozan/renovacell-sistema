@@ -77,11 +77,13 @@ export function confirmLoad(id: string, who: string, folio: string) {
   logAudit({ actor: who, action: 'Carga recibida (chofer)', resource: folio })
 }
 
-export function reportIncident(shipmentId: string, type: string, note: string | null, folio: string) {
+export function reportIncident(shipmentId: string, type: string, note: string | null, folio: string, opts: { toWarehouse?: boolean } = {}) {
   const incident = { type, note, at: new Date().toISOString(), resolved: false } as Shipment['incident']
   live.setLocal(live.current().map((s) => (s.id === shipmentId ? { ...s, status: 'incident', incident } : s)))
   if (hasSupabase && isUuid(shipmentId)) supabase.from('shipments').update({ status: 'incident', incident: incident as unknown as Json }).eq('id', shipmentId).then(({ error }) => { if (error) console.warn('[shipments] incident', error.message); live.reload() })
   notify({ text: `Incidencia en ${folio}: ${type}`, roles: ['admin'], screen: 'seguimiento' })
+  // Problema con la CARGA (antes de salir): Almacén debe corregir/re-surtir antes del reparto.
+  if (opts.toWarehouse) notify({ text: `Problema con la carga de ${folio}: ${type} · revisar antes de que salga`, roles: ['warehouse'], screen: 'despacho' })
   logAudit({ actor: 'Chofer', action: 'Incidencia reportada', resource: folio, detail: type })
 }
 
