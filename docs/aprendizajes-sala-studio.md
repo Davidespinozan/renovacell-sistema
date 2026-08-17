@@ -153,3 +153,7 @@ sensibles (estados de pedido, verified, precios) a RPCs canónicas validadas** �
 que sala aprendió a la mala ("un UPDATE con RLS es más laxo que una RPC: la policy deja tocar
 la fila pero no revisa reglas de negocio"). Empezar por la máquina de estados del pedido
 (packed→shipped→delivered debe validar la transición, hoy es UPDATE directo).
+- ✅ **Máquina de estados del pedido (defensa en la BASE)** — `20260807150000`: trigger que
+  hace los estados terminales FINALES (cancelled/delivered/fulfilled no revierten). Ningún
+  UPDATE directo, RPC ni bug futuro puede revivir/revertir un pedido cerrado. Transiciones
+  hacia adelante intactas → cero regresión.
