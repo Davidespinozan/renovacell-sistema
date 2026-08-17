@@ -74,18 +74,29 @@ export function OrderCard({
 
       <ShippingLine meta={order.shipping_meta} />
 
-      {((onReorder && order.items.length > 0) || (onCancel && isCancelable(order.status))) && (
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {onReorder && order.items.length > 0 && (
-            <button className="btn ghost sm" type="button" onClick={onReorder}>
-              <Icon name="cart" /> Volver a pedir
-            </button>
-          )}
-          {onCancel && isCancelable(order.status) && (
-            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
-          )}
-        </div>
-      )}
+      {(() => {
+        // El doctor solo auto-cancela pedidos NO pagados: un pedido ya pagado que se
+        // cancela dejaría el dinero en el limbo (no hay reembolso en autoservicio). Los
+        // pagados se cancelan con Dirección, que sí tiene el flujo de devolución.
+        const puedeCancelar = onCancel && isCancelable(order.status) && order.payment_status !== 'paid'
+        const puedeReordenar = onReorder && order.items.length > 0
+        if (!puedeCancelar && !puedeReordenar && order.payment_status !== 'paid') return null
+        return (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {puedeReordenar && (
+              <button className="btn ghost sm" type="button" onClick={onReorder}>
+                <Icon name="cart" /> Volver a pedir
+              </button>
+            )}
+            {puedeCancelar && (
+              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
+            )}
+            {onCancel && isCancelable(order.status) && order.payment_status === 'paid' && (
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>Para cancelar un pedido pagado, contacta a Renovacell.</span>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

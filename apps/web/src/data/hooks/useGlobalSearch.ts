@@ -6,6 +6,7 @@
 import { useCallback } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { getRole, getNav } from '../../app/roles'
+import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { useProducts } from './useProducts'
 import { useAllOrders, useOrders } from './useOrders'
 import { useDoctors } from './useDoctors'
@@ -64,8 +65,10 @@ export function useGlobalSearch() {
     }
 
     if (role === 'pos') {
-      // Vendedor: busca en SU cartera (prospectos y clientes propios).
-      const me = user?.email
+      // Vendedor: busca en SU cartera (prospectos y clientes propios). Con backend la
+      // propiedad es el UUID de auth (RLS), no el email — mismo fix que la Bandeja; antes
+      // el buscador comparaba contra el email y en producción no encontraba a nadie.
+      const me = hasSupabase ? currentUserId() : user?.email
       prospects.filter((p) => p.assigned_to === me && hit(p.name, p.email)).slice(0, 5)
         .forEach((p) => out.push({ id: p.id, type: 'Prospecto', label: p.name ?? '—', sub: p.source ?? '', screen: 'av_prosp' }))
       doctors.filter((d) => ((d.meta as Record<string, unknown>)?.owner as string) === me && hit(d.full_name, d.organization, d.email)).slice(0, 5)

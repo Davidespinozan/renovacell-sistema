@@ -79,7 +79,10 @@ function flagLowStock(before: Record<string, number>, ids: Set<string>) {
   ids.forEach((pid) => {
     const b = before[pid] ?? 0, a = after[pid] ?? 0
     if (b > LOW_STOCK_REORDER && a <= LOW_STOCK_REORDER) {
-      notify({ text: a <= 0 ? `Agotado: ${names[pid] ?? 'producto'} · reabastece` : `Stock bajo: ${names[pid] ?? 'producto'} (${a} u) · reabastece`, roles: ['warehouse', 'admin'], screen: 'av_inv' })
+      // screen 'compras' (nav de Almacén): antes 'av_inv' (solo nav de Dirección) →
+      // el filtro de la campana descartaba el aviso para el almacenista, justo el que
+      // debe reabastecer. Dirección lo sigue viendo por el short-circuit admin.
+      notify({ text: a <= 0 ? `Agotado: ${names[pid] ?? 'producto'} · reabastece` : `Stock bajo: ${names[pid] ?? 'producto'} (${a} u) · reabastece`, roles: ['warehouse', 'admin'], screen: 'compras' })
     }
   })
 }

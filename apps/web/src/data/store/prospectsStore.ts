@@ -267,7 +267,11 @@ export function captureLead(input: {
 
 // Reasignar manualmente un prospecto a otro vendedor (Dirección).
 export function reassign(id: string, sellerId: string | null) {
-  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, assigned_to: sellerId } : p)))
+  const p = live.current().find((x) => x.id === id)
+  live.setLocal(live.current().map((x) => (x.id === id ? { ...x, assigned_to: sellerId } : x)))
   logAudit({ actor: 'Dirección', action: 'Prospecto reasignado', resource: id, detail: sellerId ?? 'sin asignar' })
+  // Aviso DIRIGIDO al nuevo dueño (como captureLead): antes el traspaso era silencioso
+  // y el lead caía en su lista sin señal, sin campana ni contador.
+  if (sellerId) notify({ text: `Te reasignaron un prospecto: ${p?.name ?? id}`, userIds: [sellerId], screen: 'av_prosp' })
   if (hasSupabase) supabase.from('prospects').update({ assigned_to: sellerId }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] reassign', error.message); live.reload() })
 }
