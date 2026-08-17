@@ -129,11 +129,15 @@ export function localDay(d: Date): string {
 
 // Esperado = ventas POS en EFECTIVO dentro del alcance (día u evento), MENOS las
 // devoluciones en efectivo de esos pedidos (el dinero salió del cajón).
-export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string; seller?: string }, refunds: RefundLine[] = []): number {
+export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string; seller?: string; since?: string }, refunds: RefundLine[] = []): number {
+  const sinceT = opts.since ? new Date(opts.since).getTime() : null
   const inScope = orders
     .filter((o) => isPosOrder(o) && (o.payment_method === 'efectivo'))
     .filter((o) => {
       const meta = (o.shipping_meta ?? {}) as { event_id?: string | null; seller?: string | null }
+      // `since` (corte por turno): solo ventas POSTERIORES al último corte del mismo
+      // alcance — así un segundo corte no vuelve a contar el efectivo ya retirado.
+      if (sinceT !== null && new Date(o.created_at).getTime() <= sinceT) return false
       // `seller` es un filtro ADICIONAL (corte por cajero): combina con día/evento.
       if (opts.seller && meta.seller !== opts.seller) return false
       if (opts.eventId) return meta.event_id === opts.eventId
