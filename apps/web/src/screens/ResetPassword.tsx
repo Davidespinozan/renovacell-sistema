@@ -4,6 +4,7 @@
 import React, { useState } from 'react'
 import { Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { traducirError } from '../lib/errorMsg'
 import { useRole } from '../auth/RoleContext'
 import { BrandLogo } from '../app/BrandLogo'
 
@@ -30,7 +31,7 @@ export function ResetPassword() {
     if (pass !== pass2) { setError('Las contraseñas no coinciden.'); return }
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password: pass })
-    if (error) { setError(error.message); setBusy(false); return }
+    if (error) { setError(traducirError(error)); setBusy(false); return }
     await supabase.auth.signOut()
     setDone(true)
     setBusy(false)

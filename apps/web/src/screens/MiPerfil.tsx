@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react'
 import { X, Camera, Check } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
+import { traducirError } from '../lib/errorMsg'
 import { useRole } from '../auth/RoleContext'
 import { uploadImage } from '../lib/uploads'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
@@ -55,7 +56,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     // Cambio de contraseña REAL (Supabase Auth).
     if (pw && hasSupabase) {
       const { error: pErr } = await supabase.auth.updateUser({ password: pw })
-      if (pErr) { setError(pErr.message); setBusy(false); return }
+      if (pErr) { setError(traducirError(pErr)); setBusy(false); return }
     }
     await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined, fiscal: isDoctor ? fiscal : undefined })
     setBusy(false)
