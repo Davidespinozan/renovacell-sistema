@@ -26,6 +26,14 @@ export function Clientes() {
     () => (role === 'admin' ? doctors : doctors.filter((d) => ownerOf(d) === user?.email)),
     [doctors, role, user],
   )
+  // Buscador de cartera: por nombre, consultorio o especialidad. Una cartera crece sin
+  // cota, así que scrollear no escala — el vendedor teclea el nombre y lo encuentra.
+  const [q, setQ] = useState('')
+  const shown = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return mine
+    return mine.filter((d) => `${d.full_name ?? ''} ${d.organization ?? ''} ${specialtyOf(d)}`.toLowerCase().includes(s))
+  }, [mine, q])
   const orderCount = useMemo(() => {
     const m: Record<string, number> = {}
     orders.forEach((o) => { if (o.doctor_id) m[o.doctor_id] = (m[o.doctor_id] ?? 0) + 1 })
@@ -36,7 +44,7 @@ export function Clientes() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow">{role === 'admin' ? 'Administración' : 'Ventas'} · Clientes</div>
-        <ExportButton name="clientes" rows={mine} style={{ marginLeft: 'auto' }} columns={[
+        <ExportButton name="clientes" rows={shown} style={{ marginLeft: 'auto' }} columns={[
           { key: 'full_name', label: 'Nombre' },
           { key: 'organization', label: 'Consultorio' },
           { key: 'meta', label: 'Especialidad', format: (_v, d) => specialtyOf(d) },
@@ -46,11 +54,24 @@ export function Clientes() {
         ]} />
       </div>
 
+      {mine.length > 0 && (
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por nombre, consultorio o especialidad…"
+          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+        />
+      )}
+
       {mine.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
           Aún no tienes clientes en tu cartera.
         </div>
-      ) : mine.map((d) => (
+      ) : shown.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
+          Ningún cliente coincide con “{q}”.
+        </div>
+      ) : shown.map((d) => (
         <div key={d.id} className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="avatar" style={{ background: avatarColor(d.full_name ?? '?') }}>{initials(d.full_name ?? '?')}</div>
@@ -76,7 +97,7 @@ export function Clientes() {
                 </button>
               </>
             ) : (
-              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Verifícalo para poder pedir</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>En verificación — se habilita al aprobarse</span>
             )}
           </div>
         </div>

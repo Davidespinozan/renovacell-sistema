@@ -82,15 +82,27 @@ export function Prospectos() {
     [prospects, role, user],
   )
 
+  // Buscador + filtro por estatus: el pipeline crece sin cota, una lista plana no escala.
+  const [q, setQ] = useState('')
+  const [fStatus, setFStatus] = useState<ProspectStatus | 'todos'>('todos')
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    return visible.filter((p) => {
+      if (fStatus !== 'todos' && statusOf(p) !== fStatus) return false
+      if (!s) return true
+      return `${p.name ?? ''} ${orgOf(p)} ${p.email ?? ''} ${p.phone ?? ''} ${p.source ?? ''}`.toLowerCase().includes(s)
+    })
+  }, [visible, q, fStatus])
+
   // Nuevos arriba; luego por fecha desc.
   const sorted = useMemo(
     () =>
-      visible.slice().sort((a, b) => {
+      filtered.slice().sort((a, b) => {
         const an = statusOf(a) === 'nuevo' ? 0 : 1
         const bn = statusOf(b) === 'nuevo' ? 0 : 1
         return an - bn || (a.created_at < b.created_at ? 1 : -1)
       }),
-    [visible],
+    [filtered],
   )
   const nuevos = visible.filter((p) => statusOf(p) === 'nuevo').length
 
@@ -141,6 +153,23 @@ export function Prospectos() {
           <Plus size={14} /> Nuevo prospecto
         </button>
       </div>
+
+      {visible.length > 0 && (
+        <div className="grid" style={{ gap: 10 }}>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por nombre, organización, correo, teléfono u origen…"
+            style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+          />
+          <div className="fchips">
+            <button type="button" className={'fchip' + (fStatus === 'todos' ? ' on' : '')} onClick={() => setFStatus('todos')}>Todos</button>
+            {(Object.keys(STATUS_META) as ProspectStatus[]).map((k) => (
+              <button key={k} type="button" className={'fchip' + (fStatus === k ? ' on' : '')} onClick={() => setFStatus(k)}>{STATUS_META[k].label}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isAdmin && <CaptacionPanel prospects={visible} roster={roster} />}
 

@@ -38,6 +38,8 @@ export function diagnoseShipment(order: OrderWithItems, shipment: Shipment | und
       new Date(shipment.estimated_delivery_at).getTime() < Date.now()
     switch (shipment.status) {
       case 'assigned': statusLabel = 'Asignado a chofer'; statusPill = 'p-warn'; break
+      case 'por_despachar': statusLabel = 'Por despachar'; statusPill = 'p-warn'; break
+      case 'despachado': statusLabel = 'Despachado'; statusPill = 'p-blue'; break
       case 'out_for_delivery': statusLabel = 'En reparto'; statusPill = 'p-blue'; break
       case 'in_transit': statusLabel = 'En camino'; statusPill = 'p-blue'; break
       case 'delivered': statusLabel = 'Entregado'; statusPill = 'p-ok'; break
