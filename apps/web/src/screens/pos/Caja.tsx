@@ -67,6 +67,10 @@ export function Caja() {
   const [cobrando, setCobrando] = useState(false)
   const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
+  // CFDI: el cliente puede pedir factura en la venta. Si hay doctor ligado, se factura con
+  // sus datos fiscales (perfil); si es mostrador, se capturan aquí (RFC, razón, uso, correo).
+  const [invoiceReq, setInvoiceReq] = useState(false)
+  const [fiscal, setFiscal] = useState({ rfc: '', razon: '', uso: 'G03', email: '' })
   // Ventas del turno (en memoria) para poder REIMPRIMIR el recibo si el cliente vuelve.
   type VentaTurno = { order: OrderWithItems; clientName: string; pago: { recibido: number; cambio: number } | null }
   const [ventasTurno, setVentasTurno] = useState<VentaTurno[]>([])
@@ -113,7 +117,12 @@ export function Caja() {
         ? { ok: true, order }
         : { ok: false, error: 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
     } else {
-      res = await venderPOS(posLines, total, method, { doctorId: client?.id ?? null, seller: user?.email ?? null })
+      // CFDI: mostrador → datos fiscales capturados; con doctor ligado → se factura con su
+      // perfil (Facturación), aquí solo se marca la solicitud.
+      const invoiceMeta = invoiceReq && !client
+        ? { rfc: fiscal.rfc.trim(), razon_social: fiscal.razon.trim(), uso_cfdi: fiscal.uso, email: fiscal.email.trim() }
+        : null
+      res = await venderPOS(posLines, total, method, { doctorId: client?.id ?? null, seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta })
     }
     setCobrando(false)
     if (res.ok && res.order) {
@@ -126,6 +135,8 @@ export function Caja() {
       setCart({})
       setClient(null)
       setRecibido('')
+      setInvoiceReq(false)
+      setFiscal({ rfc: '', razon: '', uso: 'G03', email: '' })
     } else {
       // La RPC atómica falla ANTES de cobrar si el inventario no alcanza: no hay venta fantasma.
       setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
@@ -252,10 +263,46 @@ export function Caja() {
               </div>
             )}
 
-            <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(cobrando || !efectivoOk ? { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' } : {}) }} onClick={cobrar} disabled={cobrando || !efectivoOk}>
+            {!eventId && (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={invoiceReq} onChange={(e) => setInvoiceReq(e.target.checked)} />
+                  <span>Solicitar factura (CFDI)</span>
+                </label>
+                {invoiceReq && (
+                  client ? (
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>Se facturará con los datos fiscales de {client.name} (perfil). La emite Facturación.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                      <input value={fiscal.rfc} onChange={(e) => setFiscal((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))} placeholder="RFC"
+                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                      <input value={fiscal.razon} onChange={(e) => setFiscal((f) => ({ ...f, razon: e.target.value }))} placeholder="Razón social"
+                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                      <input value={fiscal.email} onChange={(e) => setFiscal((f) => ({ ...f, email: e.target.value }))} placeholder="Correo para la factura"
+                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                      <select value={fiscal.uso} onChange={(e) => setFiscal((f) => ({ ...f, uso: e.target.value }))}
+                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }}>
+                        <option value="G03">G03 · Gastos en general</option>
+                        <option value="G01">G01 · Adquisición de mercancías</option>
+                        <option value="P01">P01 · Por definir</option>
+                      </select>
+                      {(fiscal.rfc.trim() === '' || fiscal.razon.trim() === '') && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>RFC y razón social son obligatorios para facturar.</div>}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {(() => {
+              const cfdiOk = !invoiceReq || client != null || (fiscal.rfc.trim() !== '' && fiscal.razon.trim() !== '')
+              const puede = !cobrando && efectivoOk && cfdiOk
+              return (<>
+            <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(puede ? {} : { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' }) }} onClick={cobrar} disabled={!puede}>
               <Icon name="check" /> {cobrando ? 'Cobrando…' : `Cobrar ${money(total)}`}
             </button>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Pago inmediato · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
+              </>)
+            })()}
           </>
         )}
 

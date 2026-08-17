@@ -163,7 +163,11 @@ export function createPosOrder(input: {
   seller?: string | null
   doctor_id?: string | null
   channel?: string
+  invoice_requested?: boolean
+  invoice_meta?: Record<string, unknown> | null
 }, localOnly = false): OrderWithItems {
+  const invoiceReq = input.invoice_requested ?? false
+  const invoiceMeta = input.invoice_meta ?? null
   const id = hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`
   const folio = `POS-${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
@@ -172,8 +176,8 @@ export function createPosOrder(input: {
   const order: Order = {
     id, external_ref: folio, doctor_id: input.doctor_id ?? null, total: input.total, currency: 'MXN',
     status: 'delivered', payment_method: input.payment_method, payment_ref: null,
-    payment_status: 'paid', stripe_payment_id: null, invoice_requested: false,
-    invoice_meta: null, shipping_meta, created_at: now,
+    payment_status: 'paid', stripe_payment_id: null, invoice_requested: invoiceReq,
+    invoice_meta: invoiceMeta as Order['invoice_meta'], shipping_meta, created_at: now,
   }
   const newItems: OrderItem[] = input.lines.map((l, i) => ({
     id: `${id}-${i}`, order_id: id, product_id: l.product_id, lot_id: l.lot_id,
@@ -193,7 +197,7 @@ export function createPosOrder(input: {
       const oi = await supabase.from('orders').insert({
         id, external_ref: folio, doctor_id: isUuid(input.doctor_id) ? input.doctor_id : null, total: input.total,
         currency: 'MXN', status: 'delivered', payment_method: input.payment_method, payment_status: 'paid',
-        invoice_requested: false, shipping_meta: shipping_meta as unknown as Json,
+        invoice_requested: invoiceReq, invoice_meta: invoiceMeta as unknown as Json, shipping_meta: shipping_meta as unknown as Json,
       })
       if (oi.error) { console.warn('[orders] pos insert', oi.error.message); return }
       await supabase.from('order_items').insert(input.lines.map((l) => ({

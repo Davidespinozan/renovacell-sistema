@@ -31,7 +31,7 @@ export async function venderPOS(
   lines: PosLine[],
   total: number,
   paymentMethod: string,
-  opts: { doctorId?: string | null; seller?: string | null; eventId?: string | null } = {},
+  opts: { doctorId?: string | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null } = {},
 ): Promise<PosResult> {
   if (lines.length === 0) return { ok: false }
 
@@ -54,6 +54,7 @@ export async function venderPOS(
   const order = createPosOrder({
     lines: posLines, total, payment_method: paymentMethod,
     doctor_id: opts.doctorId ?? null, seller: opts.seller ?? null, event_id: opts.eventId ?? null,
+    invoice_requested: opts.invoiceRequested ?? false, invoice_meta: opts.invoiceMeta ?? null,
   }, hasSupabase)
 
   if (hasSupabase) {
@@ -66,6 +67,8 @@ export async function venderPOS(
       p_shipping_meta: ((order.shipping_meta ?? {}) as unknown) as Json,
       p_lines: (posLines.map((l) => ({ ...l, lot_id: isUuid(l.lot_id) ? l.lot_id : null })) as unknown) as Json,
       p_allocations: (allocations.filter((a) => isUuid(a.lot_id)) as unknown) as Json,
+      p_invoice_requested: opts.invoiceRequested ?? false,
+      p_invoice_meta: ((opts.invoiceMeta ?? null) as unknown) as Json,
     })
     if (error || data !== true) {
       // La venta NO se concretó (inventario insuficiente u otro error): revierte lo
