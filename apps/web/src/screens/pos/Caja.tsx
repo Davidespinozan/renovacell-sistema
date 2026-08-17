@@ -11,8 +11,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useEvents } from '../../data/hooks/useEvents'
 import { useRole } from '../../auth/RoleContext'
-import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
-import { venderPOS } from '../../data/ops/pos'
+import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
+import { venderPOS, type PosResult } from '../../data/ops/pos'
 import { clientOf } from '../../data/mock/profiles'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe, Profile } from '../../data/types'
@@ -25,7 +25,7 @@ export function Caja() {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
-  const { data: events } = useEvents()
+  const { data: events, sellAtEvent } = useEvents()
   const { user } = useRole()
   const eventosActivos = useMemo(() => events.filter((e) => e.status === 'activo'), [events])
   // Contexto de venta: mostrador (null) o un evento activo. Se asigna a la venta para
@@ -33,7 +33,22 @@ export function Caja() {
   const [eventId, setEventId] = useState<string | null>(null)
   // Solo productos activos y con precio (no se vende lo oculto).
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
-  const stockMap = useMemo(() => stockByProduct(lots), [lots])
+  // En un evento se vende del STAND (lo asignado − lo vendido), NO del almacén. Antes
+  // Caja mostraba/limitaba por almacén y cobraba con venderPOS, que descontaba el almacén
+  // OTRA VEZ (el stock ya se había movido al stand al asignarlo) — doble descuento y el
+  // stand nunca bajaba. Con evento seleccionado, el stock disponible es el del stand.
+  const stockMap = useMemo(() => {
+    if (eventId) {
+      const ev = events.find((e) => e.id === eventId)
+      const m: Record<string, StockInfo> = {}
+      ev?.items.forEach((it) => {
+        const q = it.assigned - it.sold
+        m[it.product_id] = { qty: q, tracked: true, status: q <= 0 ? 'out' : q <= LOW_STOCK ? 'low' : 'ok' }
+      })
+      return m
+    }
+    return stockByProduct(lots)
+  }, [eventId, events, lots])
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
   const [buscar, setBuscar] = useState('')
   // Buscador: por nombre, categoría o SKU (útil en un evento con fila; también sirve para
@@ -89,12 +104,18 @@ export function Caja() {
   const cobrar = async () => {
     if (cobrando) return
     setCobrando(true)
-    const res = await venderPOS(
-      lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price ?? 0 })),
-      total,
-      method,
-      { doctorId: client?.id ?? null, seller: user?.email ?? null, eventId },
-    )
+    const posLines = lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price ?? 0 }))
+    // Venta en evento → sellAtEvent (descuenta el STAND, registra el lote entregado y
+    // cuadra "Ventas del evento"). Mostrador → venderPOS (descuenta el almacén por FEFO).
+    let res: PosResult
+    if (eventId) {
+      const order = sellAtEvent(eventId, posLines, total, method, user?.email ?? null)
+      res = order
+        ? { ok: true, order }
+        : { ok: false, error: 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
+    } else {
+      res = await venderPOS(posLines, total, method, { doctorId: client?.id ?? null, seller: user?.email ?? null })
+    }
     setCobrando(false)
     if (res.ok && res.order) {
       const order = res.order
@@ -174,7 +195,7 @@ export function Caja() {
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12.5, color: 'var(--ink-3)' }}>
             <Icon name="store" style={{ width: 15, height: 15, color: eventId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
             <span style={{ whiteSpace: 'nowrap' }}>Vendiendo en</span>
-            <select value={eventId ?? ''} onChange={(e) => setEventId(e.target.value || null)}
+            <select value={eventId ?? ''} onChange={(e) => { setEventId(e.target.value || null); setCart({}) }}
               style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none', fontWeight: eventId ? 600 : 400 }}>
               <option value="">Mostrador (sin evento)</option>
               {eventosActivos.map((e) => <option key={e.id} value={e.id}>Evento · {e.name}</option>)}
