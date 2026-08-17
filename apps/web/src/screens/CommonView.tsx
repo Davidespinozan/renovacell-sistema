@@ -147,8 +147,14 @@ export function CommonView() {
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
-                  <a className="btn ghost sm" style={{ flex: '1 1 auto' }} href={as.url || '#'} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
-                  <a className="btn sm" style={{ flex: '1 1 auto' }} href={as.url || '#'} download><Download size={14} /> Descargar</a>
+                  {as.url ? (
+                    <>
+                      <a className="btn ghost sm" style={{ flex: '1 1 auto' }} href={as.url} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
+                      <a className="btn sm" style={{ flex: '1 1 auto' }} href={as.url} download><Download size={14} /> Descargar</a>
+                    </>
+                  ) : (
+                    <span style={{ flex: '1 1 auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Sin archivo</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -277,7 +283,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
     r.readAsDataURL(f)
   }
   const save = async () => {
-    if (!key.trim() || busy) return
+    if (!key.trim() || (!file && !dataUrl) || busy) return // sin imagen no se sube (evita asset muerto)
     setBusy(true)
     // Sube la imagen a Storage y guarda su URL (no el data-URI).
     const url = file ? await uploadImage(file, 'library') : dataUrl
@@ -311,7 +317,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" onClick={save} disabled={busy || !key.trim()} style={busy || !key.trim() ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}><Upload size={15} /> {busy ? 'Subiendo…' : 'Subir'}</button>
+            <button className="btn" type="button" onClick={save} disabled={busy || !key.trim() || (!file && !dataUrl)} style={busy || !key.trim() || (!file && !dataUrl) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}><Upload size={15} /> {busy ? 'Subiendo…' : 'Subir'}</button>
           </div>
         </div>
       </div>

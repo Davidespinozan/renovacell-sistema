@@ -2,7 +2,7 @@
 // expenses / cash_closings. Solo Dirección los consume.
 import { useSyncExternalStore } from 'react'
 import { subscribe as subG, getSnapshot as snapG, addGasto, removeGasto, type Gasto, type GastoCategoria } from '../store/gastosStore'
-import { subscribe as subC, getSnapshot as snapC, registrarCierre, type Cierre } from '../store/cierresStore'
+import { subscribe as subC, getSnapshot as snapC, registrarCierre, anularCierre, type Cierre } from '../store/cierresStore'
 import { subscribe as subR, getSnapshot as snapR, registrarDevolucion, refundedByOrder, returnedByItem, type Refund, type RefundItem } from '../store/refundsStore'
 
 export function useGastos() {
@@ -12,7 +12,7 @@ export function useGastos() {
 
 export function useCierres() {
   const data = useSyncExternalStore(subC, snapC, snapC)
-  return { data, registrarCierre }
+  return { data, registrarCierre, anularCierre }
 }
 
 export function useRefunds() {

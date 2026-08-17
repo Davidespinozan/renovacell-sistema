@@ -43,3 +43,14 @@ export function registrarCierre(input: { fecha: string; alcance: string; esperad
   }
   return c
 }
+
+// Anular un corte mal capturado (solo Dirección). Lo quita del historial para que no
+// distorsione el punto de corte del arqueo; queda en la bitácora quién lo anuló.
+export function anularCierre(id: string): void {
+  const c = live.current().find((x) => x.id === id)
+  live.setLocal(live.current().filter((x) => x.id !== id))
+  logAudit({ actor: c?.usuario ?? 'Administración', action: 'Corte de caja anulado', resource: c?.alcance ?? id, detail: c ? `contado $${c.contado}` : undefined })
+  if (hasSupabase) {
+    supabase.from('cash_closings').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[cash_closings] delete', error.message); live.reload() })
+  }
+}
