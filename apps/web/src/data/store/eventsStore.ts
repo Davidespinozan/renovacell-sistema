@@ -100,6 +100,38 @@ export function assignStock(eventId: string, productId: string, qty: number): { 
   return { ok: true }
 }
 
+// Regresa al almacén parte del inventario SOBRE-asignado a un evento, SIN cerrarlo ni
+// eliminarlo. Tope: remaining(it) = assigned − sold (nunca regresa lo ya vendido).
+// Devuelve por lote de origen (evento-regreso), recorta el pool del stand y baja `assigned`.
+export function unassignStock(eventId: string, productId: string, qty: number): { ok: boolean; returned?: number } {
+  const ev = events.find((e) => e.id === eventId)
+  if (!ev || qty <= 0) return { ok: false }
+  const it = ev.items.find((x) => x.product_id === productId)
+  if (!it) return { ok: false }
+  const toReturn = Math.min(qty, remaining(it))
+  if (toReturn <= 0) return { ok: false, returned: 0 }
+  const pool = [...(it.lots ?? [])]
+  let left = toReturn
+  const rest: EventLot[] = []
+  for (const lot of pool) {
+    if (left <= 0) { rest.push(lot); continue }
+    const give = Math.min(lot.qty, left)
+    adjust(lot.lot_id, give, 'evento-regreso', ev.name)
+    left -= give
+    if (give < lot.qty) rest.push({ ...lot, qty: lot.qty - give })
+  }
+  const returned = toReturn - left
+  events = events.map((e) => {
+    if (e.id !== eventId) return e
+    const items = e.items.map((x) => (x.product_id === productId ? { ...x, assigned: Math.max(x.sold, x.assigned - returned), lots: rest } : x))
+    return { ...e, items }
+  })
+  emit()
+  persistEvent(eventId)
+  logAudit({ actor: 'Almacén', action: 'Inventario regresado de evento', resource: ev.name, detail: `${returned} u` })
+  return { ok: true, returned }
+}
+
 export function sellAtEvent(eventId: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string, seller: string | null = null): OrderWithItems | null {
   const ev = events.find((e) => e.id === eventId)
   if (!ev || lines.length === 0) return null

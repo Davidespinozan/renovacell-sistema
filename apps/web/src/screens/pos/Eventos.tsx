@@ -12,7 +12,9 @@ import { useTeam } from '../../data/hooks/useTeam'
 import { useLots } from '../../data/hooks/useLots'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { useRole } from '../../auth/RoleContext'
+import { VentaTicketPrint, enviarReciboWhatsApp, imprimirVenta, type Pago } from './ventaRecibo'
 import type { ProductSafe } from '../../data/types'
+import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function Eventos() {
   const { data: events } = useEvents()
@@ -66,7 +68,7 @@ export function Eventos() {
 
 function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void }) {
   const { data: products } = useProducts()
-  const { sellAtEvent, closeEvent, updateEvent, deleteEvent } = useEvents()
+  const { sellAtEvent, unassignStock, closeEvent, updateEvent, deleteEvent } = useEvents()
   const { data: team } = useTeam()
   const { user } = useRole()
   const [editOpen, setEditOpen] = useState(false)
@@ -77,8 +79,12 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<'efectivo' | 'tarjeta'>('efectivo')
+  const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [assignOpen, setAssignOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [done, setDone] = useState<OrderWithItems | null>(null) // venta hecha → recibo
+  const [lastPago, setLastPago] = useState<Pago | null>(null)
+  const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
   const closed = event.status === 'cerrado'
 
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2400) }
@@ -86,19 +92,36 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
     const it = event.items.find((x) => x.product_id === productId)
     return it ? remaining(it) : 0
   }
+  // Regresar al almacén stock sobre-asignado al stand, sin cerrar el evento (tope = en stand).
+  const regresar = (productId: string, rem: number, name: string) => {
+    const raw = window.prompt(`¿Cuántas unidades de ${name} regresar al almacén? (máx. ${rem})`, String(rem))
+    if (raw == null) return
+    const n = Math.floor(Number(raw))
+    if (!Number.isFinite(n) || n <= 0) { flash('Cantidad inválida.'); return }
+    const r = unassignStock(event.id, productId, n)
+    if (r.ok) flash(`Regresaste ${r.returned} u de ${name} al almacén.`)
+    else flash('No se pudo regresar (¿ya se vendió?).')
+  }
   const add = (id: string) => setCart((c) => ({ ...c, [id]: Math.min((c[id] ?? 0) + 1, left(id)) }))
   const dec = (id: string) => setCart((c) => { const q = (c[id] ?? 0) - 1; if (q <= 0) { const { [id]: _x, ...r } = c; return r } return { ...c, [id]: q } })
 
   const lines = Object.entries(cart).map(([id, qty]) => ({ p: byId[id], qty })).filter((l) => l.p)
   const total = lines.reduce((s, l) => s + (l.p!.price ?? 0) * l.qty, 0)
   const vendido = event.items.reduce((s, it) => s + it.sold * (byId[it.product_id]?.price ?? 0), 0)
+  const recibidoN = Math.max(0, Number(recibido) || 0)
+  const cambio = recibidoN - total
+  // En efectivo no se cobra si el recibido no alcanza el total (evita cambio negativo).
+  const efectivoOk = method !== 'efectivo' || recibido === '' ? true : recibidoN >= total
 
   const cobrar = () => {
-    if (lines.length === 0) return
+    if (lines.length === 0 || !efectivoOk) return
     const order = sellAtEvent(event.id, lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price ?? 0 })), total, method, user?.email ?? null)
     if (!order) { flash('No se pudo cobrar — revisa el stock del stand.'); return }
+    const pago = method === 'efectivo' && recibido !== '' ? { recibido: recibidoN, cambio } : null
+    setLastPago(pago)
+    setDone(order)
     setCart({})
-    flash(`Venta registrada · ${money(total)}`)
+    setRecibido('')
   }
 
   return (
@@ -166,6 +189,9 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
                         <button className="btn sm" type="button" disabled={qty >= rem} onClick={() => add(p.id)}><Icon name="plus" /></button>
                       </div>
                     ))}
+                    {!closed && rem > 0 && (
+                      <button type="button" onClick={() => regresar(p.id, rem, p.name)} style={{ marginTop: 6, background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 11, fontFamily: 'inherit', textDecoration: 'underline' }}>Regresar al almacén</button>
+                    )}
                   </div>
                 </div>
               )
@@ -195,7 +221,21 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
                   <button type="button" className={method === 'efectivo' ? 'active' : undefined} onClick={() => setMethod('efectivo')}>Efectivo</button>
                   <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
                 </div>
-                <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={cobrar}><Check size={16} /> Cobrar {money(total)}</button>
+                {method === 'efectivo' && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 56 }}>Recibí</span>
+                      <input type="number" min={0} value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="¿con cuánto paga? (opcional)"
+                        style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, outline: 'none', background: '#fff' }} />
+                    </div>
+                    {recibido !== '' && (
+                      <div className="tket-total" style={{ marginTop: 8, color: cambio < 0 ? 'var(--danger)' : 'var(--green-deep)' }}>
+                        <span>{cambio < 0 ? 'Falta' : 'Cambio'}</span><b>{money(Math.abs(cambio))}</b>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(!efectivoOk ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }} onClick={cobrar} disabled={!efectivoOk}><Check size={16} /> Cobrar {money(total)}</button>
               </>
             )}
           </div>
@@ -204,6 +244,30 @@ function EventDetail({ event, onBack }: { event: SalesEvent; onBack: () => void 
 
       {assignOpen && <AssignModal event={event} onClose={() => setAssignOpen(false)} onDone={(m) => { setAssignOpen(false); flash(m) }} />}
       {editOpen && <EditEvent event={event} onClose={() => setEditOpen(false)} onSave={(patch) => { updateEvent(event.id, patch); setEditOpen(false); flash('Evento actualizado') }} />}
+
+      {done && (
+        <div className="overlay" onClick={() => setDone(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mbody">
+              <div className="success">
+                <div className="ck"><Check size={20} /></div>
+                <h3>Venta registrada</h3>
+                <p>
+                  <b>{done.external_ref}</b> · {money(done.total)} · {done.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'} · {event.name}.
+                  Descontado del stand. Ya suma en “Ventas del evento”.
+                </p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
+                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago)}><Icon name="chat" /> Enviar por WhatsApp</button>
+                  <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <VentaTicketPrint order={done} productName={productName} pago={lastPago} clientName={`Evento · ${event.name}`} />
+        </div>
+      )}
+
       {toast && <div className="toast show"><Check size={16} /> {toast}</div>}
     </div>
   )
