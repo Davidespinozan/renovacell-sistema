@@ -310,6 +310,25 @@ export function markPaid(orderId: string) {
   }
 }
 
+// Descartar una transferencia informada por el cliente que NO se localizó. Saca el
+// pedido de la cola "por confirmar" (transfer.reported=false) dejando rastro
+// (rejected + fecha), SIN marcar pagado ni cancelar el pedido; avisa al doctor para que
+// reintente o pague por otro medio. Antes esta pantalla solo tenía la salida "confirmar".
+export function rejectTransfer(orderId: string) {
+  const o = orders.find((x) => x.id === orderId)
+  if (!o) return
+  const prevMeta = (o.shipping_meta as Record<string, unknown> | null) ?? {}
+  const prevTransfer = (prevMeta.transfer as Record<string, unknown> | null) ?? {}
+  const nextMeta = { ...prevMeta, transfer: { ...prevTransfer, reported: false, rejected: true, rejected_at: new Date().toISOString() } }
+  orders = orders.map((x) => (x.id === orderId ? { ...x, shipping_meta: nextMeta } : x))
+  emit()
+  logAudit({ actor: 'Administración', action: 'Transferencia descartada', resource: folioOf(orderId) })
+  if (o.doctor_id) notify({ text: `No localizamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}. Reintenta el pago o usa otro método.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+  if (hasSupabase && isUuid(orderId)) {
+    supabase.from('orders').update({ shipping_meta: nextMeta as unknown as Json }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] rejectTransfer', error.message); hydrate() })
+  }
+}
+
 // Cobro EN LÍNEA (Portal del Doctor). Pasa por la función segura pay_order (que
 // valida dueño/rol), como hará el webhook de Stripe.
 export function payOrder(orderId: string, payment: { method: string; ref: string; actor?: string }): { ok: boolean } {

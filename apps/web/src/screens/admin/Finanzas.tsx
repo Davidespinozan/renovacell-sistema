@@ -162,8 +162,8 @@ export function Finanzas() {
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxp.count} compra(s) a proveedor sin pagar (a costo real).</div>
           {porPagar.length > 0 && (
-            <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-              {porPagar.slice(0, 5).map((p) => (
+            <div style={{ marginTop: 10, display: 'grid', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+              {porPagar.map((p) => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.product_name}{p.supplier ? ` · ${p.supplier}` : ''}</span>
                   <span className="mono">{money(p.unit_cost * p.qty)}</span>
@@ -197,7 +197,7 @@ export function Finanzas() {
                   <td data-label="Concepto">{g.concepto}</td>
                   <td data-label="Monto" className="mono">{money(g.monto)}</td>
                   <td data-label="" style={{ textAlign: 'right' }}>
-                    <button className="btn ghost sm" type="button" onClick={() => removeGasto(g.id)}><Trash2 size={14} /></button>
+                    <button className="btn ghost sm" type="button" onClick={() => { if (window.confirm(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`)) removeGasto(g.id) }}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}

@@ -9,7 +9,7 @@ import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
-import { markInvoiced, markPaid } from '../../data/store/ordersStore'
+import { markInvoiced, markPaid, rejectTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
 
@@ -276,6 +276,7 @@ function BillDetail({ order, productsById, clientName, onClose }: {
                 <b>El cliente informó su transferencia.</b>{transfer.reference ? ` Referencia: ${transfer.reference}.` : ''} Verifica que cayó y márcala cobrada para liberar el pedido.
                 {transfer.proof_path && <> · <button type="button" onClick={() => verProof(transfer.proof_path!)} style={{ color: 'var(--green-deep)', fontWeight: 700, background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>Ver comprobante</button></>}
               </span>
+              <button type="button" className="btn ghost sm" onClick={() => { if (window.confirm('¿Descartar esta transferencia? El pedido sale de la cola por confirmar y se avisa al cliente para que reintente. No marca pagado ni cancela.')) { rejectTransfer(order.id); onClose() } }}>Descartar transferencia</button>
             </div>
           )}
 
