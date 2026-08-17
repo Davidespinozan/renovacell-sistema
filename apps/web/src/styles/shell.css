@@ -430,4 +430,22 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   body.printing-venta .venta-print-root{display:block !important}
   body.printing-venta .corte-ticket{max-width:100%;box-shadow:none}
 }
+/* Manifiesto / hoja de salida del chofer: documento ancho (lista de paradas + firma),
+   mismo patrón de impresión aislada que el recibo/corte. */
+.manifiesto-doc{max-width:720px;margin:0 auto;background:#fff;color:#1a1f1c;padding:22px 26px;font-variant-numeric:tabular-nums}
+.manifiesto-doc h4{font-weight:800;font-size:17px;letter-spacing:.02em;margin:0}
+.manifiesto-doc .mf-sub{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#7a857c;margin-top:3px}
+.manifiesto-doc .mf-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:#5b665d;margin:12px 0 14px;border-top:1px dashed #cfd4cd;border-bottom:1px dashed #cfd4cd;padding:10px 0}
+.manifiesto-doc table{width:100%;border-collapse:collapse;font-size:12px}
+.manifiesto-doc th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#7a857c;border-bottom:1px solid #cfd4cd;padding:6px 8px}
+.manifiesto-doc td{padding:7px 8px;border-bottom:1px solid #eef1ee;vertical-align:top}
+.manifiesto-doc .mf-firma{display:flex;gap:40px;margin-top:34px}
+.manifiesto-doc .mf-firma > div{flex:1;border-top:1px solid #1a1f1c;padding-top:6px;font-size:11px;color:#5b665d;text-align:center}
+.manifiesto-doc .mf-foot{font-size:10px;color:#98a09a;margin-top:16px}
+.manifiesto-print-root{display:none}
+@media print{
+  body.printing-manifiesto > :not(.manifiesto-print-root){display:none !important}
+  body.printing-manifiesto .manifiesto-print-root{display:block !important}
+  body.printing-manifiesto .manifiesto-doc{max-width:100%;box-shadow:none}
+}
 @media print{ @page{margin:14mm} }
