@@ -44,6 +44,9 @@ export function setVerified(id: string, verified: boolean): boolean {
   if (verified && !((doc.meta?.cedula as string) ?? '').trim()) return false // gate: sin cédula no se verifica
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified } : d)))
   logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: doc.full_name ?? id })
+  // Al aprobarse, avisar al doctor (la landing le prometió "te avisaremos"). Dirigido al
+  // dueño de la cuenta, como el resto de avisos al doctor (patrón de markPaid).
+  if (verified) notify({ text: 'Tu acceso al portal Renovacell fue aprobado. Ya puedes iniciar sesión.', userIds: [id], screen: 'pedidosdr' })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verify', error.message); live.reload() })
   return true
 }
@@ -145,7 +148,8 @@ export function inviteDoctor(id: string) {
   if (!doc) return
   const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), invited: true }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
-  notify({ text: `Acceso al Portal enviado a ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  // El aviso va al DOCTOR (antes se lo mandaba al propio admin y el doctor nunca se enteraba).
+  notify({ text: 'Tu acceso al portal Renovacell está listo. Ya puedes iniciar sesión.', userIds: [id], screen: 'pedidosdr' })
   logAudit({ actor: 'Administración', action: 'Acceso al Portal enviado', resource: doc.full_name ?? id })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(() => live.reload())
   // Nota: la invitación real (crear usuario de auth + enlace mágico) es acción

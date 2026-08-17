@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Announcement, RoleId } from '../types'
 import { MOCK_ANNOUNCEMENTS } from '../mock/comunicacion'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { notify } from '../store/notificationsStore'
 import { useRole } from '../../auth/RoleContext'
 import type { Json } from '../database.types'
 
@@ -49,6 +50,9 @@ export function useAnnouncements() {
     const metadata = { kind: input.kind, pinned: input.pinned, audience: input.audience, author: user?.name ?? 'Tú', reactions: 0, reads: 0 }
     const row: Announcement = { id, title: input.title, body: input.body, start_at: now, end_at: null, created_by: currentUserId(), created_at: now, metadata }
     setData((prev) => [row, ...prev])
+    // Publicar un aviso/anuncio DEBE sonar la campana; antes se guardaba en silencio y el
+    // equipo solo lo veía si entraba a Inicio. Sin audiencia → a todo el equipo; con rol → al área.
+    notify({ text: `${input.kind === 'aviso' ? 'Nuevo aviso' : 'Nuevo anuncio'}: ${input.title}`, roles: input.audience ? [input.audience] : undefined, screen: 'comun' })
     if (hasSupabase) {
       supabase.from('announcements').insert({ id, title: input.title, body: input.body, start_at: now, created_by: currentUserId(), metadata: metadata as unknown as Json })
         .then(({ error }) => { if (error) console.warn('[announcements] insert', error.message); reload() })
