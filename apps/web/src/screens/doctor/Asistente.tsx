@@ -6,8 +6,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sparkles, Send, Plus, RefreshCw, ShoppingBag, ShieldCheck, Leaf } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAssistant } from '../../data/hooks/useAssistant'
+import { usePricing } from '../../data/hooks/usePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor } from '../../data/ops/stock'
+import { clientOf } from '../../data/mock/profiles'
+import { DOCTOR_ID } from '../../data/mock/orders'
+import { hasSupabase, currentUserId } from '../../lib/supabase'
+import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { statusView } from './orderStatus'
 import type { AssistantReply } from '../../data/assistant/engine'
 import type { ProductSafe } from '../../data/types'
@@ -28,7 +33,19 @@ const GREETING =
 
 export function Asistente() {
   const { ask, createOrder } = useAssistant()
+  const { priceFor } = usePricing()
+  // Precio del doctor: el de SU lista (RLS) o el base — igual que el catálogo. Antes el
+  // asistente cobraba siempre el precio base e ignoraba la lista Mayoreo/promos del doctor.
+  const priceOf = (p: ProductSafe): number | null => priceFor(p.id, p.price)
   const stockMap = useStock()
+
+  // Domicilio base del doctor (mismo cálculo que el checkout del catálogo): el pedido del
+  // asistente debe viajar con dirección de entrega, no salir con shipping vacío.
+  const myId = hasSupabase ? currentUserId() : DOCTOR_ID
+  const ci = clientOf(myId)
+  const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
+    ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
+    : null
 
   const seq = useRef(0)
   const nextId = () => `m-${(seq.current += 1)}`
@@ -71,14 +88,15 @@ export function Asistente() {
     push({ role: 'assistant', text: `Agregué ${product.name} a tu pedido en armado (abajo).` })
   }
 
-  const draftTotal = draft.reduce((s, d) => s + (d.product.price ?? 0) * d.qty, 0)
+  const draftTotal = draft.reduce((s, d) => s + (priceOf(d.product) ?? 0) * d.qty, 0)
 
   const crearPedido = () => {
     if (draft.length === 0) return
     const order = createOrder({
-      lines: draft.map((d) => ({ product_id: d.product.id, qty: d.qty, unit_price: d.product.price })),
+      lines: draft.map((d) => ({ product_id: d.product.id, qty: d.qty, unit_price: priceOf(d.product) })),
       total: draftTotal,
       invoice_requested: false,
+      shipping: baseAddr,
     })
     push({
       role: 'assistant',
@@ -106,7 +124,7 @@ export function Asistente() {
       return it.qty > (info.tracked ? info.qty : 0)
     })
     const total = lines.reduce((s, l) => s + (l.unit_price != null ? l.unit_price * l.qty : 0), 0)
-    const order = createOrder({ lines, total, invoice_requested: false })
+    const order = createOrder({ lines, total, invoice_requested: false, shipping: baseAddr })
     push({
       role: 'assistant',
       text: `Recreé tu pedido ${o.external_ref} como ${order.external_ref} (pago contra pedido).${adjusted ? ' Ajusté algunas cantidades al inventario disponible.' : ''} Lo ves en “Mis pedidos”.`,
@@ -149,7 +167,7 @@ export function Asistente() {
                   {m.reply?.products && m.reply.products.length > 0 && (
                     <div className="asst-prods">
                       {m.reply.products.map((p) => (
-                        <ProductRow key={p.id} p={p} onAdd={() => addToDraft(p)} />
+                        <ProductRow key={p.id} p={p} price={priceOf(p)} onAdd={() => addToDraft(p)} />
                       ))}
                     </div>
                   )}
@@ -216,7 +234,7 @@ export function Asistente() {
   )
 }
 
-function ProductRow({ p, onAdd }: { p: ProductSafe; onAdd: () => void }) {
+function ProductRow({ p, price, onAdd }: { p: ProductSafe; price: number | null; onAdd: () => void }) {
   const isProf = p.line === 'prof'
   return (
     <div className="asst-prod">
@@ -226,7 +244,7 @@ function ProductRow({ p, onAdd }: { p: ProductSafe; onAdd: () => void }) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2 }}>{p.name}</div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{p.category}</div>
-        <div className="mono" style={{ fontSize: 13, marginTop: 2 }}>{money(p.price)}</div>
+        <div className="mono" style={{ fontSize: 13, marginTop: 2 }}>{money(price ?? p.price)}</div>
       </div>
       <button className="btn sm" type="button" onClick={onAdd}>
         <Plus size={14} /> Agregar
