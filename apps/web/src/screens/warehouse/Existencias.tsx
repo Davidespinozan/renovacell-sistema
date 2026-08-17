@@ -8,6 +8,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, sevLabel } from './expiry'
 import { MermaModal } from './MermaModal'
+import { AjusteModal } from './AjusteModal'
 import type { Lot, ProductSafe } from '../../data/types'
 
 type MermaLot = { id: string; lot_code: string; quantity: number; producto?: string }
@@ -16,6 +17,7 @@ export function Existencias() {
   const { data: lots } = useLots()
   const { data: products } = useProducts()
   const [mermaLot, setMermaLot] = useState<MermaLot | null>(null)
+  const [ajusteLot, setAjusteLot] = useState<MermaLot | null>(null)
 
   const groups = useMemo(() => {
     const byProduct = new Map<string, Lot[]>()
@@ -53,7 +55,7 @@ export function Existencias() {
         </div>
       )}
       {groups.map((g) => (
-        <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} />
+        <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} onAjuste={setAjusteLot} />
       ))}
       {groups.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
@@ -62,11 +64,12 @@ export function Existencias() {
       )}
 
       {mermaLot && <MermaModal lot={mermaLot} onClose={() => setMermaLot(null)} />}
+      {ajusteLot && <AjusteModal lot={ajusteLot} onClose={() => setAjusteLot(null)} />}
     </div>
   )
 }
 
-function ProductStock({ product, lots, onMerma }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void }) {
+function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void; onAjuste: (l: MermaLot) => void }) {
   const total = lots.reduce((s, l) => s + l.quantity, 0)
   const isProf = product.line === 'prof'
   // El lote FEFO = el primero con stock que no esté caducado.
@@ -95,8 +98,10 @@ function ProductStock({ product, lots, onMerma }: { product: ProductSafe; lots: 
               <span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
               <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
+              <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)" style={{ marginLeft: 'auto' }}
+                onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}>Ajustar</button>
               {l.quantity > 0 && (
-                <button className="btn ghost sm" type="button" title="Dar de baja por merma (parcial o total)" style={{ color: 'var(--danger)', marginLeft: 'auto' }}
+                <button className="btn ghost sm" type="button" title="Dar de baja por merma (parcial o total)" style={{ color: 'var(--danger)' }}
                   onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}>Merma</button>
               )}
             </div>

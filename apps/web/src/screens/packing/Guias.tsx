@@ -55,7 +55,7 @@ export function Guias() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Pedido</th><th>Método</th><th>Estimada</th><th>Estatus</th></tr>
+              <tr><th>Pedido</th><th>Método</th><th>Estimada</th><th>Estatus</th><th>Etiqueta</th></tr>
             </thead>
             <tbody>
               {shipments.map((s) => {
@@ -72,11 +72,16 @@ export function Guias() {
                     </td>
                     <td data-label="Estimada">{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
                     <td data-label="Estatus"><span className={'pill ' + sp.pill}>{sp.label}</span></td>
+                    <td data-label="Etiqueta">
+                      {s.label_url
+                        ? <a className="btn ghost sm" href={s.label_url} target="_blank" rel="noreferrer"><Icon name="download" style={{ width: 13, height: 13 }} /> Guía</a>
+                        : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
+                    </td>
                   </tr>
                 )
               })}
               {shipments.length === 0 && (
-                <tr><td colSpan={4} style={{ color: 'var(--ink-3)' }}>Aún no hay envíos generados.</td></tr>
+                <tr><td colSpan={5} style={{ color: 'var(--ink-3)' }}>Aún no hay envíos generados.</td></tr>
               )}
             </tbody>
           </table>
