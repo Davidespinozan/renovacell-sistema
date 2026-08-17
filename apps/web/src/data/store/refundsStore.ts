@@ -7,7 +7,7 @@ import { logAudit } from './auditStore'
 import { makeLive } from './live'
 import type { Json } from '../database.types'
 
-export type RefundTipo = 'devolucion' | 'correccion'
+export type RefundTipo = 'devolucion' | 'correccion' | 'cortesia'
 
 // Renglón devuelto (para reingresar al inventario): el lote al que vuelve y cuántas piezas.
 export interface RefundItem { item_id?: string; lot_id: string | null; qty: number }

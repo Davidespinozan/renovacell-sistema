@@ -261,7 +261,7 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
               <div className="eyebrow" style={{ marginBottom: 8 }}>Devoluciones y correcciones</div>
               {misDevs.map((r) => (
                 <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
-                  <span className={'pill ' + (r.tipo === 'correccion' ? 'p-warn' : 'p-neu')}>{r.tipo === 'correccion' ? 'Corrección' : 'Devolución'}</span>
+                  <span className={'pill ' + (r.tipo === 'devolucion' ? 'p-neu' : 'p-warn')}>{({ devolucion: 'Devolución', correccion: 'Corrección', cortesia: 'Cortesía' } as Record<string, string>)[r.tipo] ?? 'Devolución'}</span>
                   <span className="mono" style={{ color: 'var(--danger)' }}>− {money(r.monto)}</span>
                   <span style={{ color: 'var(--ink-2)', flex: 1 }}>{r.motivo}</span>
                   <span style={{ color: 'var(--ink-3)', fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)} · {r.usuario}</span>
@@ -310,7 +310,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
   onClose: () => void
 }) {
   const { data: refunds, registrarDevolucion, returnedByItem } = useRefunds()
-  const [tipo, setTipo] = useState<'devolucion' | 'correccion'>('devolucion')
+  const [tipo, setTipo] = useState<'devolucion' | 'correccion' | 'cortesia'>('devolucion')
   const [qtys, setQtys] = useState<Record<string, number>>({})   // piezas a regresar por renglón
   const [montoCorr, setMontoCorr] = useState(String(restante))    // monto libre para corrección
   const [motivo, setMotivo] = useState('')
@@ -343,11 +343,14 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
   return (
     <div style={{ marginTop: 14, padding: 14, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }}>
       <div className="seg" style={{ marginBottom: 12 }}>
-        <button type="button" className={tipo === 'devolucion' ? 'active' : undefined} onClick={() => setTipo('devolucion')}>Devolución al cliente</button>
-        <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>Corrección de error</button>
+        <button type="button" className={tipo === 'devolucion' ? 'active' : undefined} onClick={() => setTipo('devolucion')}>Devolución</button>
+        <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>Corrección</button>
+        <button type="button" className={tipo === 'cortesia' ? 'active' : undefined} onClick={() => setTipo('cortesia')}>Cortesía</button>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        {tipo === 'devolucion' ? 'El producto regresó: elige qué renglones y cuántas piezas. Se reingresan al inventario.' : 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'}
+        {tipo === 'devolucion' ? 'El producto regresó: elige qué renglones y cuántas piezas. Se reingresan al inventario.'
+          : tipo === 'correccion' ? 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'
+          : 'Se cobró pero no debía (cortesía). Regresa el dinero; el producto se queda con el cliente, no toca inventario.'}
       </div>
 
       {tipo === 'devolucion' ? (
@@ -383,7 +386,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Motivo</label>
       <input style={{ ...fld, marginTop: 5, marginBottom: 8 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {(tipo === 'correccion' ? PRESETS_CORR : PRESETS_DEV).map((pz) => (
+        {(tipo === 'devolucion' ? PRESETS_DEV : PRESETS_CORR).map((pz) => (
           <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: '#fff', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
         ))}
       </div>
@@ -391,7 +394,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button className="btn ghost sm" type="button" onClick={onClose}>Cancelar</button>
         <button className="btn sm" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
-          {busy ? 'Registrando…' : `Registrar ${tipo === 'correccion' ? 'corrección' : 'devolución'}`}
+          {busy ? 'Registrando…' : `Registrar ${({ devolucion: 'devolución', correccion: 'corrección', cortesia: 'cortesía' } as const)[tipo]}`}
         </button>
       </div>
     </div>
