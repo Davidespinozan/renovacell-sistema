@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
+import { ConfirmModal } from '../../app/ConfirmModal'
 import { ExportButton } from '../../app/ExportButton'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -45,8 +46,8 @@ export function Doctores() {
     setBusyId(null)
     if (res) setFlash({ name, res })
   }
-  const onDeleteDoctor = async (id: string, name: string) => {
-    if (!window.confirm(`¿Eliminar a ${name}? Perderá el acceso y se borra su cuenta. Esta acción no se puede deshacer.`)) return
+  // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
+  const doDeleteDoctor = async (id: string) => {
     const r = await deleteDoctor(id)
     if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
   }
@@ -54,6 +55,7 @@ export function Doctores() {
   const { lists } = usePricing()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
+  const [delDoctor, setDelDoctor] = useState<{ id: string; name: string } | null>(null)
   const detail = doctors.find((d) => d.id === detailId) ?? null // siempre el doctor vivo del store
 
   const orderCount = useMemo(() => {
@@ -136,7 +138,7 @@ export function Doctores() {
             </label>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
-            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => onDeleteDoctor(d.id, d.full_name ?? 'este doctor')}><Trash2 size={14} /> Eliminar</button>
+            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setDelDoctor({ id: d.id, name: d.full_name ?? 'este doctor' })}><Trash2 size={14} /> Eliminar</button>
             {d.verified ? (
               <>
                 <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
@@ -183,6 +185,16 @@ export function Doctores() {
       )}
 
       {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy="Administración" onClose={() => setPedidoFor(null)} />}
+      {delDoctor && (
+        <ConfirmModal
+          title="Eliminar doctor"
+          confirmLabel="Eliminar definitivamente"
+          requireType="ELIMINAR"
+          message={<>Vas a eliminar a <b>{delDoctor.name}</b>: perderá el acceso, se borra su cuenta y su historial. <b>Esta acción no se puede deshacer.</b></>}
+          onConfirm={() => doDeleteDoctor(delDoctor.id)}
+          onClose={() => setDelDoctor(null)}
+        />
+      )}
       {editDoc && (
         <EditDoctorModal
           initial={editDoc}
