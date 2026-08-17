@@ -137,3 +137,19 @@ concurrentes. Renovacell ya tiene el corte; esto lo blinda.
 4. **C (auditar REVOKE, dedup webhook)** — seguridad, rápido.
 5. **B8/B9/B11/B12** — pulido de reportes y caja.
 6. **D (RPCs canónicas, tests en migración)** — método continuo.
+
+---
+
+## Camino a "clase mundial" (más allá de paridad)
+Lo que separa un buen sistema de uno EXCEPCIONAL no son más features (Renovacell tiene de
+sobra) sino **robustez, integridad de auditoría y disciplina arquitectónica** — lo que hace
+que sala "aguante". Construido en esta línea (7 ago):
+- ✅ **Alertas proactivas por cron** (caducidad + cobranza) — `20260807130000`.
+- ✅ **Ledgers inmutables** (`audit_logs` + `inventory_movements` append-only por trigger) —
+  `20260807140000`. Integridad regulatoria COFEPRIS/LFPDPPP.
+
+Siguiente palanca (arquitectónica, incremental): **migrar los ~15 `UPDATE` directos a tablas
+sensibles (estados de pedido, verified, precios) a RPCs canónicas validadas** — la disciplina
+que sala aprendió a la mala ("un UPDATE con RLS es más laxo que una RPC: la policy deja tocar
+la fila pero no revisa reglas de negocio"). Empezar por la máquina de estados del pedido
+(packed→shipped→delivered debe validar la transición, hoy es UPDATE directo).
