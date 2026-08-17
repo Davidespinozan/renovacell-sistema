@@ -123,7 +123,7 @@ export function Prospectos() {
     markConverted(p.id, doc.id)
   }
 
-  const onCapture = (input: { name: string; email: string | null; phone: string | null; organization: string | null; channel: string; interest: string[] }) => {
+  const onCapture = (input: { name: string; email: string | null; phone: string | null; organization: string | null; channel: string; interest: string[]; message?: string }) => {
     const res = captureLead(input, roster.length ? roster : undefined)
     setCaptureOpen(false)
     setFlash(res.duplicate
@@ -558,7 +558,7 @@ function CaptacionPanel({ prospects, roster }: { prospects: Prospect[]; roster: 
 // auto-asignación). Los canales con "auto" pueden llegar por integración (seam).
 function CaptureModal({ onClose, onCapture }: {
   onClose: () => void
-  onCapture: (input: { name: string; email: string | null; phone: string | null; organization: string | null; channel: string; interest: string[] }) => void
+  onCapture: (input: { name: string; email: string | null; phone: string | null; organization: string | null; channel: string; interest: string[]; message?: string }) => void
 }) {
   const { data: products } = useProducts()
   const [channel, setChannel] = useState('WhatsApp')
@@ -567,13 +567,14 @@ function CaptureModal({ onClose, onCapture }: {
   const [email, setEmail] = useState('')
   const [org, setOrg] = useState('')
   const [interest, setInterest] = useState('')
+  const [message, setMessage] = useState('')
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   const save = () => {
     if (!name.trim()) return
-    onCapture({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, organization: org.trim() || null, channel, interest: interest ? [interest] : [] })
+    onCapture({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, organization: org.trim() || null, channel, interest: interest ? [interest] : [], message: isChatChannel(channel) ? (message.trim() || undefined) : undefined })
   }
 
   return (
@@ -632,6 +633,18 @@ function CaptureModal({ onClose, onCapture }: {
               </select>
             </div>
           </div>
+
+          {isChatChannel(channel) && (
+            <>
+              <label style={label}>Primer mensaje del prospecto (opcional)</label>
+              <textarea
+                style={{ ...input, minHeight: 68, resize: 'vertical' }}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={`Lo que escribió por ${channel}… (siembra su conversación)`}
+              />
+            </>
+          )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
