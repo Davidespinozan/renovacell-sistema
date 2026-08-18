@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react'
 import { Target, Percent, Trophy } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
+import { useProducts } from '../../data/hooks/useProducts'
 import { useTeam } from '../../data/hooks/useTeam'
 import { useMetas } from '../../data/hooks/useMetas'
 import { isSale } from '../../data/metrics'
@@ -15,14 +16,23 @@ const localYM = (iso: string): string => { const d = new Date(iso); return `${d.
 
 export function Comisiones() {
   const { data: orders } = useAllOrders()
+  const { data: products } = useProducts()
   const { data: team } = useTeam()
-  const { targetFor, globalRate, setTarget, setGlobalRate } = useMetas()
+  const { targetFor, lineRate, setTarget, setLineRate } = useMetas()
 
   const now = new Date()
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const rate = globalRate()
+  const rateCosm = lineRate('cosm')
+  const rateProf = lineRate('prof')
 
   const sellers = useMemo(() => team.filter((u) => u.role === 'pos' && u.active), [team])
+  // Línea de cada producto (Home Care 'cosm' / Professional 'prof') para la comisión por línea.
+  const lineOf = useMemo(() => {
+    const m: Record<string, 'cosm' | 'prof'> = {}
+    products.forEach((p) => { m[p.id] = p.line === 'prof' ? 'prof' : 'cosm' })
+    return m
+  }, [products])
+  const rateForLine = (pid: string | null): number => ((pid && lineOf[pid]) === 'prof' ? rateProf : rateCosm)
 
   // Atribución de la venta a un vendedor: email de shipping_meta.seller (POS/venta directa/
   // eventos) o, si el pedido lo levantó un vendedor, por coincidencia de nombre en placed_by.
@@ -34,15 +44,21 @@ export function Comisiones() {
   }
 
   const { agg, sinVend } = useMemo(() => {
-    const a: Record<string, { total: number; count: number }> = {}
-    const sin = { total: 0, count: 0 }
+    const a: Record<string, { total: number; count: number; comision: number }> = {}
+    const sin = { total: 0, count: 0, comision: 0 }
     orders.filter(isSale).filter((o) => localYM(o.created_at) === ym).forEach((o) => {
       const s = sellerOf(o)
-      if (s) { (a[s] ??= { total: 0, count: 0 }); a[s].total += o.total ?? 0; a[s].count += 1 }
-      else { sin.total += o.total ?? 0; sin.count += 1 }
+      const bucket = s ? (a[s] ??= { total: 0, count: 0, comision: 0 }) : sin
+      bucket.count += 1
+      // Comisión POR LÍNEA: cada renglón aporta importe × tasa de su línea.
+      o.items.filter((it) => it.unit_price != null).forEach((it) => {
+        const amt = (it.unit_price ?? 0) * it.qty
+        bucket.total += amt
+        bucket.comision += amt * rateForLine(it.product_id ?? null)
+      })
     })
     return { agg: a, sinVend: sin }
-  }, [orders, ym, sellers])
+  }, [orders, ym, sellers, rateCosm, rateProf, lineOf])
 
   // Filas: todos los vendedores activos + cualquier email con ventas que no esté en el equipo.
   const emails = useMemo(() => {
@@ -55,20 +71,21 @@ export function Comisiones() {
     const nombre = sellers.find((s) => s.email === email)?.name ?? email
     const ventas = agg[email]?.total ?? 0
     const pedidos = agg[email]?.count ?? 0
+    const comision = agg[email]?.comision ?? 0
     const meta = targetFor(email)
     const avance = meta > 0 ? (ventas / meta) * 100 : 0
-    const comision = ventas * rate
     return { email, nombre, ventas, pedidos, meta, avance, comision }
-  }).sort((a, b) => b.ventas - a.ventas), [emails, agg, sellers, rate, targetFor])
+  }).sort((a, b) => b.ventas - a.ventas), [emails, agg, sellers, targetFor])
 
   const totVentas = rows.reduce((s, r) => s + r.ventas, 0)
   const totComision = rows.reduce((s, r) => s + r.comision, 0)
 
-  const editarTasa = () => {
-    const raw = window.prompt('Tasa de comisión del equipo (%). Ej. 5 = 5%', String((rate * 100).toFixed(2)))
+  const editarLinea = (line: 'cosm' | 'prof', actual: number) => {
+    const label = line === 'prof' ? 'Professional' : 'Home Care'
+    const raw = window.prompt(`Tasa de comisión ${label} (%). Ej. 5 = 5%`, String((actual * 100).toFixed(2)))
     if (raw == null) return
     const n = Number(raw)
-    if (Number.isFinite(n) && n >= 0 && n <= 100) setGlobalRate(n / 100)
+    if (Number.isFinite(n) && n >= 0 && n <= 100) setLineRate(line, n / 100)
   }
 
   return (
@@ -76,9 +93,14 @@ export function Comisiones() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="eyebrow" style={{ margin: 0 }}>Comercial · Metas y comisiones</div>
         <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{MONTHS[now.getMonth()]} {now.getFullYear()}</span>
-        <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={editarTasa}>
-          <Percent size={14} /> Comisión: {(rate * 100).toFixed(1)}%
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn ghost sm" type="button" title="Editar % de comisión Home Care" onClick={() => editarLinea('cosm', rateCosm)}>
+            <Percent size={14} /> Home Care: {(rateCosm * 100).toFixed(1)}%
+          </button>
+          <button className="btn ghost sm" type="button" title="Editar % de comisión Professional" onClick={() => editarLinea('prof', rateProf)}>
+            <Percent size={14} /> Professional: {(rateProf * 100).toFixed(1)}%
+          </button>
+        </div>
       </div>
 
       <div className="grid sigs">
@@ -88,7 +110,10 @@ export function Comisiones() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '14px 16px 6px' }}><div className="eyebrow" style={{ margin: 0 }}>Por vendedor</div></div>
+        <div style={{ padding: '14px 16px 6px' }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Por vendedor</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>La comisión se calcula por línea: cada renglón vendido aplica la tasa de Home Care o Professional.</div>
+        </div>
         <div style={{ padding: '0 14px 10px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Vendedor</th><th>Ventas</th><th>Pedidos</th><th>Meta</th><th>Avance</th><th>Comisión</th></tr></thead>

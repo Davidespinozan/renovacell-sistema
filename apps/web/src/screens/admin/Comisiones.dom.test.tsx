@@ -8,11 +8,12 @@ import { Comisiones } from './Comisiones'
 beforeEach(cleanup)
 
 describe('<Comisiones>', () => {
-  it('renderiza el encabezado, la tasa de comisión y la tabla por vendedor', () => {
+  it('renderiza el encabezado, las tasas por línea y la tabla por vendedor', () => {
     render(<Comisiones />)
     expect(screen.getByText('Comercial · Metas y comisiones')).toBeInTheDocument()
-    // Tasa por defecto del equipo (mock): 5.0%.
-    expect(screen.getByText(/Comisión: 5\.0%/)).toBeInTheDocument()
+    // Tasas por línea (mock): Home Care 4.0% y Professional 6.0%.
+    expect(screen.getByText(/Home Care: 4\.0%/)).toBeInTheDocument()
+    expect(screen.getByText(/Professional: 6\.0%/)).toBeInTheDocument()
     expect(screen.getByText('Por vendedor')).toBeInTheDocument()
   })
 
