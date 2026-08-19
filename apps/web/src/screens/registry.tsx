@@ -39,6 +39,7 @@ import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
 import { Precios } from './admin/Precios'
 import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
+import { Mermas } from './admin/Mermas'
 import { Importar } from './admin/Importar'
 import { Eventos } from './pos/Eventos'
 import { MiConsigna } from './sales/MiConsigna'
@@ -85,6 +86,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_precios: () => <Precios />,
   av_comisiones: () => <Comisiones />,
   av_config: () => <Configuracion />,
+  av_mermas: () => <Mermas />,
   av_import: () => <Importar />,
   av_sitio: () => <SitioWeb />,
   eventos: () => <Eventos />,
