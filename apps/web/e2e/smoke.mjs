@@ -2,7 +2,11 @@
 // (vite --mode test, que ignora .env.local), entra con CADA rol y recorre TODAS sus
 // pantallas, verificando que ninguna ROMPE (ErrorBoundary) ni tira errores de consola.
 // Atrapa roturas de auth/routing/render que los tests unitarios no ven. Read-only: solo
-// navega, no escribe. Uso: `npm run e2e` (necesita Chrome; CHROME_PATH para apuntarlo).
+// navega, no escribe. Necesita Chrome (CHROME_PATH para apuntarlo).
+//   Mock (default):  npm run e2e
+//   Backend real:    E2E_EMAIL=... E2E_PASSWORD=... npm run e2e:backend
+//                    (vite normal → usa .env.local; READ-ONLY contra Supabase real; verifica
+//                     que RLS/lecturas responden. Si faltan credenciales, se OMITE sin fallar.)
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import puppeteer from 'puppeteer-core'
@@ -10,6 +14,11 @@ import puppeteer from 'puppeteer-core'
 const PORT = Number(process.env.E2E_PORT || 4188)
 const BASE = `http://localhost:${PORT}`
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// MODO: 'mock' (default, determinista, sin backend) o 'backend' (contra Supabase real,
+// READ-ONLY). En backend las credenciales llegan por env (E2E_EMAIL/E2E_PASSWORD) — nunca
+// se hardcodean ni se commitean. Si faltan, el backend smoke se OMITE (no rompe CI).
+const MODE = process.env.E2E_MODE === 'backend' ? 'backend' : 'mock'
 
 const CHROME = process.env.CHROME_PATH || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -39,22 +48,38 @@ async function waitServer(ms = 40000) {
   throw new Error('el dev server no respondió en ' + BASE)
 }
 
-async function login(page, email) {
+async function login(page, email, password) {
   await page.waitForSelector('input[type=email]', { timeout: 15000 })
   await page.$eval('input[type=email]', (e) => (e.value = ''))
   await page.type('input[type=email]', email)
-  await page.type('input[type=password]', 'demo')
+  await page.type('input[type=password]', password)
   await page.click('button[type=submit]')
-  await page.waitForSelector('nav.nav a', { timeout: 15000 })
-  await sleep(600)
+  // Backend real puede tardar más (auth + primer fetch).
+  await page.waitForSelector('nav.nav a', { timeout: MODE === 'backend' ? 25000 : 15000 })
+  await sleep(MODE === 'backend' ? 1200 : 600)
 }
 
 async function run() {
   if (!CHROME) { console.error('No encontré Chrome. Define CHROME_PATH.'); process.exit(2) }
-  console.log('▶ Levantando app en modo mock (vite --mode test) en :' + PORT)
-  const vite = spawn('npx', ['vite', '--mode', 'test', '--port', String(PORT), '--strictPort'], {
-    cwd: new URL('..', import.meta.url).pathname, stdio: 'ignore',
-  })
+
+  // Cuentas a probar según el modo.
+  let accounts
+  if (MODE === 'backend') {
+    if (!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD) {
+      console.log('⏭  Backend smoke OMITIDO: faltan E2E_EMAIL / E2E_PASSWORD (read-only contra Supabase real).')
+      process.exit(0)
+    }
+    accounts = [{ role: process.env.E2E_ROLE || 'Backend', email: process.env.E2E_EMAIL, password: process.env.E2E_PASSWORD }]
+  } else {
+    accounts = ROLES.map((r) => ({ ...r, password: 'demo' }))
+  }
+
+  // mock → vite --mode test (ignora .env.local); backend → vite normal (usa .env.local real).
+  const viteArgs = MODE === 'backend'
+    ? ['vite', '--port', String(PORT), '--strictPort']
+    : ['vite', '--mode', 'test', '--port', String(PORT), '--strictPort']
+  console.log(`▶ Levantando app (${MODE}) en :${PORT}`)
+  const vite = spawn('npx', viteArgs, { cwd: new URL('..', import.meta.url).pathname, stdio: 'ignore' })
   const kill = () => { try { vite.kill('SIGTERM') } catch { /* */ } }
   process.on('exit', kill); process.on('SIGINT', () => { kill(); process.exit(1) })
 
@@ -64,14 +89,14 @@ async function run() {
     await waitServer()
     browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'], defaultViewport: { width: 1440, height: 900 } })
 
-    for (const { role, email } of ROLES) {
+    for (const { role, email, password } of accounts) {
       const page = await browser.newPage()
       let bucket = []
       page.on('console', (m) => { if (m.type() === 'error' && isReal(m.text())) bucket.push(m.text().slice(0, 160)) })
       page.on('pageerror', (e) => { if (isReal(String(e))) bucket.push('PAGEERROR ' + String(e).slice(0, 160)) })
 
       await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 30000 })
-      await login(page, email)
+      await login(page, email, password)
 
       const labels = await page.$$eval('nav.nav a', (els) =>
         els.map((e) => e.querySelector('span')?.textContent?.trim()).filter(Boolean))

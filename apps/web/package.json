@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "node e2e/smoke.mjs"
+    "e2e": "node e2e/smoke.mjs",
+    "e2e:backend": "E2E_MODE=backend node e2e/smoke.mjs"
   },
   "dependencies": {
     "@renovacell/ui": "*",
