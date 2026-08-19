@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@renovacell/ui": "*",
+    "@sentry/react": "^8.55.2",
     "@supabase/supabase-js": "^2.0.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
