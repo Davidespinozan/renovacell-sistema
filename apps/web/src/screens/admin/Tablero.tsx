@@ -11,6 +11,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
+import { cobranza, cuentasPorCobrar } from '../../data/ops/finanzas'
+import { useRefunds } from '../../data/hooks/useFinanzas'
 import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo, doctoresEnRiesgo } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
@@ -29,6 +31,16 @@ export function Tablero() {
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
   const { data: products } = useProducts()
+  const { data: refunds } = useRefunds()
+
+  // "Tu dinero" (mes): cobranza real neta de devoluciones + lo que te deben (CxC de pie).
+  const now = new Date()
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const cobMes = useMemo(
+    () => cobranza(orders.filter((o) => { const d = new Date(o.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === ym }), refunds),
+    [orders, refunds, ym],
+  )
+  const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
 
   const prodName = useMemo(() => {
     const m: Record<string, string> = {}
@@ -124,6 +136,17 @@ export function Tablero() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* TU DINERO (posición de cobranza del mes, en lenguaje llano — inspirado en CuboPolar) */}
+      <div>
+        <div className="eyebrow" style={{ margin: '0 0 12px' }}>Tu dinero · {mesLabel}</div>
+        <div className="grid sigs">
+          <Sig icon="chart" value={money(cobMes.vendido)} k="Vendiste" s="ventas del mes" />
+          <Sig icon="receipt" value={money(cobMes.cobrado)} k="Cobrado" s="entró a caja, neto de devoluciones" />
+          <Sig icon="check" value={`${Math.round(cobMes.tasaCobro)}%`} k="Tasa de cobro" s="cobrado ÷ vendido" tone={cobMes.vendido > 0 && cobMes.tasaCobro < 70 ? 'warn' : undefined} />
+          <Sig icon="clock" value={money(cxc.total)} k="Te deben" s={`${cxc.count} pedido(s) por cobrar`} tone={cxc.total > 0 ? 'warn' : undefined} />
         </div>
       </div>
 
