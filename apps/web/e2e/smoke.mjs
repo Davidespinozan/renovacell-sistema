@@ -62,7 +62,7 @@ async function run() {
   let browser
   try {
     await waitServer()
-    browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1440, height: 900 } })
+    browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'], defaultViewport: { width: 1440, height: 900 } })
 
     for (const { role, email } of ROLES) {
       const page = await browser.newPage()

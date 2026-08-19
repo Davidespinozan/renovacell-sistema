@@ -37,3 +37,29 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    name: e2e smoke · todas las pantallas por rol
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install (workspaces)
+        run: npm ci
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+
+      # Levanta la app en modo mock (vite --mode test) y recorre cada pantalla de cada rol;
+      # falla si alguna cae en el ErrorBoundary o tira un error de consola.
+      - name: Smoke E2E
+        run: npm run e2e --workspace @renovacell/web
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
