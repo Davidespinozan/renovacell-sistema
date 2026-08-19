@@ -1267,6 +1267,45 @@ export type Database = {
         }
         Relationships: []
       }
+      company_settings: {
+        Row: {
+          cp: string | null
+          direccion: string | null
+          email: string | null
+          id: string
+          logo_url: string | null
+          razon_social: string | null
+          regimen_fiscal: string | null
+          rfc: string | null
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          cp?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          razon_social?: string | null
+          regimen_fiscal?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cp?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          razon_social?: string | null
+          regimen_fiscal?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sales_targets: {
         Row: {
           commission_rate: number

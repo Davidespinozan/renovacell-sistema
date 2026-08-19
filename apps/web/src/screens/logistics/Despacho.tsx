@@ -11,6 +11,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { driverName } from '../../data/mock/shipments'
 import { deliveryOf } from '../../data/mock/profiles'
+import { useCompany } from '../../data/hooks/useCompany'
 import { useRole } from '../../auth/RoleContext'
 
 interface Parada { shipmentId: string; folio: string; cliente: string; direccion: string; telefono: string; piezas: number }
@@ -20,6 +21,8 @@ export function Despacho() {
   const { data: shipments, dispatchShipment } = useShipments()
   const { data: orders } = useAllOrders()
   const { user, role } = useRole()
+  const { company } = useCompany()
+  const empresa = company.razon_social || 'RENOVACELL'
   const [toast, setToast] = useState<string | null>(null)
   const [printMf, setPrintMf] = useState<Manifiesto | null>(null)
 
@@ -141,7 +144,7 @@ export function Despacho() {
         </div>
       </div>
 
-      {printMf && <ManifiestoPrint mf={printMf} who={who} />}
+      {printMf && <ManifiestoPrint mf={printMf} who={who} empresa={empresa} />}
       {toast && <div className="toast show"><Icon name="check" /> {toast}</div>}
     </div>
   )
@@ -149,10 +152,10 @@ export function Despacho() {
 
 // Hoja de salida imprimible: folios, destinos, piezas y renglones de FIRMA (quien entrega
 // y el chofer que recibe). Es el documento físico que respalda la entrega de la carga.
-function ManifiestoDoc({ mf, who }: { mf: Manifiesto; who: string }) {
+function ManifiestoDoc({ mf, who, empresa }: { mf: Manifiesto; who: string; empresa: string }) {
   return (
     <div className="manifiesto-doc">
-      <h4>RENOVACELL</h4>
+      <h4>{empresa}</h4>
       <div className="mf-sub">Manifiesto de carga · hoja de salida</div>
       <div className="mf-meta">
         <span>Chofer: <b>{mf.chofer}</b></span>
@@ -183,6 +186,6 @@ function ManifiestoDoc({ mf, who }: { mf: Manifiesto; who: string }) {
     </div>
   )
 }
-function ManifiestoPrint({ mf, who }: { mf: Manifiesto; who: string }) {
-  return createPortal(<div className="manifiesto-print-root"><ManifiestoDoc mf={mf} who={who} /></div>, document.body)
+function ManifiestoPrint({ mf, who, empresa }: { mf: Manifiesto; who: string; empresa: string }) {
+  return createPortal(<div className="manifiesto-print-root"><ManifiestoDoc mf={mf} who={who} empresa={empresa} /></div>, document.body)
 }
