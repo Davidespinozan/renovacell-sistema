@@ -48,15 +48,24 @@ async function waitServer(ms = 40000) {
   throw new Error('el dev server no respondió en ' + BASE)
 }
 
+// Devuelve el estado tras el submit: 'ok' (entró al shell), 'gated' (doctor sin verificar
+// → pantalla de cédula, comportamiento correcto), 'bad-credentials', o 'unknown'.
 async function login(page, email, password) {
   await page.waitForSelector('input[type=email]', { timeout: 15000 })
   await page.$eval('input[type=email]', (e) => (e.value = ''))
   await page.type('input[type=email]', email)
   await page.type('input[type=password]', password)
   await page.click('button[type=submit]')
-  // Backend real puede tardar más (auth + primer fetch).
-  await page.waitForSelector('nav.nav a', { timeout: MODE === 'backend' ? 25000 : 15000 })
-  await sleep(MODE === 'backend' ? 1200 : 600)
+  try {
+    await page.waitForSelector('nav.nav a', { timeout: MODE === 'backend' ? 25000 : 15000 })
+    await sleep(MODE === 'backend' ? 1200 : 600)
+    return 'ok'
+  } catch {
+    const body = await page.evaluate(() => document.body.innerText)
+    if (/Verifica tu c[eé]dula/i.test(body)) return 'gated'
+    if (/incorrect/i.test(body)) return 'bad-credentials'
+    return 'unknown'
+  }
 }
 
 async function run() {
@@ -96,7 +105,10 @@ async function run() {
       page.on('pageerror', (e) => { if (isReal(String(e))) bucket.push('PAGEERROR ' + String(e).slice(0, 160)) })
 
       await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 30000 })
-      await login(page, email, password)
+      const status = await login(page, email, password)
+      if (status === 'gated') { console.log(`  ${role}: portal bloqueado por verificación de cédula (correcto)`); await page.close(); continue }
+      if (status === 'bad-credentials') { failures.push(`${role}: login rechazado (credenciales incorrectas)`); await page.close(); continue }
+      if (status === 'unknown') { failures.push(`${role}: no cargó el shell tras el login`); await page.close(); continue }
 
       const labels = await page.$$eval('nav.nav a', (els) =>
         els.map((e) => e.querySelector('span')?.textContent?.trim()).filter(Boolean))
