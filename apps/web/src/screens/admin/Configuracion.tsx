@@ -18,12 +18,12 @@ export function Configuracion() {
     setForm((f) => ({ ...f, [k]: e.target.value })); setSaved(false)
   }
   const dirty = useMemo(() => (Object.keys(form) as (keyof typeof form)[]).some((k) => form[k] !== company[k]), [form, company])
-  const rfcOk = form.rfc === '' || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
+  const rfcOk = !form.rfc || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
   const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
 
   const guardar = () => {
     if (!puedeGuardar) return
-    saveCompany({ ...form, rfc: form.rfc.trim().toUpperCase() })
+    saveCompany({ ...form, rfc: (form.rfc ?? '').trim().toUpperCase() })
     setSaved(true)
   }
 

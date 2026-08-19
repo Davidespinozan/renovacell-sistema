@@ -23,6 +23,23 @@ export const EMPTY_COMPANY: CompanySettings = {
 // Mock: sin datos capturados (el cliente los llena en Configuración antes del go-live).
 const MOCK: CompanySettings[] = [{ ...EMPTY_COMPANY }]
 
+// El backend devuelve las columnas como NULL cuando están vacías; hay que colapsarlas a ''
+// (un spread directo dejaría null y rompería cualquier .trim() en la UI — bug real que el
+// smoke de backend cazó en Configuración). Función pura para poder testearla.
+export function normalizeCompany(row: Partial<Record<keyof CompanySettings, string | null>> | null): CompanySettings {
+  const r = row ?? {}
+  return {
+    razon_social: r.razon_social ?? '',
+    rfc: r.rfc ?? '',
+    regimen_fiscal: r.regimen_fiscal ?? '',
+    cp: r.cp ?? '',
+    direccion: r.direccion ?? '',
+    telefono: r.telefono ?? '',
+    email: r.email ?? '',
+    logo_url: r.logo_url ?? '',
+  }
+}
+
 const live = makeLive<CompanySettings>(async () => {
   const { data, error } = await supabase
     .from('company_settings')
@@ -30,7 +47,7 @@ const live = makeLive<CompanySettings>(async () => {
     .eq('id', 'default')
     .maybeSingle()
   if (error) throw error
-  return [{ ...EMPTY_COMPANY, ...(data ?? {}) } as CompanySettings]
+  return [normalizeCompany(data as Partial<Record<keyof CompanySettings, string | null>> | null)]
 }, MOCK)
 
 export const subscribe = live.subscribe
