@@ -123,16 +123,31 @@ export function createOrder(input: {
   // el "a nombre de" con id mock se conectará al cablear doctores).
   if (hasSupabase && isUuid(doctorId)) {
     (async () => {
-      const oi = await supabase.from('orders').insert({
-        id, external_ref: folio, doctor_id: doctorId, total: input.total, currency: 'MXN',
-        status: 'pending_payment', payment_method: 'contra_pedido', payment_status: 'pending',
-        invoice_requested: input.invoice_requested, shipping_meta: order.shipping_meta as unknown as Json,
+      // EL PRECIO NO LO PONE EL CLIENTE. El servidor (RPC crear_pedido, SECURITY DEFINER)
+      // calcula unit_price/total desde la lista del doctor; aquí solo se manda {product_id, qty}.
+      // El total optimista de arriba es solo para respuesta instantánea y se reemplaza por el
+      // total autoritativo del servidor.
+      const { data, error } = await supabase.rpc('crear_pedido', {
+        p_order_id: id,
+        p_folio: folio,
+        p_doctor_id: doctorId as string, // isUuid(doctorId) ya garantizó no-null
+
+        p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
+        p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
+        p_invoice_requested: input.invoice_requested,
       })
-      if (oi.error) { console.warn('[orders] insert', oi.error.message); return }
-      await supabase.from('order_items').insert(input.lines.map((l) => ({
-        order_id: id, product_id: l.product_id, qty: l.qty, unit_price: l.unit_price,
-      })))
-      hydrate()
+      if (error || !data) {
+        // Servidor rechazó (precio inválido, producto inactivo, no autorizado…): revierte el
+        // pedido optimista para no dejar una orden fantasma sin persistir.
+        console.warn('[orders] crear_pedido', error?.message)
+        orders = orders.filter((o) => o.id !== id)
+        items = items.filter((it) => it.order_id !== id)
+        emit()
+        return
+      }
+      const t = Number((data as { total?: number }).total)
+      if (Number.isFinite(t)) { orders = orders.map((o) => (o.id === id ? { ...o, total: t } : o)); emit() }
+      hydrate() // trae unit_price/total AUTORITATIVOS del servidor
     })()
   }
   return { ...order, items: newItems }

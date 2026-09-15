@@ -14,6 +14,7 @@
 // (profiles.meta.fiscal) o del payload; si faltan, responde 422 (no timbra a ciegas).
 // Los importes de la app se asumen IVA-incluido (16%) y se desglosan.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { cfdiYaTimbrado, lugarDeExpedicion } from './rules.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -55,9 +56,20 @@ Deno.serve(async (req) => {
 
   // Pedido + renglones + datos fiscales del doctor.
   const { data: order, error: oErr } = await admin.from('orders')
-    .select('id, external_ref, total, currency, doctor_id, payment_method, order_items(description:product_id, qty, unit_price)')
+    .select('id, external_ref, total, currency, doctor_id, payment_method, invoice_meta, order_items(description:product_id, qty, unit_price)')
     .eq('id', payload.order_id).single()
   if (oErr || !order) return json(404, { error: 'Pedido no encontrado.' })
+
+  // IDEMPOTENCIA (#3): si el pedido ya tiene un CFDI TIMBRADO, no se vuelve a timbrar
+  // (aunque el front reintente por doble clic o falle). Devuelve el UUID existente.
+  const yaTimbrado = cfdiYaTimbrado((order as { invoice_meta?: unknown }).invoice_meta)
+  if (yaTimbrado) return json(200, { uuid: yaTimbrado.uuid, id: yaTimbrado.facturama_id, idempotent: true })
+
+  // LUGAR DE EXPEDICIÓN (#2): CP fiscal del EMISOR (Configuración de la empresa), nunca el
+  // del receptor. Si falta, falla explícito en vez de usar el CP del receptor.
+  const { data: company } = await admin.from('company_settings').select('cp').eq('id', 'default').maybeSingle()
+  const expedicion = lugarDeExpedicion(company)
+  if (!expedicion.ok) return json(422, { error: expedicion.error, message: expedicion.message })
 
   // Receptor: del payload o del perfil del doctor (meta.fiscal).
   let fiscal = payload.receiver ?? {}
@@ -90,7 +102,7 @@ Deno.serve(async (req) => {
   const cfdi = {
     Serie: serie, Currency: (order.currency ?? 'MXN'), CfdiType: 'I',
     PaymentForm: order.payment_method === 'efectivo' ? '01' : '03', PaymentMethod: 'PUE',
-    ExpeditionPlace: fiscal.TaxZipCode, // CP del lugar de expedición (usa el del emisor si difiere)
+    ExpeditionPlace: expedicion.cp, // CP fiscal del EMISOR (Configuración de la empresa)
     Receiver: { Rfc: fiscal.Rfc, Name: fiscal.Name, CfdiUse: fiscal.CfdiUse ?? 'G03', FiscalRegime: fiscal.FiscalRegime ?? '616', TaxZipCode: fiscal.TaxZipCode },
     Items: items,
   }
@@ -103,5 +115,10 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   const d = data as any
   const uuid = d?.Complement?.TaxStamp?.Uuid ?? d?.Uuid ?? d?.uuid
-  return json(200, { uuid, id: d?.Id ?? d?.id, folio: d?.Folio, date: d?.Date })
+  const facturamaId = d?.Id ?? d?.id ?? null
+  // Persiste el timbre SERVER-SIDE: es la autoridad para la idempotencia (#3). Un 2º intento
+  // encontrará 'timbrada' arriba y no volverá a timbrar, sin depender de que el front escriba.
+  const stamp = { status: 'timbrada', uuid, facturama_id: facturamaId, emitida_at: new Date().toISOString(), simulated: false }
+  await admin.from('orders').update({ invoice_requested: true, invoice_meta: stamp }).eq('id', order.id)
+  return json(200, { uuid, id: facturamaId, folio: d?.Folio, date: d?.Date, invoice_meta: stamp })
 })

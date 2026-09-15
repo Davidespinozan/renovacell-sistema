@@ -11,6 +11,7 @@ import { useShipments } from '../data/hooks/useShipments'
 import { useLots } from '../data/hooks/useLots'
 import { useDoctors } from '../data/hooks/useDoctors'
 import { useProspects } from '../data/hooks/useProspects'
+import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
@@ -18,8 +19,7 @@ import { daysUntil, severity } from './warehouse/expiry'
 type Tone = 'warn' | 'dang' | 'neu'
 interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen: string }
 
-const isEmitida = (o: OrderWithItems) =>
-  ((o.invoice_meta as Record<string, unknown> | null)?.status as string) === 'emitida'
+const isEmitida = (o: OrderWithItems) => tieneCfdi(o) // reconoce 'emitida' Y 'timbrada' (fuente única)
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 
 export function Bandeja() {

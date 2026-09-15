@@ -12,6 +12,7 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { markInvoiced, markPaid, rejectTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
+import { tieneCfdi } from '../../data/ops/cfdi'
 
 // Transferencia informada por el cliente (reportada vía report-transfer): vive en
 // shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
@@ -26,8 +27,9 @@ import type { ProductSafe, Profile } from '../../data/types'
 
 type Filter = 'todos' | 'por_emitir' | 'emitidos' | 'por_cobrar' | 'transfer'
 
-const isEmitida = (o: OrderWithItems): boolean =>
-  ((o.invoice_meta as Record<string, unknown> | null)?.status as string) === 'emitida'
+// Reconoce CFDI emitido (simulado 'emitida' Y timbre real 'timbrada') vía la fuente única
+// tieneCfdi → un CFDI ya timbrado no puede volver a timbrarse (fix doble timbrado).
+const isEmitida = (o: OrderWithItems): boolean => tieneCfdi(o)
 const cfdiUuid = (o: OrderWithItems): string | null =>
   ((o.invoice_meta as Record<string, unknown> | null)?.uuid as string) ?? null
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
@@ -240,7 +242,7 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
   )
 }
 
-function BillDetail({ order, productsById, clientName, onClose }: {
+export function BillDetail({ order, productsById, clientName, onClose }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string

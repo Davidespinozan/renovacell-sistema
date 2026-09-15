@@ -1643,6 +1643,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      crear_pedido: {
+        Args: {
+          p_order_id: string
+          p_folio: string
+          p_doctor_id: string
+          p_lines: Json
+          p_shipping_meta?: Json
+          p_invoice_requested?: boolean
+        }
+        Returns: Json
+      }
+      precio_de: {
+        Args: { p_product: string; p_list: string }
+        Returns: number
+      }
       vender_pos: {
         Args: {
           p_allocations: Json
