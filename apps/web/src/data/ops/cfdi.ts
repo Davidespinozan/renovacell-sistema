@@ -9,3 +9,11 @@ export function tieneCfdi(o: OrderWithItems): boolean {
   const status = (o.invoice_meta as { status?: string } | null)?.status
   return status === 'emitida' || status === 'timbrada'
 }
+
+// ¿Tiene un CFDI TIMBRADO de verdad y descargable? Solo entonces existe XML/PDF en Facturama:
+// requiere status 'timbrada', NO simulado y con facturama_id. Un folio 'emitida' simulado/demo
+// (o sin facturama_id) NO es descargable → la UI no debe ofrecer "Descargar XML/PDF".
+export function cfdiTimbradoReal(o: OrderWithItems): boolean {
+  const m = o.invoice_meta as { status?: string; facturama_id?: string | null; simulated?: boolean } | null
+  return !!m && m.status === 'timbrada' && m.simulated !== true && typeof m.facturama_id === 'string' && m.facturama_id.length > 0
+}

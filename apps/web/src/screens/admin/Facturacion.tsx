@@ -4,7 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import React, { useMemo, useState } from 'react'
-import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X } from 'lucide-react'
+import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -12,7 +12,8 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { markInvoiced, markPaid, rejectTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
-import { tieneCfdi } from '../../data/ops/cfdi'
+import { tieneCfdi, cfdiTimbradoReal } from '../../data/ops/cfdi'
+import { downloadCfdi } from '../../data/ops/cfdiDownload'
 
 // Transferencia informada por el cliente (reportada vía report-transfer): vive en
 // shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
@@ -252,6 +253,13 @@ export function BillDetail({ order, productsById, clientName, onClose }: {
   const emitida = isEmitida(order); const uuid = cfdiUuid(order)
   const paid = order.payment_status === 'paid'
   const transfer = transferOf(order)
+  const descargable = cfdiTimbradoReal(order)
+  const [downloading, setDownloading] = useState<'xml' | 'pdf' | null>(null)
+  const bajarCfdi = async (fmt: 'xml' | 'pdf') => {
+    if (downloading) return // impide doble clic durante cada descarga
+    setDownloading(fmt)
+    try { await downloadCfdi(order.id, fmt) } finally { setDownloading(null) }
+  }
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
   return (
@@ -300,6 +308,19 @@ export function BillDetail({ order, productsById, clientName, onClose }: {
             <div className="sysnote" style={{ marginTop: 14 }}>
               <FileCheck2 size={16} />
               <span>CFDI emitido · UUID <b className="mono">{uuid}</b></span>
+            </div>
+          )}
+
+          {/* Descarga bajo demanda del XML/PDF real — solo para CFDI TIMBRADO con facturama_id
+              (no para folios simulados/demo). El navegador recibe el archivo desde la función. */}
+          {descargable && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              <button className="btn ghost sm" type="button" disabled={downloading !== null} onClick={() => bajarCfdi('xml')}>
+                <Download size={15} /> {downloading === 'xml' ? 'Descargando…' : 'Descargar XML'}
+              </button>
+              <button className="btn ghost sm" type="button" disabled={downloading !== null} onClick={() => bajarCfdi('pdf')}>
+                <Download size={15} /> {downloading === 'pdf' ? 'Descargando…' : 'Descargar PDF'}
+              </button>
             </div>
           )}
 
