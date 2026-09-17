@@ -4,7 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import React, { useMemo, useState } from 'react'
-import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail } from 'lucide-react'
+import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -12,9 +12,10 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { markInvoiced, markPaid, rejectTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
-import { tieneCfdi, cfdiTimbradoReal } from '../../data/ops/cfdi'
+import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
+import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
 
 // Transferencia informada por el cliente (reportada vía report-transfer): vive en
 // shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
@@ -256,6 +257,27 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
   const paid = order.payment_status === 'paid'
   const transfer = transferOf(order)
   const descargable = cfdiTimbradoReal(order)
+  // Estado de cancelación fiscal (local para reflejar el cambio sin recargar). La cancelación es
+  // un evento fiscal separado: NO cambia pedido/pago/inventario. Descarga histórica siempre; envío
+  // se bloquea si está cancelada/pendiente; 'rechazada' (sigue vigente) permite enviar y reintentar.
+  const [cancelState, setCancelState] = useState<string | null>(estadoCancelacion(order))
+  const cancelMotivoGuardado = (order.invoice_meta as { cancel?: { motive?: string } } | null)?.cancel?.motive
+  const cancelable = descargable && (cancelState === null || cancelState === 'rechazada')
+  const enviable = descargable && (cancelState === null || cancelState === 'rechazada')
+  const [showCancel, setShowCancel] = useState(false)
+  const [cancelMotive, setCancelMotive] = useState<MotivoCancel>('02')
+  const [canceling, setCanceling] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const doCancel = async () => {
+    if (canceling) return
+    setCanceling(true)
+    try { const s = await cancelCfdi(order.id, cancelMotive); if (s) { setCancelState(s); setShowCancel(false) } } finally { setCanceling(false) }
+  }
+  const doRefresh = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try { const s = await refreshCancelStatus(order.id); if (s) setCancelState(s) } finally { setRefreshing(false) }
+  }
   const [downloading, setDownloading] = useState<'xml' | 'pdf' | null>(null)
   const bajarCfdi = async (fmt: 'xml' | 'pdf') => {
     if (downloading) return // impide doble clic durante cada descarga
@@ -338,8 +360,9 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
           )}
 
           {/* Envío del CFDI al cliente por email (Facturama). Prefill con el correo del doctor,
-              editable solo para este envío; POS/sin doctor queda vacío para captura manual. */}
-          {descargable && (
+              editable solo para este envío; POS/sin doctor queda vacío para captura manual.
+              Se OCULTA si el CFDI está cancelado o con cancelación pendiente (no vigente). */}
+          {enviable && (
             <div style={{ marginTop: 12 }}>
               <label className="ms" style={{ display: 'block', marginBottom: 4 }}>Correo de envío</label>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -357,6 +380,65 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 </button>
               </div>
               {email.length > 0 && !emailOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 4 }}>Correo no válido.</div>}
+            </div>
+          )}
+
+          {/* Cancelación fiscal (motivos 02/03). Evento fiscal separado: no toca pedido/pago/inventario.
+              La descarga histórica del XML/PDF permanece disponible en cualquier estado. */}
+          {descargable && (
+            <div style={{ marginTop: 14 }}>
+              {cancelState === 'cancelada' && (
+                <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
+                  <Ban size={16} /><span>CFDI cancelado{cancelMotivoGuardado ? ` · motivo ${cancelMotivoGuardado}` : ''}</span>
+                </div>
+              )}
+              {cancelState === 'pendiente' && (
+                <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
+                  <Clock size={16} /><span style={{ flex: 1 }}>Cancelación pendiente (aceptación del receptor)</span>
+                  <button className="btn ghost sm" type="button" disabled={refreshing} onClick={doRefresh}>
+                    <RefreshCw size={14} /> {refreshing ? 'Actualizando…' : 'Actualizar estatus'}
+                  </button>
+                </div>
+              )}
+              {cancelState === 'rechazada' && (
+                <div className="sysnote"><span>Cancelación no realizada · el CFDI sigue vigente.</span></div>
+              )}
+              {cancelable && (
+                <button className="btn ghost sm" type="button" style={{ marginTop: 8, color: '#b42318' }} onClick={() => setShowCancel(true)}>
+                  <Ban size={15} /> Cancelar CFDI
+                </button>
+              )}
+            </div>
+          )}
+
+          {showCancel && (
+            <div className="overlay" onClick={() => { if (!canceling) setShowCancel(false) }} style={{ zIndex: 60 }}>
+              <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+                <div className="mhead">
+                  <h3>Cancelar CFDI</h3>
+                  <button className="mclose" type="button" onClick={() => { if (!canceling) setShowCancel(false) }}><X size={16} /></button>
+                </div>
+                <div className="mbody">
+                  <p className="ms" style={{ marginBottom: 8 }}>Selecciona el motivo SAT de cancelación:</p>
+                  <label style={{ display: 'block', marginBottom: 8 }}>
+                    <input type="radio" name="motivoCancel" checked={cancelMotive === '02'} onChange={() => setCancelMotive('02')} disabled={canceling} />{' '}
+                    02 — Comprobante emitido con errores sin relación
+                  </label>
+                  <label style={{ display: 'block', marginBottom: 12 }}>
+                    <input type="radio" name="motivoCancel" checked={cancelMotive === '03'} onChange={() => setCancelMotive('03')} disabled={canceling} />{' '}
+                    03 — No se llevó a cabo la operación
+                  </label>
+                  <div className="sysnote" style={{ marginBottom: 12 }}>
+                    <span>La cancelación fiscal no modifica el pedido, pago ni inventario.</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button className="btn ghost" type="button" disabled={canceling} onClick={() => setShowCancel(false)}>No cancelar</button>
+                    <button className="btn" type="button" disabled={canceling} onClick={doCancel}>
+                      <Ban size={15} /> {canceling ? 'Cancelando…' : 'Confirmar cancelación'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
