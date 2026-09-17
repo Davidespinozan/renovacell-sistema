@@ -281,31 +281,48 @@ function fakeFiscalUuid(seed: string): string {
 }
 export function markInvoiced(orderId: string) {
   const now = new Date().toISOString()
-  // Optimista: folio SIMULADO (marca `simulated`). Si Facturama está configurado, se
-  // reemplaza por el UUID real del SAT; si no, queda el simulado (demo).
-  const meta: Record<string, unknown> = { status: 'emitida', uuid: fakeFiscalUuid(orderId), emitida_at: now, simulated: true }
-  orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true, invoice_meta: meta } : o))
+  // Modo MOCK (sin backend / id no-UUID): folio SIMULADO optimista (marca `simulated`).
+  // Se conserva el comportamiento demo existente: el CFDI es de mentira y se marca al vuelo.
+  if (!hasSupabase || !isUuid(orderId)) {
+    const meta: Record<string, unknown> = { status: 'emitida', uuid: fakeFiscalUuid(orderId), emitida_at: now, simulated: true }
+    orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true, invoice_meta: meta } : o))
+    emit()
+    notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+    logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
+    return
+  }
+  // Backend REAL: un fallo de Facturama JAMÁS debe dejar el pedido como CFDI emitido.
+  // Optimista solo marcamos la SOLICITUD (invoice_requested=true); invoice_meta queda null
+  // hasta recibir un UUID real del SAT. Nada de folio falso, nada de notify/logAudit de éxito.
+  orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true } : o))
   emit()
-  notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
-  logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId)) {
-    (async () => {
-      // Timbrado REAL vía Facturama (Edge Function cfdi). 501=no configurado (queda el
-      // folio simulado) · 422=faltan datos fiscales (avisa) · éxito=UUID real del SAT.
-      let finalMeta: Record<string, unknown> = meta
-      const { data, error } = await supabase.functions.invoke('cfdi', { body: { order_id: orderId } })
-      if (!error && data?.uuid) {
-        finalMeta = { status: 'timbrada', uuid: data.uuid, facturama_id: data.id ?? null, emitida_at: now, simulated: false }
-      } else if (error) {
-        let reason = ''
+  ;(async () => {
+    // Timbrado REAL vía Facturama (Edge Function cfdi). 501=no configurado · 422=faltan datos
+    // fiscales · éxito=UUID real del SAT. Solo el éxito marca el pedido como emitido.
+    const { data, error } = await supabase.functions.invoke('cfdi', { body: { order_id: orderId } })
+    if (!error && data?.uuid) {
+      // ÉXITO: UUID real del SAT. Única vía para marcar el CFDI y avisar/auditar el éxito.
+      const finalMeta: Record<string, unknown> = { status: 'timbrada', uuid: data.uuid, facturama_id: data.id ?? null, emitida_at: now, simulated: false }
+      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: finalMeta as unknown as Json }).eq('id', orderId)
+      notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+      logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
+    } else {
+      // FALLO (error de invoke, 501/not_configured, o respuesta sin uuid): NO se marca CFDI.
+      // invoice_meta se mantiene/restaura a null; invoice_requested sigue true → reintentable.
+      let reason = ''
+      if (error) {
         try { const b = await (error as { context?: { json?: () => Promise<{ message?: string }> } }).context?.json?.(); reason = b?.message ?? '' } catch { /* noop */ }
-        if (reason && !/not_configured/.test(reason)) notify({ text: `CFDI · ${reason}`, roles: ['admin'], screen: 'av_fin' })
         console.warn('[cfdi]', error.message, reason)
       }
-      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: finalMeta as unknown as Json }).eq('id', orderId)
-      hydrate()
-    })()
-  }
+      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: null }).eq('id', orderId)
+      // Mostrar el error real (salvo 501/not_configured, que es estado de demo, no un fallo).
+      if (!/not_configured/.test(reason)) {
+        const msg = reason || (error ? error.message : 'no se pudo emitir el CFDI')
+        notify({ text: `CFDI · ${msg}`, roles: ['admin'], screen: 'av_fin' })
+      }
+    }
+    hydrate()
+  })()
 }
 
 export function markPaid(orderId: string) {
