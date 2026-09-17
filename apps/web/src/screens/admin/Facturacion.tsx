@@ -4,7 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import React, { useMemo, useState } from 'react'
-import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download } from 'lucide-react'
+import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -14,6 +14,7 @@ import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
 import { tieneCfdi, cfdiTimbradoReal } from '../../data/ops/cfdi'
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
+import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 
 // Transferencia informada por el cliente (reportada vía report-transfer): vive en
 // shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
@@ -226,7 +227,7 @@ export function Facturacion() {
       </div>
 
       {selectedOrder && (
-        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} onClose={() => setSelected(null)} />
+        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} onClose={() => setSelected(null)} />
       )}
     </div>
   )
@@ -243,10 +244,11 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
   )
 }
 
-export function BillDetail({ order, productsById, clientName, onClose }: {
+export function BillDetail({ order, productsById, clientName, clientEmail = '', onClose }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
+  clientEmail?: string
   onClose: () => void
 }) {
   const cob = cobroTag(order); const cf = cfdiTag(order)
@@ -259,6 +261,17 @@ export function BillDetail({ order, productsById, clientName, onClose }: {
     if (downloading) return // impide doble clic durante cada descarga
     setDownloading(fmt)
     try { await downloadCfdi(order.id, fmt) } finally { setDownloading(null) }
+  }
+  // Envío del CFDI por email (Facturama). Prefill con el correo del doctor; editable solo para
+  // este envío (no se persiste). La trazabilidad queda en audit_logs, no en invoice_meta.
+  const [email, setEmail] = useState(clientEmail)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false) // solo estado de sesión para el texto del botón
+  const emailOk = emailValido(email)
+  const enviarFactura = async () => {
+    if (sending || !emailOk) return // bloquea doble clic y email inválido antes del invoke
+    setSending(true)
+    try { const ok = await sendCfdi(order.id, email.trim().toLowerCase()); if (ok) setSent(true) } finally { setSending(false) }
   }
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
@@ -321,6 +334,29 @@ export function BillDetail({ order, productsById, clientName, onClose }: {
               <button className="btn ghost sm" type="button" disabled={downloading !== null} onClick={() => bajarCfdi('pdf')}>
                 <Download size={15} /> {downloading === 'pdf' ? 'Descargando…' : 'Descargar PDF'}
               </button>
+            </div>
+          )}
+
+          {/* Envío del CFDI al cliente por email (Facturama). Prefill con el correo del doctor,
+              editable solo para este envío; POS/sin doctor queda vacío para captura manual. */}
+          {descargable && (
+            <div style={{ marginTop: 12 }}>
+              <label className="ms" style={{ display: 'block', marginBottom: 4 }}>Correo de envío</label>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="email"
+                  className="inp"
+                  placeholder="correo@cliente.mx"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={sending}
+                  style={{ flex: 1, minWidth: 220 }}
+                />
+                <button className="btn" type="button" disabled={sending || !emailOk} onClick={enviarFactura}>
+                  <Mail size={15} /> {sending ? 'Enviando…' : sent ? 'Reenviar factura' : 'Enviar factura'}
+                </button>
+              </div>
+              {email.length > 0 && !emailOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 4 }}>Correo no válido.</div>}
             </div>
           )}
 
