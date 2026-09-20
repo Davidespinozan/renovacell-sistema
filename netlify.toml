@@ -10,6 +10,21 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# ── Cabeceras de seguridad (auditoría M-01) ─────────────────────────────────
+# Conjunto conservador: NO restringe scripts/estilos (no rompe el SPA ni la landing con
+# scripts inline). frame-ancestors 'self' evita que el panel se incruste en un sitio ajeno
+# (clickjacking); object-src/base-uri cierran vectores clásicos. Una CSP de script-src con
+# nonces/hashes queda como endurecimiento posterior (requiere ajustar la landing).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(self)"
+    Content-Security-Policy = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
+
 # ── Quién vive en qué dirección ──────────────────────────────────────────────
 # La LANDING es la cara pública: el doctor teclea el dominio y debe verla.
 # El SISTEMA vive bajo /sistema — se instala en el celular y se abre desde su

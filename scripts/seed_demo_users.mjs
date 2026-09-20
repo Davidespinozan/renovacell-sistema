@@ -7,7 +7,10 @@ const URL = process.env.SUPABASE_URL
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!URL || !KEY) { console.error('Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }
 
-const PASSWORD = 'demo1234'
+// La contraseña de siembra viene del ENTORNO (nunca en el repo ni en el historial de Git).
+// Uso: `SEED_PASSWORD='...' node scripts/seed_demo_users.mjs`
+const PASSWORD = process.env.SEED_PASSWORD
+if (!PASSWORD || PASSWORD.length < 8) { console.error('Falta SEED_PASSWORD (mínimo 8 caracteres) en el entorno'); process.exit(1) }
 const ACCOUNTS = [
   { email: 'direccion@renovacell.mx', role: 'admin',     verified: true,  name: 'Claudia · Dirección',               capabilities: [] },
   { email: 'almacen@renovacell.mx',   role: 'warehouse', verified: true,  name: 'Alberto · Almacén / Empaque',       capabilities: ['diseno', 'anuncios'] },
