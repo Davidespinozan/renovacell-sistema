@@ -172,8 +172,10 @@ Deno.serve(async (req) => {
   let payload: { cedula?: string; name?: string }
   try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const cedula = (payload.cedula ?? '').trim()
-  // El doctor verifica SU cédula (nombre desde su perfil); el staff pasa el nombre del doctor.
-  const name = (payload.name ?? (isDoctor ? (prof?.full_name ?? '') : '')).trim()
+  // El doctor se coteja SIEMPRE contra el nombre de SU perfil, NUNCA contra el que mande el
+  // cliente: si no, podría hacerse pasar por otro médico enviando el nombre exacto (público en
+  // la SEP) de una cédula ajena y auto-verificarse. Solo el staff pasa el nombre a verificar.
+  const name = (isDoctor ? (prof?.full_name ?? '') : (payload.name ?? '')).trim()
   if (!cedula) return json(400, { error: 'Falta la cédula.' })
 
   const sep = await lookupSep(cedula, name)

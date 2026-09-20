@@ -9,6 +9,8 @@
 //   SHIPPING_LABEL_PATH  ruta de guía (default /ship/generate/)
 // El mapeo de respuesta es tolerante (busca los campos comunes); ajústalo al contrato
 // exacto de tu proveedor si difiere. Ver README.
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -49,6 +51,18 @@ function buildShipment(origin: Addr, destination: Addr, parcel: Parcel, carrier?
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
+
+  // AUTH: solo staff de logística puede cotizar/generar guías (con cargo a la cuenta de
+  // paquetería). El verify_jwt de la plataforma solo valida la firma; aquí exigimos usuario + rol.
+  const sbUrl = Deno.env.get('SUPABASE_URL')!
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')!
+  const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
+  const { data: who } = await caller.auth.getUser()
+  if (!who?.user) return json(401, { error: 'No autenticado.' })
+  const admin = createClient(sbUrl, service, { auth: { persistSession: false } })
+  const { data: me } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
+  if (!['admin', 'warehouse', 'packing'].includes(me?.role_id ?? '')) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
 
   const key = Deno.env.get('SHIPPING_API_KEY')
   if (!key) return json(501, { error: 'not_configured', message: 'Paquetería no habilitada. Agrega SHIPPING_API_KEY.' })

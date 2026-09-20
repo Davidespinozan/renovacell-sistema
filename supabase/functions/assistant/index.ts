@@ -8,6 +8,8 @@
 //
 // SEAM: sin ANTHROPIC_API_KEY responde 501 → el cliente usa su motor local (mock).
 // Activar = `supabase secrets set ANTHROPIC_API_KEY=...` (opcional ANTHROPIC_MODEL).
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,8 +22,12 @@ const json = (status: number, body: unknown) =>
 function catalogText(products: any[]): string {
   if (!Array.isArray(products) || products.length === 0) return '(sin catálogo provisto)'
   return products.slice(0, 60).map((p) => {
-    const line = p.line === 'prof' ? 'Professional' : p.line === 'cosm' ? 'Home Care' : (p.line ?? '')
-    return `- ${p.name}${p.category ? ` (${p.category})` : ''}${line ? ` · ${line}` : ''}`
+    // Topa longitudes: el catálogo va en el prompt de sistema; nombres/categorías del cliente
+    // no deben poder inflarlo ni inyectar instrucciones largas.
+    const name = String(p.name ?? '').slice(0, 80)
+    const category = p.category ? String(p.category).slice(0, 60) : ''
+    const line = p.line === 'prof' ? 'Professional' : p.line === 'cosm' ? 'Home Care' : (typeof p.line === 'string' ? p.line.slice(0, 20) : '')
+    return `- ${name}${category ? ` (${category})` : ''}${line ? ` · ${line}` : ''}`
   }).join('\n')
 }
 
@@ -94,10 +100,23 @@ Deno.serve(async (req) => {
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const mode = p.mode === 'landing' ? 'landing' : 'doctor'
+
+  // El concierge del doctor exige sesión (no debe alcanzarse con la sola clave anon, ni
+  // usarse como proxy gratis a la API de Anthropic). La landing SÍ es pública por diseño.
+  if (mode === 'doctor') {
+    const sbUrl = Deno.env.get('SUPABASE_URL')!
+    const anon = Deno.env.get('SUPABASE_ANON_KEY')!
+    const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
+    const { data: who } = await caller.auth.getUser()
+    if (!who?.user) return json(401, { error: 'No autenticado.' })
+  }
+
   // deno-lint-ignore no-explicit-any
   const history: any[] = Array.isArray(p.messages) ? p.messages : []
+  // Topes de entrada (evita prompts gigantes / abuso): máx 12 turnos, 4000 chars por turno.
   const messages = history.length > 0
-    ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-12)
+    ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .slice(-12).map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) }))
     : [{ role: 'user', content: String(p.text ?? '').slice(0, 2000) }]
   if (!messages.length || !messages.some((m) => m.role === 'user')) return json(400, { error: 'Falta el mensaje.' })
 
@@ -142,7 +161,8 @@ Deno.serve(async (req) => {
       text: text || (lead ? '¡Perfecto! Ya te canalicé con un asesor; te contactará en breve. Para ver catálogo y precios, verifica tu cédula y entra al portal.' : 'Con gusto te ayudo. ¿Puedes darme un poco más de detalle?'),
       lead,
     })
-  } catch (e) {
-    return json(502, { error: `Error con el modelo: ${(e as Error).message}` })
+  } catch (_e) {
+    // No filtrar el detalle interno al cliente.
+    return json(502, { error: 'No se pudo contactar al asistente. Intenta de nuevo.' })
   }
 })
