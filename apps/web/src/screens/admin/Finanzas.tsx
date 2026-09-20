@@ -136,7 +136,7 @@ export function Finanzas() {
           {cob.devuelto > 0 && (
             <Stat icon={<TrendingDown size={18} />} v={money(cob.devuelto)} k="Devuelto" s="reembolsado de pagadas" accent="dang" />
           )}
-          <Stat icon={<ArrowDownCircle size={18} />} v={money(cob.porCobrar)} k="Por cobrar" s="del periodo (contra pedido)" />
+          <Stat icon={<ArrowDownCircle size={18} />} v={money(cob.porCobrar)} k="Por cobrar" s="ventas del periodo aún sin cobrar" />
         </div>
       </div>
 
@@ -146,8 +146,9 @@ export function Finanzas() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div className="chip" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)', width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center' }}><ArrowDownCircle size={18} /></div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 700 }}>Por cobrar</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 700 }}>Cuentas por cobrar · posición a hoy</div>
               <div style={{ fontSize: 20, fontWeight: 600 }}>{money(cxc.total)}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>incluye contra-pedido pendiente</div>
             </div>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxc.count} pedido(s) contra pedido sin pagar.</div>

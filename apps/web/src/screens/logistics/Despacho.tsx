@@ -9,12 +9,13 @@ import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
+import { markShipped } from '../../data/store/ordersStore'
 import { driverName } from '../../data/mock/shipments'
 import { deliveryOf } from '../../data/mock/profiles'
 import { useCompany } from '../../data/hooks/useCompany'
 import { useRole } from '../../auth/RoleContext'
 
-interface Parada { shipmentId: string; folio: string; cliente: string; direccion: string; telefono: string; piezas: number }
+interface Parada { shipmentId: string; orderId: string; folio: string; cliente: string; direccion: string; telefono: string; piezas: number }
 interface Manifiesto { driverId: string; chofer: string; paradas: Parada[]; totalPiezas: number }
 
 export function Despacho() {
@@ -42,7 +43,7 @@ export function Despacho() {
       const o = orderById[s.order_id]
       const d = o ? deliveryOf(o) : { name: '—', addr: '—', phone: '—' }
       const arr = byDriver.get(s.driver_id!) ?? []
-      arr.push({ shipmentId: s.id, folio: o?.external_ref ?? s.order_id, cliente: d.name, direccion: d.addr, telefono: d.phone, piezas: piezas(s.order_id) })
+      arr.push({ shipmentId: s.id, orderId: s.order_id, folio: o?.external_ref ?? s.order_id, cliente: d.name, direccion: d.addr, telefono: d.phone, piezas: piezas(s.order_id) })
       byDriver.set(s.driver_id!, arr)
     })
     return [...byDriver.entries()].map(([driverId, paradas]) => ({
@@ -56,7 +57,11 @@ export function Despacho() {
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600) }
 
   const despacharTodo = (mf: Manifiesto) => {
-    mf.paradas.forEach((p) => dispatchShipment(p.shipmentId, who, p.folio))
+    mf.paradas.forEach((p) => {
+      dispatchShipment(p.shipmentId, who, p.folio)
+      // R-62: el pedido pasa a "enviado" (En camino) AL DESPACHAR, no al asignar el chofer.
+      markShipped(p.orderId, { method: 'chofer', driver: mf.chofer, driver_id: mf.driverId })
+    })
     flash(`Manifiesto despachado a ${mf.chofer} · ${mf.paradas.length} pedido(s) · falta que confirme`)
   }
 

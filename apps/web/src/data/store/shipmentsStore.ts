@@ -98,5 +98,12 @@ export function resolveIncident(shipmentId: string, folio: string) {
 }
 
 export function markDelivered(shipmentId: string, proofUrl: string | null, receivedBy: string | null = null, opts: { remote?: boolean } = {}) {
-  patch(shipmentId, { status: 'delivered', delivered_at: new Date().toISOString(), proof_image_url: proofUrl, received_by: receivedBy }, opts)
+  // R-63: si el envío traía una incidencia sin resolver, ciérrala al entregar (antes quedaba
+  // como incident.resolved=false para siempre, invisible: "una incidencia que nunca se resuelve").
+  const cur = live.current().find((s) => s.id === shipmentId)
+  const inc = cur?.incident as unknown as Record<string, unknown> | null
+  const extra = inc && inc.resolved !== true
+    ? { incident: { ...inc, resolved: true, resolved_at: new Date().toISOString(), resolved_on_delivery: true } as unknown as Shipment['incident'] }
+    : {}
+  patch(shipmentId, { status: 'delivered', delivered_at: new Date().toISOString(), proof_image_url: proofUrl, received_by: receivedBy, ...extra }, opts)
 }

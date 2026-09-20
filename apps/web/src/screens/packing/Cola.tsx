@@ -129,7 +129,11 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
       order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
       estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
     })
-    markShipped(order.id, { method: 'chofer', driver: drv?.name ?? '', driver_id: driverId })
+    // R-62: NO marcamos el pedido "En camino" aquí (sigue en el almacén, por_despachar). El
+    // chofer y el manifiesto ya lo ven por el shipment. El pedido pasa a "enviado" al DESPACHAR
+    // el manifiesto (Despacho), para no falsear el Tablero mostrando en tránsito lo que sigue
+    // en el estante. (drv se usa solo para el mensaje de confirmación de abajo.)
+    void drv
     setDoneChofer(true)
   }
 
@@ -158,8 +162,8 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
           <div className="mbody">
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
-              <h3>Envío asignado</h3>
-              <p><b>{order.external_ref}</b> pasó a <b>En camino</b> con chofer propio. Ya aparece en la ruta del chofer.</p>
+              <h3>Chofer asignado</h3>
+              <p><b>{order.external_ref}</b> quedó <b>por despachar</b> con chofer propio. Aparece en su manifiesto; pasará a <b>En camino</b> cuando se despache la carga.</p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>

@@ -146,7 +146,7 @@ export function Tablero() {
           <Sig icon="chart" value={money(cobMes.vendido)} k="Vendiste" s="ventas del mes" />
           <Sig icon="receipt" value={money(cobMes.cobrado)} k="Cobrado" s="entró a caja, neto de devoluciones" />
           <Sig icon="check" value={`${Math.round(cobMes.tasaCobro)}%`} k="Tasa de cobro" s="cobrado ÷ vendido" tone={cobMes.vendido > 0 && cobMes.tasaCobro < 70 ? 'warn' : undefined} />
-          <Sig icon="clock" value={money(cxc.total)} k="Te deben" s={`${cxc.count} pedido(s) por cobrar`} tone={cxc.total > 0 ? 'warn' : undefined} />
+          <Sig icon="clock" value={money(cxc.total)} k="Te deben" s={`${cxc.count} pedido(s) sin pagar · incluye contra-pedido`} tone={cxc.total > 0 ? 'warn' : undefined} />
         </div>
       </div>
 

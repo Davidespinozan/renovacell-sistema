@@ -121,7 +121,7 @@ export function Facturacion() {
         <Stat icon={<Receipt size={18} />} v={String(porEmitir)} k="Por emitir" s="solicitados sin CFDI" />
         <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados" />
         <Stat icon={<BadgeDollarSign size={18} />} v={money(bill.paid)} k="Cobrado" s="pagos confirmados" />
-        <Stat icon={<Clock size={18} />} v={money(bill.pending)} k="Por cobrar" s="contra pedido / pendiente" />
+        <Stat icon={<Clock size={18} />} v={money(bill.pending)} k="Por cobrar" s="ventas en curso sin pagar" />
       </div>
 
       {/* Filtros */}
