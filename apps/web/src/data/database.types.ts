@@ -1269,7 +1269,10 @@ export type Database = {
       }
       company_settings: {
         Row: {
+          banco: string | null
+          clabe: string | null
           cp: string | null
+          cuenta: string | null
           direccion: string | null
           email: string | null
           id: string
@@ -1278,10 +1281,14 @@ export type Database = {
           regimen_fiscal: string | null
           rfc: string | null
           telefono: string | null
+          titular: string | null
           updated_at: string
         }
         Insert: {
+          banco?: string | null
+          clabe?: string | null
           cp?: string | null
+          cuenta?: string | null
           direccion?: string | null
           email?: string | null
           id?: string
@@ -1290,10 +1297,14 @@ export type Database = {
           regimen_fiscal?: string | null
           rfc?: string | null
           telefono?: string | null
+          titular?: string | null
           updated_at?: string
         }
         Update: {
+          banco?: string | null
+          clabe?: string | null
           cp?: string | null
+          cuenta?: string | null
           direccion?: string | null
           email?: string | null
           id?: string
@@ -1302,6 +1313,7 @@ export type Database = {
           regimen_fiscal?: string | null
           rfc?: string | null
           telefono?: string | null
+          titular?: string | null
           updated_at?: string
         }
         Relationships: []

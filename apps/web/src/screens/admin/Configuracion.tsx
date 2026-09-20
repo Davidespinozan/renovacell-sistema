@@ -19,7 +19,8 @@ export function Configuracion() {
   }
   const dirty = useMemo(() => (Object.keys(form) as (keyof typeof form)[]).some((k) => form[k] !== company[k]), [form, company])
   const rfcOk = !form.rfc || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
-  const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
+  const clabeOk = !form.clabe || /^\d{18}$/.test(form.clabe.trim())
+  const puedeGuardar = dirty && rfcOk && clabeOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
 
   const guardar = () => {
     if (!puedeGuardar) return
@@ -81,6 +82,29 @@ export function Configuracion() {
 
         <label style={label}>Logo (URL)</label>
         <input style={input} value={form.logo_url} onChange={set('logo_url')} placeholder="https://…/logo.png (opcional)" />
+
+        {/* Datos bancarios: se muestran al doctor en el modal de transferencia (R-58). */}
+        <h4 style={{ margin: '26px 0 0', fontSize: 14, fontWeight: 700 }}>Datos bancarios (pago por transferencia)</h4>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>Aparecen en la ventana de pago del doctor. Sin estos datos, no puede transferir.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={label}>Banco</label>
+            <input style={input} value={form.banco} onChange={set('banco')} placeholder="BBVA, Banorte, …" />
+          </div>
+          <div>
+            <label style={label}>Beneficiario / titular</label>
+            <input style={input} value={form.titular} onChange={set('titular')} placeholder="Razón social del titular de la cuenta" />
+          </div>
+          <div>
+            <label style={label}>CLABE (18 dígitos)</label>
+            <input style={{ ...input, borderColor: clabeOk ? 'var(--line)' : 'var(--danger, #be4a3f)' }} value={form.clabe} onChange={set('clabe')} placeholder="000000000000000000" maxLength={18} inputMode="numeric" />
+            {!clabeOk && <div style={{ fontSize: 11, color: 'var(--danger, #be4a3f)', marginTop: 4 }}>La CLABE debe tener 18 dígitos.</div>}
+          </div>
+          <div>
+            <label style={label}>Cuenta (opcional)</label>
+            <input style={input} value={form.cuenta} onChange={set('cuenta')} placeholder="Número de cuenta" />
+          </div>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22 }}>
           <button className="btn" type="button" onClick={guardar} disabled={!puedeGuardar} style={!puedeGuardar ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>

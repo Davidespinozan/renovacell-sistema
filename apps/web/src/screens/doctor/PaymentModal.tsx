@@ -8,6 +8,7 @@ import { processPayment, type PayMethod, type PayResult } from '../../data/payme
 import { startStripeCheckout } from '../../lib/stripe'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { notify } from '../../data/store/notificationsStore'
+import { useCompany } from '../../data/hooks/useCompany'
 
 // Lee un archivo de imagen como data-URL (para mandar el comprobante a la función).
 function fileToDataUrl(file: File): Promise<string> {
@@ -26,6 +27,7 @@ export function PaymentModal({
   onPaid: (r: PayResult) => void
   onClose: () => void
 }) {
+  const { company } = useCompany()
   const [method, setMethod] = useState<PayMethod>('tarjeta')
   const [card, setCard] = useState({ number: '', name: '', exp: '', cvc: '' })
   const [busy, setBusy] = useState(false)
@@ -141,7 +143,20 @@ export function PaymentModal({
                 <>
                   <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
                     <Icon name="receipt" />
-                    <span>Transfiere <b>{money(amount)}</b> a la cuenta de Renovacell e indica el folio <b>{folio}</b> como referencia. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
+                    {company.clabe || company.banco ? (
+                      <span>
+                        Transfiere <b>{money(amount)}</b> e indica el folio <b>{folio}</b> como referencia:
+                        <span style={{ display: 'block', marginTop: 8, lineHeight: 1.7 }}>
+                          {company.titular && <>Beneficiario: <b>{company.titular}</b><br /></>}
+                          {company.banco && <>Banco: <b>{company.banco}</b><br /></>}
+                          {company.clabe && <>CLABE: <b className="mono">{company.clabe}</b><br /></>}
+                          {company.cuenta && <>Cuenta: <b className="mono">{company.cuenta}</b></>}
+                        </span>
+                        <b style={{ display: 'block', marginTop: 8 }}>Cuando recibamos la transferencia, activamos tu pedido.</b>
+                      </span>
+                    ) : (
+                      <span>Transfiere <b>{money(amount)}</b> con el folio <b>{folio}</b> como referencia. Los datos bancarios los confirma Renovacell; comunícate para recibirlos. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
+                    )}
                   </div>
                   <label style={{ display: 'block', marginTop: 12 }}>
                     <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Adjunta el comprobante <span style={{ opacity: .7 }}>(opcional · agiliza la confirmación)</span></span>

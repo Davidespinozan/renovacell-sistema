@@ -14,10 +14,16 @@ export interface CompanySettings {
   telefono: string
   email: string
   logo_url: string
+  // Datos bancarios para el pago por transferencia (R-58).
+  banco: string
+  clabe: string
+  cuenta: string
+  titular: string
 }
 
 export const EMPTY_COMPANY: CompanySettings = {
   razon_social: '', rfc: '', regimen_fiscal: '', cp: '', direccion: '', telefono: '', email: '', logo_url: '',
+  banco: '', clabe: '', cuenta: '', titular: '',
 }
 
 // Mock: sin datos capturados (el cliente los llena en Configuración antes del go-live).
@@ -37,13 +43,17 @@ export function normalizeCompany(row: Partial<Record<keyof CompanySettings, stri
     telefono: r.telefono ?? '',
     email: r.email ?? '',
     logo_url: r.logo_url ?? '',
+    banco: r.banco ?? '',
+    clabe: r.clabe ?? '',
+    cuenta: r.cuenta ?? '',
+    titular: r.titular ?? '',
   }
 }
 
 const live = makeLive<CompanySettings>(async () => {
   const { data, error } = await supabase
     .from('company_settings')
-    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url')
+    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular')
     .eq('id', 'default')
     .maybeSingle()
   if (error) throw error
