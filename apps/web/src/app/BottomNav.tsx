@@ -19,8 +19,11 @@ export function BottomNav({ onMenu }: { onMenu: () => void }) {
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
   const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 
-  const primary = hub.length > 0 ? hub : modules.slice(0, 4)
-  const showMenu = hub.length > 0 || modules.length > 4
+  // El cajón (Sidebar) tiene perfil, ajustes y CERRAR SESIÓN → debe estar SIEMPRE accesible en
+  // móvil (antes el doctor, con hub vacío y 4 módulos exactos, se quedaba sin "Menú" y no podía
+  // salir). Con el Menú siempre visible, dejamos 3 accesos directos + Menú (4 pestañas máx).
+  const showMenu = true
+  const primary = hub.length > 0 ? hub : modules.slice(0, 3)
 
   return (
     <nav className="bnav">

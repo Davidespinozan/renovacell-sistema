@@ -14,7 +14,13 @@ export function money(n: number | null | undefined): string {
 
 export function fmtDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+    // Una fecha SIN hora ('YYYY-MM-DD', p. ej. caducidad de lote o fecha de arqueo) la
+    // interpreta JS como medianoche UTC y en México (UTC−6/−7) se pinta el DÍA ANTERIOR.
+    // La parseamos como fecha LOCAL para mostrar el día correcto. Las que llevan hora
+    // (contienen 'T', p. ej. created_at) siguen su curso normal.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
   } catch {
     return iso
   }

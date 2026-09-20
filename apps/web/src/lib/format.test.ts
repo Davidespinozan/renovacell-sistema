@@ -1,6 +1,6 @@
 // Pruebas de utilidades de formato (moneda, fecha relativa, iniciales, avatar).
 import { describe, it, expect } from 'vitest'
-import { money, timeAgo, initials, avatarColor } from './format'
+import { money, timeAgo, initials, avatarColor, fmtDate } from './format'
 
 describe('money', () => {
   it('formatea MXN sin decimales', () => {
@@ -46,5 +46,22 @@ describe('avatarColor', () => {
   })
   it('devuelve un color de la paleta', () => {
     expect(avatarColor('x')).toMatch(/^#[0-9A-Fa-f]{6}$/)
+  })
+})
+
+// R-65 — una fecha SIN hora (YYYY-MM-DD) debe mostrarse en su DÍA correcto (no el anterior).
+describe('fmtDate — fecha sin hora se muestra en su día local', () => {
+  it('2026-09-18 → día 18 (no 17) y año 2026', () => {
+    const s = fmtDate('2026-09-18')
+    expect(s).toMatch(/\b18\b/)
+    expect(s).toMatch(/2026/)
+  })
+  it('2026-01-01 → sigue en 2026 (no cae a 2025)', () => {
+    const s = fmtDate('2026-01-01')
+    expect(s).toMatch(/2026/)
+    expect(s).not.toMatch(/2025/)
+  })
+  it('fecha CON hora (created_at) sigue funcionando', () => {
+    expect(fmtDate('2026-09-18T10:00:00')).toMatch(/\b18\b/)
   })
 })

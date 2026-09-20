@@ -355,6 +355,10 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   .bnav a.on{background:var(--side-active);color:#fff}
   .bnav a.on svg{color:var(--green-soft)}
   .canvas{padding-bottom:88px!important}
+  /* R-32: con un modal/hoja abierto, OCULTA la barra inferior. Los overlays viven en otro
+     contexto de apilamiento y la barra fija (z-index del shell) podía quedar encima de sus
+     botones, impidiendo confirmar/cancelar en móvil. Así los botones quedan siempre libres. */
+  body:has(.overlay) .bnav, body:has(.sheet-wrap) .bnav{display:none}
 }
 
 @media (max-width:900px){
@@ -388,7 +392,10 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   .canvas #content > .grid{gap:11px!important}
   .card{padding:13px;border-radius:13px}
   .card.sig{padding:12px 13px}
-  .sigs{margin-bottom:12px;gap:10px}
+  /* R-33: en móvil el grid de tarjetas (p. ej. la pantalla del chofer con 3 tarjetas a
+     minmax(200px)) sumaba ~600px y desbordaba el teléfono, ensanchando toda la página.
+     Se fija a 2 columnas que caben en 390px. */
+  .sigs{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px;gap:10px}
   .page-h{padding:14px 15px;border-radius:15px;margin-bottom:2px}
   .page-h h1{font-size:18.5px}
   .page-h p{font-size:12.5px;margin-top:4px;line-height:1.45}
