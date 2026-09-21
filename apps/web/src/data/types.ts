@@ -89,6 +89,7 @@ export interface Order {
   id: UUID
   external_ref: string | null
   doctor_id: UUID | null
+  customer_id?: UUID | null    // identidad comercial (customers.id); independiente del portal
   total: number | null
   currency: string            // default 'MXN'
   status: OrderStatus | null

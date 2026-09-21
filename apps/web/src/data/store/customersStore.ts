@@ -1,0 +1,71 @@
+// Customer domain — data layer. CRUD sobre `customers` (identidad comercial, sin Auth). La RLS es
+// la autoridad (admin CRUD; pos lee; doctor solo su propio customer). NO crea Auth ni invita.
+// La conversión a portal es un paso APARTE (linkCustomerToProfile + invite-doctor).
+import { hasSupabase, supabase } from '../../lib/supabase'
+import { logAudit } from './auditStore'
+import type { Customer, CustomerInput } from '../ops/customer'
+
+export type CustomerFields = Omit<CustomerInput, 'id' | 'created_at' | 'updated_at'>
+
+export async function listCustomers(opts: { seller?: string; search?: string } = {}): Promise<Customer[]> {
+  if (!hasSupabase) return []
+  let q = supabase.from('customers').select('*').eq('active', true).order('full_name', { ascending: true })
+  if (opts.seller) q = q.eq('seller_name', opts.seller)
+  if (opts.search) q = q.ilike('full_name', `%${opts.search}%`)
+  const { data, error } = await q
+  if (error) { console.warn('[customers] list', error.message); return [] }
+  return (data ?? []) as Customer[]
+}
+
+// Alta. Correos/teléfonos duplicados SON válidos (no hay unicidad de contacto). La idempotencia
+// real la da (source, external_id) o (source, import_hash) a nivel DB.
+export async function createCustomer(fields: CustomerFields): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión.' }
+  if (!(fields.full_name ?? '').toString().trim()) return { ok: false, error: 'Falta el nombre.' }
+  const { data, error } = await supabase.from('customers').insert(fields).select('id').single()
+  if (error) return { ok: false, error: error.message }
+  logAudit({ actor: 'Administración', action: 'Cliente creado', resource: fields.full_name })
+  return { ok: true, id: data?.id }
+}
+
+export async function updateCustomer(id: string, patch: Partial<CustomerFields>): Promise<{ ok: boolean; error?: string }> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión.' }
+  const { error } = await supabase.from('customers').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function deactivateCustomer(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión.' }
+  const { error } = await supabase.from('customers').update({ active: false, updated_at: new Date().toISOString() }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  logAudit({ actor: 'Administración', action: 'Cliente desactivado', resource: id })
+  return { ok: true }
+}
+
+// CONVERSIÓN A PORTAL (paso 3 del flujo): enlaza un customer a un profile ya creado (por
+// invite-doctor). Idempotente: fijar el mismo profile dos veces es no-op; la unicidad
+// `uq_customers_profile` impide que un profile quede en dos customers. NO crea Auth ni invita aquí.
+export async function linkCustomerToProfile(customerId: string, profileId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión.' }
+  const { error } = await supabase.from('customers').update({ profile_id: profileId, updated_at: new Date().toISOString() }).eq('id', customerId)
+  if (error) return { ok: false, error: error.message }
+  logAudit({ actor: 'Administración', action: 'Cliente vinculado a portal', resource: customerId })
+  return { ok: true }
+}
+
+// Busca un customer existente por identidad (para clasificación de import). Prioridad: (source,
+// external_id) → email normalizado → sin match. No usa nombre solo.
+export async function findCustomerByIdentity(id: { source?: string; external_id?: string | null; email?: string | null }): Promise<Customer | null> {
+  if (!hasSupabase) return null
+  if (id.source && id.external_id) {
+    const { data } = await supabase.from('customers').select('*').eq('source', id.source).eq('external_id', id.external_id).maybeSingle()
+    if (data) return data as Customer
+  }
+  const email = (id.email ?? '').trim().toLowerCase()
+  if (email) {
+    const { data } = await supabase.from('customers').select('*').eq('email', email).limit(1).maybeSingle()
+    if (data) return data as Customer
+  }
+  return null
+}

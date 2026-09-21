@@ -8,7 +8,7 @@ import storeSrc from '../store/doctorLocationsStore.ts?raw'
 import pickerSrc from '../../app/DeliveryLocationPicker.tsx?raw'
 
 const mk = (o: Partial<DoctorLocation> = {}): DoctorLocation => ({
-  id: 'l1', doctor_id: 'd1', name: 'Clínica', line1: 'Av. Reforma', exterior_number: '100', interior_number: null,
+  id: 'l1', doctor_id: 'd1', customer_id: null, name: 'Clínica', line1: 'Av. Reforma', exterior_number: '100', interior_number: null,
   neighborhood: 'Centro', postal_code: '06000', city: 'CDMX', state: 'CDMX', country: 'México',
   reference_notes: null, contact_name: null, contact_phone: '5551234567', is_default: false, active: true,
   created_at: 'T0', updated_at: 'T0', ...o,

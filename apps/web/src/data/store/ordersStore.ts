@@ -63,7 +63,7 @@ async function hydrate() {
   const g = ++hgen
   const { data, error } = await supabase
     .from('orders')
-    .select('id, external_ref, doctor_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
+    .select('id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
     .order('created_at', { ascending: false })
   if (g !== hgen) return // llegó una hidratación más nueva; ignora esta
   if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
@@ -90,6 +90,7 @@ export function createOrder(input: {
   total: number
   invoice_requested: boolean
   doctor_id?: string
+  customer_id?: string | null       // identidad comercial (customers.id); independiente de doctor_id/portal
   placedBy?: string
   shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
   location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
@@ -100,7 +101,7 @@ export function createOrder(input: {
   const doctorId = input.doctor_id ?? (hasSupabase ? currentUserId() : DOCTOR_ID)
 
   const order: Order = {
-    id, external_ref: folio, doctor_id: doctorId, total: input.total, currency: 'MXN',
+    id, external_ref: folio, doctor_id: doctorId, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
     invoice_meta: null,
@@ -185,6 +186,7 @@ export function createPosOrder(input: {
   event_id?: string | null
   seller?: string | null
   doctor_id?: string | null
+  customer_id?: string | null
   channel?: string
   invoice_requested?: boolean
   invoice_meta?: Record<string, unknown> | null
@@ -197,7 +199,7 @@ export function createPosOrder(input: {
   const shipping_meta = { channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null }
 
   const order: Order = {
-    id, external_ref: folio, doctor_id: input.doctor_id ?? null, total: input.total, currency: 'MXN',
+    id, external_ref: folio, doctor_id: input.doctor_id ?? null, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',
     status: 'delivered', payment_method: input.payment_method, payment_ref: null,
     payment_status: 'paid', stripe_payment_id: null, invoice_requested: invoiceReq,
     invoice_meta: invoiceMeta as Order['invoice_meta'], shipping_meta, created_at: now,

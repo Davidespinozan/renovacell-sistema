@@ -797,6 +797,7 @@ export type Database = {
         Row: {
           created_at: string | null
           currency: string | null
+          customer_id: string | null
           doctor_id: string | null
           external_ref: string | null
           id: string
@@ -813,6 +814,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           currency?: string | null
+          customer_id?: string | null
           doctor_id?: string | null
           external_ref?: string | null
           id?: string
@@ -829,6 +831,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           currency?: string | null
+          customer_id?: string | null
           doctor_id?: string | null
           external_ref?: string | null
           id?: string
@@ -1267,10 +1270,65 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          id: string
+          full_name: string
+          email: string | null
+          phone: string | null
+          city: string | null
+          country: string | null
+          seller_name: string | null
+          external_id: string | null
+          source: string | null
+          import_hash: string | null
+          profile_id: string | null
+          meta: Json
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          full_name: string
+          email?: string | null
+          phone?: string | null
+          city?: string | null
+          country?: string | null
+          seller_name?: string | null
+          external_id?: string | null
+          source?: string | null
+          import_hash?: string | null
+          profile_id?: string | null
+          meta?: Json
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          email?: string | null
+          phone?: string | null
+          city?: string | null
+          country?: string | null
+          seller_name?: string | null
+          external_id?: string | null
+          source?: string | null
+          import_hash?: string | null
+          profile_id?: string | null
+          meta?: Json
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       doctor_locations: {
         Row: {
           id: string
-          doctor_id: string
+          doctor_id: string | null
+          customer_id: string | null
           name: string
           line1: string
           exterior_number: string | null
@@ -1290,7 +1348,8 @@ export type Database = {
         }
         Insert: {
           id?: string
-          doctor_id: string
+          doctor_id?: string | null
+          customer_id?: string | null
           name: string
           line1: string
           exterior_number?: string | null
@@ -1310,7 +1369,8 @@ export type Database = {
         }
         Update: {
           id?: string
-          doctor_id?: string
+          doctor_id?: string | null
+          customer_id?: string | null
           name?: string
           line1?: string
           exterior_number?: string | null
