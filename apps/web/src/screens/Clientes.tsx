@@ -1,110 +1,115 @@
-// CLIENTES — cartera del vendedor (directorio de doctores). Aislado por vendedor:
-// cada quien ve SOLO su cartera (doctor.meta.owner); Admin ve todos. Solo lectura.
+// CLIENTES — DIRECTORIO COMERCIAL real, basado en `customers` (los ~2,568 clientes de Renovacell,
+// existan o no en el portal). Fuente = useCustomers (customers), NO useDoctors (profiles): profiles/
+// doctor_directory siguen sirviendo SOLO al acceso al portal. Solo lectura (RLS admin/pos).
 import React, { useMemo, useState } from 'react'
-import { ShieldCheck, Clock, ShoppingBag, Plus } from 'lucide-react'
+import { X, MapPin, Phone, Mail, UserCheck, UserX } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from '../app/ExportButton'
-import { useDoctors } from '../data/hooks/useDoctors'
-import { useAllOrders } from '../data/hooks/useOrders'
-import { useRole } from '../auth/RoleContext'
-import { NuevoPedido } from './sales/NuevoPedido'
-import { VentaDirecta } from './sales/VentaDirecta'
-import type { Profile } from '../data/types'
+import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
+import { portalStatus, type Customer } from '../data/ops/customer'
 
-const ownerOf = (d: Profile): string | null => ((d.meta as Record<string, unknown>)?.owner as string) ?? null
-const specialtyOf = (d: Profile): string => ((d.meta as Record<string, unknown>)?.specialty as string) ?? ''
+const MAX_RENDER = 100 // el filtro corre sobre todos; solo pintamos los primeros N (perf con miles)
+const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
 
 export function Clientes() {
-  const { data: doctors } = useDoctors()
-  const { data: orders } = useAllOrders()
-  const { role, user } = useRole()
-  const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
-  const [ventaFor, setVentaFor] = useState<{ id: string; name: string } | null>(null)
-  const placedBy = role === 'admin' ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
-
-  const mine = useMemo(
-    () => (role === 'admin' ? doctors : doctors.filter((d) => ownerOf(d) === user?.email)),
-    [doctors, role, user],
-  )
-  // Buscador de cartera: por nombre, consultorio o especialidad. Una cartera crece sin
-  // cota, así que scrollear no escala — el vendedor teclea el nombre y lo encuentra.
+  const { data: customers, loading, error } = useCustomers()
   const [q, setQ] = useState('')
-  const shown = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    if (!s) return mine
-    return mine.filter((d) => `${d.full_name ?? ''} ${d.organization ?? ''} ${specialtyOf(d)}`.toLowerCase().includes(s))
-  }, [mine, q])
-  const orderCount = useMemo(() => {
-    const m: Record<string, number> = {}
-    orders.forEach((o) => { if (o.doctor_id) m[o.doctor_id] = (m[o.doctor_id] ?? 0) + 1 })
-    return m
-  }, [orders])
+  const shown = useCustomerSearch(customers, q)
+  const [detail, setDetail] = useState<Customer | null>(null)
+  const visible = useMemo(() => shown.slice(0, MAX_RENDER), [shown])
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">{role === 'admin' ? 'Administración' : 'Ventas'} · Clientes</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="eyebrow">Clientes · Directorio comercial</div>
+        {!loading && !error && <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{customers.length.toLocaleString('es-MX')} cliente(s)</span>}
         <ExportButton name="clientes" rows={shown} style={{ marginLeft: 'auto' }} columns={[
           { key: 'full_name', label: 'Nombre' },
-          { key: 'organization', label: 'Consultorio' },
-          { key: 'meta', label: 'Especialidad', format: (_v, d) => specialtyOf(d) },
           { key: 'email', label: 'Correo' },
-          { key: 'verified', label: 'Verificado', format: (v) => (v ? 'Sí' : 'No') },
-          { key: 'id', label: 'Pedidos', format: (v) => orderCount[v as string] ?? 0 },
+          { key: 'phone', label: 'Teléfono' },
+          { key: 'city', label: 'Ciudad' },
+          { key: 'country', label: 'País' },
+          { key: 'seller_name', label: 'Vendedor' },
+          { key: 'profile_id', label: 'Portal', format: (v) => (v ? 'Con acceso' : 'Sin acceso') },
         ]} />
       </div>
 
-      {mine.length > 0 && (
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre, consultorio o especialidad…"
-          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
-        />
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Buscar por nombre, correo, teléfono, ciudad o vendedor…"
+        style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+      />
+
+      {loading ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando directorio…</div>
+      ) : error ? (
+        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>
+      ) : customers.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>No hay clientes en el directorio.</div>
+      ) : shown.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ningún cliente coincide con “{q}”.</div>
+      ) : (
+        <>
+          {visible.map((c) => (
+            <button key={c.id} type="button" className="card" onClick={() => setDetail(c)}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
+              <div className="avatar" style={{ background: avatarColor(c.full_name || '?') }}>{initials(c.full_name || '?')}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{c.full_name}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[dash(c.city) !== '—' ? c.city : null, dash(c.seller_name) !== '—' ? c.seller_name : null].filter(Boolean).join(' · ') || '—'}
+                </div>
+              </div>
+              <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5, whiteSpace: 'nowrap' }}>
+                {c.profile_id ? <UserCheck size={12} /> : <UserX size={12} />} {c.profile_id ? 'Portal' : 'Sin portal'}
+              </span>
+            </button>
+          ))}
+          {shown.length > MAX_RENDER && (
+            <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--ink-3)' }}>
+              Mostrando {MAX_RENDER} de {shown.length.toLocaleString('es-MX')}. Refina la búsqueda para acotar.
+            </div>
+          )}
+        </>
       )}
 
-      {mine.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Aún no tienes clientes en tu cartera.
-        </div>
-      ) : shown.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Ningún cliente coincide con “{q}”.
-        </div>
-      ) : shown.map((d) => (
-        <div key={d.id} className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar" style={{ background: avatarColor(d.full_name ?? '?') }}>{initials(d.full_name ?? '?')}</div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontWeight: 600 }}>{d.full_name}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-                {d.organization}{specialtyOf(d) ? ` · ${specialtyOf(d)}` : ''}
-              </div>
-            </div>
-            <span className={'pill ' + (d.verified ? 'p-ok' : 'p-warn')}>
-              {d.verified ? <ShieldCheck size={12} /> : <Clock size={12} />} {d.verified ? 'Verificado' : 'Pendiente'}
-            </span>
-            <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
-          </div>
-          <div style={{ display: 'flex', marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            {d.verified ? (
-              <>
-                <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setVentaFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
-                  <Plus size={14} /> Venta directa
-                </button>
-                <button className="btn sm" type="button" onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
-                  <Plus size={14} /> Levantar pedido
-                </button>
-              </>
-            ) : (
-              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>En verificación — se habilita al aprobarse</span>
-            )}
-          </div>
-        </div>
-      ))}
+      {detail && <CustomerDetail c={detail} onClose={() => setDetail(null)} />}
+    </div>
+  )
+}
 
-      {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy={placedBy} onClose={() => setPedidoFor(null)} />}
-      {ventaFor && <VentaDirecta doctor={ventaFor} vendor={user?.email ?? ''} onClose={() => setVentaFor(null)} />}
+function CustomerDetail({ c, onClose }: { c: Customer; onClose: () => void }) {
+  const row = (icon: React.ReactNode, label: string, value: string | null | undefined) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--line)' }}>
+      <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}>{icon}</span>
+      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink-3)', width: 84 }}>{label}</span>
+      <span style={{ fontSize: 13.5, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>{dash(value)}</span>
+    </div>
+  )
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="avatar" style={{ background: avatarColor(c.full_name || '?') }}>{initials(c.full_name || '?')}</div>
+            <div><h3 style={{ margin: 0 }}>{c.full_name}</h3><div className="ms">{portalStatus(c)}</div></div>
+          </div>
+          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          {row(<Mail size={15} />, 'Correo', c.email)}
+          {row(<Phone size={15} />, 'Teléfono', c.phone)}
+          {row(<MapPin size={15} />, 'Ciudad', c.city)}
+          {row(<MapPin size={15} />, 'País', c.country)}
+          {row(<UserCheck size={15} />, 'Vendedor', c.seller_name)}
+          <div style={{ marginTop: 14 }}>
+            <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 6 }}>
+              {c.profile_id ? <UserCheck size={13} /> : <UserX size={13} />} {portalStatus(c)}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

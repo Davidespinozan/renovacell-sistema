@@ -2,10 +2,12 @@
 // Las conductas de RLS/constraints son a nivel DB (no ejecutables en vitest): se aseguran contra
 // el texto de la migración y el self-test que corre al aplicarla (E2E autenticado aparte).
 import { describe, it, expect } from 'vitest'
-import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, type Customer } from './customer'
+import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, type Customer } from './customer'
+import { filterCustomers } from '../hooks/useCustomers'
 import { createOrder, createPosOrder } from '../store/ordersStore'
 import migSrc from '../../../../../supabase/migrations/20260922120000_customers_domain.sql?raw'
 import storeSrc from '../store/customersStore.ts?raw'
+import clientesSrc from '../../screens/Clientes.tsx?raw'
 
 const mkCustomer = (o: Partial<Customer> = {}): Customer => ({
   id: 'c1', full_name: 'Dra. Ana', email: null, phone: null, city: null, country: null,
@@ -117,6 +119,45 @@ describe('store customers — no contamina y no dedup por contacto', () => {
   it('linkCustomerToProfile fija profile_id (conversión idempotente)', () => {
     expect(storeSrc).toMatch(/linkCustomerToProfile/)
     expect(storeSrc).toMatch(/\.update\(\{ profile_id: profileId/)
+  })
+})
+
+describe('directorio comercial — estado de portal y búsqueda (Fase 1 UI)', () => {
+  const sample: Customer[] = [
+    mkCustomer({ id: 'c1', full_name: 'Dra. Ana López', email: 'ana@clinica.mx', phone: '6671234567', city: 'Culiacán', seller_name: 'Roberto Ibarra', profile_id: 'p1' }),
+    mkCustomer({ id: 'c2', full_name: 'Dr. Beto Ruiz', email: null, phone: null, city: 'CDMX', seller_name: 'Alejandra Cazarez', profile_id: null }),
+    mkCustomer({ id: 'c3', full_name: 'ADRIANA CANTU', email: 'ADRIANA@X.COM', phone: '55-5555-0000', city: 'Monterrey', seller_name: 'Antonio Gallardo', profile_id: null }),
+  ]
+  it('portalStatus deriva de profile_id (sin consultar profiles)', () => {
+    expect(portalStatus({ profile_id: 'p1' })).toBe('Con acceso al portal')
+    expect(portalStatus({ profile_id: null })).toBe('Sin acceso al portal')
+  })
+  it('búsqueda por NOMBRE (case/acentos/espacios tolerantes)', () => {
+    expect(filterCustomers(sample, '  ANA LÓPEZ  ').map((c) => c.id)).toEqual(['c1']) // espacios/mayúsculas
+    expect(filterCustomers(sample, 'lopez').map((c) => c.id)).toEqual(['c1']) // sin acento
+  })
+  it('búsqueda por EMAIL (case-insensitive)', () => {
+    expect(filterCustomers(sample, 'adriana@x.com').map((c) => c.id)).toEqual(['c3'])
+  })
+  it('búsqueda por TELÉFONO (dígitos, ignora formato)', () => {
+    expect(filterCustomers(sample, '667123').map((c) => c.id)).toEqual(['c1'])
+    expect(filterCustomers(sample, '55 5555').map((c) => c.id)).toEqual(['c3'])
+  })
+  it('búsqueda por CIUDAD y por VENDEDOR', () => {
+    expect(filterCustomers(sample, 'cdmx').map((c) => c.id)).toEqual(['c2'])
+    expect(filterCustomers(sample, 'gallardo').map((c) => c.id)).toEqual(['c3'])
+  })
+  it('customer SIN email/teléfono no rompe la búsqueda (NULL-tolerante)', () => {
+    expect(matchCustomer(sample[1], 'beto')).toBe(true)
+    expect(matchCustomer(sample[1], 'nada@x.com')).toBe(false)
+  })
+  it('query vacía → todos; sin coincidencia → cero', () => {
+    expect(filterCustomers(sample, '').length).toBe(3)
+    expect(filterCustomers(sample, 'zzz-inexistente').length).toBe(0)
+  })
+  it('la pantalla Clientes usa customers (useCustomers), NO useDoctors como fuente comercial', () => {
+    expect(clientesSrc).toMatch(/hooks\/useCustomers/)
+    expect(clientesSrc).not.toMatch(/hooks\/useDoctors/) // no importa doctores como fuente comercial
   })
 })
 

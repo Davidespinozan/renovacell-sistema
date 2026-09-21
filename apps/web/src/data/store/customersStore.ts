@@ -9,12 +9,20 @@ export type CustomerFields = Omit<CustomerInput, 'id' | 'created_at' | 'updated_
 
 export async function listCustomers(opts: { seller?: string; search?: string } = {}): Promise<Customer[]> {
   if (!hasSupabase) return []
-  let q = supabase.from('customers').select('*').eq('active', true).order('full_name', { ascending: true })
-  if (opts.seller) q = q.eq('seller_name', opts.seller)
-  if (opts.search) q = q.ilike('full_name', `%${opts.search}%`)
-  const { data, error } = await q
-  if (error) { console.warn('[customers] list', error.message); return [] }
-  return (data ?? []) as Customer[]
+  // Pagina en bloques (PostgREST tope ~1000) para traer TODO el directorio sin N+1.
+  const PAGE = 1000
+  const out: Customer[] = []
+  for (let from = 0; ; from += PAGE) {
+    let q = supabase.from('customers').select('*').eq('active', true).order('full_name', { ascending: true }).range(from, from + PAGE - 1)
+    if (opts.seller) q = q.eq('seller_name', opts.seller)
+    if (opts.search) q = q.ilike('full_name', `%${opts.search}%`)
+    const { data, error } = await q
+    if (error) { console.warn('[customers] list', error.message); break }
+    const rows = (data ?? []) as Customer[]
+    out.push(...rows)
+    if (rows.length < PAGE) break
+  }
+  return out
 }
 
 // Alta. Correos/teléfonos duplicados SON válidos (no hay unicidad de contacto). La idempotencia

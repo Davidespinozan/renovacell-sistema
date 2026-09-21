@@ -39,6 +39,23 @@ export function computeImportHash(fields: {
   return `h${h.toString(16)}`
 }
 
+// Estado de acceso al portal, derivado SOLO de profile_id (sin consultar profiles → sin N+1).
+export function portalStatus(c: Pick<Customer, 'profile_id'>): 'Con acceso al portal' | 'Sin acceso al portal' {
+  return c.profile_id ? 'Con acceso al portal' : 'Sin acceso al portal'
+}
+
+// Búsqueda del directorio: tolera NULL, mayúsculas/minúsculas y espacios. Busca en nombre,
+// email, teléfono (texto y solo-dígitos), ciudad y vendedor. Cadena vacía → coincide todo.
+export function matchCustomer(c: Pick<Customer, 'full_name' | 'email' | 'phone' | 'city' | 'seller_name'>, query: string): boolean {
+  const q = (query ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!q) return true
+  const norm = (s: string | null | undefined) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const digits = (s: string | null | undefined) => (s ?? '').toString().replace(/[^0-9]/g, '')
+  const hay = [norm(c.full_name), norm(c.email), norm(c.phone), norm(c.city), norm(c.seller_name)].join(' ')
+  const qDigits = q.replace(/[^0-9]/g, '')
+  return hay.includes(norm(query).trim()) || (qDigits.length >= 3 && digits(c.phone).includes(qDigits))
+}
+
 export type ImportState = 'NUEVO' | 'YA_EXISTE' | 'ACTUALIZABLE' | 'CONFLICTO' | 'INVALIDO'
 
 // Clasifica una fila de importación contra el customer existente (si lo hay). Reglas:
