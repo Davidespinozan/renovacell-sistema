@@ -8,22 +8,26 @@ import { enviarReciboWhatsApp, imprimirVenta, VentaTicketPrint } from './ventaRe
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useCustomers, useCustomerSearch } from '../../data/hooks/useCustomers'
 import { useEvents } from '../../data/hooks/useEvents'
 import { useRole } from '../../auth/RoleContext'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
 import { venderPOS, type PosResult } from '../../data/ops/pos'
+import { orderClientName } from '../../data/ops/orderClient'
 import { clientOf } from '../../data/mock/profiles'
+import type { Customer } from '../../data/ops/customer'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
-import type { ProductSafe, Profile } from '../../data/types'
+import type { ProductSafe } from '../../data/types'
 
 type PayMethod = 'efectivo' | 'tarjeta'
 interface Line { product: ProductSafe; qty: number }
-interface Client { id: string; name: string }
+interface Client { id: string; name: string; phone?: string | null }
 
 export function Caja() {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
+  const { data: allCustomers } = useCustomers()
   const { data: events, sellAtEvent } = useEvents()
   const { user } = useRole()
   const eventosActivos = useMemo(() => events.filter((e) => e.status === 'activo'), [events])
@@ -75,7 +79,9 @@ export function Caja() {
   type VentaTurno = { order: OrderWithItems; clientName: string; pago: { recibido: number; cambio: number } | null }
   const [ventasTurno, setVentasTurno] = useState<VentaTurno[]>([])
   const [reprint, setReprint] = useState<VentaTurno | null>(null)
-  const clientNameFor = (o: OrderWithItems) => (o.doctor_id ? (doctors.find((d) => d.id === o.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general')
+  // Nombre del cliente: snapshot del customer → doctor legacy → mostrador (sin N+1).
+  const clientNameFor = (o: OrderWithItems) =>
+    orderClientName(o, (id) => doctors.find((d) => d.id === id)?.full_name, 'Mostrador · público general')
 
   const lines: Line[] = useMemo(
     () =>
@@ -117,12 +123,16 @@ export function Caja() {
         ? { ok: true, order }
         : { ok: false, error: 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
     } else {
-      // CFDI: mostrador → datos fiscales capturados; con doctor ligado → se factura con su
-      // perfil (Facturación), aquí solo se marca la solicitud.
-      const invoiceMeta = invoiceReq && !client
+      // CFDI: el cliente comercial (customer) no tiene datos fiscales de perfil → se capturan aquí
+      // igual que mostrador. (CFDI fiscal por customer es fase posterior.)
+      const invoiceMeta = invoiceReq
         ? { rfc: fiscal.rfc.trim(), razon_social: fiscal.razon.trim(), uso_cfdi: fiscal.uso, email: fiscal.email.trim() }
         : null
-      res = await venderPOS(posLines, total, method, { doctorId: client?.id ?? null, seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta })
+      res = await venderPOS(posLines, total, method, {
+        customerId: client?.id ?? null,
+        customer: client ? { name: client.name, phone: client.phone ?? null } : null,
+        seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta,
+      })
     }
     setCobrando(false)
     if (res.ok && res.order) {
@@ -270,31 +280,28 @@ export function Caja() {
                   <span>Solicitar factura (CFDI)</span>
                 </label>
                 {invoiceReq && (
-                  client ? (
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>Se facturará con los datos fiscales de {client.name} (perfil). La emite Facturación.</div>
-                  ) : (
-                    <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                      <input value={fiscal.rfc} onChange={(e) => setFiscal((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))} placeholder="RFC"
-                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                      <input value={fiscal.razon} onChange={(e) => setFiscal((f) => ({ ...f, razon: e.target.value }))} placeholder="Razón social"
-                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                      <input value={fiscal.email} onChange={(e) => setFiscal((f) => ({ ...f, email: e.target.value }))} placeholder="Correo para la factura"
-                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                      <select value={fiscal.uso} onChange={(e) => setFiscal((f) => ({ ...f, uso: e.target.value }))}
-                        style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }}>
-                        <option value="G03">G03 · Gastos en general</option>
-                        <option value="G01">G01 · Adquisición de mercancías</option>
-                        <option value="P01">P01 · Por definir</option>
-                      </select>
-                      {(fiscal.rfc.trim() === '' || fiscal.razon.trim() === '') && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>RFC y razón social son obligatorios para facturar.</div>}
-                    </div>
-                  )
+                  <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                    {client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Captura los datos fiscales de {client.name} (el cliente comercial no los tiene en el portal).</div>}
+                    <input value={fiscal.rfc} onChange={(e) => setFiscal((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))} placeholder="RFC"
+                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                    <input value={fiscal.razon} onChange={(e) => setFiscal((f) => ({ ...f, razon: e.target.value }))} placeholder="Razón social"
+                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                    <input value={fiscal.email} onChange={(e) => setFiscal((f) => ({ ...f, email: e.target.value }))} placeholder="Correo para la factura"
+                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                    <select value={fiscal.uso} onChange={(e) => setFiscal((f) => ({ ...f, uso: e.target.value }))}
+                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }}>
+                      <option value="G03">G03 · Gastos en general</option>
+                      <option value="G01">G01 · Adquisición de mercancías</option>
+                      <option value="P01">P01 · Por definir</option>
+                    </select>
+                    {(fiscal.rfc.trim() === '' || fiscal.razon.trim() === '') && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>RFC y razón social son obligatorios para facturar.</div>}
+                  </div>
                 )}
               </div>
             )}
 
             {(() => {
-              const cfdiOk = !invoiceReq || client != null || (fiscal.rfc.trim() !== '' && fiscal.razon.trim() !== '')
+              const cfdiOk = !invoiceReq || (fiscal.rfc.trim() !== '' && fiscal.razon.trim() !== '')
               const puede = !cobrando && efectivoOk && cfdiOk
               return (<>
             <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(puede ? {} : { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' }) }} onClick={cobrar} disabled={!puede}>
@@ -330,7 +337,7 @@ export function Caja() {
 
       {pickOpen && (
         <ClientPicker
-          doctors={doctors}
+          customers={allCustomers}
           onPick={(c) => { setClient(c); setPickOpen(false) }}
           onClose={() => setPickOpen(false)}
         />
@@ -345,7 +352,7 @@ export function Caja() {
                 <h3>Venta registrada</h3>
                 <p>
                   <b>{done.external_ref}</b> · {money(done.total)} · {done.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}
-                  {' · '}{done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador'}.
+                  {' · '}{clientNameFor(done)}.
                   Inventario descontado por lote. Ya suma en el Tablero.
                 </p>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -358,7 +365,7 @@ export function Caja() {
               </div>
             </div>
           </div>
-          <VentaTicketPrint order={done} productName={productName} pago={lastPago} clientName={done.doctor_id ? (doctors.find((d) => d.id === done.doctor_id)?.full_name ?? 'Cliente') : 'Mostrador · público general'} />
+          <VentaTicketPrint order={done} productName={productName} pago={lastPago} clientName={clientNameFor(done)} />
         </div>
       )}
     </div>
@@ -366,16 +373,15 @@ export function Caja() {
 }
 
 // Selector de cliente para la Caja: buscar un doctor verificado, o dejar Mostrador.
-function ClientPicker({ doctors, onPick, onClose }: {
-  doctors: Profile[]
+// Selector de cliente de la Caja: DIRECTORIO COMERCIAL (customers). Un customer con portal se
+// muestra UNA sola vez (es el mismo cliente comercial; no se duplica con su doctor/profile).
+function ClientPicker({ customers, onPick, onClose }: {
+  customers: Customer[]
   onPick: (c: Client | null) => void
   onClose: () => void
 }) {
   const [q, setQ] = useState('')
-  const list = doctors
-    .filter((d) => d.verified)
-    .filter((d) => (d.full_name ?? '').toLowerCase().includes(q.trim().toLowerCase()))
-    .slice(0, 40)
+  const list = useCustomerSearch(customers, q).slice(0, 40)
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -384,20 +390,25 @@ function ClientPicker({ doctors, onPick, onClose }: {
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
         </div>
         <div className="mbody">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar doctor por nombre…"
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente por nombre, teléfono o ciudad…"
             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
           <button type="button" onClick={() => onPick(null)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '11px 12px', border: '1px solid var(--line)', borderRadius: 11, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 6, fontWeight: 600 }}>
             <Icon name="store" style={{ width: 15, height: 15, color: 'var(--ink-3)' }} /> Mostrador · público general
           </button>
           <div style={{ display: 'grid', gap: 4, maxHeight: '44vh', overflow: 'auto' }}>
-            {list.map((d) => (
-              <button key={d.id} type="button" onClick={() => onPick({ id: d.id, name: d.full_name ?? 'Doctor' })}
+            {list.map((c) => (
+              <button key={c.id} type="button" onClick={() => onPick({ id: c.id, name: c.full_name, phone: c.phone })}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <Icon name="usercheck" style={{ width: 15, height: 15, color: 'var(--green-deep)' }} /> {d.full_name ?? 'Doctor'}
+                <Icon name="usercheck" style={{ width: 15, height: 15, color: c.profile_id ? 'var(--green-deep)' : 'var(--ink-3)' }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13.5 }}>{c.full_name}</span>
+                  {(c.city || c.phone) && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)' }}>{[c.city, c.phone].filter(Boolean).join(' · ')}</span>}
+                </span>
               </button>
             ))}
-            {list.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 2px' }}>Sin doctores verificados que coincidan.</div>}
+            {q.trim() !== '' && list.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 2px' }}>Ningún cliente coincide.</div>}
+            {q.trim() === '' && <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 2px' }}>Escribe para buscar entre el directorio comercial.</div>}
           </div>
         </div>
       </div>

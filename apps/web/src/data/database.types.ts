@@ -1782,10 +1782,11 @@ export type Database = {
         Args: {
           p_order_id: string
           p_folio: string
-          p_doctor_id: string
+          p_doctor_id: string | null
           p_lines: Json
           p_shipping_meta?: Json
           p_invoice_requested?: boolean
+          p_customer_id?: string | null
         }
         Returns: Json
       }
@@ -1800,13 +1801,16 @@ export type Database = {
       vender_pos: {
         Args: {
           p_allocations: Json
-          p_doctor_id: string
+          p_doctor_id: string | null
           p_folio: string
           p_lines: Json
           p_order_id: string
           p_payment_method: string
           p_shipping_meta: Json
           p_total: number
+          p_invoice_requested?: boolean
+          p_invoice_meta?: Json
+          p_customer_id?: string | null
         }
         Returns: boolean
       }

@@ -94,11 +94,14 @@ export function createOrder(input: {
   placedBy?: string
   shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
   location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
+  customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
 }): OrderWithItems {
   const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
   const folio = `S${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
-  const doctorId = input.doctor_id ?? (hasSupabase ? currentUserId() : DOCTOR_ID)
+  // Identidad del pedido: doctor explícito → ese; customer-only (customer_id sin doctor) → doctor NULL
+  // (NO el uid del staff); si no, fallback a la sesión (auto-pedido del doctor) / mock.
+  const doctorId = input.doctor_id ?? (input.customer_id ? null : (hasSupabase ? currentUserId() : DOCTOR_ID))
 
   const order: Order = {
     id, external_ref: folio, doctor_id: doctorId, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',
@@ -106,13 +109,14 @@ export function createOrder(input: {
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
     invoice_meta: null,
     // El snapshot COMPLETO de la dirección (address) es autoritativo y viaja con el pedido; el
-    // location_id es solo una referencia informativa. Editar/desactivar la ubicación después NO
-    // altera este snapshot histórico.
-    shipping_meta: (input.placedBy || input.shipping || input.location_id)
+    // location_id es solo una referencia informativa. Editar/desactivar la ubicación/cliente después
+    // NO altera este snapshot histórico. `customer` = snapshot mínimo de nombre/teléfono.
+    shipping_meta: (input.placedBy || input.shipping || input.location_id || input.customer)
       ? {
           ...(input.placedBy ? { placed_by: input.placedBy } : {}),
           ...(input.shipping ? { address: input.shipping } : {}),
           ...(input.location_id ? { location_id: input.location_id } : {}),
+          ...(input.customer ? { customer: { id: input.customer_id ?? null, name: input.customer.name, phone: input.customer.phone ?? null } } : {}),
         }
       : null,
     created_at: now,
@@ -128,19 +132,17 @@ export function createOrder(input: {
   notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
   logAudit({ actor: input.placedBy ?? 'Portal del Doctor', action: 'Pedido creado', resource: folio })
 
-  // Persistir solo si el doctor_id es un uuid real (pedido propio del doctor;
-  // el "a nombre de" con id mock se conectará al cablear doctores).
-  if (hasSupabase && isUuid(doctorId)) {
+  // Persistir si hay identidad real: doctor uuid (portal/legacy) O customer uuid (comercial).
+  if (hasSupabase && (isUuid(doctorId) || isUuid(input.customer_id))) {
     (async () => {
       // EL PRECIO NO LO PONE EL CLIENTE. El servidor (RPC crear_pedido, SECURITY DEFINER)
-      // calcula unit_price/total desde la lista del doctor; aquí solo se manda {product_id, qty}.
-      // El total optimista de arriba es solo para respuesta instantánea y se reemplaza por el
-      // total autoritativo del servidor.
+      // calcula unit_price/total desde la lista del doctor (o base/General si es customer-only);
+      // aquí solo se manda {product_id, qty}. El total optimista se reemplaza por el del servidor.
       const { data, error } = await supabase.rpc('crear_pedido', {
         p_order_id: id,
         p_folio: folio,
-        p_doctor_id: doctorId as string, // isUuid(doctorId) ya garantizó no-null
-
+        p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
+        p_customer_id: (isUuid(input.customer_id) ? input.customer_id : null) as unknown as string,
         p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
         p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
         p_invoice_requested: input.invoice_requested,
@@ -187,6 +189,7 @@ export function createPosOrder(input: {
   seller?: string | null
   doctor_id?: string | null
   customer_id?: string | null
+  customer?: { name: string; phone?: string | null } | null
   channel?: string
   invoice_requested?: boolean
   invoice_meta?: Record<string, unknown> | null
@@ -196,7 +199,10 @@ export function createPosOrder(input: {
   const id = hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`
   const folio = `POS-${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
-  const shipping_meta = { channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null }
+  const shipping_meta = {
+    channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null,
+    ...(input.customer ? { customer: { id: input.customer_id ?? null, name: input.customer.name, phone: input.customer.phone ?? null } } : {}),
+  }
 
   const order: Order = {
     id, external_ref: folio, doctor_id: input.doctor_id ?? null, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',

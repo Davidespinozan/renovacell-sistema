@@ -9,30 +9,38 @@ import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
+import { AddressPicker } from '../../app/AddressPicker'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 
-export function NuevoPedido({ doctor, placedBy, onClose }: {
-  doctor: { id: string; name: string }
+// Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
+// Exactamente uno de doctor|customer. Customer-only ⇒ doctor_id NULL + customer_id + snapshot.
+export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
+  doctor?: { id: string; name: string }
+  customer?: { id: string; name: string; phone?: string | null }
   placedBy: string
   onClose: () => void
 }) {
+  const isCustomer = !!customer
+  const target = customer ?? doctor!
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { createOrder } = useOrders()
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
 
-  // Domicilio base del cliente (si lo tiene). Siempre se pregunta si el envío va ahí o a otra.
-  const ci = clientOf(doctor.id)
-  const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
+  // Domicilio base SOLO aplica al flujo doctor (perfil legacy). Customer captura dirección one-off.
+  const ci = !isCustomer && doctor ? clientOf(doctor.id) : null
+  const baseAddr: ShippingAddress | null = ci && ci.address && ci.address !== '—'
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [invoice, setInvoice] = useState(false)
-  const [choice, setChoice] = useState<DeliveryChoice | null>(null)
+  const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
+  const [custAddr, setCustAddr] = useState<ShippingAddress | null>(null) // flujo customer (one-off)
   const [folio, setFolio] = useState<string | null>(null)
+  const shipping = isCustomer ? custAddr : (choice?.address ?? null)
 
   const add = (id: string) => setCart((c) => {
     const info = stockInfoFor(stockMap, id)
@@ -50,15 +58,16 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
   const total = lines.reduce((s, l) => s + (l.p!.price ?? 0) * l.qty, 0)
 
   const crear = () => {
-    if (lines.length === 0 || !choice?.address) return
+    if (lines.length === 0 || !shipping) return
     const order = createOrder({
       lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price })),
       total,
       invoice_requested: invoice,
-      doctor_id: doctor.id,
       placedBy,
-      shipping: choice.address,
-      location_id: choice.locationId ?? null,
+      shipping,
+      ...(isCustomer
+        ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
+        : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
     })
     setFolio(order.external_ref ?? '—')
   }
@@ -71,14 +80,14 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
             <div className="success">
               <div className="ck"><Plus size={26} /></div>
               <h3>Pedido creado</h3>
-              <p>El pedido <b>{folio}</b> para <b>{doctor.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
+              <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
         ) : (
           <>
             <div className="mhead">
-              <div><h3>Levantar pedido</h3><div className="ms">A nombre de {doctor.name}</div></div>
+              <div><h3>Levantar pedido</h3><div className="ms">A nombre de {target.name}{isCustomer ? ' · cliente comercial' : ''}</div></div>
               <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
             </div>
             <div className="mbody">
@@ -104,15 +113,22 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b>{money(total)}</b></div>
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega</div>
-              <DeliveryLocationPicker doctorId={doctor.id} legacyBase={baseAddr} allowManage={false} onChange={setChoice} />
+              {isCustomer
+                ? <AddressPicker base={null} value={custAddr} onChange={setCustAddr} />
+                : <DeliveryLocationPicker doctorId={doctor!.id} legacyBase={baseAddr} allowManage={false} onChange={setChoice} />}
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
+              {isCustomer && invoice && (
+                <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 6 }}>
+                  Este cliente comercial no tiene datos fiscales en el portal; el timbrado CFDI se bloqueará hasta capturarlos.
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0 || !choice?.address} style={(lines.length === 0 || !choice?.address) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
+                <button className="btn" type="button" disabled={lines.length === 0 || !shipping} style={(lines.length === 0 || !shipping) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
               </div>
             </div>
           </>

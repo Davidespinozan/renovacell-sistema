@@ -31,7 +31,7 @@ export async function venderPOS(
   lines: PosLine[],
   total: number,
   paymentMethod: string,
-  opts: { doctorId?: string | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null } = {},
+  opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null } = {},
 ): Promise<PosResult> {
   if (lines.length === 0) return { ok: false }
 
@@ -53,7 +53,8 @@ export async function venderPOS(
   // la escritura suelta: la persistencia real la hace la RPC atómica de abajo.
   const order = createPosOrder({
     lines: posLines, total, payment_method: paymentMethod,
-    doctor_id: opts.doctorId ?? null, seller: opts.seller ?? null, event_id: opts.eventId ?? null,
+    doctor_id: opts.doctorId ?? null, customer_id: opts.customerId ?? null, customer: opts.customer ?? null,
+    seller: opts.seller ?? null, event_id: opts.eventId ?? null,
     invoice_requested: opts.invoiceRequested ?? false, invoice_meta: opts.invoiceMeta ?? null,
   }, hasSupabase)
 
@@ -64,6 +65,7 @@ export async function venderPOS(
       p_total: total,
       p_payment_method: paymentMethod,
       p_doctor_id: (isUuid(opts.doctorId) ? opts.doctorId : null) as unknown as string,
+      p_customer_id: (isUuid(opts.customerId) ? opts.customerId : null) as unknown as string,
       p_shipping_meta: ((order.shipping_meta ?? {}) as unknown) as Json,
       p_lines: (posLines.map((l) => ({ ...l, lot_id: isUuid(l.lot_id) ? l.lot_id : null })) as unknown) as Json,
       p_allocations: (allocations.filter((a) => isUuid(a.lot_id)) as unknown) as Json,

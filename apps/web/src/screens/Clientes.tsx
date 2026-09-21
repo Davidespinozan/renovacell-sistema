@@ -7,15 +7,21 @@ import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from '../app/ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
 import { portalStatus, type Customer } from '../data/ops/customer'
+import { useRole } from '../auth/RoleContext'
+import { NuevoPedido } from './sales/NuevoPedido'
 
 const MAX_RENDER = 100 // el filtro corre sobre todos; solo pintamos los primeros N (perf con miles)
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
 
 export function Clientes() {
   const { data: customers, loading, error } = useCustomers()
+  const { role, user } = useRole()
+  const canOrder = role === 'admin' || role === 'pos'
+  const placedBy = role === 'admin' ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
   const [q, setQ] = useState('')
   const shown = useCustomerSearch(customers, q)
   const [detail, setDetail] = useState<Customer | null>(null)
+  const [pedidoFor, setPedidoFor] = useState<Customer | null>(null)
   const visible = useMemo(() => shown.slice(0, MAX_RENDER), [shown])
 
   return (
@@ -74,12 +80,26 @@ export function Clientes() {
         </>
       )}
 
-      {detail && <CustomerDetail c={detail} onClose={() => setDetail(null)} />}
+      {detail && (
+        <CustomerDetail
+          c={detail}
+          canOrder={canOrder}
+          onOrder={() => { setPedidoFor(detail); setDetail(null) }}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {pedidoFor && (
+        <NuevoPedido
+          customer={{ id: pedidoFor.id, name: pedidoFor.full_name, phone: pedidoFor.phone }}
+          placedBy={placedBy}
+          onClose={() => setPedidoFor(null)}
+        />
+      )}
     </div>
   )
 }
 
-function CustomerDetail({ c, onClose }: { c: Customer; onClose: () => void }) {
+function CustomerDetail({ c, canOrder, onOrder, onClose }: { c: Customer; canOrder: boolean; onOrder: () => void; onClose: () => void }) {
   const row = (icon: React.ReactNode, label: string, value: string | null | undefined) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--line)' }}>
       <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}>{icon}</span>
@@ -103,10 +123,11 @@ function CustomerDetail({ c, onClose }: { c: Customer; onClose: () => void }) {
           {row(<MapPin size={15} />, 'Ciudad', c.city)}
           {row(<MapPin size={15} />, 'País', c.country)}
           {row(<UserCheck size={15} />, 'Vendedor', c.seller_name)}
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 6 }}>
               {c.profile_id ? <UserCheck size={13} /> : <UserX size={13} />} {portalStatus(c)}
             </span>
+            {canOrder && <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={onOrder}>Levantar pedido</button>}
           </div>
         </div>
       </div>

@@ -2,7 +2,8 @@
 // Directorio comercial (Clientes) — render, búsqueda inmediata y detalle, con customers de prueba.
 // Se mockea SOLO el hook de carga (useCustomers); el filtro (useCustomerSearch/filterCustomers) es real.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { screen, fireEvent, cleanup } from '@testing-library/react'
+import { renderWithRole } from '../test/utils'
 import type { Customer } from '../data/ops/customer'
 
 const mk = (o: Partial<Customer>): Customer => ({
@@ -26,30 +27,30 @@ afterEach(cleanup)
 
 describe('<Clientes> directorio comercial', () => {
   it('renderiza los customers y el conteo', () => {
-    render(<Clientes />)
+    renderWithRole(<Clientes />)
     expect(screen.getByText('Dra. Ana López')).toBeTruthy()
     expect(screen.getByText('Dr. Beto Ruiz')).toBeTruthy()
     expect(screen.getByText(/2 cliente/)).toBeTruthy()
   })
   it('búsqueda filtra en vivo (por vendedor)', () => {
-    render(<Clientes />)
+    renderWithRole(<Clientes />)
     fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/), { target: { value: 'cazarez' } })
     expect(screen.queryByText('Dra. Ana López')).toBeNull()
     expect(screen.getByText('Dr. Beto Ruiz')).toBeTruthy()
   })
   it('cero resultados muestra el aviso', () => {
-    render(<Clientes />)
+    renderWithRole(<Clientes />)
     fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/), { target: { value: 'zzz' } })
     expect(screen.getByText(/Ningún cliente coincide/)).toBeTruthy()
   })
   it('abrir un cliente muestra su detalle y estado de portal', () => {
-    render(<Clientes />)
+    renderWithRole(<Clientes />)
     fireEvent.click(screen.getByText('Dra. Ana López'))
     expect(screen.getByText('ana@clinica.mx')).toBeTruthy()
     expect(screen.getAllByText('Con acceso al portal').length).toBeGreaterThan(0)
   })
   it('customer sin portal se marca "Sin acceso al portal"', () => {
-    render(<Clientes />)
+    renderWithRole(<Clientes />)
     fireEvent.click(screen.getByText('Dr. Beto Ruiz'))
     expect(screen.getAllByText('Sin acceso al portal').length).toBeGreaterThan(0)
   })
