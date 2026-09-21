@@ -11,7 +11,7 @@ import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
 import { PaymentModal } from './PaymentModal'
-import { AddressPicker } from '../../app/AddressPicker'
+import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
@@ -117,12 +117,13 @@ export function Catalogo() {
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  const onConfirm = (invoice: boolean, shipping: ShippingAddress | null) =>
+  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null) =>
     createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: priceOf(l.product) })),
       total,
       invoice_requested: invoice,
-      shipping,
+      shipping: choice?.address ?? null,
+      location_id: choice?.locationId ?? null,
     })
 
   if (loading) return <div className="card">Cargando catálogo…</div>
@@ -297,19 +298,19 @@ function CheckoutModal({
   total: number
   priceOf: (p: ProductSafe) => number | null
   base: ShippingAddress | null
-  onConfirm: (invoice: boolean, shipping: ShippingAddress | null) => OrderWithItems
+  onConfirm: (invoice: boolean, choice: DeliveryChoice | null) => OrderWithItems
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
 }) {
   const [invoice, setInvoice] = useState(false)
-  const [shipping, setShipping] = useState<ShippingAddress | null>(base)
+  const [choice, setChoice] = useState<DeliveryChoice | null>(null)
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [payNow, setPayNow] = useState(false)
 
   const confirm = () => {
-    if (!shipping) return // el pedido es a domicilio: exige dirección de entrega
-    const created = onConfirm(invoice, shipping)
+    if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
+    const created = onConfirm(invoice, choice)
     setOrder(created)
     onDone() // limpia el carrito
   }
@@ -369,7 +370,7 @@ function CheckoutModal({
               </div>
 
               <div className="eyebrow" style={{ marginTop: 16 }}>Dirección de entrega</div>
-              <AddressPicker base={base} value={shipping} onChange={setShipping} />
+              <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
@@ -377,7 +378,7 @@ function CheckoutModal({
 
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!shipping} style={!shipping ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> Crear pedido</button>
+                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address} style={!choice?.address ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> Crear pedido</button>
               </div>
             </div>
           </>

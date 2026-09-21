@@ -8,6 +8,7 @@ import { traducirError } from '../lib/errorMsg'
 import { useRole } from '../auth/RoleContext'
 import { uploadImage } from '../lib/uploads'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
+import { DeliveryLocationsManager } from '../app/DeliveryLocationsManager'
 
 // Usos de CFDI y regímenes fiscales SAT más comunes para persona física (doctor).
 const CFDI_USES = [['G03', 'Gastos en general'], ['G01', 'Adquisición de mercancías'], ['D01', 'Honorarios médicos'], ['P01', 'Por definir']] as const
@@ -112,6 +113,8 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
           )}
+
+          {isDoctor && <DeliveryLocationsManager />}
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Cambiar contraseña</div>

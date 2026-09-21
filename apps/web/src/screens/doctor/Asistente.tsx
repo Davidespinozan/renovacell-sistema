@@ -12,7 +12,9 @@ import { stockInfoFor } from '../../data/ops/stock'
 import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
-import type { ShippingAddress } from '../../data/ops/shippingAddress'
+import { isAddressUsable, type ShippingAddress } from '../../data/ops/shippingAddress'
+import { useDoctorLocations } from '../../data/hooks/useDoctorLocations'
+import { initialLocationSelection, locationToShippingAddress } from '../../data/ops/doctorLocation'
 import { statusView } from './orderStatus'
 import type { AssistantReply } from '../../data/assistant/engine'
 import type { ProductSafe } from '../../data/types'
@@ -46,6 +48,23 @@ export function Asistente() {
   const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
+
+  // Multi-ubicación (Fase 2): resuelve a dónde enviar sin ELEGIR EN SILENCIO. Si hay default o
+  // una sola ubicación, la usa; si hay varias sin default, NO crea y pide elegir en el Catálogo;
+  // si no hay ninguna, cae al domicilio legacy o pide registrar una.
+  const { data: myLocations } = useDoctorLocations()
+  const resolveDelivery = (): { ok: true; address: ShippingAddress | null; locationId?: string } | { ok: false; reason: string } => {
+    const sel = initialLocationSelection(myLocations)
+    if (sel.mode === 'auto' && sel.selectedId) {
+      const loc = myLocations.find((l) => l.id === sel.selectedId)
+      if (loc) return { ok: true, address: locationToShippingAddress(loc), locationId: loc.id }
+    }
+    if (sel.mode === 'requires-choice') {
+      return { ok: false, reason: 'Tienes varias ubicaciones de entrega y ninguna predeterminada. Elige a cuál enviar desde el Catálogo al crear el pedido, o marca una como predeterminada en Mi perfil.' }
+    }
+    if (isAddressUsable(baseAddr)) return { ok: true, address: baseAddr }
+    return { ok: false, reason: 'Aún no tienes una dirección de entrega registrada. Agrégala en Mi perfil → Ubicaciones de entrega y vuelve a intentarlo.' }
+  }
 
   const seq = useRef(0)
   const nextId = () => `m-${(seq.current += 1)}`
@@ -92,11 +111,14 @@ export function Asistente() {
 
   const crearPedido = () => {
     if (draft.length === 0) return
+    const d = resolveDelivery()
+    if (!d.ok) { push({ role: 'assistant', text: d.reason }); return }
     const order = createOrder({
-      lines: draft.map((d) => ({ product_id: d.product.id, qty: d.qty, unit_price: priceOf(d.product) })),
+      lines: draft.map((dl) => ({ product_id: dl.product.id, qty: dl.qty, unit_price: priceOf(dl.product) })),
       total: draftTotal,
       invoice_requested: false,
-      shipping: baseAddr,
+      shipping: d.address,
+      location_id: d.locationId ?? null,
     })
     push({
       role: 'assistant',
@@ -124,7 +146,9 @@ export function Asistente() {
       return it.qty > (info.tracked ? info.qty : 0)
     })
     const total = lines.reduce((s, l) => s + (l.unit_price != null ? l.unit_price * l.qty : 0), 0)
-    const order = createOrder({ lines, total, invoice_requested: false, shipping: baseAddr })
+    const del = resolveDelivery()
+    if (!del.ok) { push({ role: 'assistant', text: del.reason }); return }
+    const order = createOrder({ lines, total, invoice_requested: false, shipping: del.address, location_id: del.locationId ?? null })
     push({
       role: 'assistant',
       text: `Recreé tu pedido ${o.external_ref} como ${order.external_ref} (pago contra pedido).${adjusted ? ' Ajusté algunas cantidades al inventario disponible.' : ''} Lo ves en “Mis pedidos”.`,

@@ -1,9 +1,11 @@
 // Multi-ubicación (Fase 1) — helpers puros + garantías estructurales (RLS/índice de default) y
 // no-contaminación (nunca toca orders ni meta.fiscal).
 import { describe, it, expect } from 'vitest'
-import { locationToShippingAddress, legacyShippingToLocation, activeLocations, defaultLocation, type DoctorLocation } from './doctorLocation'
+import { locationToShippingAddress, legacyShippingToLocation, activeLocations, defaultLocation, initialLocationSelection, shouldOfferLegacy, summarizeLocation, type DoctorLocation } from './doctorLocation'
+import { createDoctorLocation, updateDoctorLocation, deactivateDoctorLocation, setDefaultDoctorLocation } from '../store/doctorLocationsStore'
 import migSrc from '../../../../../supabase/migrations/20260921120000_doctor_locations.sql?raw'
 import storeSrc from '../store/doctorLocationsStore.ts?raw'
+import pickerSrc from '../../app/DeliveryLocationPicker.tsx?raw'
 
 const mk = (o: Partial<DoctorLocation> = {}): DoctorLocation => ({
   id: 'l1', doctor_id: 'd1', name: 'Clínica', line1: 'Av. Reforma', exterior_number: '100', interior_number: null,
@@ -54,6 +56,79 @@ describe('defaultLocation — determinista, máximo una default utilizable', () 
   })
 })
 
+describe('initialLocationSelection — checkout Fase 2 (sin elegir en silencio)', () => {
+  it('0 ubicaciones → mode "none"', () => {
+    expect(initialLocationSelection([])).toEqual({ mode: 'none', selectedId: null })
+  })
+  it('1 ubicación activa → se elige sola (auto)', () => {
+    expect(initialLocationSelection([mk({ id: 'a' })])).toEqual({ mode: 'auto', selectedId: 'a' })
+  })
+  it('varias con default → auto la default', () => {
+    const sel = initialLocationSelection([mk({ id: 'a' }), mk({ id: 'b', is_default: true }), mk({ id: 'c' })])
+    expect(sel).toEqual({ mode: 'auto', selectedId: 'b' })
+  })
+  it('varias SIN default → requires-choice (no elige ninguna)', () => {
+    const sel = initialLocationSelection([mk({ id: 'a' }), mk({ id: 'b' })])
+    expect(sel).toEqual({ mode: 'requires-choice', selectedId: null })
+  })
+  it('inactivas no cuentan: 1 activa entre inactivas → auto la activa', () => {
+    const sel = initialLocationSelection([mk({ id: 'x', active: false, is_default: true }), mk({ id: 'a' }), mk({ id: 'y', active: false })])
+    expect(sel).toEqual({ mode: 'auto', selectedId: 'a' })
+  })
+  it('default INACTIVA + varias activas sin default → requires-choice', () => {
+    const sel = initialLocationSelection([mk({ id: 'd', is_default: true, active: false }), mk({ id: 'a' }), mk({ id: 'b' })])
+    expect(sel).toEqual({ mode: 'requires-choice', selectedId: null })
+  })
+})
+
+describe('snapshot autoritativo — la elección se copia al pedido', () => {
+  it('ubicación elegida → snapshot correcto (address del pedido)', () => {
+    const loc = mk({ id: 'a', line1: 'Av. Central', exterior_number: '50', neighborhood: 'Roma', postal_code: '06700', city: 'CDMX', state: 'CDMX' })
+    const snap = locationToShippingAddress(loc)
+    expect(snap).toMatchObject({ line1: 'Av. Central 50', colonia: 'Roma', cp: '06700', city: 'CDMX', state: 'CDMX' })
+  })
+  it('editar la ubicación DESPUÉS no altera un snapshot ya construido', () => {
+    const loc = mk({ id: 'a', line1: 'Calle A', exterior_number: '1' })
+    const snap = locationToShippingAddress(loc)
+    // Simula una edición posterior de la fila (updateDoctorLocation) o su desactivación.
+    loc.line1 = 'Calle B'; loc.active = false
+    expect(snap.line1).toBe('Calle A 1') // el pedido histórico conserva su dirección
+  })
+  it('el snapshot NO incluye datos fiscales (rfc/cfdi/regimen)', () => {
+    expect(JSON.stringify(locationToShippingAddress(mk()))).not.toMatch(/rfc|fiscal|cfdi|regimen|taxZip/i)
+  })
+})
+
+describe('legacy y desactivación', () => {
+  it('shouldOfferLegacy: solo sin ubicaciones y con legacy usable', () => {
+    const legacy = { line1: 'Calle 1', city: 'CDMX' }
+    expect(shouldOfferLegacy([], legacy)).toBe(true)
+    expect(shouldOfferLegacy([], { line1: '', city: '' })).toBe(false)     // legacy inusable
+    expect(shouldOfferLegacy([mk({ id: 'a' })], legacy)).toBe(false)        // ya hay ubicaciones
+  })
+  it('desactivar la default deja 0 default utilizable y NO auto-elige otra', () => {
+    const locs = [mk({ id: 'a', is_default: true }), mk({ id: 'b' }), mk({ id: 'c' })]
+    // deactivate(a): a → active:false + is_default:false; b/c intactas (el sistema no marca otra)
+    const after = locs.map((l) => (l.id === 'a' ? { ...l, active: false, is_default: false } : l))
+    expect(after.some((l) => l.active && l.is_default)).toBe(false)         // ninguna default
+    expect(initialLocationSelection(after)).toEqual({ mode: 'requires-choice', selectedId: null })
+  })
+  it('summarizeLocation arma una línea legible', () => {
+    expect(summarizeLocation(mk({ line1: 'Av. Reforma', exterior_number: '100', interior_number: '4', neighborhood: 'Centro' })))
+      .toBe('Av. Reforma 100 Int. 4, Centro, C.P. 06000, CDMX, CDMX')
+  })
+})
+
+describe('CRUD del store sin conexión (modo mock) devuelve error controlado', () => {
+  const fields = { name: 'X', line1: 'Y', postal_code: '1', city: 'C', state: 'S', country: 'México' } as never
+  it('create/update/deactivate/setDefault → { ok:false } cuando no hay Supabase', async () => {
+    expect((await createDoctorLocation(fields)).ok).toBe(false)
+    expect((await updateDoctorLocation('id', {})).ok).toBe(false)
+    expect((await deactivateDoctorLocation('id')).ok).toBe(false)
+    expect((await setDefaultDoctorLocation('id')).ok).toBe(false)
+  })
+})
+
 describe('garantías DB (migración) y no-contaminación (store)', () => {
   it('la migración crea el índice único parcial de UNA default activa', () => {
     expect(migSrc).toMatch(/uq_doctor_locations_one_default/)
@@ -69,6 +144,24 @@ describe('garantías DB (migración) y no-contaminación (store)', () => {
     const froms = [...storeSrc.matchAll(/\.from\('([^']+)'\)/g)].map((m) => m[1])
     expect(froms.length).toBeGreaterThan(0)
     expect([...new Set(froms)]).toEqual(['doctor_locations'])
+  })
+  it('list scopea por el doctor seleccionado (staff no usa sus propias ubicaciones)', () => {
+    expect(storeSrc).toMatch(/if \(doctorId\) q = q\.eq\('doctor_id', doctorId\)/)
+  })
+})
+
+describe('checkout staff/POS — la RPC/CRUD queda tras allowManage (permisos §3)', () => {
+  it('guardar ubicación y marcar predeterminada solo se ofrecen con allowManage', () => {
+    // La captura persistible (LocationForm + guardar) está protegida por allowManage.
+    expect(pickerSrc).toMatch(/mode !== 'legacy' && allowManage &&/)
+    // Sin allowManage: captura one-off con AddressPicker, sin persistir.
+    expect(pickerSrc).toMatch(/mode !== 'legacy' && !allowManage &&/)
+  })
+  it('crear ubicación y set-default solo ocurren dentro de saveNew (no en el flujo one-off)', () => {
+    const creates = (pickerSrc.match(/createDoctorLocation\(/g) ?? []).length
+    const setDefaults = (pickerSrc.match(/setDefaultDoctorLocation\(/g) ?? []).length
+    expect(creates).toBe(1)      // una sola llamada, en saveNew
+    expect(setDefaults).toBe(1)  // una sola llamada, en saveNew
   })
 })
 

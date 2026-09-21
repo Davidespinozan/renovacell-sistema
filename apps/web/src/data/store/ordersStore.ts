@@ -92,6 +92,7 @@ export function createOrder(input: {
   doctor_id?: string
   placedBy?: string
   shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
+  location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
 }): OrderWithItems {
   const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
   const folio = `S${Date.now().toString().slice(-6)}`
@@ -103,8 +104,15 @@ export function createOrder(input: {
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
     invoice_meta: null,
-    shipping_meta: (input.placedBy || input.shipping)
-      ? { ...(input.placedBy ? { placed_by: input.placedBy } : {}), ...(input.shipping ? { address: input.shipping } : {}) }
+    // El snapshot COMPLETO de la dirección (address) es autoritativo y viaja con el pedido; el
+    // location_id es solo una referencia informativa. Editar/desactivar la ubicación después NO
+    // altera este snapshot histórico.
+    shipping_meta: (input.placedBy || input.shipping || input.location_id)
+      ? {
+          ...(input.placedBy ? { placed_by: input.placedBy } : {}),
+          ...(input.shipping ? { address: input.shipping } : {}),
+          ...(input.location_id ? { location_id: input.location_id } : {}),
+        }
       : null,
     created_at: now,
   }

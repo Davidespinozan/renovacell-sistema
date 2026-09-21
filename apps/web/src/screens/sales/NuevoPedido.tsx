@@ -8,7 +8,7 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
-import { AddressPicker } from '../../app/AddressPicker'
+import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 
@@ -31,7 +31,7 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [invoice, setInvoice] = useState(false)
-  const [shipping, setShipping] = useState<ShippingAddress | null>(baseAddr)
+  const [choice, setChoice] = useState<DeliveryChoice | null>(null)
   const [folio, setFolio] = useState<string | null>(null)
 
   const add = (id: string) => setCart((c) => {
@@ -50,14 +50,15 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
   const total = lines.reduce((s, l) => s + (l.p!.price ?? 0) * l.qty, 0)
 
   const crear = () => {
-    if (lines.length === 0 || !shipping) return
+    if (lines.length === 0 || !choice?.address) return
     const order = createOrder({
       lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price })),
       total,
       invoice_requested: invoice,
       doctor_id: doctor.id,
       placedBy,
-      shipping,
+      shipping: choice.address,
+      location_id: choice.locationId ?? null,
     })
     setFolio(order.external_ref ?? '—')
   }
@@ -103,7 +104,7 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b>{money(total)}</b></div>
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega</div>
-              <AddressPicker base={baseAddr} value={shipping} onChange={setShipping} />
+              <DeliveryLocationPicker doctorId={doctor.id} legacyBase={baseAddr} allowManage={false} onChange={setChoice} />
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
@@ -111,7 +112,7 @@ export function NuevoPedido({ doctor, placedBy, onClose }: {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0 || !shipping} style={(lines.length === 0 || !shipping) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
+                <button className="btn" type="button" disabled={lines.length === 0 || !choice?.address} style={(lines.length === 0 || !choice?.address) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
               </div>
             </div>
           </>
