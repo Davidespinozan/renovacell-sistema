@@ -34,7 +34,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const go = (key: string) => { setScreen(key); onNavigate?.() }
 
   const Link = (s: ScreenDef) => (
-    <a key={s.key} className={s.key === screen ? 'on' : undefined} onClick={() => go(s.key)}>
+    // R-36/R-24: enlaces sin href → damos foco por teclado (role=button, tabIndex) y activación
+    // con Enter/Espacio; antes no recibían foco ni respondían al teclado.
+    <a
+      key={s.key} role="button" tabIndex={0} aria-current={s.key === screen ? 'page' : undefined}
+      className={s.key === screen ? 'on' : undefined}
+      onClick={() => go(s.key)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(s.key) } }}
+    >
       <Icon name={s.icon} />
       <span>{s.label}</span>
     </a>

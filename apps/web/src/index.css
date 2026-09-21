@@ -10,6 +10,16 @@
 
 html,body,#root{height:100%}
 
+/* Accesibilidad (R-36): foco VISIBLE por teclado. El proyecto tenía outline:none en muchos
+   sitios y ninguna regla :focus-visible; sin esto, quien navega con teclado no ve dónde está.
+   Solo se muestra en foco por teclado (no al hacer clic con el mouse). */
+a[role="button"]:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible, [role="dialog"] :focus-visible {
+  outline: 2px solid var(--green-deep, #007311);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* Miniatura del producto en el Punto de Venta. Sale de products.image_url, la
    misma fuente que alimenta el catálogo del doctor y la landing: una imagen
    subida desde Administración aparece en los tres lados. */

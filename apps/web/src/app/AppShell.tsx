@@ -24,11 +24,11 @@ export function AppShell() {
       <Sidebar onNavigate={() => setDrawer(false)} />
       <div className="main" data-area={role}>
         <TopBar onMenu={() => setDrawer(true)} />
-        <div className="canvas">
+        <main className="canvas">
           <div id="content" key={`${role}:${screen}`}>
             {renderScreen(role, screen)}
           </div>
-        </div>
+        </main>
       </div>
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
       <BottomNav onMenu={() => setDrawer(true)} />

@@ -25,16 +25,20 @@ export function BottomNav({ onMenu }: { onMenu: () => void }) {
   const showMenu = true
   const primary = hub.length > 0 ? hub : modules.slice(0, 3)
 
+  // R-36/R-24: enlaces sin href → foco por teclado (role=button, tabIndex) + Enter/Espacio.
+  const onKey = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }
   return (
     <nav className="bnav">
       {primary.map((s) => (
-        <a key={s.key} className={s.key === screen ? 'on' : undefined} onClick={() => setScreen(s.key)}>
+        <a key={s.key} role="button" tabIndex={0} aria-current={s.key === screen ? 'page' : undefined}
+          className={s.key === screen ? 'on' : undefined}
+          onClick={() => setScreen(s.key)} onKeyDown={onKey(() => setScreen(s.key))}>
           <Icon name={s.icon} />
           <span>{short(s.label, s.key)}</span>
         </a>
       ))}
       {showMenu && (
-        <a onClick={onMenu}>
+        <a role="button" tabIndex={0} onClick={onMenu} onKeyDown={onKey(onMenu)}>
           <Icon name="menu" />
           <span>Menú</span>
         </a>

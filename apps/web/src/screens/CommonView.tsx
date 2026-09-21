@@ -420,6 +420,7 @@ function Composer({ onPublish, meUrl, meName }: { onPublish: (input: { title: st
             <button type="button" className={'fchip' + (kind === 'aviso' ? ' on' : '')} onClick={() => setKind('aviso')}>Aviso</button>
           </div>
           <select
+            aria-label="Destinatario del anuncio"
             value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}
             style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 'var(--pill)', fontFamily: 'inherit', fontSize: 12.5, background: '#fff' }}
           >
