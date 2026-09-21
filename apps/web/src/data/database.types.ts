@@ -1267,6 +1267,69 @@ export type Database = {
         }
         Relationships: []
       }
+      doctor_locations: {
+        Row: {
+          id: string
+          doctor_id: string
+          name: string
+          line1: string
+          exterior_number: string | null
+          interior_number: string | null
+          neighborhood: string | null
+          postal_code: string
+          city: string
+          state: string
+          country: string
+          reference_notes: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          is_default: boolean
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          doctor_id: string
+          name: string
+          line1: string
+          exterior_number?: string | null
+          interior_number?: string | null
+          neighborhood?: string | null
+          postal_code: string
+          city: string
+          state: string
+          country?: string
+          reference_notes?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          is_default?: boolean
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          doctor_id?: string
+          name?: string
+          line1?: string
+          exterior_number?: string | null
+          interior_number?: string | null
+          neighborhood?: string | null
+          postal_code?: string
+          city?: string
+          state?: string
+          country?: string
+          reference_notes?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          is_default?: boolean
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           banco: string | null
@@ -1669,6 +1732,10 @@ export type Database = {
       precio_de: {
         Args: { p_product: string; p_list: string }
         Returns: number
+      }
+      set_doctor_default_location: {
+        Args: { p_location_id: string }
+        Returns: undefined
       }
       vender_pos: {
         Args: {
