@@ -16,7 +16,7 @@ type Tipo = 'catalogo' | 'clientes' | 'inventario' | 'costos'
 
 // Sinónimos aceptados por columna: el archivo del cliente no tiene por qué usar
 // nuestros nombres. Se reconocen variantes en español e inglés.
-type Campo = { key: string; label: string; alias: string[]; num?: boolean }
+type Campo = { key: string; label: string; alias: string[]; num?: boolean; req?: boolean }
 
 interface Def {
   tipo: Tipo
@@ -30,8 +30,8 @@ const DEFS: Def[] = [
   {
     tipo: 'catalogo', titulo: 'Catálogo', ayuda: 'Los productos que venden, con su precio de lista.',
     campos: [
-      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código'] },
-      { key: 'name', label: 'Nombre', alias: ['name', 'nombre', 'producto', 'descripcion', 'descripción'] },
+      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código'], req: true },
+      { key: 'name', label: 'Nombre', alias: ['name', 'nombre', 'producto', 'descripcion', 'descripción'], req: true },
       { key: 'line', label: 'Línea', alias: ['line', 'linea', 'línea'] },
       { key: 'category', label: 'Categoría', alias: ['category', 'categoria', 'categoría', 'familia'] },
       { key: 'price', label: 'Precio', alias: ['price', 'precio', 'precio venta', 'pvp'], num: true },
@@ -42,7 +42,7 @@ const DEFS: Def[] = [
   {
     tipo: 'clientes', titulo: 'Clientes / doctores', ayuda: 'Crea su cuenta. Quedan POR VERIFICAR: migrar no equivale a comprobar la cédula.',
     campos: [
-      { key: 'name', label: 'Nombre', alias: ['name', 'nombre', 'cliente', 'doctor'] },
+      { key: 'name', label: 'Nombre', alias: ['name', 'nombre', 'cliente', 'doctor'], req: true },
       { key: 'email', label: 'Correo', alias: ['email', 'correo', 'e-mail', 'mail'] },
       { key: 'phone', label: 'Teléfono', alias: ['phone', 'telefono', 'teléfono', 'celular', 'movil', 'móvil'] },
       { key: 'organization', label: 'Consultorio', alias: ['organization', 'consultorio', 'clinica', 'clínica', 'empresa'] },
@@ -55,10 +55,10 @@ const DEFS: Def[] = [
   {
     tipo: 'inventario', titulo: 'Inventario por lote', ayuda: 'Existencias iniciales. El lote y la caducidad sostienen el FEFO y la trazabilidad.',
     campos: [
-      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código', 'producto'] },
-      { key: 'lote', label: 'Lote', alias: ['lote', 'lot', 'lot_code', 'batch'] },
-      { key: 'caducidad', label: 'Caducidad', alias: ['caducidad', 'expiry', 'vence', 'vencimiento', 'expiracion', 'expiración'] },
-      { key: 'cantidad', label: 'Cantidad', alias: ['cantidad', 'qty', 'existencia', 'stock', 'unidades'], num: true },
+      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código', 'producto'], req: true },
+      { key: 'lote', label: 'Lote', alias: ['lote', 'lot', 'lot_code', 'batch'], req: true },
+      { key: 'caducidad', label: 'Caducidad', alias: ['caducidad', 'expiry', 'vence', 'vencimiento', 'expiracion', 'expiración'], req: true },
+      { key: 'cantidad', label: 'Cantidad', alias: ['cantidad', 'qty', 'existencia', 'stock', 'unidades'], num: true, req: true },
       { key: 'ubicacion', label: 'Ubicación', alias: ['ubicacion', 'ubicación', 'almacen', 'almacén', 'location'] },
     ],
     ejemplo: 'sku,lote,caducidad,cantidad,ubicacion\nPEP-001,RC-2601-A,2027-06-30,12,Bodega central',
@@ -66,8 +66,8 @@ const DEFS: Def[] = [
   {
     tipo: 'costos', titulo: 'Costos', ayuda: 'Habilita el margen en Finanzas. Solo Dirección ve los costos.',
     campos: [
-      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código'] },
-      { key: 'costo', label: 'Costo', alias: ['costo', 'cost', 'costo unitario'], num: true },
+      { key: 'sku', label: 'SKU', alias: ['sku', 'clave', 'codigo', 'código'], req: true },
+      { key: 'costo', label: 'Costo', alias: ['costo', 'cost', 'costo unitario'], num: true, req: true },
     ],
     ejemplo: 'sku,costo\nPEP-001,7200',
   },
@@ -75,22 +75,39 @@ const DEFS: Def[] = [
 
 const num = (v: string): number => { const n = Number(String(v ?? '').replace(/[^0-9.-]/g, '')); return Number.isNaN(n) ? 0 : n }
 
-// Parser tolerante: coma o punto y coma, comillas, y encabezado por sinónimos.
+const splitCsv = (l: string) => l.split(l.includes(';') && !l.includes(',') ? ';' : ',').map((c) => c.replace(/^"|"$/g, '').trim())
+const norm = (h: string) => h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+// Índice de cada campo según el ENCABEZADO (por sinónimos). -1 si la columna no está.
+function columnIndex(headerLine: string, def: Def): Record<string, number> {
+  const head = splitCsv(headerLine).map(norm)
+  const idx: Record<string, number> = {}
+  def.campos.forEach((c) => {
+    idx[c.key] = head.findIndex((h) => c.alias.some((a) => h === norm(a)))
+  })
+  return idx
+}
+
+// R-34: valida que el archivo traiga un ENCABEZADO con las columnas REQUERIDAS. Devuelve las
+// etiquetas de las que faltan (vacío = ok). Sin esto, un CSV basura se mapeaba posicionalmente
+// y se daba por bueno (p. ej. "columna_basura" → SKU).
+export function columnasFaltantes(text: string, def: Def): string[] {
+  const first = text.split(/\r?\n/).find((l) => l.trim())
+  if (!first) return []
+  const idx = columnIndex(first, def)
+  return def.campos.filter((c) => c.req && idx[c.key] < 0).map((c) => c.label)
+}
+
+// Parser: EXIGE encabezado y mapea SOLO por columna reconocida (nunca por posición).
 function parse(text: string, def: Def): Record<string, string | number>[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim())
   if (lines.length === 0) return []
-  const split = (l: string) => l.split(l.includes(';') && !l.includes(',') ? ';' : ',').map((c) => c.replace(/^"|"$/g, '').trim())
-  const head = split(lines[0]).map((h) => h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))
-  const idx: Record<string, number> = {}
-  def.campos.forEach((c) => {
-    idx[c.key] = head.findIndex((h) => c.alias.some((a) => h === a.normalize('NFD').replace(/[̀-ͯ]/g, '')))
-  })
-  const hayEncabezado = Object.values(idx).some((i) => i >= 0)
-  const cuerpo = (hayEncabezado ? lines.slice(1) : lines).map(split)
-  return cuerpo.map((cols) => {
+  if (columnasFaltantes(text, def).length > 0) return [] // encabezado inválido → nada
+  const idx = columnIndex(lines[0], def)
+  return lines.slice(1).map(splitCsv).map((cols) => {
     const row: Record<string, string | number> = {}
-    def.campos.forEach((c, i) => {
-      const at = hayEncabezado ? idx[c.key] : i
+    def.campos.forEach((c) => {
+      const at = idx[c.key]
       const raw = at >= 0 ? (cols[at] ?? '') : ''
       row[c.key] = c.num ? num(raw) : raw
     })
@@ -104,11 +121,24 @@ export function Importar() {
   const [rows, setRows] = useState<Record<string, string | number>[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<MigrationResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const def = DEFS.find((d) => d.tipo === tipo)!
-  const cambiarTipo = (t: Tipo) => { setTipo(t); setRows(null); setResult(null); setText('') }
-  const preview = () => { setResult(null); setRows(parse(text, def)) }
-  const onFile = (f: File | undefined) => { if (!f) return; f.text().then((t) => { setText(t); setRows(parse(t, def)); setResult(null) }) }
+  const cambiarTipo = (t: Tipo) => { setTipo(t); setRows(null); setResult(null); setText(''); setError(null) }
+  // R-34: antes de previsualizar, exige las columnas requeridas; si faltan, avisa y no mapea nada.
+  const cargar = (t: string) => {
+    setResult(null)
+    if (!t.trim()) { setRows(null); setError(null); return }
+    const faltan = columnasFaltantes(t, def)
+    if (faltan.length > 0) {
+      setRows(null)
+      setError(`El archivo no tiene las columnas requeridas: ${faltan.join(', ')}. Revisa el ejemplo y que la primera fila sea el encabezado.`)
+      return
+    }
+    setError(null); setRows(parse(t, def))
+  }
+  const preview = () => cargar(text)
+  const onFile = (f: File | undefined) => { if (!f) return; f.text().then((t) => { setText(t); cargar(t) }) }
 
   // Descarga un CSV con SOLO las filas que no entraron + el motivo, para que el
   // cliente lo corrija y lo reimporte (idempotente: lo que ya entró no se duplica).
@@ -198,6 +228,12 @@ export function Importar() {
             <Upload size={15} /> {busy ? 'Importando…' : `Importar ${rows?.length ?? ''} registro(s)`}
           </button>
         </div>
+
+        {error && (
+          <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}>
+            <AlertTriangle size={16} /><span>{error}</span>
+          </div>
+        )}
       </div>
 
       {result && (

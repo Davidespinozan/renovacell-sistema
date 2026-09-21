@@ -11,7 +11,9 @@ export function MermaModal({ lot, onClose }: {
   lot: { id: string; lot_code: string; quantity: number; producto?: string }
   onClose: () => void
 }) {
-  const [qty, setQty] = useState<string>(String(lot.quantity))
+  // R-59: NO precargar el lote completo. La baja es irreversible; el usuario debe escribir la
+  // cantidad (o pulsar "Todo el lote" a propósito). Así no se borra un lote entero por descuido.
+  const [qty, setQty] = useState<string>('')
   const [motivo, setMotivo] = useState(MOTIVOS[0])
   const n = Math.max(0, Math.min(lot.quantity, Math.floor(Number(qty) || 0)))
 

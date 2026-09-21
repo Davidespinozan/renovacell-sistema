@@ -87,7 +87,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <button className="side-logout" type="button" onClick={() => setAjustesOpen(true)}>
               <Settings size={15} /> Ajustes
             </button>
-            <button className="side-logout" type="button" onClick={logout}>
+            <button className="side-logout" type="button" onClick={() => { if (window.confirm('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).')) logout() }}>
               <LogOut size={15} /> Cerrar sesión
             </button>
           </div>
