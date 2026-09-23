@@ -2,12 +2,15 @@
 // Las conductas de RLS/constraints son a nivel DB (no ejecutables en vitest): se aseguran contra
 // el texto de la migración y el self-test que corre al aplicarla (E2E autenticado aparte).
 import { describe, it, expect } from 'vitest'
-import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, type Customer } from './customer'
+import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, filterByCartera, sellerMatchesUser, type Customer } from './customer'
 import { filterCustomers } from '../hooks/useCustomers'
 import { createOrder, createPosOrder } from '../store/ordersStore'
 import migSrc from '../../../../../supabase/migrations/20260922120000_customers_domain.sql?raw'
 import storeSrc from '../store/customersStore.ts?raw'
 import clientesSrc from '../../screens/Clientes.tsx?raw'
+import doctoresSrc from '../../screens/admin/DoctoresDirectorio.tsx?raw'
+import directorySrc from '../../app/CustomerDirectory.tsx?raw'
+import registrySrc from '../../screens/registry.tsx?raw'
 
 const mkCustomer = (o: Partial<Customer> = {}): Customer => ({
   id: 'c1', full_name: 'Dra. Ana', email: null, phone: null, city: null, country: null,
@@ -155,9 +158,42 @@ describe('directorio comercial — estado de portal y búsqueda (Fase 1 UI)', ()
     expect(filterCustomers(sample, '').length).toBe(3)
     expect(filterCustomers(sample, 'zzz-inexistente').length).toBe(0)
   })
-  it('la pantalla Clientes usa customers (useCustomers), NO useDoctors como fuente comercial', () => {
-    expect(clientesSrc).toMatch(/hooks\/useCustomers/)
-    expect(clientesSrc).not.toMatch(/hooks\/useDoctors/) // no importa doctores como fuente comercial
+  it('la pantalla Clientes usa el directorio compartido (customers), NO useDoctors', () => {
+    expect(clientesSrc).toMatch(/CustomerDirectory/)
+    expect(clientesSrc).not.toMatch(/hooks\/useDoctors/)
+  })
+})
+
+describe('Fase 3 — Doctores(admin) y Clientes(ventas) = MISMA población (customers)', () => {
+  const sample: Customer[] = [
+    mkCustomer({ id: 'c1', full_name: 'Ana', seller_name: 'Alejandra Cazarez Bojorquez' }),
+    mkCustomer({ id: 'c2', full_name: 'Beto', seller_name: 'Antonio Gallardo' }),
+    mkCustomer({ id: 'c3', full_name: 'Cid', seller_name: 'Alejandra Cazarez Bojorquez' }),
+  ]
+  it('sellerMatchesUser tolera apellidos extra / 2 primeros tokens', () => {
+    expect(sellerMatchesUser('Alejandra Cazarez Bojorquez', 'Alejandra Cazarez')).toBe(true)
+    expect(sellerMatchesUser('Antonio Gallardo', 'Antonio Gallardo')).toBe(true)
+    expect(sellerMatchesUser('Antonio Gallardo', 'Roberto Ibarra')).toBe(false)
+    expect(sellerMatchesUser(null, 'X')).toBe(false)
+  })
+  it('scope all / admin → población completa', () => {
+    expect(filterByCartera(sample, { scope: 'all', isAdmin: false }).length).toBe(3)
+    expect(filterByCartera(sample, { scope: 'cartera', isAdmin: true }).length).toBe(3)
+  })
+  it('scope cartera + ventas → solo su cartera por seller_name', () => {
+    const mine = filterByCartera(sample, { scope: 'cartera', isAdmin: false, userName: 'Alejandra Cazarez' })
+    expect(mine.map((c) => c.id)).toEqual(['c1', 'c3'])
+  })
+  it('Doctores(admin) y Clientes(ventas) montan el MISMO CustomerDirectory (customers)', () => {
+    expect(doctoresSrc).toMatch(/CustomerDirectory/)
+    expect(doctoresSrc).toMatch(/scope="all"/)
+    expect(clientesSrc).toMatch(/scope="cartera"/)
+    expect(directorySrc).toMatch(/useCustomers/)
+    expect(directorySrc).not.toMatch(/hooks\/useDoctors/) // el directorio comercial NO usa profiles
+  })
+  it('el registry apunta Doctores(admin) al directorio de customers, no al de profiles', () => {
+    expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio/)
+    expect(registrySrc).not.toMatch(/import \{ Doctores \} from '\.\/admin\/Doctores'/)
   })
 })
 

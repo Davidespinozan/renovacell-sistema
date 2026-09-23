@@ -27,7 +27,7 @@ import { MisEntregas } from './driver/MisEntregas'
 const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ default: m.Tablero })))
 const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default: m.Ventas })))
 import { Trazabilidad } from './admin/Trazabilidad'
-import { Doctores } from './admin/Doctores'
+import { DoctoresDirectorio } from './admin/DoctoresDirectorio'
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { Finanzas } from './admin/Finanzas'
@@ -73,7 +73,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   tablero: () => <Tablero />,
   av_ventas: () => <Ventas />,
   av_traza: () => <Trazabilidad />,
-  av_doc: () => <Doctores />,
+  av_doc: () => <DoctoresDirectorio />,
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
   av_finanzas: () => <Finanzas />,

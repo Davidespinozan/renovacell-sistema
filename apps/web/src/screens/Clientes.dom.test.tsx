@@ -26,11 +26,11 @@ import { Clientes } from './Clientes'
 afterEach(cleanup)
 
 describe('<Clientes> directorio comercial', () => {
-  it('renderiza los customers y el conteo', () => {
+  it('renderiza los customers y el conteo (con portal)', () => {
     renderWithRole(<Clientes />)
     expect(screen.getByText('Dra. Ana López')).toBeTruthy()
     expect(screen.getByText('Dr. Beto Ruiz')).toBeTruthy()
-    expect(screen.getByText(/2 cliente/)).toBeTruthy()
+    expect(screen.getByText(/2 · 1 con portal/)).toBeTruthy() // c1 tiene profile_id
   })
   it('búsqueda filtra en vivo (por vendedor)', () => {
     renderWithRole(<Clientes />)
@@ -41,7 +41,7 @@ describe('<Clientes> directorio comercial', () => {
   it('cero resultados muestra el aviso', () => {
     renderWithRole(<Clientes />)
     fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/), { target: { value: 'zzz' } })
-    expect(screen.getByText(/Ningún cliente coincide/)).toBeTruthy()
+    expect(screen.getByText(/Ninguno coincide/)).toBeTruthy()
   })
   it('abrir un cliente muestra su detalle y estado de portal', () => {
     renderWithRole(<Clientes />)
