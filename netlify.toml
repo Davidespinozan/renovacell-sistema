@@ -25,7 +25,64 @@
     Permissions-Policy = "geolocation=(), microphone=(), camera=(self)"
     Content-Security-Policy = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
 
-# ── Quién vive en qué dirección ──────────────────────────────────────────────
+# ── Dominios oficiales Renovacell (una base / un backend / varias puertas) ────
+# Las reglas específicas de host van PRIMERO (Netlify aplica la primera que
+# coincide). Un hostname NO autoriza: la autoridad sigue siendo RLS/roles del
+# backend; estas reglas solo deciden qué se sirve en cada dirección.
+# Estas reglas quedan inertes hasta que los dominios se asignen a la site en
+# Netlify + DNS; NO afectan a sistemaoperativorenovacell.netlify.app (default),
+# que sigue funcionando con las reglas genéricas de más abajo.
+
+# A) PUERTAS DE LA APP: sistema.* y portal.* → la raíz manda a /sistema (la SPA
+#    real vive en /sistema; se mantiene como ruta interna). Solo la raíz exacta
+#    se redirige; /sistema/*, /assets, /manifest… caen en las reglas genéricas.
+[[redirects]]
+  from = "https://sistema.renovacell.mx/"
+  to = "/sistema"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://portal.renovacell.mx/"
+  to = "/sistema"
+  status = 301
+  force = true
+
+# B) CANÓNICO: todo lo demás (www del dominio principal, .com.mx y el dominio
+#    legado goldenplacenta.com) → 301 permanente a https://renovacell.mx,
+#    preservando path y query (:splat). Netlify sube http→https automáticamente.
+[[redirects]]
+  from = "https://www.renovacell.mx/*"
+  to = "https://renovacell.mx/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://renovacell.com.mx/*"
+  to = "https://renovacell.mx/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.renovacell.com.mx/*"
+  to = "https://renovacell.mx/:splat"
+  status = 301
+  force = true
+
+# Dominio LEGADO (goldenplacenta.com): redirige al canónico actual.
+[[redirects]]
+  from = "https://goldenplacenta.com/*"
+  to = "https://renovacell.mx/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.goldenplacenta.com/*"
+  to = "https://renovacell.mx/:splat"
+  status = 301
+  force = true
+
+# ── Reglas genéricas (renovacell.mx canónico + *.netlify.app) ─────────────────
 # La LANDING es la cara pública: el doctor teclea el dominio y debe verla.
 # El SISTEMA vive bajo /sistema — se instala en el celular y se abre desde su
 # ícono, así que su dirección no necesita ser corta ni memorizable.

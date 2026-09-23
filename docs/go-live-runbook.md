@@ -90,3 +90,64 @@ Secretos = Supabase → Edge Functions → Secrets (nunca en el repo). NUNCA com
 4. **company_settings** (emisor CFDI) sin capturar → el timbrado responde 422.
 5. **Corte de datos de Odoo** (sección D): costos, clientes, inventario inicial.
 6. **Confirmar `register-doctor` desplegado** (no verificable al preparar por mantenimiento de la API de functions).
+
+## G. HITO DE INFRAESTRUCTURA — CUTOVER DE NETLIFY (2026-09-23)
+> Evidencia para el **Reporte 5** (cutover/migración de infraestructura). Registra el estado a la fecha; los ítems marcados **PENDIENTE** aún no se ejecutan.
+
+**Fecha:** 23 de septiembre de 2026
+**Hito:** Migración del deployment frontend a infraestructura Netlify **propiedad/control de Renovacell**.
+
+| Campo | Valor |
+|---|---|
+| **Nuevo Netlify** | https://sistemaoperativorenovacell.netlify.app |
+| **Estado** | Published / Production |
+| **Branch** | `main` |
+| **Commit desplegado** | `c9ce6a2` (según Netlify) |
+| **Origen** | GitHub del cliente / Renovacell |
+| **Backend** | Mismo proyecto Supabase productivo — **no se duplicó base de datos** |
+| **Arquitectura** | Una base / un backend / múltiples puertas |
+
+**Variables de entorno migradas** (valores **no** documentados):
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+**Nota sobre el deployment anterior:** el Netlify del desarrollador (`sistema-renovacell.netlify.app`) **permanece temporalmente activo como respaldo** durante el cutover y **NO** debe considerarse infraestructura final del cliente. Su retiro queda como pendiente (abajo).
+
+**QA del nuevo deployment — PASS (2026-09-23):** verificado por HTTP (sin login ni escritura de datos).
+- `GET /` → 200, landing Renovacell (219 KB, `canonical` → `renovacell.mx`).
+- `GET /sistema` → 200, SPA (título "Sistema operativo"); `/sistema/*` profundo → 200 sirve la app (no landing).
+- Assets: `index-Ch7dKwsp.js` → 200 (810 058 B, `application/javascript`); `index-BtEJ8FQm.css` → 200.
+- **Mismo build/commit que prod**: bundle **byte-idéntico** al del Netlify anterior (`md5 67a0e329…`, 810 058 B) → commit `c9ce6a2`.
+- **ENV efectivas**: `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` presentes en el bundle y apuntando al **mismo** proyecto Supabase productivo (`amurlvlvfohwucvxfdot`); al ser byte-idéntico al deployment en operación, las credenciales migradas son las válidas (valores no documentados). Host Supabase responde.
+- **Rewrites `netlify.toml`** aplicadas (`/`→landing, `/sistema/*`→app, fallback root→landing).
+- **Security headers** presentes (CSP `frame-ancestors 'self'`, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`).
+- **Sin referencias** al Netlify anterior en páginas ni bundle; sin errores críticos de carga (todos los recursos 200).
+
+**Reglas de dominio preparadas en código — `netlify.toml` (2026-09-23):** listas para cuando los dominios se asignen a la site (hoy inertes; no afectan `sistemaoperativorenovacell.netlify.app`). Validado local: `tsc` 0 · 585 tests · build OK · TOML parseado (12 redirects, sin loops).
+- `renovacell.mx` → landing / canónico (reglas genéricas).
+- `www.renovacell.mx` → **301** `https://renovacell.mx/:splat`.
+- `sistema.renovacell.mx` → `/` **301** `/sistema`; `/sistema/*` sirve la SPA.
+- `portal.renovacell.mx` → `/` **301** `/sistema`; misma SPA (el hostname **no** autoriza; RLS/roles intactos).
+- `renovacell.com.mx` + `www` → **301** `https://renovacell.mx/:splat`.
+- `goldenplacenta.com` + `www` (**dominio legado**) → **301** `https://renovacell.mx/:splat`.
+- `/sistema` se mantiene como ruta interna; assets/manifest/imágenes/rutas profundas intactos.
+
+> **No** confirmados aún (requieren acción fuera del repo, siguen pendientes): DNS en Hostinger, alta de dominios + SSL en Netlify, y Supabase Auth (Site URL / Redirect URLs). Estas reglas no surten efecto hasta que el DNS/dominios estén configurados.
+
+**Pendientes registrados (aún no ejecutados):**
+- [x] ~~QA del nuevo deployment~~ → **PASS (2026-09-23)**, evidencia arriba.
+- [x] ~~Reglas de dominio/redirects en código~~ → **preparadas en `netlify.toml` (2026-09-23)**; inertes hasta DNS/SSL.
+- [ ] Configuración de dominios oficiales (alta en Netlify + DNS):
+  - [ ] renovacell.mx
+  - [ ] www.renovacell.mx
+  - [ ] sistema.renovacell.mx
+  - [ ] portal.renovacell.mx
+  - [ ] renovacell.com.mx
+  - [ ] www.renovacell.com.mx
+  - [ ] goldenplacenta.com
+  - [ ] www.goldenplacenta.com
+- [ ] Redirects 301 canónicos **activos** (verificar en vivo post-DNS; ya preparados en código)
+- [ ] SSL de todos los hostnames
+- [ ] Actualización de Supabase Auth **Site URL** / **Redirect URLs**
+- [ ] Validación final post-DNS
+- [ ] Retiro posterior del deployment temporal del desarrollador
