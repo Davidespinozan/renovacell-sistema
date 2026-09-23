@@ -151,3 +151,28 @@ Secretos = Supabase → Edge Functions → Secrets (nunca en el repo). NUNCA com
 - [ ] Actualización de Supabase Auth **Site URL** / **Redirect URLs**
 - [ ] Validación final post-DNS
 - [ ] Retiro posterior del deployment temporal del desarrollador
+
+## H. HITO — DHL EXPRESS (MyDHL API) FASE 1: INFRAESTRUCTURA LIVE (2026-09-23)
+> Evidencia para el **Reporte 5**. Integración logística multiproveedor (DHL primero, T1 después) desplegada en producción. **DHL NO está cerrado**: falta el E2E Sandbox.
+
+**Commit desplegado:** `819f99e` (author/committer = `albertogutierrez-cell`, contributor autorizado del Netlify de Renovacell). Bundle en producción: `index-CQsSNEqA.js`.
+
+**Verificado en producción (PASS):**
+- [x] **Commit `819f99e` desplegado** — Published en `sistemaoperativorenovacell`; bundle `index-CQsSNEqA.js` LIVE en los 3 hosts.
+- [x] **Frontend nuevo LIVE** — verificado por hash + marcadores de código nuevo.
+- [x] **Packing logístico LIVE** — UI captura peso / largo / ancho / alto / piezas de la caja final + validación de datos faltantes (bloqueo con detalle exacto; sin defaults silenciosos).
+- [x] **`company_settings` compatible con configuración de remitente** — columnas `ciudad/estado/pais` aplicadas; la consulta de la app responde 200 (sin `SelectQueryError`).
+- [x] **Routing estable** — `renovacell.mx` → landing 200; `sistema.renovacell.mx/` → 301 `/sistema`; `portal.renovacell.mx/` → 301 `/sistema`.
+- [x] **`sistema.*` sin 500/503** — verificación repetida: `/` 12/12 × 301, `/sistema` 12/12 × 200 (el 5xx intermitente previo era un deploy a medio publicar; resuelto).
+- [x] **Edge Function `shipping` v7 ACTIVE**.
+- [x] **`shipping-labels` privado** (`public: false`) — etiquetas por URL firmada, nunca base64 permanente.
+- [x] **Migración `20260926120000` aplicada** — idempotencia (índice único parcial por `order_id` con tracking), snapshots neutrales (`package/ship_from/ship_to/provider_meta`), `provider/service_code/pickup_confirmation/label_path`.
+
+**DHL Sandbox — infraestructura READY, E2E PENDIENTE:**
+- [x] Infraestructura lista (código + migración + edge + storage) con `DHL_API_ENV=test`.
+- [ ] Secrets DHL de TEST cargados por David (`DHL_API_USERNAME`, `DHL_API_PASSWORD`, `DHL_ACCOUNT_NUMBER`, `DHL_API_ENV=test`).
+- [ ] Remitente real capturado en Configuración de empresa.
+- [ ] **E2E Sandbox:** cotización → guía → etiqueta (Storage + URL firmada) → tracking → **idempotencia**.
+- [ ] Activación de producción (solo tras validar sandbox; `DHL_API_ENV=production`).
+
+> **DHL NO se considera integración cerrada** hasta completar el E2E Sandbox. T1 aún no se implementa (el modelo ya es neutral para agregarlo sin reescribir Packing).
