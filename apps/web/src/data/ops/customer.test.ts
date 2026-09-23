@@ -2,7 +2,7 @@
 // Las conductas de RLS/constraints son a nivel DB (no ejecutables en vitest): se aseguran contra
 // el texto de la migración y el self-test que corre al aplicarla (E2E autenticado aparte).
 import { describe, it, expect } from 'vitest'
-import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, filterByCartera, sellerMatchesUser, type Customer } from './customer'
+import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, filterByCartera, sellerMatchesUser, paginate, pageWindow, type Customer } from './customer'
 import { filterCustomers } from '../hooks/useCustomers'
 import { createOrder, createPosOrder } from '../store/ordersStore'
 import migSrc from '../../../../../supabase/migrations/20260922120000_customers_domain.sql?raw'
@@ -194,6 +194,44 @@ describe('Fase 3 — Doctores(admin) y Clientes(ventas) = MISMA población (cust
   it('el registry apunta Doctores(admin) al directorio de customers, no al de profiles', () => {
     expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio/)
     expect(registrySrc).not.toMatch(/import \{ Doctores \} from '\.\/admin\/Doctores'/)
+  })
+})
+
+describe('paginación (PAGE_SIZE=100, aplica después de filtro/búsqueda)', () => {
+  const items = Array.from({ length: 2568 }, (_, i) => i + 1)
+  it('2568 → 26 páginas', () => {
+    expect(paginate(items, 1, 100).totalPages).toBe(26)
+  })
+  it('página 1 = registros 1–100', () => {
+    const p = paginate(items, 1, 100)
+    expect([p.from, p.to]).toEqual([1, 100]); expect(p.items[0]).toBe(1); expect(p.items[99]).toBe(100); expect(p.items.length).toBe(100)
+  })
+  it('página 2 = 101–200', () => {
+    const p = paginate(items, 2, 100)
+    expect([p.from, p.to]).toEqual([101, 200]); expect(p.items[0]).toBe(101)
+  })
+  it('página 26 = últimos 68', () => {
+    const p = paginate(items, 26, 100)
+    expect([p.from, p.to]).toEqual([2501, 2568]); expect(p.items.length).toBe(68); expect(p.items.at(-1)).toBe(2568)
+  })
+  it('clamp: página fuera de rango se ajusta a válida', () => {
+    expect(paginate(items, 0, 100).page).toBe(1)
+    expect(paginate(items, 999, 100).page).toBe(26)
+  })
+  it('conjunto vacío → 1 página, from/to 0', () => {
+    const p = paginate([], 1, 100)
+    expect(p.totalPages).toBe(1); expect([p.from, p.to, p.total]).toEqual([0, 0, 0])
+  })
+  it('filtro/búsqueda ANTES de paginar: 347 resultados → 4 páginas', () => {
+    const filtered = items.filter((n) => n <= 347) // simula 347 resultados de un filtro
+    expect(paginate(filtered, 1, 100).totalPages).toBe(4)
+    expect(paginate(filtered, 4, 100).items.length).toBe(47)
+  })
+  it('pageWindow compacto con elipsis alrededor de la actual', () => {
+    expect(pageWindow(1, 26)).toEqual([1, 2, 3, '…', 26])
+    expect(pageWindow(13, 26)).toEqual([1, '…', 11, 12, 13, 14, 15, '…', 26])
+    expect(pageWindow(26, 26)).toEqual([1, '…', 24, 25, 26])
+    expect(pageWindow(1, 1)).toEqual([1])
   })
 })
 

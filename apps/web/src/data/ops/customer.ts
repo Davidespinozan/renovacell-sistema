@@ -76,6 +76,29 @@ export function filterByCartera(
   return customers.filter((c) => sellerMatchesUser(c.seller_name, opts.userName))
 }
 
+// Paginación (aplica DESPUÉS de filtro+búsqueda). Nunca renderiza todo: devuelve solo la página.
+export interface Page<T> { items: T[]; page: number; totalPages: number; from: number; to: number; total: number }
+export function paginate<T>(items: T[], page: number, size: number): Page<T> {
+  const total = items.length
+  const totalPages = Math.max(1, Math.ceil(total / size))
+  const p = Math.min(Math.max(1, Math.floor(page) || 1), totalPages) // clamp a rango válido
+  const start = (p - 1) * size
+  const slice = items.slice(start, start + size)
+  return { items: slice, page: p, totalPages, from: total === 0 ? 0 : start + 1, to: start + slice.length, total }
+}
+
+// Ventana compacta de números de página: 1 … 11 12 [13] 14 15 … 26 (con elipsis).
+export function pageWindow(current: number, totalPages: number, radius = 2): (number | '…')[] {
+  if (totalPages <= 1) return [1]
+  const set = new Set<number>([1, totalPages])
+  for (let i = current - radius; i <= current + radius; i++) if (i >= 1 && i <= totalPages) set.add(i)
+  const nums = [...set].sort((a, b) => a - b)
+  const out: (number | '…')[] = []
+  let prev = 0
+  for (const n of nums) { if (prev && n - prev > 1) out.push('…'); out.push(n); prev = n }
+  return out
+}
+
 export type ImportState = 'NUEVO' | 'YA_EXISTE' | 'ACTUALIZABLE' | 'CONFLICTO' | 'INVALIDO'
 
 // Clasifica una fila de importación contra el customer existente (si lo hay). Reglas:

@@ -1,16 +1,16 @@
 // DIRECTORIO COMERCIAL compartido — la MISMA población (customers) para Admin "Doctores" y Ventas
 // "Clientes". customers = identidad comercial del doctor/comprador (con o sin portal). profiles solo
 // = acceso al portal (badge). scope 'all' (admin) o 'cartera' (ventas por seller_name). Solo lectura.
-import React, { useMemo, useState } from 'react'
-import { X, MapPin, Phone, Mail, UserCheck, UserX } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, MapPin, Phone, Mail, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from './ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
-import { portalStatus, filterByCartera, type Customer } from '../data/ops/customer'
+import { portalStatus, filterByCartera, paginate, pageWindow, type Customer } from '../data/ops/customer'
 import { useRole } from '../auth/RoleContext'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
 
-const MAX_RENDER = 100
+const PAGE_SIZE = 100
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
 
 // title = etiqueta de la sección ("Doctores" admin / "Clientes" ventas). scope = alcance de cartera.
@@ -24,11 +24,17 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
   // MISMA fuente (customers); admin ve todo, ventas su cartera por seller_name.
   const customers = useMemo(() => filterByCartera(all, { scope, isAdmin, userName: user?.name }), [all, scope, isAdmin, user])
   const [q, setQ] = useState('')
-  const shown = useCustomerSearch(customers, q)
+  const shown = useCustomerSearch(customers, q) // filtro cartera + búsqueda, SOBRE TODOS (antes de paginar)
+  const [page, setPage] = useState(1)
   const [detail, setDetail] = useState<Customer | null>(null)
   const [pedidoFor, setPedidoFor] = useState<Customer | null>(null)
-  const visible = useMemo(() => shown.slice(0, MAX_RENDER), [shown])
   const conPortal = useMemo(() => customers.filter((c) => c.profile_id).length, [customers])
+
+  // Reset a página 1 al cambiar búsqueda o cambiar el conjunto filtrado (nuevo scope/cartera).
+  useEffect(() => { setPage(1) }, [q, shown.length])
+
+  const pg = paginate(shown, page, PAGE_SIZE) // clamp interno a rango válido
+  const visible = pg.items
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -82,11 +88,7 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
               </span>
             </button>
           ))}
-          {shown.length > MAX_RENDER && (
-            <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--ink-3)' }}>
-              Mostrando {MAX_RENDER} de {shown.length.toLocaleString('es-MX')}. Refina la búsqueda para acotar.
-            </div>
-          )}
+          <Pager pg={pg} onPage={setPage} />
         </>
       )}
 
@@ -95,6 +97,43 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
       )}
       {pedidoFor && (
         <NuevoPedido customer={{ id: pedidoFor.id, name: pedidoFor.full_name, phone: pedidoFor.phone }} placedBy={placedBy} onClose={() => setPedidoFor(null)} />
+      )}
+    </div>
+  )
+}
+
+// Paginación: "Mostrando 1–100 de 2,568 · Página 1 de 26" + ← números … → (desktop) / ← Página X de Y → (móvil).
+function Pager({ pg, onPage }: { pg: import('../data/ops/customer').Page<Customer>; onPage: (p: number) => void }) {
+  const nf = (n: number) => n.toLocaleString('es-MX')
+  const btn: React.CSSProperties = { minWidth: 34, height: 34, padding: '0 9px', border: '1px solid var(--line)', borderRadius: 9, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }
+  const off = (on: boolean): React.CSSProperties => (on ? {} : { opacity: 0.4, cursor: 'not-allowed' })
+  const prev = () => onPage(pg.page - 1)
+  const next = () => onPage(pg.page + 1)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 4 }}>
+      <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+        Mostrando {nf(pg.from)}–{nf(pg.to)} de {nf(pg.total)} · Página {nf(pg.page)} de {nf(pg.totalPages)}
+      </div>
+      {pg.totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button type="button" style={{ ...btn, ...off(pg.page > 1), display: 'inline-flex', alignItems: 'center', gap: 4 }} disabled={pg.page <= 1} onClick={prev}>
+            <ChevronLeft size={15} /> <span className="pg-lbl">Anterior</span>
+          </button>
+          {/* Desktop: números compactos con elipsis */}
+          <span className="pg-nums" style={{ display: 'inline-flex', gap: 6 }}>
+            {pageWindow(pg.page, pg.totalPages).map((n, i) =>
+              n === '…'
+                ? <span key={`e${i}`} style={{ minWidth: 20, textAlign: 'center', color: 'var(--ink-3)' }}>…</span>
+                : <button key={n} type="button" onClick={() => onPage(n)}
+                    style={{ ...btn, ...(n === pg.page ? { background: 'var(--green-deep)', color: '#fff', borderColor: 'var(--green-deep)', fontWeight: 700 } : {}) }}>{n}</button>,
+            )}
+          </span>
+          {/* Móvil: "Página X de Y" */}
+          <span className="pg-mobile" style={{ fontSize: 13, color: 'var(--ink-3)', minWidth: 110, textAlign: 'center' }}>Página {nf(pg.page)} de {nf(pg.totalPages)}</span>
+          <button type="button" style={{ ...btn, ...off(pg.page < pg.totalPages), display: 'inline-flex', alignItems: 'center', gap: 4 }} disabled={pg.page >= pg.totalPages} onClick={next}>
+            <span className="pg-lbl">Siguiente</span> <ChevronRight size={15} />
+          </button>
+        </div>
       )}
     </div>
   )

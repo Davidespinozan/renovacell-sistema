@@ -456,3 +456,11 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   body.printing-manifiesto .manifiesto-doc{max-width:100%;box-shadow:none}
 }
 @media print{ @page{margin:14mm} }
+
+/* Paginación del directorio comercial: desktop = números + etiquetas; móvil = "Página X de Y". */
+.pg-mobile{display:none}
+@media (max-width:640px){
+  .pg-nums{display:none !important}
+  .pg-lbl{display:none}
+  .pg-mobile{display:inline}
+}
