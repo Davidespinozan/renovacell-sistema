@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { hasSupabase, supabase } from '../../lib/supabase'
+import type { LogisticsPackage, ShipperConfig, Receiver } from './model'
 
 export interface ShipAddress {
   name: string
@@ -33,16 +34,19 @@ export interface RateQuote {
   id: string
   carrier: string   // 'Estafeta' | 'DHL' | ...
   service: string   // 'Terrestre' | 'Día siguiente' | ...
+  serviceCode?: string // código de servicio/producto del proveedor (DHL productCode)
   amount: number    // MXN
   currency: string
   etaDays: number
 }
 
 export interface LabelResult {
+  provider?: string // 'dhl' | 't1' | 'mock' | …
   carrier: string
   service: string
+  serviceCode?: string
   tracking: string
-  labelUrl: string  // PDF/etiqueta para imprimir (mock: blob HTML imprimible)
+  labelUrl: string  // URL FIRMADA de corta vida (mock: blob HTML imprimible)
   amount: number
   etaDays: number
   estimatedDeliveryAt: string // ISO
@@ -97,6 +101,67 @@ export async function generateLabel(rate: RateQuote, req: ShipmentRequest): Prom
     } catch { /* cae al mock */ }
   }
   return mockGenerateLabel(rate, req)
+}
+
+// ============================================================================
+// API NEUTRAL MULTIPROVEEDOR (DHL ahora; T1 después SIN reescribir Packing).
+// El "provider" real vive server-side en la Edge Function `shipping`; aquí solo
+// es transporte. Si el provider no está configurado (501) → mock (demo sigue).
+// ============================================================================
+export interface TrackResult { tracking: string; status: string; events: Array<{ at: string; status: string; description: string; location?: string }> }
+const NOT_CONFIGURED = Symbol('not_configured')
+
+// COTIZAR (neutral). Devuelve tarifas del provider; si no está configurado → mock.
+export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string): Promise<RateQuote[]> {
+  if (hasSupabase) {
+    const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', shipper, receiver, pkg, orderRef })
+    if (r !== NOT_CONFIGURED && Array.isArray(r?.rates) && r.rates.length) return r.rates
+  }
+  return mockQuoteRates({ origin: ORIGIN, destination: toShipAddress(receiver), parcel: toParcel(pkg), orderRef })
+}
+
+// CREAR GUÍA (neutral, idempotente server-side). Devuelve la etiqueta o cae al mock.
+export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote }): Promise<{ label: LabelResult; idempotent?: boolean }> {
+  if (hasSupabase) {
+    const r = await callShipping<{ label: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', ...args })
+    if (r !== NOT_CONFIGURED && r?.label?.tracking) return { label: r.label, idempotent: r.idempotent }
+  }
+  // Fallback demo/mock (sin persistir server-side): guía simulada.
+  const label = await mockGenerateLabel(args.rate, { origin: ORIGIN, destination: toShipAddress(args.receiver), parcel: toParcel(args.pkg), orderRef: args.orderRef })
+  return { label: { ...label, provider: 'mock' } }
+}
+
+// TRACKING (neutral) por número de guía real.
+export async function trackShipment(tracking: string): Promise<TrackResult | null> {
+  if (!hasSupabase) return null
+  const r = await callShipping<TrackResult>({ action: 'track', tracking })
+  return r === NOT_CONFIGURED ? null : r
+}
+
+// deno/edge invoke con detección de "no configurado" (501) para el seam.
+async function callShipping<T>(body: Record<string, unknown>): Promise<T | typeof NOT_CONFIGURED> {
+  try {
+    const { data, error } = await supabase.functions.invoke('shipping', { body })
+    if (error) {
+      // 501 = provider no configurado → seam al mock.
+      const msg = (error as { message?: string }).message ?? ''
+      if (/501|not_configured/i.test(msg)) return NOT_CONFIGURED
+      throw error
+    }
+    if (data && typeof data === 'object' && (data as { error?: string }).error === 'not_configured') return NOT_CONFIGURED
+    return data as T
+  } catch (e) {
+    if (/501|not_configured/i.test((e as Error).message)) return NOT_CONFIGURED
+    throw e
+  }
+}
+
+// Adaptadores neutral→legacy (para el mock que aún habla en ShipAddress/Parcel).
+function toShipAddress(r: Receiver): ShipAddress {
+  return { name: r.name, street: r.address.line1, city: r.address.city ?? '', state: r.address.state ?? '', zip: r.address.cp ?? '', phone: r.address.phone ?? '' }
+}
+function toParcel(p: LogisticsPackage): Parcel {
+  return { weightKg: p.weightKg, lengthCm: p.lengthCm, widthCm: p.widthCm, heightCm: p.heightCm }
 }
 
 // --- Mock (fallback / demo sin credencial) --------------------------------------

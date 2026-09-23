@@ -14,7 +14,7 @@ describe('A-03 · shipping exige usuario + rol de logística antes de llamar al 
   })
   it('la autenticación ocurre ANTES del fetch al proveedor', () => {
     const auth = shippingSrc.indexOf('auth.getUser()')
-    const firstFetch = shippingSrc.indexOf('fetch(base')
+    const firstFetch = shippingSrc.indexOf('fetch(') // primer llamado saliente al proveedor
     expect(auth).toBeGreaterThan(-1)
     expect(firstFetch).toBeGreaterThan(auth)
   })

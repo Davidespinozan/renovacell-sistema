@@ -19,11 +19,18 @@ export interface CompanySettings {
   clabe: string
   cuenta: string
   titular: string
+  // Origen operativo (remitente de paquetería), reutilizable por DHL/T1. Estas
+  // columnas existen tras la migración 20260926120000; este archivo debe
+  // desplegarse junto con esa migración.
+  ciudad: string
+  estado: string
+  pais: string
 }
 
 export const EMPTY_COMPANY: CompanySettings = {
   razon_social: '', rfc: '', regimen_fiscal: '', cp: '', direccion: '', telefono: '', email: '', logo_url: '',
   banco: '', clabe: '', cuenta: '', titular: '',
+  ciudad: '', estado: '', pais: 'MX',
 }
 
 // Mock: sin datos capturados (el cliente los llena en Configuración antes del go-live).
@@ -47,13 +54,16 @@ export function normalizeCompany(row: Partial<Record<keyof CompanySettings, stri
     clabe: r.clabe ?? '',
     cuenta: r.cuenta ?? '',
     titular: r.titular ?? '',
+    ciudad: r.ciudad ?? '',
+    estado: r.estado ?? '',
+    pais: r.pais ?? '', // el default operativo 'MX' lo aplica shipperFromCompany, no aquí
   }
 }
 
 const live = makeLive<CompanySettings>(async () => {
   const { data, error } = await supabase
     .from('company_settings')
-    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular')
+    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular, ciudad, estado, pais')
     .eq('id', 'default')
     .maybeSingle()
   if (error) throw error

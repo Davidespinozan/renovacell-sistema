@@ -9,16 +9,22 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useShipments } from '../../data/hooks/useShipments'
 import { markShipped } from '../../data/store/ordersStore'
 import { getDrivers } from '../../data/mock/shipments'
-import { clientOf } from '../../data/mock/profiles'
-import { ORIGIN, quoteRates, generateLabel, type ShipAddress, type RateQuote, type LabelResult } from '../../data/shipping/provider'
+import { quoteShipment, createShipmentReal, type RateQuote, type LabelResult } from '../../data/shipping/provider'
+import { orderAddress } from '../../data/ops/shippingAddress'
+import { shipperFromCompany } from '../../data/shipping/shipper'
+import { currentCompany } from '../../data/store/companyStore'
+import { missingForShipment } from '../../data/shipping/validate'
+import type { LogisticsPackage, Receiver } from '../../data/shipping/model'
 import type { ProductSafe } from '../../data/types'
 
-// Destino a partir del perfil del doctor del pedido. Con Supabase: dirección de
-// envío del pedido. El CP es placeholder mientras no se modele por doctor.
-function destinationOf(order: OrderWithItems): ShipAddress {
-  const c = clientOf(order.doctor_id)
-  const [city, state] = (c.city || 'Culiacán, Sin.').split(',').map((s) => s.trim())
-  return { name: c.clinic || c.name, street: c.address, city: city || 'Culiacán', state: state || 'Sin.', zip: '80000', phone: c.phone }
+// Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
+// (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
+// falta un dato obligatorio, la validación lo bloquea con el detalle exacto.
+function receiverOf(order: OrderWithItems): Receiver {
+  const meta = (order.shipping_meta ?? {}) as { customer?: { name?: string; phone?: string | null } | null }
+  const address = orderAddress(order.shipping_meta, null) ?? { line1: '' }
+  const name = meta.customer?.name ?? ''
+  return { name, address: { ...address, phone: address.phone ?? meta.customer?.phone ?? '' } }
 }
 
 const inputStyle: React.CSSProperties = {
@@ -84,42 +90,59 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
   const [method, setMethod] = useState<Method>('paqueteria')
   const [driverId, setDriverId] = useState('')
 
-  // Paquetería: paquete → cotizar → elegir tarifa → generar guía.
-  const dest = useMemo(() => destinationOf(order), [order])
-  const [parcel, setParcel] = useState({ weightKg: '0.5', lengthCm: '20', widthCm: '15', heightCm: '10' })
+  // Paquetería: datos reales del pedido/empresa → validar → cotizar → guía.
+  const receiver = useMemo(() => receiverOf(order), [order])
+  const shipperInfo = useMemo(() => shipperFromCompany(currentCompany()), [])
+  // Paquete FÍSICO final: se captura en empaque. SIN defaults silenciosos (vacío
+  // hasta que el operador lo mida). pieces por defecto 1 (bulto único).
+  const [parcel, setParcel] = useState({ weightKg: '', lengthCm: '', widthCm: '', heightCm: '', pieces: '1' })
   const [rates, setRates] = useState<RateQuote[] | null>(null)
   const [rateId, setRateId] = useState('')
   const [busy, setBusy] = useState<false | 'quote' | 'label'>(false)
   const [result, setResult] = useState<LabelResult | null>(null)
   const [doneChofer, setDoneChofer] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const req = () => ({
-    origin: ORIGIN,
-    destination: dest,
-    parcel: {
-      weightKg: Number(parcel.weightKg) || 0.5, lengthCm: Number(parcel.lengthCm) || 1,
-      widthCm: Number(parcel.widthCm) || 1, heightCm: Number(parcel.heightCm) || 1,
-    },
-    orderRef: order.external_ref ?? order.id,
-  })
+  const pkg: LogisticsPackage = {
+    weightKg: Number(parcel.weightKg), lengthCm: Number(parcel.lengthCm),
+    widthCm: Number(parcel.widthCm), heightCm: Number(parcel.heightCm), pieces: Number(parcel.pieces),
+  }
+  const orderRef = order.external_ref ?? order.id
+  // Faltantes exactos (remitente + destinatario + paquete). Bloquea si hay alguno.
+  const missing = missingForShipment({ shipper: shipperInfo.config, receiver, pkg })
 
   const cotizar = async () => {
+    setError(null)
+    if (missing.length) return
     setBusy('quote'); setRates(null); setRateId('')
-    const r = await quoteRates(req())
-    setRates(r); setRateId(r[0]?.id ?? ''); setBusy(false)
+    try {
+      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef)
+      setRates(r); setRateId(r[0]?.id ?? '')
+    } catch (e) { setError((e as Error).message || 'No se pudo cotizar.') }
+    setBusy(false)
   }
 
   const generarGuia = async () => {
     const rate = rates?.find((r) => r.id === rateId)
-    if (!rate) return
-    setBusy('label')
-    const label = await generateLabel(rate, req())
-    createShipment({
-      order_id: order.id, carrier: label.carrier, tracking_number: label.tracking,
-      label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
-    })
-    markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
-    setResult(label); setBusy(false)
+    if (!rate || busy) return
+    if (missing.length) return
+    setBusy('label'); setError(null)
+    try {
+      const { label } = await createShipmentReal({
+        order_id: order.id, orderRef, idempotencyKey: `${order.id}:${rate.id}`,
+        shipper: shipperInfo.config, receiver, pkg, rate,
+      })
+      // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
+      if (label.provider === 'mock' || !label.provider) {
+        createShipment({
+          order_id: order.id, carrier: label.carrier, tracking_number: label.tracking,
+          label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
+        })
+      }
+      markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
+      setResult(label)
+    } catch (e) { setError((e as Error).message || 'No se pudo generar la guía. El pedido NO se marcó como enviado.') }
+    setBusy(false)
   }
 
   const asignarChofer = () => {
@@ -188,26 +211,39 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
 
               {method === 'paqueteria' ? (
                 <>
-                  {/* Destino: del perfil del doctor */}
+                  {/* Destino/Origen REALES (snapshot del pedido + config de empresa) */}
                   <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
                     <Icon name="truck" />
                     <span>
-                      <b>Destino:</b> {dest.name} · {dest.street}, {dest.city}, {dest.state}.<br />
-                      <b>Origen:</b> {ORIGIN.city}, {ORIGIN.state}.
+                      <b>Destino:</b> {receiver.name || '—'} · {receiver.address.line1 || '—'}{receiver.address.cp ? `, C.P. ${receiver.address.cp}` : ''}{receiver.address.city ? `, ${receiver.address.city}` : ''}.<br />
+                      <b>Origen:</b> {shipperInfo.config.city || '—'}{shipperInfo.config.cp ? ` (C.P. ${shipperInfo.config.cp})` : ''}.
                     </span>
                   </div>
 
-                  <label style={labelStyle}>Paquete</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                  {missing.length > 0 && (
+                    <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start', background: 'var(--warn-bg, #fff7ed)', border: '1px solid var(--warn, #f59e0b)' }}>
+                      <Icon name="bell" />
+                      <span>
+                        <b>Falta información para generar la guía.</b> Captúrala antes de cotizar (no se usan valores por defecto):
+                        <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{missing.map((m) => <li key={m}>{m}</li>)}</ul>
+                      </span>
+                    </div>
+                  )}
+
+                  <label style={labelStyle}>Paquete final (medido en empaque)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
                     <input style={f2} type="number" min="0.1" step="0.1" value={parcel.weightKg} onChange={(e) => { setParcel({ ...parcel, weightKg: e.target.value }); setRates(null) }} placeholder="kg" />
                     <input style={f2} type="number" min="1" value={parcel.lengthCm} onChange={(e) => { setParcel({ ...parcel, lengthCm: e.target.value }); setRates(null) }} placeholder="largo" />
                     <input style={f2} type="number" min="1" value={parcel.widthCm} onChange={(e) => { setParcel({ ...parcel, widthCm: e.target.value }); setRates(null) }} placeholder="ancho" />
                     <input style={f2} type="number" min="1" value={parcel.heightCm} onChange={(e) => { setParcel({ ...parcel, heightCm: e.target.value }); setRates(null) }} placeholder="alto" />
+                    <input style={f2} type="number" min="1" step="1" value={parcel.pieces} onChange={(e) => { setParcel({ ...parcel, pieces: e.target.value }); setRates(null) }} placeholder="piezas" />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>Peso (kg) y medidas en cm (largo × ancho × alto).</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>Peso (kg), medidas en cm (largo × ancho × alto) y número de piezas de la caja final.</div>
+
+                  {error && <div style={{ fontSize: 12.5, color: 'var(--dang, #dc2626)', marginTop: 10 }}>{error}</div>}
 
                   {!rates ? (
-                    <button className="btn" type="button" style={{ width: '100%', marginTop: 16 }} onClick={cotizar} disabled={busy === 'quote'}>
+                    <button className="btn" type="button" style={{ width: '100%', marginTop: 16 }} onClick={cotizar} disabled={busy === 'quote' || missing.length > 0} title={missing.length ? 'Completa los datos faltantes' : undefined}>
                       {busy === 'quote' ? 'Cotizando…' : <><Icon name="truck" /> Cotizar envío</>}
                     </button>
                   ) : (

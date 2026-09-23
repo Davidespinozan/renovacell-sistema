@@ -1393,13 +1393,16 @@ export type Database = {
       company_settings: {
         Row: {
           banco: string | null
+          ciudad: string | null
           clabe: string | null
           cp: string | null
           cuenta: string | null
           direccion: string | null
           email: string | null
+          estado: string | null
           id: string
           logo_url: string | null
+          pais: string | null
           razon_social: string | null
           regimen_fiscal: string | null
           rfc: string | null
@@ -1409,13 +1412,16 @@ export type Database = {
         }
         Insert: {
           banco?: string | null
+          ciudad?: string | null
           clabe?: string | null
           cp?: string | null
           cuenta?: string | null
           direccion?: string | null
           email?: string | null
+          estado?: string | null
           id?: string
           logo_url?: string | null
+          pais?: string | null
           razon_social?: string | null
           regimen_fiscal?: string | null
           rfc?: string | null
@@ -1425,13 +1431,16 @@ export type Database = {
         }
         Update: {
           banco?: string | null
+          ciudad?: string | null
           clabe?: string | null
           cp?: string | null
           cuenta?: string | null
           direccion?: string | null
           email?: string | null
+          estado?: string | null
           id?: string
           logo_url?: string | null
+          pais?: string | null
           razon_social?: string | null
           regimen_fiscal?: string | null
           rfc?: string | null
