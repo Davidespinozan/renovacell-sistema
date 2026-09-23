@@ -1638,11 +1638,14 @@ export type Database = {
           active: boolean | null
           category: string | null
           description: string | null
+          family: string | null
           id: string | null
           image_url: string | null
           line: string | null
           name: string | null
+          parent_product_id: string | null
           price: number | null
+          sellable: boolean | null
           show_landing: boolean | null
           show_portal: boolean | null
           sku: string | null

@@ -42,6 +42,11 @@ export interface Product {
   // en ningún lado. Estas solo deciden en qué escaparate aparece.
   show_landing?: boolean
   show_portal?: boolean
+  // Modelo producto+variante (catálogo Odoo). family = agrupación visual; parent_product_id = la
+  // variante apunta a su tarjeta padre; sellable = si se puede vender/agregar al carrito.
+  family?: string | null
+  parent_product_id?: UUID | null
+  sellable?: boolean
 }
 
 // Forma de la vista segura `products_safe` (sin metadata/costo/proveedor).

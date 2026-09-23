@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct, isPortalProduct } from '../../data/hooks/useProducts'
+import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data/ops/productVariants'
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useStock } from '../../data/hooks/useStock'
@@ -73,10 +74,17 @@ export function Catalogo() {
     }
   }, [products, stockMap])
 
-  const shown = useMemo(
-    () => products.filter(isPortalProduct).filter((p) => (filter === 'all' ? true : p.line === filter)),
+  // Agrupa producto→variantes: una tarjeta por familia (padre con hijas) + productos standalone.
+  // Las variantes NUNCA se listan sueltas; se eligen dentro del modal de la familia.
+  const entries = useMemo(
+    () => catalogEntries(
+      products,
+      (p) => isPortalProduct(p) && (filter === 'all' ? true : p.line === filter),
+      (v) => isPortalProduct(v), // variantes visibles (incl. sin precio → "No disponible")
+    ),
     [products, filter],
   )
+  const [openFamily, setOpenFamily] = useState<ProductSafe | null>(null)
 
   const lines: CartLine[] = useMemo(
     () =>
@@ -149,15 +157,26 @@ export function Catalogo() {
         </div>
 
         <div className="pgrid">
-          {shown.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ink-3)' }}>
               No hay productos disponibles en este momento.
             </div>
-          ) : shown.map((p) => (
-            <ProductCard key={p.id} p={p} price={priceOf(p)} qty={cart[p.id] ?? 0} stock={stockInfoFor(stockMap, p.id)} onAdd={() => add(p.id)} onDec={() => dec(p.id)} />
+          ) : entries.map((e) => e.kind === 'family' ? (
+            <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
+          ) : (
+            <ProductCard key={e.product.id} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
           ))}
         </div>
       </div>
+
+      {openFamily && (
+        <VariantModal
+          parent={openFamily}
+          variants={products.filter((v) => v.parent_product_id === openFamily.id && isPortalProduct(v))}
+          cart={cart} priceOf={priceOf} stockMap={stockMap}
+          onAdd={add} onDec={dec} onClose={() => setOpenFamily(null)}
+        />
+      )}
 
       {/* DERECHA: pedido en curso */}
       <CartPanel lines={lines} total={total} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
@@ -225,6 +244,105 @@ function ProductCard({ p, price, qty, stock, onAdd, onDec }: { p: ProductSafe; p
           </div>
         )}
         {qty > 0 && atMax && <div style={{ fontSize: 10.5, color: 'var(--warn)', marginTop: 5 }}>Máximo disponible</div>}
+      </div>
+    </div>
+  )
+}
+
+// Tarjeta de FAMILIA: una sola imagen (del padre) + resumen de variantes. Abre el selector.
+function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; onOpen: () => void }) {
+  const p = entry.product
+  const disponibles = entry.variants.filter(isSellableVariant).length
+  const enCarrito = entry.variants.reduce((s, v) => s + (cart[v.id] ?? 0), 0)
+  const isProf = p.line === 'prof'
+  return (
+    <div className="pcard">
+      <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
+        <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
+        {p.image_url
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: 10 }} />
+          : <Icon name="leaf" />}
+      </div>
+      <div className="pb">
+        <h5 style={{ margin: 0 }}>{p.name}</h5>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
+          {entry.variants.length} variante(s){disponibles !== entry.variants.length ? ` · ${disponibles} con precio` : ''}
+        </div>
+        <div className="pr" style={{ fontSize: 13, color: 'var(--ink-3)' }}>Varias presentaciones</div>
+        <button className="addb" type="button" onClick={onOpen}>
+          <Icon name="grid" /> Ver variantes{enCarrito > 0 ? ` (${enCarrito})` : ''}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Selector de variantes de una familia. Al agregar, SIEMPRE usa el id de la VARIANTE.
+function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec, onClose }: {
+  parent: ProductSafe
+  variants: ProductSafe[]
+  cart: Cart
+  priceOf: (p: ProductSafe) => number | null
+  stockMap: ReturnType<typeof useStock>
+  onAdd: (id: string) => void
+  onDec: (id: string) => void
+  onClose: () => void
+}) {
+  const [q, setQ] = useState('')
+  const shown = q.trim() ? variants.filter((v) => v.name.toLowerCase().includes(q.trim().toLowerCase())) : variants
+  // Etiqueta de la variante: el nombre sin el prefijo del padre cuando aplica.
+  const variantLabel = (v: ProductSafe) => {
+    const n = v.name.trim()
+    const pre = parent.name.trim()
+    return n.toLowerCase().startsWith(pre.toLowerCase()) && n.length > pre.length ? n.slice(pre.length).trim() : n
+  }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--line)' }} />}
+            <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} variante(s) · elige presentación</div></div>
+          </div>
+          <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
+        </div>
+        <div className="mbody">
+          {variants.length > 8 && (
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar variante…"
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
+          )}
+          <div style={{ display: 'grid', gap: 8, maxHeight: '52vh', overflow: 'auto' }}>
+            {shown.map((v) => {
+              const price = priceOf(v)
+              const stock = stockInfoFor(stockMap, v.id)
+              const disponible = isSellableVariant(v) && price != null
+              const qty = cart[v.id] ?? 0
+              const atMax = stock.tracked && qty >= stock.qty
+              return (
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, opacity: disponible ? 1 : 0.6 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{variantLabel(v)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{disponible ? money(price) : 'No disponible'}</div>
+                  </div>
+                  {!disponible ? (
+                    <span className="pill p-neu" style={{ whiteSpace: 'nowrap' }}>No disponible</span>
+                  ) : qty === 0 ? (
+                    <button className="btn sm" type="button" disabled={stock.tracked && stock.qty <= 0} onClick={() => onAdd(v.id)}><Icon name="plus" /> Agregar</button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button className="btn ghost sm" type="button" onClick={() => onDec(v.id)}><Icon name="minus" /></button>
+                      <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>
+                      <button className="btn sm" type="button" disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined} onClick={() => onAdd(v.id)}><Icon name="plus" /></button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+            <button className="btn" type="button" onClick={onClose}>Listo</button>
+          </div>
+        </div>
       </div>
     </div>
   )

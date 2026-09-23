@@ -13,7 +13,7 @@ const fallback: ProductSafe[] = MOCK_PRODUCTS.map((p) => ({ active: true, ...p }
 const live = makeLive<ProductSafe>(async () => {
   const { data, error } = await supabase
     .from('products_safe')
-    .select('id, sku, name, line, category, description, price, unit, image_url, active, show_landing, show_portal')
+    .select('id, sku, name, line, category, description, price, unit, image_url, active, show_landing, show_portal, family, parent_product_id, sellable')
     .order('line')
     .order('name')
   if (error) throw error
@@ -30,6 +30,9 @@ const live = makeLive<ProductSafe>(async () => {
     active: r.active ?? true,
     show_landing: r.show_landing ?? true,
     show_portal: r.show_portal ?? true,
+    family: (r as { family?: string | null }).family ?? null,
+    parent_product_id: (r as { parent_product_id?: string | null }).parent_product_id ?? null,
+    sellable: (r as { sellable?: boolean }).sellable ?? true,
   }))
 }, fallback)
 

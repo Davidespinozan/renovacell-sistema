@@ -35,7 +35,7 @@ export function Caja() {
   // que el arqueo por evento y "Ventas del evento" cuadren (antes nunca se asignaba).
   const [eventId, setEventId] = useState<string | null>(null)
   // Solo productos activos y con precio (no se vende lo oculto).
-  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
+  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
   // En un evento se vende del STAND (lo asignado − lo vendido), NO del almacén. Antes
   // Caja mostraba/limitaba por almacén y cobraba con venderPOS, que descontaba el almacén
   // OTRA VEZ (el stock ya se había movido al stand al asignarlo) — doble descuento y el

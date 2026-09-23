@@ -27,7 +27,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const { data: lots } = useLots()
   const { createOrder } = useOrders()
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
-  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p)), [products])
+  const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
 
   // Domicilio base SOLO aplica al flujo doctor (perfil legacy). Customer captura dirección one-off.
   const ci = !isCustomer && doctor ? clientOf(doctor.id) : null

@@ -212,7 +212,7 @@ describe('paginación (PAGE_SIZE=100, aplica después de filtro/búsqueda)', () 
   })
   it('página 26 = últimos 68', () => {
     const p = paginate(items, 26, 100)
-    expect([p.from, p.to]).toEqual([2501, 2568]); expect(p.items.length).toBe(68); expect(p.items.at(-1)).toBe(2568)
+    expect([p.from, p.to]).toEqual([2501, 2568]); expect(p.items.length).toBe(68); expect(p.items[p.items.length - 1]).toBe(2568)
   })
   it('clamp: página fuera de rango se ajusta a válida', () => {
     expect(paginate(items, 0, 100).page).toBe(1)
