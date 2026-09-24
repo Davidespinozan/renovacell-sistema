@@ -1,0 +1,148 @@
+-- Habilitar sellable=true en EXACTAMENTE los 121 productos auditados (117 variantes de
+-- familia + 4 standalone: DYSPORT, EMLA, RADIESSE CLASICO, RADIESSE-LIDO). Idempotente por
+-- product_id. SOLO cambia sellable. Guardas abortan ante discrepancia.
+do $BODY$
+declare expected int := 121; n int;
+begin
+  create temp table _sell_targets(id uuid primary key) on commit drop;
+  insert into _sell_targets(id) values
+    ('7e338736-0ce2-4070-a1b0-92f8507c9101'::uuid),
+    ('8e0cdfce-c90c-41c4-b33a-7ba245bdce58'::uuid),
+    ('4c723990-7a79-4b58-bc0b-91ff39cbec23'::uuid),
+    ('eae8a07e-4051-44c9-ac89-263bf941c635'::uuid),
+    ('a3fa587f-8d5f-405b-a7eb-33bfef03b8fe'::uuid),
+    ('18c1aa28-d233-4e91-b840-ed874b312b9a'::uuid),
+    ('3043a620-5274-44ed-ab25-a0d60b56d706'::uuid),
+    ('6416e3e3-f60e-4929-8c48-791bfe27ba40'::uuid),
+    ('d5383ab3-e57d-403b-80f2-ca593367245c'::uuid),
+    ('d2689b12-4586-43af-b1ab-c84d060d7070'::uuid),
+    ('eef9ee73-9bd3-47e0-846f-317bb83a299a'::uuid),
+    ('1bb9ca5f-4c87-447a-b177-121ee9a29103'::uuid),
+    ('f99c03a1-a02e-48c1-acbb-65594a6cae6a'::uuid),
+    ('3024a702-9dfb-4c00-937e-58d9ce96f261'::uuid),
+    ('b8be3e8f-f3b2-4254-9c37-2426a868c09f'::uuid),
+    ('e89185ff-3a08-4b67-952c-8325fee48c61'::uuid),
+    ('dd2eba06-f449-4764-b4cc-0c3273c86acf'::uuid),
+    ('b1b706cb-6994-4baf-ba57-e840148153a3'::uuid),
+    ('34541e8a-469d-4bb3-973e-408565a338f2'::uuid),
+    ('9f6ba8cc-4904-4095-9182-a00136ceb1c0'::uuid),
+    ('b7536cdf-d53e-48d7-b756-50a7be950e24'::uuid),
+    ('e2102321-c25d-4bac-9677-8b589ef3d7eb'::uuid),
+    ('69bd4cfd-fc39-49b1-8758-46689076140c'::uuid),
+    ('bbabaff6-17ad-4715-a567-a6bfa0d7b02a'::uuid),
+    ('2eac6877-1a42-4f27-b49e-699a4b3c814a'::uuid),
+    ('52518557-0343-45c1-b875-3b8795ea99d0'::uuid),
+    ('26286a27-ace6-4748-ae50-4b7be02a5ed3'::uuid),
+    ('c49654b3-517b-4976-8d82-1d685664e932'::uuid),
+    ('cc8704b9-44f4-403a-90ce-1e658960b9cd'::uuid),
+    ('547558e6-7955-4f5e-8246-cff4bdf3a7fb'::uuid),
+    ('37897db4-9fc0-4935-b18d-64e131c3f9dc'::uuid),
+    ('86e85877-31be-405c-a31f-205aef1112dc'::uuid),
+    ('fc50e014-1a96-498f-b8d5-f6a172c7777d'::uuid),
+    ('8d1f067e-2309-4358-ac92-7ec7bd7ef535'::uuid),
+    ('faaa7f43-6784-4f30-bfd7-1fd7570489b9'::uuid),
+    ('1f6b0805-11b2-4695-802f-f8f4001f258b'::uuid),
+    ('a894ed6b-6e33-4419-b62b-5dd00215e5df'::uuid),
+    ('e2cbb1c3-fd5f-4eb0-b544-91455d1a94a5'::uuid),
+    ('de183c46-5240-4664-bba1-10576167bae3'::uuid),
+    ('9e0db293-38bc-4131-bbf6-8e789b8d0734'::uuid),
+    ('c45bfac0-940d-4cb0-99d3-6957f3c774d7'::uuid),
+    ('04d5e143-aa49-4257-ab69-db9a35fdfc82'::uuid),
+    ('57a14e21-92bf-4666-bbb5-badcbbc386b7'::uuid),
+    ('36b12f02-704d-4c36-865f-b4a98d7133ce'::uuid),
+    ('3144dd17-2fc6-40d4-9962-6acac489c941'::uuid),
+    ('30adf787-c7d7-46cd-a7a4-3b1e4d90f938'::uuid),
+    ('3f53991d-4070-46f0-b721-16988308b0d5'::uuid),
+    ('c816fa68-6269-437b-8947-482643cad516'::uuid),
+    ('9cf3e8cf-dc4f-473f-9055-603aac4ff595'::uuid),
+    ('f51b9f60-886f-4916-99e7-e85ead847bcb'::uuid),
+    ('6f9d3c3e-d57b-4e3f-ac57-63ae2002b953'::uuid),
+    ('ffdf4a85-6ce4-41a5-95d0-bac036806db4'::uuid),
+    ('37bb528b-e793-4e45-8a3b-e07a4f81c2d0'::uuid),
+    ('aba7f11b-1dd5-4e9c-b6a0-8fe23da38bdc'::uuid),
+    ('1109fa3b-405a-4c0d-97e2-a126d8d80542'::uuid),
+    ('4415b7be-c5a9-4b9e-bfda-9b399a7a1686'::uuid),
+    ('0eb73911-aac3-41f3-bcc1-715d9db13968'::uuid),
+    ('ec483bbe-2b4e-4da8-8355-d28d994df9c1'::uuid),
+    ('17fd4361-537d-4fb1-9f72-afaae86f62a0'::uuid),
+    ('2ffad776-1f74-45e4-ad85-18f85e0683df'::uuid),
+    ('9744ed0d-a4b1-44a9-81ee-b064362f6bc8'::uuid),
+    ('54ce127b-ce48-47a0-a4dd-022769375170'::uuid),
+    ('a1ae62d6-cc54-4739-b44c-7a9cf85874ff'::uuid),
+    ('69044226-b5c8-422f-9ad3-95f006384c77'::uuid),
+    ('efe74557-c485-4f16-8eff-eeafc9b16a6d'::uuid),
+    ('5e0acc26-1092-4bbe-a20b-93f6f09dd1fb'::uuid),
+    ('4d5df95c-c3a4-4f7f-a057-0bc238191da5'::uuid),
+    ('2cea1445-61eb-46fb-9363-203b79c6830d'::uuid),
+    ('7cc605b9-759e-4ba7-85fc-9bb4e8b9acc7'::uuid),
+    ('94700e24-e152-4350-b548-db8413fb8db3'::uuid),
+    ('66c7464c-e412-44f4-b3b6-dd3819acc92e'::uuid),
+    ('0207fef1-44da-49bd-b2ed-8312f4438966'::uuid),
+    ('04e06ca5-5b0f-4267-9af2-64068fa72365'::uuid),
+    ('b3337744-8597-4bf4-ad87-d8dfdf7d1274'::uuid),
+    ('41608051-5699-4642-b6c6-33ff9c1fee88'::uuid),
+    ('1cd85116-5c60-481c-b0cf-a3571108b9dc'::uuid),
+    ('796386c2-5878-4324-9f8e-9a3d0bc7ae58'::uuid),
+    ('166b81f0-4151-4605-8c85-04e97e48edf9'::uuid),
+    ('7b930a8c-2847-430e-a8b0-fa9591c4c549'::uuid),
+    ('a1a91e38-7a33-4ff3-9957-eeb08e758e39'::uuid),
+    ('76a9f366-f9bb-453c-b5e4-faa57953801d'::uuid),
+    ('6e953acf-1596-42e6-8571-35688400c612'::uuid),
+    ('6265b38d-30e5-4976-8e88-bce3ddd3c6dc'::uuid),
+    ('22e46646-c7f7-4a70-b1e6-2632795c05ca'::uuid),
+    ('f3fe9078-889d-4910-a43a-94239e162f6c'::uuid),
+    ('d9890a86-8fca-467c-9b8a-eb4545ca4823'::uuid),
+    ('03b839c2-b094-40e6-85a5-b289e6b501cb'::uuid),
+    ('17a980dd-47bb-4f1d-8045-eda7dd6951cd'::uuid),
+    ('e2ce81ee-ebdb-4d29-8fbb-696c8b942d4e'::uuid),
+    ('74c3b72e-f938-413e-8479-45e0075c2c26'::uuid),
+    ('60ed8e0b-634b-4260-9ee0-9c9b63e98987'::uuid),
+    ('df88b7f0-c12a-4bc3-9982-d58f323ed348'::uuid),
+    ('2688abc2-293a-474d-8646-23a1a5c9bc07'::uuid),
+    ('76cc56cb-6567-4d53-8330-99ece52bef7d'::uuid),
+    ('4e42ea74-ca5e-4042-bd9a-a7404a2bef3c'::uuid),
+    ('36c2e2fe-efc8-422a-b01b-f28e9ef35bcd'::uuid),
+    ('2d453484-2b65-41c0-b93f-49e1d0f25850'::uuid),
+    ('b09dfd5d-31e0-44c8-946a-45f7e991280c'::uuid),
+    ('e1f9a301-ae40-4ea5-bc40-21c63394160e'::uuid),
+    ('f9b2695b-74cd-4a98-81ee-4321092c8d62'::uuid),
+    ('04d4360f-27be-4866-8982-4970123cc9bb'::uuid),
+    ('1c961bee-0345-4dbf-8d48-e5c9f7842a27'::uuid),
+    ('f08bc3f5-6456-4ca3-b3cf-6e68e4934e47'::uuid),
+    ('ecf4b7e5-b63b-4f71-9126-e95a2876c206'::uuid),
+    ('e2ece653-9734-4486-96cd-7c1ac126beb1'::uuid),
+    ('1b965a38-6512-488e-9d8b-716840cfa192'::uuid),
+    ('c66df1cf-a529-40a6-bad2-17aa56e19719'::uuid),
+    ('8663e890-ea63-42ea-aca2-e699c83b165a'::uuid),
+    ('01f337ab-4cae-4516-a186-dc8d8284271f'::uuid),
+    ('b922370f-c4eb-415c-aa64-c49072edeacf'::uuid),
+    ('4323f6b6-71b1-46a8-aa0c-39aaaa8553e4'::uuid),
+    ('6f52735b-a611-4fa0-affa-8f9bbbdca858'::uuid),
+    ('14cca947-f301-4f33-915e-2c52dd38873a'::uuid),
+    ('c07fbb83-120c-4aa4-943c-fefe78dd5e13'::uuid),
+    ('66243b28-1f4d-4891-850d-fd845319abee'::uuid),
+    ('877b3b1c-b5a3-4cb5-a2db-c9a695347464'::uuid),
+    ('768c4b20-e51c-40c5-9a5a-cf4cffdf30fe'::uuid),
+    ('a2c6548c-a147-42e6-91bf-2ce5a6504d59'::uuid),
+    ('a729386b-bd45-4c65-a6e8-87337531507f'::uuid),
+    ('90b59637-02a8-402e-afe0-d6100e72f9e0'::uuid),
+    ('866328fd-6c97-43a1-98a0-5a1fccfe7a91'::uuid);
+  select count(*) into n from _sell_targets;
+  if n <> expected then raise exception 'GUARD1 targets % <> %', n, expected; end if;
+  select count(*) into n from _sell_targets t join public.products p on p.id=t.id;
+  if n <> expected then raise exception 'GUARD2 encontrados % de %', n, expected; end if;
+  select count(*) into n from _sell_targets t join public.products p on p.id=t.id where p.active is not true;
+  if n <> 0 then raise exception 'GUARD3 no-activos: %', n; end if;
+  select count(*) into n from _sell_targets t join public.products p on p.id=t.id where coalesce(p.price,0) <= 0;
+  if n <> 0 then raise exception 'GUARD4 sin precio>0: %', n; end if;
+  select count(*) into n from _sell_targets t where exists(select 1 from public.products c where c.parent_product_id=t.id);
+  if n <> 0 then raise exception 'GUARD5 visual parents: %', n; end if;
+  select count(*) into n from _sell_targets t join public.products p on p.id=t.id
+    where p.sku in ('REL-005','REL-009','NEW-010','NEW-014','XEL-001','XEL-002','XEL-003','XEL-004');
+  if n <> 0 then raise exception 'GUARD6 REVIEW: %', n; end if;
+  update public.products p set sellable = true from _sell_targets t where p.id=t.id;
+  select count(*) into n from _sell_targets t join public.products p on p.id=t.id where p.sellable is true;
+  if n <> expected then raise exception 'POSTCHECK sellable=true % <> %', n, expected; end if;
+  raise notice 'OK: % productos habilitados sellable=true', expected;
+end
+$BODY$;
