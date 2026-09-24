@@ -8,6 +8,8 @@ import { useProducts, isActiveProduct, isPortalProduct } from '../../data/hooks/
 import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data/ops/productVariants'
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
+import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { effectiveUnitPrice, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
@@ -32,8 +34,12 @@ export function Catalogo() {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
   const { priceFor } = usePricing()
-  // Precio del doctor: el de SU lista (RLS) o el base. Se usa en todo el catálogo/carrito.
+  const { data: volRules } = useVolumePrices()
+  // Precio de LISTA del doctor (su tarifa/base). El descuento por VOLUMEN se previsualiza
+  // aparte con `effOf(qty)`; el servidor (precio_de) es la autoridad del cobro final.
   const priceOf = (p: ProductSafe): number | null => priceFor(p.id, p.price)
+  // Precio unitario EFECTIVO previsto para una cantidad = LEAST(lista, volumen aplicable).
+  const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty)
 
   const [filter, setFilter] = useState<LineFilter>('all')
   const [cart, setCart] = useState<Cart>({})
@@ -94,7 +100,9 @@ export function Catalogo() {
     [cart, products],
   )
 
-  const total = lines.reduce((sum, l) => sum + (priceOf(l.product) ?? 0) * l.qty, 0)
+  // Total con descuento por volumen previsualizado (el servidor recalcula al crear el pedido).
+  const total = lines.reduce((sum, l) => sum + (effOf(l.product, l.qty) ?? 0) * l.qty, 0)
+  const savings = lines.reduce((sum, l) => sum + volumeSavings(priceOf(l.product), volRules, l.product.id, l.qty), 0)
 
   // No se puede pedir más de lo disponible en inventario. Ni un producto sin
   // precio publicado (price null = "a consultar"): evita un pedido con renglón a $0.
@@ -127,7 +135,7 @@ export function Catalogo() {
 
   const onConfirm = (invoice: boolean, choice: DeliveryChoice | null) =>
     createOrder({
-      lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: priceOf(l.product) })),
+      lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) })),
       total,
       invoice_requested: invoice,
       shipping: choice?.address ?? null,
@@ -164,7 +172,7 @@ export function Catalogo() {
           ) : entries.map((e) => e.kind === 'family' ? (
             <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
           ) : (
-            <ProductCard key={e.product.id} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+            <ProductCard key={e.product.id} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
           ))}
         </div>
       </div>
@@ -179,7 +187,7 @@ export function Catalogo() {
       )}
 
       {/* DERECHA: pedido en curso */}
-      <CartPanel lines={lines} total={total} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
+      <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
 
       {checkout && (
         <CheckoutModal
@@ -203,10 +211,11 @@ function StockTag({ stock }: { stock: StockInfo }) {
   return <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Agotado</span>
 }
 
-function ProductCard({ p, price, qty, stock, onAdd, onDec }: { p: ProductSafe; price: number | null; qty: number; stock: StockInfo; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
+  const discounted = effPrice != null && price != null && effPrice < price // volumen aplicado a esta cantidad
   return (
     <div className="pcard">
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
@@ -221,7 +230,16 @@ function ProductCard({ p, price, qty, stock, onAdd, onDec }: { p: ProductSafe; p
           <StockTag stock={stock} />
         </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.category}</div>
-        <div className="pr">{money(price)}</div>
+        <div className="pr">
+          {discounted ? (
+            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline' }}>
+              <span>{money(effPrice)}</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', textDecoration: 'line-through' }}>{money(price)}</span>
+            </span>
+          ) : money(price)}
+        </div>
+        {promo && !discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>{promo}</div>}
+        {discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>Precio por volumen aplicado</div>}
         {price == null ? (
           // Precio "a consultar": antes mostraba un "Agregar" habilitado que no hacía
           // nada (add() sale temprano). Ahora es un estado claro y no engañoso.
@@ -349,10 +367,11 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
 }
 
 function CartPanel({
-  lines, total, priceOf, onInc, onDec, onClear, onReview,
+  lines, total, savings = 0, priceOf, onInc, onDec, onClear, onReview,
 }: {
   lines: CartLine[]
   total: number
+  savings?: number
   priceOf: (p: ProductSafe) => number | null
   onInc: (id: string) => void
   onDec: (id: string) => void
@@ -380,6 +399,11 @@ function CartPanel({
 
       {!empty && (
         <>
+          {savings > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>
+              <span>Ahorro por volumen</span><span>−{money(savings)}</span>
+            </div>
+          )}
           <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
             <span>Total</span>
             <b>{money(total)}</b>

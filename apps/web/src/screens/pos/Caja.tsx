@@ -10,6 +10,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useCustomers, useCustomerSearch } from '../../data/hooks/useCustomers'
 import { useEvents } from '../../data/hooks/useEvents'
+import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
 import { venderPOS, type PosResult } from '../../data/ops/pos'
@@ -29,7 +31,11 @@ export function Caja() {
   const { data: doctors } = useDoctors()
   const { data: allCustomers } = useCustomers()
   const { data: events, sellAtEvent } = useEvents()
+  const { data: volRules } = useVolumePrices()
   const { user } = useRole()
+  // Precio unitario efectivo previsto = LEAST(precio base, volumen por cantidad). El servidor
+  // (vender_pos → precio_de) es la autoridad del cobro; esto es previsualización para el vendedor.
+  const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty) ?? (p.price ?? 0)
   const eventosActivos = useMemo(() => events.filter((e) => e.status === 'activo'), [events])
   // Contexto de venta: mostrador (null) o un evento activo. Se asigna a la venta para
   // que el arqueo por evento y "Ventas del evento" cuadren (antes nunca se asignaba).
@@ -90,7 +96,8 @@ export function Caja() {
         .filter((l): l is Line => Boolean(l.product)),
     [cart, sellable],
   )
-  const total = lines.reduce((s, l) => s + (l.product.price ?? 0) * l.qty, 0)
+  const total = lines.reduce((s, l) => s + effOf(l.product, l.qty) * l.qty, 0)
+  const savings = lines.reduce((s, l) => s + volumeSavings(l.product.price, volRules, l.product.id, l.qty), 0)
   const recibidoN = Math.max(0, Number(recibido) || 0)
   const cambio = recibidoN - total
   // En efectivo, no se cobra hasta que el recibido alcance el total (evita cambio negativo).
@@ -113,7 +120,7 @@ export function Caja() {
   const cobrar = async () => {
     if (cobrando) return
     setCobrando(true)
-    const posLines = lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: l.product.price ?? 0 }))
+    const posLines = lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) }))
     // Venta en evento → sellAtEvent (descuenta el STAND, registra el lote entregado y
     // cuadra "Ventas del evento"). Mostrador → venderPOS (descuenta el almacén por FEFO).
     let res: PosResult
@@ -186,7 +193,9 @@ export function Caja() {
                 )}
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
-                <div className="pr">{money(p.price)}</div>
+                <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(effOf(p, qty)) : money(p.price)}</div>
+                {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0)
+                  return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{disc ? 'Precio por volumen' : promo}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
                   : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
                 {qty > 0 && (
@@ -248,6 +257,11 @@ export function Caja() {
               </div>
             ))}
 
+            {savings > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>
+                <span>Descuento por volumen</span><span>−{money(savings)}</span>
+              </div>
+            )}
             <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
               <span>Total</span><b>{money(total)}</b>
             </div>

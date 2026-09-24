@@ -86,6 +86,20 @@ export function createProduct(input: ProductInput): ProductSafe {
   return temp
 }
 
+// PRECIO GENERAL (products.price): edición segura desde Admin → Precios. Valida, audita
+// con valor anterior→nuevo y persiste (RLS admin). No toca listas ni reglas de volumen.
+// No permite editar productos NO vendibles / parents visuales (no son SKU comercial).
+export function setBasePrice(id: string, price: number, name?: string): { ok: boolean; error?: string } {
+  const before = live.current().find((p) => p.id === id)
+  if (!before) return { ok: false, error: 'Producto no encontrado.' }
+  if (before.sellable === false) return { ok: false, error: 'Este producto no es vendible (variante/tarjeta visual); no tiene precio comercial editable.' }
+  if (!(price > 0)) return { ok: false, error: 'El precio debe ser mayor que 0.' }
+  live.setLocal(live.current().map((p) => (p.id === id ? { ...p, price } : p)))
+  logAudit({ actor: 'Administración', action: 'Precio general actualizado', resource: name ?? before.name, detail: `$${before.price ?? 0} ⇒ $${price}` })
+  if (hasSupabase) supabase.from('products').update({ price }).eq('id', id).then(({ error }) => { if (error) console.warn('[products] setBasePrice', error.message); live.reload() })
+  return { ok: true }
+}
+
 export function updateProduct(id: string, patch: Partial<ProductInput>) {
   const before = live.current().find((p) => p.id === id)
   // `cost` no es columna de products (va a product_costs, lo maneja el modal aparte);

@@ -7,6 +7,8 @@ import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
+import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { AddressPicker } from '../../app/AddressPicker'
@@ -26,8 +28,11 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { createOrder } = useOrders()
+  const { data: volRules } = useVolumePrices()
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
+  // Precio unitario efectivo previsto = LEAST(base, volumen). El servidor (crear_pedido) es la autoridad.
+  const effOf = (p: { id: string; price: number | null }, qty: number): number | null => effectiveUnitPrice(p.price, volRules, p.id, qty)
 
   // Domicilio base SOLO aplica al flujo doctor (perfil legacy). Customer captura dirección one-off.
   const ci = !isCustomer && doctor ? clientOf(doctor.id) : null
@@ -55,12 +60,13 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   })
 
   const lines = Object.entries(cart).map(([id, qty]) => ({ p: sellable.find((x) => x.id === id), qty })).filter((l) => l.p)
-  const total = lines.reduce((s, l) => s + (l.p!.price ?? 0) * l.qty, 0)
+  const total = lines.reduce((s, l) => s + (effOf(l.p!, l.qty) ?? l.p!.price ?? 0) * l.qty, 0)
+  const savings = lines.reduce((s, l) => s + volumeSavings(l.p!.price, volRules, l.p!.id, l.qty), 0)
 
   const crear = () => {
     if (lines.length === 0 || !shipping) return
     const order = createOrder({
-      lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: l.p!.price })),
+      lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
       total,
       invoice_requested: invoice,
       placedBy,
@@ -100,7 +106,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, opacity: out ? 0.55 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{money(p.price)}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${stock.qty}` : ''}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                          {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(effOf(p, qty))}</b> : money(p.price)}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${stock.qty}` : ''}
+                        </div>
+                        {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Minus size={14} /></button>}
                       {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>}
@@ -110,6 +119,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
                 })}
               </div>
 
+              {savings > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}><span>Descuento por volumen</span><span>−{money(savings)}</span></div>}
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b>{money(total)}</b></div>
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega</div>
