@@ -8,7 +8,8 @@ import { processPayment, type PayMethod, type PayResult } from '../../data/payme
 import { startStripeCheckout } from '../../lib/stripe'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { notify } from '../../data/store/notificationsStore'
-import { useCompany } from '../../data/hooks/useCompany'
+import { useBankAccounts } from '../../data/hooks/useBankAccounts'
+import { Copy } from 'lucide-react'
 
 // Lee un archivo de imagen como data-URL (para mandar el comprobante a la función).
 function fileToDataUrl(file: File): Promise<string> {
@@ -27,13 +28,18 @@ export function PaymentModal({
   onPaid: (r: PayResult) => void
   onClose: () => void
 }) {
-  const { company } = useCompany()
+  const { data: bankAll } = useBankAccounts()
+  // Cuentas ACTIVAS (principal primero) — el doctor elige a cuál transfirió.
+  const banks = bankAll.filter((b) => b.active).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.display_order - b.display_order)
   const [method, setMethod] = useState<PayMethod>('tarjeta')
   const [card, setCard] = useState({ number: '', name: '', exp: '', cvc: '' })
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<PayResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [proof, setProof] = useState<string | null>(null) // comprobante de transferencia (data-URL)
+  const [bankId, setBankId] = useState<string>('') // cuenta seleccionada (a cuál transfirió)
+  const [copied, setCopied] = useState<string>('')
+  const selectedBank = banks.find((b) => b.id === bankId) ?? (banks.length === 1 ? banks[0] : null)
 
   const cardOk = method !== 'tarjeta' || (card.number.replace(/\D/g, '').length >= 15 && card.name.trim().length > 2)
 
@@ -44,10 +50,13 @@ export function PaymentModal({
     // confirma al recibir el dinero — el pedido NO se marca pagado aquí (antes se
     // marcaba pagado sin comprobante). Se avisa a Dirección para que lo confirme.
     if (method === 'transferencia') {
+      // Si hay varias cuentas, el doctor DEBE indicar a cuál transfirió (no se elige
+      // en silencio) para poder auditar Pedido → cuenta → comprobante.
+      if (banks.length > 1 && !selectedBank) { setError('Selecciona a qué cuenta transferiste.'); setBusy(false); return }
       // Con backend: la función servidor marca el pedido, guarda el comprobante y avisa
       // a Dirección (el doctor no puede insertar avisos por RLS). En demo: notify local.
       if (hasSupabase && orderId) {
-        const { error: e } = await supabase.functions.invoke('report-transfer', { body: { orderId, reference: folio, proof } })
+        const { error: e } = await supabase.functions.invoke('report-transfer', { body: { orderId, reference: folio, proof, bank_account_id: selectedBank?.id ?? null } })
         if (e) { setError('No se pudo registrar tu transferencia. Intenta de nuevo.'); setBusy(false); return }
       } else {
         notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
@@ -143,21 +152,41 @@ export function PaymentModal({
                 <>
                   <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
                     <Icon name="receipt" />
-                    {company.clabe || company.banco ? (
-                      <span>
-                        Transfiere <b>{money(amount)}</b> e indica el folio <b>{folio}</b> como referencia:
-                        <span style={{ display: 'block', marginTop: 8, lineHeight: 1.7 }}>
-                          {company.titular && <>Beneficiario: <b>{company.titular}</b><br /></>}
-                          {company.banco && <>Banco: <b>{company.banco}</b><br /></>}
-                          {company.clabe && <>CLABE: <b className="mono">{company.clabe}</b><br /></>}
-                          {company.cuenta && <>Cuenta: <b className="mono">{company.cuenta}</b></>}
-                        </span>
-                        <b style={{ display: 'block', marginTop: 8 }}>Cuando recibamos la transferencia, activamos tu pedido.</b>
-                      </span>
-                    ) : (
-                      <span>Transfiere <b>{money(amount)}</b> con el folio <b>{folio}</b> como referencia. Los datos bancarios los confirma Renovacell; comunícate para recibirlos. <b>Cuando recibamos la transferencia, activamos tu pedido.</b></span>
-                    )}
+                    <span>Transfiere <b>{money(amount)}</b> e indica el folio <b>{folio}</b> como referencia.
+                      {banks.length > 1 && <> Elige la cuenta a la que transferiste:</>}
+                      <b style={{ display: 'block', marginTop: 8 }}>Cuando recibamos la transferencia, activamos tu pedido.</b>
+                    </span>
                   </div>
+
+                  {banks.length === 0 ? (
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 10 }}>Los datos bancarios los confirma Renovacell; comunícate para recibirlos.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                      {banks.map((b) => {
+                        const sel = (selectedBank?.id === b.id)
+                        return (
+                          <div key={b.id} onClick={() => setBankId(b.id)} style={{ border: '1px solid ' + (sel ? 'var(--green, #2f9e69)' : 'var(--line)'), background: sel ? 'var(--ok-bg, #f0faf4)' : '#fff', borderRadius: 11, padding: '10px 12px', cursor: banks.length > 1 ? 'pointer' : 'default' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {banks.length > 1 && <input type="radio" name="bank" checked={sel} onChange={() => setBankId(b.id)} />}
+                              <b>{b.bank_name}</b>
+                              {b.is_default && <span className="pill p-ok" style={{ fontSize: 10 }}>Principal</span>}
+                            </div>
+                            <div style={{ fontSize: 12.5, lineHeight: 1.7, marginTop: 4 }}>
+                              Beneficiario: <b>{b.beneficiary_name}</b><br />
+                              {b.clabe && (
+                                <>CLABE: <b className="mono">{b.clabe}</b>
+                                  <button type="button" className="btn ghost sm" style={{ marginLeft: 8, padding: '2px 8px' }}
+                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(b.clabe ?? ''); setCopied(b.id); setTimeout(() => setCopied(''), 1500) }}>
+                                    <Copy size={12} /> {copied === b.id ? 'Copiada' : 'Copiar'}
+                                  </button><br /></>
+                              )}
+                              {b.account_number && <>Cuenta: <b className="mono">{b.account_number}</b></>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                   <label style={{ display: 'block', marginTop: 12 }}>
                     <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Adjunta el comprobante <span style={{ opacity: .7 }}>(opcional · agiliza la confirmación)</span></span>
                     <input type="file" accept="image/*" style={{ display: 'block', marginTop: 6, fontSize: 12.5 }}

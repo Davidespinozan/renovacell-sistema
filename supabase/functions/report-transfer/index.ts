@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   const { data: who } = await caller.auth.getUser()
   if (!who?.user) return json(401, { error: 'No autenticado.' })
 
-  let body: { orderId?: string; reference?: string; proof?: string }
+  let body: { orderId?: string; reference?: string; proof?: string; bank_account_id?: string | null }
   try { body = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   if (!body.orderId) return json(400, { error: 'Falta el pedido.' })
 
@@ -65,7 +65,10 @@ Deno.serve(async (req) => {
 
   // Marca el pedido (conserva la dirección de entrega que ya trae shipping_meta).
   const meta = { ...((order.shipping_meta ?? {}) as Record<string, unknown>) }
-  meta.transfer = { reported: true, at: now, reference: (body.reference ?? '').slice(0, 80), proof_path: proofPath }
+  // Atribución: a qué cuenta bancaria de Renovacell transfirió el doctor (auditoría
+  // Pedido → transferencia → cuenta → comprobante). Aditivo; null si no se indicó.
+  const bankAccountId = typeof body.bank_account_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.bank_account_id) ? body.bank_account_id : null
+  meta.transfer = { reported: true, at: now, reference: (body.reference ?? '').slice(0, 80), proof_path: proofPath, bank_account_id: bankAccountId }
   await admin.from('orders').update({ shipping_meta: meta, payment_method: 'transferencia' }).eq('id', order.id)
 
   // Avisa a Dirección (service role: sin el bloqueo del doctor).

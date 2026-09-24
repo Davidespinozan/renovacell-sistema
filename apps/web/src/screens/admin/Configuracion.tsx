@@ -2,8 +2,10 @@
 // necesita el CFDI (razón social, RFC, régimen SAT, lugar de expedición) y la identidad que
 // aparece en recibos/manifiestos. Antes no existía dónde capturar al EMISOR del CFDI.
 import React, { useMemo, useState } from 'react'
-import { Building2, Save } from 'lucide-react'
+import { Building2, Save, Plus, Star, Trash2, Copy } from 'lucide-react'
 import { useCompany } from '../../data/hooks/useCompany'
+import { useBankAccounts } from '../../data/hooks/useBankAccounts'
+import { clabeValida, type BankAccount } from '../../data/store/companyBankStore'
 import { REGIMENES_OPTIONS, esRegimenValido } from '../../data/sat/regimenesFiscales'
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
@@ -19,8 +21,7 @@ export function Configuracion() {
   }
   const dirty = useMemo(() => (Object.keys(form) as (keyof typeof form)[]).some((k) => form[k] !== company[k]), [form, company])
   const rfcOk = !form.rfc || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
-  const clabeOk = !form.clabe || /^\d{18}$/.test(form.clabe.trim())
-  const puedeGuardar = dirty && rfcOk && clabeOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
+  const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
 
   const guardar = () => {
     if (!puedeGuardar) return
@@ -126,34 +127,86 @@ export function Configuracion() {
         <label style={label}>Correo</label>
         <input style={input} value={form.shipping_email} onChange={set('shipping_email')} placeholder="envios@renovacell.mx" type="email" />
 
-        {/* Datos bancarios: se muestran al doctor en el modal de transferencia (R-58). */}
-        <h4 style={{ margin: '26px 0 0', fontSize: 14, fontWeight: 700 }}>Datos bancarios (pago por transferencia)</h4>
-        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>Aparecen en la ventana de pago del doctor. Sin estos datos, no puede transferir.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={label}>Banco</label>
-            <input style={input} value={form.banco} onChange={set('banco')} placeholder="BBVA, Banorte, …" />
-          </div>
-          <div>
-            <label style={label}>Beneficiario / titular</label>
-            <input style={input} value={form.titular} onChange={set('titular')} placeholder="Razón social del titular de la cuenta" />
-          </div>
-          <div>
-            <label style={label}>CLABE (18 dígitos)</label>
-            <input style={{ ...input, borderColor: clabeOk ? 'var(--line)' : 'var(--danger, #be4a3f)' }} value={form.clabe} onChange={set('clabe')} placeholder="000000000000000000" maxLength={18} inputMode="numeric" />
-            {!clabeOk && <div style={{ fontSize: 11, color: 'var(--danger, #be4a3f)', marginTop: 4 }}>La CLABE debe tener 18 dígitos.</div>}
-          </div>
-          <div>
-            <label style={label}>Cuenta (opcional)</label>
-            <input style={input} value={form.cuenta} onChange={set('cuenta')} placeholder="Número de cuenta" />
-          </div>
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22 }}>
           <button className="btn" type="button" onClick={guardar} disabled={!puedeGuardar} style={!puedeGuardar ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
             <Save size={15} /> Guardar cambios
           </button>
           {saved && !dirty && <span style={{ fontSize: 13, color: 'var(--green-deep, #1e7a4b)' }}>Guardado ✓</span>}
+        </div>
+      </div>
+
+      <BankAccountsEditor />
+    </div>
+  )
+}
+
+// Editor de MÚLTIPLES cuentas bancarias (transferencia). Ver todas, agregar,
+// editar, activar/desactivar, marcar principal. Persiste por cuenta (no con el
+// "Guardar" del formulario fiscal).
+function BankAccountsEditor() {
+  const { data: accounts, addBankAccount, updateBankAccount, setDefaultBankAccount, setBankActive } = useBankAccounts()
+  const ordered = accounts.slice().sort((a, b) => a.display_order - b.display_order || a.bank_name.localeCompare(b.bank_name))
+
+  const nuevo = () => addBankAccount({ bank_name: 'Nuevo banco', beneficiary_name: 'Renovacell', clabe: '', account_number: '' })
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Datos bancarios · Cuentas para transferencia</h4>
+        <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={nuevo}><Plus size={14} /> Agregar cuenta</button>
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>
+        Renovacell puede tener <b>varias cuentas</b>. Las <b>activas</b> se le muestran al doctor al pagar por transferencia; la
+        <b> principal</b> aparece destacada. Las inactivas no se muestran (se conservan para historial).
+      </p>
+
+      {ordered.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '14px 0' }}>Sin cuentas capturadas. Agrega la primera con “Agregar cuenta”.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
+          {ordered.map((a) => (
+            <BankAccountRow key={a.id} a={a} onUpdate={updateBankAccount} onDefault={setDefaultBankAccount} onActive={setBankActive} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BankAccountRow({ a, onUpdate, onDefault, onActive }: {
+  a: BankAccount
+  onUpdate: (id: string, patch: Partial<{ bank_name: string; beneficiary_name: string; clabe: string | null; account_number: string | null }>) => void
+  onDefault: (id: string) => void
+  onActive: (id: string, active: boolean) => void
+}) {
+  const clabeOk = clabeValida(a.clabe ?? '')
+  return (
+    <div style={{ border: '1px solid ' + (a.is_default ? 'var(--green, #2f9e69)' : 'var(--line)'), borderRadius: 12, padding: 12, background: a.active ? (a.is_default ? 'var(--ok-bg, #f0faf4)' : 'var(--card,#fff)') : 'var(--muted-bg, #f6f6f6)', opacity: a.active ? 1 : 0.7 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        {a.is_default && <span className="pill p-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Star size={12} /> Principal</span>}
+        {!a.active && <span className="pill p-neu">Inactiva</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {a.active && !a.is_default && <button className="btn ghost sm" type="button" onClick={() => onDefault(a.id)}><Star size={13} /> Marcar principal</button>}
+          <button className="btn ghost sm" type="button" onClick={() => onActive(a.id, !a.active)}>{a.active ? <><Trash2 size={13} /> Desactivar</> : 'Reactivar'}</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <label style={label}>Banco</label>
+          <input style={input} value={a.bank_name} onChange={(e) => onUpdate(a.id, { bank_name: e.target.value })} placeholder="BBVA, Banorte, …" />
+        </div>
+        <div>
+          <label style={label}>Beneficiario / titular</label>
+          <input style={input} value={a.beneficiary_name} onChange={(e) => onUpdate(a.id, { beneficiary_name: e.target.value })} placeholder="Razón social del titular" />
+        </div>
+        <div>
+          <label style={label}>CLABE (18 dígitos)</label>
+          <input style={{ ...input, borderColor: clabeOk ? 'var(--line)' : 'var(--danger, #be4a3f)' }} value={a.clabe ?? ''} onChange={(e) => onUpdate(a.id, { clabe: e.target.value })} placeholder="000000000000000000" maxLength={18} inputMode="numeric" />
+          {!clabeOk && <div style={{ fontSize: 11, color: 'var(--danger, #be4a3f)', marginTop: 4 }}>La CLABE debe tener 18 dígitos.</div>}
+        </div>
+        <div>
+          <label style={label}>Cuenta (opcional)</label>
+          <input style={input} value={a.account_number ?? ''} onChange={(e) => onUpdate(a.id, { account_number: e.target.value })} placeholder="Número de cuenta" />
         </div>
       </div>
     </div>

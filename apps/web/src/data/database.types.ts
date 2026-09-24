@@ -1390,6 +1390,45 @@ export type Database = {
         }
         Relationships: []
       }
+      company_bank_accounts: {
+        Row: {
+          account_number: string | null
+          active: boolean
+          bank_name: string
+          beneficiary_name: string
+          clabe: string | null
+          created_at: string
+          display_order: number
+          id: string
+          is_default: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_number?: string | null
+          active?: boolean
+          bank_name: string
+          beneficiary_name: string
+          clabe?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_default?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string | null
+          active?: boolean
+          bank_name?: string
+          beneficiary_name?: string
+          clabe?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_default?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           banco: string | null
