@@ -184,12 +184,26 @@ describe('Fase 3 — Doctores(admin) y Clientes(ventas) = MISMA población (cust
     const mine = filterByCartera(sample, { scope: 'cartera', isAdmin: false, userName: 'Alejandra Cazarez' })
     expect(mine.map((c) => c.id)).toEqual(['c1', 'c3'])
   })
+  it('toggle Todos↔Mi cartera (vendedor): "Todos" ve la población completa; "Mi cartera" filtra', () => {
+    // El toggle de Ventas alterna effectiveScope entre 'all' y 'cartera' (mismo helper puro).
+    const todos = filterByCartera(sample, { scope: 'all', isAdmin: false, userName: 'Alejandra Cazarez' })
+    expect(todos.length).toBe(3)                                   // "Todos" NO filtra por cartera
+    const cartera = filterByCartera(sample, { scope: 'cartera', isAdmin: false, userName: 'Alejandra Cazarez' })
+    expect(cartera.map((c) => c.id)).toEqual(['c1', 'c3'])         // "Mi cartera" conserva el filtro
+  })
   it('Doctores(admin) y Clientes(ventas) montan el MISMO CustomerDirectory (customers)', () => {
     expect(doctoresSrc).toMatch(/CustomerDirectory/)
     expect(doctoresSrc).toMatch(/scope="all"/)
-    expect(clientesSrc).toMatch(/scope="cartera"/)
+    // Ventas ahora entra por defecto a "Todos" y habilita el toggle de cartera (read-only para pos).
+    expect(clientesSrc).toMatch(/scope="all"/)
+    expect(clientesSrc).toMatch(/carteraToggle/)
     expect(directorySrc).toMatch(/useCustomers/)
     expect(directorySrc).not.toMatch(/hooks\/useDoctors/) // el directorio comercial NO usa profiles
+  })
+  it('CustomerDirectory: el toggle NO habilita escritura para pos (sin update/delete/reasignación)', () => {
+    // Guard de no-regresión: el directorio compartido es de solo lectura; el toggle es de vista.
+    expect(directorySrc).not.toMatch(/updateCustomer|deleteCustomer|reassign/i)
+    expect(directorySrc).toMatch(/carteraToggle/)
   })
   it('el registry apunta Doctores(admin) al directorio de customers, no al de profiles', () => {
     expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio/)

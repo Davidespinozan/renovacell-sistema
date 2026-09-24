@@ -13,16 +13,21 @@ import { NuevoPedido } from '../screens/sales/NuevoPedido'
 const PAGE_SIZE = 100
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
 
-// title = etiqueta de la sección ("Doctores" admin / "Clientes" ventas). scope = alcance de cartera.
-export function CustomerDirectory({ title, scope }: { title: string; scope: 'all' | 'cartera' }) {
+// title = etiqueta de la sección ("Doctores" admin / "Clientes" ventas). scope = alcance por defecto.
+// carteraToggle = muestra el filtro "Todos | Mi cartera" (Ventas); default = scope.
+export function CustomerDirectory({ title, scope, carteraToggle = false }: { title: string; scope: 'all' | 'cartera'; carteraToggle?: boolean }) {
   const { data: all, loading, error } = useCustomers()
   const { role, user } = useRole()
   const isAdmin = role === 'admin'
   const canOrder = role === 'admin' || role === 'pos'
   const placedBy = isAdmin ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
 
-  // MISMA fuente (customers); admin ve todo, ventas su cartera por seller_name.
-  const customers = useMemo(() => filterByCartera(all, { scope, isAdmin, userName: user?.name }), [all, scope, isAdmin, user])
+  // Vista efectiva: con toggle el vendedor alterna Todos/Mi cartera (default = scope, "Todos").
+  const [view, setView] = useState<'all' | 'cartera'>(scope)
+  const effectiveScope = carteraToggle ? view : scope
+
+  // MISMA fuente (customers); "Todos" muestra todo lo accesible por RLS, "Mi cartera" filtra por seller_name.
+  const customers = useMemo(() => filterByCartera(all, { scope: effectiveScope, isAdmin, userName: user?.name }), [all, effectiveScope, isAdmin, user])
   const [q, setQ] = useState('')
   const shown = useCustomerSearch(customers, q) // filtro cartera + búsqueda, SOBRE TODOS (antes de paginar)
   const [page, setPage] = useState(1)
@@ -30,8 +35,8 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
   const [pedidoFor, setPedidoFor] = useState<Customer | null>(null)
   const conPortal = useMemo(() => customers.filter((c) => c.profile_id).length, [customers])
 
-  // Reset a página 1 al cambiar búsqueda o cambiar el conjunto filtrado (nuevo scope/cartera).
-  useEffect(() => { setPage(1) }, [q, shown.length])
+  // Reset a página 1 al cambiar búsqueda, vista o el conjunto filtrado.
+  useEffect(() => { setPage(1) }, [q, shown.length, effectiveScope])
 
   const pg = paginate(shown, page, PAGE_SIZE) // clamp interno a rango válido
   const visible = pg.items
@@ -56,6 +61,14 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
         ]} />
       </div>
 
+      {carteraToggle && (
+        <div className="seg" style={{ alignSelf: 'flex-start' }}>
+          {([['all', 'Todos'], ['cartera', 'Mi cartera']] as const).map(([k, lbl]) => (
+            <button key={k} type="button" className={view === k ? 'active' : undefined} onClick={() => setView(k)}>{lbl}</button>
+          ))}
+        </div>
+      )}
+
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -68,7 +81,7 @@ export function CustomerDirectory({ title, scope }: { title: string; scope: 'all
       ) : error ? (
         <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>
       ) : customers.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>{scope === 'cartera' ? 'No tienes clientes en tu cartera.' : 'No hay registros en el directorio.'}</div>
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>{effectiveScope === 'cartera' ? 'No tienes clientes en tu cartera.' : 'No hay registros en el directorio.'}</div>
       ) : shown.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ninguno coincide con “{q}”.</div>
       ) : (

@@ -13,6 +13,8 @@ import { useProspects, CHANNELS, messagesOf, type ProspectStatus, type ProspectN
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
+import { useTeam } from '../../data/hooks/useTeam'
+import { resolveSellerName } from '../../data/ops/sellers'
 import { ExportButton } from '../../app/ExportButton'
 import { hasSupabase } from '../../lib/supabase'
 import type { Prospect } from '../../data/types'
@@ -22,7 +24,18 @@ const SELLER_NAMES: Record<string, string> = {
   'ventas1@renovacell.mx': 'Lucía · Ventas',
   'ventas2@renovacell.mx': 'Diego · Ventas',
 }
-const sellerLabel = (id?: string | null): string => (id ? (SELLER_NAMES[id] ?? id) : 'Sin asignar')
+
+// Resolver de vendedor apoyado en el directorio real (profiles vía useTeam): id→nombre→
+// email→"Vendedor no disponible". NUNCA muestra el uuid. Cada componente que renderiza
+// vendedores llama este hook para tener el label consistente (tabla, tarjetas, detalle,
+// reasignación y reparto). SELLER_NAMES queda solo como compatibilidad demo.
+function useSellerLabel() {
+  const { data: team } = useTeam()
+  return React.useCallback(
+    (id?: string | null): string => resolveSellerName(team, id, SELLER_NAMES),
+    [team],
+  )
+}
 
 // Color de marca por canal para el hilo de conversación (bandeja multicanal).
 const CHANNEL_COLOR: Record<string, string> = {
@@ -62,6 +75,7 @@ export function Prospectos() {
   }
   const { addPending } = useDoctors()
   const { role, user } = useRole()
+  const sellerLabel = useSellerLabel()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
@@ -262,6 +276,7 @@ function DetailModal({
   onReply: (text: string) => void
   onConvert: () => void
 }) {
+  const sellerLabel = useSellerLabel()
   const [note, setNote] = useState('')
   const [reply, setReply] = useState('')
   const status = statusOf(p)
@@ -439,6 +454,7 @@ function DetailModal({
 // Panel de captación (Dirección): embudo de conversión por etapa, desempeño por
 // canal y reparto de carga entre vendedores. Todo derivado de los prospectos reales.
 function CaptacionPanel({ prospects, roster }: { prospects: Prospect[]; roster: string[] }) {
+  const sellerLabel = useSellerLabel()
   const stats = useMemo(() => {
     const byStage: Record<string, number> = { nuevo: 0, contactado: 0, cotizado: 0, convertido: 0, descartado: 0 }
     const byChannel: Record<string, { total: number; conv: number }> = {}
