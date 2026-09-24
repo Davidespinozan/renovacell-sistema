@@ -1,7 +1,7 @@
 // DIRECCIÓN · Configuración de la empresa (emisor). Aquí se capturan los datos fiscales que
 // necesita el CFDI (razón social, RFC, régimen SAT, lugar de expedición) y la identidad que
 // aparece en recibos/manifiestos. Antes no existía dónde capturar al EMISOR del CFDI.
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { Building2, Save, Plus, Star, Trash2, Copy } from 'lucide-react'
 import { useCompany } from '../../data/hooks/useCompany'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
@@ -179,12 +179,30 @@ function BankAccountRow({ a, onUpdate, onDefault, onActive }: {
   onDefault: (id: string) => void
   onActive: (id: string, active: boolean) => void
 }) {
-  const clabeOk = clabeValida(a.clabe ?? '')
+  // Draft local: se edita sin guardar en cada tecla; se PERSISTE al salir del campo
+  // (onBlur) y solo si cambió. La CLABE inválida no se guarda (se avisa).
+  const [draft, setDraft] = useState({ bank_name: a.bank_name, beneficiary_name: a.beneficiary_name, clabe: a.clabe ?? '', account_number: a.account_number ?? '' })
+  const [saved, setSaved] = useState(false)
+  // Resincroniza si la fila cambió desde el store (p. ej. tras recargar).
+  useEffect(() => { setDraft({ bank_name: a.bank_name, beneficiary_name: a.beneficiary_name, clabe: a.clabe ?? '', account_number: a.account_number ?? '' }) }, [a.id, a.bank_name, a.beneficiary_name, a.clabe, a.account_number])
+
+  const clabeOk = clabeValida(draft.clabe)
+  const flashSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1500) }
+  const commit = (field: 'bank_name' | 'beneficiary_name' | 'account_number') => {
+    const cur = (a[field] ?? '') as string
+    if (draft[field].trim() !== cur.trim()) { onUpdate(a.id, { [field]: draft[field] }); flashSaved() }
+  }
+  const commitClabe = () => {
+    if (!clabeOk) return // no persistir CLABE inválida
+    if ((draft.clabe.trim() || null) !== (a.clabe ?? null)) { onUpdate(a.id, { clabe: draft.clabe }); flashSaved() }
+  }
+
   return (
     <div style={{ border: '1px solid ' + (a.is_default ? 'var(--green, #2f9e69)' : 'var(--line)'), borderRadius: 12, padding: 12, background: a.active ? (a.is_default ? 'var(--ok-bg, #f0faf4)' : 'var(--card,#fff)') : 'var(--muted-bg, #f6f6f6)', opacity: a.active ? 1 : 0.7 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         {a.is_default && <span className="pill p-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Star size={12} /> Principal</span>}
         {!a.active && <span className="pill p-neu">Inactiva</span>}
+        {saved && <span style={{ fontSize: 12, color: 'var(--green-deep, #1e7a4b)', fontWeight: 600 }}>Guardado ✓</span>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {a.active && !a.is_default && <button className="btn ghost sm" type="button" onClick={() => onDefault(a.id)}><Star size={13} /> Marcar principal</button>}
           <button className="btn ghost sm" type="button" onClick={() => onActive(a.id, !a.active)}>{a.active ? <><Trash2 size={13} /> Desactivar</> : 'Reactivar'}</button>
@@ -193,20 +211,20 @@ function BankAccountRow({ a, onUpdate, onDefault, onActive }: {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
           <label style={label}>Banco</label>
-          <input style={input} value={a.bank_name} onChange={(e) => onUpdate(a.id, { bank_name: e.target.value })} placeholder="BBVA, Banorte, …" />
+          <input style={input} value={draft.bank_name} onChange={(e) => setDraft({ ...draft, bank_name: e.target.value })} onBlur={() => commit('bank_name')} placeholder="BBVA, Banorte, …" />
         </div>
         <div>
           <label style={label}>Beneficiario / titular</label>
-          <input style={input} value={a.beneficiary_name} onChange={(e) => onUpdate(a.id, { beneficiary_name: e.target.value })} placeholder="Razón social del titular" />
+          <input style={input} value={draft.beneficiary_name} onChange={(e) => setDraft({ ...draft, beneficiary_name: e.target.value })} onBlur={() => commit('beneficiary_name')} placeholder="Razón social del titular" />
         </div>
         <div>
           <label style={label}>CLABE (18 dígitos)</label>
-          <input style={{ ...input, borderColor: clabeOk ? 'var(--line)' : 'var(--danger, #be4a3f)' }} value={a.clabe ?? ''} onChange={(e) => onUpdate(a.id, { clabe: e.target.value })} placeholder="000000000000000000" maxLength={18} inputMode="numeric" />
-          {!clabeOk && <div style={{ fontSize: 11, color: 'var(--danger, #be4a3f)', marginTop: 4 }}>La CLABE debe tener 18 dígitos.</div>}
+          <input style={{ ...input, borderColor: clabeOk ? 'var(--line)' : 'var(--danger, #be4a3f)' }} value={draft.clabe} onChange={(e) => setDraft({ ...draft, clabe: e.target.value })} onBlur={commitClabe} placeholder="000000000000000000" maxLength={18} inputMode="numeric" />
+          {!clabeOk && <div style={{ fontSize: 11, color: 'var(--danger, #be4a3f)', marginTop: 4 }}>La CLABE debe tener 18 dígitos (no se guarda hasta corregirla).</div>}
         </div>
         <div>
           <label style={label}>Cuenta (opcional)</label>
-          <input style={input} value={a.account_number ?? ''} onChange={(e) => onUpdate(a.id, { account_number: e.target.value })} placeholder="Número de cuenta" />
+          <input style={input} value={draft.account_number} onChange={(e) => setDraft({ ...draft, account_number: e.target.value })} onBlur={() => commit('account_number')} placeholder="Número de cuenta" />
         </div>
       </div>
     </div>
