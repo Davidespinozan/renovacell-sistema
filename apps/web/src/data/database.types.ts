@@ -1406,6 +1406,14 @@ export type Database = {
           razon_social: string | null
           regimen_fiscal: string | null
           rfc: string | null
+          shipping_address: string | null
+          shipping_city: string | null
+          shipping_country: string | null
+          shipping_cp: string | null
+          shipping_email: string | null
+          shipping_name: string | null
+          shipping_phone: string | null
+          shipping_state: string | null
           telefono: string | null
           titular: string | null
           updated_at: string
@@ -1425,6 +1433,14 @@ export type Database = {
           razon_social?: string | null
           regimen_fiscal?: string | null
           rfc?: string | null
+          shipping_address?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_cp?: string | null
+          shipping_email?: string | null
+          shipping_name?: string | null
+          shipping_phone?: string | null
+          shipping_state?: string | null
           telefono?: string | null
           titular?: string | null
           updated_at?: string
@@ -1444,6 +1460,14 @@ export type Database = {
           razon_social?: string | null
           regimen_fiscal?: string | null
           rfc?: string | null
+          shipping_address?: string | null
+          shipping_city?: string | null
+          shipping_country?: string | null
+          shipping_cp?: string | null
+          shipping_email?: string | null
+          shipping_name?: string | null
+          shipping_phone?: string | null
+          shipping_state?: string | null
           telefono?: string | null
           titular?: string | null
           updated_at?: string

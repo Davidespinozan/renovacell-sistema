@@ -47,10 +47,18 @@ describe('validateShipper / shipperFromCompany', () => {
     expect(missing).toContain('remitente: ciudad')
     expect(missing).toContain('remitente: email')
   })
-  it('company con datos → shipper válido', () => {
-    const { missing } = shipperFromCompany({ ...EMPTY_COMPANY,
-      razon_social: 'Renovacell', direccion: 'Blvd 1', cp: '80020', ciudad: 'Culiacán', estado: 'Sinaloa', pais: 'MX', telefono: '6671002000', email: 'ops@renovacell.mx' })
+  it('shipper sale del ORIGEN DE ENVÍOS (shipping_*), NO del fiscal', () => {
+    // Solo datos FISCALES cargados → el shipper sigue incompleto (sin fallback).
+    const soloFiscal = { ...EMPTY_COMPANY, razon_social: 'Renovacell', direccion: 'Blvd Fiscal', cp: '80000' }
+    expect(shipperFromCompany(soloFiscal).missing.length).toBeGreaterThan(0)
+    // Origen de envíos capturado → shipper válido.
+    const conOrigen = { ...EMPTY_COMPANY,
+      shipping_name: 'Renovacell Bodega', shipping_address: 'Blvd 1', shipping_cp: '80020',
+      shipping_city: 'Culiacán', shipping_state: 'Sinaloa', shipping_country: 'MX',
+      shipping_phone: '6671002000', shipping_email: 'ops@renovacell.mx' }
+    const { config, missing } = shipperFromCompany(conOrigen)
     expect(missing).toEqual([])
+    expect(config.addressLine1).toBe('Blvd 1') // usó shipping_address, no direccion fiscal
   })
 })
 

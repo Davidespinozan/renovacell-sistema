@@ -6,15 +6,17 @@ import type { ShipperConfig } from './model'
 import { validateShipper } from './validate'
 
 export function shipperFromCompany(c: CompanySettings): { config: ShipperConfig; missing: string[] } {
+  // EXCLUSIVAMENTE del bloque ORIGEN DE ENVÍOS. Sin fallback al domicilio fiscal:
+  // el domicilio fiscal y el origen de despacho pueden diferir (p.ej. remodelación).
   const config: ShipperConfig = {
-    name: c.razon_social,
-    addressLine1: c.direccion,
-    cp: c.cp,
-    city: c.ciudad,
-    state: c.estado,
-    country: c.pais || 'MX',
-    phone: c.telefono,
-    email: c.email,
+    name: c.shipping_name,
+    addressLine1: c.shipping_address,
+    cp: c.shipping_cp,
+    city: c.shipping_city,
+    state: c.shipping_state,
+    country: c.shipping_country || 'MX',
+    phone: c.shipping_phone,
+    email: c.shipping_email,
   }
   return { config, missing: validateShipper(config) }
 }

@@ -36,10 +36,11 @@ export function Configuracion() {
       </div>
 
       <div className="card">
-        <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 4 }}>
-          Configuración <b>operativa</b> de Renovacell: identidad, domicilio (origen de envíos), contacto y datos bancarios.
-          Se usa en recibos, manifiestos, <b>transferencias</b> y como <b>remitente de paquetería</b>. La configuración
-          <b> fiscal del emisor del CFDI</b> (certificados y timbrado) la administra Facturama, no esta pantalla.
+        <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>Datos fiscales / empresa</h4>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
+          Identidad de la empresa para recibos y manifiestos. La <b>configuración fiscal efectiva para el timbrado del CFDI</b>
+          (certificados y emisor) la administra <b>Facturama</b>; estos datos <b>no</b> determinan automáticamente el origen de
+          paquetería (ese se configura abajo en <b>Origen de envíos</b>).
         </div>
 
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -68,25 +69,8 @@ export function Configuracion() {
           </div>
         </div>
 
-        <label style={label}>Dirección</label>
-        <input style={input} value={form.direccion} onChange={set('direccion')} placeholder="Calle, número, colonia" />
-
-        {/* Ciudad/Estado/País: origen operativo (remitente de paquetería, p. ej. DHL). */}
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-          <div>
-            <label style={label}>Ciudad</label>
-            <input style={input} value={form.ciudad} onChange={set('ciudad')} placeholder="Culiacán" />
-          </div>
-          <div>
-            <label style={label}>Estado</label>
-            <input style={input} value={form.estado} onChange={set('estado')} placeholder="Sinaloa" />
-          </div>
-          <div>
-            <label style={label}>País</label>
-            <input style={input} value={form.pais} onChange={set('pais')} placeholder="MX" maxLength={2} />
-          </div>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>Ciudad, estado y país (ISO-2, p. ej. MX) del domicilio de origen para envíos.</div>
+        <label style={label}>Domicilio fiscal</label>
+        <input style={input} value={form.direccion} onChange={set('direccion')} placeholder="Calle, número, colonia, ciudad" />
 
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
           <div>
@@ -101,6 +85,46 @@ export function Configuracion() {
 
         <label style={label}>Logo (URL)</label>
         <input style={input} value={form.logo_url} onChange={set('logo_url')} placeholder="https://…/logo.png (opcional)" />
+
+        {/* ORIGEN DE ENVÍOS: remitente de paquetería (neutral DHL/T1), independiente del fiscal. */}
+        <h4 style={{ margin: '26px 0 0', fontSize: 14, fontWeight: 700 }}>Origen de envíos (remitente de paquetería)</h4>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>
+          Dirección desde donde Renovacell entrega los paquetes a la paquetería. <b>DHL y otros proveedores de envío usarán estos
+          datos como remitente.</b> Es independiente del domicilio fiscal (puede diferir, p. ej. por remodelación). Si queda
+          incompleto, Empaque <b>bloquea</b> la cotización/guía indicando qué falta.
+        </p>
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div>
+            <label style={label}>Nombre / remitente</label>
+            <input style={input} value={form.shipping_name} onChange={set('shipping_name')} placeholder="Renovacell · Bodega" />
+          </div>
+          <div>
+            <label style={label}>Teléfono</label>
+            <input style={input} value={form.shipping_phone} onChange={set('shipping_phone')} placeholder="667 000 0000" />
+          </div>
+        </div>
+        <label style={label}>Dirección</label>
+        <input style={input} value={form.shipping_address} onChange={set('shipping_address')} placeholder="Calle, número, colonia" />
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={label}>CP</label>
+            <input style={input} value={form.shipping_cp} onChange={set('shipping_cp')} placeholder="00000" maxLength={5} inputMode="numeric" />
+          </div>
+          <div>
+            <label style={label}>Ciudad</label>
+            <input style={input} value={form.shipping_city} onChange={set('shipping_city')} placeholder="Culiacán" />
+          </div>
+          <div>
+            <label style={label}>Estado</label>
+            <input style={input} value={form.shipping_state} onChange={set('shipping_state')} placeholder="Sinaloa" />
+          </div>
+          <div>
+            <label style={label}>País</label>
+            <input style={input} value={form.shipping_country} onChange={set('shipping_country')} placeholder="MX" maxLength={2} />
+          </div>
+        </div>
+        <label style={label}>Correo</label>
+        <input style={input} value={form.shipping_email} onChange={set('shipping_email')} placeholder="envios@renovacell.mx" type="email" />
 
         {/* Datos bancarios: se muestran al doctor en el modal de transferencia (R-58). */}
         <h4 style={{ margin: '26px 0 0', fontSize: 14, fontWeight: 700 }}>Datos bancarios (pago por transferencia)</h4>

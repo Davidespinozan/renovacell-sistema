@@ -19,18 +19,24 @@ export interface CompanySettings {
   clabe: string
   cuenta: string
   titular: string
-  // Origen operativo (remitente de paquetería), reutilizable por DHL/T1. Estas
-  // columnas existen tras la migración 20260926120000; este archivo debe
-  // desplegarse junto con esa migración.
-  ciudad: string
-  estado: string
-  pais: string
+  // ORIGEN DE ENVÍOS (remitente de paquetería), NEUTRAL al proveedor (DHL/T1).
+  // Independiente del domicilio FISCAL: el shipping usa EXCLUSIVAMENTE estos campos,
+  // sin fallback al fiscal. Vacío hasta que Dirección capture el domicilio operativo.
+  shipping_name: string
+  shipping_address: string
+  shipping_cp: string
+  shipping_city: string
+  shipping_state: string
+  shipping_country: string
+  shipping_phone: string
+  shipping_email: string
 }
 
 export const EMPTY_COMPANY: CompanySettings = {
   razon_social: '', rfc: '', regimen_fiscal: '', cp: '', direccion: '', telefono: '', email: '', logo_url: '',
   banco: '', clabe: '', cuenta: '', titular: '',
-  ciudad: '', estado: '', pais: 'MX',
+  shipping_name: '', shipping_address: '', shipping_cp: '', shipping_city: '',
+  shipping_state: '', shipping_country: 'MX', shipping_phone: '', shipping_email: '',
 }
 
 // Mock: sin datos capturados (el cliente los llena en Configuración antes del go-live).
@@ -54,16 +60,21 @@ export function normalizeCompany(row: Partial<Record<keyof CompanySettings, stri
     clabe: r.clabe ?? '',
     cuenta: r.cuenta ?? '',
     titular: r.titular ?? '',
-    ciudad: r.ciudad ?? '',
-    estado: r.estado ?? '',
-    pais: r.pais ?? '', // el default operativo 'MX' lo aplica shipperFromCompany, no aquí
+    shipping_name: r.shipping_name ?? '',
+    shipping_address: r.shipping_address ?? '',
+    shipping_cp: r.shipping_cp ?? '',
+    shipping_city: r.shipping_city ?? '',
+    shipping_state: r.shipping_state ?? '',
+    shipping_country: r.shipping_country ?? '', // default 'MX' lo aplica shipperFromCompany
+    shipping_phone: r.shipping_phone ?? '',
+    shipping_email: r.shipping_email ?? '',
   }
 }
 
 const live = makeLive<CompanySettings>(async () => {
   const { data, error } = await supabase
     .from('company_settings')
-    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular, ciudad, estado, pais')
+    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular, shipping_name, shipping_address, shipping_cp, shipping_city, shipping_state, shipping_country, shipping_phone, shipping_email')
     .eq('id', 'default')
     .maybeSingle()
   if (error) throw error
