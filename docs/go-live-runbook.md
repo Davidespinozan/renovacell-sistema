@@ -191,4 +191,6 @@ E2E real contra MyDHL API TEST (`DHL_API_ENV=test`), con fixture QA temporal (us
 
 > **DHL PRODUCCIÓN: PENDIENTE** — el requisito contractual de una guía real de producción sigue abierto (no se activó `production`).
 
+**Catálogo público (landing) respeta familias/variantes (2026-09-24) — APLICADO:** la vista `catalog_public` se redefinió para devolver solo TOP-LEVEL (familias con hijos + standalone vendibles), excluyendo variantes hijas y parents huérfanos. Migración `20260929120000_catalog_public_families.sql` **aplicada a producción**. Verificado (anón): `catalog_public` = **64** (5 familias + 59 standalone), **0 variantes filtrándose**; Hidrolizados/Implantes/Ultrafiltrados/ELITE/Agujas FMC = 1 tarjeta c/u; la landing y el asistente público (`__rncCatalog`) reciben el catálogo agrupado en runtime (sin deploy de Netlify). Sin cambios en products/precios/costos/inventario (products sigue 192).
+
 **Mejora post-E2E (2026-09-24):** tracking normalizado — un `404 / "No data found"` de una guía válida recién creada se devuelve como éxito de dominio (`status: sin_eventos`, `events: []`, "Aún no hay eventos de seguimiento"), no como 502. Auth (401/403), request inválido (400) y 5xx inesperados siguen siendo error real. Con tests. No cambia el estado: **DHL SANDBOX E2E: PASS · DHL PRODUCTION: PENDING**.
