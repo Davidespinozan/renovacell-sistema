@@ -197,6 +197,16 @@ Deno.serve(async (req) => {
   if (password.length < 6) return json(400, { error: 'La contraseña debe tener al menos 6 caracteres.' })
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+
+  // PRE-CHEQUEO DE DUPLICADO (fix landing): si ya existe una cuenta con ese correo, NO
+  // intentamos createUser (GoTrue devuelve un 500 opaco "Database error checking email"
+  // ante duplicados, que nuestro código no reconocía como 'already'). Respondemos estado
+  // controlado 'exists' con mensaje útil. No crea nada, no cambia verified/política.
+  {
+    const { data: dup } = await admin.from('profiles').select('id').ilike('email', email).limit(1).maybeSingle()
+    if (dup) return json(200, { decision: 'exists', message: 'Ese correo ya tiene una cuenta. Inicia sesión o recupera tu contraseña.' })
+  }
+
   const imgs = { selfie: p.selfie, ineFront: p.ineFront, ineBack: p.ineBack }
 
   // Las dos consultas en paralelo (registro oficial + proveedor KYC).
