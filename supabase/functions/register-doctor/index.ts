@@ -215,19 +215,19 @@ Deno.serve(async (req) => {
     return json(200, { decision: 'reject', reasons })
   }
 
-  // Se crea cuenta (la cédula existe). ¿Verificada al instante o en revisión?
+  // POLÍTICA (Fase 1): NINGÚN registro público/in-app obtiene acceso automático. Las
+  // validaciones automáticas (cédula/INE/selfie) se CONSERVAN como EVIDENCIA para el
+  // admin, pero el estado inicial es SIEMPRE verified=false + verification.status='pending'.
+  // La aprobación comercial ocurre únicamente en el flujo administrativo av_verif.
   const green = id.attempted && idIsGreen(id, name)
-  const instant = cel.decision === 'auto' && green
-  // Compat: si el registro NO adjuntó identidad, se respeta el flujo anterior
-  // (cédula auto → verificado; cédula review → prospecto sin cuenta).
-  if (!id.attempted) {
-    if (cel.decision !== 'auto') {
-      await admin.from('prospects').insert({
-        name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
-        meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro' },
-      }).then(() => {}, () => {})
-      return json(200, { decision: cel.decision, reasons: cel.reasons })
-    }
+  // Compat: si el registro NO adjuntó identidad y la cédula NO es 'auto', se mantiene el
+  // comportamiento anterior (prospecto sin cuenta) para no crear cuentas de cédulas dudosas.
+  if (!id.attempted && cel.decision !== 'auto') {
+    await admin.from('prospects').insert({
+      name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
+      meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro' },
+    }).then(() => {}, () => {})
+    return json(200, { decision: cel.decision, reasons: cel.reasons })
   }
 
   const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name } })
@@ -239,23 +239,36 @@ Deno.serve(async (req) => {
 
   // Guarda la evidencia (selfie + INE) en el bucket privado, si vino.
   const evidence = id.attempted ? await uploadEvidence(admin, uid, imgs) : {}
-  const identityStatus = instant ? 'approved' : 'pending'
+  const autoOk = green && cel.decision === 'auto' // solo EVIDENCIA para el admin, NO da acceso
+  const identityStatus = autoOk ? 'approved' : 'pending' // dictamen KYC (evidencia)
 
+  // SIEMPRE pendiente: verified=false + verification.status='pending'. La evidencia
+  // (verifyResult + identity + auto_ok) queda en meta para que el admin decida en av_verif.
   await admin.from('profiles').upsert({
-    id: uid, email, full_name: name, role_id: 'doctor', verified: instant,
+    id: uid, email, full_name: name, role_id: 'doctor', verified: false,
     organization: p.organization ?? null,
-    meta: { cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence }, capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}) },
+    meta: {
+      cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence },
+      verification: { status: 'pending', auto_ok: autoOk },
+      capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}),
+    },
   })
 
-  if (instant) {
-    await admin.from('notifications').insert({ body: `Doctor auto-verificado (cédula + identidad): ${name}`, roles: ['admin'], screen: 'av_doc' }).then(() => {}, () => {})
-    return json(200, { decision: 'auto' })
-  }
-  // En revisión: cuenta creada pero sin acceso al catálogo hasta que Dirección apruebe la identidad.
-  await admin.from('notifications').insert({ body: `Doctor EN REVISIÓN de identidad: ${name} — revisa selfie + INE`, roles: ['admin'], screen: 'av_doc' }).then(() => {}, () => {})
+  // Aviso al admin (cola de revisión av_verif). Distingue si las validaciones salieron verdes.
+  await admin.from('notifications').insert({
+    body: autoOk
+      ? `Doctor nuevo (validación automática OK) PENDIENTE de aprobación: ${name}`
+      : `Doctor EN REVISIÓN de identidad: ${name} — revisa cédula/selfie/INE`,
+    roles: ['admin'], screen: 'av_verif',
+  }).then(() => {}, () => {})
+
   const reasons: string[] = []
-  if (id.unavailable) reasons.push('Tu identidad la validará nuestro equipo (revisión manual).')
-  else { if (id.live !== true) reasons.push('No se pudo confirmar la prueba de vida automáticamente.'); if (id.ineValid !== true) reasons.push('No se pudo validar tu INE automáticamente.'); if ((id.faceMatch ?? 0) < 0.85) reasons.push('La coincidencia con tu INE requiere revisión.') }
-  if (cel.decision !== 'auto') reasons.push(...cel.reasons)
+  if (autoOk) reasons.push('Tus datos pasaron la validación automática. Tu cuenta quedó pendiente de aprobación por Renovacell.')
+  else {
+    if (id.unavailable) reasons.push('Tu identidad la validará nuestro equipo (revisión manual).')
+    else if (id.attempted) { if (id.live !== true) reasons.push('No se pudo confirmar la prueba de vida automáticamente.'); if (id.ineValid !== true) reasons.push('No se pudo validar tu INE automáticamente.'); if ((id.faceMatch ?? 0) < 0.85) reasons.push('La coincidencia con tu INE requiere revisión.') }
+    if (cel.decision !== 'auto') reasons.push(...cel.reasons)
+  }
+  // NUNCA devuelve 'auto': el acceso comercial solo lo concede el admin en av_verif.
   return json(200, { decision: 'pending', reasons })
 })

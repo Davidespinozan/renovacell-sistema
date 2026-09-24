@@ -10,7 +10,15 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { decideVerification, simulateSep, type VerifyDecision } from '../verification/decide'
+import { buildVerificationMeta, type VerificationStatus } from '../ops/verification'
+import type { CustomerFields } from './customersStore'
 import type { Json } from '../database.types'
+
+// Merge no destructivo del bloque meta.verification (estado legible; la autoridad de
+// acceso sigue siendo profiles.verified). No borra otras llaves de meta.
+function withVerification(meta: unknown, status: VerificationStatus, reviewedBy?: string | null, reason?: string): Record<string, unknown> {
+  return { ...((meta ?? {}) as Record<string, unknown>), verification: buildVerificationMeta(status, reviewedBy, reason) }
+}
 
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
 
@@ -143,17 +151,82 @@ export async function deleteDoctor(id: string): Promise<{ ok: boolean; error?: s
   return { ok: true }
 }
 
+// Marca al doctor como "acceso pendiente de activación". NO envía nada: hoy no existe
+// canal externo (email/WhatsApp) ni mecanismo de reclamación de cuenta — eso es FASE 2.
+// Antes esto afirmaba "acceso enviado / ya puedes iniciar sesión", lo cual era FALSO
+// (el doctor convertido no tiene credencial y no recibe correo). Copy corregido.
 export function inviteDoctor(id: string) {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return
-  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), invited: true }
+  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), accessPending: true }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
-  // El aviso va al DOCTOR (antes se lo mandaba al propio admin y el doctor nunca se enteraba).
-  notify({ text: 'Tu acceso al portal Renovacell está listo. Ya puedes iniciar sesión.', userIds: [id], screen: 'pedidosdr' })
-  logAudit({ actor: 'Administración', action: 'Acceso al Portal enviado', resource: doc.full_name ?? id })
+  logAudit({ actor: 'Administración', action: 'Acceso marcado pendiente de activación', resource: doc.full_name ?? id })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(() => live.reload())
-  // Nota: la invitación real (crear usuario de auth + enlace mágico) es acción
-  // server-side (admin API / Edge Function) que se conecta en la fase de correo.
+  // La activación real del acceso (que el doctor fije su contraseña) es FASE 2.
+}
+
+// ============================================================================
+// REVISIÓN HUMANA (Fase 1): aprobar / rechazar / revocar. `verified` sigue siendo la
+// autoridad de acceso (RLS is_verified); meta.verification aporta el estado legible.
+// ============================================================================
+
+// APROBAR: exige resolver el customer (vincular uno existente O crear uno nuevo). Con
+// backend usa el RPC atómico admin-only `admin_approve_doctor` (bloquea customer ya
+// vinculado a otro profile, es idempotente). Sin backend refleja el estado localmente.
+export async function approveDoctor(
+  id: string,
+  choice: { customerId?: string; newCustomer?: CustomerFields },
+  reviewedBy?: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.' }
+  if (!choice.customerId && !choice.newCustomer) {
+    return { ok: false, error: 'Antes de aprobar, vincula un cliente existente o crea uno nuevo.' }
+  }
+  if (hasSupabase && isUuid(id)) {
+    // RPC nueva (migración aditiva 20261005120000, aún no en database.types) → escape tipado.
+    const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>
+    const { data, error } = await rpc('admin_approve_doctor', {
+      p_profile: id,
+      p_customer_id: choice.customerId ?? null,
+      p_new_customer: choice.newCustomer ?? null,
+    })
+    const err = error?.message ?? (data as { error?: string } | null)?.error
+    if (err) return { ok: false, error: err }
+    await live.reload()
+    logAudit({ actor: 'Administración', action: 'Doctor verificado', resource: doc.full_name ?? id, detail: choice.customerId ? 'cliente vinculado' : 'cliente creado' })
+    notify({ text: 'Tu cuenta Renovacell fue verificada.', userIds: [id], screen: 'pedidosdr' })
+    return { ok: true }
+  }
+  // Demo/local: sin persistencia de customers; refleja verified + estado.
+  const meta = withVerification(doc.meta, 'verified', reviewedBy ?? 'Administración')
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified: true, meta: meta as unknown as Profile['meta'] } : d)))
+  logAudit({ actor: 'Administración', action: 'Doctor verificado', resource: doc.full_name ?? id })
+  notify({ text: 'Tu cuenta Renovacell fue verificada.', userIds: [id], screen: 'pedidosdr' })
+  return { ok: true }
+}
+
+// RECHAZAR: verified=false + estado 'rejected' + razón. NO borra Auth/profile ni crea customer.
+export function rejectDoctor(id: string, reason: string, reviewedBy?: string | null): { ok: boolean; error?: string } {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.' }
+  const meta = withVerification(doc.meta, 'rejected', reviewedBy ?? 'Administración', reason)
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified: false, meta: meta as unknown as Profile['meta'] } : d)))
+  logAudit({ actor: 'Administración', action: 'Doctor rechazado', resource: doc.full_name ?? id, detail: (reason ?? '').slice(0, 200) })
+  if (isUuid(id)) notify({ text: 'Tu solicitud de verificación no fue aprobada. Contacta a Renovacell para más información.', userIds: [id], screen: 'pedidosdr' })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] reject', error.message); live.reload() })
+  return { ok: true }
+}
+
+// REVOCAR: verified=false + estado 'revoked' (mantiene el comportamiento previo + estado legible).
+export function revokeDoctor(id: string, reviewedBy?: string | null): { ok: boolean; error?: string } {
+  const doc = live.current().find((d) => d.id === id)
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.' }
+  const meta = withVerification(doc.meta, 'revoked', reviewedBy ?? 'Administración')
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified: false, meta: meta as unknown as Profile['meta'] } : d)))
+  logAudit({ actor: 'Administración', action: 'Acceso revocado', resource: doc.full_name ?? id })
+  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] revoke', error.message); live.reload() })
+  return { ok: true }
 }
 
 // Alta como PENDIENTE (conversión de prospecto). Un doctor es un usuario de auth:

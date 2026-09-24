@@ -3368,10 +3368,10 @@ document.addEventListener('keydown', e => {
       var rs=(r&&r.reasons||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join('');
       if(r && r.decision==='pending'){
         f.reset();
-        return say('ok','<b>Recibimos tu registro.</b> Estás <b>en revisión</b>: validaremos tu identidad y te avisaremos por correo cuando se active tu acceso.'+(rs?'<ul>'+rs+'</ul>':''));
+        return say('ok','<b>Recibimos tu registro.</b> Tu cuenta quedó <b>pendiente de verificación</b> por Renovacell. Ya puedes <a href="/sistema">iniciar sesión</a> para ver el estado de tu verificación.'+(rs?'<ul>'+rs+'</ul>':''));
       }
       f.reset();
-      say('wait','<b>Tu solicitud quedó registrada.</b> Dirección revisará tu verificación y te avisaremos por correo.'+(rs?'<ul>'+rs+'</ul>':''));
+      say('wait','<b>Tu solicitud quedó registrada.</b> Dirección revisará tu verificación. Puedes <a href="/sistema">iniciar sesión</a> para ver el estado de tu cuenta.'+(rs?'<ul>'+rs+'</ul>':''));
     })
     .catch(function(){
       listo();

@@ -135,7 +135,7 @@ export function Login() {
                 <>
                   <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
                     <ScanSearch size={16} />
-                    <span><b>Tu cédula está en revisión.</b> Encontramos tu registro pero Dirección debe confirmarlo. En cuanto te aprueben tendrás acceso; te avisaremos.</span>
+                    <span><b>Tu cuenta quedó pendiente de verificación por Renovacell.</b> Encontramos tu registro pero Dirección debe confirmarlo. Puedes iniciar sesión; verás el estado de tu verificación al entrar.</span>
                   </div>
                   <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => { setView('login'); setRegMsg(null) }}>Volver a iniciar sesión</button>
                 </>
@@ -193,13 +193,13 @@ export function Login() {
             <>
               <h1 style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Recuperar contraseña</h1>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 20px' }}>
-                Te enviaremos un enlace para restablecerla a tu correo.
+                Si el envío de correos está habilitado, recibirás un enlace para restablecerla.
               </div>
 
               {sent ? (
                 <>
                   <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
-                    <span>Si <b>{email || 'tu correo'}</b> está registrado, te enviamos las instrucciones para restablecer tu contraseña. Revisa tu bandeja.</span>
+                    <span>Si <b>{email || 'tu correo'}</b> está registrado y el envío de correos está habilitado, recibirás las instrucciones para restablecer tu contraseña. Si no llega, contacta a Renovacell.</span>
                   </div>
                   <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => { setView('login'); setSent(false) }}>Volver a iniciar sesión</button>
                 </>

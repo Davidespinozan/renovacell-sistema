@@ -8,8 +8,12 @@ import { UserAvatar } from '../../app/UserAvatar'
 import { ConfirmModal } from '../../app/ConfirmModal'
 import { ExportButton } from '../../app/ExportButton'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useCustomers } from '../../data/hooks/useCustomers'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
+import { findCustomerCandidates, type CustomerCandidate } from '../../data/ops/customerMatch'
+import { deriveVerificationStatus, VERIF_LABEL, VERIF_PILL } from '../../data/ops/verification'
+import type { CustomerFields } from '../../data/store/customersStore'
 import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
@@ -36,7 +40,8 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, verify, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
+  const { data: doctors, approve, reject, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
+  const { data: customers } = useCustomers()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ name: string; res: VerifyDecision } | null>(null)
@@ -122,9 +127,11 @@ export function Doctores() {
                 {d.organization}{specialtyOf(d) ? ` · ${specialtyOf(d)}` : ''}
               </div>
             </div>
-            <span className={'pill ' + (d.verified ? 'p-ok' : verifyResultOf(d)?.decision === 'reject' ? 'p-dang' : 'p-warn')}>
-              {d.verified ? <ShieldCheck size={12} /> : verifyResultOf(d)?.decision === 'reject' ? <Ban size={12} /> : <Clock size={12} />} {d.verified ? 'Verificado' : verifyResultOf(d)?.decision === 'reject' ? 'Rechazado' : 'Pendiente'}
-            </span>
+            {(() => { const st = deriveVerificationStatus(d); return (
+              <span className={'pill ' + VERIF_PILL[st]}>
+                {st === 'verified' ? <ShieldCheck size={12} /> : st === 'rejected' || st === 'revoked' ? <Ban size={12} /> : <Clock size={12} />} {VERIF_LABEL[st]}
+              </span>
+            ) })()}
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -159,8 +166,8 @@ export function Doctores() {
                 <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busyId === d.id} onClick={() => runAutoVerify(d.id, d.full_name ?? 'Doctor')}>
                   <Sparkles size={14} /> {busyId === d.id ? 'Validando…' : 'Auto-verificar (IA + SEP)'}
                 </button>
-                <button className="btn ghost sm" type="button" title="Aprobar manualmente" onClick={() => verify(d.id)}>
-                  <UserCheck size={14} /> Verificar
+                <button className="btn ghost sm" type="button" title="Revisar y aprobar (vincula cliente)" onClick={() => setDetailId(d.id)}>
+                  <UserCheck size={14} /> Revisar / Aprobar
                 </button>
               </>
             ) : (
@@ -176,9 +183,11 @@ export function Doctores() {
         <DoctorDetail
           doctor={detail}
           orders={orders.filter((o) => o.doctor_id === detail.id)}
+          candidates={findCustomerCandidates(customers, { email: detail.email, phone: (detail.meta?.phone as string) ?? null, full_name: detail.full_name }, detail.id)}
           onClose={() => setDetailId(null)}
-          onVerify={() => verify(detail.id)}
-          onRevoke={() => revoke(detail.id)}
+          onApprove={(choice) => approve(detail.id, choice)}
+          onReject={(reason) => { reject(detail.id, reason); setDetailId(null) }}
+          onRevoke={() => { revoke(detail.id); setDetailId(null) }}
           onSetCedula={(c) => setCedula(detail.id, c)}
           onInvite={() => inviteDoctor(detail.id)}
         />
@@ -302,12 +311,14 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
 }
 
 function DoctorDetail({
-  doctor, orders, onClose, onVerify, onRevoke, onSetCedula, onInvite,
+  doctor, orders, candidates, onClose, onApprove, onReject, onRevoke, onSetCedula, onInvite,
 }: {
   doctor: Profile
   orders: ReturnType<typeof useAllOrders>['data']
+  candidates: CustomerCandidate[]
   onClose: () => void
-  onVerify: () => void
+  onApprove: (choice: { customerId?: string; newCustomer?: CustomerFields }) => Promise<{ ok: boolean; error?: string }> | void
+  onReject: (reason: string) => void
   onRevoke: () => void
   onSetCedula: (cedula: string) => void
   onInvite: () => void
@@ -317,6 +328,41 @@ function DoctorDetail({
   // Precargado con la cédula actual: mientras el doctor NO esté verificado se puede
   // CORREGIR una cédula mal capturada, no solo registrar la primera.
   const [ced, setCed] = useState(cedulaOf(doctor))
+  const status = deriveVerificationStatus(doctor)
+  const hasCedula = !!cedulaOf(doctor)
+  // Resolución de identidad comercial (customer). '' sin elegir; '__new__' crear; otro = id.
+  const linkable = candidates.filter((c) => !c.linkedToOther)
+  const [choice, setChoice] = useState<string>(linkable.length === 1 && linkable[0].strong ? linkable[0].customer.id : '')
+  const [rejectMode, setRejectMode] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const buildNewCustomer = (): CustomerFields => ({
+    full_name: doctor.full_name ?? 'Doctor',
+    email: doctor.email ?? null,
+    phone: (doctor.meta?.phone as string) ?? null,
+    city: (doctor.meta?.city as string) ?? null,
+    source: 'portal',
+    profile_id: doctor.id,
+  } as CustomerFields)
+
+  const doApprove = async () => {
+    setErr(null)
+    if (!hasCedula) { setErr('Falta la cédula profesional (regístrala arriba) antes de aprobar.'); return }
+    if (!choice) { setErr('Elige un cliente existente para vincular, o "Crear cliente nuevo".'); return }
+    const payload = choice === '__new__' ? { newCustomer: buildNewCustomer() } : { customerId: choice }
+    setBusy(true)
+    const r = await onApprove(payload)
+    setBusy(false)
+    if (r && !r.ok) { setErr(r.error ?? 'No se pudo aprobar.'); return }
+    onClose()
+  }
+  const doReject = () => {
+    setErr(null)
+    if (!reason.trim()) { setErr('Escribe el motivo del rechazo.'); return }
+    onReject(reason.trim())
+  }
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -339,10 +385,13 @@ function DoctorDetail({
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Dirección</div>{(doctor.meta?.address as string) ? `${doctor.meta?.address as string}, ${(doctor.meta?.city as string) ?? ''}` : '—'}</div>
             <div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Estatus</div>
-              <span className={'pill ' + (doctor.verified ? 'p-ok' : 'p-warn')}>{doctor.verified ? 'Verificado' : 'Pendiente'}</span>
+              <span className={'pill ' + VERIF_PILL[status]}>{VERIF_LABEL[status]}</span>
             </div>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Pedidos</div>{history.length}</div>
           </div>
+          {(status === 'rejected' || status === 'revoked') && (doctor.meta as { verification?: { reason?: string } } | null)?.verification?.reason && (
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>Motivo: {(doctor.meta as { verification?: { reason?: string } }).verification!.reason}</div>
+          )}
 
           <IdentityReview doctor={doctor} />
 
@@ -366,6 +415,34 @@ function DoctorDetail({
                 style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
               />
               <button className="btn sm" type="button" disabled={!ced.trim() || ced.trim() === cedulaOf(doctor)} style={(!ced.trim() || ced.trim() === cedulaOf(doctor)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSetCedula(ced.trim())}>{cedulaOf(doctor) ? 'Actualizar cédula' : 'Registrar cédula'}</button>
+            </div>
+          )}
+
+          {!doctor.verified && (
+            <div style={{ marginBottom: 16 }}>
+              <div className="eyebrow">Identidad comercial (cliente)</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
+                Aprobar exige vincular a un cliente del directorio o crear uno nuevo. No se vincula por correo automáticamente.
+              </div>
+              {candidates.length === 0 && (
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 6 }}>No se encontraron clientes coincidentes.</div>
+              )}
+              {candidates.map((c) => (
+                <label key={c.customer.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, marginBottom: 6, opacity: c.linkedToOther ? 0.55 : 1 }}>
+                  <input type="radio" name="cust-choice" disabled={c.linkedToOther} checked={choice === c.customer.id} onChange={() => setChoice(c.customer.id)} style={{ marginTop: 3 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ fontWeight: 600 }}>{c.customer.full_name}</span>{c.strong && <span className="pill p-ok" style={{ marginLeft: 6, fontSize: 10.5 }}>coincidencia fuerte</span>}
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>
+                      {c.customer.email ?? 's/correo'} · {c.customer.phone ?? 's/tel'} · coincide por {c.reasons.join(', ')}
+                      {c.linkedToOther && ' · ya vinculado a otro portal'}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', border: '1px dashed var(--line)', borderRadius: 10 }}>
+                <input type="radio" name="cust-choice" checked={choice === '__new__'} onChange={() => setChoice('__new__')} />
+                <span style={{ fontSize: 13 }}>Crear cliente nuevo con los datos del doctor</span>
+              </label>
             </div>
           )}
 
@@ -394,23 +471,39 @@ function DoctorDetail({
           {doctor.verified && (
             <div className="sysnote" style={{ marginTop: 4, marginBottom: 4, alignItems: 'center' }}>
               <span>
-                {(doctor.meta?.invited as boolean)
-                  ? 'Ya se le envió acceso a su Portal (puede pedir él mismo o por su vendedor).'
-                  : 'Verificado: puede comprar. Si quiere pedir desde su propio Portal, envíale el acceso.'}
+                {(doctor.meta?.accessPending as boolean)
+                  ? 'Verificado. Acceso al Portal pendiente de activación (Fase 2): todavía no existe canal para que el doctor reciba/active su cuenta.'
+                  : 'Verificado: puede comprar. La activación de su acceso al Portal se habilitará en la Fase 2.'}
               </span>
+            </div>
+          )}
+
+          {err && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 10 }}>{err}</div>}
+          {rejectMode && !doctor.verified && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo del rechazo"
+                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }} />
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             {doctor.verified ? (
               <>
-                <button className="btn ghost" type="button" disabled={Boolean(doctor.meta?.invited)} style={Boolean(doctor.meta?.invited) ? { opacity: 0.6 } : undefined} onClick={onInvite}>
-                  <UserCheck size={15} /> {(doctor.meta?.invited as boolean) ? 'Acceso enviado' : 'Enviar acceso al Portal'}
+                <button className="btn ghost" type="button" disabled={Boolean(doctor.meta?.accessPending)} style={Boolean(doctor.meta?.accessPending) ? { opacity: 0.6 } : undefined} onClick={onInvite}>
+                  <UserCheck size={15} /> {(doctor.meta?.accessPending as boolean) ? 'Acceso pendiente de activación' : 'Marcar acceso pendiente (Fase 2)'}
                 </button>
                 <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={onRevoke}><Ban size={15} /> Revocar acceso</button>
               </>
+            ) : rejectMode ? (
+              <>
+                <button className="btn ghost" type="button" onClick={() => { setRejectMode(false); setErr(null) }}>Cancelar</button>
+                <button className="btn" type="button" style={{ background: 'var(--danger)' }} onClick={doReject}><Ban size={15} /> Confirmar rechazo</button>
+              </>
             ) : (
-              <button className="btn" type="button" disabled={!cedulaOf(doctor)} title={cedulaOf(doctor) ? '' : 'Falta la cédula profesional'} onClick={onVerify}><UserCheck size={15} /> Verificar doctor</button>
+              <>
+                <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={() => { setRejectMode(true); setErr(null) }}><Ban size={15} /> Rechazar</button>
+                <button className="btn" type="button" disabled={busy} onClick={doApprove}><UserCheck size={15} /> {busy ? 'Aprobando…' : 'Aprobar doctor'}</button>
+              </>
             )}
           </div>
         </div>

@@ -55,7 +55,7 @@ export function ReviewPending() {
             <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--warn-bg)', color: 'var(--warn)', display: 'grid', placeItems: 'center', margin: '16px auto 0' }}><ScanSearch size={22} /></div>
             <h1 style={{ fontSize: 19, fontWeight: 700, marginTop: 12 }}>Tu cédula está en revisión</h1>
             <p style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55, marginTop: 8 }}>
-              Encontramos tu registro pero necesitamos una revisión de Administración. En cuanto la aprueben, tendrás acceso al portal. Te avisaremos.
+              Encontramos tu registro pero necesitamos una revisión de Administración. Cuando la aprueben, tendrás acceso al portal. Puedes volver a intentar iniciar sesión más tarde para ver el estado.
             </p>
             <button className="btn ghost" type="button" style={{ marginTop: 18 }} onClick={logout}><LogOut size={15} /> Cerrar sesión</button>
           </>
