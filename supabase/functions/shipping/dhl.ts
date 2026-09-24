@@ -109,7 +109,8 @@ export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralR
     },
     outputImageProperties: {
       printerDPI: 300,
-      imageOptions: [{ typeCode: 'label', templateName: 'ECOM26_84_001', isRequested: true, imageFormat: 'PDF' }],
+      encodingFormat: 'pdf', // el formato va aquí (nivel superior), NO en cada imageOptions
+      imageOptions: [{ typeCode: 'label', templateName: 'ECOM26_84_001', isRequested: true }],
     },
   }
 }

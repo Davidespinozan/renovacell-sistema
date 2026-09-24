@@ -176,3 +176,17 @@ Secretos = Supabase → Edge Functions → Secrets (nunca en el repo). NUNCA com
 - [ ] Activación de producción (solo tras validar sandbox; `DHL_API_ENV=production`).
 
 > **DHL NO se considera integración cerrada** hasta completar el E2E Sandbox. T1 aún no se implementa (el modelo ya es neutral para agregarlo sin reescribir Packing).
+
+### DHL Sandbox E2E — **PASS (2026-09-23)**
+E2E real contra MyDHL API TEST (`DHL_API_ENV=test`), con fixture QA temporal (usuario staff + orden `QA-DHL-E2E`), **ya eliminado**. Sin producción DHL, sin venta/inventario real.
+- **PRECHECK:** función `shipping` ACTIVE; `shipping_*` completo; `shipping-labels` privado; migraciones aplicadas; secrets DHL presentes (confirmado porque `rate` respondió, no 501).
+- **QUOTE:** HTTP **200** — servicios reales DHL: EXPRESS DOMESTIC (`N`, $444 MXN), 12:00 (`1`, $531), 10:30 (`O`, $568), 9:00 (`I`, $900), ECONOMY SELECT (`G`, $478).
+- **SHIPMENT:** HTTP **200** — tracking **7360109201**, service_code `N`.
+- **LABEL:** PDF real (15 372 B) en bucket **privado** `shipping-labels`; signed URL → 200 `application/pdf`; acceso público → **400** (privado).
+- **PERSISTENCIA:** `provider=dhl`, `tracking_number`, `service_code`, `package`, `ship_from`, `ship_to`, `provider_meta`, `label_path` ✓.
+- **IDEMPOTENCIA:** 2ª creación → `idempotent:true`, **mismo tracking**; `SHIPMENTS FOR ORDER = 1` (índice único parcial).
+- **TRACKING:** endpoint alcanzado; Sandbox devolvió "No data found" (guía recién creada, sin eventos) — round-trip correcto.
+- **ERROR-SAFETY:** un 422 real de DHL **no** persistió shipment ni marcó la orden enviada (siguió `packed`); errores sanitizados (sin secrets).
+- **Corrección mínima aplicada** (por respuesta real del Sandbox): en el shipment request, el formato de etiqueta va en `outputImageProperties.encodingFormat='pdf'`, no en `imageOptions[].imageFormat` (DHL 422 "extraneous key [imageFormat]"). Función redeployada.
+
+> **DHL PRODUCCIÓN: PENDIENTE** — el requisito contractual de una guía real de producción sigue abierto (no se activó `production`).
