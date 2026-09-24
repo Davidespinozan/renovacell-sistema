@@ -98,7 +98,7 @@ export function Doctores() {
       {pendientes > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>
           <div className="ico"><Clock size={20} /></div>
-          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Usa <b>Auto-verificar (IA + SEP)</b>: valida la cédula contra el registro oficial y aprueba sola las que coinciden.</div>
+          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Usa <b>Validar cédula (IA + SEP)</b> para reunir evidencia; la aprobación (con cliente vinculado) es manual en <b>Revisar / Aprobar</b>.</div>
         </div>
       )}
 
@@ -106,7 +106,7 @@ export function Doctores() {
         <div className="sysnote" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: flash.res.decision === 'auto' ? 'var(--ok-bg)' : flash.res.decision === 'review' ? 'var(--warn-bg)' : 'var(--danger-bg)', borderColor: 'transparent' }}>
           {flash.res.decision === 'auto' ? <ShieldCheck size={18} style={{ color: 'var(--green-deep)', flex: 'none' }} /> : <ScanSearch size={18} style={{ color: flash.res.decision === 'review' ? 'var(--warn)' : 'var(--danger)', flex: 'none' }} />}
           <div style={{ flex: 1 }}>
-            <b>{flash.name} · {flash.res.decision === 'auto' ? 'Auto-verificado ✓' : flash.res.decision === 'review' ? 'Enviado a revisión' : 'Rechazado'}</b>
+            <b>{flash.name} · {flash.res.decision === 'auto' ? 'Validación OK (pendiente de aprobar)' : flash.res.decision === 'review' ? 'Enviado a revisión' : 'Rechazado'}</b>
             <span style={{ color: 'var(--ink-3)' }}> · score {flash.res.score}% · nombre {flash.res.nameMatch}% · {flash.res.isMedical ? 'profesión médica' : 'no médica'}</span>
             <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--ink-2)' }}>
               {flash.res.reasons.map((r, i) => <li key={i}>{r}</li>)}
@@ -164,7 +164,7 @@ export function Doctores() {
                   <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanSearch size={12} /> Revisión IA · {verifyResultOf(d)?.score}%</span>
                 )}
                 <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busyId === d.id} onClick={() => runAutoVerify(d.id, d.full_name ?? 'Doctor')}>
-                  <Sparkles size={14} /> {busyId === d.id ? 'Validando…' : 'Auto-verificar (IA + SEP)'}
+                  <Sparkles size={14} /> {busyId === d.id ? 'Validando…' : 'Validar cédula (IA + SEP)'}
                 </button>
                 <button className="btn ghost sm" type="button" title="Revisar y aprobar (vincula cliente)" onClick={() => setDetailId(d.id)}>
                   <UserCheck size={14} /> Revisar / Aprobar

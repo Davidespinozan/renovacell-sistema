@@ -11,6 +11,9 @@ import reviewPendingSrc from '../../screens/ReviewPending.tsx?raw'
 import appSrc from '../../App.tsx?raw'
 import doctorsStoreSrc from './doctorsStore.ts?raw'
 import hardeningSrc from '../../../../../supabase/migrations/20260706194143_security_hardening.sql?raw'
+import registerDoctorSrc from '../../../../../supabase/functions/register-doctor/index.ts?raw'
+import verifyCedulaSrc from '../../../../../supabase/functions/verify-cedula/index.ts?raw'
+import approvalRpcSrc from '../../../../../supabase/migrations/20261005120000_doctor_approval_rpc.sql?raw'
 
 const find = (id: string) => getSnapshot().find((d) => d.id === id)
 
@@ -90,5 +93,27 @@ describe('flujo/seguridad — gates server-side intactos', () => {
   it('is_verified sigue gateando catálogo/pedidos (no se debilitó)', () => {
     expect(hardeningSrc).toMatch(/is_verified/)
     expect(hardeningSrc).toMatch(/products_safe/)
+  })
+})
+
+describe('política — TODO registro queda pending; auto-validación es solo evidencia', () => {
+  it('register-doctor NUNCA crea verified=true (siempre false + status pending)', () => {
+    expect(registerDoctorSrc).toMatch(/role_id: 'doctor', verified: false/)
+    expect(registerDoctorSrc).not.toMatch(/verified: instant/)
+    expect(registerDoctorSrc).not.toMatch(/return json\(200, \{ decision: 'auto' \}\)/)
+    expect(registerDoctorSrc).toMatch(/verification: \{ status: 'pending'/)
+  })
+  it('verify-cedula ya NO flipa verified server-side (evidencia, no acceso)', () => {
+    expect(verifyCedulaSrc).not.toMatch(/patch\.verified = true/)
+    expect(verifyCedulaSrc).toMatch(/verified NO se toca/)
+  })
+  it('la auto-validación del cockpit NO concede acceso (solo evidencia)', () => {
+    expect(doctorsStoreSrc).toMatch(/es EVIDENCIA, NO concede acceso/)
+  })
+  it('el RPC de aprobación es admin-only, security definer y bloquea customer ya vinculado', () => {
+    expect(approvalRpcSrc).toMatch(/security definer/)
+    expect(approvalRpcSrc).toMatch(/set search_path = public/)
+    expect(approvalRpcSrc).toMatch(/revoke all on function public\.admin_approve_doctor.*from public, anon/)
+    expect(approvalRpcSrc).toMatch(/ya está vinculado a otro portal/)
   })
 })

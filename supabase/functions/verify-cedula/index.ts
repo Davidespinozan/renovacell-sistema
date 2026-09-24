@@ -192,24 +192,24 @@ Deno.serve(async (req) => {
   // evidencia. Si NO hay captura de identidad (flujo viejo solo-cédula), se conserva
   // el auto-acceso por cédula.
   if (isDoctor) {
+    // POLÍTICA Fase 1: el auto-servicio NUNCA concede acceso. La cédula + dictamen se
+    // guardan como EVIDENCIA (verified NO se toca, queda pendiente). El acceso comercial
+    // lo concede SOLO Dirección en av_verif tras revisión humana (con cliente vinculado).
     const existingMeta = (prof?.meta ?? {}) as Record<string, unknown>
-    const identity = existingMeta.identity as { status?: string } | undefined
-    const identityPending = identity?.status === 'pending'
-    const meta = { ...existingMeta, cedula, verifyResult: result }
-    const patch: Record<string, unknown> = { meta }
-    if (result.decision === 'auto' && !identityPending) patch.verified = true
-    await admin.from('profiles').update(patch).eq('id', who.user.id)
-    // La cédula pasó pero la identidad sigue en revisión → se le informa que aún NO
-    // tiene acceso (que no crea que ya entró por teclear su cédula).
-    if (result.decision === 'auto' && identityPending) {
-      return json(200, {
-        ...result,
-        decision: 'review',
-        identityPending: true,
-        reasons: ['Tu cédula es válida. Tu identidad (INE + prueba de vida) sigue en revisión; te daremos acceso en cuanto la aprobemos.'],
-      })
+    const meta = {
+      ...existingMeta, cedula, verifyResult: result,
+      verification: { status: 'pending', auto_ok: result.decision === 'auto' },
     }
+    await admin.from('profiles').update({ meta }).eq('id', who.user.id)
+    // El doctor queda SIEMPRE en revisión (no auto-login): se le informa con claridad.
+    return json(200, {
+      ...result,
+      decision: 'review',
+      reasons: result.decision === 'auto'
+        ? ['Tu cédula fue validada. Tu cuenta quedó pendiente de aprobación por Renovacell.']
+        : (result.reasons ?? []),
+    })
   }
-  // Para staff, el cliente aplica la decisión bajo su RLS de admin.
+  // Para staff, el cliente aplica la decisión bajo su RLS de admin (evidencia, no acceso).
   return json(200, result)
 })

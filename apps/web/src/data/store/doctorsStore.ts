@@ -105,17 +105,18 @@ export async function autoVerify(id: string): Promise<VerifyDecision | null> {
 function applyVerifyDecision(id: string, result: VerifyDecision) {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return
-  if (result.decision === 'auto') {
-    setVerified(id, true) // ya persiste verified=true
-    logAudit({ actor: 'Verificación IA', action: 'Doctor auto-verificado (IA+SEP)', resource: doc.full_name ?? id, detail: `score ${result.score}` })
-    notify({ text: `Doctor auto-verificado: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
-    return
-  }
-  // review / reject: guarda el dictamen de la IA (para la cola de revisión), sin acceso.
-  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result }
-  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
-  logAudit({ actor: 'Verificación IA', action: result.decision === 'review' ? 'Verificación enviada a revisión' : 'Verificación rechazada', resource: doc.full_name ?? id, detail: `score ${result.score}` })
-  if (result.decision === 'review') notify({ text: `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
+  // POLÍTICA Fase 1: la auto-verificación (IA+SEP) es EVIDENCIA, NO concede acceso. El
+  // acceso lo da SOLO la aprobación manual con cliente vinculado (approveDoctor). Aquí se
+  // guarda el dictamen y, si salió verde, se marca auto_ok para que el admin lo vea.
+  const autoOk = result.decision === 'auto'
+  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result, verification: { status: 'pending', auto_ok: autoOk } }
+  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta: meta as unknown as Profile['meta'] } : d)))
+  logAudit({
+    actor: 'Verificación IA',
+    action: autoOk ? 'Validación IA OK (pendiente de aprobación)' : result.decision === 'review' ? 'Verificación enviada a revisión' : 'Verificación rechazada',
+    resource: doc.full_name ?? id, detail: `score ${result.score}`,
+  })
+  notify({ text: autoOk ? `Validación automática OK, pendiente de aprobar: ${doc.full_name}` : `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verifyResult', error.message); live.reload() })
 }
 

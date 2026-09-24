@@ -40,9 +40,10 @@ describe('Ninguna señal "por verificar" apunta al directorio read-only (av_doc)
   it('la notificación semilla de verificación va a av_verif', () => {
     expect(notifSrc).toMatch(/Doctores esperando verificación[\s\S]*?screen: 'av_verif'/)
   })
-  it('los avisos del store (convertir / auto-verificar / a revisión) van a av_verif', () => {
+  it('los avisos del store (convertir / validación IA / a revisión) van a av_verif', () => {
     expect(doctorsSrc).toMatch(/Doctor por verificar[\s\S]*?screen: 'av_verif'/)
-    expect(doctorsSrc).toMatch(/Doctor auto-verificado[\s\S]*?screen: 'av_verif'/)
+    // La auto-validación ya NO concede acceso: el aviso es "pendiente de aprobar".
+    expect(doctorsSrc).toMatch(/pendiente de aprobar[\s\S]*?screen: 'av_verif'/)
     expect(doctorsSrc).toMatch(/Verificación a revisión[\s\S]*?screen: 'av_verif'/)
     // Ya no queda ningún aviso de verificación colgando de av_doc.
     expect(doctorsSrc).not.toMatch(/screen: 'av_doc'/)
