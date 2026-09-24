@@ -386,10 +386,15 @@ function DoctorDetail({
     if (!choice) { setErr('Elige un cliente existente para vincular, o "Crear cliente nuevo".'); return }
     const payload = choice === '__new__' ? { newCustomer: buildNewCustomer() } : { customerId: choice }
     setBusy(true)
-    const r = await onApprove(payload)
-    setBusy(false)
-    if (r && !r.ok) { setErr(r.error ?? 'No se pudo aprobar.'); return }
-    onClose()
+    try {
+      const r = await onApprove(payload)
+      if (r && !r.ok) { setErr(r.error ?? 'No se pudo aprobar.'); return }
+      onClose()
+    } catch (e) {
+      setErr((e as Error)?.message ?? 'No se pudo aprobar.') // nunca dejar la UI colgada
+    } finally {
+      setBusy(false)
+    }
   }
   const doReject = () => {
     setErr(null)

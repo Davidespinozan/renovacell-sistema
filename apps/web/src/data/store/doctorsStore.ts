@@ -185,13 +185,15 @@ export async function approveDoctor(
     return { ok: false, error: 'Antes de aprobar, vincula un cliente existente o crea uno nuevo.' }
   }
   if (hasSupabase && isUuid(id)) {
-    // RPC nueva (migración aditiva 20261005120000, aún no en database.types) → escape tipado.
-    const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>
-    const { data, error } = await rpc('admin_approve_doctor', {
+    // BUG C FIX: `supabase.rpc` DEBE llamarse como método (conserva `this`). Antes se
+    // extraía a una variable y se invocaba sin binding → TypeError en runtime → la UI
+    // quedaba colgada en "Aprobando…". `admin_approve_doctor` aún no está en database.types
+    // → se castea el nombre/args para el typecheck, sin perder el binding.
+    const { data, error } = await supabase.rpc('admin_approve_doctor' as never, {
       p_profile: id,
       p_customer_id: choice.customerId ?? null,
-      p_new_customer: choice.newCustomer ?? null,
-    })
+      p_new_customer: (choice.newCustomer ?? null) as unknown,
+    } as never) as unknown as { data: unknown; error: { message: string } | null }
     const err = error?.message ?? (data as { error?: string } | null)?.error
     if (err) return { ok: false, error: err }
     await live.reload()
