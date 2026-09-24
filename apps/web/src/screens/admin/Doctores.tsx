@@ -12,6 +12,7 @@ import { useCustomers } from '../../data/hooks/useCustomers'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { findCustomerCandidates, type CustomerCandidate } from '../../data/ops/customerMatch'
+import { findVerifiedOrphans } from '../../data/ops/orphans'
 import { deriveVerificationStatus, VERIF_LABEL, VERIF_PILL } from '../../data/ops/verification'
 import type { CustomerFields } from '../../data/store/customersStore'
 import { supabase } from '../../lib/supabase'
@@ -69,15 +70,22 @@ export function Doctores() {
     return m
   }, [orders])
 
-  // Pendientes arriba (necesitan acción), luego por nombre.
-  const sorted = useMemo(
-    () =>
-      doctors.slice().sort((a, b) =>
-        Number(a.verified) - Number(b.verified) || (a.full_name ?? '').localeCompare(b.full_name ?? ''),
-      ),
+  // "Por verificar" es una COLA DE REVISIÓN: SOLO pending (incluye el dictamen IA 'review',
+  // que mantiene status pending). Excluye verified/rejected/revoked. profiles.verified es la
+  // autoridad: verified=true SIEMPRE sale de la cola (aunque un meta legacy diga 'pending').
+  const queue = useMemo(
+    () => doctors.filter((d) => deriveVerificationStatus(d) === 'pending')
+      .sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')),
     [doctors],
   )
-  const pendientes = sorted.filter((d) => !d.verified).length
+  const pendientes = queue.length
+  // Export: la población completa de doctores (no solo la cola).
+  const sorted = useMemo(
+    () => doctors.slice().sort((a, b) => Number(a.verified) - Number(b.verified) || (a.full_name ?? '').localeCompare(b.full_name ?? '')),
+    [doctors],
+  )
+  // ORPHANS tipo A (caso Magaly): verificados SIN customer vinculado → no aparecen en Doctores.
+  const orphans = useMemo(() => findVerifiedOrphans(doctors, customers), [doctors, customers])
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -117,7 +125,28 @@ export function Doctores() {
         </div>
       )}
 
-      {sorted.map((d) => (
+      {orphans.length > 0 && (
+        <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)', display: 'block' }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ScanFace size={15} /> {orphans.length} doctor(es) verificado(s) SIN cliente vinculado
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 8 }}>
+            Están verificados pero no aparecen en <b>Doctores</b> (que se alimenta de clientes). Vincula su ficha comercial para completarlos.
+          </div>
+          {orphans.map((d) => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--line)' }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{d.full_name} <span style={{ color: 'var(--ink-3)' }}>· {d.email ?? 's/correo'}</span></span>
+              <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Vincular cliente</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {queue.length === 0 && orphans.length === 0 && (
+        <div className="card" style={{ color: 'var(--ink-3)' }}>No hay doctores pendientes de verificación.</div>
+      )}
+
+      {queue.map((d) => (
         <div key={d.id} className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Avatar name={d.full_name ?? '?'} url={avatarOf(d)} />
@@ -184,6 +213,7 @@ export function Doctores() {
           doctor={detail}
           orders={orders.filter((o) => o.doctor_id === detail.id)}
           candidates={findCustomerCandidates(customers, { email: detail.email, phone: (detail.meta?.phone as string) ?? null, full_name: detail.full_name }, detail.id)}
+          needsCustomer={orphans.some((o) => o.id === detail.id)}
           onClose={() => setDetailId(null)}
           onApprove={(choice) => approve(detail.id, choice)}
           onReject={(reason) => { reject(detail.id, reason); setDetailId(null) }}
@@ -311,11 +341,12 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
 }
 
 function DoctorDetail({
-  doctor, orders, candidates, onClose, onApprove, onReject, onRevoke, onSetCedula, onInvite,
+  doctor, orders, candidates, needsCustomer = false, onClose, onApprove, onReject, onRevoke, onSetCedula, onInvite,
 }: {
   doctor: Profile
   orders: ReturnType<typeof useAllOrders>['data']
   candidates: CustomerCandidate[]
+  needsCustomer?: boolean
   onClose: () => void
   onApprove: (choice: { customerId?: string; newCustomer?: CustomerFields }) => Promise<{ ok: boolean; error?: string }> | void
   onReject: (reason: string) => void
@@ -349,7 +380,9 @@ function DoctorDetail({
 
   const doApprove = async () => {
     setErr(null)
-    if (!hasCedula) { setErr('Falta la cédula profesional (regístrala arriba) antes de aprobar.'); return }
+    // La cédula se exige para APROBAR (aún no verificado). Para vincular cliente a un orphan
+    // ya verificado no se re-exige (solo completa su ficha comercial).
+    if (!doctor.verified && !hasCedula) { setErr('Falta la cédula profesional (regístrala arriba) antes de aprobar.'); return }
     if (!choice) { setErr('Elige un cliente existente para vincular, o "Crear cliente nuevo".'); return }
     const payload = choice === '__new__' ? { newCustomer: buildNewCustomer() } : { customerId: choice }
     setBusy(true)
@@ -418,7 +451,7 @@ function DoctorDetail({
             </div>
           )}
 
-          {!doctor.verified && (
+          {(!doctor.verified || needsCustomer) && (
             <div style={{ marginBottom: 16 }}>
               <div className="eyebrow">Identidad comercial (cliente)</div>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
@@ -487,7 +520,13 @@ function DoctorDetail({
           )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {doctor.verified ? (
+            {doctor.verified && needsCustomer ? (
+              // Orphan tipo A (verificado sin cliente): resolver vinculando/creando su ficha.
+              <>
+                <button className="btn ghost" type="button" style={{ color: 'var(--danger)' }} onClick={onRevoke}><Ban size={15} /> Revocar acceso</button>
+                <button className="btn" type="button" disabled={busy} onClick={doApprove}><UserCheck size={15} /> {busy ? 'Vinculando…' : 'Vincular cliente'}</button>
+              </>
+            ) : doctor.verified ? (
               <>
                 <button className="btn ghost" type="button" disabled={Boolean(doctor.meta?.accessPending)} style={Boolean(doctor.meta?.accessPending) ? { opacity: 0.6 } : undefined} onClick={onInvite}>
                   <UserCheck size={15} /> {(doctor.meta?.accessPending as boolean) ? 'Acceso pendiente de activación' : 'Marcar acceso pendiente (Fase 2)'}

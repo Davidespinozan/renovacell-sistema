@@ -236,26 +236,35 @@ export function revokeDoctor(id: string, reviewedBy?: string | null): { ok: bool
 // recargamos para traer el doctor real (uuid). Sin correo del prospecto no se puede
 // crear el usuario → queda local (se persiste cuando se capture un correo).
 let newSeq = 0
-export function addDoctor(input: {
+export async function addDoctor(input: {
   full_name: string
   email: string | null
   organization: string | null
   meta?: Record<string, unknown>
-}): Profile {
+}): Promise<{ ok: boolean; id?: string; error?: string }> {
+  // PREVENCIÓN DE ORPHAN "conversión fantasma" (caso David): antes se agregaba un doctor
+  // optimista local y se disparaba invite-doctor fire-and-forget; el prospecto se marcaba
+  // 'convertido' aunque invite-doctor fallara → prospecto convertido SIN profile/auth. Ahora
+  // con backend se ESPERA a que invite-doctor persista y SOLO entonces se considera exitoso.
+  if (hasSupabase) {
+    if (!input.email) return { ok: false, error: 'El prospecto no tiene correo; no se puede crear la cuenta del doctor.' }
+    const { data, error } = await supabase.functions.invoke('invite-doctor', {
+      body: { email: input.email, full_name: input.full_name, organization: input.organization, meta: input.meta ?? {} },
+    })
+    const err = error?.message ?? (data as { error?: string } | null)?.error
+    if (err) return { ok: false, error: err } // NO se marcó convertido → sin fantasma
+    await live.reload() // trae el doctor real persistido (uuid)
+    notify({ text: `Doctor por verificar: ${input.full_name}`, roles: ['admin'], screen: 'av_verif' })
+    const real = live.current().find((d) => (d.email ?? '').toLowerCase() === input.email!.toLowerCase())
+    return { ok: true, id: (data as { id?: string } | null)?.id ?? real?.id }
+  }
+  // Demo/local (sin backend): alta optimista en el store; sirve para la demostración.
   newSeq += 1
   const doc: Profile = {
     id: `doctor-new-${newSeq}`, email: input.email, full_name: input.full_name,
-    role_id: 'doctor', verified: false, organization: input.organization, meta: input.meta ?? {},
+    role_id: 'doctor', verified: false, organization: input.organization, meta: (input.meta ?? {}) as Profile['meta'],
   }
   live.setLocal([doc, ...live.current()])
   notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
-  if (hasSupabase && input.email) {
-    supabase.functions.invoke('invite-doctor', {
-      body: { email: input.email, full_name: input.full_name, organization: input.organization, meta: input.meta ?? {} },
-    }).then(({ error }) => {
-      if (error) { console.warn('[doctors] invite-doctor', error.message); return }
-      live.reload() // reemplaza el optimista por el doctor real persistido
-    })
-  }
-  return doc
+  return { ok: true, id: doc.id }
 }

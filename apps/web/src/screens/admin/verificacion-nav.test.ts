@@ -30,6 +30,10 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
   it('roles.ts declara la entrada av_verif', () => {
     expect(rolesSrc).toMatch(/key: 'av_verif'.*label: 'Por verificar'.*section: 'Comercial'/)
   })
+  it('orden EXACTO del menú Comercial: Ventas→Prospectos→Por verificar→Doctores→Comisiones→Catálogo→Precios→Sitio web', () => {
+    const comercial = getNav(getRole('admin')).filter((s) => s.section === 'Comercial').map((s) => s.label)
+    expect(comercial).toEqual(['Ventas', 'Prospectos', 'Por verificar', 'Doctores', 'Comisiones', 'Catálogo', 'Precios', 'Sitio web'])
+  })
 })
 
 describe('Ninguna señal "por verificar" apunta al directorio read-only (av_doc)', () => {

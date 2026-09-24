@@ -120,7 +120,7 @@ export function Prospectos() {
   )
   const nuevos = visible.filter((p) => statusOf(p) === 'nuevo').length
 
-  const convert = (p: Prospect) => {
+  const convert = async (p: Prospect) => {
     // El correo es la LLAVE de la cuenta del doctor (invite-doctor lo necesita). Sin él,
     // se creaba un "doctor fantasma" local que desaparecía al recargar y el prospecto
     // salía del pipeline como convertido → lead perdido. Se bloquea y se pide el correo.
@@ -128,13 +128,16 @@ export function Prospectos() {
       window.alert('Este prospecto no tiene correo. Agrégalo con "Editar" antes de convertirlo — el correo es la llave de la cuenta del doctor.')
       return
     }
-    const doc = addPending({
+    // PREVENCIÓN DE CONVERSIÓN FANTASMA (caso David): solo marcamos 'convertido' si el doctor
+    // se PERSISTIÓ de verdad. Si invite-doctor falla, el prospecto sigue en el pipeline.
+    const r = await addPending({
       full_name: p.name ?? 'Doctor',
       email: p.email,
       organization: orgOf(p) || null,
       meta: { cedula: p.cedula ?? undefined, fromProspect: p.id, owner: role === 'admin' ? undefined : user?.email },
     })
-    markConverted(p.id, doc.id)
+    if (!r.ok) { window.alert(r.error ?? 'No se pudo crear la cuenta del doctor. El prospecto NO se marcó como convertido.'); return }
+    markConverted(p.id, r.id ?? '')
   }
 
   const onCapture = (input: { name: string; email: string | null; phone: string | null; organization: string | null; channel: string; interest: string[]; message?: string }) => {

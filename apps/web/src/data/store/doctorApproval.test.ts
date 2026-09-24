@@ -19,49 +19,49 @@ const find = (id: string) => getSnapshot().find((d) => d.id === id)
 
 describe('approveDoctor — exige resolver customer + marca verified/estado', () => {
   it('sin elegir customer → error (no aprueba)', async () => {
-    const doc = addDoctor({ full_name: 'Dra. Test A', email: 'a@test.mx', organization: null })
-    const r = await approveDoctor(doc.id, {})
+    const doc = await addDoctor({ full_name: 'Dra. Test A', email: 'a@test.mx', organization: null })
+    const r = await approveDoctor(doc.id!, {})
     expect(r.ok).toBe(false)
-    expect(find(doc.id)?.verified).toBe(false)
+    expect(find(doc.id!)?.verified).toBe(false)
   })
   it('aprobar creando customer nuevo → verified + status verified', async () => {
-    const doc = addDoctor({ full_name: 'Dra. Test B', email: 'b@test.mx', organization: null })
-    const r = await approveDoctor(doc.id, { newCustomer: { full_name: 'Dra. Test B', email: 'b@test.mx' } as never })
+    const doc = await addDoctor({ full_name: 'Dra. Test B', email: 'b@test.mx', organization: null })
+    const r = await approveDoctor(doc.id!, { newCustomer: { full_name: 'Dra. Test B', email: 'b@test.mx' } as never })
     expect(r.ok).toBe(true)
-    const d = find(doc.id)!
+    const d = find(doc.id!)!
     expect(d.verified).toBe(true)
     expect(deriveVerificationStatus(d)).toBe('verified')
   })
   it('aprobar con customer seleccionado → verified', async () => {
-    const doc = addDoctor({ full_name: 'Dra. Test C', email: 'c@test.mx', organization: null })
-    const r = await approveDoctor(doc.id, { customerId: 'cust-123' })
+    const doc = await addDoctor({ full_name: 'Dra. Test C', email: 'c@test.mx', organization: null })
+    const r = await approveDoctor(doc.id!, { customerId: 'cust-123' })
     expect(r.ok).toBe(true)
-    expect(find(doc.id)?.verified).toBe(true)
+    expect(find(doc.id!)?.verified).toBe(true)
   })
   it('aprobación idempotente (dos veces) deja verified', async () => {
-    const doc = addDoctor({ full_name: 'Dra. Test D', email: 'd@test.mx', organization: null })
-    await approveDoctor(doc.id, { customerId: 'cust-1' })
-    const r2 = await approveDoctor(doc.id, { customerId: 'cust-1' })
+    const doc = await addDoctor({ full_name: 'Dra. Test D', email: 'd@test.mx', organization: null })
+    await approveDoctor(doc.id!, { customerId: 'cust-1' })
+    const r2 = await approveDoctor(doc.id!, { customerId: 'cust-1' })
     expect(r2.ok).toBe(true)
-    expect(find(doc.id)?.verified).toBe(true)
+    expect(find(doc.id!)?.verified).toBe(true)
   })
 })
 
 describe('rejectDoctor / revokeDoctor — estado sin borrar cuenta', () => {
-  it('rechazar → verified=false + status rejected + razón', () => {
-    const doc = addDoctor({ full_name: 'Dra. Test E', email: 'e@test.mx', organization: null })
-    rejectDoctor(doc.id, 'cédula no válida')
-    const d = find(doc.id)!
+  it('rechazar → verified=false + status rejected + razón', async () => {
+    const doc = await addDoctor({ full_name: 'Dra. Test E', email: 'e@test.mx', organization: null })
+    rejectDoctor(doc.id!, 'cédula no válida')
+    const d = find(doc.id!)!
     expect(d.verified).toBe(false)
     expect(deriveVerificationStatus(d)).toBe('rejected')
     expect((d.meta as { verification?: { reason?: string } }).verification?.reason).toBe('cédula no válida')
     // NO se borró: sigue en el store.
-    expect(find(doc.id)).toBeTruthy()
+    expect(find(doc.id!)).toBeTruthy()
   })
-  it('revocar → verified=false + status revoked', () => {
-    const doc = addDoctor({ full_name: 'Dra. Test F', email: 'f@test.mx', organization: null })
-    revokeDoctor(doc.id)
-    const d = find(doc.id)!
+  it('revocar → verified=false + status revoked', async () => {
+    const doc = await addDoctor({ full_name: 'Dra. Test F', email: 'f@test.mx', organization: null })
+    revokeDoctor(doc.id!)
+    const d = find(doc.id!)!
     expect(d.verified).toBe(false)
     expect(deriveVerificationStatus(d)).toBe('revoked')
   })

@@ -23,6 +23,23 @@ describe('deriveVerificationStatus — verified es la autoridad de acceso', () =
   })
 })
 
+describe('cola "Por verificar" = solo pending (deriveVerificationStatus)', () => {
+  // La cola incluye SOLO status 'pending' (que abarca el dictamen IA 'review').
+  const inQueue = (p: { verified?: boolean | null; meta?: unknown }) => deriveVerificationStatus(p) === 'pending'
+  it('pending aparece', () => { expect(inQueue({ verified: false, meta: { verification: { status: 'pending' } } })).toBe(true) })
+  it('review (dictamen IA, sin status) aparece como pending', () => {
+    expect(inQueue({ verified: false, meta: { verifyResult: { decision: 'review' } } })).toBe(true)
+  })
+  it('verified NO aparece', () => { expect(inQueue({ verified: true, meta: {} })).toBe(false) })
+  it('rejected NO aparece', () => { expect(inQueue({ verified: false, meta: { verification: { status: 'rejected' } } })).toBe(false) })
+  it('revoked NO aparece', () => { expect(inQueue({ verified: false, meta: { verification: { status: 'revoked' } } })).toBe(false) })
+  it('legacy verified=false sin status → aparece', () => { expect(inQueue({ verified: false, meta: {} })).toBe(true) })
+  it('legacy verified=true sin status → NO aparece', () => { expect(inQueue({ verified: true, meta: {} })).toBe(false) })
+  it('verified=true manda ante meta legacy contradictorio (status pending) → NO aparece', () => {
+    expect(inQueue({ verified: true, meta: { verification: { status: 'pending' } } })).toBe(false)
+  })
+})
+
 describe('buildVerificationMeta', () => {
   it('incluye status y reviewed_at; reason solo si se pasa', () => {
     const a = buildVerificationMeta('rejected', 'admin-1', 'cédula inválida')
