@@ -13,7 +13,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
-  dhlErrorMessage, dhlBaseUrl,
+  dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
 
@@ -85,7 +85,12 @@ Deno.serve(async (req) => {
         if (!tn) return json(400, { error: 'Falta tracking.' })
         const r = await fetch(`${base}/shipments/${encodeURIComponent(tn)}/tracking`, { headers: { Authorization: authz } })
         const data = await r.json().catch(() => ({}))
-        if (!r.ok) return json(502, { error: dhlErrorMessage(r.status, data) })
+        if (!r.ok) {
+          // Guía válida sin eventos todavía (404 / "No data found") → éxito de dominio,
+          // no error. Auth (401/403), request inválido (400) y otros 5xx SIGUEN siendo error.
+          if (isTrackingNoData(r.status, data)) return json(200, emptyTrackingResult(tn))
+          return json(502, { error: dhlErrorMessage(r.status, data) })
+        }
         return json(200, { tracking: tn, ...parseTracking(data) })
       }
 

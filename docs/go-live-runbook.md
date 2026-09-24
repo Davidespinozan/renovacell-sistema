@@ -190,3 +190,5 @@ E2E real contra MyDHL API TEST (`DHL_API_ENV=test`), con fixture QA temporal (us
 - **Corrección mínima aplicada** (por respuesta real del Sandbox): en el shipment request, el formato de etiqueta va en `outputImageProperties.encodingFormat='pdf'`, no en `imageOptions[].imageFormat` (DHL 422 "extraneous key [imageFormat]"). Función redeployada.
 
 > **DHL PRODUCCIÓN: PENDIENTE** — el requisito contractual de una guía real de producción sigue abierto (no se activó `production`).
+
+**Mejora post-E2E (2026-09-24):** tracking normalizado — un `404 / "No data found"` de una guía válida recién creada se devuelve como éxito de dominio (`status: sin_eventos`, `events: []`, "Aún no hay eventos de seguimiento"), no como 502. Auth (401/403), request inválido (400) y 5xx inesperados siguen siendo error real. Con tests. No cambia el estado: **DHL SANDBOX E2E: PASS · DHL PRODUCTION: PENDING**.

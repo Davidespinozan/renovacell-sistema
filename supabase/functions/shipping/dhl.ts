@@ -136,6 +136,20 @@ export function parseTracking(data: any): { status: string; events: Array<{ at: 
   }
 }
 
+// Tracking de una guía VÁLIDA recién creada: MyDHL responde 404 / "No data found"
+// mientras aún no hay eventos. Eso NO es un error de dominio, es "sin eventos todavía".
+// deno-lint-ignore no-explicit-any
+export function isTrackingNoData(status: number, data: any): boolean {
+  if (status === 401 || status === 403 || status === 400) return false // auth / request inválido = error real
+  if (status >= 500) return false                                       // error inesperado DHL = error real
+  if (status === 404) return true                                       // guía sin eventos todavía
+  const detail = String(data?.detail ?? data?.title ?? (Array.isArray(data?.additionalDetails) ? data.additionalDetails.join(' ') : ''))
+  return /no data found|no result found/i.test(detail)
+}
+export function emptyTrackingResult(tracking: string): { tracking: string; status: string; events: []; message: string } {
+  return { tracking, status: 'sin_eventos', events: [], message: 'Aún no hay eventos de seguimiento.' }
+}
+
 // Extrae un mensaje de error de DHL SIN filtrar credenciales ni el cuerpo crudo completo.
 // deno-lint-ignore no-explicit-any
 export function dhlErrorMessage(status: number, data: any): string {
