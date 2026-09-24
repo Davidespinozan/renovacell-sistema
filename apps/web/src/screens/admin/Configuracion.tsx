@@ -37,7 +37,9 @@ export function Configuracion() {
 
       <div className="card">
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 4 }}>
-          Estos datos identifican a la <b>empresa emisora</b>: aparecen en el CFDI, los recibos y los manifiestos.
+          Configuración <b>operativa</b> de Renovacell: identidad, domicilio (origen de envíos), contacto y datos bancarios.
+          Se usa en recibos, manifiestos, <b>transferencias</b> y como <b>remitente de paquetería</b>. La configuración
+          <b> fiscal del emisor del CFDI</b> (certificados y timbrado) la administra Facturama, no esta pantalla.
         </div>
 
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -67,9 +69,26 @@ export function Configuracion() {
         </div>
 
         <label style={label}>Dirección</label>
-        <input style={input} value={form.direccion} onChange={set('direccion')} placeholder="Calle, número, colonia, ciudad" />
+        <input style={input} value={form.direccion} onChange={set('direccion')} placeholder="Calle, número, colonia" />
 
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {/* Ciudad/Estado/País: origen operativo (remitente de paquetería, p. ej. DHL). */}
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+          <div>
+            <label style={label}>Ciudad</label>
+            <input style={input} value={form.ciudad} onChange={set('ciudad')} placeholder="Culiacán" />
+          </div>
+          <div>
+            <label style={label}>Estado</label>
+            <input style={input} value={form.estado} onChange={set('estado')} placeholder="Sinaloa" />
+          </div>
+          <div>
+            <label style={label}>País</label>
+            <input style={input} value={form.pais} onChange={set('pais')} placeholder="MX" maxLength={2} />
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>Ciudad, estado y país (ISO-2, p. ej. MX) del domicilio de origen para envíos.</div>
+
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
           <div>
             <label style={label}>Teléfono</label>
             <input style={input} value={form.telefono} onChange={set('telefono')} placeholder="55 0000 0000" />
