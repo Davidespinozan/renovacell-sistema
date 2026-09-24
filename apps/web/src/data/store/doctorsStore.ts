@@ -100,14 +100,14 @@ function applyVerifyDecision(id: string, result: VerifyDecision) {
   if (result.decision === 'auto') {
     setVerified(id, true) // ya persiste verified=true
     logAudit({ actor: 'Verificación IA', action: 'Doctor auto-verificado (IA+SEP)', resource: doc.full_name ?? id, detail: `score ${result.score}` })
-    notify({ text: `Doctor auto-verificado: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+    notify({ text: `Doctor auto-verificado: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
     return
   }
   // review / reject: guarda el dictamen de la IA (para la cola de revisión), sin acceso.
   const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Verificación IA', action: result.decision === 'review' ? 'Verificación enviada a revisión' : 'Verificación rechazada', resource: doc.full_name ?? id, detail: `score ${result.score}` })
-  if (result.decision === 'review') notify({ text: `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  if (result.decision === 'review') notify({ text: `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
   if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verifyResult', error.message); live.reload() })
 }
 
@@ -174,7 +174,7 @@ export function addDoctor(input: {
     role_id: 'doctor', verified: false, organization: input.organization, meta: input.meta ?? {},
   }
   live.setLocal([doc, ...live.current()])
-  notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_doc' })
+  notify({ text: `Doctor por verificar: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
   if (hasSupabase && input.email) {
     supabase.functions.invoke('invite-doctor', {
       body: { email: input.email, full_name: input.full_name, organization: input.organization, meta: input.meta ?? {} },

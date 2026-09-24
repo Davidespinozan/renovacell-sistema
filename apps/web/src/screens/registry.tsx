@@ -28,6 +28,7 @@ const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ defaul
 const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default: m.Ventas })))
 import { Trazabilidad } from './admin/Trazabilidad'
 import { DoctoresDirectorio } from './admin/DoctoresDirectorio'
+import { Doctores } from './admin/Doctores' // cockpit de verificación (av_verif); av_doc queda como directorio comercial
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { Finanzas } from './admin/Finanzas'
@@ -74,6 +75,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_ventas: () => <Ventas />,
   av_traza: () => <Trazabilidad />,
   av_doc: () => <DoctoresDirectorio />,
+  av_verif: () => <Doctores />, // "Por verificar": gate del canal comercial (profiles.verified)
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
   av_finanzas: () => <Finanzas />,

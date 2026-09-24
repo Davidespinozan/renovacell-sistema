@@ -205,9 +205,12 @@ describe('Fase 3 — Doctores(admin) y Clientes(ventas) = MISMA población (cust
     expect(directorySrc).not.toMatch(/updateCustomer|deleteCustomer|reassign/i)
     expect(directorySrc).toMatch(/carteraToggle/)
   })
-  it('el registry apunta Doctores(admin) al directorio de customers, no al de profiles', () => {
+  it('el registry apunta av_doc(directorio) a customers; la verificación vive aparte en av_verif', () => {
+    // av_doc = directorio comercial (customers) read-only.
     expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio/)
-    expect(registrySrc).not.toMatch(/import \{ Doctores \} from '\.\/admin\/Doctores'/)
+    // El cockpit de verificación (profiles.verified) se monta en av_verif, NO en av_doc.
+    expect(registrySrc).toMatch(/av_verif: \(\) => <Doctores \/>/)
+    expect(registrySrc).not.toMatch(/av_doc: \(\) => <Doctores \/>/)
   })
 })
 

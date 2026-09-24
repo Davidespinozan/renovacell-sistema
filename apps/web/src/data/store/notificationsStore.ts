@@ -27,7 +27,7 @@ const listeners = new Set<() => void>()
 // Seeds SOLO para modo mock (sin backend).
 const SEED: Notif[] = [
   { id: 'n-seed-2', text: 'Pedidos pendientes de surtir en Almacén', at: '2026-06-18T16:00:00.000Z', roles: ['warehouse'], screen: 'surtido', read: false },
-  { id: 'n-seed-1', text: 'Doctores esperando verificación', at: '2026-06-18T17:30:00.000Z', roles: ['admin'], screen: 'av_doc', read: false },
+  { id: 'n-seed-1', text: 'Doctores esperando verificación', at: '2026-06-18T17:30:00.000Z', roles: ['admin'], screen: 'av_verif', read: false },
 ]
 
 let items: Notif[] = hasSupabase ? [] : [...SEED]

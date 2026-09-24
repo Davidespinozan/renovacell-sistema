@@ -49,7 +49,7 @@ export function Bandeja() {
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && o.payment_status !== 'paid')
 
-      if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_doc' })
+      if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
       if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos y muévelos por el pipeline.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
       const transferPend = orders.filter((o) => notCancelled(o) && o.payment_status !== 'paid' && !!(o.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported)
       if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Transferencias por confirmar', detail: 'El cliente informó su pago; verifícalo y márcalo cobrado.', count: transferPend.length, tone: 'warn', screen: 'av_fin' })
