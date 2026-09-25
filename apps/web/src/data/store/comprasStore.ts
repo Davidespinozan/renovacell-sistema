@@ -34,6 +34,12 @@ const live = makeLive<PurchaseOrder>(async () => {
 
 export const subscribe = live.subscribe
 export const getSnapshot = live.getSnapshot
+// Recarga la lista de compras (tras una recepción atómica que marcó 'recibida' en el server).
+export const reloadCompras = (): void => { void live.reload() }
+// Actualiza SOLO el cache local a 'recibida' (para el modo mock/demo tras recibir).
+export function markReceivedLocal(id: string): void {
+  live.setLocal(live.current().map((o) => (o.id === id ? { ...o, status: 'recibida' } : o)))
+}
 
 let seq = 0
 export function createReplenishment(input: { product_id: string; product_name: string; qty: number; unit_cost: number; kind: ReplenKind; supplier?: string | null }): PurchaseOrder {

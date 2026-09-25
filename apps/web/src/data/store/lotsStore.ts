@@ -11,6 +11,7 @@ import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { refreshStock } from './stockStore'
 import { REORDER_THRESHOLD } from '../ops/stock'
+import { blendedLotCost } from '../ops/inventoryCost'
 
 const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
@@ -123,34 +124,63 @@ export interface EntryInput {
   unit_cost?: number | null
 }
 
-// Registrar entrada: crea un lote nuevo y su movimiento (+cantidad).
-export function addEntry(input: EntryInput): Lot {
-  seq += 1
-  const lot: Lot = {
-    id: `l-${seq}`, product_id: input.product_id, lot_code: input.lot_code,
-    manufacture_date: null, expiry_date: input.expiry_date, quantity: input.quantity,
-    location: input.location, unit_cost: input.unit_cost ?? costOf(input.product_id), metadata: null,
+export interface ReceiveInput extends EntryInput {
+  reason?: string
+  reference?: string | null
+  replenishment_id?: string | null // si se pasa, la RPC marca la compra 'recibida' en la misma tx
+}
+
+// RECEPCIÓN/ENTRADA ATÓMICA (Fase 1). Backend: RPC `recibir_lote` (crea/suma lote +
+// movimiento + costo congelado, y opcionalmente marca la compra recibida en UNA
+// transacción → sin el estado inconsistente "stock arriba pero compra pendiente").
+// Mock: upsert-or-create local con promedio ponderado (blendedLotCost) + movimiento.
+// Devuelve {ok} con error real (no console.warn silencioso).
+export async function recibirLote(input: ReceiveInput): Promise<{ ok: boolean; error?: string; lot_id?: string }> {
+  const reason = (input.reason ?? '').trim() || 'entrada'
+  const reference = input.reference ?? input.lot_code
+  if (!input.product_id || !(input.lot_code ?? '').trim()) return { ok: false, error: 'Falta producto o lote.' }
+  if (!(input.quantity > 0)) return { ok: false, error: 'La cantidad debe ser mayor que 0.' }
+  const inc = input.unit_cost ?? null
+
+  if (hasSupabase) {
+    const { data, error } = await supabase.rpc('recibir_lote' as never, {
+      p_product: input.product_id, p_lote: input.lot_code, p_caducidad: input.expiry_date ?? null,
+      p_cantidad: input.quantity, p_ubicacion: input.location ?? null, p_unit_cost: inc,
+      p_reason: reason, p_reference: reference, p_replenishment_id: input.replenishment_id ?? null,
+    } as never) as unknown as { data: { lot_id?: string } | null; error: { message: string } | null }
+    if (error) return { ok: false, error: error.message }
+    await Promise.all([lotsLive.reload(), movsLive.reload()]); refreshStock()
+    return { ok: true, lot_id: data?.lot_id }
   }
-  const mov: InventoryMovement = {
-    id: `m-${seq}`, lot_id: lot.id, change: input.quantity, reason: 'entrada',
-    reference: input.lot_code, created_by: null, created_at: nowIso(),
+
+  // Mock: identidad = producto + código de lote (suma, no idempotente).
+  const key = input.lot_code.trim().toLowerCase()
+  const existing = lotsLive.current().find((l) => l.product_id === input.product_id && (l.lot_code ?? '').trim().toLowerCase() === key)
+  seq += 1
+  if (existing) {
+    const newCost = blendedLotCost(existing.quantity, existing.unit_cost ?? null, input.quantity, inc)
+    lotsLive.setLocal(lotsLive.current().map((l) => (l.id === existing.id
+      ? { ...l, quantity: l.quantity + input.quantity, unit_cost: newCost, expiry_date: l.expiry_date ?? input.expiry_date }
+      : l)))
+    movsLive.setLocal([{ id: `m-${seq}`, lot_id: existing.id, change: input.quantity, reason, reference, created_by: null, created_at: nowIso() }, ...movsLive.current()])
+    refreshStock(lotsLive.current())
+    return { ok: true, lot_id: existing.id }
+  }
+  const lot: Lot = {
+    id: `l-${seq}`, product_id: input.product_id, lot_code: input.lot_code, manufacture_date: null,
+    expiry_date: input.expiry_date, quantity: input.quantity, location: input.location,
+    unit_cost: inc ?? costOf(input.product_id), metadata: null,
   }
   lotsLive.setLocal([...lotsLive.current(), lot])
-  movsLive.setLocal([mov, ...movsLive.current()])
+  movsLive.setLocal([{ id: `m-${seq}`, lot_id: lot.id, change: input.quantity, reason, reference, created_by: null, created_at: nowIso() }, ...movsLive.current()])
   refreshStock(lotsLive.current())
-  if (hasSupabase) {
-    (async () => {
-      // Lote nace en 0; el RPC atómico fija la cantidad y registra la entrada.
-      const ins = await supabase.from('lots').insert({
-        product_id: input.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date,
-        quantity: 0, location: input.location,
-      }).select('id').single()
-      if (ins.error) { console.warn('[lots] entrada', ins.error.message); return }
-      await supabase.rpc('apply_lot_movement', { p_lot: ins.data.id, p_change: input.quantity, p_reason: 'entrada', p_reference: input.lot_code })
-      lotsLive.reload(); movsLive.reload(); refreshStock()
-    })()
-  }
-  return lot
+  return { ok: true, lot_id: lot.id }
+}
+
+// Compat: Registrar entrada legacy → delega en la recepción atómica (fire-and-forget).
+// Lo usan flujos que no esperan feedback (p.ej. regreso de evento en eventsStore).
+export function addEntry(input: EntryInput): void {
+  void recibirLote(input)
 }
 
 // Ajuste de un lote (baja por merma/caducidad o reingreso). Registra el movimiento.

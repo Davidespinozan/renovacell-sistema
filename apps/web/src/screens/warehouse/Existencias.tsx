@@ -70,7 +70,11 @@ export function Existencias() {
 }
 
 function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void; onAjuste: (l: MermaLot) => void }) {
-  const total = lots.reduce((s, l) => s + l.quantity, 0)
+  // Existencia FÍSICA = todo el inventario (incl. caducado, que sigue existiendo/trazable).
+  // DISPONIBLE PARA VENTA = no caducado (misma semántica autoritativa que product_stock).
+  const fisica = lots.reduce((s, l) => s + l.quantity, 0)
+  const disponible = lots.reduce((s, l) => s + ((daysUntil(l.expiry_date) ?? 1) >= 0 ? l.quantity : 0), 0)
+  const caducado = fisica - disponible
   const isProf = product.line === 'prof'
   // El lote FEFO = el primero con stock que no esté caducado.
   const fefoId = lots.find((l) => l.quantity > 0 && (daysUntil(l.expiry_date) ?? 1) >= 0)?.id
@@ -83,7 +87,11 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
             {product.name}{' '}
             <span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>{total} {total === 1 ? 'pieza' : 'piezas'}</div>
+          <div style={{ textAlign: 'right', fontSize: 12 }}>
+            <div style={{ fontWeight: 600 }} title="Todo el inventario, incluido lo caducado">Física: {fisica}</div>
+            <div style={{ color: 'var(--green-deep)' }} title="No caducado (lo que se puede vender)">Disponible: {disponible}</div>
+            {caducado > 0 && <div style={{ color: 'var(--danger)' }} title="Caducado: existe físicamente pero NO es vendible">Caducado: {caducado}</div>}
+          </div>
         </div>
         {lots.map((l) => {
           const d = daysUntil(l.expiry_date)

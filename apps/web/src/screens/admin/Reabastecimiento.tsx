@@ -3,7 +3,7 @@
 //  2) DIRECCIÓN reabastece: Compra a proveedor o Producción interna (mixto).
 //  3) ALMACÉN recibe y da de alta el lote (código + caducidad + cantidad).
 import React, { useMemo, useState } from 'react'
-import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory } from 'lucide-react'
+import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory, Check, DollarSign } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
@@ -12,17 +12,20 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
 import { stockByProduct, REORDER_THRESHOLD } from '../../data/ops/stock'
 import { costOf } from '../../data/mock/costs'
+import { hasSupabase } from '../../lib/supabase'
 import type { ProductSafe } from '../../data/types'
 
 const LOW = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 const TARGET = 60   // stock objetivo tras reabastecer
 
 export function Reabastecimiento() {
-  const { data: lots, addEntry } = useLots()
+  const { data: lots, recibirLote } = useLots()
   const { data: products } = useProducts()
-  const { data: pos, createReplenishment, markReceived } = useCompras()
+  const { data: pos, createReplenishment, markReceivedLocal, markPaid, reloadCompras } = useCompras()
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [replen, setReplen] = useState<{ product: ProductSafe; suggested: number } | null>(null)
+  const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = (ok: boolean, text: string) => { setFlash({ ok, text }); if (ok) setTimeout(() => setFlash(null), 4000) }
 
   const stock = useMemo(() => stockByProduct(lots), [lots])
   const stockOf = (id: string) => stock[id]?.qty ?? 0
@@ -51,6 +54,13 @@ export function Reabastecimiento() {
         El sistema te avisa cuando hay <b>stock bajo</b> (aquí y en la campana). Tú, Dirección, reabastreces
         con una <b>compra a proveedor</b> o una <b>producción interna</b>. Almacén lo recibe y da de alta el lote.
       </PageHead>
+
+      {flash && (
+        <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10, background: flash.ok ? 'var(--ok-bg)' : 'var(--danger-bg)', borderColor: 'transparent', color: flash.ok ? 'var(--green-deep)' : 'var(--danger)' }}>
+          {flash.ok ? <Check size={16} /> : <X size={16} />}<span style={{ flex: 1 }}>{flash.text}</span>
+          <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setFlash(null)}><X size={14} /></button>
+        </div>
+      )}
 
       {/* 1+2) Stock bajo → Dirección reabastece */}
       <div className="card" style={{ padding: 0 }}>
@@ -151,9 +161,16 @@ export function Reabastecimiento() {
                   <td data-label="Fecha">{fmtDate(o.created_at)}</td>
                   <td data-label="Estado"><span className={'pill ' + (o.status === 'recibida' ? 'p-ok' : 'p-warn')}>{o.status === 'recibida' ? 'Recibida' : 'Pendiente'}</span></td>
                   <td data-label="">
-                    {o.status === 'pendiente'
-                      ? <button className="btn ghost sm" type="button" onClick={() => setReceiving(o)}><PackageCheck size={14} /> Recibir y dar de alta</button>
-                      : <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Lote dado de alta</span>}
+                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {o.status === 'pendiente'
+                        ? <button className="btn sm" type="button" onClick={() => setReceiving(o)}><PackageCheck size={14} /> Recibir mercancía</button>
+                        : <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Lote dado de alta</span>}
+                      {o.kind === 'compra' && !o.paid && (
+                        <button className="btn ghost sm" type="button" title="Registrar el pago al proveedor (independiente de la recepción)"
+                          onClick={() => { markPaid(o.id); toast(true, 'Compra marcada como pagada.') }}><DollarSign size={13} /> Marcar pagado</button>
+                      )}
+                      {o.kind === 'compra' && o.paid && <span className="pill p-ok" style={{ fontSize: 10.5 }}>Pagada</span>}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -171,6 +188,9 @@ export function Reabastecimiento() {
           onConfirm={(input) => {
             createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, unit_cost: input.unitCost, kind: input.kind, supplier: input.supplier })
             setReplen(null)
+            toast(true, input.kind === 'compra'
+              ? 'Compra registrada. El inventario se actualizará cuando recibas la mercancía (Recibir y dar de alta).'
+              : 'Producción registrada. Se dará de alta como lote al recibirla.')
           }}
         />
       )}
@@ -179,10 +199,18 @@ export function Reabastecimiento() {
         <RecibirModal
           po={receiving}
           onClose={() => setReceiving(null)}
-          onConfirm={(input) => {
-            addEntry({ product_id: receiving.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date, quantity: input.quantity, location: null, unit_cost: receiving.unit_cost })
-            markReceived(receiving.id)
+          onConfirm={async (input) => {
+            // Recepción ATÓMICA: crea/suma lote + movimiento + costo + marca 'recibida'
+            // en la misma transacción (backend) → nunca "stock arriba pero compra pendiente".
+            const r = await recibirLote({
+              product_id: receiving.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date,
+              quantity: input.quantity, location: null, unit_cost: receiving.unit_cost,
+              reason: 'entrada', reference: receiving.id, replenishment_id: receiving.id,
+            })
+            if (!r.ok) { toast(false, r.error ?? 'No se pudo recibir la mercancía.'); return }
+            if (hasSupabase) reloadCompras(); else markReceivedLocal(receiving.id)
             setReceiving(null)
+            toast(true, 'Mercancía recibida. Lote dado de alta y stock actualizado.')
           }}
         />
       )}

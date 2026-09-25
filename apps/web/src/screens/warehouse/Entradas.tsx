@@ -31,15 +31,17 @@ const labelStyle: React.CSSProperties = {
 
 export function Entradas() {
   const { data: products } = useProducts()
-  const { data: lots, addEntry } = useLots()
+  const { data: lots, recibirLote } = useLots()
   const { data: movements } = useInventory()
 
   const [productId, setProductId] = useState('')
   const [lotCode, setLotCode] = useState('')
   const [expiry, setExpiry] = useState('')
   const [qty, setQty] = useState('')
+  const [cost, setCost] = useState('')
   const [location, setLocation] = useState('Culiacán')
-  const [toast, setToast] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
 
   const lotById = useMemo(() => {
     const m: Record<string, Lot | undefined> = {}
@@ -54,17 +56,23 @@ export function Entradas() {
 
   const valid = productId && lotCode.trim() && Number(qty) > 0
 
-  const submit = () => {
-    if (!valid) return
-    addEntry({
+  const submit = async () => {
+    if (!valid || busy) return
+    setBusy(true)
+    const c = cost.trim() === '' ? null : Number(cost)
+    const r = await recibirLote({
       product_id: productId,
       lot_code: lotCode.trim(),
       expiry_date: expiry || null,
       quantity: Number(qty),
       location: location.trim() || null,
+      unit_cost: c != null && c > 0 ? c : null, // vacío → la RPC usa el costo de referencia
+      reason: 'entrada',
     })
-    setToast(`Entrada registrada: ${lotCode.trim()} (+${qty} pzas)`)
-    setLotCode(''); setExpiry(''); setQty('')
+    setBusy(false)
+    if (!r.ok) { setToast({ ok: false, text: r.error ?? 'No se pudo registrar la entrada.' }); return }
+    setToast({ ok: true, text: `Entrada registrada: ${lotCode.trim()} (+${qty} pzas)` })
+    setLotCode(''); setExpiry(''); setQty(''); setCost('')
     window.setTimeout(() => setToast(null), 2600)
   }
 
@@ -105,8 +113,15 @@ export function Entradas() {
           </div>
         </div>
 
-        <button className="btn" type="button" style={{ marginTop: 18, width: '100%', opacity: valid ? 1 : 0.5, cursor: valid ? 'pointer' : 'not-allowed' }} onClick={submit} disabled={!valid}>
-          <Icon name="download" /> Registrar entrada
+        <div style={{ marginTop: 14 }}>
+          <label style={labelStyle}>Costo de adquisición (opcional)</label>
+          <input style={inputStyle} type="number" min={0} step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Déjalo vacío para usar el costo de referencia" />
+          <p style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>Si lo dejas vacío se usa el <b>costo de referencia</b> del producto. Si lo capturas, ese será el costo real de este lote.</p>
+        </div>
+
+        {toast && !toast.ok && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 12 }}>{toast.text}</div>}
+        <button className="btn" type="button" style={{ marginTop: 18, width: '100%', opacity: valid && !busy ? 1 : 0.5, cursor: valid && !busy ? 'pointer' : 'not-allowed' }} onClick={submit} disabled={!valid || busy}>
+          <Icon name="download" /> {busy ? 'Registrando…' : 'Registrar entrada'}
         </button>
       </div>
 
@@ -163,8 +178,8 @@ export function Entradas() {
       </div>
       </div>
 
-      {toast && (
-        <div className="toast show"><Icon name="check" /> {toast}</div>
+      {toast?.ok && (
+        <div className="toast show"><Icon name="check" /> {toast.text}</div>
       )}
     </div>
   )
