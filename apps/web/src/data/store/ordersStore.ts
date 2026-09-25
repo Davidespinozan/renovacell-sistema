@@ -5,6 +5,7 @@
 // avanza el estado. Sin backend, opera sobre las semillas mock. La API no cambia.
 import type { Order, OrderItem } from '../types'
 import type { ShippingAddress } from '../ops/shippingAddress'
+import { decideTransferReview } from '../ops/transferReview'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -362,22 +363,68 @@ export function markPaid(orderId: string) {
   }
 }
 
-// Descartar una transferencia informada por el cliente que NO se localizó. Saca el
-// pedido de la cola "por confirmar" (transfer.reported=false) dejando rastro
-// (rejected + fecha), SIN marcar pagado ni cancelar el pedido; avisa al doctor para que
-// reintente o pague por otro medio. Antes esta pantalla solo tenía la salida "confirmar".
-export function rejectTransfer(orderId: string) {
+// CONFIRMAR / RECHAZAR una transferencia informada, de forma ATÓMICA y auditada por el
+// servidor (RPC review_transfer_payment, SECURITY DEFINER, solo Dirección/Facturación).
+// - confirm → payment_status='paid' (única vía manual de pago por transferencia).
+// - reject  → deja el pedido SIN pagar, marca el reporte como rechazado (con motivo) y
+//   lo saca de la cola; el doctor puede volver a reportar.
+// El servidor es la autoridad; el estado local es un espejo que se rehidrata después.
+export async function reviewTransfer(
+  orderId: string,
+  action: 'confirm' | 'reject',
+  reason?: string,
+): Promise<{ ok: boolean; status?: string; error?: string }> {
+  const o = orders.find((x) => x.id === orderId)
+  if (!o) return { ok: false, error: 'Pedido no encontrado.' }
+  if (action === 'reject' && !reason?.trim()) return { ok: false, error: 'El rechazo necesita un motivo.' }
+
+  // Autoridad server-side cuando hay backend.
+  if (hasSupabase && isUuid(orderId)) {
+    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: { message: string } | null }>)
+    const { data, error } = await rpc('review_transfer_payment', { p_order: orderId, p_action: action, p_reason: reason ?? null })
+    if (error) return { ok: false, error: error.message }
+    const res = (data ?? {}) as { status?: string }
+    // Espejo local + avisos (idempotente: si el server dijo already_*, no dispares avisos nuevos).
+    applyReviewLocally(orderId, action, reason, res.status)
+    hydrate()
+    return { ok: true, status: res.status }
+  }
+
+  // Mock (sin backend): reproduce la máquina de estados del RPC vía la función pura.
+  const prevTransfer = ((o.shipping_meta as Record<string, unknown> | null)?.transfer as Record<string, unknown> | null) ?? {}
+  const d = decideTransferReview(
+    { paymentStatus: o.payment_status ?? 'pending', reported: prevTransfer.reported === true, reviewStatus: (prevTransfer.review as { status?: string } | undefined)?.status },
+    action, reason,
+  )
+  if (!d.ok) return d
+  if (d.effect !== 'noop') applyReviewLocally(orderId, action, reason, d.status)
+  return { ok: true, status: d.status }
+}
+
+// Espejo local del efecto del RPC + avisos. status es lo que devolvió el server.
+function applyReviewLocally(orderId: string, action: 'confirm' | 'reject', reason: string | undefined, status?: string) {
   const o = orders.find((x) => x.id === orderId)
   if (!o) return
   const prevMeta = (o.shipping_meta as Record<string, unknown> | null) ?? {}
   const prevTransfer = (prevMeta.transfer as Record<string, unknown> | null) ?? {}
-  const nextMeta = { ...prevMeta, transfer: { ...prevTransfer, reported: false, rejected: true, rejected_at: new Date().toISOString() } }
-  orders = orders.map((x) => (x.id === orderId ? { ...x, shipping_meta: nextMeta } : x))
-  emit()
-  logAudit({ actor: 'Administración', action: 'Transferencia descartada', resource: folioOf(orderId) })
-  if (o.doctor_id) notify({ text: `No localizamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}. Reintenta el pago o usa otro método.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
-  if (hasSupabase && isUuid(orderId)) {
-    supabase.from('orders').update({ shipping_meta: nextMeta as unknown as Json }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] rejectTransfer', error.message); hydrate() })
+  const now = new Date().toISOString()
+  const noop = status === 'already_confirmed' || status === 'already_rejected'
+  if (action === 'confirm') {
+    const nextMeta = { ...prevMeta, transfer: { ...prevTransfer, reported: false, review: { status: 'confirmed', reviewed_at: now, reviewed_by: 'Administración' } } }
+    orders = orders.map((x) => (x.id === orderId ? { ...x, payment_status: 'paid', status: x.status === 'pending_payment' ? 'paid' : x.status, shipping_meta: nextMeta } : x))
+    emit()
+    if (noop) return
+    notify({ text: `Transferencia confirmada · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+    notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)}`, roles: ['admin'], screen: 'av_pagos' })
+    if (o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+    logAudit({ actor: 'Administración', action: 'Transferencia confirmada', resource: folioOf(orderId) })
+  } else {
+    const nextMeta = { ...prevMeta, transfer: { ...prevTransfer, reported: false, review: { status: 'rejected', reviewed_at: now, reviewed_by: 'Administración', reason: (reason ?? '').slice(0, 400) } } }
+    orders = orders.map((x) => (x.id === orderId ? { ...x, shipping_meta: nextMeta } : x))
+    emit()
+    if (noop) return
+    logAudit({ actor: 'Administración', action: 'Transferencia rechazada', resource: folioOf(orderId), detail: reason })
+    if (o.doctor_id) notify({ text: `No confirmamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}${reason ? ` (${reason})` : ''}. Reintenta el pago o usa otro método.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
   }
 }
 

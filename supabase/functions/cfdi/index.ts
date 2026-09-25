@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
   // Pedido + renglones + datos fiscales del doctor.
   const { data: order, error: oErr } = await admin.from('orders')
-    .select('id, external_ref, total, currency, doctor_id, payment_method, invoice_meta, order_items(description:product_id, qty, unit_price)')
+    .select('id, external_ref, total, currency, doctor_id, payment_method, payment_status, invoice_meta, order_items(description:product_id, qty, unit_price)')
     .eq('id', payload.order_id).single()
   if (oErr || !order) return json(404, { error: 'Pedido no encontrado.' })
 
@@ -64,6 +64,12 @@ Deno.serve(async (req) => {
   // (aunque el front reintente por doble clic o falle). Devuelve el UUID existente.
   const yaTimbrado = cfdiYaTimbrado((order as { invoice_meta?: unknown }).invoice_meta)
   if (yaTimbrado) return json(200, { uuid: yaTimbrado.uuid, id: yaTimbrado.facturama_id, idempotent: true })
+
+  // GATE DE PAGO (autoridad server-side): NO se timbra un pedido que no está pagado.
+  // El front oculta el botón, pero esta es la barrera real (no confiar en el cliente).
+  if ((order as { payment_status?: string }).payment_status !== 'paid') {
+    return json(422, { error: 'unpaid', message: 'El pedido debe estar pagado antes de facturarse.' })
+  }
 
   // LUGAR DE EXPEDICIÓN (#2): CP fiscal del EMISOR (Configuración de la empresa), nunca el
   // del receptor. Si falta, falla explícito en vez de usar el CP del receptor.

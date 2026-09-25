@@ -31,6 +31,7 @@ import { DoctoresDirectorio } from './admin/DoctoresDirectorio'
 import { Doctores } from './admin/Doctores' // cockpit de verificación (av_verif); av_doc queda como directorio comercial
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
+import { PagosPorValidar } from './admin/PagosPorValidar'
 import { Finanzas } from './admin/Finanzas'
 import { CierreCaja } from './admin/CierreCaja'
 import { Bitacora } from './admin/Bitacora'
@@ -78,6 +79,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_verif: () => <Doctores />, // "Por verificar": gate del canal comercial (profiles.verified)
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
+  av_pagos: () => <PagosPorValidar />,
   av_finanzas: () => <Finanzas />,
   av_cierre: () => <CierreCaja />,
   av_audit: () => <Bitacora />,

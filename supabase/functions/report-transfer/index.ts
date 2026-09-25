@@ -53,6 +53,17 @@ Deno.serve(async (req) => {
   if (order.payment_status === 'paid') return json(400, { error: 'Ese pedido ya está pagado.' })
 
   const now = new Date().toISOString()
+  const meta = { ...((order.shipping_meta ?? {}) as Record<string, unknown>) }
+  const prev = (meta.transfer ?? null) as Record<string, unknown> | null
+
+  // Cuenta bancaria: además del formato, DEBE existir y estar ACTIVA (auditoría real,
+  // no un UUID cualquiera). Si no se indica, se acepta null (retrocompat).
+  let bankAccountId: string | null = null
+  if (typeof body.bank_account_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.bank_account_id)) {
+    const { data: acct } = await admin.from('company_bank_accounts').select('id, active').eq('id', body.bank_account_id).maybeSingle()
+    if (!acct || acct.active !== true) return json(400, { error: 'La cuenta bancaria seleccionada no es válida o está inactiva.' })
+    bankAccountId = acct.id
+  }
 
   // Comprobante (opcional) → bucket privado.
   let proofPath: string | null = null
@@ -63,19 +74,32 @@ Deno.serve(async (req) => {
     if (!up.error) proofPath = path
   }
 
-  // Marca el pedido (conserva la dirección de entrega que ya trae shipping_meta).
-  const meta = { ...((order.shipping_meta ?? {}) as Record<string, unknown>) }
-  // Atribución: a qué cuenta bancaria de Renovacell transfirió el doctor (auditoría
-  // Pedido → transferencia → cuenta → comprobante). Aditivo; null si no se indicó.
-  const bankAccountId = typeof body.bank_account_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.bank_account_id) ? body.bank_account_id : null
-  meta.transfer = { reported: true, at: now, reference: (body.reference ?? '').slice(0, 80), proof_path: proofPath, bank_account_id: bankAccountId }
+  // Traza multi-intento SIN tabla nueva: si ya había un reporte (p.ej. uno RECHAZADO),
+  // se archiva en transfer.history[] antes de sobrescribir con el nuevo intento pendiente.
+  const history = Array.isArray(prev?.history) ? (prev!.history as unknown[]).slice(-9) : []
+  if (prev && (prev.reported || prev.review)) {
+    const { history: _drop, ...prevSnapshot } = prev as Record<string, unknown>
+    history.push({ ...prevSnapshot, archived_at: now })
+  }
+
+  // Nuevo intento en cola: reported=true + review.status='pending'.
+  meta.transfer = {
+    reported: true, at: now, reference: (body.reference ?? '').slice(0, 80),
+    proof_path: proofPath, bank_account_id: bankAccountId,
+    review: { status: 'pending' },
+    ...(history.length ? { history } : {}),
+  }
   await admin.from('orders').update({ shipping_meta: meta, payment_method: 'transferencia' }).eq('id', order.id)
 
-  // Avisa a Dirección (service role: sin el bloqueo del doctor).
-  await admin.from('notifications').insert({
-    body: `Transferencia informada · pedido ${order.external_ref ?? order.id} · confírmala al recibirla`,
-    roles: ['admin'], screen: 'av_fin',
-  }).then(() => {}, () => {})
+  // Avisa a Dirección (service role: sin el bloqueo del doctor). Evita duplicar el aviso
+  // si ya había un reporte pendiente sin revisar (re-envío del mismo intento).
+  const alreadyPending = prev?.reported === true && (prev?.review as Record<string, unknown> | undefined)?.status !== 'rejected'
+  if (!alreadyPending) {
+    await admin.from('notifications').insert({
+      body: `Transferencia informada · pedido ${order.external_ref ?? order.id} · confírmala al recibirla`,
+      roles: ['admin'], screen: 'av_pagos',
+    }).then(() => {}, () => {})
+  }
 
   return json(200, { ok: true })
 })

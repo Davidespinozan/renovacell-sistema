@@ -9,7 +9,7 @@ import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
-import { markInvoiced, markPaid, rejectTransfer } from '../../data/store/ordersStore'
+import { markInvoiced, markPaid, reviewTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
@@ -321,7 +321,13 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 <b>El cliente informó su transferencia.</b>{transfer.reference ? ` Referencia: ${transfer.reference}.` : ''} Verifica que cayó y márcala cobrada para liberar el pedido.
                 {transfer.proof_path && <> · <button type="button" onClick={() => verProof(transfer.proof_path!)} style={{ color: 'var(--green-deep)', fontWeight: 700, background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>Ver comprobante</button></>}
               </span>
-              <button type="button" className="btn ghost sm" onClick={() => { if (window.confirm('¿Descartar esta transferencia? El pedido sale de la cola por confirmar y se avisa al cliente para que reintente. No marca pagado ni cancela.')) { rejectTransfer(order.id); onClose() } }}>Descartar transferencia</button>
+              <button type="button" className="btn ghost sm" onClick={async () => {
+                const motivo = window.prompt('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela.')
+                if (motivo == null) return
+                const r = await reviewTransfer(order.id, 'reject', motivo)
+                if (!r.ok) { window.alert(r.error ?? 'No se pudo rechazar.'); return }
+                onClose()
+              }}>Rechazar transferencia</button>
             </div>
           )}
 
@@ -442,19 +448,33 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
             {!paid && (
-              <button className="btn ghost" type="button" onClick={() => markPaid(order.id)}>
-                <BadgeDollarSign size={15} /> Marcar cobrado
-              </button>
+              transfer ? (
+                <button className="btn ghost" type="button" onClick={async () => {
+                  const r = await reviewTransfer(order.id, 'confirm')
+                  if (!r.ok) { window.alert(r.error ?? 'No se pudo confirmar.'); return }
+                  onClose()
+                }}>
+                  <BadgeDollarSign size={15} /> Confirmar pago (transferencia)
+                </button>
+              ) : (
+                <button className="btn ghost" type="button" onClick={() => markPaid(order.id)}>
+                  <BadgeDollarSign size={15} /> Marcar cobrado
+                </button>
+              )
             )}
-            {!emitida ? (
-              <button className="btn" type="button" onClick={() => markInvoiced(order.id)}>
-                <FileText size={15} /> Emitir CFDI
-              </button>
-            ) : (
+            {/* GATE CFDI (front): no se puede timbrar sin pago. El servidor es la barrera real
+                (cfdi Edge exige payment_status='paid'); aquí solo se evita ofrecer la acción. */}
+            {emitida ? (
               <button className="btn" type="button" disabled style={{ opacity: 0.6, cursor: 'default' }}>
                 <FileCheck2 size={15} /> CFDI emitido
+              </button>
+            ) : !paid ? (
+              <span className="ms" style={{ color: 'var(--ink-3)' }}>El pedido debe estar pagado antes de facturarse.</span>
+            ) : (
+              <button className="btn" type="button" onClick={() => markInvoiced(order.id)}>
+                <FileText size={15} /> Emitir CFDI
               </button>
             )}
           </div>
