@@ -107,10 +107,10 @@ describe('estadoResultados — utilidad valuada al costo REAL del lote', () => {
   it('usa el unit_cost del lote como costo de ventas (no margen 100% falso)', () => {
     const lots = [lot({ id: 'l1', unit_cost: 400, quantity: 10 })]
     const orders = [order({ total: 1000 })]
-    const movements = [mov({ lot_id: 'l1', change: -2, reason: 'surtido' })] // 2 u vendidas
+    const movements = [mov({ lot_id: 'l1', change: -2, reason: 'surtido', unit_cost: 400 })] // 2 u @ costo congelado 400
     const r = estadoResultados(orders, [], movements, lots)
     expect(r.ventas).toBe(1000)
-    expect(r.costoVentas).toBe(800)       // 2 × 400 (costo real)
+    expect(r.costoVentas).toBe(800)       // 2 × 400 (costo congelado en el movimiento)
     expect(r.utilidadBruta).toBe(200)
     expect(r.margenBruto).toBeCloseTo(20) // NO 100%
   })
@@ -118,8 +118,8 @@ describe('estadoResultados — utilidad valuada al costo REAL del lote', () => {
   it('separa la merma (caducidad/daño) del costo de ventas', () => {
     const lots = [lot({ id: 'l1', unit_cost: 100, quantity: 10 })]
     const movements = [
-      mov({ lot_id: 'l1', change: -1, reason: 'surtido' }), // costo de ventas
-      mov({ lot_id: 'l1', change: -3, reason: 'merma' }),   // pérdida, no COGS
+      mov({ lot_id: 'l1', change: -1, reason: 'surtido', unit_cost: 100 }), // costo de ventas (congelado)
+      mov({ lot_id: 'l1', change: -3, reason: 'merma', unit_cost: 100 }),   // pérdida, no COGS
     ]
     const r = estadoResultados([order({ total: 500 })], [], movements, lots)
     expect(r.costoVentas).toBe(100) // solo el surtido

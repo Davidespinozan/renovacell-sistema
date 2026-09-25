@@ -27,16 +27,16 @@ const lotsLive = makeLive<Lot>(async () => {
   // (solo admin/billing lo lee). Para otros roles la consulta devuelve [] y el
   // costo queda en 0 —correcto: no ven finanzas. NUNCA usar costOf(uuid): sus
   // claves son slugs legacy ('p-mgp-90') y con uuid siempre daría 0 (utilidad falsa).
-  const [lotsRes, costsRes] = await Promise.all([
-    supabase.from('lots').select('id, product_id, lot_code, manufacture_date, expiry_date, quantity, location, metadata'),
-    supabase.from('product_costs').select('product_id, unit_cost'),
-  ])
-  if (lotsRes.error) throw lotsRes.error
-  const costMap = new Map<string, number>((costsRes.data ?? []).map((c) => [c.product_id as string, Number(c.unit_cost) || 0]))
-  const mapped = (lotsRes.data ?? []).map((l) => ({
+  // Fase 2: el costo REAL de valoración del lote vive en lots.unit_cost (costo de
+  // adquisición conocido; NULL = desconocido). product_costs queda como referencia (Catálogo),
+  // NO se usa aquí para valorar (evita presentar el estándar como costo real del lote).
+  const { data: lotsData, error: lotsErr } = await supabase.from('lots')
+    .select('id, product_id, lot_code, manufacture_date, expiry_date, quantity, location, unit_cost, metadata')
+  if (lotsErr) throw lotsErr
+  const mapped = (lotsData ?? []).map((l) => ({
     id: l.id, product_id: l.product_id ?? '', lot_code: l.lot_code,
     manufacture_date: l.manufacture_date, expiry_date: l.expiry_date, quantity: l.quantity,
-    location: l.location, unit_cost: costMap.get(l.product_id ?? '') ?? 0, metadata: (l.metadata ?? null) as Lot['metadata'],
+    location: l.location, unit_cost: (l as { unit_cost?: number | null }).unit_cost ?? null, metadata: (l.metadata ?? null) as Lot['metadata'],
   }))
   flagExpiring(mapped) // avisa de lotes por caducar / caducados al cargar inventario
   return mapped
@@ -45,12 +45,13 @@ const lotsLive = makeLive<Lot>(async () => {
 const movsLive = makeLive<InventoryMovement>(async () => {
   const { data, error } = await supabase
     .from('inventory_movements')
-    .select('id, lot_id, change, reason, reference, created_by, created_at')
+    .select('id, lot_id, change, reason, reference, created_by, created_at, unit_cost')
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((m) => ({
     id: m.id, lot_id: m.lot_id ?? '', change: m.change, reason: m.reason ?? '',
     reference: m.reference, created_by: m.created_by, created_at: m.created_at ?? '',
+    unit_cost: (m as { unit_cost?: number | null }).unit_cost ?? null,
   }))
 }, movsFallback)
 

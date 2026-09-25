@@ -3,7 +3,6 @@
 // SENSIBLE: usa costos → solo se muestra a Dirección.
 import type { OrderWithItems } from '../hooks/useOrders'
 import { isSale, isPosOrder } from '../metrics'
-import { costOf } from '../mock/costs'
 import type { Gasto } from '../store/gastosStore'
 import type { PurchaseOrder } from '../store/comprasStore'
 import type { InventoryMovement, Lot } from '../types'
@@ -28,6 +27,10 @@ export interface EstadoResultados {
   utilidadNeta: number
   margenBruto: number   // %
   margenNeto: number    // %
+  // Fase 2 · cobertura de costo (COGS a partir de snapshots congelados en el ledger).
+  costoConocidoPct: number   // % de unidades vendidas con costo histórico conocido
+  unidadesSinCosto: number   // unidades de COGS con costo desconocido (movimientos NULL, p.ej. legacy)
+  costoConfiable: boolean    // true si todas las unidades de COGS tienen costo (cobertura 100%)
 }
 
 // Estado de resultados del periodo: ventas netas − costo de ventas − gastos = utilidad.
@@ -40,18 +43,27 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
   const saleIds = new Set(sales.map((o) => o.id))
   const devoluciones = refunds.filter((r) => saleIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
   const ventasNetas = ventas - devoluciones
-  const lotById: Record<string, Lot | undefined> = Object.fromEntries(lots.map((l) => [l.id, l]))
-  const lotCost = (lotId: string): number => {
-    const l = lotById[lotId]
-    return l?.unit_cost ?? costOf(l?.product_id)
-  }
+  // Fase 2: el COGS usa el COSTO CONGELADO en cada movimiento (m.unit_cost), no el costo
+  // actual de product_costs → cambiar product_costs mañana NO altera la historia. NULL =
+  // costo desconocido (p.ej. movimientos legacy pre-Fase 2): NO se cuenta como 0, se reporta
+  // como cobertura incompleta.
+  let cogsUnitsKnown = 0
+  let cogsUnitsUnknown = 0
   const costoVentas = movements.reduce((s, m) => {
-    const c = lotCost(m.lot_id)
-    if (COGS_OUT.has(m.reason ?? '') && m.change < 0) return s + (-m.change) * c
-    if (COGS_IN.has(m.reason ?? '') && m.change > 0) return s - m.change * c
-    return s
+    const out = COGS_OUT.has(m.reason ?? '') && m.change < 0
+    const inn = COGS_IN.has(m.reason ?? '') && m.change > 0
+    if (!out && !inn) return s
+    const units = Math.abs(m.change)
+    if (m.unit_cost == null) { cogsUnitsUnknown += units; return s } // desconocido → no fabrica costo
+    cogsUnitsKnown += units
+    return out ? s + units * m.unit_cost : s - units * m.unit_cost
   }, 0)
-  const mermas = movements.reduce((s, m) => (MERMA.has(m.reason ?? '') && m.change < 0 ? s + (-m.change) * lotCost(m.lot_id) : s), 0)
+  const mermas = movements.reduce((s, m) => {
+    if (!(MERMA.has(m.reason ?? '') && m.change < 0)) return s
+    return m.unit_cost == null ? s : s + (-m.change) * m.unit_cost // NULL merma legacy → desconocida, no 0
+  }, 0)
+  const cogsUnitsTotal = cogsUnitsKnown + cogsUnitsUnknown
+  const costoConocidoPct = cogsUnitsTotal > 0 ? Math.round((cogsUnitsKnown / cogsUnitsTotal) * 100) : 100
   const gastosTotal = gastos.reduce((s, g) => s + g.monto, 0)
   const utilidadBruta = ventasNetas - costoVentas
   const utilidadNeta = utilidadBruta - gastosTotal - mermas
@@ -66,6 +78,9 @@ export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], move
     utilidadNeta,
     margenBruto: ventasNetas > 0 ? (utilidadBruta / ventasNetas) * 100 : 0,
     margenNeto: ventasNetas > 0 ? (utilidadNeta / ventasNetas) * 100 : 0,
+    costoConocidoPct,
+    unidadesSinCosto: cogsUnitsUnknown,
+    costoConfiable: cogsUnitsUnknown === 0,
   }
 }
 

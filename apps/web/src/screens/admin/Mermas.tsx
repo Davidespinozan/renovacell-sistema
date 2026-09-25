@@ -9,7 +9,6 @@ import { ExportButton } from '../../app/ExportButton'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
-import { costOf } from '../../data/mock/costs'
 
 const MERMA_REASONS = new Set(['merma', 'baja'])
 const reasonLabel = (r: string | null): string => (r === 'baja' ? 'Baja' : r === 'merma' ? 'Merma (caducidad/daño)' : r ?? '—')
@@ -34,13 +33,16 @@ export function Mermas() {
       .map((m) => {
         const lot = lotById[m.lot_id]
         const unidades = -m.change
-        const costo = lot?.unit_cost ?? costOf(lot?.product_id)
+        // Fase 2: pérdida a COSTO CONGELADO del movimiento (histórico, no retroactivo).
+        // NULL = costo desconocido (merma legacy) → no se fabrica (queda en 0 y se marca).
+        const costo = m.unit_cost ?? null
         return {
           id: m.id, fecha: m.created_at,
           producto: prodName[lot?.product_id ?? ''] ?? 'Producto',
           lote: lot?.lot_code ?? '—',
           unidades, motivo: reasonLabel(m.reason),
-          valor: unidades * costo,
+          valor: costo == null ? 0 : unidades * costo,
+          costoDesconocido: costo == null,
           referencia: m.reference ?? '',
         }
       })
@@ -96,7 +98,7 @@ export function Mermas() {
                   <td data-label="Lote" className="mono">{r.lote}</td>
                   <td data-label="Unidades" className="mono">{r.unidades}</td>
                   <td data-label="Motivo">{r.motivo}</td>
-                  <td data-label="Pérdida" className="mono"><b>{money(r.valor)}</b></td>
+                  <td data-label="Pérdida" className="mono"><b>{r.costoDesconocido ? '—' : money(r.valor)}</b>{r.costoDesconocido && <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }} title="Costo desconocido (merma anterior al registro de costo)"> s/costo</span>}</td>
                 </tr>
               ))}
               {rows.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-3)' }}>Sin mermas registradas {scope === 'mes' ? 'este mes' : ''}.</td></tr>}

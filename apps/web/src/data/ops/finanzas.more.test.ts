@@ -6,9 +6,10 @@ import { mkOrder, mkLot, mkMov } from '../../test/factories'
 describe('estadoResultados — reversas y márgenes', () => {
   it('una cancelación (reingreso) resta del costo de ventas', () => {
     const lots = [mkLot({ id: 'l1', unit_cost: 100, quantity: 10 })]
+    // Fase 2: el COGS usa el costo CONGELADO en el movimiento (snapshot), no el del lote.
     const movements = [
-      mkMov({ lot_id: 'l1', change: -5, reason: 'surtido' }), // -500 costo
-      mkMov({ lot_id: 'l1', change: 2, reason: 'cancelacion' }), // reingreso: +2*100 revierte
+      mkMov({ lot_id: 'l1', change: -5, reason: 'surtido', unit_cost: 100 }), // -500 costo
+      mkMov({ lot_id: 'l1', change: 2, reason: 'cancelacion', unit_cost: 100 }), // reingreso: +2*100 revierte
     ]
     const r = estadoResultados([mkOrder({ total: 2000 })], [], movements, lots)
     expect(r.costoVentas).toBe(300) // 500 - 200
@@ -21,7 +22,7 @@ describe('estadoResultados — reversas y márgenes', () => {
 
   it('los gastos reducen la utilidad neta pero no la bruta', () => {
     const lots = [mkLot({ id: 'l1', unit_cost: 100 })]
-    const movements = [mkMov({ lot_id: 'l1', change: -1, reason: 'surtido' })]
+    const movements = [mkMov({ lot_id: 'l1', change: -1, reason: 'surtido', unit_cost: 100 })]
     const r = estadoResultados([mkOrder({ total: 1000 })], [{ id: 'g', fecha: '2026-06-01', categoria: 'Renta', concepto: 'x', monto: 400, created_at: '' } as never], movements, lots)
     expect(r.utilidadBruta).toBe(900) // 1000 - 100
     expect(r.utilidadNeta).toBe(500) // 900 - 400 gastos

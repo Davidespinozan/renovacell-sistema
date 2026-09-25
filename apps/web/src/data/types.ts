@@ -82,6 +82,7 @@ export interface InventoryMovement {
   reference: string | null
   created_by: UUID | null
   created_at: ISODateTime
+  unit_cost?: number | null // snapshot histórico del costo del lote en ese movimiento (Fase 2)
 }
 
 export type OrderStatus =

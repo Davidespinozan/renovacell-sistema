@@ -3,7 +3,6 @@
 // SENSIBLES (costos/utilidad): solo Dirección. Lógica pura en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle, Receipt } from 'lucide-react'
-import { useProducts } from '../../data/hooks/useProducts'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
@@ -22,19 +21,9 @@ export function Finanzas() {
   const { data: compras, markPaid } = useCompras()
   const { data: movements } = useInventory()
   const { data: lots } = useLots()
-  const { data: products } = useProducts()
   const { data: gastos, addGasto, removeGasto } = useGastos()
   const [open, setOpen] = useState(false)
 
-  // Productos con lotes SIN costo registrado (falta su renglón en product_costs):
-  // su costo de ventas se contabiliza en 0 → la utilidad saldría inflada. Se avisa.
-  const missingCost = useMemo(() => {
-    const zero = new Set(lots.filter((l) => (l.unit_cost ?? 0) === 0).map((l) => l.product_id))
-    return products.filter((p) => zero.has(p.id)).map((p) => p.name)
-  }, [lots, products])
-  // Con costos incompletos, el costo de ventas se subestima → utilidad y margen NO son
-  // confiables. No se muestran como número firme ni se exportan como reales.
-  const costosIncompletos = missingCost.length > 0
 
   const [period, setPeriod] = useState<'mes' | 'pasado' | 'todo'>('mes')
   const range = useMemo(() => {
@@ -55,6 +44,7 @@ export function Finanzas() {
   // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
   const { data: refunds } = useRefunds()
   const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots, refunds), [fOrders, fGastos, fMov, lots, refunds])
+  const cogsUnreliable = !er.costoConfiable  // Fase 2: confianza del COGS = cobertura de snapshots congelados
   const cob = useMemo(() => cobranza(fOrders, refunds), [fOrders, refunds])
   const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
@@ -68,12 +58,13 @@ export function Finanzas() {
         <b> cuánto ganaste</b> — más lo que te deben y lo que debes. (Solo Dirección.)
       </PageHead>
 
-      {missingCost.length > 0 && (
+      {cogsUnreliable && (
         <div className="sysnote" style={{ background: 'var(--warn-bg, #FFF6E5)', borderColor: '#E9D8A6', color: '#8a6d1a', alignItems: 'flex-start' }}>
           <AlertTriangle size={16} />
           <span>
-            <b>{missingCost.length} producto(s) sin costo registrado.</b> Su costo de ventas se cuenta en $0, así que la
-            utilidad puede estar <b>sobrevaluada</b>. Captura su costo (Catálogo/Inventario): {missingCost.slice(0, 6).join(', ')}{missingCost.length > 6 ? '…' : ''}.
+            <b>Costo histórico incompleto: cobertura {er.costoConocidoPct}%.</b> {er.unidadesSinCosto} unidad(es) vendida(s) del periodo
+            no tienen costo congelado (ventas anteriores al registro de costo). Por eso <b>utilidad y margen se marcan como no confiables</b>;
+            las ventas futuras sí llevan su costo real. Cambiar el costo de referencia hoy no altera la historia ya registrada.
           </span>
         </div>
       )}
@@ -89,17 +80,17 @@ export function Finanzas() {
           name={`estado-de-resultados-${range.label}`}
           style={{ marginLeft: 'auto' }}
           rows={[
-            ...(costosIncompletos ? [{ concepto: 'AVISO: costos incompletos — utilidad y margen NO son confiables', monto: '' as number | string }] : []),
+            ...(cogsUnreliable ? [{ concepto: 'AVISO: costos incompletos — utilidad y margen NO son confiables', monto: '' as number | string }] : []),
             { concepto: 'Ventas', monto: er.ventas as number | string },
             { concepto: 'Devoluciones', monto: -er.devoluciones },
             { concepto: 'Ventas netas', monto: er.ventasNetas },
-            { concepto: 'Costo de ventas', monto: costosIncompletos ? 'incompleto' : -er.costoVentas },
-            { concepto: 'Utilidad bruta', monto: costosIncompletos ? 'no confiable' : er.utilidadBruta },
+            { concepto: 'Costo de ventas', monto: cogsUnreliable ? 'incompleto' : -er.costoVentas },
+            { concepto: 'Utilidad bruta', monto: cogsUnreliable ? 'no confiable' : er.utilidadBruta },
             { concepto: 'Gastos', monto: -er.gastos },
             { concepto: 'Mermas', monto: -er.mermas },
-            { concepto: 'Utilidad neta', monto: costosIncompletos ? 'no confiable' : er.utilidadNeta },
-            { concepto: 'Margen bruto %', monto: costosIncompletos ? 'no confiable' : Math.round(er.margenBruto * 10) / 10 },
-            { concepto: 'Margen neto %', monto: costosIncompletos ? 'no confiable' : Math.round(er.margenNeto * 10) / 10 },
+            { concepto: 'Utilidad neta', monto: cogsUnreliable ? 'no confiable' : er.utilidadNeta },
+            { concepto: 'Margen bruto %', monto: cogsUnreliable ? 'no confiable' : Math.round(er.margenBruto * 10) / 10 },
+            { concepto: 'Margen neto %', monto: cogsUnreliable ? 'no confiable' : Math.round(er.margenNeto * 10) / 10 },
           ]}
           columns={[
             { key: 'concepto', label: 'Concepto' },
@@ -114,11 +105,11 @@ export function Finanzas() {
         {er.devoluciones > 0 && (
           <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventasNetas)}`} accent="dang" />
         )}
-        <Stat icon={<ArrowDownCircle size={18} />} v={costosIncompletos ? '—' : money(er.costoVentas)} k="Costo de ventas" s={costosIncompletos ? 'faltan costos' : `margen bruto ${pct(er.margenBruto)}`} accent={costosIncompletos ? 'warn' : undefined} />
-        <Stat icon={<Wallet size={18} />} v={costosIncompletos ? 'No confiable' : money(er.utilidadBruta)} k="Utilidad bruta" s={costosIncompletos ? 'captura costos para verla' : 'ventas − costo'} accent={costosIncompletos ? 'warn' : undefined} />
+        <Stat icon={<ArrowDownCircle size={18} />} v={cogsUnreliable ? '—' : money(er.costoVentas)} k="Costo de ventas" s={cogsUnreliable ? 'faltan costos' : `margen bruto ${pct(er.margenBruto)}`} accent={cogsUnreliable ? 'warn' : undefined} />
+        <Stat icon={<Wallet size={18} />} v={cogsUnreliable ? 'No confiable' : money(er.utilidadBruta)} k="Utilidad bruta" s={cogsUnreliable ? 'captura costos para verla' : 'ventas − costo'} accent={cogsUnreliable ? 'warn' : undefined} />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
         <Stat icon={<ArrowDownCircle size={18} />} v={money(er.mermas)} k="Mermas" s="caducidad / daño" accent={er.mermas > 0 ? 'dang' : undefined} />
-        <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={costosIncompletos ? 'No confiable' : money(er.utilidadNeta)} k="Utilidad neta" s={costosIncompletos ? 'captura costos para verla' : `margen neto ${pct(er.margenNeto)}`} accent={costosIncompletos ? 'warn' : er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
+        <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={cogsUnreliable ? 'No confiable' : money(er.utilidadNeta)} k="Utilidad neta" s={cogsUnreliable ? 'captura costos para verla' : `margen neto ${pct(er.margenNeto)}`} accent={cogsUnreliable ? 'warn' : er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
       </div>
 
       {/* Cobranza real: vendido vs dinero que de verdad entró */}
