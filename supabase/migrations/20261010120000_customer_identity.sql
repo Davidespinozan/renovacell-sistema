@@ -217,12 +217,17 @@ update public.prospects pr
    and c.profile_id = (pr.meta->>'convertedDoctorId')::uuid;
 
 -- ── orders.customer_id backfill DETERMINISTA (doctor_id → único customer por profile_id) ───────
+-- El orders_guard bloquea cambios financieros salvo contexto confiable; este backfill solo enlaza
+-- la identidad comercial (no toca dinero/estado), así que se marca trusted para pasar el trigger.
+-- set_config(...,false) = nivel sesión: válido con o sin transacción (evita warning de SET LOCAL).
+select set_config('app.trusted','on', false);
 update public.orders o
    set customer_id = c.id
   from public.customers c
  where o.customer_id is null
    and o.doctor_id is not null
    and c.profile_id = o.doctor_id;
+select set_config('app.trusted','off', false);
 
 -- ── Grants ───────────────────────────────────────────────────────────────────────────────────
 revoke all on function public._norm_email(text) from public, anon, authenticated;
