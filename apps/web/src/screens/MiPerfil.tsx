@@ -11,7 +11,7 @@ import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { DeliveryLocationsManager } from '../app/DeliveryLocationsManager'
 import { FiscalFields } from '../app/FiscalFields'
 import { emptyFiscalProfile, normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../data/ops/fiscal'
-import { customerFiscal, upsertCustomerFiscal } from '../data/store/customersStore'
+import { customerFiscal, upsertCustomerFiscal, upsertCustomerContact } from '../data/store/customersStore'
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
   const { user, role, updateProfile } = useRole()
@@ -69,6 +69,11 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       if (pErr) { setError(traducirError(pErr)); setBusy(false); return }
     }
     await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined })
+    // Contacto comercial compartido: el customer es la autoridad. Si el doctor tiene customer
+    // ligado, sincroniza el nombre vía operación acotada (merge conservador; no pisa con vacío).
+    if (isDoctor && customerId && name.trim()) {
+      await upsertCustomerContact(customerId, { full_name: name.trim() })
+    }
     // Datos fiscales (opcionales): si el doctor capturó algo, se persiste en el MASTER
     // (customers.meta.fiscal) vía RPC. Si está incompleto, se bloquea y se marca el error.
     if (isDoctor) {

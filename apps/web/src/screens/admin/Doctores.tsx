@@ -369,14 +369,28 @@ function DoctorDetail({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const buildNewCustomer = (): CustomerFields => ({
-    full_name: doctor.full_name ?? 'Doctor',
-    email: doctor.email ?? null,
-    phone: (doctor.meta?.phone as string) ?? null,
-    city: (doctor.meta?.city as string) ?? null,
-    source: 'portal',
-    profile_id: doctor.id,
-  } as CustomerFields)
+  // Preserva TODO el contexto comercial disponible (incl. el que viajó desde el prospecto en
+  // doctor.meta.commercial): teléfono, ciudad, source, organización, notas y vendedor. NULL/'' no
+  // fabrica valores; el seller queda como seller_profile_id en meta (no perdemos la atribución).
+  const buildNewCustomer = (): CustomerFields => {
+    const c = (doctor.meta?.commercial ?? {}) as Record<string, unknown>
+    const meta: Record<string, unknown> = {}
+    const org = doctor.organization ?? (c.organization as string) ?? null
+    if (org) meta.organization = org
+    if (c.notes) meta.notes = c.notes
+    if (c.seller_profile_id) meta.seller_profile_id = c.seller_profile_id
+    if (c.from_prospect) meta.from_prospect = c.from_prospect
+    return {
+      full_name: doctor.full_name ?? 'Doctor',
+      email: doctor.email ?? null,
+      phone: (doctor.meta?.phone as string) ?? (c.phone as string) ?? null,
+      city: (doctor.meta?.city as string) ?? (c.city as string) ?? null,
+      source: (c.source as string) ?? 'portal',
+      seller_name: (c.seller_name as string) ?? null,
+      profile_id: doctor.id,
+      meta,
+    } as CustomerFields
+  }
 
   const doApprove = async () => {
     setErr(null)

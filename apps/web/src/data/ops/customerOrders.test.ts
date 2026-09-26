@@ -82,8 +82,10 @@ describe('garantías DB — RPC crear_pedido / vender_pos (migración)', () => {
 })
 
 describe('data layer / UI pasan customer_id a las RPC', () => {
-  it('ordersStore.createOrder pasa p_customer_id a crear_pedido', () => {
-    expect(ordersRaw).toMatch(/p_customer_id: \(isUuid\(input\.customer_id\)/)
+  it('ordersStore.createOrder pasa p_customer_id a crear_pedido (customer explícito o resuelto del doctor)', () => {
+    // Customer 360: el pedido Portal del doctor lleva customer_id resuelto por profile_id.
+    expect(ordersRaw).toMatch(/p_customer_id: resolvedCustomerId/)
+    expect(ordersRaw).toMatch(/from\('customers'\)\.select\('id'\)\.eq\('profile_id', doctorId/)
   })
   it('pos.ts pasa p_customer_id a vender_pos', () => {
     expect(posSrc).toMatch(/p_customer_id: \(isUuid\(opts\.customerId\)/)

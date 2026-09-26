@@ -143,9 +143,19 @@ Deno.serve(async (req) => {
     const meta: Record<string, unknown> = { organization: null, interest: [], notes: [], messages: [message] }
     if (inc.psid) meta.psid = inc.psid
     const name = inc.name?.trim() || `Contacto ${inc.channel}`
+    // CUSTOMER 360: liga a un customer existente por teléfono (EXACT/MATCH); AMBIGUOUS → REVIEW.
+    let customerId: string | null = null
+    if (!inc.psid && inc.from) {
+      try {
+        const { data: r } = await admin.rpc('resolve_customer_identity', { p_phone: inc.from, p_name: name })
+        const res = r as { status?: string; customer_id?: string | null } | null
+        if (res?.status === 'EXACT' || res?.status === 'MATCH') customerId = res.customer_id ?? null
+        else if (res?.status === 'AMBIGUOUS') meta.identity_review = true
+      } catch { /* el webhook no debe fallar por el resolver */ }
+    }
     const { data: created } = await admin.from('prospects').insert({
       name, email: null, phone: inc.psid ? null : inc.from, cedula: null,
-      source: inc.channel, status: 'nuevo', assigned_to: assigned, meta,
+      source: inc.channel, status: 'nuevo', assigned_to: assigned, customer_id: customerId, meta,
     }).select('id, name, phone, source, assigned_to, meta').single()
     if (created) rows.push(created as typeof rows[number]) // que el resto del batch lo dedupe
 

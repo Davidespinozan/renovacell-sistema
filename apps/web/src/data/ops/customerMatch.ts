@@ -2,7 +2,9 @@
 // REGLA DURA (auditoría): customers.email NO es único → NUNCA auto-vincular por email.
 // Este módulo solo PROPONE candidatos y clasifica la resolución; la decisión final la
 // toma un humano en el cockpit. No hace merge ni sobrescribe datos históricos.
-import { normalizeEmail, normalizePhone, type Customer } from './customer'
+import type { Customer } from './customer'
+// Normalización UNIFICADA con el resolver central (identity.ts) — misma regla en todo el sistema.
+import { normalizeEmail, normalizePhone } from './identity'
 
 const norm = (s: string | null | undefined): string =>
   (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()

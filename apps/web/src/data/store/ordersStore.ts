@@ -142,11 +142,18 @@ export function createOrder(input: {
       // EL PRECIO NO LO PONE EL CLIENTE. El servidor (RPC crear_pedido, SECURITY DEFINER)
       // calcula unit_price/total desde la lista del doctor (o base/General si es customer-only);
       // aquí solo se manda {product_id, qty}. El total optimista se reemplaza por el del servidor.
+      // IDENTIDAD COMERCIAL: un pedido Portal de un doctor debe llevar customer_id ADEMÁS de
+      // doctor_id. Resuelve el customer ligado al profile del doctor (RLS: el doctor lee el suyo).
+      let resolvedCustomerId: string | null = isUuid(input.customer_id) ? (input.customer_id as string) : null
+      if (!resolvedCustomerId && isUuid(doctorId)) {
+        const { data: c } = await supabase.from('customers').select('id').eq('profile_id', doctorId as string).maybeSingle()
+        if (c?.id) resolvedCustomerId = c.id
+      }
       const { data, error } = await supabase.rpc('crear_pedido', {
         p_order_id: id,
         p_folio: folio,
         p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
-        p_customer_id: (isUuid(input.customer_id) ? input.customer_id : null) as unknown as string,
+        p_customer_id: resolvedCustomerId as unknown as string,
         p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
         p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
         p_invoice_requested: input.invoice_requested,

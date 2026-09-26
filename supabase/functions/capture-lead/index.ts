@@ -77,10 +77,21 @@ Deno.serve(async (req) => {
     assigned = sellers.map((s) => s.id as string).sort((a, b) => (load[a] ?? 0) - (load[b] ?? 0))[0]
   }
 
-  const meta = { organization, interest: interest ? [interest] : [], notes: [] as unknown[], capturedVia: 'landing' }
+  // CUSTOMER 360: ¿esta persona YA es un customer? Resuelve identidad ANTES de crear el prospect
+  // para no fabricar una identidad comercial paralela en silencio. EXACT/MATCH → liga el prospect al
+  // customer; AMBIGUOUS → deja el prospect sin ligar y marca REVIEW. NUNCA revela nada al lead.
+  let customerId: string | null = null
+  const meta: Record<string, unknown> = { organization, interest: interest ? [interest] : [], notes: [] as unknown[], capturedVia: 'landing' }
+  try {
+    const { data: r } = await admin.rpc('resolve_customer_identity', { p_email: email || null, p_phone: phone || null, p_name: name })
+    const res = r as { status?: string; customer_id?: string | null } | null
+    if (res?.status === 'EXACT' || res?.status === 'MATCH') customerId = res.customer_id ?? null
+    else if (res?.status === 'AMBIGUOUS') meta.identity_review = true
+  } catch { /* el lead no debe fallar por el resolver */ }
+
   const { error: insErr } = await admin.from('prospects').insert({
     name, email: email || null, phone: phone || null, cedula, source: channel,
-    status: 'nuevo', assigned_to: assigned, meta,
+    status: 'nuevo', assigned_to: assigned, customer_id: customerId, meta,
   })
   if (insErr) return json(500, { error: 'No se pudo registrar. Intenta de nuevo.' })
 

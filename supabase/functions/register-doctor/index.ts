@@ -252,6 +252,15 @@ Deno.serve(async (req) => {
   const autoOk = green && cel.decision === 'auto' // solo EVIDENCIA para el admin, NO da acceso
   const identityStatus = autoOk ? 'approved' : 'pending' // dictamen KYC (evidencia)
 
+  // CUSTOMER 360: resuelve si YA existe una identidad comercial (p.ej. customer migrado de Odoo con
+  // el mismo email). NO se auto-vincula; se deja como CANDIDATO para que la aprobación decida. Así el
+  // sistema ya no puede ignorar que existía un customer previo. AMBIGUOUS → REVIEW en el cockpit.
+  let commercial: { status: string; customer_id: string | null; signals: unknown } | null = null
+  try {
+    const { data: r } = await admin.rpc('resolve_customer_identity', { p_email: email, p_phone: p.phone ?? null, p_name: name })
+    if (r) commercial = r as { status: string; customer_id: string | null; signals: unknown }
+  } catch { /* el registro no debe fallar por el resolver */ }
+
   // SIEMPRE pendiente: verified=false + verification.status='pending'. La evidencia
   // (verifyResult + identity + auto_ok) queda en meta para que el admin decida en av_verif.
   await admin.from('profiles').upsert({
@@ -261,6 +270,7 @@ Deno.serve(async (req) => {
       cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence },
       verification: { status: 'pending', auto_ok: autoOk },
       capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}),
+      ...(commercial ? { commercial } : {}),
     },
   })
 

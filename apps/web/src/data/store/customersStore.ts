@@ -81,6 +81,30 @@ export async function upsertCustomerFiscal(customerId: string, fiscal: FiscalPro
   return { ok: true }
 }
 
+// RESOLVER CENTRAL (server-side) — devuelve { status, customer_id, signals }. Solo staff puede
+// llamarlo (RLS/authz en la RPC); el doctor no, para evitar enumeración de customers.
+export interface IdentityResolution { status: 'EXACT' | 'MATCH' | 'NOT_FOUND' | 'AMBIGUOUS'; customer_id: string | null; signals: string[] }
+export async function resolveCustomerIdentity(sig: { profile_id?: string | null; external_id?: string | null; source?: string | null; email?: string | null; phone?: string | null; name?: string | null }): Promise<IdentityResolution | null> {
+  if (!hasSupabase) return null
+  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: { message: string } | null }>)
+  const { data, error } = await rpc('resolve_customer_identity', {
+    p_profile_id: sig.profile_id ?? null, p_external_id: sig.external_id ?? null, p_source: sig.source ?? null,
+    p_email: sig.email ?? null, p_phone: sig.phone ?? null, p_name: sig.name ?? null,
+  })
+  if (error) { console.warn('[identity] resolve', error.message); return null }
+  return (data ?? null) as IdentityResolution | null
+}
+
+// SYNC de contacto acotado (Mi Perfil del doctor / staff). Merge conservador server-side: un valor
+// vacío NUNCA pisa dato bueno. No abre UPDATE general de customers.
+export async function upsertCustomerContact(customerId: string, patch: { full_name?: string; email?: string; phone?: string; city?: string; organization?: string; notes?: string; seller_name?: string }): Promise<{ ok: boolean; error?: string }> {
+  if (!hasSupabase) return { ok: true }
+  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+  const { error } = await rpc('upsert_customer_contact', { p_customer_id: customerId, p_patch: patch })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
 // Busca un customer existente por identidad (para clasificación de import). Prioridad: (source,
 // external_id) → email normalizado → sin match. No usa nombre solo.
 export async function findCustomerByIdentity(id: { source?: string; external_id?: string | null; email?: string | null }): Promise<Customer | null> {

@@ -130,11 +130,20 @@ export function Prospectos() {
     }
     // PREVENCIÓN DE CONVERSIÓN FANTASMA (caso David): solo marcamos 'convertido' si el doctor
     // se PERSISTIÓ de verdad. Si invite-doctor falla, el prospecto sigue en el pipeline.
+    // CUSTOMER 360: preserva el contexto comercial del prospecto para que sobreviva a la conversión
+    // y a la aprobación (hoy se perdía seller/source/notas/teléfono/ciudad). Viaja en profile.meta.
+    const pm = (p.meta ?? {}) as Record<string, unknown>
+    const notesText = Array.isArray(pm.notes) ? (pm.notes as { text?: string }[]).map((n) => n?.text).filter(Boolean).join(' · ') : ''
+    const commercial = {
+      phone: p.phone ?? null, city: (pm.city as string) ?? null, source: p.source ?? null,
+      organization: orgOf(p) || null, notes: notesText || null, seller_profile_id: p.assigned_to ?? null,
+      from_prospect: p.id,
+    }
     const r = await addPending({
       full_name: p.name ?? 'Doctor',
       email: p.email,
       organization: orgOf(p) || null,
-      meta: { cedula: p.cedula ?? undefined, fromProspect: p.id, owner: role === 'admin' ? undefined : user?.email },
+      meta: { cedula: p.cedula ?? undefined, fromProspect: p.id, owner: role === 'admin' ? undefined : user?.email, commercial },
     })
     if (!r.ok) { window.alert(r.error ?? 'No se pudo crear la cuenta del doctor. El prospecto NO se marcó como convertido.'); return }
     markConverted(p.id, r.id ?? '')
