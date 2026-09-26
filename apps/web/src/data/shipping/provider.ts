@@ -115,7 +115,11 @@ const NOT_CONFIGURED = Symbol('not_configured')
 export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string): Promise<RateQuote[]> {
   if (hasSupabase) {
     const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', shipper, receiver, pkg, orderRef })
-    if (r !== NOT_CONFIGURED && Array.isArray(r?.rates) && r.rates.length) return r.rates
+    // FAIL-CLOSED (#18): con backend conectado, "no configurado" NO cae a mock silencioso; es un
+    // bloqueo operativo explícito. El mock solo aplica en demo sin backend.
+    if (r === NOT_CONFIGURED) throw new Error('shipping_not_configured')
+    if (Array.isArray(r?.rates) && r.rates.length) return r.rates
+    return []
   }
   return mockQuoteRates({ origin: ORIGIN, destination: toShipAddress(receiver), parcel: toParcel(pkg), orderRef })
 }
@@ -124,9 +128,13 @@ export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, 
 export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote }): Promise<{ label: LabelResult; idempotent?: boolean }> {
   if (hasSupabase) {
     const r = await callShipping<{ label: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', ...args })
-    if (r !== NOT_CONFIGURED && r?.label?.tracking) return { label: r.label, idempotent: r.idempotent }
+    // FAIL-CLOSED (#18): con backend, DHL no configurado NO genera guía mock silenciosa.
+    if (r === NOT_CONFIGURED) throw new Error('shipping_not_configured')
+    if (r?.label?.tracking) return { label: r.label, idempotent: r.idempotent }
+    // Sin tracking y sin error lanzado (no debería pasar): trata como fallo, no como guía.
+    throw new Error('shipping_no_label')
   }
-  // Fallback demo/mock (sin persistir server-side): guía simulada.
+  // Fallback demo/mock SOLO sin backend (sin persistir server-side): guía simulada.
   const label = await mockGenerateLabel(args.rate, { origin: ORIGIN, destination: toShipAddress(args.receiver), parcel: toParcel(args.pkg), orderRef: args.orderRef })
   return { label: { ...label, provider: 'mock' } }
 }
