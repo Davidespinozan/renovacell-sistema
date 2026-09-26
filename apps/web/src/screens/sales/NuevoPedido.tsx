@@ -1,9 +1,13 @@
 // Levantar pedido A NOMBRE de un doctor (Ventas sobre su cartera, o Dirección).
 // Crea un pedido contra pedido idéntico a uno del Portal → cae solo en Almacén →
 // Preparar pedidos. Respeta el stock (mismo tope que el catálogo del doctor).
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
+import { hasSupabase, supabase } from '../../lib/supabase'
+import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
+import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
+import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
@@ -47,6 +51,39 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const [folio, setFolio] = useState<string | null>(null)
   const shipping = isCustomer ? custAddr : (choice?.address ?? null)
 
+  // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
+  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
+  const [fiscalCustomerId, setFiscalCustomerId] = useState<string | null>(null)
+  const [fiscalLoaded, setFiscalLoaded] = useState(false)
+  const [editingFiscal, setEditingFiscal] = useState(false)
+  const [showFiscalErr, setShowFiscalErr] = useState(false)
+  const [savingFiscal, setSavingFiscal] = useState(false)
+  const fiscalOk = isFiscalProfileComplete(fiscal)
+
+  useEffect(() => {
+    if (!invoice || fiscalLoaded) return
+    ;(async () => {
+      if (hasSupabase && isCustomer && customer?.id) {
+        setFiscalCustomerId(customer.id)
+        const { data } = await supabase.from('customers').select('meta').eq('id', customer.id).maybeSingle()
+        const m = customerFiscal(data as { meta: unknown } | null); setFiscal(m); setEditingFiscal(!isFiscalProfileComplete(m))
+      } else if (hasSupabase && doctor?.id) {
+        const { data: cust } = await supabase.from('customers').select('id, meta').eq('profile_id', doctor.id).maybeSingle()
+        if (cust?.id) setFiscalCustomerId(cust.id)
+        let m = customerFiscal(cust as { meta: unknown } | null)
+        if (!m.rfc) {
+          const { data: prof } = await supabase.from('profiles').select('meta').eq('id', doctor.id).maybeSingle()
+          const legacy = (prof?.meta as { fiscal?: unknown } | null)?.fiscal
+          if (legacy) m = normalizeFiscalProfile(legacy)
+        }
+        setFiscal(m); setEditingFiscal(!isFiscalProfileComplete(m))
+      } else {
+        setEditingFiscal(true)
+      }
+      setFiscalLoaded(true)
+    })()
+  }, [invoice, fiscalLoaded])
+
   const add = (id: string) => setCart((c) => {
     const info = stockInfoFor(stockMap, id)
     const max = info.tracked ? info.qty : 0
@@ -63,14 +100,22 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const total = lines.reduce((s, l) => s + (effOf(l.p!, l.qty) ?? l.p!.price ?? 0) * l.qty, 0)
   const savings = lines.reduce((s, l) => s + volumeSavings(l.p!.price, volRules, l.p!.id, l.qty), 0)
 
-  const crear = () => {
+  const crear = async () => {
     if (lines.length === 0 || !shipping) return
+    if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
+    if (invoice && fiscalCustomerId && editingFiscal) {
+      setSavingFiscal(true)
+      const res = await upsertCustomerFiscal(fiscalCustomerId, fiscal)
+      setSavingFiscal(false)
+      if (!res.ok) { window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
+    }
     const order = createOrder({
       lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
       total,
       invoice_requested: invoice,
       placedBy,
       shipping,
+      receiver: invoice ? fiscal : null,
       ...(isCustomer
         ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
         : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
@@ -130,15 +175,26 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
-              {isCustomer && invoice && (
-                <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 6 }}>
-                  Este cliente comercial no tiene datos fiscales en el portal; el timbrado CFDI se bloqueará hasta capturarlos.
+              {invoice && (
+                <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface-2, #fafafa)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales del cliente</div>
+                    {fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
+                  </div>
+                  {!fiscalLoaded ? (
+                    <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando…</div>
+                  ) : editingFiscal ? (
+                    <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
+                  ) : (
+                    <FiscalSummary value={fiscal} />
+                  )}
+                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>Completa los datos fiscales para poder solicitar la factura.</div>}
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0 || !shipping} style={(lines.length === 0 || !shipping) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>Crear pedido</button>
+                <button className="btn" type="button" disabled={lines.length === 0 || !shipping || savingFiscal || (invoice && !fiscalOk)} style={(lines.length === 0 || !shipping || savingFiscal || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : 'Crear pedido'}</button>
               </div>
             </div>
           </>

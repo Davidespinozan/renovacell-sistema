@@ -9,10 +9,9 @@ import { useRole } from '../auth/RoleContext'
 import { uploadImage } from '../lib/uploads'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { DeliveryLocationsManager } from '../app/DeliveryLocationsManager'
-
-// Usos de CFDI y regímenes fiscales SAT más comunes para persona física (doctor).
-const CFDI_USES = [['G03', 'Gastos en general'], ['G01', 'Adquisición de mercancías'], ['D01', 'Honorarios médicos'], ['P01', 'Por definir']] as const
-const REGIMES = [['612', 'PF con Actividad Empresarial y Profesional'], ['605', 'Sueldos y Salarios'], ['616', 'Sin obligaciones fiscales'], ['621', 'Incorporación Fiscal']] as const
+import { FiscalFields } from '../app/FiscalFields'
+import { emptyFiscalProfile, normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../data/ops/fiscal'
+import { customerFiscal, upsertCustomerFiscal } from '../data/store/customersStore'
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
   const { user, role, updateProfile } = useRole()
@@ -24,17 +23,27 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  // Datos fiscales del doctor (para su CFDI). Se guardan en profiles.meta.fiscal.
+  // Datos fiscales del doctor (para su CFDI). AUTORIDAD = customers.meta.fiscal (master omnicanal).
+  // profiles.meta.fiscal solo se lee como fallback legacy de transición.
   const isDoctor = role === 'doctor'
-  const [fiscal, setFiscal] = useState({ rfc: '', name: '', cfdiUse: 'G03', taxRegime: '612', taxZip: '' })
+  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  const [showFiscalErr, setShowFiscalErr] = useState(false)
 
   useEffect(() => {
     if (!isDoctor || !hasSupabase) return
     const uid = currentUserId(); if (!uid) return
-    supabase.from('profiles').select('meta').eq('id', uid).single().then(({ data }) => {
-      const f = ((data?.meta ?? {}) as { fiscal?: Record<string, string> }).fiscal
-      if (f) setFiscal((cur) => ({ ...cur, ...f }))
-    })
+    ;(async () => {
+      // Master: el customer ligado a este perfil.
+      const { data: cust } = await supabase.from('customers').select('id, meta').eq('profile_id', uid).maybeSingle()
+      if (cust?.id) setCustomerId(cust.id)
+      const master = customerFiscal(cust as { meta: unknown } | null)
+      if (master.rfc || master.razon_social) { setFiscal(master); return }
+      // Fallback legacy: profiles.meta.fiscal (para migración controlada del doctor al confirmar).
+      const { data: prof } = await supabase.from('profiles').select('meta').eq('id', uid).single()
+      const legacy = (prof?.meta as { fiscal?: unknown } | null)?.fiscal
+      if (legacy) setFiscal(normalizeFiscalProfile(legacy))
+    })()
   }, [isDoctor])
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
@@ -59,7 +68,22 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       const { error: pErr } = await supabase.auth.updateUser({ password: pw })
       if (pErr) { setError(traducirError(pErr)); setBusy(false); return }
     }
-    await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined, fiscal: isDoctor ? fiscal : undefined })
+    await updateProfile({ name: name.trim() || user?.name, avatarUrl: avatar || undefined })
+    // Datos fiscales (opcionales): si el doctor capturó algo, se persiste en el MASTER
+    // (customers.meta.fiscal) vía RPC. Si está incompleto, se bloquea y se marca el error.
+    if (isDoctor) {
+      const touched = Object.values(fiscal).some((v) => (v ?? '').toString().trim() !== '')
+      if (touched) {
+        if (!validateFiscalProfile(fiscal).ok) { setShowFiscalErr(true); setError('Revisa tus datos fiscales.'); setBusy(false); return }
+        if (customerId) {
+          const res = await upsertCustomerFiscal(customerId, fiscal)
+          if (!res.ok) { setError(res.error ?? 'No se pudieron guardar los datos fiscales.'); setBusy(false); return }
+        } else {
+          // Sin customer ligado (caso legacy/transición): conserva en profiles.meta.fiscal.
+          updateProfile({ fiscal: normalizeFiscalProfile(fiscal) as unknown as Record<string, string> })
+        }
+      }
+    }
     setBusy(false)
     setToast(pw ? 'Perfil y contraseña actualizados.' : 'Perfil actualizado.')
     window.setTimeout(() => { setToast(null); onClose() }, 1100)
@@ -91,26 +115,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Datos fiscales (para tu factura CFDI)</div>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>Los usamos solo al emitir tu factura. Opcional si no la necesitas.</div>
-              <label style={label}>RFC</label>
-              <input style={input} value={fiscal.rfc} onChange={(e) => setFiscal({ ...fiscal, rfc: e.target.value.toUpperCase() })} placeholder="XAXX010101000" />
-              <label style={label}>Razón social (nombre fiscal)</label>
-              <input style={input} value={fiscal.name} onChange={(e) => setFiscal({ ...fiscal, name: e.target.value })} placeholder="Como aparece en tu constancia" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={label}>Uso de CFDI</label>
-                  <select style={input} value={fiscal.cfdiUse} onChange={(e) => setFiscal({ ...fiscal, cfdiUse: e.target.value })}>
-                    {CFDI_USES.map(([v, t]) => <option key={v} value={v}>{v} · {t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={label}>CP fiscal</label>
-                  <input style={input} inputMode="numeric" value={fiscal.taxZip} onChange={(e) => setFiscal({ ...fiscal, taxZip: e.target.value })} placeholder="80020" />
-                </div>
-              </div>
-              <label style={label}>Régimen fiscal</label>
-              <select style={input} value={fiscal.taxRegime} onChange={(e) => setFiscal({ ...fiscal, taxRegime: e.target.value })}>
-                {REGIMES.map(([v, t]) => <option key={v} value={v}>{v} · {t}</option>)}
-              </select>
+              <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
             </div>
           )}
 

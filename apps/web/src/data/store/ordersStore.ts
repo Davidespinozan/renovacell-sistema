@@ -6,6 +6,7 @@
 import type { Order, OrderItem } from '../types'
 import type { ShippingAddress } from '../ops/shippingAddress'
 import { decideTransferReview } from '../ops/transferReview'
+import { normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../ops/fiscal'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -96,6 +97,7 @@ export function createOrder(input: {
   shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
   location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
   customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
+  receiver?: FiscalProfile | null   // perfil fiscal CONFIRMADO → congela invoice_meta.receiver del pedido
 }): OrderWithItems {
   const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
   const folio = `S${Date.now().toString().slice(-6)}`
@@ -108,7 +110,8 @@ export function createOrder(input: {
     id, external_ref: folio, doctor_id: doctorId, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
-    invoice_meta: null,
+    // Snapshot fiscal congelado en el momento de confirmar la solicitud (no se recalcula después).
+    invoice_meta: input.receiver ? ({ receiver: normalizeFiscalProfile(input.receiver) } as unknown as Order['invoice_meta']) : null,
     // El snapshot COMPLETO de la dirección (address) es autoritativo y viaja con el pedido; el
     // location_id es solo una referencia informativa. Editar/desactivar la ubicación/cliente después
     // NO altera este snapshot histórico. `customer` = snapshot mínimo de nombre/teléfono.
@@ -159,6 +162,12 @@ export function createOrder(input: {
       }
       const t = Number((data as { total?: number }).total)
       if (Number.isFinite(t)) { orders = orders.map((o) => (o.id === id ? { ...o, total: t } : o)); emit() }
+      // Congela el snapshot fiscal server-side una vez que el pedido ya existe (RPC acotada).
+      if (input.receiver) {
+        const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+        const { error: fErr } = await rpc('set_order_fiscal_snapshot', { p_order_id: id, p_receiver: normalizeFiscalProfile(input.receiver) })
+        if (fErr) console.warn('[orders] snapshot fiscal', fErr.message)
+      }
       hydrate() // trae unit_price/total AUTORITATIVOS del servidor
     })()
   }
@@ -296,6 +305,30 @@ function fakeFiscalUuid(seed: string): string {
   const a = hex(h, 8), b = hex(h * 7, 4), c = hex(h * 13, 4), d = hex(h * 17, 4), e = hex(h * 19, 8) + hex(h * 23, 4)
   return `${a}-${b}-${c}-${d}-${e}`
 }
+// SNAPSHOT fiscal por pedido: congela orders.invoice_meta.receiver (el receptor confirmado para
+// ESE CFDI) vía RPC acotada. Se llama al CONFIRMAR la solicitud de factura (no espera al pago) y
+// desde el editor de Facturación. Un CFDI ya timbrado NO admite cambio de receptor.
+export async function setOrderFiscalSnapshot(orderId: string, receiver: FiscalProfile): Promise<{ ok: boolean; error?: string }> {
+  const v = validateFiscalProfile(receiver)
+  if (!v.ok) return { ok: false, error: Object.values(v.errors)[0] ?? 'Datos fiscales incompletos.' }
+  const clean = normalizeFiscalProfile(receiver)
+  const o = orders.find((x) => x.id === orderId)
+  if (o) {
+    const inv = (o.invoice_meta as Record<string, unknown> | null) ?? {}
+    if (inv.status === 'timbrada' || inv.status === 'emitida') return { ok: false, error: 'El CFDI ya fue emitido; no se puede cambiar el receptor.' }
+    const nextInv = { ...inv, receiver: clean }
+    orders = orders.map((x) => (x.id === orderId ? { ...x, invoice_requested: true, invoice_meta: nextInv as unknown as Order['invoice_meta'] } : x))
+    emit()
+  }
+  if (hasSupabase && isUuid(orderId)) {
+    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+    const { error } = await rpc('set_order_fiscal_snapshot', { p_order_id: orderId, p_receiver: clean })
+    if (error) { hydrate(); return { ok: false, error: error.message } }
+    hydrate()
+  }
+  return { ok: true }
+}
+
 export function markInvoiced(orderId: string) {
   const now = new Date().toISOString()
   // Modo MOCK (sin backend / id no-UUID): folio SIMULADO optimista (marca `simulated`).

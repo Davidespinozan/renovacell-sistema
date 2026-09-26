@@ -17,7 +17,10 @@ import { PaymentModal } from './PaymentModal'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
-import { hasSupabase, currentUserId } from '../../lib/supabase'
+import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
+import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
+import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
@@ -133,13 +136,14 @@ export function Catalogo() {
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null) =>
+  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) =>
     createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) })),
       total,
       invoice_requested: invoice,
       shipping: choice?.address ?? null,
       location_id: choice?.locationId ?? null,
+      receiver: invoice ? receiver : null,
     })
 
   if (loading) return <div className="card">Cargando catálogo…</div>
@@ -440,7 +444,7 @@ function CheckoutModal({
   total: number
   priceOf: (p: ProductSafe) => number | null
   base: ShippingAddress | null
-  onConfirm: (invoice: boolean, choice: DeliveryChoice | null) => OrderWithItems
+  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => OrderWithItems
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
@@ -449,10 +453,51 @@ function CheckoutModal({
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [payNow, setPayNow] = useState(false)
+  // Perfil fiscal para "Solicitar factura": AUTORIDAD = customers.meta.fiscal (master).
+  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  const [fiscalLoaded, setFiscalLoaded] = useState(false)
+  const [editingFiscal, setEditingFiscal] = useState(false)
+  const [showFiscalErr, setShowFiscalErr] = useState(false)
+  const [savingFiscal, setSavingFiscal] = useState(false)
+  const fiscalOk = isFiscalProfileComplete(fiscal)
 
-  const confirm = () => {
+  // Al activar "Solicitar factura", carga el master del cliente (o legacy) una sola vez.
+  useEffect(() => {
+    if (!invoice || fiscalLoaded) return
+    ;(async () => {
+      if (hasSupabase) {
+        const uid = currentUserId() ?? ''
+        const { data: cust } = await supabase.from('customers').select('id, meta, email').eq('profile_id', uid).maybeSingle()
+        if (cust?.id) setCustomerId(cust.id)
+        let master = customerFiscal(cust as { meta: unknown } | null)
+        if (!master.rfc) {
+          const { data: prof } = await supabase.from('profiles').select('meta, email').eq('id', uid ?? '').maybeSingle()
+          const legacy = (prof?.meta as { fiscal?: unknown } | null)?.fiscal
+          if (legacy) master = normalizeFiscalProfile(legacy)
+          // Prefill del correo de facturación desde el contacto si aún no hay uno.
+          if (!master.email_facturacion) master.email_facturacion = normalizeFiscalProfile({ email: (cust?.email ?? prof?.email ?? '') }).email_facturacion
+        }
+        setFiscal(master)
+        setEditingFiscal(!isFiscalProfileComplete(master))
+      } else {
+        setEditingFiscal(true)
+      }
+      setFiscalLoaded(true)
+    })()
+  }, [invoice, fiscalLoaded])
+
+  const confirm = async () => {
     if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
-    const created = onConfirm(invoice, choice)
+    if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
+    if (invoice && customerId && editingFiscal) {
+      // Guarda/actualiza el master antes de crear (así POS/Admin lo verán después).
+      setSavingFiscal(true)
+      const res = await upsertCustomerFiscal(customerId, fiscal)
+      setSavingFiscal(false)
+      if (!res.ok) { setShowFiscalErr(true); window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
+    }
+    const created = onConfirm(invoice, choice, invoice ? fiscal : null)
     setOrder(created)
     onDone() // limpia el carrito
   }
@@ -518,9 +563,26 @@ function CheckoutModal({
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
               </label>
 
+              {invoice && (
+                <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface-2, #fafafa)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales para tu CFDI</div>
+                    {fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
+                  </div>
+                  {!fiscalLoaded ? (
+                    <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando tus datos…</div>
+                  ) : editingFiscal ? (
+                    <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
+                  ) : (
+                    <FiscalSummary value={fiscal} />
+                  )}
+                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>Completa tus datos fiscales para poder solicitar la factura.</div>}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address} style={!choice?.address ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> Crear pedido</button>
+                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address || savingFiscal || (invoice && !fiscalOk)} style={(!choice?.address || savingFiscal || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> {savingFiscal ? 'Guardando…' : 'Crear pedido'}</button>
               </div>
             </div>
           </>

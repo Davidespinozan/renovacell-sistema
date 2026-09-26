@@ -20,9 +20,17 @@ describe('<BillDetail> · acción Emitir CFDI', () => {
     expect(emitido).toBeDisabled()
   })
 
-  it('pedido SIN CFDI → sí ofrece la acción "Emitir CFDI"', () => {
-    const order = mkOrder({ payment_status: 'paid', invoice_requested: true, items: [mkItem()], invoice_meta: null })
+  it('pedido pagado SIN CFDI y CON datos fiscales completos → ofrece "Emitir CFDI"', () => {
+    const receiver = { rfc: 'GODE561231GR8', razon_social: 'Dra. Uno', regimen: '612', cp: '80020', uso_cfdi: 'G03', email_facturacion: 'dra@x.mx' }
+    const order = mkOrder({ payment_status: 'paid', invoice_requested: true, items: [mkItem()], invoice_meta: { receiver } as never })
     render(<BillDetail order={order} {...props} />)
     expect(screen.getByText('Emitir CFDI')).toBeInTheDocument()
+  })
+
+  it('pedido pagado SIN datos fiscales → NO ofrece emitir; pide completar datos', () => {
+    const order = mkOrder({ payment_status: 'paid', invoice_requested: true, items: [mkItem()], invoice_meta: null })
+    render(<BillDetail order={order} {...props} />)
+    expect(screen.queryByText('Emitir CFDI')).toBeNull()
+    expect(screen.getByText(/Completa los datos fiscales del pedido/)).toBeInTheDocument()
   })
 })

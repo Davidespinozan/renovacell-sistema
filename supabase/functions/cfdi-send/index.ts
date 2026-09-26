@@ -43,25 +43,37 @@ Deno.serve(async (req) => {
 
   // Pedido server-side: el facturama_id se toma de BD, jamás del cliente.
   const { data: order, error: oErr } = await admin.from('orders')
-    .select('external_ref, doctor_id, invoice_meta').eq('id', payload.order_id).single()
+    .select('external_ref, doctor_id, customer_id, invoice_meta').eq('id', payload.order_id).single()
   if (oErr || !order) return json(404, { error: 'Pedido no encontrado.' })
 
   const gate = puedeEnviar((order as { invoice_meta?: unknown }).invoice_meta)
   if (!gate.ok) return json(409, { error: gate.error, message: gate.message })
 
-  // Email: override de la UI si viene; si no, profiles.email por doctor_id. Validado. Sin persistir.
+  // EMAIL — resolución en orden de autoridad (el POS huérfano ya NO es autoridad):
+  //   0) override de la UI (captura manual del admin)
+  //   1) snapshot del pedido: invoice_meta.receiver.email_facturacion
+  //   2) master del cliente: customers.meta.fiscal.email_facturacion
+  //   3) legacy/contacto: profiles.email por doctor_id
   const override = normalizaEmail(payload.email)
   let email = ''
   if (override) {
     if (!emailValido(override)) return json(422, { error: 'email_invalid', message: 'El correo no es válido.' })
     email = override
   } else {
-    if (order.doctor_id) {
+    const inv = ((order as { invoice_meta?: unknown }).invoice_meta ?? {}) as Record<string, unknown>
+    const rcv = (inv.receiver ?? {}) as Record<string, unknown>
+    email = normalizaEmail(typeof rcv.email_facturacion === 'string' ? rcv.email_facturacion : '')
+    if (!email && (order as { customer_id?: string }).customer_id) {
+      const { data: cust } = await admin.from('customers').select('meta').eq('id', (order as { customer_id: string }).customer_id).maybeSingle()
+      const cf = (cust?.meta as Record<string, unknown> | null)?.fiscal as Record<string, unknown> | undefined
+      email = normalizaEmail(typeof cf?.email_facturacion === 'string' ? cf.email_facturacion : '')
+    }
+    if (!email && order.doctor_id) {
       const { data: doc } = await admin.from('profiles').select('email').eq('id', order.doctor_id).single()
       email = normalizaEmail(doc?.email)
     }
-    if (!email) return json(422, { error: 'email_missing', message: 'No hay correo del cliente; captúralo para enviar.' })
-    if (!emailValido(email)) return json(422, { error: 'email_invalid', message: 'El correo del cliente no es válido.' })
+    if (!email) return json(422, { error: 'email_missing', message: 'No hay correo de facturación; captúralo para enviar.' })
+    if (!emailValido(email)) return json(422, { error: 'email_invalid', message: 'El correo de facturación no es válido.' })
   }
 
   const resource = order.external_ref ?? payload.order_id

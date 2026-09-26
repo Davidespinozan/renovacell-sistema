@@ -1,9 +1,13 @@
 // Caja (Punto de Venta): venta en persona. Selecciona productos, arma la venta,
 // cobra (efectivo/tarjeta) y completa. Al cobrar: crea orden POS pagada/entregada
 // y descuenta inventario por lote (FEFO de Almacén, reutilizada).
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
+import { hasSupabase, supabase } from '../../lib/supabase'
+import { FiscalFields } from '../../app/FiscalFields'
+import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
+import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { enviarReciboWhatsApp, imprimirVenta, VentaTicketPrint } from './ventaRecibo'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
@@ -77,10 +81,28 @@ export function Caja() {
   const [cobrando, setCobrando] = useState(false)
   const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
-  // CFDI: el cliente puede pedir factura en la venta. Si hay doctor ligado, se factura con
-  // sus datos fiscales (perfil); si es mostrador, se capturan aquí (RFC, razón, uso, correo).
+  // CFDI: el cliente puede pedir factura en la venta. AUTORIDAD = customers.meta.fiscal (master
+  // omnicanal): se precarga del cliente seleccionado y, al guardar, se persiste vía RPC + snapshot.
   const [invoiceReq, setInvoiceReq] = useState(false)
-  const [fiscal, setFiscal] = useState({ rfc: '', razon: '', uso: 'G03', email: '' })
+  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
+  const [showFiscalErr, setShowFiscalErr] = useState(false)
+  const fiscalKeyRef = useRef<string>('')
+
+  // Precarga el perfil fiscal MASTER del cliente al activar factura o cambiar de cliente.
+  useEffect(() => {
+    const key = `${invoiceReq ? '1' : '0'}|${client?.id ?? ''}`
+    if (key === fiscalKeyRef.current) return
+    fiscalKeyRef.current = key
+    if (!invoiceReq) return
+    ;(async () => {
+      if (hasSupabase && client?.id) {
+        const { data } = await supabase.from('customers').select('meta').eq('id', client.id).maybeSingle()
+        setFiscal(customerFiscal(data as { meta: unknown } | null))
+      } else {
+        setFiscal(emptyFiscalProfile())
+      }
+    })()
+  }, [invoiceReq, client?.id])
   // Ventas del turno (en memoria) para poder REIMPRIMIR el recibo si el cliente vuelve.
   type VentaTurno = { order: OrderWithItems; clientName: string; pago: { recibido: number; cambio: number } | null }
   const [ventasTurno, setVentasTurno] = useState<VentaTurno[]>([])
@@ -130,11 +152,16 @@ export function Caja() {
         ? { ok: true, order }
         : { ok: false, error: 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
     } else {
-      // CFDI: el cliente comercial (customer) no tiene datos fiscales de perfil → se capturan aquí
-      // igual que mostrador. (CFDI fiscal por customer es fase posterior.)
-      const invoiceMeta = invoiceReq
-        ? { rfc: fiscal.rfc.trim(), razon_social: fiscal.razon.trim(), uso_cfdi: fiscal.uso, email: fiscal.email.trim() }
-        : null
+      // CFDI omnicanal: guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC y
+      // congela el SNAPSHOT del receptor en el pedido (invoice_meta.receiver, atómico en vender_pos).
+      let invoiceMeta: Record<string, unknown> | null = null
+      if (invoiceReq) {
+        if (client?.id) {
+          const saved = await upsertCustomerFiscal(client.id, fiscal)
+          if (!saved.ok) { setCobrando(false); setErr(saved.error ?? 'No se pudieron guardar los datos fiscales.'); window.setTimeout(() => setErr(null), 4000); return }
+        }
+        invoiceMeta = { receiver: normalizeFiscalProfile(fiscal) }
+      }
       res = await venderPOS(posLines, total, method, {
         customerId: client?.id ?? null,
         customer: client ? { name: client.name, phone: client.phone ?? null } : null,
@@ -153,7 +180,9 @@ export function Caja() {
       setClient(null)
       setRecibido('')
       setInvoiceReq(false)
-      setFiscal({ rfc: '', razon: '', uso: 'G03', email: '' })
+      setFiscal(emptyFiscalProfile())
+      setShowFiscalErr(false)
+      fiscalKeyRef.current = ''
     } else {
       // La RPC atómica falla ANTES de cobrar si el inventario no alcanza: no hay venta fantasma.
       setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
@@ -294,28 +323,17 @@ export function Caja() {
                   <span>Solicitar factura (CFDI)</span>
                 </label>
                 {invoiceReq && (
-                  <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                    {client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Captura los datos fiscales de {client.name} (el cliente comercial no los tiene en el portal).</div>}
-                    <input value={fiscal.rfc} onChange={(e) => setFiscal((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))} placeholder="RFC"
-                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                    <input value={fiscal.razon} onChange={(e) => setFiscal((f) => ({ ...f, razon: e.target.value }))} placeholder="Razón social"
-                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                    <input value={fiscal.email} onChange={(e) => setFiscal((f) => ({ ...f, email: e.target.value }))} placeholder="Correo para la factura"
-                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
-                    <select value={fiscal.uso} onChange={(e) => setFiscal((f) => ({ ...f, uso: e.target.value }))}
-                      style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }}>
-                      <option value="G03">G03 · Gastos en general</option>
-                      <option value="G01">G01 · Adquisición de mercancías</option>
-                      <option value="P01">P01 · Por definir</option>
-                    </select>
-                    {(fiscal.rfc.trim() === '' || fiscal.razon.trim() === '') && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>RFC y razón social son obligatorios para facturar.</div>}
+                  <div style={{ marginTop: 8 }}>
+                    {client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Datos fiscales de {client.name} (se guardan en su ficha para futuras compras).</div>}
+                    <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
+                    {!isFiscalProfileComplete(fiscal) && <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 6 }}>Completa los 6 campos fiscales para poder facturar.</div>}
                   </div>
                 )}
               </div>
             )}
 
             {(() => {
-              const cfdiOk = !invoiceReq || (fiscal.rfc.trim() !== '' && fiscal.razon.trim() !== '')
+              const cfdiOk = !invoiceReq || isFiscalProfileComplete(fiscal)
               const puede = !cobrando && efectivoOk && cfdiOk
               return (<>
             <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(puede ? {} : { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' }) }} onClick={cobrar} disabled={!puede}>

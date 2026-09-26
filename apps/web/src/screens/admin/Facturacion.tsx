@@ -3,13 +3,17 @@
 // cobro y de CFDI, y permite "Emitir CFDI" / "Marcar cobrado". La emisión REAL
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
-import { markInvoiced, markPaid, reviewTransfer } from '../../data/store/ordersStore'
+import { markInvoiced, markPaid, reviewTransfer, setOrderFiscalSnapshot } from '../../data/store/ordersStore'
+import { upsertCustomerFiscal } from '../../data/store/customersStore'
+import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
+import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
+import { hasSupabase, supabase } from '../../lib/supabase'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
@@ -297,6 +301,34 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
   }
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
+  // ── Datos fiscales del PEDIDO (snapshot congelado en invoice_meta.receiver) ──────────────
+  const invMeta = (order.invoice_meta as Record<string, unknown> | null) ?? {}
+  const snapshot = normalizeFiscalProfile(invMeta.receiver ?? {})
+  const snapOk = isFiscalProfileComplete(snapshot)
+  const [fiscal, setFiscal] = useState<FiscalProfile>(snapshot)
+  const [editingFiscal, setEditingFiscal] = useState(false)
+  const [saveMaster, setSaveMaster] = useState(false)
+  const [showFiscalErr, setShowFiscalErr] = useState(false)
+  const [savingFiscal, setSavingFiscal] = useState(false)
+  // Si el snapshot está incompleto, precarga el master del cliente para facilitar la corrección.
+  useEffect(() => {
+    if (snapOk || !hasSupabase || !order.customer_id) return
+    supabase.from('customers').select('meta').eq('id', order.customer_id).maybeSingle().then(({ data }) => {
+      const m = normalizeFiscalProfile((data?.meta as { fiscal?: unknown } | null)?.fiscal ?? {})
+      if (m.rfc) setFiscal((cur) => (cur.rfc ? cur : m))
+    })
+  }, [order.customer_id])
+  const guardarFiscal = async () => {
+    if (!isFiscalProfileComplete(fiscal)) { setShowFiscalErr(true); return }
+    setSavingFiscal(true)
+    try {
+      const res = await setOrderFiscalSnapshot(order.id, fiscal) // por default: SOLO este pedido
+      if (!res.ok) { window.alert(res.error ?? 'No se pudo guardar el snapshot.'); return }
+      if (saveMaster && order.customer_id) await upsertCustomerFiscal(order.customer_id, fiscal) // acción explícita
+      setEditingFiscal(false)
+    } finally { setSavingFiscal(false) }
+  }
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -448,6 +480,35 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
             </div>
           )}
 
+          {order.invoice_requested && (
+            <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--line)', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales del pedido</div>
+                <span className={'pill ' + (emitida ? 'p-ok' : snapOk ? 'p-ok' : 'p-warn')} style={{ marginLeft: 'auto' }}>
+                  {emitida ? 'Timbrado' : snapOk ? 'Datos completos' : 'Datos incompletos'}
+                </span>
+              </div>
+              {editingFiscal && !emitida ? (
+                <div style={{ marginTop: 8 }}>
+                  <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={saveMaster} onChange={(e) => setSaveMaster(e.target.checked)} />
+                    Guardar también para futuras compras (actualiza la ficha del cliente)
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                    <button className="btn ghost sm" type="button" disabled={savingFiscal} onClick={() => { setEditingFiscal(false); setFiscal(snapshot) }}>Cancelar</button>
+                    <button className="btn sm" type="button" disabled={savingFiscal} onClick={guardarFiscal}>{savingFiscal ? 'Guardando…' : 'Guardar datos fiscales'}</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  <FiscalSummary value={snapshot} />
+                  {!emitida && <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => setEditingFiscal(true)}>Editar datos fiscales</button>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
             {!paid && (
               transfer ? (
@@ -472,6 +533,8 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
               </button>
             ) : !paid ? (
               <span className="ms" style={{ color: 'var(--ink-3)' }}>El pedido debe estar pagado antes de facturarse.</span>
+            ) : !snapOk ? (
+              <span className="ms" style={{ color: 'var(--warn)' }}>Completa los datos fiscales del pedido antes de emitir el CFDI.</span>
             ) : (
               <button className="btn" type="button" onClick={() => markInvoiced(order.id)}>
                 <FileText size={15} /> Emitir CFDI

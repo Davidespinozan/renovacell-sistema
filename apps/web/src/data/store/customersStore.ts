@@ -4,6 +4,7 @@
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { logAudit } from './auditStore'
 import type { Customer, CustomerInput } from '../ops/customer'
+import { normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../ops/fiscal'
 
 export type CustomerFields = Omit<CustomerInput, 'id' | 'created_at' | 'updated_at'>
 
@@ -59,6 +60,24 @@ export async function linkCustomerToProfile(customerId: string, profileId: strin
   const { error } = await supabase.from('customers').update({ profile_id: profileId, updated_at: new Date().toISOString() }).eq('id', customerId)
   if (error) return { ok: false, error: error.message }
   logAudit({ actor: 'Administración', action: 'Cliente vinculado a portal', resource: customerId })
+  return { ok: true }
+}
+
+// Lee el perfil fiscal MAESTRO de un customer (customers.meta.fiscal), normalizado al canónico.
+export function customerFiscal(c: { meta?: unknown } | null | undefined): FiscalProfile {
+  const f = (c?.meta as { fiscal?: unknown } | null)?.fiscal
+  return normalizeFiscalProfile(f ?? {})
+}
+
+// MASTER fiscal: escribe SOLO customers.meta.fiscal vía RPC acotada (no update directo del row,
+// no amplía RLS). Valida en cliente antes de invocar; el servidor revalida y autoriza.
+export async function upsertCustomerFiscal(customerId: string, fiscal: FiscalProfile): Promise<{ ok: boolean; error?: string }> {
+  const v = validateFiscalProfile(fiscal)
+  if (!v.ok) return { ok: false, error: Object.values(v.errors)[0] ?? 'Datos fiscales incompletos.' }
+  if (!hasSupabase) return { ok: true } // mock: la UI conserva el estado del formulario
+  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+  const { error } = await rpc('upsert_customer_fiscal', { p_customer_id: customerId, p_fiscal: normalizeFiscalProfile(fiscal) })
+  if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
 
