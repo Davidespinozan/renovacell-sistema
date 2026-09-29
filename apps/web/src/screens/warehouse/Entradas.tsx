@@ -9,10 +9,19 @@ import { useLots } from '../../data/hooks/useLots'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useProducts } from '../../data/hooks/useProducts'
 import type { Lot, ProductSafe } from '../../data/types'
+import { useRole } from '../../auth/RoleContext'
+import { useOpId } from '../../data/hooks/useOpId'
+import { hasSupabase } from '../../lib/supabase'
+
+// W1 · D-04: una entrada SIN orden de compra/producción requiere Dirección y motivo.
+const MOTIVOS_ENTRADA = ['Carga inicial', 'Inventario encontrado', 'Muestra', 'Corrección autorizada', 'Otro']
 
 // Motivos del movimiento en palabras claras (el dato técnico vive en el store).
 const reasonLabel = (r: string | null): string => ({
   entrada: 'Entró a almacén',
+  carga_inicial: 'Carga inicial',
+  devolucion: 'Regresó por devolución',
+  correccion_recepcion: 'Corrección de recepción',
   surtido: 'Salió en un pedido',
   venta: 'Salió en una venta',
   merma: 'Baja (caducó / dañado)',
@@ -40,7 +49,14 @@ export function Entradas() {
   const [qty, setQty] = useState('')
   const [cost, setCost] = useState('')
   const [location, setLocation] = useState('Culiacán')
+  const [motivo, setMotivo] = useState(MOTIVOS_ENTRADA[0])
+  const [motivoOtro, setMotivoOtro] = useState('')
   const [busy, setBusy] = useState(false)
+  const { role } = useRole()
+  const { opId, renew } = useOpId()
+  // Con backend solo Dirección registra entradas sin orden (el servidor lo impone igual).
+  const puedeRegistrar = !hasSupabase || role === 'admin'
+  const motivoFinal = motivo === 'Otro' ? motivoOtro.trim() : motivo
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
 
   const lotById = useMemo(() => {
@@ -54,7 +70,7 @@ export function Entradas() {
     return m
   }, [products])
 
-  const valid = productId && lotCode.trim() && Number(qty) > 0
+  const valid = puedeRegistrar && productId && lotCode.trim() && Number(qty) > 0 && (!hasSupabase || (!!expiry && motivoFinal.length >= 3))
 
   const submit = async () => {
     if (!valid || busy) return
@@ -67,11 +83,14 @@ export function Entradas() {
       quantity: Number(qty),
       location: location.trim() || null,
       unit_cost: c != null && c > 0 ? c : null, // vacío → la RPC usa el costo de referencia
-      reason: 'entrada',
+      reason: hasSupabase ? motivoFinal : 'entrada',
+      kind: 'sin_orden',
+      op_id: opId,
     })
     setBusy(false)
     if (!r.ok) { setToast({ ok: false, text: r.error ?? 'No se pudo registrar la entrada.' }); return }
     setToast({ ok: true, text: `Entrada registrada: ${lotCode.trim()} (+${qty} pzas)` })
+    renew()
     setLotCode(''); setExpiry(''); setQty(''); setCost('')
     window.setTimeout(() => setToast(null), 2600)
   }
@@ -84,7 +103,13 @@ export function Entradas() {
       </PageHead>
       <div className="grid two" style={{ alignItems: 'start', gap: 18 }}>
       <div className="card">
-        <div className="eyebrow">Nueva entrada</div>
+        <div className="eyebrow">Nueva entrada sin orden</div>
+        {!puedeRegistrar && (
+          <div className="sysnote" style={{ marginBottom: 12 }}>
+            <Icon name="shield" />
+            <span>Las entradas <b>sin orden</b> las registra <b>Dirección</b> con motivo. Para recibir mercancía de una compra o producción usa <b>Compras › Recibir mercancía</b>.</span>
+          </div>
+        )}
         <label style={labelStyle}>Producto</label>
         <select style={inputStyle} value={productId} onChange={(e) => setProductId(e.target.value)}>
           <option value="">Selecciona…</option>
@@ -104,7 +129,7 @@ export function Entradas() {
 
         <div className="form-grid-2" style={{ marginTop: 14 }}>
           <div>
-            <label style={labelStyle}>Caducidad</label>
+            <label style={labelStyle}>Caducidad{hasSupabase ? ' (obligatoria)' : ''}</label>
             <input style={inputStyle} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
           </div>
           <div>
@@ -112,6 +137,16 @@ export function Entradas() {
             <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Culiacán u otra sede" />
           </div>
         </div>
+
+        {hasSupabase && (
+          <div style={{ marginTop: 14 }}>
+            <label style={labelStyle}>Motivo (obligatorio)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {MOTIVOS_ENTRADA.map((m) => <button key={m} type="button" className={'fchip' + (motivo === m ? ' on' : '')} onClick={() => setMotivo(m)}>{m}</button>)}
+            </div>
+            {motivo === 'Otro' && <input style={{ ...inputStyle, marginTop: 8 }} value={motivoOtro} onChange={(e) => setMotivoOtro(e.target.value)} placeholder="Describe el motivo" />}
+          </div>
+        )}
 
         <div style={{ marginTop: 14 }}>
           <label style={labelStyle}>Costo de adquisición (opcional)</label>

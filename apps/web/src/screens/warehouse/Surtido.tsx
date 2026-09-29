@@ -9,6 +9,7 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { planSurtido, canFulfill, surtirPedido, type ItemPlan } from '../../data/ops/surtir'
+import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
@@ -19,7 +20,8 @@ export function Surtido() {
   const { data: lots } = useLots()
   const [active, setActive] = useState<OrderWithItems | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [batchResult, setBatchResult] = useState<{ ok: number; fail: number } | null>(null)
+  const [batchResult, setBatchResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null)
+  const [batchBusy, setBatchBusy] = useState(false)
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -52,17 +54,23 @@ export function Surtido() {
   const selectAll = () => setSelected(new Set(allFulfillable))
   const clearSel = () => setSelected(new Set())
 
-  // Surte cada pedido seleccionado. surtirPedido RE-PLANEA contra el cache vivo y hace
-  // el consumo local síncrono, así que dos pedidos que comparten un lote NO sobreasignan:
-  // el segundo ve el stock ya descontado por el primero y se rechaza si no alcanza.
-  const surtirLote = () => {
+  // Surte cada pedido seleccionado EN SECUENCIA, esperando la confirmación del servidor
+  // de cada uno (W1: sin éxito optimista). Tras cada surtido se recarga el inventario, así
+  // que el siguiente pedido re-planea contra el stock real. Un reintento de un pedido que
+  // sí se aplicó lo rechaza el servidor (ya empacado): no hay doble descuento.
+  const surtirLote = async () => {
+    if (batchBusy) return
+    setBatchBusy(true)
     let ok = 0, fail = 0
-    pending.filter((o) => selIds.includes(o.id)).forEach((o) => {
-      const r = surtirPedido(o)
-      if (r.ok) ok += 1; else fail += 1
-    })
-    setBatchResult({ ok, fail })
+    const errors: string[] = []
+    for (const o of pending.filter((x) => selIds.includes(x.id))) {
+      const r = await surtirPedido(o)
+      if (r.ok) ok += 1
+      else { fail += 1; errors.push(`${o.external_ref ?? o.id}: ${r.error ?? 'no se pudo surtir'}`) }
+    }
+    setBatchResult({ ok, fail, errors })
     setSelected(new Set())
+    setBatchBusy(false)
   }
 
   return (
@@ -78,7 +86,8 @@ export function Surtido() {
           <Icon name="check" />
           <span style={{ flex: 1 }}>
             Surtiste <b>{batchResult.ok}</b> pedido(s).{' '}
-            {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no tenían stock suficiente y quedaron pendientes.</span>}
+            {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no se pudieron surtir y quedaron pendientes.</span>}
+            {batchResult.errors.map((e) => <span key={e} style={{ display: 'block', fontSize: 12, color: 'var(--danger)' }}>{e}</span>)}
           </span>
           <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setBatchResult(null)}><Icon name="x" /></button>
         </div>
@@ -89,8 +98,8 @@ export function Surtido() {
           <span style={{ fontWeight: 600 }}>{selIds.length} seleccionado(s)</span>
           <span className="mono" style={{ color: 'var(--ink-3)' }}>{selUnits} u</span>
           <button className="btn ghost sm" type="button" onClick={clearSel}>Limpiar</button>
-          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={surtirLote}>
-            <Icon name="layers" /> Surtir seleccionados
+          <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={surtirLote} disabled={batchBusy}>
+            <Icon name="layers" /> {batchBusy ? 'Surtiendo…' : 'Surtir seleccionados'}
           </button>
         </div>
       )}
@@ -158,13 +167,20 @@ function SurtirModal({
 }) {
   const { data: lots } = useLots()
   const [done, setDone] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const { opId } = useOpId() // misma intención ⇒ mismo op_id en cada reintento
 
   const plans = useMemo(() => planSurtido(order, lots), [order, lots])
   const ok = canFulfill(plans)
 
-  const confirm = () => {
-    const res = surtirPedido(order)
+  const confirm = async () => {
+    if (busy) return
+    setBusy(true); setErr(null)
+    const res = await surtirPedido(order, opId)
+    setBusy(false)
     if (res.ok) setDone(true)
+    else setErr(res.error ?? 'No se pudo surtir el pedido.')
   }
 
   return (
@@ -203,10 +219,15 @@ function SurtirModal({
                 </div>
               )}
 
+              {err && (
+                <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>
+                  <Icon name="x" /><span>{err}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!ok} style={!ok ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-                  <Icon name="check" /> Confirmar y descontar
+                <button className="btn" type="button" onClick={confirm} disabled={!ok || busy} style={!ok || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+                  <Icon name="check" /> {busy ? 'Confirmando…' : err ? 'Reintentar' : 'Confirmar y descontar'}
                 </button>
               </div>
             </div>

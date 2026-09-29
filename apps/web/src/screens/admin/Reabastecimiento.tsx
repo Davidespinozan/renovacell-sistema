@@ -13,6 +13,9 @@ import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hook
 import { stockByProduct, REORDER_THRESHOLD } from '../../data/ops/stock'
 import { costOf } from '../../data/mock/costs'
 import { hasSupabase } from '../../lib/supabase'
+import { useRole } from '../../auth/RoleContext'
+import { useOpId } from '../../data/hooks/useOpId'
+import { cerrarOrdenCompra, pendingQty, isOpen, markReceivedLocal } from '../../data/store/comprasStore'
 import type { ProductSafe } from '../../data/types'
 
 const LOW = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
@@ -21,7 +24,9 @@ const TARGET = 60   // stock objetivo tras reabastecer
 export function Reabastecimiento() {
   const { data: lots, recibirLote } = useLots()
   const { data: products } = useProducts()
-  const { data: pos, createReplenishment, markReceivedLocal, markPaid, reloadCompras } = useCompras()
+  const { data: pos, createReplenishment, markPaid } = useCompras()
+  const { role } = useRole()
+  const isAdmin = role === 'admin'
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [replen, setReplen] = useState<{ product: ProductSafe; suggested: number } | null>(null)
   const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(null)
@@ -157,14 +162,17 @@ export function Reabastecimiento() {
                     </span>
                     {o.supplier && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{o.supplier}</div>}
                   </td>
-                  <td data-label="Cantidad" className="mono">{o.qty} u</td>
+                  <td data-label="Cantidad" className="mono">{o.received_qty ?? 0}/{o.qty} u</td>
                   <td data-label="Fecha">{fmtDate(o.created_at)}</td>
-                  <td data-label="Estado"><span className={'pill ' + (o.status === 'recibida' ? 'p-ok' : 'p-warn')}>{o.status === 'recibida' ? 'Recibida' : 'Pendiente'}</span></td>
+                  <td data-label="Estado"><span className={'pill ' + STATUS_PILL[o.status]} title={o.close_reason ?? undefined}>{STATUS_LABEL[o.status]}</span></td>
                   <td data-label="">
                     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {o.status === 'pendiente'
+                      {isOpen(o)
                         ? <button className="btn sm" type="button" onClick={() => setReceiving(o)}><PackageCheck size={14} /> Recibir mercancía</button>
-                        : <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Lote dado de alta</span>}
+                        : <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{o.status === 'recibida' ? 'Recibida completa' : 'Cerrada (no se reabre)'}</span>}
+                      {!isOpen(o) && isAdmin && hasSupabase && (
+                        <button className="btn ghost sm" type="button" title="Producto de más que llegó con esta orden: entrada separada autorizada por Dirección" onClick={() => setReceiving(o)}>Registrar excedente</button>
+                      )}
                       {o.kind === 'compra' && !o.paid && (
                         <button className="btn ghost sm" type="button" title="Registrar el pago al proveedor (independiente de la recepción)"
                           onClick={() => { markPaid(o.id); toast(true, 'Compra marcada como pagada.') }}><DollarSign size={13} /> Marcar pagado</button>
@@ -198,20 +206,9 @@ export function Reabastecimiento() {
       {receiving && (
         <RecibirModal
           po={receiving}
+          isAdmin={isAdmin}
           onClose={() => setReceiving(null)}
-          onConfirm={async (input) => {
-            // Recepción ATÓMICA: crea/suma lote + movimiento + costo + marca 'recibida'
-            // en la misma transacción (backend) → nunca "stock arriba pero compra pendiente".
-            const r = await recibirLote({
-              product_id: receiving.product_id, lot_code: input.lot_code, expiry_date: input.expiry_date,
-              quantity: input.quantity, location: null, unit_cost: receiving.unit_cost,
-              reason: 'entrada', reference: receiving.id, replenishment_id: receiving.id,
-            })
-            if (!r.ok) { toast(false, r.error ?? 'No se pudo recibir la mercancía.'); return }
-            if (hasSupabase) reloadCompras(); else markReceivedLocal(receiving.id)
-            setReceiving(null)
-            toast(true, 'Mercancía recibida. Lote dado de alta y stock actualizado.')
-          }}
+          onDone={(msg) => { setReceiving(null); toast(true, msg) }}
         />
       )}
     </div>
@@ -284,43 +281,109 @@ function ReplenishModal({ product, suggested, onClose, onConfirm }: {
   )
 }
 
-function RecibirModal({ po, onClose, onConfirm }: {
+const STATUS_LABEL: Record<PurchaseOrder['status'], string> = { pendiente: 'Pendiente', parcial: 'Parcial', recibida: 'Recibida', cerrada_incompleta: 'Cerrada incompleta' }
+const STATUS_PILL: Record<PurchaseOrder['status'], string> = { pendiente: 'p-warn', parcial: 'p-blue', recibida: 'p-ok', cerrada_incompleta: 'p-neu' }
+
+// Recepción W1 (D-04): parcial y acumulada contra la orden; nunca supera lo pendiente.
+// Excedente = entrada SEPARADA (solo Dirección, motivo). Cerrar incompleta = Dirección.
+// op_id estable por intención: reintentar tras una respuesta ambigua no duplica stock.
+function RecibirModal({ po, isAdmin, onClose, onDone }: {
   po: PurchaseOrder
+  isAdmin: boolean
   onClose: () => void
-  onConfirm: (input: { lot_code: string; expiry_date: string | null; quantity: number }) => void
+  onDone: (msg: string) => void
 }) {
+  const { recibirLote } = useLots()
+  const pend = pendingQty(po)
+  const abierta = isOpen(po)
+  const [mode, setMode] = useState<'recibir' | 'excedente' | 'cerrar'>(abierta ? 'recibir' : 'excedente')
   const [lotCode, setLotCode] = useState('')
   const [expiry, setExpiry] = useState('')
-  const [qty, setQty] = useState(String(po.qty))
+  const [qty, setQty] = useState(String(abierta ? pend : 1))
+  const [reason, setReason] = useState('')
+  const [evidence, setEvidence] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const { opId } = useOpId()
   const n = Math.max(0, parseInt(qty, 10) || 0)
-  const valid = lotCode.trim() !== '' && n > 0
+  const needsReason = mode !== 'recibir'
+  const valid = mode === 'cerrar'
+    ? reason.trim().length >= 3
+    : lotCode.trim() !== '' && !!expiry && n > 0 && (mode !== 'recibir' || n <= pend) && (!needsReason || reason.trim().length >= 3)
+
+  const submit = async () => {
+    if (!valid || busy) return
+    setBusy(true); setErr(null)
+    if (mode === 'cerrar') {
+      const r = await cerrarOrdenCompra(opId, po.id, reason)
+      setBusy(false)
+      if (!r.ok) { setErr(r.error ?? 'No se pudo cerrar la orden.'); return }
+      onDone(`Orden cerrada incompleta (faltaron ${pend} u). Si se necesitan, genera una orden nueva.`)
+      return
+    }
+    const r = await recibirLote({
+      product_id: po.product_id, lot_code: lotCode.trim(), expiry_date: expiry, quantity: n, location: null,
+      unit_cost: po.unit_cost, replenishment_id: po.id, kind: mode === 'excedente' ? 'excedente' : 'orden',
+      reason: mode === 'excedente' ? reason : undefined, evidence: evidence.trim() || null, op_id: opId,
+    })
+    setBusy(false)
+    if (!r.ok) { setErr(r.error ?? 'No se pudo recibir la mercancía.'); return }
+    if (!hasSupabase && mode === 'recibir') markReceivedLocalFor(po.id, n)
+    onDone(mode === 'excedente'
+      ? 'Excedente registrado como entrada separada (no suma a la orden).'
+      : r.replenishment_status === 'parcial' ? `Recepción parcial registrada. Pendiente: ${r.pending_qty ?? pend - n} u.` : 'Mercancía recibida. Orden completa.')
+  }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div>
-            <h3>Recibir y dar de alta</h3>
-            <div className="ms">{po.product_name} · {po.kind === 'compra' ? `compra${po.supplier ? ` · ${po.supplier}` : ''}` : 'producción'} · {po.qty} u</div>
+            <h3>{mode === 'cerrar' ? 'Cerrar orden incompleta' : mode === 'excedente' ? 'Registrar excedente' : 'Recibir y dar de alta'}</h3>
+            <div className="ms">{po.product_name} · {po.kind === 'compra' ? `compra${po.supplier ? ` · ${po.supplier}` : ''}` : 'producción'} · recibido {po.received_qty ?? 0}/{po.qty} u{abierta ? ` · pendiente ${pend} u` : ''}</div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
-          <label style={{ ...lbl, marginTop: 0 }}>Código de lote</label>
-          <input style={fld} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="p. ej. LT-2026-014" autoFocus />
-          <label style={lbl}>Caducidad</label>
-          <input type="date" style={fld} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
-          <label style={lbl}>Cantidad recibida</label>
-          <input type="number" min={1} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} />
-
+          {isAdmin && hasSupabase && (
+            <div className="seg" style={{ marginBottom: 12 }}>
+              {abierta && <button type="button" className={mode === 'recibir' ? 'active' : undefined} onClick={() => setMode('recibir')}>Recibir</button>}
+              <button type="button" className={mode === 'excedente' ? 'active' : undefined} onClick={() => setMode('excedente')}>Excedente</button>
+              {abierta && <button type="button" className={mode === 'cerrar' ? 'active' : undefined} onClick={() => setMode('cerrar')}>Cerrar incompleta</button>}
+            </div>
+          )}
+          {mode !== 'cerrar' && (
+            <>
+              <label style={{ ...lbl, marginTop: 0 }}>Código de lote</label>
+              <input style={fld} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="p. ej. LT-2026-014" autoFocus />
+              <label style={lbl}>Caducidad (obligatoria)</label>
+              <input type="date" style={fld} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+              <label style={lbl}>{mode === 'excedente' ? 'Cantidad excedente' : `Cantidad recibida (máx. ${pend})`}</label>
+              <input type="number" min={1} max={mode === 'recibir' ? pend : undefined} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} />
+              {mode === 'recibir' && n > pend && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>Supera lo pendiente ({pend} u). El excedente lo registra Dirección aparte.</div>}
+            </>
+          )}
+          {needsReason && (
+            <>
+              <label style={lbl}>Motivo (obligatorio)</label>
+              <input style={fld} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={mode === 'cerrar' ? 'p. ej. el proveedor no surtirá el resto' : 'p. ej. el proveedor mandó 3 de más'} />
+            </>
+          )}
+          {mode === 'excedente' && (
+            <>
+              <label style={lbl}>Evidencia (opcional)</label>
+              <input style={fld} value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Remisión / factura / nota" />
+            </>
+          )}
           <div className="sysnote" style={{ marginTop: 14 }}>
-            <span>Se crea el lote con su caducidad y queda el movimiento de entrada (trazabilidad).</span>
+            <span>{mode === 'cerrar' ? 'La orden queda cerrada y NO se reabre; el faltante se pide con una orden nueva.'
+              : 'Se da de alta el lote (o se suma al mismo lote si el código y la caducidad coinciden) con su movimiento de entrada.'}</span>
           </div>
-
+          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onConfirm({ lot_code: lotCode.trim(), expiry_date: expiry || null, quantity: n })}>
-              <PackageCheck size={15} /> Dar de alta lote
+            <button className="btn" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
+              <PackageCheck size={15} /> {busy ? 'Registrando…' : err ? 'Reintentar' : mode === 'cerrar' ? 'Cerrar orden' : mode === 'excedente' ? 'Registrar excedente' : 'Dar de alta lote'}
             </button>
           </div>
         </div>
@@ -328,3 +391,6 @@ function RecibirModal({ po, onClose, onConfirm }: {
     </div>
   )
 }
+
+// Modo demo: refleja la recepción en el cache local de compras.
+function markReceivedLocalFor(id: string, qty: number) { markReceivedLocal(id, qty) }

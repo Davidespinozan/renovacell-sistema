@@ -78,7 +78,9 @@ export function OrderCard({
         // El doctor solo auto-cancela pedidos NO pagados: un pedido ya pagado que se
         // cancela dejaría el dinero en el limbo (no hay reembolso en autoservicio). Los
         // pagados se cancelan con Dirección, que sí tiene el flujo de devolución.
-        const puedeCancelar = onCancel && isCancelable(order.status) && order.payment_status !== 'paid'
+        // W1 · frontera B: con transferencia reportada (pago en revisión) también decide Dirección.
+        const transferReportada = ((order.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported) === true
+        const puedeCancelar = onCancel && isCancelable(order.status) && order.payment_status !== 'paid' && !transferReportada
         const puedeReordenar = onReorder && order.items.length > 0
         if (!puedeCancelar && !puedeReordenar && order.payment_status !== 'paid') return null
         return (
@@ -91,7 +93,7 @@ export function OrderCard({
             {puedeCancelar && (
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
             )}
-            {onCancel && isCancelable(order.status) && order.payment_status === 'paid' && (
+            {onCancel && isCancelable(order.status) && (order.payment_status === 'paid' || transferReportada) && (
               <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>Para cancelar un pedido pagado, contacta a Renovacell.</span>
             )}
           </div>

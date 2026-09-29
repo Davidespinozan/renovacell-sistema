@@ -5,6 +5,7 @@
 // de lotes ya escribe write-through en lotsStore. El hook useEvents no cambia.
 import { getSnapshotLots, getSnapshotMovements, consume, addEntry, adjust } from './lotsStore'
 import { allocateFEFO } from '../ops/surtir'
+import { CUSTODY_INVENTORY_DISABLED } from '../ops/w1Flags'
 import { createPosOrder, type OrderWithItems } from './ordersStore'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -79,7 +80,8 @@ export function createEvent(input: { name: string; venue: string; date: string; 
   return e
 }
 
-export function assignStock(eventId: string, productId: string, qty: number): { ok: boolean; missing?: number } {
+export function assignStock(eventId: string, productId: string, qty: number): { ok: boolean; missing?: number; disabled?: boolean } {
+  if (CUSTODY_INVENTORY_DISABLED) return { ok: false, disabled: true }
   const ev = events.find((e) => e.id === eventId)
   if (!ev || qty <= 0) return { ok: false }
   const plan = allocateFEFO(productId, qty, getSnapshotLots())
@@ -103,7 +105,8 @@ export function assignStock(eventId: string, productId: string, qty: number): { 
 // Regresa al almacén parte del inventario SOBRE-asignado a un evento, SIN cerrarlo ni
 // eliminarlo. Tope: remaining(it) = assigned − sold (nunca regresa lo ya vendido).
 // Devuelve por lote de origen (evento-regreso), recorta el pool del stand y baja `assigned`.
-export function unassignStock(eventId: string, productId: string, qty: number): { ok: boolean; returned?: number } {
+export function unassignStock(eventId: string, productId: string, qty: number): { ok: boolean; returned?: number; disabled?: boolean } {
+  if (CUSTODY_INVENTORY_DISABLED) return { ok: false, disabled: true }
   const ev = events.find((e) => e.id === eventId)
   if (!ev || qty <= 0) return { ok: false }
   const it = ev.items.find((x) => x.product_id === productId)
@@ -133,6 +136,7 @@ export function unassignStock(eventId: string, productId: string, qty: number): 
 }
 
 export function sellAtEvent(eventId: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string, seller: string | null = null): OrderWithItems | null {
+  if (CUSTODY_INVENTORY_DISABLED) return null
   const ev = events.find((e) => e.id === eventId)
   if (!ev || lines.length === 0) return null
   const sellable = lines.every((l) => {
@@ -219,6 +223,7 @@ export function deleteEvent(eventId: string) {
 }
 
 export function closeEvent(eventId: string) {
+  if (CUSTODY_INVENTORY_DISABLED) return
   const ev = events.find((e) => e.id === eventId)
   if (!ev || ev.status === 'cerrado') return
   returnLeftover(ev)

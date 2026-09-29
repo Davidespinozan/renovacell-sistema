@@ -1,6 +1,7 @@
 // VENTA DIRECTA del vendedor: vende a un cliente desde SU consignación (lo que
 // trae consigo), pago y entrega en el acto. Descuenta de su saldo, no del central.
 import React, { useMemo, useState } from 'react'
+import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -36,6 +37,9 @@ export function VentaDirecta({ doctor, vendor, onClose }: {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
+        {CUSTODY_INVENTORY_DISABLED && (
+          <div className="sysnote" role="status" style={{ margin: 16, background: 'var(--warn-bg, #FFF7E6)' }}><span>{CUSTODY_DISABLED_MSG}</span></div>
+        )}
         {done ? (
           <div className="mbody">
             <div className="success">

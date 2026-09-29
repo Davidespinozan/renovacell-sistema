@@ -12,6 +12,8 @@ import { makeLive } from './live'
 import { refreshStock } from './stockStore'
 import { REORDER_THRESHOLD } from '../ops/stock'
 import { blendedLotCost } from '../ops/inventoryCost'
+import { runW1Command, newOpId, type W1Result } from '../ops/w1Command'
+import { reloadCompras } from './comprasStore'
 
 const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
@@ -125,10 +127,18 @@ export interface EntryInput {
   unit_cost?: number | null
 }
 
+export type ReceiveKind = 'orden' | 'sin_orden' | 'excedente'
 export interface ReceiveInput extends EntryInput {
   reason?: string
   reference?: string | null
-  replenishment_id?: string | null // si se pasa, la RPC marca la compra 'recibida' en la misma tx
+  replenishment_id?: string | null // recepción contra una orden (acumula; parcial/recibida en la misma tx)
+  op_id?: string                   // W1: op_id estable de la intención (reintentos no duplican)
+  kind?: ReceiveKind               // W1: orden (almacén) · sin_orden / excedente (solo Dirección, con motivo)
+  evidence?: string | null
+}
+export interface ReceiveResult {
+  ok: boolean; error?: string; lot_id?: string; ambiguous?: boolean; status?: string
+  replenishment_status?: string | null; pending_qty?: number | null
 }
 
 // RECEPCIÓN/ENTRADA ATÓMICA (Fase 1). Backend: RPC `recibir_lote` (crea/suma lote +
@@ -136,7 +146,7 @@ export interface ReceiveInput extends EntryInput {
 // transacción → sin el estado inconsistente "stock arriba pero compra pendiente").
 // Mock: upsert-or-create local con promedio ponderado (blendedLotCost) + movimiento.
 // Devuelve {ok} con error real (no console.warn silencioso).
-export async function recibirLote(input: ReceiveInput): Promise<{ ok: boolean; error?: string; lot_id?: string }> {
+export async function recibirLote(input: ReceiveInput): Promise<ReceiveResult> {
   const reason = (input.reason ?? '').trim() || 'entrada'
   const reference = input.reference ?? input.lot_code
   if (!input.product_id || !(input.lot_code ?? '').trim()) return { ok: false, error: 'Falta producto o lote.' }
@@ -144,14 +154,21 @@ export async function recibirLote(input: ReceiveInput): Promise<{ ok: boolean; e
   const inc = input.unit_cost ?? null
 
   if (hasSupabase) {
-    const { data, error } = await supabase.rpc('recibir_lote' as never, {
-      p_product: input.product_id, p_lote: input.lot_code, p_caducidad: input.expiry_date ?? null,
-      p_cantidad: input.quantity, p_ubicacion: input.location ?? null, p_unit_cost: inc,
-      p_reason: reason, p_reference: reference, p_replenishment_id: input.replenishment_id ?? null,
-    } as never) as unknown as { data: { lot_id?: string } | null; error: { message: string } | null }
-    if (error) return { ok: false, error: error.message }
-    await Promise.all([lotsLive.reload(), movsLive.reload()]); refreshStock()
-    return { ok: true, lot_id: data?.lot_id }
+    // W1: comando del servidor (identidad canónica, caducidad, acumulado, idempotencia por op_id).
+    // Sin éxito optimista: la pantalla refleja solo lo que el servidor confirmó.
+    if (!input.expiry_date) return { ok: false, error: 'Indica la fecha de caducidad del lote.' }
+    const kind: ReceiveKind = input.kind ?? (input.replenishment_id ? 'orden' : 'sin_orden')
+    const opId = input.op_id ?? newOpId()
+    const r: W1Result<{ lot_id?: string; replenishment_status?: string | null; pending_qty?: number | null }> =
+      await runW1Command('recibir_lote', {
+        p_op_id: opId, p_product: input.product_id, p_lote: input.lot_code, p_caducidad: input.expiry_date,
+        p_cantidad: input.quantity, p_replenishment_id: input.replenishment_id ?? undefined, p_kind: kind,
+        p_unit_cost: kind === 'orden' ? undefined : (inc ?? undefined), p_reason: kind === 'orden' ? undefined : (input.reason ?? undefined),
+        p_evidence: input.evidence ?? undefined,
+      }, opId)
+    if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+    await Promise.all([lotsLive.reload(), movsLive.reload()]); refreshStock(); reloadCompras()
+    return { ok: true, status: r.status, lot_id: r.data.lot_id, replenishment_status: r.data.replenishment_status ?? null, pending_qty: r.data.pending_qty ?? null }
   }
 
   // Mock: identidad = producto + código de lote (suma, no idempotente).
@@ -181,57 +198,73 @@ export async function recibirLote(input: ReceiveInput): Promise<{ ok: boolean; e
 // Compat: Registrar entrada legacy → delega en la recepción atómica (fire-and-forget).
 // Lo usan flujos que no esperan feedback (p.ej. regreso de evento en eventsStore).
 export function addEntry(input: EntryInput): void {
+  if (hasSupabase) throw new Error(W1_DIRECT_DISABLED)
   void recibirLote(input)
+}
+
+// W1: con backend, el inventario SOLO cambia por comandos del servidor. Los caminos
+// directos de abajo (adjust / restockByReference / consume no-local / addEntry) quedan
+// para el modo demo (sin backend); con backend fallan cerrado (eventos y consignación
+// están deshabilitados hasta W2 y no llegan aquí).
+export const W1_DIRECT_DISABLED = 'Movimiento directo de inventario deshabilitado (W1): usa el comando correspondiente.'
+
+export type AjusteKind = 'merma' | 'ajuste' | 'correccion_recepcion'
+// MERMA / AJUSTE (D-06). Almacén da de baja con motivo (efecto inmediato, auditado); el
+// ajuste POSITIVO y la corrección de recepción son solo de Dirección (lo impone el servidor).
+export async function ajustarLote(input: { op_id: string; lot_id: string; delta: number; kind: AjusteKind; reason: string; receipt_id?: string | null }): Promise<{ ok: boolean; error?: string; ambiguous?: boolean; status?: string }> {
+  if (!input.reason.trim()) return { ok: false, error: 'Escribe el motivo — es obligatorio.' }
+  if (!input.delta) return { ok: false, error: 'La cantidad no puede ser cero.' }
+  if (hasSupabase) {
+    const r = await runW1Command('ajustar_lote', {
+      p_op_id: input.op_id, p_lot: input.lot_id, p_delta: input.delta, p_kind: input.kind,
+      p_reason: input.reason.trim(), p_receipt_id: input.receipt_id ?? undefined,
+    }, input.op_id)
+    if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+    await Promise.all([lotsLive.reload(), movsLive.reload()]); refreshStock()
+    return { ok: true, status: r.status }
+  }
+  const cur = lotsLive.current().find((l) => l.id === input.lot_id)
+  if (!cur) return { ok: false, error: 'No se encontró el lote.' }
+  if (input.delta < 0 && cur.quantity + input.delta < 0) return { ok: false, error: 'No hay existencia suficiente en el lote.' }
+  adjust(input.lot_id, input.delta, input.kind, input.reason.trim())
+  return { ok: true, status: 'applied' }
 }
 
 // Ajuste de un lote (baja por merma/caducidad o reingreso). Registra el movimiento.
 export function adjust(lotId: string, delta: number, reason: string, reference = '') {
+  if (hasSupabase) throw new Error(W1_DIRECT_DISABLED)
   const cur = lotsLive.current().find((l) => l.id === lotId)
   const newQty = Math.max(0, (cur?.quantity ?? 0) + delta)
   seq += 1
   lotsLive.setLocal(lotsLive.current().map((l) => (l.id === lotId ? { ...l, quantity: newQty } : l)))
   movsLive.setLocal([{ id: `m-${seq}`, lot_id: lotId, change: delta, reason, reference, created_by: null, created_at: nowIso() }, ...movsLive.current()])
   refreshStock(lotsLive.current())
-  if (hasSupabase && /^[0-9a-f]{8}-/i.test(lotId)) {
-    supabase.rpc('apply_lot_movement', { p_lot: lotId, p_change: delta, p_reason: reason, p_reference: reference }).then(({ error }) => { if (error) console.warn('[lots] adjust', error.message); lotsLive.reload(); movsLive.reload(); refreshStock() })
-  }
 }
 
 // Reingresa a SUS lotes las salidas registradas con una referencia (cancelación).
 export function restockByReference(reference: string, reason = 'cancelacion'): void {
+  if (hasSupabase) throw new Error(W1_DIRECT_DISABLED)
   const outs = movsLive.current().filter((m) => m.reference === reference && m.change < 0 && (m.reason === 'surtido' || m.reason === 'venta'))
   if (outs.length === 0) return
   const now = nowIso()
   const newMovs: InventoryMovement[] = []
   let lots = lotsLive.current()
-  const rpcs: { lot: string; give: number }[] = []
   outs.forEach((m, i) => {
     const give = -m.change
     lots = lots.map((l) => (l.id === m.lot_id ? { ...l, quantity: l.quantity + give } : l))
     seq += 1
     newMovs.push({ id: `m-${seq}-r${i}`, lot_id: m.lot_id, change: give, reason, reference, created_by: null, created_at: now })
-    if (hasSupabase && /^[0-9a-f]{8}-/i.test(m.lot_id)) rpcs.push({ lot: m.lot_id, give })
   })
   lotsLive.setLocal(lots)
   movsLive.setLocal([...newMovs, ...movsLive.current()])
   refreshStock(lotsLive.current())
-  if (hasSupabase) {
-    // ESPERA a que persistan los reingresos ANTES de recargar (si no, la recarga
-    // revierte la UI a las cantidades pre-restock hasta la siguiente hidratación).
-    (async () => {
-      for (const r of rpcs) {
-        const { error } = await supabase.rpc('apply_lot_movement', { p_lot: r.lot, p_change: r.give, p_reason: reason, p_reference: reference })
-        if (error) console.warn('[lots] restock', error.message)
-      }
-      lotsLive.reload(); movsLive.reload(); refreshStock()
-    })()
-  }
 }
 
 // Consumir lotes (salida): decrementa y registra un movimiento por lote.
 // `localOnly`: solo actualiza el cache (sin escribir a Supabase) — lo usa el surtido
 // atómico, que persiste todo (lotes+pedido) en UNA sola RPC (surtir_pedido).
 export function consume(allocations: { lot_id: string; qty: number }[], reference: string, reason = 'surtido', localOnly = false) {
+  if (hasSupabase && !localOnly) throw new Error(W1_DIRECT_DISABLED)
   const now = nowIso()
   const affected = new Set<string>()
   allocations.forEach((a) => { const lot = lotsLive.current().find((l) => l.id === a.lot_id); if (lot) affected.add(lot.product_id) })
@@ -245,15 +278,6 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
   movsLive.setLocal([...newMovs, ...movsLive.current()])
   flagLowStock(before, affected)
   refreshStock(lotsLive.current())
-  if (hasSupabase && !localOnly) {
-    (async () => {
-      // RPC atómico por lote: evita el lost-update del read-modify-write.
-      for (const a of allocations) {
-        if (/^[0-9a-f]{8}-/i.test(a.lot_id)) await supabase.rpc('apply_lot_movement', { p_lot: a.lot_id, p_change: -a.qty, p_reason: reason, p_reference: reference })
-      }
-      lotsLive.reload(); movsLive.reload(); refreshStock()
-    })()
-  }
 }
 
 // Recarga lotes+movimientos+stock tras una escritura externa (p. ej. surtir_pedido RPC).

@@ -2,6 +2,7 @@
 // FEFO), ve el saldo de cada vendedor y recibe devoluciones. Modelo de saldo
 // permanente: no hay cierre diario.
 import React, { useMemo, useState } from 'react'
+import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { Plus, X, PackagePlus, Undo2 } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
@@ -30,6 +31,11 @@ export function Consigna() {
         Producto que entregas a un vendedor para que venda en campo. Se descuenta del almacén al asignarlo
         y queda en su saldo; el vendedor regresa lo que no venda cuando quiera.
       </PageHead>
+      {CUSTODY_INVENTORY_DISABLED && (
+        <div className="sysnote" role="status" style={{ background: 'var(--warn-bg, #FFF7E6)' }}>
+          <span>{CUSTODY_DISABLED_MSG}</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10 }}>
         <ExportButton

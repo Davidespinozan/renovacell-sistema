@@ -2,6 +2,7 @@
 // (descuenta del almacén), véndelo en el stand con un showcase muy visual, y al
 // cerrar el sobrante regresa al almacén. Todo sobre data real (mock).
 import React, { useMemo, useState } from 'react'
+import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { Icon } from '../../app/icons'
 import { Plus, X, Store, PackagePlus, Check, ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { money } from '../../lib/format'
@@ -33,6 +34,11 @@ export function Eventos() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      {CUSTODY_INVENTORY_DISABLED && (
+        <div className="sysnote" role="status" style={{ background: 'var(--warn-bg, #FFF7E6)' }}>
+          <span>{CUSTODY_DISABLED_MSG}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}>Ventas · Eventos</div>
         <ExportButton name="eventos" rows={mine} style={{ marginLeft: 'auto' }} columns={[

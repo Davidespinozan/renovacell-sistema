@@ -7,15 +7,17 @@ import { useRole } from '../../auth/RoleContext'
 import { seedReorder } from '../../data/store/reorderStore'
 import { OrderCard } from './OrderCard'
 import { PaymentModal } from './PaymentModal'
+import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { isPast } from './orderStatus'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function MisPedidos() {
-  const { data: orders, loading, cancelOrder, payOrder } = useOrders()
+  const { data: orders, loading, payOrder } = useOrders()
   const { data: products } = useProducts()
   const { setScreen } = useRole()
   const [paying, setPaying] = useState<OrderWithItems | null>(null)
+  const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
 
   const reorder = (o: OrderWithItems) => {
     seedReorder(o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty })))
@@ -46,10 +48,15 @@ export function MisPedidos() {
             order={o}
             productsById={byId}
             onPay={() => setPaying(o)}
-            onCancel={() => { if (window.confirm('¿Cancelar este pedido?')) cancelOrder(o.id, 'Portal del Doctor') }}
+            onCancel={() => setCancelling(o)}
             onReorder={() => reorder(o)}
           />
         ))
+      )}
+
+      {cancelling && (
+        <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason={false}
+          actor="Portal del Doctor" onClose={() => setCancelling(null)} />
       )}
 
       {paying && (

@@ -10,6 +10,7 @@ import {
   ready,
   createOrder,
   cancelOrder,
+  cancelarPedido,
   payOrder,
   isCancelable,
   type OrderWithItems,
@@ -19,13 +20,13 @@ import {
 // Pedidos del doctor actual (Portal). Mañana lo limita la RLS de Supabase.
 export function useOrders() {
   const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-  return { data, loading: hasSupabase && !ready(), error: null as string | null, createOrder, cancelOrder, payOrder }
+  return { data, loading: hasSupabase && !ready(), error: null as string | null, createOrder, cancelOrder, cancelarPedido, payOrder }
 }
 
 // Todos los pedidos (staff de operación: almacén/empaque).
 export function useAllOrders() {
   const data = useSyncExternalStore(subscribe, getSnapshotAll, getSnapshotAll)
-  return { data, loading: hasSupabase && !ready(), error: null as string | null, cancelOrder }
+  return { data, loading: hasSupabase && !ready(), error: null as string | null, cancelOrder, cancelarPedido }
 }
 
 export { isCancelable }

@@ -13,6 +13,7 @@ import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import type { Json } from '../database.types'
+import { runW1Command } from '../ops/w1Command'
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -183,7 +184,10 @@ export function createOrder(input: {
 
 const CANCELABLE = ['draft', 'pending_payment', 'paid', 'picking', 'packed']
 export const isCancelable = (status: string | null): boolean => CANCELABLE.includes(status ?? '')
+// Modo demo (sin backend): cancelación local con reingreso inmediato. Con backend la
+// cancelación es SOLO el comando del servidor `cancelar_pedido` (ver cancelarPedido).
 export function cancelOrder(orderId: string, actor = 'Administración'): { ok: boolean } {
+  if (hasSupabase) return { ok: false }
   const o = orders.find((x) => x.id === orderId)
   if (!o || !isCancelable(o.status)) return { ok: false }
   if (o.status === 'packed') restockByReference(o.external_ref ?? o.id)
@@ -191,13 +195,42 @@ export function cancelOrder(orderId: string, actor = 'Administración'): { ok: b
   emit()
   notify({ text: `Pedido ${o.external_ref ?? orderId} cancelado`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor, action: 'Pedido cancelado', resource: o.external_ref ?? orderId })
-  if (hasSupabase && isUuid(orderId)) {
-    supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] cancel', error.message); hydrate() })
-  }
   return { ok: true }
 }
 
+export interface CancelResult {
+  ok: boolean; error?: string; code?: string; ambiguous?: boolean; status?: string
+  refundReview?: 'no_aplica' | 'pendiente_revision'; reingresoPendiente?: boolean
+}
+// W1 · D-03: cancelación atómica e idempotente EN EL SERVIDOR. Reglas por etapa (sin pagar:
+// doctor/staff; pagado/picking/empacado: solo Dirección con motivo; enviado/entregado/POS:
+// devolución), marca "reembolso pendiente de revisión" si hay dinero y, si estaba empacado,
+// deja el reingreso PENDIENTE de confirmación física de Almacén. Sin éxito optimista.
+export async function cancelarPedido(orderId: string, opts: { opId: string; reason?: string | null; actor?: string }): Promise<CancelResult> {
+  if (!hasSupabase) {
+    const r = cancelOrder(orderId, opts.actor ?? 'Administración')
+    return r.ok ? { ok: true, status: 'applied', refundReview: 'no_aplica', reingresoPendiente: false } : { ok: false, error: 'Este pedido ya no se puede cancelar.' }
+  }
+  const r = await runW1Command<{ refund_review?: 'no_aplica' | 'pendiente_revision'; reingreso_pendiente?: boolean }>(
+    'cancelar_pedido', { p_op_id: opts.opId, p_order: orderId, p_reason: opts.reason?.trim() || undefined }, opts.opId)
+  if (!r.ok) return { ok: false, error: r.error, code: r.code, ambiguous: r.ambiguous }
+  await hydrate()
+  if (r.status === 'applied') {
+    notify({ text: `Pedido ${folioOf(orderId)} cancelado${r.data.reingreso_pendiente ? ' · reingreso por confirmar' : ''}`, roles: ['admin', 'warehouse'], screen: r.data.reingreso_pendiente ? 'devoluciones' : 'av_ventas' })
+    logAudit({ actor: opts.actor ?? 'Administración', action: 'Pedido cancelado', resource: folioOf(orderId), detail: opts.reason ?? undefined })
+  }
+  return { ok: true, status: r.status, refundReview: r.data.refund_review, reingresoPendiente: !!r.data.reingreso_pendiente }
+}
+
 export interface PosOrderLine { product_id: string; qty: number; unit_price: number; lot_id: string | null }
+// shipping_meta de una venta POS: DETERMINISTA (sin timestamps) para que un reintento de la
+// misma venta mande exactamente el mismo contenido (idempotencia por order_id en vender_pos).
+export function posShippingMeta(input: { channel?: string; event_id?: string | null; seller?: string | null; customer_id?: string | null; customer?: { name: string; phone?: string | null } | null }): Record<string, unknown> {
+  return {
+    channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null,
+    ...(input.customer ? { customer: { id: input.customer_id ?? null, name: input.customer.name, phone: input.customer.phone ?? null } } : {}),
+  }
+}
 export function createPosOrder(input: {
   lines: PosOrderLine[]
   total: number
@@ -210,16 +243,15 @@ export function createPosOrder(input: {
   channel?: string
   invoice_requested?: boolean
   invoice_meta?: Record<string, unknown> | null
+  id?: string      // W1: id/folio confirmados por vender_pos (el ticket refleja la venta del servidor)
+  folio?: string
 }, localOnly = false): OrderWithItems {
   const invoiceReq = input.invoice_requested ?? false
   const invoiceMeta = input.invoice_meta ?? null
-  const id = hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`
-  const folio = `POS-${Date.now().toString().slice(-6)}`
+  const id = input.id ?? (hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`)
+  const folio = input.folio ?? `POS-${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
-  const shipping_meta = {
-    channel: input.channel ?? 'pos', event_id: input.event_id ?? null, seller: input.seller ?? null,
-    ...(input.customer ? { customer: { id: input.customer_id ?? null, name: input.customer.name, phone: input.customer.phone ?? null } } : {}),
-  }
+  const shipping_meta = posShippingMeta(input)
 
   const order: Order = {
     id, external_ref: folio, doctor_id: input.doctor_id ?? null, customer_id: input.customer_id ?? null, total: input.total, currency: 'MXN',
@@ -238,22 +270,8 @@ export function createPosOrder(input: {
   notify({ text: `Venta POS ${folio} cobrada`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor: 'Punto de Venta', action: 'Venta POS', resource: folio, detail: input.payment_method })
 
-  // localOnly: la venta POS atómica (vender_pos RPC) persiste orden+renglones+inventario
-  // en una transacción; aquí solo se refleja localmente para respuesta instantánea.
-  if (hasSupabase && !localOnly) {
-    (async () => {
-      const oi = await supabase.from('orders').insert({
-        id, external_ref: folio, doctor_id: isUuid(input.doctor_id) ? input.doctor_id : null, total: input.total,
-        currency: 'MXN', status: 'delivered', payment_method: input.payment_method, payment_status: 'paid',
-        invoice_requested: invoiceReq, invoice_meta: invoiceMeta as unknown as Json, shipping_meta: shipping_meta as unknown as Json,
-      })
-      if (oi.error) { console.warn('[orders] pos insert', oi.error.message); return }
-      await supabase.from('order_items').insert(input.lines.map((l) => ({
-        order_id: id, product_id: l.product_id, lot_id: isUuid(l.lot_id) ? l.lot_id : null, qty: l.qty, unit_price: l.unit_price,
-      })))
-      hydrate()
-    })()
-  }
+  // Con backend la venta la persiste SOLO vender_pos (W1); aquí se refleja lo ya confirmado.
+  void localOnly
   return { ...order, items: newItems }
 }
 
@@ -266,15 +284,9 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} surtido · por empacar`, roles: ['warehouse'], screen: 'cola' })
   logAudit({ actor: 'Almacén', action: 'Surtido (FEFO)', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId) && !localOnly) {
-    (async () => {
-      await supabase.from('orders').update({ status: 'packed' }).eq('id', orderId)
-      for (const [itemId, lotId] of Object.entries(itemLot)) {
-        if (isUuid(itemId)) await supabase.from('order_items').update({ lot_id: isUuid(lotId) ? lotId : null }).eq('id', itemId)
-      }
-      hydrate()
-    })()
-  }
+  // Con backend, 'packed' y los lotes por renglón los escribe SOLO surtir_pedido (W1);
+  // esta función refleja localmente lo ya confirmado (aviso + bitácora).
+  void localOnly
 }
 
 export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {

@@ -8,6 +8,7 @@
 //
 // Todas son IDEMPOTENTES: volver a correr el mismo archivo no duplica. Es lo que
 // permite migrar por partes, corregir el archivo y reintentar sin ensuciar datos.
+import { runW1Command, newOpId } from '../ops/w1Command'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { logAudit } from './auditStore'
 import { reloadInventory } from './lotsStore'
@@ -90,8 +91,12 @@ function traducirLote(msg: string): string {
   if (msg.includes('SKU_INEXISTENTE')) return 'no existe un producto con ese SKU (importa primero el catálogo)'
   if (msg.includes('LOTE_REQUERIDO')) return 'falta el código de lote'
   if (msg.includes('CANTIDAD_INVALIDA')) return 'cantidad inválida'
-  if (msg.includes('NO_AUTORIZADO')) return 'no tienes permiso para importar inventario'
-  return msg
+  if (msg.includes('NO_AUTORIZADO')) return 'solo Dirección puede importar inventario'
+  if (msg.includes('CADUCIDAD_REQUERIDA')) return 'falta la caducidad'
+  if (msg.includes('CADUCIDAD_INVALIDA')) return 'la caducidad no es una fecha válida (AAAA-MM-DD)'
+  if (msg.includes('CADUCADO_NO_RECIBIBLE')) return 'el lote ya está caducado; no entra como stock'
+  if (msg.includes('LOTE_CADUCIDAD_DISTINTA')) return 'ese lote ya existe con otra caducidad'
+  return ''
 }
 export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   const res = empty()
@@ -100,16 +105,20 @@ export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   // Cada lote entra por la RPC `importar_lote`: crea el lote y su movimiento de
   // entrada en UNA transacción (nunca un lote huérfano sin movimiento) y es
   // idempotente (si ya existe, lo omite). Una fila mala no tumba las demás.
+  // W1: carga inicial = entrada sin orden → solo Dirección (lo impone el servidor), caducidad
+  // ESTRICTA (una fecha inválida ya no entra como NULL). Idempotencia: el servidor omite un lote
+  // ya existente ('skipped'), así que re-subir el mismo archivo tras una respuesta ambigua no duplica.
   for (const r of rows) {
-    const { data, error } = await supabase.rpc('importar_lote', {
+    const opId = newOpId()
+    const out = await runW1Command<{ result?: string }>('importar_lote', {
+      p_op_id: opId,
       p_sku: (r.sku || '').trim(),
       p_lote: (r.lote || '').trim(),
       p_caducidad: (r.caducidad || '').trim(),
       p_cantidad: Math.trunc(Number(r.cantidad) || 0),
-      p_ubicacion: (r.ubicacion || '').trim(),
-    })
-    if (error) { rej(res, r as unknown as Record<string, unknown>, `Lote ${r.lote || '?'}: ${traducirLote(error.message)}`); continue }
-    if ((data as { result?: string } | null)?.result === 'skipped') { res.skipped += 1; continue }
+    }, opId)
+    if (!out.ok) { rej(res, r as unknown as Record<string, unknown>, `Lote ${r.lote || '?'}: ${out.ambiguous ? out.error : traducirLote(out.code ? out.code + ': ' : '') || out.error}`); continue }
+    if (out.data.result === 'skipped') { res.skipped += 1; continue }
     res.created += 1
   }
   reloadInventory()

@@ -4,7 +4,10 @@
 // (entrada); no había forma de corregir hacia arriba ni de cuadrar un conteo mal capturado.
 import React, { useState } from 'react'
 import { Icon } from '../../app/icons'
-import { adjust } from '../../data/store/lotsStore'
+import { ajustarLote } from '../../data/store/lotsStore'
+import { useOpId } from '../../data/hooks/useOpId'
+import { useRole } from '../../auth/RoleContext'
+import { hasSupabase } from '../../lib/supabase'
 
 const MOTIVOS = ['Conteo físico', 'Entrada mal capturada', 'Devolución no registrada', 'Otro']
 
@@ -16,10 +19,20 @@ export function AjusteModal({ lot, onClose }: {
   const [motivo, setMotivo] = useState(MOTIVOS[0])
   const realN = Math.max(0, Math.floor(Number(real) || 0))
   const delta = realN - lot.quantity
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const { opId } = useOpId()
+  const { role } = useRole()
+  // W1 · D-06: el ajuste NEGATIVO lo registra Almacén (inmediato, auditado); el POSITIVO
+  // (crea stock) es solo de Dirección — el servidor lo impone igual.
+  const positivoBloqueado = hasSupabase && delta > 0 && role !== 'admin'
 
-  const aplicar = () => {
-    if (delta === 0) return
-    adjust(lot.id, delta, 'ajuste', `${motivo} · ${lot.lot_code}`)
+  const aplicar = async () => {
+    if (delta === 0 || busy || positivoBloqueado) return
+    setBusy(true); setErr(null)
+    const r = await ajustarLote({ op_id: opId, lot_id: lot.id, delta, kind: 'ajuste', reason: `${motivo} · ${lot.lot_code}` })
+    setBusy(false)
+    if (!r.ok) { setErr(r.error ?? 'No se pudo ajustar.'); return }
     onClose()
   }
 
@@ -49,10 +62,12 @@ export function AjusteModal({ lot, onClose }: {
             </div>
           )}
 
+          {positivoBloqueado && <div className="sysnote" style={{ marginTop: 12 }}><span>Un ajuste que <b>suma</b> unidades lo registra <b>Dirección</b>. Pídeselo con el conteo.</span></div>}
+          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" onClick={aplicar} disabled={delta === 0} style={delta === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-              <Icon name="check" /> Ajustar a {realN} u
+            <button className="btn" type="button" onClick={aplicar} disabled={delta === 0 || busy || positivoBloqueado} style={delta === 0 || busy || positivoBloqueado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+              <Icon name="check" /> {busy ? 'Registrando…' : err ? 'Reintentar' : `Ajustar a ${realN} u`}
             </button>
           </div>
         </div>

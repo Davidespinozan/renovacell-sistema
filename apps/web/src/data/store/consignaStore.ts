@@ -5,6 +5,7 @@
 // reingreso de lotes ya escribe write-through en lotsStore. El hook no cambia.
 import { getSnapshotLots, getSnapshotMovements, consume, adjust } from './lotsStore'
 import { allocateFEFO } from '../ops/surtir'
+import { CUSTODY_INVENTORY_DISABLED } from '../ops/w1Flags'
 import { createPosOrder, type OrderWithItems } from './ordersStore'
 import { logAudit } from './auditStore'
 import { notify } from './notificationsStore'
@@ -76,7 +77,8 @@ function persist(vendor: string, productId: string) {
 }
 
 // Almacén asigna al vendedor: descuenta del central (FEFO, write-through) y suma a su saldo.
-export function assignToVendor(vendor: string, productId: string, qty: number): { ok: boolean; missing?: number } {
+export function assignToVendor(vendor: string, productId: string, qty: number): { ok: boolean; missing?: number; disabled?: boolean } {
+  if (CUSTODY_INVENTORY_DISABLED) return { ok: false, disabled: true }
   if (!vendor || qty <= 0) return { ok: false }
   const plan = allocateFEFO(productId, qty, getSnapshotLots())
   if (plan.shortfall > 0) return { ok: false, missing: plan.shortfall }
@@ -96,6 +98,7 @@ export function assignToVendor(vendor: string, productId: string, qty: number): 
 
 // Venta directa del vendedor: descuenta de SU saldo y registra la venta (POS).
 export function sellFromConsigna(vendor: string, lines: { product_id: string; qty: number; unit_price: number }[], total: number, paymentMethod: string, doctorId: string): OrderWithItems | null {
+  if (CUSTODY_INVENTORY_DISABLED) return null
   if (!vendor || lines.length === 0) return null
   const ok = lines.every((l) => remainingFor(vendor, l.product_id) >= l.qty)
   if (!ok) return null
@@ -151,6 +154,7 @@ export function requestRestock(vendor: string, productId: string, productName: s
 
 // Regresar al almacén lo no vendido: vuelve a SUS lotes (adjust write-through).
 export function returnToWarehouse(vendor: string, productId: string, qty: number) {
+  if (CUSTODY_INVENTORY_DISABLED) return
   if (qty <= 0) return
   // Tope: solo se puede devolver lo que sigue EN PODER del vendedor (asignado −
   // vendido). Sin esto, devolver de más reingresaba unidades ya vendidas → stock

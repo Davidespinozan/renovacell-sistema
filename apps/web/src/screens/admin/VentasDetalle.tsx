@@ -13,6 +13,8 @@ import { useRole } from '../../auth/RoleContext'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { ExportButton } from '../../app/ExportButton'
+import { CancelOrderModal } from '../../app/CancelOrderModal'
+import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 
 type ChannelFilter = 'todos' | 'portal' | 'pos'
@@ -32,7 +34,8 @@ const sel: React.CSSProperties = {
 }
 
 export function VentasDetalle() {
-  const { data: orders, cancelOrder } = useAllOrders()
+  const { data: orders } = useAllOrders()
+  const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
 
@@ -184,7 +187,11 @@ export function VentasDetalle() {
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => { if (window.confirm('¿Cancelar este pedido? Se reingresa el inventario si ya estaba surtido.')) { const r = cancelOrder(selectedOrder.id, 'Administración'); if (!r.ok) window.alert('Este pedido ya no se puede cancelar (cambió de estado).'); setSelected(null) } }} />
+        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} />
+      )}
+      {cancelling && (
+        <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
+          onClose={() => { setCancelling(null); setSelected(null) }} />
       )}
     </div>
   )
@@ -286,6 +293,8 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
             </div>
           )}
 
+          {order.status === 'packed' && <GuiaManualVoid orderId={order.id} />}
+
           {isCancelable(order.status) && (
             <div style={{ marginTop: 16, textAlign: 'right' }}>
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={onCancel}>Cancelar pedido</button>
@@ -348,7 +357,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
         <button type="button" className={tipo === 'cortesia' ? 'active' : undefined} onClick={() => setTipo('cortesia')}>Cortesía</button>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        {tipo === 'devolucion' ? 'El producto regresó: elige qué renglones y cuántas piezas. Se reingresan al inventario.'
+        {tipo === 'devolucion' ? 'Reembolso por producto devuelto: elige renglones y piezas para calcular el monto. Este registro es SOLO financiero; la entrada física del producto la registra Almacén en «Devoluciones y reingresos» y Dirección decide su destino.'
           : tipo === 'correccion' ? 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'
           : 'Se cobró pero no debía (cortesía). Regresa el dinero; el producto se queda con el cliente, no toca inventario.'}
       </div>

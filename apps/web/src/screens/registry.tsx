@@ -17,6 +17,7 @@ import { Existencias } from './warehouse/Existencias'
 import { Surtido } from './warehouse/Surtido'
 import { Caducidades } from './warehouse/Caducidades'
 import { Entradas } from './warehouse/Entradas'
+import { Devoluciones } from './warehouse/Devoluciones'
 import { Cola } from './packing/Cola'
 import { Guias } from './packing/Guias'
 import { Recibo } from './packing/Recibo'
@@ -36,6 +37,7 @@ import { Finanzas } from './admin/Finanzas'
 import { CierreCaja } from './admin/CierreCaja'
 import { Bitacora } from './admin/Bitacora'
 import { Reabastecimiento } from './admin/Reabastecimiento'
+import { ControlInventario } from './admin/ControlInventario'
 import { Equipo } from './admin/Equipo'
 import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
 import { Precios } from './admin/Precios'
@@ -66,6 +68,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
   entradas: () => <Entradas />,
+  devoluciones: () => <Devoluciones />,
   cola: () => <Cola />,
   guia: () => <Guias />,
   recibo: () => <Recibo />,
@@ -91,6 +94,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_comisiones: () => <Comisiones />,
   av_config: () => <Configuracion />,
   av_mermas: () => <Mermas />,
+  av_control_inv: () => <ControlInventario />,
   av_import: () => <Importar />,
   av_sitio: () => <SitioWeb />,
   eventos: () => <Eventos />,

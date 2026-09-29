@@ -5,9 +5,8 @@
 import type { Lot, OrderItem } from '../types'
 import { getSnapshotLots, consume, reloadInventory } from '../store/lotsStore'
 import { markPacked, reloadOrders, type OrderWithItems } from '../store/ordersStore'
-import { hasSupabase, supabase } from '../../lib/supabase'
-
-const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
+import { hasSupabase } from '../../lib/supabase'
+import { runW1Command, newOpId } from './w1Command'
 
 export interface Alloc {
   lot: Lot
@@ -58,43 +57,43 @@ export function canFulfill(plans: ItemPlan[]): boolean {
   return plans.length > 0 && plans.every((p) => p.shortfall === 0)
 }
 
+export interface SurtirResult { ok: boolean; plans: ItemPlan[]; error?: string; ambiguous?: boolean }
+
 // Confirma el surtido FEFO del pedido.
-export function surtirPedido(order: OrderWithItems): { ok: boolean; plans: ItemPlan[] } {
+// W1 (con backend): comando `surtir_pedido` con asignaciones POR RENGLÓN (order_item_id +
+// lote + qty). El servidor valida renglón, producto, caducidad, cobertura exacta y stock,
+// descuenta y marca empacado en UNA transacción. SIN éxito optimista: la pantalla solo
+// refleja lo confirmado. `opId` estable ⇒ un reintento no descuenta dos veces.
+export async function surtirPedido(order: OrderWithItems, opId: string = newOpId()): Promise<SurtirResult> {
   // Idempotencia: si el pedido YA se surtió/avanzó, no volver a descontar (evita el
   // doble consumo por doble-click o dos usuarios de almacén sobre el mismo pedido).
   if (['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(order.status ?? '')) {
-    return { ok: false, plans: [] }
+    return { ok: false, plans: [], error: 'Ese pedido ya fue surtido o cerrado.' }
   }
-  // Debe estar en estado EMPACABLE (pagado). markPacked exige lo mismo; validarlo ANTES
-  // de consumir evita descontar inventario de un pedido que luego no se empacaría
-  // (dejaba stock descontado, el pedido sin surtir y un falso "ok").
+  // Debe estar en estado EMPACABLE (pagado). Validarlo ANTES de consumir evita descontar
+  // inventario de un pedido que luego no se empacaría.
   if (!['paid', 'picking'].includes(order.status ?? '')) {
-    return { ok: false, plans: [] }
+    return { ok: false, plans: [], error: 'Ese pedido todavía no se puede surtir (debe estar pagado).' }
   }
   const plans = planSurtido(order, getSnapshotLots())
-  if (!canFulfill(plans)) return { ok: false, plans }
+  if (!canFulfill(plans)) return { ok: false, plans, error: 'No hay existencia suficiente para surtir este pedido.' }
 
-  const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty })))
   const itemLot: Record<string, string | null> = {}
   plans.forEach((p) => { itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null })
-  const ref = order.external_ref ?? order.id
 
-  // Optimista local (para respuesta instantánea).
-  consume(allocations, ref, 'surtido', true)
-  markPacked(order.id, itemLot, true)
-
-  if (hasSupabase && isUuid(order.id)) {
-    // ATÓMICO: descuenta lotes + movimientos + estado + lote por renglón en UNA
-    // sola transacción (surtir_pedido). Si algo falla, recarga y revierte lo local.
-    supabase.rpc('surtir_pedido', {
-      p_order: order.id, p_ref: ref,
-      p_allocations: allocations.filter((a) => isUuid(a.lot_id)),
-      p_item_lots: Object.fromEntries(Object.entries(itemLot).filter(([k]) => isUuid(k)).map(([k, v]) => [k, v ?? ''])),
-    }).then(({ error }) => {
-      if (error) console.warn('[surtir] rpc', error.message)
-      reloadInventory(); reloadOrders()
-    })
+  if (hasSupabase) {
+    const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ order_item_id: p.item.id, lot_id: a.lot.id, qty: a.qty })))
+    const r = await runW1Command('surtir_pedido', { p_op_id: opId, p_order: order.id, p_allocations: allocations }, opId)
+    if (!r.ok) { reloadInventory(); reloadOrders(); return { ok: false, plans, error: r.error, ambiguous: r.ambiguous } }
+    // Confirmado por el servidor: aviso/auditoría locales y recarga de la verdad.
+    markPacked(order.id, itemLot, true)
+    reloadInventory(); reloadOrders()
+    return { ok: true, plans }
   }
 
+  // Modo demo (sin backend): descuento local síncrono.
+  const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ lot_id: a.lot.id, qty: a.qty })))
+  consume(allocations, order.external_ref ?? order.id, 'surtido', true)
+  markPacked(order.id, itemLot, true)
   return { ok: true, plans }
 }

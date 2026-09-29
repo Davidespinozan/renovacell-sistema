@@ -18,7 +18,9 @@ import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
-import { venderPOS, type PosResult } from '../../data/ops/pos'
+import { venderPOS, newPosOp, type PosOp, type PosResult } from '../../data/ops/pos'
+import { estadoOperacion } from '../../data/ops/w1Command'
+import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { orderClientName } from '../../data/ops/orderClient'
 import { clientOf } from '../../data/mock/profiles'
 import type { Customer } from '../../data/ops/customer'
@@ -87,6 +89,10 @@ export function Caja() {
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const fiscalKeyRef = useRef<string>('')
+  // W1: identidad estable de la venta EN CURSO. Mientras la misma venta se reintenta tras una
+  // respuesta ambigua se reusa el mismo order_id/folio (el servidor no duplica); se renueva al
+  // confirmar o ante un rechazo definitivo.
+  const posOpRef = useRef<{ fp: string; op: PosOp } | null>(null)
 
   // Precarga el perfil fiscal MASTER del cliente al activar factura o cambiar de cliente.
   useEffect(() => {
@@ -142,6 +148,7 @@ export function Caja() {
   const cobrar = async () => {
     if (cobrando) return
     setCobrando(true)
+    setErr(null)
     const posLines = lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) }))
     // Venta en evento → sellAtEvent (descuenta el STAND, registra el lote entregado y
     // cuadra "Ventas del evento"). Mostrador → venderPOS (descuenta el almacén por FEFO).
@@ -150,7 +157,7 @@ export function Caja() {
       const order = sellAtEvent(eventId, posLines, total, method, user?.email ?? null)
       res = order
         ? { ok: true, order }
-        : { ok: false, error: 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
+        : { ok: false, error: CUSTODY_INVENTORY_DISABLED ? CUSTODY_DISABLED_MSG : 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
     } else {
       // CFDI omnicanal: guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC y
       // congela el SNAPSHOT del receptor en el pedido (invoice_meta.receiver, atómico en vender_pos).
@@ -162,11 +169,27 @@ export function Caja() {
         }
         invoiceMeta = { receiver: normalizeFiscalProfile(fiscal) }
       }
+      const fp = JSON.stringify({ posLines, total, method, client: client?.id ?? null, invoiceReq, invoiceMeta })
+      if (posOpRef.current && posOpRef.current.fp !== fp) {
+        // La venta anterior quedó AMBIGUA y el carrito cambió: antes de cobrar otra, verifica.
+        const prev = await estadoOperacion(posOpRef.current.op.orderId)
+        if (prev) {
+          const folioPrev = posOpRef.current.op.folio
+          posOpRef.current = null
+          setCobrando(false)
+          setErr(`La venta anterior (${folioPrev}) SÍ quedó registrada. Revisa Ventas antes de cobrar de nuevo.`)
+          return
+        }
+        posOpRef.current = null
+      }
+      const op = posOpRef.current?.op ?? newPosOp()
+      posOpRef.current = { fp, op }
       res = await venderPOS(posLines, total, method, {
         customerId: client?.id ?? null,
         customer: client ? { name: client.name, phone: client.phone ?? null } : null,
-        seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta,
+        seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta, op,
       })
+      if (!(res as { ambiguous?: boolean }).ambiguous) posOpRef.current = null
     }
     setCobrando(false)
     if (res.ok && res.order) {
@@ -185,8 +208,8 @@ export function Caja() {
       fiscalKeyRef.current = ''
     } else {
       // La RPC atómica falla ANTES de cobrar si el inventario no alcanza: no hay venta fantasma.
+      // El error del servidor queda VISIBLE hasta la siguiente acción (no desaparece solo).
       setErr(res.error ?? 'No se pudo completar la venta. Verifica existencias en Almacén.')
-      window.setTimeout(() => setErr(null), 4000)
     }
   }
 
