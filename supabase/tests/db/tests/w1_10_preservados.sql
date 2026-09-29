@@ -1,0 +1,41 @@
+-- W1 · Componentes que DEBEN quedar sin cambios (md5 de pg_get_functiondef capturado antes de W1,
+-- idéntico a producción: ver supabase/rollback/w1/00_prod_snapshot.sql).
+begin;
+do $t$
+declare r record;
+begin
+  for r in select * from (values
+    ('admin_approve_doctor(uuid,uuid,jsonb)',                 'ae578fcf8652206d6db0c611d7a4a5ef'),
+    ('auth_role()',                                           '453e9a52e298c2dfcb96df0930a94e31'),
+    ('confirmar_entrega(uuid,text,text)',                     '312b5ba18dac4f4a9419e1aaff4e80cb'),
+    ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', '99d610b10ea8f5629e38e27b11ff0be8'),
+    ('event_sell(uuid,jsonb)',                                '453593fac9bdf3fda3b2c3e745b22ce4'),
+    ('finalize_shipment(uuid,jsonb)',                         'a1cf5c01877e87f41ee0e9635b478e34'),
+    ('freeze_movement_cost()',                                'f1eb88ca3b5969cbd4d15a67754542ce'),
+    ('handle_new_user()',                                     'd31936c0f165c984cd4cf28362d91a52'),
+    ('has_cap(text)',                                         '4f3623da46d27843939a986d67fb4e43'),
+    ('ledger_append_only()',                                  '7563f161c00630c2725591c680a354f2'),
+    ('log_audit()',                                           '7026276516a63fb54f0dd7287a927ecc'),
+    ('log_audit(text,text,text,text)',                        '1f8e208dadee1ec1225a515970b898bc'),
+    ('orders_estado_terminal()',                              '6c44978c08600b0ffd7777743757c359'),
+    ('pay_order(uuid,text,text)',                             '3717294aa7b93a4322f5c378f6db9e38'),
+    ('precio_de(uuid,uuid)',                                  'b256810a5e089355712bdeffcb423832'),
+    ('precio_de(uuid,uuid,integer)',                          '9efe19506f40e19c3dc5baeca66b9014'),
+    ('profiles_guard()',                                      '1a1d0a4cd4f3398b0d3d1ae865d3c741'),
+    ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
+    ('review_transfer_payment(uuid,text,text)',               'b736bcd1c74e04c21121370b256f49d1'),
+    ('set_order_fiscal_snapshot(uuid,jsonb)',                 'a009a07290c5029b1da7433aeea3b1a5'),
+    ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
+    ('upsert_customer_fiscal(uuid,jsonb)',                    '8fd937b882e85743582730ac7f132088')
+  ) as t(sig, h) loop
+    perform tests.eq(md5(pg_get_functiondef(('public.' || r.sig)::regprocedure)), r.h, 'sin cambios: ' || r.sig);
+  end loop;
+  -- Triggers existentes siguen presentes
+  perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_inventory_movements_append_only'), 'kardex sigue append-only');
+  perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_audit_logs_append_only'), 'audit_logs sigue append-only');
+  perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_freeze_movement_cost'), 'costo congelado por movimiento sigue');
+  perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_orders_estado_terminal'), 'estado terminal de pedidos sigue');
+  perform tests.ok(exists (select 1 from pg_trigger where tgname = 'orders_audit_trigger'), 'auditoría de pedidos sigue');
+end
+$t$;
+rollback;
