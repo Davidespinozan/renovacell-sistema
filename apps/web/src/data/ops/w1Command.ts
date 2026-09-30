@@ -100,7 +100,10 @@ const MENSAJES: Record<string, string> = {
   DECLARACION_RECHAZADA: 'Ese comprobante fue rechazado: el cliente debe enviar uno nuevo.',
   YA_VERIFICADO: 'Ese pago ya fue verificado: no se puede rechazar. Si el dinero no llegó, Dirección debe reversar el asiento.',
   SIN_SALDO: 'Ese pedido no tiene saldo por cobrar.',
-  TIPO_INVALIDO: 'Selecciona el tipo de reembolso: devolución, corrección o cortesía.',
+  // El servidor usa este código en tres contextos (reembolso, tipo de custodia, tipo de
+  // pérdida) y cada uno enumera sus opciones en el detalle. Por eso el mensaje base es
+  // neutral y las opciones válidas se anexan desde el detalle (ver DETALLE_VOCABULARIO).
+  TIPO_INVALIDO: 'El tipo indicado no es válido para esta operación.',
   REEMBOLSO_EXCEDE_COBRADO: 'No se puede reembolsar más de lo que se cobró de ese pedido.',
   REEMBOLSO_INEXISTENTE: 'No se encontró ese reembolso.',
   REEMBOLSO_YA_PAGADO: 'Ese reembolso ya se pagó.',
@@ -119,6 +122,64 @@ const MENSAJES: Record<string, string> = {
   CORTE_YA_ANULADO: 'Ese corte ya fue anulado.',
   CORTE_ES_ANULACION: 'Ese registro es una anulación: no se vuelve a anular.',
   EFECTIVO_INSUFICIENTE: 'El efectivo recibido es menor al total de la venta.',
+
+  // --- W2-C · custodia (eventos y consignación) ------------------------------
+  // "En poder" = lo que el vendedor o el stand traen en la mano. "Disponible" = lo que
+  // el almacén puede prometer: existencia propia menos lo que está en custodia.
+  CUSTODIA_INEXISTENTE: 'No se encontró esa custodia. Recarga la pantalla.',
+  CUSTODIA_CERRADA: 'Esta custodia ya está cerrada y no admite nuevas operaciones.',
+  CUSTODIA_YA_ABIERTA: 'Esa persona ya tiene una custodia abierta de ese tipo. Usa la que ya existe o ciérrala antes de abrir otra.',
+  CUSTODIA_CON_SALDO: 'La custodia todavía tiene producto en poder del responsable. Recibe la devolución, regístralo como vendido o asienta la pérdida antes de cerrarla.',
+  CUSTODIA_EN_PODER: 'Esas unidades están en custodia de un vendedor o de un evento: no están en el almacén. Solo puedes usar las disponibles.',
+  CUSTODIA_SALDO_INSUFICIENTE: 'El responsable no tiene tantas unidades de ese producto. Revisa su saldo antes de continuar.',
+  DISPONIBILIDAD_INSUFICIENTE: 'No hay existencia disponible suficiente: parte del producto está en custodia de un vendedor o de un evento.',
+  ENTREGA_SIN_RENGLONES: 'Indica qué producto y cuántas unidades vas a entregar.',
+  DEVOLUCION_SIN_RENGLONES: 'Indica qué producto y cuántas unidades regresan.',
+  PERDIDA_SIN_RENGLONES: 'Indica qué producto y cuántas unidades se perdieron.',
+  INSPECCION_INVALIDA: 'Indica si el producto llegó en buen estado, dañado o caducado.',
+  // Quién responde por la custodia: un usuario del sistema o un cliente del maestro.
+  TENEDOR_REQUERIDO: 'Indica un solo responsable de la custodia: un usuario del sistema o un cliente registrado.',
+  TENEDOR_INVALIDO: 'Indica qué tipo de responsable es: personal interno, doctor o tercero.',
+  TENEDOR_INTERNO_REQUIERE_CUENTA: 'El personal interno se identifica con su usuario del sistema. Selecciónalo de la lista.',
+  USUARIO_INEXISTENTE: 'Ese usuario no existe en el sistema.',
+  CLIENTE_INEXISTENTE: 'Ese cliente no existe o está inactivo. Búscalo de nuevo o regístralo antes de continuar.',
+  EVENTO_REQUIERE_NOMBRE: 'Escribe el nombre del evento.',
+  CONSIGNACION_SIN_EVENTO: 'La consignación de un vendedor no lleva datos de evento. Si es un evento, créalo desde la pantalla de Eventos.',
+
+  // --- Inventario y venta: códigos alcanzables que faltaban -------------------
+  LOTE_INEXISTENTE: 'No se encontró ese lote. Recarga el inventario y vuelve a intentar.',
+  VENTA_SIN_RENGLONES: 'Agrega al menos un producto antes de cobrar.',
+  ASIGNACIONES_REQUERIDAS: 'Falta indicar de qué lotes sale el producto. Recarga la pantalla y vuelve a intentar.',
+  CUSTOMER_INEXISTENTE: 'Ese cliente no existe o está inactivo.',
+  TIPO_AJUSTE_INVALIDO: 'Tipo de movimiento no válido: usa merma, ajuste o corrección de recepción.',
+  CORRECCION_DEBE_SER_NEGATIVA: 'Una corrección de recepción solo puede restar unidades. Si faltó capturar, registra otra entrada.',
+  RECEPCION_REQUERIDA: 'Indica a qué recepción corresponde la corrección.',
+  RECEPCION_INEXISTENTE: 'No se encontró esa recepción.',
+  RECEPCION_DE_OTRO_LOTE: 'Esa recepción corresponde a otro lote.',
+  RECEPCION_NO_APLICA: 'Solo una corrección de recepción se liga a una entrada previa.',
+}
+
+// El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones
+// distintas (reembolso, tipo de custodia, tipo de pérdida) y el detalle es lo que
+// distingue cuál. En los demás casos el mensaje base ya enumera las opciones en español,
+// y el detalle del servidor traería tokens internos ("staff", "correccion_recepcion").
+const DETALLE_VOCABULARIO = new Set(['TIPO_INVALIDO'])
+
+// Un identificador interno (uuid) no le dice NADA al operador y no debe salir a pantalla.
+// Se quita del detalle antes de mostrarlo; si al quitarlo el detalle deja de aportar,
+// simplemente no se anexa y queda el mensaje base.
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+// Vocabulario interno de la base: viene en minúsculas con guion bajo
+// ("correccion_recepcion", "pending_payment"). Tampoco sale a pantalla.
+const TOKEN_INTERNO = /\b[a-z]+(?:_[a-z]+)+\b/g
+export function limpiarDetalle(detalle: string): string {
+  return detalle
+    .replace(UUID, '')
+    .replace(TOKEN_INTERNO, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/[\s,;:]+$/, '')
+    .trim()
 }
 
 // Extrae el código de negocio ('CODIGO: detalle') o el nombre de restricción.
@@ -130,12 +191,16 @@ export function w1Code(message: string): string | undefined {
 export function w1Message(message: string): string {
   const code = w1Code(message)
   if (code && MENSAJES[code]) {
-    // Conserva el detalle numérico del servidor (p. ej. "pendiente 40") cuando lo hay.
-    const detail = message.includes(':') ? message.slice(message.indexOf(':') + 1).trim() : ''
+    // Conserva el detalle del servidor cuando aporta: una cantidad concreta
+    // (p. ej. "pendiente 40") o la lista de opciones válidas. Los identificadores
+    // internos se eliminan antes de mostrarlo.
+    const detail = limpiarDetalle(message.includes(':') ? message.slice(message.indexOf(':') + 1).trim() : '')
     const base = MENSAJES[code]
-    return /\d/.test(detail) && !['OP_ID_REUTILIZADO'].includes(code) ? `${base} (${detail})` : base
+    const aporta = /\d/.test(detail) || DETALLE_VOCABULARIO.has(code)
+    return aporta && detail !== '' && !['OP_ID_REUTILIZADO'].includes(code) ? `${base} (${detail})` : base
   }
-  return message.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo completar la operación.'
+  // Sin código conocido: se muestra lo que dijo el servidor, también sin identificadores.
+  return limpiarDetalle(message.replace(/^[A-Z_]+:\s*/, '')) || 'No se pudo completar la operación.'
 }
 
 // ¿La falla es de transporte (resultado desconocido) y no una respuesta del servidor?
