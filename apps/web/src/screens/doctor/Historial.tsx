@@ -5,12 +5,14 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
 import { seedReorder } from '../../data/store/reorderStore'
 import { OrderCard } from './OrderCard'
+import { useOrderMoney } from '../../data/hooks/useMoney'
 import { isPast } from './orderStatus'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function Historial() {
   const { data: orders, loading } = useOrders()
+  const { byOrder } = useOrderMoney()
   const { data: products } = useProducts()
   const { setScreen } = useRole()
 
@@ -37,7 +39,7 @@ export function Historial() {
           Aún no hay pedidos en tu historial.
         </div>
       ) : (
-        past.map((o) => <OrderCard key={o.id} order={o} productsById={byId} showTracking={false} onReorder={() => reorder(o)} />)
+        past.map((o) => <OrderCard key={o.id} order={o} productsById={byId} showTracking={false} dinero={byOrder[o.id] ?? null} onReorder={() => reorder(o)} />)
       )}
     </div>
   )

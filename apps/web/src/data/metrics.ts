@@ -225,11 +225,20 @@ export interface BillingSummary {
   paid: number
   pending: number
 }
-export function billingSummary(orders: OrderWithItems[]): BillingSummary {
+// W2 · con libro de dinero, `paid` es lo que REALMENTE entró (neto de reembolsos) y
+// `pending` el SALDO: un pago parcial deja de contarse como si nada se hubiera cobrado.
+// Sin libro (demo) se conserva la derivación por pedido.
+export function billingSummary(orders: OrderWithItems[], money: Record<string, { cobrado_neto: number; saldo: number } | undefined> = {}): BillingSummary {
   const valid = orders.filter(isSale)
   const cfdi = valid.filter((o) => o.invoice_requested).length
-  const paid = valid.filter((o) => o.payment_status === 'paid').reduce((s, o) => s + (o.total ?? 0), 0)
-  const pending = valid.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (o.total ?? 0), 0)
+  let paid = 0
+  let pending = 0
+  valid.forEach((o) => {
+    const m = money[o.id]
+    if (m) { paid += m.cobrado_neto; pending += Math.max(0, m.saldo); return }
+    if (o.payment_status === 'paid') paid += o.total ?? 0
+    else pending += o.total ?? 0
+  })
   return { cfdiRate: valid.length ? cfdi / valid.length : 0, paid, pending }
 }
 

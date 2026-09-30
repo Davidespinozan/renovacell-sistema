@@ -1,5 +1,8 @@
 // Máquina de estados PURA de la revisión de una transferencia (confirmar/rechazar).
-// Es el espejo fiel de la RPC server-side review_transfer_payment: el store la usa en el
+// W2 · SOLO MODO DEMO. Con backend la autoridad es `revisar_pago` sobre `payment_claims`
+// (la RPC vieja review_transfer_payment fue eliminada). Esto se conserva porque la demo sin
+// backend no tiene tablas y necesita reproducir la máquina de estados del reporte.
+// Era el espejo fiel de la RPC server-side review_transfer_payment: el store la usa en el
 // modo mock y las pruebas cubren aquí la matriz de idempotencia sin tocar la base.
 export type ReviewAction = 'confirm' | 'reject'
 

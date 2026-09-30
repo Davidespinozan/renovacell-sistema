@@ -1,11 +1,16 @@
-// DEVOLUCIONES / CORRECCIONES (append-only). Con backend escribe SOLO por la RPC
-// `registrar_devolucion` (SECURITY DEFINER: valida rol, motivo y TOPE del lado
-// servidor). El pedido original NUNCA se toca; una devolución es un registro nuevo
-// que lo referencia. Los reportes restan estas devoluciones del neto.
+// REEMBOLSOS / CORRECCIONES (append-only). W2 los divide en DOS HECHOS:
+//   1) AUTORIZAR (`autorizar_reembolso`) — queda el compromiso. El dinero NO ha salido.
+//   2) PAGAR    (`pagar_reembolso`)      — sale el dinero: nace el asiento 'out'.
+// Un reembolso autorizado y no pagado es una deuda con el cliente, y así se muestra
+// (v_order_money.reembolso_pendiente). El pedido original NUNCA se toca.
+//
+// La ENTRADA FÍSICA del producto NO vive aquí: la registra Almacén con
+// `recibir_devolucion` y la dispone Dirección con `disponer_devolucion` (W1).
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { logAudit } from './auditStore'
 import { makeLive } from './live'
-import type { Json } from '../database.types'
+import { autorizarReembolso as cmdAutorizar, pagarReembolso as cmdPagar, type PaymentMethod } from '../ops/money'
+import { reloadMoney } from './moneyStore'
 
 export type RefundTipo = 'devolucion' | 'correccion' | 'cortesia'
 
@@ -52,45 +57,58 @@ export function returnedByItem(refunds: Refund[], orderId: string): Record<strin
   return m
 }
 
-export interface RegistrarInput { orderId: string; tipo: RefundTipo; monto: number; motivo: string; usuario: string; items?: RefundItem[] }
+export interface RegistrarInput { orderId: string; tipo: RefundTipo; monto: number; motivo: string; usuario: string; items?: RefundItem[]; returnId?: string | null }
 
-// Traduce los códigos de error de la RPC a mensajes claros para el usuario.
-function traducir(msg: string): string {
-  if (msg.includes('MONTO_EXCEDE')) return 'El monto supera lo que resta por devolver de este pedido.'
-  if (msg.includes('MOTIVO_REQUERIDO')) return 'Escribe el motivo de la devolución.'
-  if (msg.includes('MONTO_INVALIDO')) return 'El monto debe ser mayor a cero.'
-  if (msg.includes('TIPO_INVALIDO')) return 'Tipo de devolución inválido.'
-  if (msg.includes('NO_AUTORIZADO')) return 'No tienes permiso para registrar devoluciones.'
-  if (msg.includes('PEDIDO_INVALIDO')) return 'Ese pedido no admite devolución.'
-  return msg
-}
+export interface RefundResult { ok: boolean; error?: string; ambiguous?: boolean; refundId?: string; restante?: number }
 
-export async function registrarDevolucion(input: RegistrarInput): Promise<{ ok: boolean; error?: string; restante?: number }> {
+// 1) AUTORIZAR el reembolso. No mueve dinero: deja el compromiso registrado.
+// El servidor valida rol, motivo, tipo y que no se autorice más de lo cobrado.
+export async function autorizarReembolso(opId: string, input: RegistrarInput): Promise<RefundResult> {
   if (input.monto <= 0) return { ok: false, error: 'El monto debe ser mayor a cero.' }
-  if (!input.motivo.trim()) return { ok: false, error: 'Escribe el motivo de la devolución.' }
-
-  const items = input.tipo === 'devolucion' ? (input.items ?? []) : []
+  if (!input.motivo.trim()) return { ok: false, error: 'Escribe el motivo del reembolso.' }
 
   if (!hasSupabase) {
-    // Modo local (sin backend): registra optimista para poder ver el flujo.
+    // Demo (sin backend): registro optimista para poder ver el flujo.
     const r: Refund = {
       id: globalThis.crypto?.randomUUID?.() ?? `rf-${Date.now()}`,
       order_id: input.orderId, tipo: input.tipo, monto: input.monto,
       motivo: input.motivo.trim(), metodo: null, usuario: input.usuario,
-      created_at: new Date().toISOString(), items,
+      created_at: new Date().toISOString(), items: input.items ?? [],
     }
     live.setLocal([r, ...live.current()])
-    return { ok: true }
+    return { ok: true, refundId: r.id }
   }
 
-  const { data, error } = await supabase.rpc('registrar_devolucion', {
-    p_order_id: input.orderId, p_tipo: input.tipo, p_monto: input.monto,
-    p_motivo: input.motivo.trim(), p_usuario: input.usuario,
-    p_items: items as unknown as Json,
+  const r = await cmdAutorizar(opId, {
+    orderId: input.orderId, tipo: input.tipo, monto: input.monto,
+    motivo: input.motivo.trim(), returnId: input.returnId ?? null, usuario: input.usuario,
   })
-  if (error) return { ok: false, error: traducir(error.message) }
-  logAudit({ actor: input.usuario, action: input.tipo === 'correccion' ? 'Corrección de cobro' : 'Devolución', resource: input.orderId, detail: `$${input.monto} · ${input.motivo.trim()}` })
-  live.reload()
-  const restante = (data as { restante?: number } | null)?.restante
-  return { ok: true, restante }
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  if (r.status === 'applied') {
+    logAudit({
+      actor: input.usuario,
+      action: input.tipo === 'correccion' ? 'Corrección de cobro autorizada' : input.tipo === 'cortesia' ? 'Cortesía autorizada' : 'Reembolso autorizado',
+      resource: input.orderId, detail: `$${input.monto} · ${input.motivo.trim()} · el dinero aún NO ha salido`,
+    })
+  }
+  await Promise.all([live.reload(), reloadMoney()])
+  return { ok: true, refundId: r.data.refund_id, restante: r.data.restante }
+}
+
+// 2) PAGAR el reembolso: aquí SÍ sale el dinero (asiento 'out' en el libro).
+// Devolver por una vía distinta a la del cobro exige motivo (el servidor lo exige).
+export async function pagarReembolso(opId: string, a: {
+  refundId: string; method: PaymentMethod; fechaValor?: string | null; reference?: string | null; motivoVia?: string | null; usuario?: string
+}): Promise<RefundResult & { monto?: number }> {
+  if (!hasSupabase) {
+    live.setLocal(live.current().map((r) => (r.id === a.refundId ? { ...r, metodo: a.method } : r)))
+    return { ok: true, refundId: a.refundId }
+  }
+  const r = await cmdPagar(opId, a)
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  if (r.status === 'applied') {
+    logAudit({ actor: a.usuario ?? 'Administración', action: 'Reembolso pagado', resource: a.refundId, detail: `$${r.data.monto} · ${a.method}${r.data.misma_via ? '' : ' · vía distinta a la del cobro'}` })
+  }
+  await Promise.all([live.reload(), reloadMoney()])
+  return { ok: true, refundId: a.refundId, monto: r.data.monto }
 }

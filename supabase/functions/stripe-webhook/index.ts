@@ -1,11 +1,30 @@
-// Edge Function: WEBHOOK de Stripe. Stripe la llama cuando un pago se completa;
-// aquí verificamos la firma y marcamos el pedido como PAGADO (service role, directo
-// a orders — no pasa por el RPC porque no hay usuario en sesión). SEAM: sin
-// STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET responde 501 (inofensivo).
+// Edge Function: WEBHOOK de Stripe. Stripe la llama cuando un pago se completa.
+//
+// W2 · el dinero se registra en el LIBRO, no editando el pedido: tras verificar la firma
+// se llama a `registrar_cobro` con service role — la notificación FIRMADA de Stripe es la
+// evidencia del cobro. El comando crea el asiento y recalcula `payment_status`; esta
+// función no vuelve a escribir campos de dinero (una sola fuente de verdad).
+//
+// IDEMPOTENCIA en dos capas: el op_id se DERIVA del id de la sesión de Stripe (mismo
+// evento ⇒ mismo op_id ⇒ `already_applied`), y `external_ref` = id de sesión tiene índice
+// único en el libro. Stripe reintenta sin miedo: no se duplica el dinero.
+//
+// SEAM: sin STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET responde 501 (inofensivo).
 // IMPORTANTE: al desplegar, usar --no-verify-jwt (Stripe no manda JWT de Supabase).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import Stripe from 'npm:stripe@17'
 import { evaluarPago } from './rules.ts'
+
+// op_id ESTABLE a partir del id de la sesión: un reintento de Stripe reusa el mismo y el
+// registro de operaciones de dinero devuelve `already_applied` en lugar de cobrar dos veces.
+async function opIdDeSesion(sessionId: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`stripe:${sessionId}`))
+  const b = new Uint8Array(buf)
+  b[6] = (b[6] & 0x0f) | 0x50 // versión 5 (derivado de un nombre)
+  b[8] = (b[8] & 0x3f) | 0x80 // variante RFC 4122
+  const h = [...b.slice(0, 16)].map((x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`
+}
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
@@ -47,16 +66,34 @@ Deno.serve(async (req) => {
       return ok({ received: true, ignored: decision.reason }) // evento procesado; no reintentar
     }
 
-    // service role: marca pagado (idempotente vía .eq('payment_status','pending')) y libera a Almacén.
+    // COMANDO: el cobro entra al libro. `payment_status` lo recalcula el servidor desde
+    // los asientos; esta función NO lo escribe.
     const pi = typeof session.payment_intent === 'string' ? session.payment_intent : null
-    const { error: upErr } = await admin.from('orders').update({
-      payment_status: 'paid', payment_method: 'stripe',
-      payment_ref: pi ?? session.id ?? null, stripe_payment_id: session.id ?? null,
-    }).eq('id', orderId).eq('payment_status', 'pending')
-    if (upErr) return new Response('db_update_error', { status: 500 }) // 500 → Stripe reintenta
+    const opId = await opIdDeSesion(session.id ?? pi ?? orderId)
+    const monto = session.amount_total != null ? session.amount_total / 100 : Number(order?.total ?? 0)
+    const { data: res, error: cobroErr } = await admin.rpc('registrar_cobro', {
+      p_op_id: opId,
+      p_order: orderId,
+      p_method: 'stripe',
+      p_amount: monto,
+      p_reference: session.id ?? pi ?? undefined,
+      p_evidence: pi ?? undefined,
+    })
+    if (cobroErr) {
+      // OP_ID_REUTILIZADO / asiento duplicado = ya estaba registrado: evento procesado.
+      if (/OP_ID_REUTILIZADO|uq_entry_external_ref|duplicate key/i.test(cobroErr.message)) {
+        return ok({ received: true, ignored: 'already_recorded' })
+      }
+      console.error('[stripe-webhook] registrar_cobro', cobroErr.message, { orderId })
+      return new Response('rpc_error', { status: 500 }) // 500 → Stripe reintenta
+    }
 
-    const { error: stErr } = await admin.from('orders').update({ status: 'paid' }).eq('id', orderId).eq('status', 'pending_payment')
-    if (stErr) return new Response('db_update_error', { status: 500 })
+    // Avanza el pedido a 'paid' solo si el libro dice que quedó pagado (un cobro insuficiente
+    // deja el pedido en 'parcial' y no libera nada). `status` es flujo, no dinero.
+    if ((res as { payment_status?: string } | null)?.payment_status === 'paid') {
+      const { error: stErr } = await admin.from('orders').update({ status: 'paid' }).eq('id', orderId).eq('status', 'pending_payment')
+      if (stErr) return new Response('db_update_error', { status: 500 })
+    }
   }
 
   return ok({ received: true })

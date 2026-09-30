@@ -57,6 +57,28 @@ begin
   raise exception 'FAIL: % — no falló (se esperaba uno de %)', p_name, p_patterns;
 end $$;
 
+-- Aserción FUERTE de no-autoridad: intenta la escritura y exige que el valor NO cambie,
+-- sin importar si el bloqueo vino de un trigger (excepción) o de RLS (0 filas afectadas).
+create or replace function tests.sin_efecto(p_sql text, p_probe text, p_expected text, p_name text)
+returns void language plpgsql as $$
+declare v_got text; v_claims text; v_role text;
+begin
+  begin execute p_sql; exception when others then null; end;
+  -- El sondeo se hace como DUEÑO: si se leyera con el rol impersonado, la RLS de lectura
+  -- devolvería NULL y se confundiría "no puedo verlo" con "lo cambié".
+  v_claims := current_setting('request.jwt.claims', true);
+  v_role   := current_setting('role', true);
+  perform set_config('role', 'postgres', true);
+  perform set_config('request.jwt.claims', '{}', true);
+  execute p_probe into v_got;
+  perform set_config('role', coalesce(nullif(v_role, ''), 'none'), true);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  if v_got is distinct from p_expected then
+    raise exception 'FAIL: % — el valor CAMBIÓ (% → %)', p_name, p_expected, coalesce(v_got, '<NULL>');
+  end if;
+  raise notice 'PASS: %', p_name;
+end $$;
+
 -- Contexto compartido entre sesiones concurrentes (ids de fixtures confirmados).
 create table if not exists tests.ctx (key text primary key, val uuid not null);
 grant select on tests.ctx to anon, authenticated, service_role;
@@ -129,7 +151,55 @@ begin
   return (v_res ->> 'lot_id')::uuid;
 end $$;
 
+-- Actor admin reutilizable para los fixtures.
+create or replace function tests.fixture_admin() returns uuid language plpgsql security definer set search_path = public as $$
+declare v uuid;
+begin
+  select id into v from public.profiles where role_id = 'admin' and email like 'fixture-admin%' limit 1;
+  if v is null then v := tests.user('admin', 'fixture-admin@test.local'); end if;
+  return v;
+end $$;
+
+-- W2: el dinero de un fixture entra por el COMANDO real (asiento en el libro).
+create or replace function tests.cobrar(p_order uuid, p_amount numeric default null, p_method text default 'transferencia')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_admin uuid := tests.fixture_admin(); v_claims text := current_setting('request.jwt.claims', true);
+        v_op uuid := gen_random_uuid(); v_monto numeric;
+begin
+  select coalesce(p_amount, total) into v_monto from public.orders where id = p_order;
+  if coalesce(v_monto, 0) <= 0 then return null; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform public.registrar_cobro(v_op, p_order, p_method, v_monto);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_op;
+end $$;
+
+-- W2: el doctor DECLARA un pago (queda en revisión, no mueve dinero).
+create or replace function tests.reportar(p_order uuid, p_amount numeric default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_doc uuid; v_claims text := current_setting('request.jwt.claims', true); v_op uuid := gen_random_uuid(); v_monto numeric;
+begin
+  select doctor_id, coalesce(p_amount, total) into v_doc, v_monto from public.orders where id = p_order;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_doc, 'role', 'authenticated')::text, true);
+  perform public.reportar_pago(v_op, p_order, 'transferencia', v_monto, 'REF-FIXTURE');
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_op;
+end $$;
+
+-- W2: crédito autorizado (libera para surtir SIN tocar payment_status ni status).
+create or replace function tests.credito(p_order uuid, p_dias int default 30)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_admin uuid := tests.fixture_admin(); v_claims text := current_setting('request.jwt.claims', true);
+        v_op uuid := gen_random_uuid();
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform public.autorizar_credito(v_op, p_order, public.hoy_local() + p_dias, 'fixture');
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_op;
+end $$;
+
 -- Pedido en un estado inicial dado (inserción directa como dueño; las guardas son BEFORE UPDATE).
+-- W2: si el fixture lo pide 'paid', el cobro entra por el comando real → asiento en el libro.
 -- p_items: [{"product_id": ..., "qty": n, "unit_price": x}]
 create or replace function tests.order(p_doctor uuid, p_status text, p_items jsonb,
                                        p_payment_status text default 'pending', p_meta jsonb default null,
@@ -140,10 +210,11 @@ begin
   insert into public.orders (id, external_ref, doctor_id, total, status, payment_method, payment_status, shipping_meta)
   values (v_id, coalesce(p_folio, 'T' || left(v_id::text, 6)), p_doctor,
           (select coalesce(sum((i->>'qty')::int * coalesce((i->>'unit_price')::numeric, 100)), 0) from jsonb_array_elements(p_items) i),
-          p_status, 'transferencia', p_payment_status, p_meta);
+          p_status, 'transferencia', case when p_payment_status = 'paid' then 'pending' else p_payment_status end, p_meta);
   insert into public.order_items (order_id, product_id, qty, unit_price)
   select v_id, (i->>'product_id')::uuid, (i->>'qty')::int, coalesce((i->>'unit_price')::numeric, 100)
     from jsonb_array_elements(p_items) i;
+  if p_payment_status = 'paid' then perform tests.cobrar(v_id); end if;
   return v_id;
 end $$;
 

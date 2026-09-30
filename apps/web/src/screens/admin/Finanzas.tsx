@@ -10,6 +10,7 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCompras } from '../../data/hooks/useCompras'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
+import { useOrderMoney } from '../../data/hooks/useMoney'
 import { useGastos, useRefunds, type GastoCategoria } from '../../data/hooks/useFinanzas'
 import { GASTO_CATEGORIAS } from '../../data/store/gastosStore'
 import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria, cobranza } from '../../data/ops/finanzas'
@@ -43,10 +44,13 @@ export function Finanzas() {
 
   // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
   const { data: refunds } = useRefunds()
+  const { byOrder } = useOrderMoney()
   const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots, refunds), [fOrders, fGastos, fMov, lots, refunds])
   const cogsUnreliable = !er.costoConfiable  // Fase 2: confianza del COGS = cobertura de snapshots congelados
-  const cob = useMemo(() => cobranza(fOrders, refunds), [fOrders, refunds])
-  const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
+  // W2 · cobrado y por cobrar salen del LIBRO (v_order_money): pagos parciales cuentan
+  // como parciales y un crédito autorizado sigue siendo deuda, no ingreso.
+  const cob = useMemo(() => cobranza(fOrders, refunds, byOrder), [fOrders, refunds, byOrder])
+  const cxc = useMemo(() => cuentasPorCobrar(orders, byOrder), [orders, byOrder])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
   const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
   const porCat = useMemo(() => gastosPorCategoria(fGastos), [fGastos])

@@ -42,6 +42,6 @@ describe('efectivoEsperado — sin filtro', () => {
 
 describe('cuentasPorCobrar — más casos', () => {
   it('sin pedidos, total 0', () => {
-    expect(cuentasPorCobrar([])).toEqual({ total: 0, count: 0 })
+    expect(cuentasPorCobrar([])).toEqual({ total: 0, count: 0, aCredito: 0, vencido: 0 })
   })
 })

@@ -77,9 +77,16 @@ begin
   perform tests.act_as_owner();
   v_e := tests.order(v_doc, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_b, 'qty', 1)));
   perform tests.act_as(v_wh);
-  perform tests.throws(format('select public.surtir_pedido(gen_random_uuid(), %L, %L)', v_e, tests.alloc(v_e)), 'PEDIDO_NO_SURTIBLE', 'pedido sin pagar no se surte');
+  perform tests.throws(format('select public.surtir_pedido(gen_random_uuid(), %L, %L)', v_e, tests.alloc(v_e)), 'PEDIDO_NO_LIBERADO', 'W2: pedido sin cobro ni crédito no se surte');
+  perform tests.act_as_owner();
+  perform tests.credito(v_e);            -- crédito autorizado ⇒ liberado SIN tocar payment_status
+  perform tests.act_as(v_wh);
+  perform tests.eq((select payment_status from public.orders where id = v_e), 'pending', 'W2: el crédito NO falsifica payment_status');
+  perform tests.eq((select status from public.orders where id = v_e), 'pending_payment', 'W2: el crédito NO falsifica orders.status');
+  perform tests.eq(public.surtir_pedido(gen_random_uuid(), v_e, tests.alloc(v_e)) ->> 'status', 'applied', 'W2: se surte a crédito sin cobro');
   perform tests.act_as_owner();
   v_e := tests.order(v_doc, 'paid', '[]'::jsonb);
+  perform tests.credito(v_e);            -- liberado, para que el corte sea por FALTA DE RENGLONES
   perform tests.act_as(v_wh);
   perform tests.throws(format('select public.surtir_pedido(gen_random_uuid(), %L, %L)', v_e, jsonb_build_array(jsonb_build_object('order_item_id', gen_random_uuid(), 'lot_id', v_lb, 'qty', 1))),
     'PEDIDO_SIN_RENGLONES', 'pedido sin renglones (caso QA-DHL-E2E) no puede quedar empacado');

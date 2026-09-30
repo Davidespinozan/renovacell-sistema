@@ -11,11 +11,13 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { planSurtido, canFulfill, surtirPedido, type ItemPlan } from '../../data/ops/surtir'
 import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
+import { useOrderMoney } from '../../data/hooks/useMoney'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 
 export function Surtido() {
   const { data: orders } = useAllOrders()
+  const { byOrder } = useOrderMoney()
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const [active, setActive] = useState<OrderWithItems | null>(null)
@@ -29,7 +31,7 @@ export function Surtido() {
     return m
   }, [products])
 
-  const pending = orders.filter(isSurtible)
+  const pending = orders.filter((o) => isSurtible(o, byOrder[o.id]))
 
   // ¿Cada pedido pendiente se puede surtir por COMPLETO con el stock actual? Solo
   // esos entran al surtido en lote (los que no, se abren uno a uno para ver el detalle).
@@ -132,6 +134,14 @@ export function Surtido() {
                     />
                   )}
                   <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
+                  {(() => {
+                    // Un pedido liberado por CRÉDITO no está pagado: se surte, pero Almacén lo ve.
+                    const d = byOrder[o.id]
+                    if (!d?.credito_autorizado) return null
+                    return <span className={'pill ' + (d.vencido ? 'p-dang' : 'p-warn')} title={`Saldo ${d.saldo}`}>
+                      {d.vencido ? 'Crédito vencido' : 'A crédito · sin pagar'}
+                    </span>
+                  })()}
                   <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
                   {!canDo && <span className="pill p-dang">Sin stock suficiente</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>

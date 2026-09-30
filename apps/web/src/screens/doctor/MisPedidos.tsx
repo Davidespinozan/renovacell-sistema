@@ -2,6 +2,7 @@
 // estatus y seguimiento. Solo ve SUS pedidos (lo garantiza el store/RLS).
 import React, { useMemo, useState } from 'react'
 import { useOrders } from '../../data/hooks/useOrders'
+import { useOrderMoney, usePaymentClaims } from '../../data/hooks/useMoney'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
 import { seedReorder } from '../../data/store/reorderStore'
@@ -14,6 +15,8 @@ import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 export function MisPedidos() {
   const { data: orders, loading, payOrder } = useOrders()
+  const { byOrder } = useOrderMoney()
+  const { data: claims } = usePaymentClaims()
   const { data: products } = useProducts()
   const { setScreen } = useRole()
   const [paying, setPaying] = useState<OrderWithItems | null>(null)
@@ -50,6 +53,8 @@ export function MisPedidos() {
             onPay={() => setPaying(o)}
             onCancel={() => setCancelling(o)}
             onReorder={() => reorder(o)}
+            dinero={byOrder[o.id] ?? null}
+            pagoReportado={claims.some((c) => c.order_id === o.id && c.status === 'reportado')}
           />
         ))
       )}
@@ -62,7 +67,7 @@ export function MisPedidos() {
       {paying && (
         <PaymentModal
           folio={paying.external_ref ?? paying.id}
-          amount={paying.total ?? 0}
+          amount={byOrder[paying.id]?.saldo ?? paying.total ?? 0}
           orderId={paying.id}
           onPaid={(r) => payOrder(paying.id, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
           onClose={() => setPaying(null)}

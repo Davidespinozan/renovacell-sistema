@@ -10,10 +10,14 @@ export interface Diagnosis {
   statusPill: string
 }
 
-// Un pedido está pendiente de surtir si YA SE PAGÓ y aún no se empacó/envió/
-// entregó/canceló. Almacén solo prepara lo cobrado (el doctor paga primero).
-export const isSurtible = (o: OrderWithItems): boolean =>
-  o.payment_status === 'paid' &&
+// Un pedido está pendiente de surtir si está LIBERADO y aún no se empacó/envió/entregó/
+// canceló. W2 · liberado = cobro suficiente O crédito autorizado vigente — exactamente la
+// misma condición que aplica el servidor en `surtir_pedido`
+// (`pedido_liberado_para_surtir`), para que la pantalla no ofrezca lo que el comando va a
+// rechazar ni esconda lo que sí se puede surtir. Un crédito NO vuelve "pagado" el pedido:
+// solo lo libera. Sin libro de dinero (demo) se cae a lo único observable: payment_status.
+export const isSurtible = (o: OrderWithItems, dinero?: { liberado: boolean } | null): boolean =>
+  (dinero ? dinero.liberado : o.payment_status === 'paid') &&
   !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
 
 // Diagnóstico de un envío en curso: detecta atorados (vencido o surtido sin salir).

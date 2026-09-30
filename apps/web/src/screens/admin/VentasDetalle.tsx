@@ -9,6 +9,12 @@ import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hook
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useRefunds } from '../../data/hooks/useFinanzas'
+import { useOrderMoney, usePaymentEntries } from '../../data/hooks/useMoney'
+import { useOpId } from '../../data/hooks/useOpId'
+import { autorizarCreditoDePedido, revocarCreditoDePedido } from '../../data/store/ordersStore'
+import { METODOS, reembolsoPagado, type OrderMoney, type PaymentEntry, type PaymentMethod } from '../../data/ops/money'
+import { etiquetaLiberacion } from '../../data/ops/moneyView'
+import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
@@ -18,12 +24,20 @@ import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 
 type ChannelFilter = 'todos' | 'portal' | 'pos'
-type PayFilter = 'todos' | 'pagado' | 'contra' | 'pendiente'
+type PayFilter = 'todos' | 'pagado' | 'parcial' | 'contra' | 'pendiente'
 
+// W2 · El estado de cobro sale del LIBRO. "Contra pedido" ya no es una forma de pago
+// inventada: es un CRÉDITO autorizado, y se muestra como deuda, no como pago.
 interface PayInfo { key: Exclude<PayFilter, 'todos'>; label: string; pill: string }
-function payInfo(o: OrderWithItems): PayInfo {
-  if (o.payment_status === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
-  if (o.payment_method === 'contra_pedido') return { key: 'contra', label: 'Contra pedido', pill: 'p-warn' }
+function payInfo(o: OrderWithItems, m?: OrderMoney | null): PayInfo {
+  if (!m) {
+    if (o.payment_status === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
+    return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
+  }
+  if (m.estado_pago === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
+  if (m.credito_autorizado) return { key: 'contra', label: m.vencido ? 'Crédito vencido' : 'A crédito', pill: m.vencido ? 'p-dang' : 'p-warn' }
+  if (m.estado_pago === 'parcial') return { key: 'parcial', label: 'Pago parcial', pill: 'p-warn' }
+  if (m.estado_pago === 'refunded') return { key: 'pendiente', label: 'Reembolsado', pill: 'p-neu' }
   return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
 }
 const channelOf = (o: OrderWithItems): 'portal' | 'pos' => (isPosOrder(o) ? 'pos' : 'portal')
@@ -35,6 +49,7 @@ const sel: React.CSSProperties = {
 
 export function VentasDetalle() {
   const { data: orders } = useAllOrders()
+  const { byOrder } = useOrderMoney()
   const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
@@ -63,7 +78,7 @@ export function VentasDetalle() {
         if (from && d < from) return false
         if (to && d > to) return false
         if (channel !== 'todos' && channelOf(o) !== channel) return false
-        if (pay !== 'todos' && payInfo(o).key !== pay) return false
+        if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
         if (query) {
           const hay = `${o.external_ref ?? ''} ${clientName(o)}`.toLowerCase()
           if (!hay.includes(query)) return false
@@ -114,7 +129,8 @@ export function VentasDetalle() {
         <select style={sel} value={pay} onChange={(e) => setPay(e.target.value as PayFilter)}>
           <option value="todos">Todo cobro</option>
           <option value="pagado">Pagado</option>
-          <option value="contra">Contra pedido</option>
+          <option value="parcial">Pago parcial</option>
+          <option value="contra">A crédito</option>
           <option value="pendiente">Pendiente</option>
         </select>
         {(from || to || channel !== 'todos' || pay !== 'todos' || q) && (
@@ -127,7 +143,7 @@ export function VentasDetalle() {
           { key: 'id', label: 'Productos', format: (_v, o) => productsSummary(o) },
           { key: 'id', label: 'Canal', format: (_v, o) => (channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal') },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
-          { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o).label },
+          { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
           { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status).label },
           { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
         ]} />
@@ -166,7 +182,7 @@ export function VentasDetalle() {
             </thead>
             <tbody>
               {rows.map((o) => {
-                const p = payInfo(o); const sv = statusView(o.status); const isPos = channelOf(o) === 'pos'
+                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status); const isPos = channelOf(o) === 'pos'
                 return (
                   <tr key={o.id} className="clickrow" onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
@@ -187,7 +203,7 @@ export function VentasDetalle() {
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} />
+        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} />
       )}
       {cancelling && (
         <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
@@ -208,21 +224,27 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
   )
 }
 
-function SaleDetail({ order, productsById, clientName, channel, onClose, onCancel }: {
+function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
   channel: 'portal' | 'pos'
+  dinero?: OrderMoney | null
   onClose: () => void
   onCancel: () => void
 }) {
-  const p = payInfo(order); const sv = statusView(order.status)
-  const { user } = useRole()
+  const p = payInfo(order, dinero); const sv = statusView(order.status)
+  const { user, role } = useRole()
   const { data: refunds, refundedByOrder } = useRefunds()
+  const { data: entries } = usePaymentEntries()
   const misDevs = refunds.filter((r) => r.order_id === order.id)
   const yaDevuelto = refundedByOrder(refunds)[order.id] ?? 0
   const restante = (order.total ?? 0) - yaDevuelto
-  const puedeDevolver = order.status !== 'cancelled' && order.status !== 'draft' && restante > 0.0001
+  // TOPE real de un reembolso: no se puede devolver dinero que nunca entró. El servidor
+  // reimpone ambos topes (restante del pedido y cobrado neto).
+  const topeReembolso = Math.min(restante, dinero ? dinero.cobrado_neto : restante)
+  const puedeDevolver = order.status !== 'cancelled' && order.status !== 'draft' && topeReembolso > 0.0001
+  const lib = dinero ? etiquetaLiberacion(dinero) : null
   const [showForm, setShowForm] = useState(false)
   return (
     <div className="overlay" onClick={onClose}>
@@ -240,6 +262,20 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
             <span className={'pill ' + sv.pill}>{sv.label}</span>
             {order.invoice_requested && <span className="pill p-blue"><FileText size={12} /> CFDI solicitado</span>}
           </div>
+
+          {dinero && (
+            <div className="sysnote" style={{ marginBottom: 14 }}>
+              <span style={{ flex: 1 }}>
+                Cobrado <b>{money(dinero.cobrado_neto)}</b> de {money(dinero.total)} · saldo <b>{money(dinero.saldo)}</b>
+                {lib && <> · {lib.texto}{lib.detalle ? ` (${lib.detalle})` : ''}</>}
+                {dinero.reembolso_pendiente > 0.0001 && <> · <b style={{ color: 'var(--warn)' }}>reembolso autorizado sin pagar: {money(dinero.reembolso_pendiente)}</b></>}
+              </span>
+            </div>
+          )}
+
+          {dinero && role === 'admin' && order.status !== 'cancelled' && dinero.saldo > 0.0001 && (
+            <CreditoAcciones order={order} dinero={dinero} />
+          )}
 
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Importe</th></tr></thead>
@@ -266,14 +302,18 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
           {misDevs.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div className="eyebrow" style={{ marginBottom: 8 }}>Devoluciones y correcciones</div>
-              {misDevs.map((r) => (
-                <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+              {misDevs.map((r) => {
+                const pagado = reembolsoPagado(entries as PaymentEntry[], r.id)
+                return (
+                <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
                   <span className={'pill ' + (r.tipo === 'devolucion' ? 'p-neu' : 'p-warn')}>{({ devolucion: 'Devolución', correccion: 'Corrección', cortesia: 'Cortesía' } as Record<string, string>)[r.tipo] ?? 'Devolución'}</span>
                   <span className="mono" style={{ color: 'var(--danger)' }}>− {money(r.monto)}</span>
+                  <span className={'pill ' + (pagado ? 'p-ok' : 'p-warn')}>{pagado ? 'dinero entregado' : 'autorizado · sin pagar'}</span>
                   <span style={{ color: 'var(--ink-2)', flex: 1 }}>{r.motivo}</span>
                   <span style={{ color: 'var(--ink-3)', fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)} · {r.usuario}</span>
+                  {!pagado && role === 'admin' && <PagarReembolso refundId={r.id} monto={r.monto} usuario={user?.name ?? 'Administración'} />}
                 </div>
-              ))}
+              )})}
             </div>
           )}
 
@@ -283,7 +323,7 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
             </div>
           )}
           {puedeDevolver && showForm && (
-            <DevolverForm order={order} restante={restante} usuario={user?.name ?? 'Administración'} productsById={productsById} onClose={() => setShowForm(false)} />
+            <DevolverForm order={order} restante={topeReembolso} usuario={user?.name ?? 'Administración'} productsById={productsById} onClose={() => setShowForm(false)} />
           )}
 
           {order.invoice_requested && (
@@ -306,9 +346,9 @@ function SaleDetail({ order, productsById, clientName, channel, onClose, onCance
   )
 }
 
-// Formulario de Devolver/Corregir: mismo movimiento contable, distinta semántica.
-// El monto tiene TOPE (lo que resta del pedido) y el motivo es obligatorio. La RPC
-// reimpone ambas validaciones del lado servidor.
+// Formulario de Devolver/Corregir. W2 · AUTORIZA el reembolso: queda el compromiso, el
+// dinero NO sale todavía (eso es "Pagar reembolso"). El monto tiene TOPE (lo que resta
+// del pedido y lo realmente cobrado) y el motivo es obligatorio; el servidor reimpone ambos.
 const PRESETS_CORR = ['Cobro duplicado', 'No pagó (era cortesía)', 'Error de captura']
 const PRESETS_DEV = ['Producto devuelto', 'Cliente canceló', 'Producto dañado']
 function DevolverForm({ order, restante, usuario, productsById, onClose }: {
@@ -318,7 +358,8 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
   productsById: Record<string, ProductSafe | undefined>
   onClose: () => void
 }) {
-  const { data: refunds, registrarDevolucion, returnedByItem } = useRefunds()
+  const { data: refunds, autorizarReembolso, returnedByItem } = useRefunds()
+  const { opId, renew } = useOpId()
   const [tipo, setTipo] = useState<'devolucion' | 'correccion' | 'cortesia'>('devolucion')
   const [qtys, setQtys] = useState<Record<string, number>>({})   // piezas a regresar por renglón
   const [montoCorr, setMontoCorr] = useState(String(restante))    // monto libre para corrección
@@ -342,9 +383,10 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
     const items = tipo === 'devolucion'
       ? sellable.filter((it) => (qtys[it.id] ?? 0) > 0).map((it) => ({ item_id: it.id, lot_id: it.lot_id ?? null, qty: qtys[it.id] }))
       : undefined
-    const r = await registrarDevolucion({ orderId: order.id, tipo, monto: montoN, motivo, usuario, items })
+    const r = await autorizarReembolso(opId, { orderId: order.id, tipo, monto: montoN, motivo, usuario, items })
     setBusy(false)
-    if (!r.ok) { setErr(r.error ?? 'No se pudo registrar.'); return }
+    if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo autorizar el reembolso.')); return }
+    renew()
     onClose()
   }
 
@@ -357,7 +399,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
         <button type="button" className={tipo === 'cortesia' ? 'active' : undefined} onClick={() => setTipo('cortesia')}>Cortesía</button>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        {tipo === 'devolucion' ? 'Reembolso por producto devuelto: elige renglones y piezas para calcular el monto. Este registro es SOLO financiero; la entrada física del producto la registra Almacén en «Devoluciones y reingresos» y Dirección decide su destino.'
+        {tipo === 'devolucion' ? 'Reembolso por producto devuelto: elige renglones y piezas para calcular el monto. Esto AUTORIZA el reembolso; el dinero sale cuando se registre su pago. La entrada física del producto la registra Almacén en «Devoluciones y reingresos» y Dirección decide su destino.'
           : tipo === 'correccion' ? 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'
           : 'Se cobró pero no debía (cortesía). Regresa el dinero; el producto se queda con el cliente, no toca inventario.'}
       </div>
@@ -403,9 +445,112 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button className="btn ghost sm" type="button" onClick={onClose}>Cancelar</button>
         <button className="btn sm" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
-          {busy ? 'Registrando…' : `Registrar ${({ devolucion: 'devolución', correccion: 'corrección', cortesia: 'cortesía' } as const)[tipo]}`}
+          {busy ? 'Autorizando…' : `Autorizar ${({ devolucion: 'devolución', correccion: 'corrección', cortesia: 'cortesía' } as const)[tipo]}`}
         </button>
       </div>
+    </div>
+  )
+}
+
+// CRÉDITO (contra pedido) — solo Dirección. Autorizarlo LIBERA el surtido sin decir que
+// el pedido está pagado: el saldo sigue ahí y la etiqueta lo dice.
+function CreditoAcciones({ order, dinero }: { order: OrderWithItems; dinero: OrderMoney }) {
+  const [abierto, setAbierto] = useState(false)
+  const [vence, setVence] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const { opId, renew } = useOpId()
+
+  const autorizar = async () => {
+    if (busy) return
+    if (!vence) { setErr('Indica la fecha límite de pago.'); return }
+    if (motivo.trim().length < 3) { setErr('Escribe el motivo del crédito.'); return }
+    setBusy(true); setErr('')
+    const r = await autorizarCreditoDePedido(opId, { orderId: order.id, dueDate: vence, motivo: motivo.trim() })
+    setBusy(false)
+    if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo autorizar el crédito.')); return }
+    renew(); setAbierto(false); setVence(''); setMotivo('')
+  }
+
+  const revocar = async () => {
+    const m = window.prompt('Motivo para revocar el crédito (el pedido dejará de estar liberado si no hay cobro suficiente).')
+    if (m == null) return
+    if (!m.trim()) { window.alert('La revocación necesita un motivo.'); return }
+    const r = await revocarCreditoDePedido(newOpId(), { orderId: order.id, motivo: m })
+    if (!r.ok) window.alert(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo revocar el crédito.'))
+  }
+
+  const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }
+
+  if (dinero.credito_autorizado) {
+    return (
+      <div className="sysnote" style={{ marginBottom: 14, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
+        <span style={{ flex: 1 }}>
+          <b>Crédito autorizado{dinero.vencido ? ' y VENCIDO' : ''}.</b> El pedido se puede surtir, pero <b>sigue debiendo {money(dinero.saldo)}</b>
+          {dinero.due_date ? ` · fecha límite ${fmtDate(dinero.due_date)}` : ''}.
+        </span>
+        <button className="btn ghost sm" type="button" onClick={() => void revocar()}>Revocar crédito</button>
+      </div>
+    )
+  }
+
+  return abierto ? (
+    <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }}>
+      <div style={{ fontSize: 12.5, marginBottom: 8 }}>
+        Autorizar crédito libera el surtido de este pedido <b>sin marcarlo pagado</b>. Queda registrado quién lo autorizó, por qué y para cuándo.
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="date" style={fld} value={vence} onChange={(e) => setVence(e.target.value)} />
+        <input style={{ ...fld, flex: 1, minWidth: 180 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo del crédito" />
+        <button className="btn sm" type="button" disabled={busy} onClick={() => void autorizar()}>{busy ? 'Autorizando…' : 'Autorizar crédito'}</button>
+        <button className="btn ghost sm" type="button" onClick={() => { setAbierto(false); setErr('') }}>Cancelar</button>
+      </div>
+      {err && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{err}</div>}
+    </div>
+  ) : (
+    <div style={{ marginBottom: 14 }}>
+      <button className="btn ghost sm" type="button" onClick={() => setAbierto(true)}>Autorizar crédito (contra pedido)</button>
+    </div>
+  )
+}
+
+// PAGAR un reembolso autorizado: aquí SÍ sale el dinero (asiento 'out' en el libro).
+function PagarReembolso({ refundId, monto, usuario }: { refundId: string; monto: number; usuario: string }) {
+  const { pagarReembolso } = useRefunds()
+  const { opId, renew } = useOpId()
+  const [abierto, setAbierto] = useState(false)
+  const [metodo, setMetodo] = useState<PaymentMethod>('transferencia')
+  const [referencia, setReferencia] = useState('')
+  const [motivoVia, setMotivoVia] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const pagar = async () => {
+    if (busy) return
+    setBusy(true); setErr('')
+    const r = await pagarReembolso(opId, {
+      refundId, method: metodo, reference: referencia.trim() || null,
+      motivoVia: motivoVia.trim() || null, usuario,
+    })
+    setBusy(false)
+    if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo registrar el pago del reembolso.')); return }
+    renew(); setAbierto(false)
+  }
+
+  const fld: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }
+
+  if (!abierto) return <button className="btn ghost sm" type="button" onClick={() => setAbierto(true)}>Pagar {money(monto)}</button>
+  return (
+    <div style={{ width: '100%', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+      <select style={fld} value={metodo} onChange={(e) => setMetodo(e.target.value as PaymentMethod)}>
+        {METODOS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+      </select>
+      <input style={{ ...fld, flex: 1, minWidth: 120 }} value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Referencia (opcional)" />
+      <input style={{ ...fld, flex: 1, minWidth: 140 }} value={motivoVia} onChange={(e) => setMotivoVia(e.target.value)} placeholder="Si la vía es distinta a la del cobro: por qué" />
+      <button className="btn sm" type="button" disabled={busy} onClick={() => void pagar()}>{busy ? 'Registrando…' : 'Registrar salida'}</button>
+      <button className="btn ghost sm" type="button" onClick={() => { setAbierto(false); setErr('') }}>Cancelar</button>
+      {err && <div style={{ fontSize: 12, color: 'var(--danger)', width: '100%' }}>{err}</div>}
     </div>
   )
 }

@@ -23,13 +23,35 @@ begin
     ('precio_de(uuid,uuid,integer)',                          '9efe19506f40e19c3dc5baeca66b9014'),
     ('profiles_guard()',                                      '1a1d0a4cd4f3398b0d3d1ae865d3c741'),
     ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
-    ('review_transfer_payment(uuid,text,text)',               'b736bcd1c74e04c21121370b256f49d1'),
     ('set_order_fiscal_snapshot(uuid,jsonb)',                 'a009a07290c5029b1da7433aeea3b1a5'),
     ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
     ('upsert_customer_fiscal(uuid,jsonb)',                    '8fd937b882e85743582730ac7f132088')
   ) as t(sig, h) loop
     perform tests.eq(md5(pg_get_functiondef(('public.' || r.sig)::regprocedure)), r.h, 'sin cambios: ' || r.sig);
   end loop;
+  -- W2 · reemplazos AUTORIZADOS (la firma vieja desaparece → el frontend viejo falla cerrado).
+  perform tests.ok(to_regprocedure('public.review_transfer_payment(uuid,text,text)') is null
+                   and to_regprocedure('public.revisar_pago(uuid,uuid,text,numeric,date,text)') is not null,
+                   'W2: review_transfer_payment → revisar_pago (reemplazo autorizado)');
+  perform tests.ok(to_regprocedure('public.registrar_devolucion(uuid,text,numeric,text,text,jsonb)') is null
+                   and to_regprocedure('public.autorizar_reembolso(uuid,uuid,text,numeric,text,uuid,text)') is not null,
+                   'W2: registrar_devolucion → autorizar_reembolso (reemplazo autorizado)');
+  perform tests.ok(to_regprocedure('public.pay_order(uuid,text,text)') is not null
+                   and not has_function_privilege('authenticated', 'public.pay_order(uuid,text,text)', 'EXECUTE'),
+                   'W2: pay_order sigue existiendo pero ya no es ejecutable por clientes');
+  -- Comandos de W1 que NO se tocan (existencia + firma exacta).
+  perform tests.ok((select count(*) = 9 from unnest(array[
+      'public.recibir_lote(uuid,uuid,text,date,integer,uuid,text,numeric,text,text)',
+      'public.importar_lote(uuid,text,text,text,integer)',
+      'public.ajustar_lote(uuid,uuid,integer,text,text,uuid)',
+      'public.confirmar_reingreso(uuid,uuid,jsonb)',
+      'public.recibir_devolucion(uuid,uuid,jsonb,text)',
+      'public.disponer_devolucion(uuid,jsonb)',
+      'public.anular_guia_manual(uuid,uuid,text,text)',
+      'public.conciliar_inventario()',
+      'public.auditoria_bajas(timestamptz,timestamptz)']) sig
+    where to_regprocedure(sig) is not null), 'W1: los 9 comandos preservados siguen con su firma exacta');
+
   -- Triggers existentes siguen presentes
   perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_inventory_movements_append_only'), 'kardex sigue append-only');
   perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_audit_logs_append_only'), 'audit_logs sigue append-only');

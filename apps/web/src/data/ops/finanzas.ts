@@ -6,6 +6,13 @@ import { isSale, isPosOrder } from '../metrics'
 import type { Gasto } from '../store/gastosStore'
 import type { PurchaseOrder } from '../store/comprasStore'
 import type { InventoryMovement, Lot } from '../types'
+import type { OrderMoney } from './money'
+
+// W2 · Cuando hay libro de dinero (`v_order_money`), el dinero cobrado/por cobrar sale
+// DE AHÍ, no de `payment_status`: reconoce pagos PARCIALES y no confunde un crédito
+// autorizado con dinero recibido. Sin libro (demo sin backend) se conserva la
+// derivación anterior por pedido, que es lo único disponible.
+export type MoneyIndex = Record<string, OrderMoney | undefined>
 
 // Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
 const COGS_OUT = new Set(['surtido', 'venta', 'evento', 'consigna'])
@@ -97,13 +104,25 @@ export interface Cobranza {
 }
 // Reconcilia: Vendido = Cobrado + Devuelto + Por cobrar. Antes el "devuelto" (reembolso
 // de pedidos ya pagados) no aparecía en ningún renglón y Dirección no veía a dónde se fue.
-export function cobranza(orders: OrderWithItems[], refunds: RefundLine[] = []): Cobranza {
+export function cobranza(orders: OrderWithItems[], refunds: RefundLine[] = [], money: MoneyIndex = {}): Cobranza {
   const sales = orders.filter(isSale)
   const vendido = sales.reduce((s, o) => s + (o.total ?? 0), 0)
-  const pagadas = sales.filter((o) => o.payment_status === 'paid')
-  const paidIds = new Set(pagadas.map((o) => o.id))
-  const cobradoBruto = pagadas.reduce((s, o) => s + (o.total ?? 0), 0)
-  const devuelto = refunds.filter((r) => paidIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
+  let cobradoBruto = 0
+  let devuelto = 0
+  sales.forEach((o) => {
+    const m = money[o.id]
+    if (m) {
+      // Del LIBRO: lo que entró y lo que salió de verdad (incluye pagos parciales).
+      cobradoBruto += m.cobrado
+      devuelto += m.reembolsado
+      return
+    }
+    // Sin libro: lo único observable es si el pedido quedó pagado.
+    if (o.payment_status === 'paid') {
+      cobradoBruto += o.total ?? 0
+      devuelto += refunds.filter((r) => r.order_id === o.id).reduce((s, r) => s + (r.monto ?? 0), 0)
+    }
+  })
   const cobrado = cobradoBruto - devuelto
   const porCobrar = vendido - cobradoBruto
   return { vendido, cobrado, devuelto, porCobrar, tasaCobro: vendido > 0 ? (cobrado / vendido) * 100 : 0 }
@@ -112,12 +131,21 @@ export function cobranza(orders: OrderWithItems[], refunds: RefundLine[] = []): 
 // Cuentas por COBRAR: pedidos del Portal confirmados (contra pedido) que el
 // cliente aún no paga — incluye los 'pending_payment' (contra pedido es un
 // cobrable real). Excluye cancelados, borradores y POS (POS se cobra al momento).
-export function cuentasPorCobrar(orders: OrderWithItems[]): { total: number; count: number } {
-  const pend = orders.filter((o) =>
-    !isPosOrder(o)
-    && o.status !== 'cancelled' && o.status !== 'draft'
-    && o.payment_status !== 'paid')
-  return { total: pend.reduce((s, o) => s + (o.total ?? 0), 0), count: pend.length }
+export interface PorCobrar { total: number; count: number; aCredito: number; vencido: number }
+export function cuentasPorCobrar(orders: OrderWithItems[], money: MoneyIndex = {}): PorCobrar {
+  const cobrable = (o: OrderWithItems) => !isPosOrder(o) && o.status !== 'cancelled' && o.status !== 'draft'
+  let total = 0, count = 0, aCredito = 0, vencido = 0
+  orders.filter(cobrable).forEach((o) => {
+    const m = money[o.id]
+    // Con libro: la CxC es el SALDO real (un pago parcial ya no se cuenta completo).
+    const saldo = m ? m.saldo : (o.payment_status === 'paid' ? 0 : (o.total ?? 0))
+    if (saldo <= 0.0001) return
+    total += saldo
+    count += 1
+    // Un crédito autorizado sigue siendo deuda; se separa para poder verla envejecer.
+    if (m?.credito_autorizado) { aCredito += saldo; if (m.vencido) vencido += saldo }
+  })
+  return { total, count, aCredito, vencido }
 }
 
 // Cuentas por PAGAR: compras a proveedor NO pagadas (pendientes o recibidas sin
@@ -135,6 +163,9 @@ export function gastosPorCategoria(gastos: Gasto[]): { categoria: string; monto:
 }
 
 // ---- Arqueo / cierre de caja (POS efectivo) -------------------------------
+// W2 · El ESPERADO de un corte real lo calcula el SERVIDOR desde el libro
+// (`efectivo_esperado`, ops/money.ts). La función pura de abajo queda para la demo
+// sin backend y para explicar el número en pantalla; NUNCA se manda al comando.
 // Día LOCAL (del dispositivo, = zona del negocio) en formato AAAA-MM-DD. Antes se
 // usaba el día UTC (`toISOString`), cuya frontera cae ~18:00 en México: un corte de
 // la tarde/noche perdía casi todas las ventas del día y marcaba un faltante falso.

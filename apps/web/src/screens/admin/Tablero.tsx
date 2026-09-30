@@ -11,6 +11,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
+import { useOrderMoney } from '../../data/hooks/useMoney'
 import { cobranza, cuentasPorCobrar } from '../../data/ops/finanzas'
 import { useRefunds } from '../../data/hooks/useFinanzas'
 import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo, doctoresEnRiesgo } from '../../data/metrics'
@@ -28,6 +29,7 @@ function bucketOf(status: string | null): Bucket | null {
 
 export function Tablero() {
   const { data: orders } = useAllOrders()
+  const { byOrder } = useOrderMoney()
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
   const { data: products } = useProducts()
@@ -37,10 +39,10 @@ export function Tablero() {
   const now = new Date()
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const cobMes = useMemo(
-    () => cobranza(orders.filter((o) => { const d = new Date(o.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === ym }), refunds),
-    [orders, refunds, ym],
+    () => cobranza(orders.filter((o) => { const d = new Date(o.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === ym }), refunds, byOrder),
+    [orders, refunds, ym, byOrder],
   )
-  const cxc = useMemo(() => cuentasPorCobrar(orders), [orders])
+  const cxc = useMemo(() => cuentasPorCobrar(orders, byOrder), [orders, byOrder])
 
   const prodName = useMemo(() => {
     const m: Record<string, string> = {}
@@ -76,7 +78,7 @@ export function Tablero() {
       .filter((r) => r.dx.stuck)
   }, [orders, shipments])
 
-  const porSurtir = orders.filter(isSurtible)
+  const porSurtir = orders.filter((o) => isSurtible(o, byOrder[o.id]))
 
   // Reusa los helpers de caducidad de Almacén.
   const porCaducar = useMemo(

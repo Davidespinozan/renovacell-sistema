@@ -1,6 +1,9 @@
-// Modal de PAGO del Portal del Doctor (UI-first). Cobra un pedido por tarjeta o
-// transferencia usando el proveedor intercambiable (data/payments/provider).
-// Al confirmar, avisa al contenedor (onPaid) para actualizar el store.
+// Modal de PAGO del Portal del Doctor. Cobra por tarjeta (proveedor) o registra que el
+// cliente ya transfirió.
+//
+// W2 · una transferencia INFORMADA no es un pago: crea una declaración
+// (`reportar_pago`, vía la Edge Function report-transfer) que Facturación verifica. El
+// pedido NO queda pagado aquí, y el texto que ve el cliente lo dice así.
 import React, { useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -9,7 +12,17 @@ import { startStripeCheckout } from '../../lib/stripe'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { notify } from '../../data/store/notificationsStore'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
+import { useOpId } from '../../data/hooks/useOpId'
 import { Copy } from 'lucide-react'
+
+// Mensaje real de la Edge Function (su cuerpo trae `error`), no un genérico.
+async function motivoDeFalla(e: unknown): Promise<string> {
+  try {
+    const body = await (e as { context?: { json?: () => Promise<{ error?: string }> } }).context?.json?.()
+    if (body?.error) return body.error
+  } catch { /* sin cuerpo legible */ }
+  return 'No se pudo registrar tu transferencia. Intenta de nuevo.'
+}
 
 // Lee un archivo de imagen como data-URL (para mandar el comprobante a la función).
 function fileToDataUrl(file: File): Promise<string> {
@@ -29,6 +42,8 @@ export function PaymentModal({
   onClose: () => void
 }) {
   const { data: bankAll } = useBankAccounts()
+  // op_id estable de ESTA intención: reintentar no crea dos comprobantes en cola.
+  const { opId, renew } = useOpId()
   // Cuentas ACTIVAS (principal primero) — el doctor elige a cuál transfirió.
   const banks = bankAll.filter((b) => b.active).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.display_order - b.display_order)
   const [method, setMethod] = useState<PayMethod>('tarjeta')
@@ -46,9 +61,8 @@ export function PaymentModal({
   const pay = async () => {
     setBusy(true); setError(null)
 
-    // TRANSFERENCIA: no se cobra en línea. El doctor informa el pago y Dirección lo
-    // confirma al recibir el dinero — el pedido NO se marca pagado aquí (antes se
-    // marcaba pagado sin comprobante). Se avisa a Dirección para que lo confirme.
+    // TRANSFERENCIA: no se cobra en línea. El cliente DECLARA el pago y Facturación lo
+    // verifica al ver el dinero en la cuenta — hasta entonces no hay cobro registrado.
     if (method === 'transferencia') {
       // Si hay varias cuentas, el doctor DEBE indicar a cuál transfirió (no se elige
       // en silencio) para poder auditar Pedido → cuenta → comprobante.
@@ -56,8 +70,15 @@ export function PaymentModal({
       // Con backend: la función servidor marca el pedido, guarda el comprobante y avisa
       // a Dirección (el doctor no puede insertar avisos por RLS). En demo: notify local.
       if (hasSupabase && orderId) {
-        const { error: e } = await supabase.functions.invoke('report-transfer', { body: { orderId, reference: folio, proof, bank_account_id: selectedBank?.id ?? null } })
-        if (e) { setError('No se pudo registrar tu transferencia. Intenta de nuevo.'); setBusy(false); return }
+        const { error: e } = await supabase.functions.invoke('report-transfer', {
+          body: {
+            orderId, opId, reference: folio, proof, method: 'transferencia',
+            amount: amount > 0 ? amount : undefined,
+            bank_account_id: selectedBank?.id ?? null,
+          },
+        })
+        if (e) { setError(await motivoDeFalla(e)); setBusy(false); return }
+        renew()
       } else {
         notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
       }
@@ -97,10 +118,11 @@ export function PaymentModal({
               <div className="ck"><Icon name={done.method === 'transferencia' ? 'receipt' : 'check'} /></div>
               {done.method === 'transferencia' ? (
                 <>
-                  <h3>Transferencia registrada</h3>
+                  <h3>Pago informado</h3>
                   <p>
                     Transfiere <b>{money(amount)}</b> con el folio <b>{folio}</b> como referencia.
-                    En cuanto <b>confirmemos</b> tu pago, tu pedido pasa a preparación — te avisaremos.
+                    Tu reporte quedó en revisión: en cuanto <b>verifiquemos</b> que el dinero llegó,
+                    tu pedido pasa a preparación — te avisaremos.
                   </p>
                 </>
               ) : (

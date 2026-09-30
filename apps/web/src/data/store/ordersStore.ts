@@ -1,8 +1,14 @@
 // Store de pedidos. Con backend (hasSupabase) hidrata de `orders`+`order_items`
 // (el RLS ya limita: el doctor ve SOLO los suyos, el staff TODOS) y las
-// mutaciones escriben write-through: el doctor crea/paga/cancela SU pedido; el
-// pago pasa por la función segura pay_order (como el webhook de Stripe); el staff
-// avanza el estado. Sin backend, opera sobre las semillas mock. La API no cambia.
+// mutaciones escriben write-through; sin backend opera sobre las semillas mock.
+//
+// W2 · DINERO: este store YA NO escribe `payment_status` (la base lo rechaza con
+// PAGO_SOLO_POR_COMANDO). El dinero se mueve con los comandos de ops/money.ts:
+//   · el cliente DECLARA        → reportar_pago   (payment_claims)
+//   · Facturación VERIFICA      → revisar_pago    (nace el asiento)
+//   · el staff COBRA directo    → registrar_cobro (mostrador, depósito)
+//   · Dirección da CRÉDITO      → autorizar_credito (libera surtido SIN decir "pagado")
+// `payment_status` se lee como proyección del libro (ops/money.ts, v_order_money).
 import type { Order, OrderItem } from '../types'
 import type { ShippingAddress } from '../ops/shippingAddress'
 import { decideTransferReview } from '../ops/transferReview'
@@ -13,7 +19,23 @@ import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import type { Json } from '../database.types'
-import { runW1Command } from '../ops/w1Command'
+import { runW1Command, newOpId } from '../ops/w1Command'
+import {
+  reportarPago as cmdReportarPago, registrarCobro as cmdRegistrarCobro, revisarPago as cmdRevisarPago,
+  autorizarCredito as cmdAutorizarCredito, revocarCredito as cmdRevocarCredito,
+  type PaymentMethod,
+} from '../ops/money'
+import { reloadMoney, setDemoCredit } from './moneyStore'
+
+// Traduce la forma de pago de la UI al vocabulario cerrado del libro (ck_entry_method).
+export function metodoW2(m: string | null | undefined): PaymentMethod {
+  const v = (m ?? '').toLowerCase()
+  if (v.includes('transfer')) return 'transferencia'
+  if (v.includes('efec') || v.includes('cash')) return 'efectivo'
+  if (v.includes('stripe')) return 'stripe'
+  if (v.includes('tarjeta') || v.includes('card')) return 'tarjeta'
+  return 'otro'
+}
 
 const folioOf = (id: string): string => orders.find((o) => o.id === id)?.external_ref ?? id
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -394,33 +416,69 @@ export function markInvoiced(orderId: string) {
   })()
 }
 
-export function markPaid(orderId: string) {
-  // Avanza el estado igual que payOrder: un contra-pedido que se paga pasa de
-  // 'pending_payment' a 'paid'. Si no, el pedido se queda pending_payment, markPacked
-  // lo rechaza en silencio y sigue apareciendo "por surtir" (se re-surtiría en bucle).
-  const o = orders.find((x) => x.id === orderId)
-  orders = orders.map((x) => (x.id === orderId ? { ...x, payment_status: 'paid', status: x.status === 'pending_payment' ? 'paid' : x.status } : x))
-  emit()
-  notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
-  // Igual que un cobro en línea (payOrder): al confirmarlo, avisa a Almacén que ya se
-  // puede surtir. Antes markPaid no pingaba a Almacén y el pedido solo aparecía en su
-  // lista por estatus, sin aviso — inconsistente con el pago por tarjeta.
-  notify({ text: `Pago confirmado · ${o?.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
-  // Aviso DIRIGIDO al doctor dueño: su pago quedó confirmado (RLS permite avisos por
-  // user_ids a doctores; lo ve en la campana → Mis pedidos).
-  if (o?.doctor_id) notify({ text: `Tu pago del pedido ${o?.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
-  logAudit({ actor: 'Administración', action: 'Pago registrado', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId)) {
-    supabase.rpc('pay_order', { p_order: orderId, p_method: 'registrado', p_ref: 'ADM' }).then(({ error }) => { if (error) console.warn('[orders] markPaid', error.message); hydrate() })
+// COBRO DIRECTO (Dirección/Facturación/POS): el dinero ya está en la casa y se
+// registra en el libro. No "marca pagado": crea el ASIENTO y el servidor recalcula
+// `payment_status` a partir de él (pending → parcial → paid según lo que entró).
+export async function registrarCobroDePedido(opId: string, a: {
+  orderId: string; method: PaymentMethod; amount: number
+  fechaValor?: string | null; reference?: string | null; bankAccountId?: string | null; evidence?: string | null
+  actor?: string
+}): Promise<{ ok: boolean; error?: string; ambiguous?: boolean; payment_status?: string; saldo?: number; sobrepago?: boolean }> {
+  const o = orders.find((x) => x.id === a.orderId)
+  if (!o) return { ok: false, error: 'No se encontró el pedido.' }
+  if (a.amount <= 0) return { ok: false, error: 'El monto debe ser mayor a cero.' }
+
+  if (!hasSupabase || !isUuid(a.orderId)) {
+    // Demo: espeja el efecto para poder mostrar el flujo.
+    orders = orders.map((x) => (x.id === a.orderId ? { ...x, payment_status: 'paid', status: x.status === 'pending_payment' ? 'paid' : x.status } : x))
+    emit()
+    avisarCobro(a.orderId, o)
+    return { ok: true, payment_status: 'paid', saldo: 0 }
   }
+
+  const r = await cmdRegistrarCobro(opId, a)
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  await reloadMoney()
+  await hydrate()
+  if (r.status === 'applied') {
+    logAudit({ actor: a.actor ?? 'Administración', action: 'Cobro registrado', resource: folioOf(a.orderId), detail: `$${a.amount} · ${a.method}` })
+    // Solo se avisa "listo para surtir" cuando el servidor dice que ya quedó pagado.
+    if (r.data.payment_status === 'paid') avisarCobro(a.orderId, o)
+    else notify({ text: `Pago parcial · ${o.external_ref ?? folioOf(a.orderId)} · falta ${r.data.saldo}`, roles: ['admin'], screen: 'av_fin' })
+  }
+  return { ok: true, payment_status: r.data.payment_status, saldo: r.data.saldo, sobrepago: r.data.sobrepago }
 }
 
-// CONFIRMAR / RECHAZAR una transferencia informada, de forma ATÓMICA y auditada por el
-// servidor (RPC review_transfer_payment, SECURITY DEFINER, solo Dirección/Facturación).
-// - confirm → payment_status='paid' (única vía manual de pago por transferencia).
-// - reject  → deja el pedido SIN pagar, marca el reporte como rechazado (con motivo) y
-//   lo saca de la cola; el doctor puede volver a reportar.
-// El servidor es la autoridad; el estado local es un espejo que se rehidrata después.
+// Avisos de "ya entró el dinero" (Almacén + Dirección + el doctor dueño).
+function avisarCobro(orderId: string, o: Order) {
+  notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
+  notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+  if (o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+}
+
+// DECLARAR un pago (el cliente o el staff informa que pagó). NO mueve dinero: abre un
+// comprobante en revisión. Reportar ≠ cobrar.
+export async function reportarPagoDePedido(opId: string, a: {
+  orderId: string; method: PaymentMethod; amount: number
+  reference?: string | null; bankAccountId?: string | null; proofPath?: string | null; actor?: string
+}): Promise<{ ok: boolean; error?: string; ambiguous?: boolean; claimId?: string }> {
+  if (!hasSupabase || !isUuid(a.orderId)) return { ok: true }
+  const r = await cmdReportarPago(opId, a)
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  await reloadMoney()
+  await hydrate()
+  if (r.status === 'applied') {
+    logAudit({ actor: a.actor ?? 'Portal del Doctor', action: 'Pago reportado', resource: folioOf(a.orderId), detail: `$${a.amount} · ${a.method}` })
+    notify({ text: `Pago informado · ${folioOf(a.orderId)} · verifica que cayó`, roles: ['admin'], screen: 'av_pagos' })
+  }
+  return { ok: true, claimId: r.data.claim_id }
+}
+
+// CONFIRMAR / RECHAZAR un comprobante declarado, de forma ATÓMICA y auditada por el
+// servidor (revisar_pago, SECURITY DEFINER, solo Dirección/Facturación).
+// - verificar → nace el ASIENTO; el servidor recalcula payment_status.
+// - rechazar  → deja el pedido SIN pagar, con motivo, y lo saca de la cola; el cliente
+//   puede volver a reportar.
 export async function reviewTransfer(
   orderId: string,
   action: 'confirm' | 'reject',
@@ -432,17 +490,35 @@ export async function reviewTransfer(
 
   // Autoridad server-side cuando hay backend.
   if (hasSupabase && isUuid(orderId)) {
-    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: { message: string } | null }>)
-    const { data, error } = await rpc('review_transfer_payment', { p_order: orderId, p_action: action, p_reason: reason ?? null })
-    if (error) return { ok: false, error: error.message }
-    const res = (data ?? {}) as { status?: string }
-    // Espejo local + avisos (idempotente: si el server dijo already_*, no dispares avisos nuevos).
-    applyReviewLocally(orderId, action, reason, res.status)
-    hydrate()
-    return { ok: true, status: res.status }
+    // El comprobante ABIERTO se busca fresco (uq_claim_abierta garantiza a lo más uno).
+    const { data: claim, error: qerr } = await supabase.from('payment_claims')
+      .select('id').eq('order_id', orderId).eq('status', 'reportado').maybeSingle()
+    if (qerr) return { ok: false, error: qerr.message }
+    if (!claim) return { ok: false, error: 'El pedido no tiene una transferencia por revisar.' }
+    const r = await cmdRevisarPago(newOpId(), {
+      claimId: (claim as { id: string }).id,
+      accion: action === 'confirm' ? 'verificar' : 'rechazar',
+      motivo: reason ?? null,
+    })
+    if (!r.ok) return { ok: false, error: r.error }
+    await reloadMoney()
+    await hydrate()
+    const nuevo = r.status === 'applied'
+    if (action === 'confirm') {
+      if (nuevo) {
+        notify({ text: `Transferencia confirmada · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+        notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)}`, roles: ['admin'], screen: 'av_pagos' })
+        if (o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+        logAudit({ actor: 'Administración', action: 'Transferencia confirmada', resource: folioOf(orderId) })
+      }
+    } else if (nuevo) {
+      logAudit({ actor: 'Administración', action: 'Transferencia rechazada', resource: folioOf(orderId), detail: reason })
+      if (o.doctor_id) notify({ text: `No confirmamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}${reason ? ` (${reason})` : ''}. Reintenta el pago o usa otro método.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+    }
+    return { ok: true, status: r.status }
   }
 
-  // Mock (sin backend): reproduce la máquina de estados del RPC vía la función pura.
+  // Demo (sin backend): reproduce la máquina de estados vía la función pura.
   const prevTransfer = ((o.shipping_meta as Record<string, unknown> | null)?.transfer as Record<string, unknown> | null) ?? {}
   const d = decideTransferReview(
     { paymentStatus: o.payment_status ?? 'pending', reported: prevTransfer.reported === true, reviewStatus: (prevTransfer.review as { status?: string } | undefined)?.status },
@@ -453,7 +529,7 @@ export async function reviewTransfer(
   return { ok: true, status: d.status }
 }
 
-// Espejo local del efecto del RPC + avisos. status es lo que devolvió el server.
+// Espejo local del efecto (SOLO demo, sin backend).
 function applyReviewLocally(orderId: string, action: 'confirm' | 'reject', reason: string | undefined, status?: string) {
   const o = orders.find((x) => x.id === orderId)
   if (!o) return
@@ -480,11 +556,54 @@ function applyReviewLocally(orderId: string, action: 'confirm' | 'reject', reaso
   }
 }
 
-// Cobro EN LÍNEA (Portal del Doctor). Pasa por la función segura pay_order (que
-// valida dueño/rol), como hará el webhook de Stripe.
+// CRÉDITO (contra pedido) — solo Dirección. Libera el surtido SIN tocar `payment_status`
+// ni `status`: el pedido sigue debiendo y así se muestra.
+export async function autorizarCreditoDePedido(opId: string, a: { orderId: string; dueDate: string; motivo: string }): Promise<{ ok: boolean; error?: string; ambiguous?: boolean }> {
+  const o = orders.find((x) => x.id === a.orderId)
+  if (!o) return { ok: false, error: 'No se encontró el pedido.' }
+  if (!hasSupabase || !isUuid(a.orderId)) {
+    setDemoCredit(a.orderId, { due_date: a.dueDate })
+    emit()
+    return { ok: true }
+  }
+  const r = await cmdAutorizarCredito(opId, a)
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  await reloadMoney()
+  await hydrate()
+  if (r.status === 'applied') {
+    logAudit({ actor: 'Dirección', action: 'Crédito autorizado', resource: folioOf(a.orderId), detail: `vence ${a.dueDate} · ${a.motivo}` })
+    notify({ text: `Crédito autorizado · ${o.external_ref ?? folioOf(a.orderId)} · puedes surtir (el pedido sigue por cobrar)`, roles: ['warehouse'], screen: 'surtido' })
+    notify({ text: `Crédito autorizado · ${o.external_ref ?? folioOf(a.orderId)} · vence ${a.dueDate}`, roles: ['admin'], screen: 'av_fin' })
+  }
+  return { ok: true }
+}
+
+export async function revocarCreditoDePedido(opId: string, a: { orderId: string; motivo: string }): Promise<{ ok: boolean; error?: string; ambiguous?: boolean }> {
+  if (!hasSupabase || !isUuid(a.orderId)) { setDemoCredit(a.orderId, null); emit(); return { ok: true } }
+  const r = await cmdRevocarCredito(opId, a)
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  await reloadMoney()
+  await hydrate()
+  if (r.status === 'applied') logAudit({ actor: 'Dirección', action: 'Crédito revocado', resource: folioOf(a.orderId), detail: a.motivo })
+  return { ok: true }
+}
+
+// Pago desde el Portal del Doctor. Con backend el doctor NO puede cobrarse a sí mismo:
+// DECLARA el pago (reportar_pago) y Facturación lo verifica — ahí nace el asiento. El
+// cobro en línea real entra por el webhook del proveedor (registrar_cobro, service_role).
+// Sin backend (demo) se simula el cobro para poder mostrar el flujo completo.
 export function payOrder(orderId: string, payment: { method: string; ref: string; actor?: string }): { ok: boolean } {
   const o = orders.find((x) => x.id === orderId)
   if (!o || o.payment_status === 'paid') return { ok: false }
+
+  if (hasSupabase && isUuid(orderId)) {
+    void reportarPagoDePedido(newOpId(), {
+      orderId, method: metodoW2(payment.method), amount: o.total ?? 0,
+      reference: payment.ref, actor: payment.actor ?? 'Portal del Doctor',
+    })
+    return { ok: true }
+  }
+
   orders = orders.map((x) =>
     x.id === orderId
       ? { ...x, payment_status: 'paid', payment_method: payment.method, payment_ref: payment.ref, status: x.status === 'pending_payment' ? 'paid' : x.status }
@@ -494,8 +613,5 @@ export function payOrder(orderId: string, payment: { method: string; ref: string
   notify({ text: `Pago recibido · ${o.external_ref ?? orderId} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
   notify({ text: `Pago recibido · ${o.external_ref ?? orderId}`, roles: ['admin'], screen: 'av_fin' })
   logAudit({ actor: payment.actor ?? 'Portal del Doctor', action: 'Pago en línea', resource: o.external_ref ?? orderId, detail: payment.method })
-  if (hasSupabase && isUuid(orderId)) {
-    supabase.rpc('pay_order', { p_order: orderId, p_method: payment.method, p_ref: payment.ref }).then(({ error }) => { if (error) console.warn('[orders] payOrder', error.message); hydrate() })
-  }
   return { ok: true }
 }

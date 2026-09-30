@@ -94,9 +94,9 @@ begin
   perform tests.act_as_owner();
   update public.lots set expiry_date = current_date + 300 where id = v_l2;
 
-  -- El reembolso (registrar_devolucion) YA NO mueve inventario
+  -- El reembolso (autorizar_reembolso) YA NO mueve inventario
   perform tests.act_as(v_bill);
-  v_r := public.registrar_devolucion(v_o, 'devolucion', 10, 'reembolso parcial', 'Caja', jsonb_build_array(jsonb_build_object('lot_id', v_l2, 'qty', 5)));
+  v_r := public.autorizar_reembolso(tests.op(), v_o, 'devolucion', 10, 'reembolso parcial', null, 'Caja');
   perform tests.act_as_owner();
   perform tests.eq(tests.qty(v_l2), 18, 'reembolso con items NO crea inventario (P0 cerrado)');
   perform tests.eq((select count(*)::int from public.refunds where order_id = v_o), 1, 'el reembolso sí se registra (W2 intacto)');

@@ -2,6 +2,9 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
+-- Rollback EN CAPAS: W2 se apoya en objetos de W1 (refunds.return_id → stock_returns),
+-- así que primero baja W2 y después W1. Ese es el orden real de una reversión.
+\ir ../../../rollback/w2/99_down.sql
 \ir ../../../rollback/w1/99_down.sql
 do $t$
 declare r record;

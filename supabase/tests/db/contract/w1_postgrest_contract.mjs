@@ -16,6 +16,7 @@ const jwt = (sub, role = 'authenticated') => {
 }
 const as = (sub, role) => new PostgrestClient(URL, { headers: sub || role ? { Authorization: `Bearer ${jwt(sub, role)}` } : {} })
 const admin = as(ids.admin), wh = as(ids.wh), pos = as(ids.pos), anon = new PostgrestClient(URL, {})
+const doc = as(ids.doc)
 const uuid = () => crypto.randomUUID()
 const exp = new Date(Date.now() + 200 * 86400000).toISOString().slice(0, 10)
 const expect = (name, cond, detail) => (cond ? ok(name) : bad(name, detail))
@@ -37,8 +38,9 @@ r = await wh.rpc('recibir_lote', { p_op_id: uuid(), p_product: ids.prod, p_lote:
 expect('error de negocio llega con código P0001 y mensaje CODIGO: (no ambiguo)', r.error?.code === 'P0001' && /^NO_AUTORIZADO:/.test(r.error.message), r.error)
 
 // 2) Surtido con asignaciones por renglón
-r = await admin.from('orders').update({ status: 'paid', payment_status: 'paid' }).eq('id', ids.order).select('status')
-expect('admin: pending_payment → paid sigue permitido por la guarda', !r.error && r.data?.[0]?.status === 'paid', r.error)
+// W2: el pedido se libera con un COBRO registrado (ya no se edita payment_status a mano).
+r = await admin.rpc('registrar_cobro', { p_op_id: uuid(), p_order: ids.order, p_method: 'transferencia', p_amount: 200 })
+expect('W2: registrar_cobro por la API libera el pedido', r.data?.payment_status === 'paid', r.error ?? r.data)
 const { data: items } = await wh.from('order_items').select('id, qty').eq('order_id', ids.order)
 r = await wh.rpc('surtir_pedido', { p_op_id: uuid(), p_order: ids.order, p_allocations: [{ order_item_id: items[0].id, lot_id: lot, qty: items[0].qty }] })
 expect('surtir_pedido (jsonb de asignaciones por renglón) aplica', r.data?.status === 'applied', r.error ?? r.data)
@@ -106,5 +108,180 @@ r = await anon.rpc('recibir_lote', { p_op_id: uuid(), p_product: ids.prod, p_lot
 expect('anon no ejecuta comandos W1', !!r.error && r.error.code !== 'P0001', r.error)
 r = await wh.rpc('_w1_trusted', { p_on: true })
 expect('helper interno _w1_trusted no expuesto', !!r.error, r.error)
+
+
+// ═══════════════ W2 · verdad de pago por la API real ═══════════════
+// 10) Declarar → verificar (parámetros con nombre, opcionales omitidos)
+r = await doc.rpc('reportar_pago', { p_op_id: uuid(), p_order: ids.omoney, p_method: 'transferencia', p_amount: 200 })
+expect('reportar_pago (doctor, opcionales omitidos) resuelve por nombre', r.data?.status === 'applied', r.error ?? r.data)
+const claim = r.data?.claim_id
+r = await doc.rpc('reportar_pago', { p_op_id: uuid(), p_order: ids.omoney, p_method: 'transferencia', p_amount: 200 })
+expect('una sola declaración abierta por pedido (por la API)', /DECLARACION_ABIERTA/.test(r.error?.message ?? ''), r.error)
+r = await doc.rpc('revisar_pago', { p_op_id: uuid(), p_claim_id: claim, p_accion: 'verificar' })
+expect('el doctor NO verifica su propio pago', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+r = await admin.rpc('revisar_pago', { p_op_id: uuid(), p_claim_id: claim, p_accion: 'verificar' })
+expect('revisar_pago verifica y genera el asiento', r.data?.resultado === 'verificado' && r.data?.payment_status === 'paid', r.error ?? r.data)
+
+// 11) La vista de dinero se lee por la API y es la definición única
+r = await admin.from('v_order_money').select('cobrado_neto, saldo, estado_pago, liberado').eq('order_id', ids.omoney).single()
+expect('v_order_money legible por la API', !r.error && Number(r.data.cobrado_neto) === 200 && r.data.estado_pago === 'paid' && r.data.liberado === true, r.error ?? r.data)
+
+// 12) Crédito: se surte sin falsificar el pago (objetivo central)
+r = await admin.rpc('autorizar_credito', { p_op_id: uuid(), p_order: ids.ocred, p_due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10), p_motivo: 'contrato' })
+expect('autorizar_credito por la API libera sin cobro', r.data?.liberado === true && r.data?.payment_status === 'pending', r.error ?? r.data)
+r = await admin.from('orders').select('status, payment_status').eq('id', ids.ocred).single()
+expect('el crédito NO falsifica status ni payment_status', r.data?.status === 'pending_payment' && r.data?.payment_status === 'pending', r.data)
+const { data: it2 } = await wh.from('order_items').select('id, qty').eq('order_id', ids.ocred)
+const { data: lot2 } = await wh.from('lots').select('id').eq('lot_code', 'CT-C').single()
+r = await wh.rpc('surtir_pedido', { p_op_id: uuid(), p_order: ids.ocred, p_allocations: [{ order_item_id: it2[0].id, lot_id: lot2.id, qty: it2[0].qty }] })
+expect('se surte a crédito por la API', r.data?.status === 'applied', r.error ?? r.data)
+r = await admin.from('orders').select('status, payment_status').eq('id', ids.ocred).single()
+expect('tras surtir a crédito sigue financieramente pendiente', r.data?.status === 'packed' && r.data?.payment_status === 'pending', r.data)
+
+// 13) Autoridad: nadie escribe el dinero por la API
+r = await admin.from('orders').update({ payment_status: 'paid' }).eq('id', ids.ocred)
+expect('escribir payment_status por la API ⇒ bloqueado (ni Dirección)', /PAGO_SOLO_POR_COMANDO/.test(r.error?.message ?? ''), r.error)
+r = await admin.from('payment_entries').insert({ order_id: ids.ocred, direction: 'in', method: 'efectivo', amount: 1, actor_role: 'admin' })
+expect('insertar en el libro por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.rpc('pay_order', { p_order: ids.ocred, p_method: 'registrado', p_ref: 'ADM' })
+expect('pay_order revocado por la API', r.error?.code === '42501' || r.error?.code === 'PGRST202', r.error)
+r = await admin.rpc('review_transfer_payment', { p_order: ids.omoney, p_action: 'confirm' })
+expect('firma VIEJA review_transfer_payment ya no existe', r.error?.code === 'PGRST202', r.error)
+r = await admin.rpc('registrar_devolucion', { p_order_id: ids.omoney, p_tipo: 'devolucion', p_monto: 1, p_motivo: 'x' })
+expect('firma VIEJA registrar_devolucion ya no existe', r.error?.code === 'PGRST202', r.error)
+
+// 14) Superficies de Dirección
+r = await admin.rpc('conciliar_dinero')
+expect('conciliar_dinero por la API: 0 errores', !r.error && r.data.filter((x) => x.severidad === 'error').length === 0, r.error ?? r.data)
+r = await wh.rpc('conciliar_dinero')
+expect('almacén no concilia dinero', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+r = await admin.rpc('estado_dinero_pedido', { p_order: ids.omoney })
+expect('estado_dinero_pedido devuelve libro + declaraciones', !r.error && Array.isArray(r.data?.asientos) && r.data.asientos.length === 1, r.error ?? r.data)
+
+
+// ═══════════════ W2 · superficie que consume el FRONTEND (N5) ═══════════════
+// 15) Las columnas que piden los stores, tal cual las manda el cliente: un nombre mal
+// escrito aquí es un 400 en producción, no un error de compilación.
+const MONEY_COLS = 'order_id, external_ref, order_status, payment_status, total, cobrado, reembolsado, cobrado_neto, saldo, '
+  + 'estado_pago, sobrepago, reembolso_pendiente, credito_autorizado, due_date, vencido, liberado'
+const CLAIM_COLS = 'id, order_id, method, amount_declared, reference, bank_account_id, proof_path, status, declared_by, '
+  + 'declared_at, resolved_at, reject_reason, entry_id'
+const ENTRY_COLS = 'id, order_id, claim_id, refund_id, direction, method, amount, value_date, external_ref, bank_account_id, '
+  + 'reversal_of, notes, actor_role, created_at'
+const CIERRE_COLS = 'id, fecha, alcance, esperado, fondo, contado, diferencia, motivo, usuario, created_at, '
+  + 'voids_closing_id, void_reason, cajero, corte_desde, corte_hasta, prev_closing_id'
+
+r = await admin.from('v_order_money').select(MONEY_COLS)
+expect('v_order_money: columnas del store (moneyStore)', !r.error && r.data.length > 0, r.error)
+r = await admin.from('payment_claims').select(CLAIM_COLS).order('declared_at', { ascending: false })
+expect('payment_claims: columnas del store', !r.error && r.data.length > 0, r.error)
+r = await admin.from('payment_entries').select(ENTRY_COLS).order('created_at', { ascending: false })
+expect('payment_entries: columnas del store', !r.error && r.data.length > 0, r.error)
+r = await admin.from('payment_claims').select('id').eq('order_id', ids.omoney).eq('status', 'reportado').maybeSingle()
+expect('comprobante abierto por pedido (reviewTransfer) no rompe con 0 filas', !r.error && r.data === null, r.error ?? r.data)
+
+// 16) Reembolso: autorizar ≠ pagar (dos comandos, dos hechos)
+r = await admin.rpc('autorizar_reembolso', { p_op_id: uuid(), p_order: ids.omoney, p_tipo: 'devolucion', p_monto: 50, p_motivo: 'producto devuelto', p_usuario: 'Dirección' })
+expect('autorizar_reembolso por la API (opcionales omitidos)', r.data?.status === 'applied' && Number(r.data?.restante) === 150, r.error ?? r.data)
+const refundId = r.data?.refund_id
+r = await admin.from('v_order_money').select('reembolso_pendiente, cobrado_neto').eq('order_id', ids.omoney).single()
+expect('autorizado sin pagar ⇒ el dinero NO ha salido', Number(r.data?.reembolso_pendiente) === 50 && Number(r.data?.cobrado_neto) === 200, r.data)
+r = await admin.rpc('pagar_reembolso', { p_op_id: uuid(), p_refund_id: refundId, p_method: 'transferencia' })
+expect('pagar_reembolso registra el EGRESO', r.data?.status === 'applied' && r.data?.misma_via === true, r.error ?? r.data)
+r = await admin.rpc('pagar_reembolso', { p_op_id: uuid(), p_refund_id: refundId, p_method: 'transferencia' })
+expect('un reembolso se paga UNA vez (por la API)', /REEMBOLSO_YA_PAGADO/.test(r.error?.message ?? ''), r.error)
+r = await admin.from('v_order_money').select('cobrado_neto, saldo, reembolso_pendiente').eq('order_id', ids.omoney).single()
+expect('tras pagar: neto 150, saldo 50, nada pendiente', Number(r.data?.cobrado_neto) === 150 && Number(r.data?.saldo) === 50 && Number(r.data?.reembolso_pendiente) === 0, r.data)
+
+// 17) Crédito: revocar por la API (CreditoAcciones)
+r = await admin.rpc('revocar_credito', { p_op_id: uuid(), p_order: ids.ocred, p_motivo: 'el cliente no firmó' })
+expect('revocar_credito por la API', r.data?.status === 'applied' && r.data?.liberado === false, r.error ?? r.data)
+r = await wh.rpc('revocar_credito', { p_op_id: uuid(), p_order: ids.ocred, p_motivo: 'x' })
+expect('almacén no revoca crédito', /NO_AUTORIZADO|SIN_CREDITO_VIGENTE/.test(r.error?.message ?? ''), r.error)
+
+// 18) Corte de caja: el ESPERADO y el TRAMO los calcula el servidor (D-W2-CASH-CUTOFF)
+const hoy = (await admin.rpc('hoy_local')).data ?? new Date().toISOString().slice(0, 10)
+r = await admin.rpc('tramo_corte_caja', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('tramo_corte_caja por la API: primer corte desde el inicio del día', !r.error && r.data?.primer_corte === true && r.data?.continua_de === null, r.error ?? r.data)
+r = await admin.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('efectivo_esperado por la API (alcance dia)', !r.error && Number(r.data) > 0, r.error ?? r.data)
+const esperado = Number(r.data)
+r = await wh.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('el efectivo en caja no se consulta desde Almacén', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+const opCorte = uuid()
+r = await admin.rpc('registrar_corte_caja', { p_op_id: opCorte, p_fecha: hoy, p_alcance: 'dia', p_fondo: 0, p_contado: esperado })
+expect('registrar_corte_caja cuadra con el esperado del servidor', r.data?.status === 'applied' && Number(r.data?.diferencia) === 0 && Number(r.data?.esperado) === esperado, r.error ?? r.data)
+const closingId = r.data?.closing_id
+r = await admin.rpc('registrar_corte_caja', { p_op_id: opCorte, p_fecha: hoy, p_alcance: 'dia', p_fondo: 0, p_contado: esperado })
+expect('reintento del MISMO corte ⇒ idempotente', r.data?.status === 'already_applied', r.error ?? r.data)
+r = await admin.rpc('registrar_corte_caja', { p_op_id: uuid(), p_fecha: hoy, p_alcance: 'dia', p_fondo: 0, p_contado: esperado + 100 })
+expect('una diferencia SIN motivo se rechaza', /MOTIVO_REQUERIDO/.test(r.error?.message ?? ''), r.error)
+
+// El límite económico: el corte siguiente NO vuelve a contar lo ya arqueado
+r = await admin.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('tras cortar, el esperado del siguiente corte es 0 (no se recuenta)', Number(r.data) === 0, r.data)
+r = await admin.rpc('tramo_corte_caja', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('el tramo siguiente CONTINÚA al corte cerrado', r.data?.primer_corte === false && r.data?.continua_de === closingId, r.error ?? r.data)
+// Entra efectivo nuevo ⇒ solo ese entra al tramo siguiente
+r = await pos.rpc('registrar_cobro', { p_op_id: uuid(), p_order: saleId, p_method: 'efectivo', p_amount: 60 })
+expect('se registra efectivo nuevo después del corte', r.data?.status === 'applied', r.error ?? r.data)
+r = await admin.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('el tramo nuevo arquea SOLO el efectivo posterior', Number(r.data) === 60, r.data)
+r = await admin.rpc('registrar_corte_caja', { p_op_id: uuid(), p_fecha: hoy, p_alcance: 'dia', p_fondo: 0, p_contado: 60 })
+const closing2 = r.data?.closing_id
+expect('el segundo corte del día cuadra sin doble conteo', r.data?.status === 'applied' && Number(r.data?.esperado) === 60 && Number(r.data?.diferencia) === 0, r.error ?? r.data)
+r = await admin.from('cash_closings').select(CIERRE_COLS).order('created_at', { ascending: false })
+expect('cash_closings: columnas del store (incluye el tramo)', !r.error && r.data.length === 2 && r.data.every((c) => c.corte_desde && c.corte_hasta), r.error ?? r.data)
+expect('los tramos se encadenan sin hueco', r.data.some((c) => c.id === closing2 && c.prev_closing_id === closingId), r.data)
+r = await admin.from('cash_closings').insert({ fecha: hoy, alcance: 'dia', esperado: 0, fondo: 0, contado: 0, diferencia: 0, usuario: 'x' })
+expect('insertar un corte por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.from('cash_closings').delete().eq('id', closingId)
+expect('borrar un corte por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.rpc('anular_corte_caja', { p_op_id: uuid(), p_closing_id: closingId, p_motivo: 'mal capturado' })
+expect('no se anula un corte intermedio (dejaría huecos entre tramos)', /CORTE_NO_ES_EL_ULTIMO/.test(r.error?.message ?? ''), r.error)
+r = await admin.rpc('anular_corte_caja', { p_op_id: uuid(), p_closing_id: closing2, p_motivo: 'mal capturado' })
+expect('anular_corte_caja deja contra-registro (no borra)', r.data?.status === 'applied', r.error ?? r.data)
+r = await admin.from('cash_closings').select('id, voids_closing_id, void_reason, prev_closing_id')
+expect('el corte anulado SIGUE en el historial con su anulación', r.data?.length === 3 && r.data.some((c) => c.voids_closing_id === closing2), r.data)
+r = await admin.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+expect('el tramo del corte anulado vuelve a estar por arquear', Number(r.data) === 60, r.data)
+
+// 19) Dinero sobre pedido CANCELADO: se registra (F-9) y se puede reversar
+r = await admin.rpc('cancelar_pedido', { p_op_id: uuid(), p_order: ids.order2, p_reason: 'el cliente ya no lo quiere' })
+expect('cancelar por comando (no por UPDATE) funciona por la API', r.data?.status === 'applied', r.error ?? r.data)
+r = await admin.rpc('registrar_cobro', { p_op_id: uuid(), p_order: ids.order2, p_method: 'efectivo', p_amount: 10 })
+expect('un cobro sobre pedido cancelado SE REGISTRA y se avisa', r.data?.status === 'applied' && r.data?.sobre_pedido_cancelado === true, r.error ?? r.data)
+const entryMal = r.data?.entry_id
+const opRev = uuid()
+r = await admin.rpc('reversar_asiento', { p_op_id: opRev, p_entry_id: entryMal, p_motivo: 'cobro aplicado al pedido equivocado' })
+expect('reversar_asiento compensa (no edita)', r.data?.status === 'applied', r.error ?? r.data)
+r = await admin.rpc('estado_operacion_dinero', { p_op_id: opRev })
+expect('estado_operacion_dinero recupera una operación ambigua', r.data?.status === 'already_applied' && r.data?.reversa_de === entryMal, r.error ?? r.data)
+r = await admin.from('v_order_money').select('cobrado_neto').eq('order_id', ids.order2).single()
+expect('tras la reversa el neto del pedido vuelve a 0', Number(r.data?.cobrado_neto) === 0, r.data)
+r = await wh.rpc('estado_operacion_dinero', { p_op_id: opRev })
+expect('almacén no lee operaciones de dinero ajenas', !r.error && (r.data === null || r.data === undefined), r.error ?? r.data)
+
+// 20) POS con efectivo recibido (Caja manda p_efectivo_recibido)
+const saleCash = uuid()
+r = await pos.rpc('vender_pos', { p_order_id: saleCash, p_folio: 'POS-CT2', p_total: 1, p_payment_method: 'efectivo',
+  p_doctor_id: null, p_shipping_meta: { channel: 'pos', event_id: null, seller: null }, p_efectivo_recibido: 200,
+  p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 150 }],
+  p_allocations: [{ line_index: 0, lot_id: lot, qty: 1 }] })
+expect('vender_pos acepta p_efectivo_recibido por la API', r.data === true, r.error ?? r.data)
+r = await admin.from('payment_entries').select('evidence_ref, method').eq('order_id', saleCash).single()
+expect('el efectivo recibido queda como evidencia del asiento', /recibido=200/.test(r.data?.evidence_ref ?? '') && r.data?.method === 'efectivo', r.data)
+r = await pos.rpc('vender_pos', { p_order_id: saleCash, p_folio: 'POS-CT2', p_total: 1, p_payment_method: 'efectivo',
+  p_doctor_id: null, p_shipping_meta: { channel: 'pos', event_id: null, seller: null }, p_efectivo_recibido: 900,
+  p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 150 }],
+  p_allocations: [{ line_index: 0, lot_id: lot, qty: 1 }] })
+expect('corregir el efectivo recibido NO crea otra venta', r.data === true, r.error ?? r.data)
+r = await admin.from('payment_entries').select('id').eq('order_id', saleCash)
+expect('la venta POS reintentada sigue con UN solo asiento', r.data?.length === 1, r.data)
+r = await pos.rpc('vender_pos', { p_order_id: uuid(), p_folio: 'POS-CT3', p_total: 1, p_payment_method: 'efectivo',
+  p_doctor_id: null, p_shipping_meta: { channel: 'pos' }, p_efectivo_recibido: 10,
+  p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 150 }],
+  p_allocations: [{ line_index: 0, lot_id: lot, qty: 1 }] })
+expect('efectivo recibido menor al total ⇒ rechazado', /EFECTIVO_INSUFICIENTE/.test(r.error?.message ?? ''), r.error)
 
 process.exit(failed)

@@ -89,7 +89,9 @@ export type OrderStatus =
   | 'draft' | 'pending_payment' | 'paid' | 'picking' | 'packed'
   | 'shipped' | 'delivered' | 'fulfilled' | 'cancelled'
 
-export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed'
+// W2 · vocabulario CERRADO y solo financiero (ck_orders_payment_status). 'parcial' = entró
+// dinero pero no alcanza; 'failed' se conserva por compatibilidad y ningún comando lo escribe.
+export type PaymentStatus = 'pending' | 'parcial' | 'paid' | 'refunded' | 'failed'
 
 export interface Order {
   id: UUID

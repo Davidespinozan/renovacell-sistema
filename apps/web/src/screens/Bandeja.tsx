@@ -7,6 +7,7 @@ import { Icon, type IconName } from '../app/icons'
 import { useRole } from '../auth/RoleContext'
 import { getRole, type RoleKey } from '../app/roles'
 import { useAllOrders, type OrderWithItems } from '../data/hooks/useOrders'
+import { useOrderMoney, usePaymentClaims } from '../data/hooks/useMoney'
 import { useShipments } from '../data/hooks/useShipments'
 import { useLots } from '../data/hooks/useLots'
 import { useDoctors } from '../data/hooks/useDoctors'
@@ -25,6 +26,8 @@ const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 export function Bandeja() {
   const { role, setScreen, user } = useRole()
   const { data: orders } = useAllOrders()
+  const { byOrder } = useOrderMoney()
+  const { data: claims } = usePaymentClaims()
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
@@ -33,7 +36,7 @@ export function Bandeja() {
   const tasks = useMemo<Task[]>(() => {
     const t: Task[] = []
     const lotesCriticos = lots.filter((l) => l.quantity > 0 && ['expired', 'critical'].includes(severity(daysUntil(l.expiry_date))))
-    const porSurtir = orders.filter(isSurtible)
+    const porSurtir = orders.filter((o) => isSurtible(o, byOrder[o.id]))
     const porEmpacar = orders.filter((o) => o.status === 'packed')
 
     if (role === 'warehouse') {
@@ -47,12 +50,13 @@ export function Bandeja() {
       const prospNuevos = prospects.filter((p) => (p.status ?? 'nuevo') === 'nuevo')
       const atorados = orders.filter((o) => ['packed', 'shipped'].includes(o.status ?? '') && diagnoseShipment(o, shipments.find((s) => s.order_id === o.id)).stuck)
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
-      const porCobrar = orders.filter((o) => notCancelled(o) && o.payment_status !== 'paid')
+      const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 
       if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
       if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos y muévelos por el pipeline.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
-      const transferPend = orders.filter((o) => notCancelled(o) && o.payment_status !== 'paid' && !!(o.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported)
-      if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Transferencias por confirmar', detail: 'El cliente informó su pago; verifícalo y márcalo cobrado.', count: transferPend.length, tone: 'warn', screen: 'av_fin' })
+      // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
+      const transferPend = claims.filter((c) => c.status === 'reportado')
+      if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Pagos por validar', detail: 'El cliente informó un pago; verifica que cayó y regístralo.', count: transferPend.length, tone: 'warn', screen: 'av_pagos' })
       if (atorados.length) t.push({ id: 'atorados', icon: 'truck', title: 'Envíos atorados', detail: 'Requieren atención en seguimiento.', count: atorados.length, tone: 'dang', screen: 'seguimiento' })
       if (porEmitir.length) t.push({ id: 'cfdi', icon: 'receipt', title: 'CFDI por emitir', detail: 'Pedidos con factura solicitada.', count: porEmitir.length, tone: 'warn', screen: 'av_fin' })
       if (porCobrar.length) t.push({ id: 'cobrar', icon: 'receipt', title: 'Por cobrar', detail: 'Cuentas por cobrar (contra pedido / pendiente).', count: porCobrar.length, tone: 'neu', screen: 'av_fin' })

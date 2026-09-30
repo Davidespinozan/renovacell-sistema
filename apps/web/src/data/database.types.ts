@@ -241,7 +241,10 @@ export type Database = {
       cash_closings: {
         Row: {
           alcance: string
+          cajero: string | null
           contado: number
+          corte_desde: string | null
+          corte_hasta: string | null
           created_at: string | null
           created_by: string | null
           diferencia: number
@@ -250,11 +253,18 @@ export type Database = {
           fondo: number
           id: string
           motivo: string | null
+          op_id: string | null
+          prev_closing_id: string | null
           usuario: string | null
+          void_reason: string | null
+          voids_closing_id: string | null
         }
         Insert: {
           alcance: string
+          cajero?: string | null
           contado: number
+          corte_desde?: string | null
+          corte_hasta?: string | null
           created_at?: string | null
           created_by?: string | null
           diferencia: number
@@ -263,11 +273,18 @@ export type Database = {
           fondo?: number
           id?: string
           motivo?: string | null
+          op_id?: string | null
+          prev_closing_id?: string | null
           usuario?: string | null
+          void_reason?: string | null
+          voids_closing_id?: string | null
         }
         Update: {
           alcance?: string
+          cajero?: string | null
           contado?: number
+          corte_desde?: string | null
+          corte_hasta?: string | null
           created_at?: string | null
           created_by?: string | null
           diferencia?: number
@@ -276,9 +293,28 @@ export type Database = {
           fondo?: number
           id?: string
           motivo?: string | null
+          op_id?: string | null
+          prev_closing_id?: string | null
           usuario?: string | null
+          void_reason?: string | null
+          voids_closing_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cash_closings_prev_closing_id_fkey"
+            columns: ["prev_closing_id"]
+            isOneToOne: false
+            referencedRelation: "cash_closings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_closings_voids_closing_id_fkey"
+            columns: ["voids_closing_id"]
+            isOneToOne: false
+            referencedRelation: "cash_closings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_bank_accounts: {
         Row: {
@@ -484,6 +520,57 @@ export type Database = {
           title?: string | null
         }
         Relationships: []
+      }
+      credit_grants: {
+        Row: {
+          due_date: string
+          granted_at: string
+          granted_by: string | null
+          id: string
+          order_id: string
+          reason: string
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+        }
+        Insert: {
+          due_date: string
+          granted_at?: string
+          granted_by?: string | null
+          id: string
+          order_id: string
+          reason: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Update: {
+          due_date?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          order_id?: string
+          reason?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_grants_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_grants_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
       }
       customers: {
         Row: {
@@ -824,6 +911,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "inventory_movements_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -993,6 +1087,36 @@ export type Database = {
           },
         ]
       }
+      money_operations: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          created_at: string
+          kind: string
+          op_id: string
+          request_hash: string
+          result: Json
+        }
+        Insert: {
+          actor?: string | null
+          actor_role: string
+          created_at?: string
+          kind: string
+          op_id: string
+          request_hash: string
+          result: Json
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          kind?: string
+          op_id?: string
+          request_hash?: string
+          result?: Json
+        }
+        Relationships: []
+      }
       notification_reads: {
         Row: {
           notification_id: string
@@ -1095,6 +1219,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_cancellations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_cancellations_return_id_fkey"
             columns: ["return_id"]
             isOneToOne: false
@@ -1145,6 +1276,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_items_product_id_fkey"
@@ -1251,6 +1389,192 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_claims: {
+        Row: {
+          amount_declared: number
+          bank_account_id: string | null
+          created_at: string
+          declared_at: string
+          declared_by: string | null
+          entry_id: string | null
+          id: string
+          method: string
+          order_id: string
+          proof_path: string | null
+          reference: string | null
+          reject_reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          amount_declared: number
+          bank_account_id?: string | null
+          created_at?: string
+          declared_at?: string
+          declared_by?: string | null
+          entry_id?: string | null
+          id: string
+          method: string
+          order_id: string
+          proof_path?: string | null
+          reference?: string | null
+          reject_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount_declared?: number
+          bank_account_id?: string | null
+          created_at?: string
+          declared_at?: string
+          declared_by?: string | null
+          entry_id?: string | null
+          id?: string
+          method?: string
+          order_id?: string
+          proof_path?: string | null
+          reference?: string | null
+          reject_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_claims_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "company_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_claims_entry_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "payment_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_claims_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_claims_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
+      payment_entries: {
+        Row: {
+          actor_role: string
+          amount: number
+          bank_account_id: string | null
+          claim_id: string | null
+          created_at: string
+          currency: string
+          direction: string
+          evidence_ref: string | null
+          external_ref: string | null
+          id: string
+          method: string
+          notes: string | null
+          order_id: string
+          recorded_by: string | null
+          refund_id: string | null
+          reversal_of: string | null
+          value_date: string
+        }
+        Insert: {
+          actor_role: string
+          amount: number
+          bank_account_id?: string | null
+          claim_id?: string | null
+          created_at?: string
+          currency?: string
+          direction: string
+          evidence_ref?: string | null
+          external_ref?: string | null
+          id: string
+          method: string
+          notes?: string | null
+          order_id: string
+          recorded_by?: string | null
+          refund_id?: string | null
+          reversal_of?: string | null
+          value_date?: string
+        }
+        Update: {
+          actor_role?: string
+          amount?: number
+          bank_account_id?: string | null
+          claim_id?: string | null
+          created_at?: string
+          currency?: string
+          direction?: string
+          evidence_ref?: string | null
+          external_ref?: string | null
+          id?: string
+          method?: string
+          notes?: string | null
+          order_id?: string
+          recorded_by?: string | null
+          refund_id?: string | null
+          reversal_of?: string | null
+          value_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_entries_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "company_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_entries_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "payment_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_entries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_entries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payment_entries_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_entries_reversal_of_fkey"
+            columns: ["reversal_of"]
+            isOneToOne: false
+            referencedRelation: "payment_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -1730,7 +2054,9 @@ export type Database = {
           metodo: string | null
           monto: number
           motivo: string
+          op_id: string | null
           order_id: string
+          return_id: string | null
           tipo: string
           usuario: string | null
         }
@@ -1742,7 +2068,9 @@ export type Database = {
           metodo?: string | null
           monto: number
           motivo: string
+          op_id?: string | null
           order_id: string
+          return_id?: string | null
           tipo: string
           usuario?: string | null
         }
@@ -1754,7 +2082,9 @@ export type Database = {
           metodo?: string | null
           monto?: number
           motivo?: string
+          op_id?: string | null
           order_id?: string
+          return_id?: string | null
           tipo?: string
           usuario?: string | null
         }
@@ -1764,6 +2094,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "refunds_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "stock_returns"
             referencedColumns: ["id"]
           },
         ]
@@ -2039,6 +2383,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
         ]
       }
       shipping_attempts: {
@@ -2113,6 +2464,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shipping_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
         ]
       }
       stock_return_lines: {
@@ -2186,6 +2544,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_return_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "stock_return_lines_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -2254,6 +2619,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
           },
         ]
       }
@@ -2450,6 +2822,27 @@ export type Database = {
           },
         ]
       }
+      v_order_money: {
+        Row: {
+          cobrado: number | null
+          cobrado_neto: number | null
+          credito_autorizado: boolean | null
+          due_date: string | null
+          estado_pago: string | null
+          external_ref: string | null
+          liberado: boolean | null
+          order_id: string | null
+          order_status: string | null
+          payment_status: string | null
+          reembolsado: number | null
+          reembolso_pendiente: number | null
+          saldo: number | null
+          sobrepago: boolean | null
+          total: number | null
+          vencido: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _fiscal_audit: {
@@ -2469,6 +2862,76 @@ export type Database = {
         Returns: Json
       }
       _w1_trusted: { Args: { p_on: boolean }; Returns: undefined }
+      _w2_asiento: {
+        Args: {
+          p_amount: number
+          p_bank?: string
+          p_claim?: string
+          p_direction: string
+          p_evidence?: string
+          p_external_ref?: string
+          p_id: string
+          p_method: string
+          p_notes?: string
+          p_order: string
+          p_refund?: string
+          p_reversal_of?: string
+          p_value_date: string
+        }
+        Returns: string
+      }
+      _w2_corte_cola: {
+        Args: { p_alcance: string; p_cajero: string }
+        Returns: {
+          alcance: string
+          cajero: string | null
+          contado: number
+          corte_desde: string | null
+          corte_hasta: string | null
+          created_at: string | null
+          created_by: string | null
+          diferencia: number
+          esperado: number
+          fecha: string
+          fondo: number
+          id: string
+          motivo: string | null
+          op_id: string | null
+          prev_closing_id: string | null
+          usuario: string | null
+          void_reason: string | null
+          voids_closing_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cash_closings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _w2_corte_desde: {
+        Args: { p_alcance: string; p_cajero: string; p_fecha: string }
+        Returns: string
+      }
+      _w2_efectivo_tramo: {
+        Args: {
+          p_alcance: string
+          p_cajero: string
+          p_desde: string
+          p_hasta: string
+        }
+        Returns: number
+      }
+      _w2_op_begin: {
+        Args: { p_kind: string; p_op: string; p_req: Json }
+        Returns: Json
+      }
+      _w2_op_finish: {
+        Args: { p_kind: string; p_op: string; p_req: Json; p_result: Json }
+        Returns: Json
+      }
+      _w2_recalc_payment_status: { Args: { p_order: string }; Returns: string }
+      _w2_trusted: { Args: { p_on: boolean }; Returns: undefined }
       admin_approve_doctor: {
         Args: {
           p_customer_id?: string
@@ -2486,6 +2949,10 @@ export type Database = {
           p_reason: string
           p_receipt_id?: string
         }
+        Returns: Json
+      }
+      anular_corte_caja: {
+        Args: { p_closing_id: string; p_motivo: string; p_op_id: string }
         Returns: Json
       }
       anular_guia_manual: {
@@ -2523,6 +2990,27 @@ export type Database = {
         }[]
       }
       auth_role: { Args: never; Returns: string }
+      autorizar_credito: {
+        Args: {
+          p_due_date: string
+          p_motivo: string
+          p_op_id: string
+          p_order: string
+        }
+        Returns: Json
+      }
+      autorizar_reembolso: {
+        Args: {
+          p_monto: number
+          p_motivo: string
+          p_op_id: string
+          p_order: string
+          p_return_id?: string
+          p_tipo: string
+          p_usuario?: string
+        }
+        Returns: Json
+      }
       avisar_cuentas_por_cobrar: { Args: never; Returns: number }
       avisar_lotes_por_caducar: { Args: never; Returns: number }
       can_access_conversation: { Args: { cid: string }; Returns: boolean }
@@ -2533,6 +3021,18 @@ export type Database = {
       cerrar_orden_compra: {
         Args: { p_op_id: string; p_reason: string; p_replenishment: string }
         Returns: Json
+      }
+      conciliar_dinero: {
+        Args: never
+        Returns: {
+          check_id: string
+          detalle: string
+          entidad: string
+          entidad_id: string
+          esperado: number
+          obtenido: number
+          severidad: string
+        }[]
       }
       conciliar_inventario: {
         Args: never
@@ -2574,6 +3074,12 @@ export type Database = {
         Args: { p_lines: Json; p_op_id: string }
         Returns: Json
       }
+      efectivo_esperado: {
+        Args: { p_alcance?: string; p_cajero?: string; p_fecha: string }
+        Returns: number
+      }
+      estado_dinero_pedido: { Args: { p_order: string }; Returns: Json }
+      estado_operacion_dinero: { Args: { p_op_id: string }; Returns: Json }
       event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       finalize_shipment: {
         Args: { p_attempt_id: string; p_shipment: Json }
@@ -2607,9 +3113,24 @@ export type Database = {
       lote_code_norm: { Args: { p_code: string }; Returns: string }
       order_owner: { Args: { o_id: string }; Returns: string }
       order_vendor_email: { Args: { o_id: string }; Returns: string }
+      pagar_reembolso: {
+        Args: {
+          p_method: string
+          p_motivo_via?: string
+          p_op_id: string
+          p_reference?: string
+          p_refund_id: string
+          p_value_date?: string
+        }
+        Returns: Json
+      }
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
+      }
+      pedido_liberado_para_surtir: {
+        Args: { p_order: string }
+        Returns: boolean
       }
       precio_de:
         | { Args: { p_list: string; p_product: string }; Returns: number }
@@ -2641,14 +3162,40 @@ export type Database = {
         }
         Returns: Json
       }
-      registrar_devolucion: {
+      registrar_cobro: {
         Args: {
-          p_items?: Json
-          p_monto: number
-          p_motivo: string
-          p_order_id: string
-          p_tipo: string
-          p_usuario?: string
+          p_amount: number
+          p_bank_account_id?: string
+          p_evidence?: string
+          p_method: string
+          p_op_id: string
+          p_order: string
+          p_reference?: string
+          p_value_date?: string
+        }
+        Returns: Json
+      }
+      registrar_corte_caja: {
+        Args: {
+          p_alcance: string
+          p_cajero?: string
+          p_contado: number
+          p_fecha: string
+          p_fondo: number
+          p_motivo?: string
+          p_op_id: string
+        }
+        Returns: Json
+      }
+      reportar_pago: {
+        Args: {
+          p_amount: number
+          p_bank_account_id?: string
+          p_method: string
+          p_op_id: string
+          p_order: string
+          p_proof_path?: string
+          p_reference?: string
         }
         Returns: Json
       }
@@ -2663,8 +3210,23 @@ export type Database = {
         }
         Returns: Json
       }
-      review_transfer_payment: {
-        Args: { p_action: string; p_order: string; p_reason?: string }
+      reversar_asiento: {
+        Args: { p_entry_id: string; p_motivo: string; p_op_id: string }
+        Returns: Json
+      }
+      revisar_pago: {
+        Args: {
+          p_accion: string
+          p_amount_verificado?: number
+          p_claim_id: string
+          p_motivo?: string
+          p_op_id: string
+          p_value_date?: string
+        }
+        Returns: Json
+      }
+      revocar_credito: {
+        Args: { p_motivo: string; p_op_id: string; p_order: string }
         Returns: Json
       }
       set_doctor_default_location: {
@@ -2677,6 +3239,10 @@ export type Database = {
       }
       surtir_pedido: {
         Args: { p_allocations: Json; p_op_id: string; p_order: string }
+        Returns: Json
+      }
+      tramo_corte_caja: {
+        Args: { p_alcance?: string; p_cajero?: string; p_fecha: string }
         Returns: Json
       }
       upsert_customer_contact: {
@@ -2692,6 +3258,7 @@ export type Database = {
           p_allocations: Json
           p_customer_id?: string
           p_doctor_id: string
+          p_efectivo_recibido?: number
           p_folio: string
           p_invoice_meta?: Json
           p_invoice_requested?: boolean

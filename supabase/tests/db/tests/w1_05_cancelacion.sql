@@ -28,14 +28,15 @@ begin
   perform tests.act_as_owner();
   perform tests.eq((select count(*)::int from public.order_cancellations where order_id = v_o), 1, 'una sola cancelación registrada');
 
-  v_o := tests.order(v_doc, 'pending_payment', v_it, 'pending', '{"transfer":{"reported":true,"review":{"status":"pending"}}}');
+  v_o := tests.order(v_doc, 'pending_payment', v_it);
+  perform tests.reportar(v_o);           -- W2: declaración en revisión (payment_claims), sin espejo en el JSON
   perform tests.act_as(v_doc);
   perform tests.throws(format('select public.cancelar_pedido(gen_random_uuid(), %L)', v_o), 'CANCELACION_REQUIERE_DIRECCION', 'frontera B: transferencia en revisión ⇒ doctor no cancela');
   perform tests.act_as(v_bill);
   perform tests.throws(format('select public.cancelar_pedido(gen_random_uuid(), %L, ''x'')', v_o), 'CANCELACION_REQUIERE_DIRECCION', 'frontera B: facturación tampoco');
   perform tests.act_as(v_admin);
   v_r := public.cancelar_pedido(tests.op(), v_o, 'cliente pidió cancelar tras transferir');
-  perform tests.eq(v_r ->> 'refund_review' || '/' || (v_r ->> 'money_signal'), 'pendiente_revision/transferencia_en_revision', 'frontera B: Dirección cancela + REEMBOLSO PENDIENTE DE REVISIÓN');
+  perform tests.eq(v_r ->> 'refund_review' || '/' || (v_r ->> 'money_signal'), 'pendiente_revision/pago_reportado_en_revision', 'frontera B: Dirección cancela + REEMBOLSO PENDIENTE DE REVISIÓN');
 
   v_o := tests.order(v_doc, 'pending_payment', v_it);
   perform tests.act_as(v_bill);

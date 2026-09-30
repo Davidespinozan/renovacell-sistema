@@ -9,7 +9,7 @@ import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
-import { markInvoiced, markPaid, reviewTransfer, setOrderFiscalSnapshot } from '../../data/store/ordersStore'
+import { markInvoiced, registrarCobroDePedido, reviewTransfer, setOrderFiscalSnapshot } from '../../data/store/ordersStore'
 import { upsertCustomerFiscal } from '../../data/store/customersStore'
 import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
 import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
@@ -21,14 +21,12 @@ import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
 
-// Transferencia informada por el cliente (reportada vía report-transfer): vive en
-// shipping_meta.transfer. Con esto Dirección ve QUÉ pedido tiene una transferencia
-// esperando, su referencia y el comprobante — antes no había señal alguna.
-interface TransferInfo { reported?: boolean; at?: string; reference?: string; proof_path?: string | null }
-const transferOf = (o: OrderWithItems): TransferInfo | null => {
-  const t = (o.shipping_meta as { transfer?: TransferInfo } | null)?.transfer
-  return t?.reported ? t : null
-}
+import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
+import { useOpId } from '../../data/hooks/useOpId'
+import { METODOS, type OrderMoney, type PaymentClaim, type PaymentMethod } from '../../data/ops/money'
+import { etiquetaPago, etiquetaLiberacion } from '../../data/ops/moneyView'
+import { AMBIGUO_MSG } from '../../data/ops/w1Command'
+import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { ExportButton } from '../../app/ExportButton'
 import type { ProductSafe, Profile } from '../../data/types'
 
@@ -42,10 +40,20 @@ const cfdiUuid = (o: OrderWithItems): string | null =>
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 
 interface Tag { label: string; pill: string }
-function cobroTag(o: OrderWithItems): Tag {
-  if (o.payment_status === 'paid') return { label: 'Pagado', pill: 'p-ok' }
-  if (o.payment_method === 'contra_pedido') return { label: 'Contra pedido', pill: 'p-warn' }
-  return { label: 'Pendiente', pill: 'p-neu' }
+const PILL: Record<string, string> = { ok: 'p-ok', warn: 'p-warn', bad: 'p-dang', muted: 'p-neu' }
+// Estado de COBRO desde el libro (v_order_money). Un crédito autorizado NO se etiqueta
+// como pagado: sale como "Crédito autorizado", que es lo que realmente es.
+function cobroTag(o: OrderWithItems, m?: OrderMoney | null): Tag {
+  if (!m) {
+    if (o.payment_status === 'paid') return { label: 'Pagado', pill: 'p-ok' }
+    return { label: 'Pendiente', pill: 'p-neu' }
+  }
+  if (m.estado_pago !== 'paid' && m.credito_autorizado) {
+    const e = etiquetaLiberacion(m)
+    return { label: e.texto, pill: PILL[e.tono] }
+  }
+  const e = etiquetaPago(m)
+  return { label: e.texto, pill: PILL[e.tono] }
 }
 function cfdiTag(o: OrderWithItems): Tag {
   if (isEmitida(o)) return { label: 'Emitido', pill: 'p-ok' }
@@ -59,6 +67,8 @@ export function Facturacion() {
   const { data: doctors } = useDoctors()
   const [filter, setFilter] = useState<Filter>('todos')
   const [selected, setSelected] = useState<string | null>(null)
+  const { data: claims } = usePaymentClaims()
+  const { byOrder } = useOrderMoney()
 
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
@@ -70,35 +80,43 @@ export function Facturacion() {
   }
 
   const valid = useMemo(() => orders.filter(notCancelled), [orders])
-  const bill = billingSummary(valid)
+  const bill = billingSummary(valid, byOrder)
   const solicitados = valid.filter((o) => o.invoice_requested).length
   const porEmitir = valid.filter((o) => o.invoice_requested && !isEmitida(o)).length
   const emitidos = valid.filter(isEmitida).length
-  const transferPend = valid.filter((o) => !!transferOf(o) && o.payment_status !== 'paid').length
+  // Comprobante ABIERTO por pedido (payment_claims): a lo más uno por pedido.
+  const claimByOrder = useMemo(() => {
+    const m: Record<string, PaymentClaim | undefined> = {}
+    claims.forEach((c) => { if (c.status === 'reportado' && !m[c.order_id]) m[c.order_id] = c })
+    return m
+  }, [claims])
+  const transferPend = valid.filter((o) => !!claimByOrder[o.id]).length
 
   const rows = useMemo(() => {
     const base = valid.filter((o) => {
       if (filter === 'por_emitir') return o.invoice_requested && !isEmitida(o)
       if (filter === 'emitidos') return isEmitida(o)
-      if (filter === 'por_cobrar') return o.payment_status !== 'paid'
-      if (filter === 'transfer') return !!transferOf(o) && o.payment_status !== 'paid'
+      if (filter === 'por_cobrar') return (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001
+      if (filter === 'transfer') return !!claimByOrder[o.id]
       return true
     })
     return base.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-  }, [valid, filter])
+  }, [valid, filter, byOrder, claimByOrder])
 
   // Cuentas por cobrar agregadas por cliente (Sección B: alertas de adeudo).
   const debt = useMemo(() => {
     const m = new Map<string, { name: string; count: number; total: number; oldest: string }>()
-    valid.filter((o) => o.payment_status !== 'paid' && o.doctor_id).forEach((o) => {
+    valid.filter((o) => o.doctor_id).forEach((o) => {
+      const saldo = byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)
+      if (saldo <= 0.0001) return
       const id = o.doctor_id as string
       const e = m.get(id) ?? { name: doctorsById[id]?.full_name ?? 'Doctor', count: 0, total: 0, oldest: o.created_at }
-      e.count += 1; e.total += o.total ?? 0
+      e.count += 1; e.total += saldo
       if (o.created_at < e.oldest) e.oldest = o.created_at
       m.set(id, e)
     })
     return [...m.values()].sort((a, b) => b.total - a.total)
-  }, [valid, doctorsById])
+  }, [valid, doctorsById, byOrder])
   const debtTotal = debt.reduce((s, d) => s + d.total, 0)
 
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
@@ -112,7 +130,7 @@ export function Facturacion() {
     { k: 'por_emitir', label: `Por emitir${porEmitir ? ` · ${porEmitir}` : ''}` },
     { k: 'emitidos', label: 'Emitidos' },
     { k: 'por_cobrar', label: 'Por cobrar' },
-    { k: 'transfer', label: `Transferencias por confirmar${transferPend ? ` · ${transferPend}` : ''}` },
+    { k: 'transfer', label: `Pagos por validar${transferPend ? ` · ${transferPend}` : ''}` },
   ]
 
   return (
@@ -232,7 +250,7 @@ export function Facturacion() {
       </div>
 
       {selectedOrder && (
-        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} onClose={() => setSelected(null)} />
+        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} dinero={byOrder[selectedOrder.id] ?? null} claim={claimByOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} />
       )}
     </div>
   )
@@ -249,17 +267,21 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
   )
 }
 
-export function BillDetail({ order, productsById, clientName, clientEmail = '', onClose }: {
+export function BillDetail({ order, productsById, clientName, clientEmail = '', dinero = null, claim = null, onClose }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
   clientEmail?: string
+  dinero?: OrderMoney | null
+  claim?: PaymentClaim | null
   onClose: () => void
 }) {
-  const cob = cobroTag(order); const cf = cfdiTag(order)
+  const cob = cobroTag(order, dinero); const cf = cfdiTag(order)
   const emitida = isEmitida(order); const uuid = cfdiUuid(order)
-  const paid = order.payment_status === 'paid'
-  const transfer = transferOf(order)
+  // Facturable solo si el dinero ENTRÓ. Un crédito autorizado libera el surtido, no el CFDI.
+  const paid = dinero ? dinero.estado_pago === 'paid' : order.payment_status === 'paid'
+  const transfer = claim
+  const [cobrando, setCobrando] = useState(false)
   const descargable = cfdiTimbradoReal(order)
   // Estado de cancelación fiscal (local para reflejar el cambio sin recargar). La cancelación es
   // un evento fiscal separado: NO cambia pedido/pago/inventario. Descarga histórica siempre; envío
@@ -343,14 +365,15 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             <span className={'pill ' + cob.pill}>{cob.label}</span>
             <span className={'pill ' + cf.pill}>{cf.label}</span>
-            {transfer && !paid && <span className="pill p-warn">Transferencia por confirmar</span>}
+            {transfer && !paid && <span className="pill p-warn">Pago informado · por validar</span>}
+            {dinero && dinero.saldo > 0.0001 && <span className="pill p-neu">Saldo {money(dinero.saldo)}</span>}
           </div>
 
           {transfer && !paid && (
             <div className="sysnote" style={{ marginBottom: 14, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
               <BadgeDollarSign size={16} />
               <span style={{ flex: 1 }}>
-                <b>El cliente informó su transferencia.</b>{transfer.reference ? ` Referencia: ${transfer.reference}.` : ''} Verifica que cayó y márcala cobrada para liberar el pedido.
+                <b>El cliente informó un pago de {money(transfer.amount_declared)}.</b>{transfer.reference ? ` Referencia: ${transfer.reference}.` : ''} Todavía no hay dinero registrado: verifica que cayó y confírmalo para que entre al libro.
                 {transfer.proof_path && <> · <button type="button" onClick={() => verProof(transfer.proof_path!)} style={{ color: 'var(--green-deep)', fontWeight: 700, background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>Ver comprobante</button></>}
               </span>
               <button type="button" className="btn ghost sm" onClick={async () => {
@@ -359,7 +382,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 const r = await reviewTransfer(order.id, 'reject', motivo)
                 if (!r.ok) { window.alert(r.error ?? 'No se pudo rechazar.'); return }
                 onClose()
-              }}>Rechazar transferencia</button>
+              }}>Rechazar pago informado</button>
             </div>
           )}
 
@@ -376,6 +399,10 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
             </tbody>
           </table>
           <div className="cototal" style={{ marginTop: 12 }}><span>Total</span><b>{money(order.total)}</b></div>
+
+          {cobrando && (
+            <CobroModal order={order} saldo={dinero ? dinero.saldo : (order.total ?? 0)} onClose={() => setCobrando(false)} />
+          )}
 
           {emitida && uuid && (
             <div className="sysnote" style={{ marginTop: 14 }}>
@@ -517,11 +544,11 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                   if (!r.ok) { window.alert(r.error ?? 'No se pudo confirmar.'); return }
                   onClose()
                 }}>
-                  <BadgeDollarSign size={15} /> Confirmar pago (transferencia)
+                  <BadgeDollarSign size={15} /> Confirmar pago informado
                 </button>
               ) : (
-                <button className="btn ghost" type="button" onClick={() => markPaid(order.id)}>
-                  <BadgeDollarSign size={15} /> Marcar cobrado
+                <button className="btn ghost" type="button" onClick={() => setCobrando(true)}>
+                  <BadgeDollarSign size={15} /> Registrar cobro
                 </button>
               )
             )}
@@ -540,6 +567,100 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 <FileText size={15} /> Emitir CFDI
               </button>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// REGISTRAR COBRO — el dinero ya llegó y se asienta en el libro. No "marca pagado":
+// crea el asiento y el servidor recalcula payment_status (pending → parcial → paid).
+// El monto se puede cobrar PARCIAL: se muestra el saldo y no se fuerza el total.
+function CobroModal({ order, saldo, onClose }: { order: OrderWithItems; saldo: number; onClose: () => void }) {
+  const { opId, renew } = useOpId()
+  const { data: bankAll } = useBankAccounts()
+  const bancos = bankAll.filter((b) => b.active)
+  const [metodo, setMetodo] = useState<PaymentMethod>('transferencia')
+  const [monto, setMonto] = useState(String(saldo > 0 ? saldo : (order.total ?? 0)))
+  const [referencia, setReferencia] = useState('')
+  const [banco, setBanco] = useState('')
+  const [fecha, setFecha] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const montoN = Math.max(0, Number(monto) || 0)
+  const valido = montoN > 0
+  const parcial = montoN + 0.0001 < saldo
+
+  const cobrar = async () => {
+    if (!valido || busy) return
+    setBusy(true); setErr('')
+    const r = await registrarCobroDePedido(opId, {
+      orderId: order.id, method: metodo, amount: montoN,
+      fechaValor: fecha || null, reference: referencia.trim() || null,
+      bankAccountId: banco || null, actor: 'Facturación',
+    })
+    setBusy(false)
+    if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo registrar el cobro.')); return }
+    renew()
+    onClose()
+  }
+
+  const fld: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 6, background: '#fff' }
+  const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
+
+  return (
+    <div className="overlay" onClick={busy ? undefined : onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhead">
+          <div>
+            <h3>Registrar cobro · {order.external_ref}</h3>
+            <div className="ms">Saldo por cobrar: {money(saldo)}</div>
+          </div>
+          <button className="mclose" type="button" onClick={onClose} disabled={busy}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <label style={lbl}>Forma de pago</label>
+          <select style={fld} value={metodo} onChange={(e) => setMetodo(e.target.value as PaymentMethod)}>
+            {METODOS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+
+          <label style={lbl}>Monto recibido</label>
+          <input type="number" min={0} step="0.01" style={fld} value={monto} onChange={(e) => setMonto(e.target.value)} />
+          {parcial && montoN > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--warn)', marginTop: 6 }}>
+              Cobro parcial: quedará un saldo de {money(saldo - montoN)}. El pedido NO pasa a pagado.
+            </div>
+          )}
+
+          <label style={lbl}>Referencia <span style={{ opacity: .7, textTransform: 'none' }}>(opcional)</span></label>
+          <input style={fld} value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="folio del depósito, autorización…" />
+
+          {bancos.length > 0 && metodo !== 'efectivo' && (
+            <>
+              <label style={lbl}>Cuenta donde cayó <span style={{ opacity: .7, textTransform: 'none' }}>(opcional)</span></label>
+              <select style={fld} value={banco} onChange={(e) => setBanco(e.target.value)}>
+                <option value="">Sin especificar</option>
+                {bancos.map((b) => <option key={b.id} value={b.id}>{b.bank_name}</option>)}
+              </select>
+            </>
+          )}
+
+          <label style={lbl}>Fecha del movimiento <span style={{ opacity: .7, textTransform: 'none' }}>(opcional · hoy si se deja vacío)</span></label>
+          <input type="date" style={fld} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+
+          {err && (
+            <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>
+              <span>{err}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose} disabled={busy}>Cancelar</button>
+            <button className="btn" type="button" onClick={cobrar} disabled={!valido || busy} style={!valido || busy ? { opacity: .55, cursor: 'not-allowed' } : undefined}>
+              <BadgeDollarSign size={15} /> {busy ? 'Registrando…' : `Registrar ${money(montoN)}`}
+            </button>
           </div>
         </div>
       </div>

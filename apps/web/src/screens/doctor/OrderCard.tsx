@@ -6,6 +6,8 @@ import { statusView } from './orderStatus'
 import { Trk } from './Trk'
 import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { trackingUrl } from '../../data/shipping/provider'
+import { etiquetaLiberacion } from '../../data/ops/moneyView'
+import type { OrderMoney } from '../../data/ops/money'
 import type { ProductSafe } from '../../data/types'
 
 export function OrderCard({
@@ -15,6 +17,8 @@ export function OrderCard({
   onCancel,
   onPay,
   onReorder,
+  dinero = null,
+  pagoReportado = false,
 }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
@@ -22,16 +26,25 @@ export function OrderCard({
   onCancel?: () => void
   onPay?: () => void
   onReorder?: () => void
+  dinero?: OrderMoney | null
+  pagoReportado?: boolean
 }) {
   const sv = statusView(order.status)
-  const unpaid = order.payment_status !== 'paid' && order.status !== 'cancelled'
+  // Con libro de dinero, "por pagar" es tener SALDO: un pago parcial sigue pendiente.
+  const saldo = dinero ? dinero.saldo : (order.payment_status === 'paid' ? 0 : (order.total ?? 0))
+  const unpaid = saldo > 0.0001 && order.status !== 'cancelled'
+  const pagado = dinero ? dinero.estado_pago === 'paid' : order.payment_status === 'paid'
+  const credito = dinero?.credito_autorizado ? etiquetaLiberacion(dinero) : null
 
   return (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
-        {order.payment_status === 'paid' && <span className="pill p-ok">Pagado</span>}
+        {pagado && <span className="pill p-ok">Pagado</span>}
+        {!pagado && dinero && dinero.cobrado_neto > 0.0001 && <span className="pill p-warn">Pago parcial · falta {money(dinero.saldo)}</span>}
+        {credito && <span className={'pill ' + (dinero?.vencido ? 'p-dang' : 'p-warn')}>{credito.texto}{dinero?.due_date ? ` · vence ${fmtDate(dinero.due_date)}` : ''}</span>}
+        {pagoReportado && !pagado && <span className="pill p-neu">Pago en revisión</span>}
         {order.invoice_requested && <span className="pill p-neu">CFDI</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(order.created_at)}</span>
       </div>
@@ -79,10 +92,14 @@ export function OrderCard({
         // cancela dejaría el dinero en el limbo (no hay reembolso en autoservicio). Los
         // pagados se cancelan con Dirección, que sí tiene el flujo de devolución.
         // W1 · frontera B: con transferencia reportada (pago en revisión) también decide Dirección.
-        const transferReportada = ((order.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported) === true
-        const puedeCancelar = onCancel && isCancelable(order.status) && order.payment_status !== 'paid' && !transferReportada
+        // W2 · tampoco se auto-cancela un pedido LIBERADO por crédito: Almacén ya lo puede
+        // estar preparando y la decisión es de Dirección (el servidor reimpone esta regla).
+        const transferReportada = pagoReportado
+          || ((order.shipping_meta as { transfer?: { reported?: boolean } } | null)?.transfer?.reported) === true
+        const liberado = dinero?.liberado ?? pagado
+        const puedeCancelar = onCancel && isCancelable(order.status) && !liberado && !transferReportada
         const puedeReordenar = onReorder && order.items.length > 0
-        if (!puedeCancelar && !puedeReordenar && order.payment_status !== 'paid') return null
+        if (!puedeCancelar && !puedeReordenar && !liberado) return null
         return (
           <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {puedeReordenar && (
@@ -93,8 +110,8 @@ export function OrderCard({
             {puedeCancelar && (
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
             )}
-            {onCancel && isCancelable(order.status) && (order.payment_status === 'paid' || transferReportada) && (
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>Para cancelar un pedido pagado, contacta a Renovacell.</span>
+            {onCancel && isCancelable(order.status) && (liberado || transferReportada) && (
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>Este pedido ya está en preparación o tiene un pago en revisión: para cancelarlo, contacta a Renovacell.</span>
             )}
           </div>
         )

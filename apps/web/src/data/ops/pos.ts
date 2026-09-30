@@ -1,4 +1,6 @@
-// Venta en Punto de Venta: inmediata y pagada. Reutiliza la FEFO de Almacén
+// Venta en Punto de Venta: inmediata y pagada. W2 · el cobro nace como ASIENTO en el
+// libro dentro de la MISMA transacción de la venta (vender_pos), así que `payment_status`
+// del POS siempre está respaldado por dinero registrado. Reutiliza la FEFO de Almacén
 // (allocateFEFO) para descontar por lote. Con backend, la venta es ATÓMICA: orden +
 // renglones + salidas de inventario en UNA transacción (RPC vender_pos). Si el
 // inventario no alcanza (otra caja vendió lo mismo), NADA se crea y se revierte lo
@@ -37,7 +39,7 @@ export async function venderPOS(
   lines: PosLine[],
   total: number,
   paymentMethod: string,
-  opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null; op?: PosOp } = {},
+  opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null; op?: PosOp; efectivoRecibido?: number | null } = {},
 ): Promise<PosResult & { ambiguous?: boolean }> {
   if (lines.length === 0) return { ok: false }
 
@@ -77,6 +79,10 @@ export async function venderPOS(
       p_allocations: allocations,
       p_invoice_requested: opts.invoiceRequested ?? false,
       p_invoice_meta: (opts.invoiceMeta ?? undefined) as Json | undefined,
+      // W2 · el efectivo con el que pagó el cliente queda como EVIDENCIA del asiento
+      // (recibido/cambio), que es lo que el corte de caja necesita poder explicar.
+      // No entra en la huella de idempotencia: corregirlo no crea otra venta.
+      p_efectivo_recibido: (opts.efectivoRecibido ?? undefined),
     }, op.orderId)
     if (!r.ok) {
       reloadOrders(); reloadInventory()

@@ -1,13 +1,18 @@
-// Edge Function: el doctor REPORTA que ya hizo la transferencia de un pedido.
-// Corrige el hueco: antes el PaymentModal solo llamaba notify() en el cliente, pero el
-// RLS bloquea que un doctor inserte notificaciones → Dirección NUNCA se enteraba, y el
-// pedido no guardaba señal alguna. Aquí, con service role:
-//   1) valida que el pedido es del doctor que llama y está por cobrar,
-//   2) sube el COMPROBANTE (captura) al bucket privado `proofs` (opcional),
-//   3) MARCA el pedido: shipping_meta.transfer = { reported, at, reference, proof_path },
-//   4) AVISA a Dirección (insert directo, sin el bloqueo del doctor) → aparece en la
-//      cola "Transferencias por confirmar".
-// Requiere JWT (el doctor autenticado). Desplegar SIN --no-verify-jwt.
+// Edge Function: el cliente REPORTA que ya pagó un pedido (transferencia/depósito).
+//
+// W2 · reportar ≠ cobrar. Esta función NO mueve dinero y NO marca el pedido pagado:
+// crea una DECLARACIÓN en `payment_claims` con el comando `reportar_pago`, que queda
+// en la cola "Pagos por validar". El cobro nace después, cuando Facturación verifica
+// el comprobante (`revisar_pago`) — ahí se escribe el asiento en el libro.
+//
+// Por qué sigue siendo una Edge Function y no una llamada directa del navegador:
+//   1) el COMPROBANTE se sube al bucket privado `proofs` con service role (el doctor
+//      no tiene permiso de escritura ahí),
+//   2) el AVISO a Dirección se inserta con service role (el RLS impide que un doctor
+//      inserte notificaciones), así que si no, nadie se enteraría.
+// El comando en sí se ejecuta CON EL JWT DEL LLAMANTE: la autoría de la declaración
+// (declared_by) y la validación de dueño son las del cliente real, no del service role.
+// Requiere JWT (cliente autenticado). Desplegar SIN --no-verify-jwt.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const cors = {
@@ -18,6 +23,8 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Decodifica un data-URI de imagen a bytes (para subir el comprobante).
 function decodeDataUrl(dataUrl?: string): { bytes: Uint8Array; contentType: string } | null {
   if (!dataUrl) return null
@@ -27,6 +34,22 @@ function decodeDataUrl(dataUrl?: string): { bytes: Uint8Array; contentType: stri
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return { bytes, contentType: m[1] }
+}
+
+// Mensajes de operador para los códigos del comando (el resto se pasa tal cual).
+const MENSAJES: Record<string, string> = {
+  DECLARACION_ABIERTA: 'Ya tienes un pago de este pedido en revisión. Te avisamos en cuanto lo confirmemos.',
+  SIN_SALDO: 'Ese pedido no tiene saldo por cobrar.',
+  PEDIDO_CANCELADO: 'Ese pedido está cancelado.',
+  NO_AUTORIZADO: 'Ese pedido no es tuyo.',
+  MONTO_INVALIDO: 'El monto debe ser mayor a cero.',
+  METODO_INVALIDO: 'Forma de pago no válida.',
+  CUENTA_INVALIDA: 'La cuenta bancaria seleccionada no es válida o está inactiva.',
+  OP_ID_REUTILIZADO: 'Ese reporte ya se registró con otros datos. Recarga la pantalla antes de reintentar.',
+}
+const traducir = (msg: string): string => {
+  const code = /\b([A-Z][A-Z0-9_]{3,})(?=:)/.exec(msg)?.[1]
+  return (code && MENSAJES[code]) || msg.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo registrar tu reporte.'
 }
 
 Deno.serve(async (req) => {
@@ -42,30 +65,29 @@ Deno.serve(async (req) => {
   const { data: who } = await caller.auth.getUser()
   if (!who?.user) return json(401, { error: 'No autenticado.' })
 
-  let body: { orderId?: string; reference?: string; proof?: string; bank_account_id?: string | null }
+  let body: {
+    orderId?: string; reference?: string; proof?: string
+    bank_account_id?: string | null; amount?: number; method?: string; opId?: string
+  }
   try { body = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
-  if (!body.orderId) return json(400, { error: 'Falta el pedido.' })
+  if (!body.orderId || !UUID.test(body.orderId)) return json(400, { error: 'Falta el pedido.' })
 
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: order } = await admin.from('orders').select('id, external_ref, doctor_id, payment_status, shipping_meta').eq('id', body.orderId).single()
+
+  // El pedido se lee solo para nombrarlo en el aviso y para tomar el saldo por omisión.
+  // La autoridad sobre dueño/estado/saldo es del comando, no de esta función.
+  const { data: order } = await admin.from('orders').select('id, external_ref, doctor_id').eq('id', body.orderId).single()
   if (!order) return json(404, { error: 'Pedido no encontrado.' })
-  if (order.doctor_id !== who.user.id) return json(403, { error: 'Ese pedido no es tuyo.' })
-  if (order.payment_status === 'paid') return json(400, { error: 'Ese pedido ya está pagado.' })
+  const { data: dinero } = await admin.from('v_order_money').select('saldo').eq('order_id', body.orderId).maybeSingle()
 
-  const now = new Date().toISOString()
-  const meta = { ...((order.shipping_meta ?? {}) as Record<string, unknown>) }
-  const prev = (meta.transfer ?? null) as Record<string, unknown> | null
+  const monto = typeof body.amount === 'number' && body.amount > 0 ? body.amount : Number(dinero?.saldo ?? 0)
+  if (!(monto > 0)) return json(400, { error: 'Ese pedido no tiene saldo por cobrar.' })
+  const metodo = ['transferencia', 'efectivo', 'tarjeta', 'stripe', 'otro'].includes(body.method ?? '')
+    ? body.method! : 'transferencia'
 
-  // Cuenta bancaria: además del formato, DEBE existir y estar ACTIVA (auditoría real,
-  // no un UUID cualquiera). Si no se indica, se acepta null (retrocompat).
-  let bankAccountId: string | null = null
-  if (typeof body.bank_account_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.bank_account_id)) {
-    const { data: acct } = await admin.from('company_bank_accounts').select('id, active').eq('id', body.bank_account_id).maybeSingle()
-    if (!acct || acct.active !== true) return json(400, { error: 'La cuenta bancaria seleccionada no es válida o está inactiva.' })
-    bankAccountId = acct.id
-  }
-
-  // Comprobante (opcional) → bucket privado.
+  // Comprobante (opcional) → bucket privado. Se sube ANTES del comando para poder
+  // guardar su ruta en la declaración; si el comando falla, el archivo queda huérfano
+  // (sin efecto contable) y el siguiente intento sube el suyo.
   let proofPath: string | null = null
   const dec = decodeDataUrl(body.proof)
   if (dec) {
@@ -74,32 +96,31 @@ Deno.serve(async (req) => {
     if (!up.error) proofPath = path
   }
 
-  // Traza multi-intento SIN tabla nueva: si ya había un reporte (p.ej. uno RECHAZADO),
-  // se archiva en transfer.history[] antes de sobrescribir con el nuevo intento pendiente.
-  const history = Array.isArray(prev?.history) ? (prev!.history as unknown[]).slice(-9) : []
-  if (prev && (prev.reported || prev.review)) {
-    const { history: _drop, ...prevSnapshot } = prev as Record<string, unknown>
-    history.push({ ...prevSnapshot, archived_at: now })
-  }
+  // El op_id lo manda el cliente para que un reintento del MISMO reporte no cree dos
+  // declaraciones; si no llega, se genera aquí.
+  const opId = body.opId && UUID.test(body.opId) ? body.opId : crypto.randomUUID()
 
-  // Nuevo intento en cola: reported=true + review.status='pending'.
-  meta.transfer = {
-    reported: true, at: now, reference: (body.reference ?? '').slice(0, 80),
-    proof_path: proofPath, bank_account_id: bankAccountId,
-    review: { status: 'pending' },
-    ...(history.length ? { history } : {}),
-  }
-  await admin.from('orders').update({ shipping_meta: meta, payment_method: 'transferencia' }).eq('id', order.id)
+  // COMANDO con el JWT del llamante: reportar_pago valida dueño, saldo, método y cuenta.
+  const { data: res, error } = await caller.rpc('reportar_pago', {
+    p_op_id: opId,
+    p_order: body.orderId,
+    p_method: metodo,
+    p_amount: monto,
+    p_reference: (body.reference ?? '').slice(0, 80) || undefined,
+    p_bank_account_id: typeof body.bank_account_id === 'string' && UUID.test(body.bank_account_id) ? body.bank_account_id : undefined,
+    p_proof_path: proofPath ?? undefined,
+  })
+  if (error) return json(400, { error: traducir(error.message) })
 
-  // Avisa a Dirección (service role: sin el bloqueo del doctor). Evita duplicar el aviso
-  // si ya había un reporte pendiente sin revisar (re-envío del mismo intento).
-  const alreadyPending = prev?.reported === true && (prev?.review as Record<string, unknown> | undefined)?.status !== 'rejected'
-  if (!alreadyPending) {
+  const estado = (res as { status?: string } | null)?.status
+  // Avisa a Dirección (service role: sin el bloqueo del doctor). Solo en la declaración
+  // NUEVA: un reintento idempotente no vuelve a sonar la campana.
+  if (estado === 'applied') {
     await admin.from('notifications').insert({
-      body: `Transferencia informada · pedido ${order.external_ref ?? order.id} · confírmala al recibirla`,
+      body: `Pago informado · pedido ${order.external_ref ?? order.id} · verifica que cayó y regístralo`,
       roles: ['admin'], screen: 'av_pagos',
     }).then(() => {}, () => {})
   }
 
-  return json(200, { ok: true })
+  return json(200, { ok: true, status: estado ?? 'applied', claim_id: (res as { claim_id?: string } | null)?.claim_id, op_id: opId })
 })

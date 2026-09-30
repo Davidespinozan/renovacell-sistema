@@ -188,6 +188,9 @@ export function Caja() {
         customerId: client?.id ?? null,
         customer: client ? { name: client.name, phone: client.phone ?? null } : null,
         seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta, op,
+        // Efectivo con el que paga el cliente: viaja al servidor como evidencia del
+        // asiento (recibido/cambio) para que el corte de caja pueda explicarse.
+        efectivoRecibido: method === 'efectivo' && recibido !== '' ? recibidoN : null,
       })
       if (!(res as { ambiguous?: boolean }).ambiguous) posOpRef.current = null
     }
