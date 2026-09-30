@@ -12,7 +12,7 @@ import c1Src from '../../../../../supabase/migrations/20261014120000_w2c_c1_sche
 import c2Src from '../../../../../supabase/migrations/20261014120100_w2c_c2_constraints.sql?raw'
 import c3Src from '../../../../../supabase/migrations/20261014120200_w2c_c3_commands.sql?raw'
 import c4Src from '../../../../../supabase/migrations/20261014120300_w2c_c4_authority.sql?raw'
-import c6Src from '../../../../../supabase/ops/w2c_c6_legacy_cleanup.sql?raw'
+import c6Src from '../../../../../supabase/migrations/20261015120000_w2c_c6_legacy_cleanup.sql?raw'
 import surtirSrc from './surtir.ts?raw'
 import posSrc from './pos.ts?raw'
 import finanzasSrc from './finanzas.ts?raw'
@@ -180,10 +180,29 @@ describe('W2-C · tenedor estable y autoridad', () => {
     expect(c4Src).toMatch(/drop policy if exists events_all/)
     expect(c4Src).toMatch(/revoke insert, update, delete, truncate on public\.events, public\.consignment_stock/)
   })
-  it('C4 NO elimina las tablas legacy: el DROP es C6, y va aparte', () => {
+  it('C4 NO elimina las tablas legacy: el DROP es C6, y va aparte y después', () => {
     expect(c4Src).not.toMatch(/drop table/)
-    expect(c6Src).toMatch(/drop table if exists public\.consignment_stock/)
-    expect(c6Src).toMatch(/W2C_C6_PRECONDICION/)
+    expect(c6Src).toMatch(/drop table public\.consignment_stock/)
+    expect(c6Src).toMatch(/drop table public\.events/)
+    expect(c6Src).toMatch(/drop function public\.event_sell/)
+  })
+  it('C6 es IDEMPOTENTE: la ausencia del legacy no es un error', () => {
+    expect(c6Src).toMatch(/already_applied/)
+    expect(c6Src).toMatch(/if not v_events and not v_consig and not v_sell then/)
+    expect(c6Src).toMatch(/raise notice/)
+  })
+  it('C6 ABORTA antes de borrar si hay historia o falta la arquitectura nueva', () => {
+    expect(c6Src).toMatch(/W2C_C6_PRECONDICION: events tiene/)
+    expect(c6Src).toMatch(/W2C_C6_PRECONDICION: consignment_stock tiene/)
+    expect(c6Src).toMatch(/W2C_C6_PRECONDICION: falta la custodia nueva/)
+    expect(c6Src).toMatch(/vista\(s\) dependen todavía/)
+    // cada drop va condicionado a que la pieza siga existiendo
+    expect(c6Src).toMatch(/if v_sell   then execute 'drop function/)
+  })
+  it('C6 no toca nada de la arquitectura nueva', () => {
+    expect(c6Src).not.toMatch(/drop table public\.custod/)
+    expect(c6Src).not.toMatch(/drop view public\.v_custody/)
+    expect(c6Src).not.toMatch(/drop function public\.custody_held/)
   })
 })
 

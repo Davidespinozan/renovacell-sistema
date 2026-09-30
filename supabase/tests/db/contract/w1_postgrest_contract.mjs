@@ -379,17 +379,16 @@ expect('un doctor no ve custodias', !r.error && r.data.length === 0, r.error)
 r = await wh.rpc('custody_held_en', { p_custody: cusId, p_lot: lotCus })
 expect('el saldo por custodia no se pide por el helper interno', r.error?.code === '42501' || r.error?.code === 'PGRST202', r.error)
 
-// 23) La custodia LEGACY quedó inerte (C4) y NO se eliminó todavía (el DROP es C6)
-r = await admin.from('events').insert({ name: 'Fantasma' })
-expect('insertar un evento legacy ⇒ 42501', r.error?.code === '42501', r.error)
-r = await admin.from('events').update({ status: 'cerrado' }).eq('id', '00000000-0000-0000-0000-000000000000')
-expect('reescribir un evento legacy ⇒ 42501', r.error?.code === '42501', r.error)
-r = await pos.from('consignment_stock').insert({ vendor: 'yo@x.mx', assigned: 999, sold: 0 })
-expect('fabricar un saldo de consignación legacy ⇒ 42501', r.error?.code === '42501', r.error)
-r = await admin.rpc('event_sell', { p_event: uuid(), p_sales: [] })
-expect('event_sell revocado por la API', r.error?.code === '42501' || r.error?.code === 'PGRST202', r.error)
+// 23) La custodia LEGACY ya no existe (C4 la dejó inerte, C6 la eliminó). Por la API
+// eso se ve como tabla/función inexistente: no queda una segunda autoridad de custodia.
 r = await admin.from('events').select('id')
-expect('las tablas legacy siguen EXISTIENDO y legibles (el DROP es C6)', !r.error, r.error)
+expect('la tabla events legacy ya no existe', r.error?.code === 'PGRST205', r.error)
+r = await pos.from('consignment_stock').select('id')
+expect('la tabla consignment_stock legacy ya no existe', r.error?.code === 'PGRST205', r.error)
+r = await admin.from('events').insert({ name: 'Fantasma' })
+expect('no hay evento legacy que insertar', r.error?.code === 'PGRST205', r.error)
+r = await admin.rpc('event_sell', { p_event: uuid(), p_sales: [] })
+expect('event_sell ya no es una ruta', r.error?.code === 'PGRST202', r.error)
 
 // 24) Conciliación de custodia
 r = await admin.rpc('conciliar_custodia')

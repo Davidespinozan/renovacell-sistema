@@ -45,21 +45,24 @@ begin
     perform tests.act_as_owner();
   end loop;
 
-  -- ── El legacy quedó INERTE (C4) ─────────────────────────────────────────────
+  -- ── El legacy YA NO EXISTE (C4 lo dejó inerte, C6 lo eliminó) ───────────────
+  -- Con las tablas y la RPC fuera, no hay una segunda autoridad que pueda escribir
+  -- custodia por detrás de los comandos. Lo que antes se probaba como "denegado"
+  -- ahora se prueba como AUSENTE, que es una garantía más fuerte.
+  perform tests.eq((select count(*)::int from information_schema.tables
+                     where table_schema = 'public' and table_name in ('events','consignment_stock')), 0,
+    'C6: las tablas legacy de custodia ya no existen');
+  perform tests.ok(to_regprocedure('public.event_sell(uuid,jsonb)') is null,
+    'C6: event_sell ya no existe');
   foreach v_role in array array['admin','warehouse','pos','doctor'] loop
     v_uid := case v_role when 'admin' then v_admin when 'warehouse' then v_wh when 'pos' then v_pos else v_doc end;
     perform tests.act_as(v_uid);
     perform tests.throws('insert into public.events (name) values (''Fantasma'')',
-      'permission denied', v_role || ': no crea eventos legacy');
-    perform tests.throws('update public.events set items = ''[]''::jsonb', 'permission denied',
-      v_role || ': no reescribe el contador JSON legacy');
-    perform tests.throws($s$insert into public.consignment_stock (vendor, product_id, assigned, sold)
-      values ('yo@test.local', null, 999, 0)$s$, 'permission denied',
-      v_role || ': no fabrica un saldo de consignación legacy');
-    perform tests.throws('update public.consignment_stock set assigned = 999', 'permission denied',
-      v_role || ': no reescribe su propio saldo legacy');
+      'does not exist', v_role || ': no hay tabla de eventos legacy que escribir');
+    perform tests.throws($s$insert into public.consignment_stock (vendor, assigned, sold) values ('yo@test.local', 999, 0)$s$,
+      'does not exist', v_role || ': no hay saldo de consignación legacy que fabricar');
     perform tests.throws('select public.event_sell(gen_random_uuid(), ''[]''::jsonb)',
-      'permission denied', v_role || ': event_sell revocado');
+      'does not exist', v_role || ': event_sell no es una ruta');
     perform tests.act_as_owner();
   end loop;
 

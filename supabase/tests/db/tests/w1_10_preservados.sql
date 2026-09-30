@@ -9,7 +9,6 @@ begin
     ('auth_role()',                                           '453e9a52e298c2dfcb96df0930a94e31'),
     ('confirmar_entrega(uuid,text,text)',                     '312b5ba18dac4f4a9419e1aaff4e80cb'),
     ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', '99d610b10ea8f5629e38e27b11ff0be8'),
-    ('event_sell(uuid,jsonb)',                                '453593fac9bdf3fda3b2c3e745b22ce4'),
     ('finalize_shipment(uuid,jsonb)',                         'a1cf5c01877e87f41ee0e9635b478e34'),
     ('freeze_movement_cost()',                                'f1eb88ca3b5969cbd4d15a67754542ce'),
     ('handle_new_user()',                                     'd31936c0f165c984cd4cf28362d91a52'),
@@ -39,6 +38,15 @@ begin
   perform tests.ok(to_regprocedure('public.pay_order(uuid,text,text)') is not null
                    and not has_function_privilege('authenticated', 'public.pay_order(uuid,text,text)', 'EXECUTE'),
                    'W2: pay_order sigue existiendo pero ya no es ejecutable por clientes');
+  -- W2-C · RETIRO autorizado de la custodia legacy (D-W2-C-6): C4 la dejó inerte y C6 la
+  -- eliminó. Ya no se preserva `event_sell`: mutaba un contador jsonb sin op_id, sin
+  -- bitácora, sin inventario y sin dinero. Su reemplazo es el libro de custodia.
+  perform tests.ok(to_regprocedure('public.event_sell(uuid,jsonb)') is null
+                   and to_regclass('public.custody_lines') is not null,
+                   'W2-C: event_sell → libro de custodia (retiro autorizado)');
+  perform tests.ok(to_regclass('public.events') is null and to_regclass('public.consignment_stock') is null
+                   and to_regclass('public.custodies') is not null,
+                   'W2-C: events / consignment_stock → custodies (retiro autorizado)');
   -- Comandos de W1 que NO se tocan (existencia + firma exacta).
   perform tests.ok((select count(*) = 9 from unnest(array[
       'public.recibir_lote(uuid,uuid,text,date,integer,uuid,text,numeric,text,text)',
