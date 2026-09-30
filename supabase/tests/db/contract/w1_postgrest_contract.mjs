@@ -17,6 +17,7 @@ const jwt = (sub, role = 'authenticated') => {
 const as = (sub, role) => new PostgrestClient(URL, { headers: sub || role ? { Authorization: `Bearer ${jwt(sub, role)}` } : {} })
 const admin = as(ids.admin), wh = as(ids.wh), pos = as(ids.pos), anon = new PostgrestClient(URL, {})
 const doc = as(ids.doc)
+const otroPos = as(ids.pos2)
 const uuid = () => crypto.randomUUID()
 const exp = new Date(Date.now() + 200 * 86400000).toISOString().slice(0, 10)
 const expect = (name, cond, detail) => (cond ? ok(name) : bad(name, detail))
@@ -283,5 +284,117 @@ r = await pos.rpc('vender_pos', { p_order_id: uuid(), p_folio: 'POS-CT3', p_tota
   p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 150 }],
   p_allocations: [{ line_index: 0, lot_id: lot, qty: 1 }] })
 expect('efectivo recibido menor al total ⇒ rechazado', /EFECTIVO_INSUFICIENTE/.test(r.error?.message ?? ''), r.error)
+
+
+// ═══════════════ W2-C · CUSTODIA por la API real ═══════════════
+// 21) El ciclo completo por PostgREST, con los MISMOS nombres de parámetros que manda
+// el frontend. Un nombre mal escrito aquí es un 400 en producción.
+const CUSTODY_COLS = 'id, kind, holder_kind, holder_user_id, holder_customer_id, event_name, event_venue, '
+  + 'event_date, status, opened_at, closed_at, close_reason'
+const CUSTODY_LINE_COLS = 'id, custody_id, kind, product_id, lot_id, qty, held_delta, unit_price, order_id, '
+  + 'order_item_id, inventory_op_id, motivo, evidence_ref, actor_role, created_at'
+const DISP_COLS = 'lot_id, product_id, lot_code, expiry_date, location, propio, en_custodia, disponible, caducado'
+
+// Lote propio para la custodia (por el comando de W1, como siempre)
+// Una entrada sin orden la autoriza Dirección (invariante de W1, intacto).
+r = await admin.rpc('recibir_lote', { p_op_id: uuid(), p_product: ids.prod, p_lote: 'CT-CUS', p_caducidad: exp, p_cantidad: 10, p_kind: 'sin_orden', p_reason: 'contrato custodia' })
+expect('custodia: lote de partida recibido', r.data?.status === 'applied', r.error ?? r.data)
+const lotCus = r.data?.lot_id
+
+r = await admin.rpc('abrir_custodia', { p_op_id: uuid(), p_kind: 'vendedor', p_holder_kind: 'staff', p_holder_user_id: ids.pos })
+expect('abrir_custodia por la API (opcionales omitidos)', r.data?.status === 'applied', r.error ?? r.data)
+const cusId = r.data?.custody_id
+r = await pos.rpc('abrir_custodia', { p_op_id: uuid(), p_kind: 'vendedor', p_holder_kind: 'staff', p_holder_user_id: ids.pos })
+expect('un vendedor no se abre su propia custodia', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+
+r = await wh.rpc('entregar_custodia', { p_op_id: uuid(), p_custody: cusId, p_lines: [{ lot_id: lotCus, qty: 6 }] })
+expect('entregar_custodia por la API', r.data?.status === 'applied' && r.data?.unidades === 6, r.error ?? r.data)
+r = await wh.from('v_stock_disponible').select(DISP_COLS).eq('lot_id', lotCus).single()
+expect('v_stock_disponible: propio 10, en custodia 6, disponible 4', !r.error && r.data.propio === 10 && r.data.en_custodia === 6 && r.data.disponible === 4, r.error ?? r.data)
+r = await admin.from('product_stock').select('available').eq('product_id', ids.prod).maybeSingle()
+expect('product_stock por la API descuenta la custodia', !r.error && Number(r.data?.available ?? -1) >= 0 && Number(r.data.available) < 10, r.error ?? r.data)
+
+// La entrega no movió inventario ni dinero
+r = await wh.from('inventory_movements').select('id').eq('lot_id', lotCus).neq('reason', 'entrada')
+expect('la entrega NO generó movimiento de inventario', !r.error && r.data.length === 0, r.error ?? r.data)
+
+// Venta desde custodia: el tenedor, por la MISMA ruta económica
+const ventaCus = uuid()
+r = await pos.rpc('vender_pos', { p_order_id: ventaCus, p_folio: 'POS-CUS', p_total: 1, p_payment_method: 'efectivo',
+  p_doctor_id: null, p_shipping_meta: { channel: 'consigna' },
+  p_lines: [{ product_id: ids.prod, qty: 2 }],
+  p_allocations: [{ line_index: 0, lot_id: lotCus, qty: 2 }],
+  p_custody_id: cusId })
+expect('vender_pos con p_custody_id resuelve por nombre y vende', r.data === true, r.error ?? r.data)
+r = await admin.from('v_order_money').select('cobrado_neto, payment_status').eq('order_id', ventaCus).single()
+expect('la venta de custodia crea la realidad económica de W2', !r.error && Number(r.data.cobrado_neto) > 0 && r.data.payment_status === 'paid', r.error ?? r.data)
+r = await admin.from('inventory_movements').select('id, change').eq('order_id', ventaCus).eq('reason', 'venta')
+expect('la venta de custodia crea UN movimiento venta', !r.error && r.data.length === 1, r.error ?? r.data)
+r = await admin.from('custody_lines').select(CUSTODY_LINE_COLS).eq('order_id', ventaCus)
+expect('custody_lines: columnas del store y una línea de venta', !r.error && r.data.length === 1 && r.data[0].kind === 'venta', r.error ?? r.data)
+r = await otroPos.rpc('vender_pos', { p_order_id: uuid(), p_folio: 'POS-AJENO', p_total: 1, p_payment_method: 'efectivo',
+  p_doctor_id: null, p_shipping_meta: {}, p_lines: [{ product_id: ids.prod, qty: 1 }],
+  p_allocations: [{ line_index: 0, lot_id: lotCus, qty: 1 }], p_custody_id: cusId })
+expect('otro vendedor no vende de una custodia ajena', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+
+// Con saldo en la calle no se cierra
+r = await admin.rpc('cerrar_custodia', { p_op_id: uuid(), p_custody: cusId, p_motivo: 'fin del contrato' })
+expect('no se cierra con saldo en poder', /CUSTODIA_CON_SALDO/.test(r.error?.message ?? ''), r.error)
+
+// Devolución limpia y pérdida
+r = await wh.rpc('devolver_de_custodia', { p_op_id: uuid(), p_custody: cusId, p_lines: [{ lot_id: lotCus, qty: 3, inspection: 'ok' }] })
+expect('devolver_de_custodia por la API', r.data?.devuelto_disponible === 3 && r.data?.dado_de_baja === 0, r.error ?? r.data)
+r = await wh.rpc('registrar_perdida_custodia', { p_op_id: uuid(), p_custody: cusId, p_kind: 'faltante',
+  p_lines: [{ lot_id: lotCus, qty: 1 }], p_motivo: 'conteo físico', p_evidencia: 'acta-ct' })
+expect('registrar_perdida_custodia da de baja y NO crea deuda', r.data?.status === 'applied' && /NO genera deuda/.test(r.data?.nota ?? ''), r.error ?? r.data)
+r = await pos.rpc('registrar_perdida_custodia', { p_op_id: uuid(), p_custody: cusId, p_kind: 'faltante',
+  p_lines: [{ lot_id: lotCus, qty: 1 }], p_motivo: 'yo dije' })
+expect('el tenedor no declara sus propias pérdidas', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
+
+// Estado y cierre
+r = await pos.rpc('estado_custodia', { p_custody: cusId })
+expect('estado_custodia: el tenedor consulta la suya', !r.error && Array.isArray(r.data?.movimientos), r.error ?? r.data)
+r = await wh.rpc('devolver_de_custodia', { p_op_id: uuid(), p_custody: cusId, p_lines: [{ lot_id: lotCus, qty: 0 }] })
+expect('cantidad cero rechazada por la API', /CANTIDAD_INVALIDA/.test(r.error?.message ?? ''), r.error)
+r = await admin.from('v_custody_stock').select('custody_id, product_id, lot_id, entregado, vendido, devuelto, perdido, en_poder').eq('custody_id', cusId)
+expect('v_custody_stock: columnas del store', !r.error && r.data.length === 1 && r.data[0].en_poder === 0, r.error ?? r.data)
+r = await admin.rpc('cerrar_custodia', { p_op_id: uuid(), p_custody: cusId, p_motivo: 'fin del contrato' })
+expect('cerrar_custodia liquida y cierra', r.data?.status === 'applied' && r.data?.vendidas === 2 && r.data?.devueltas === 3 && r.data?.perdidas === 1, r.error ?? r.data)
+r = await admin.from('v_custody_liquidacion').select('custody_id, unidades_entregadas, unidades_vendidas, importe_vendido, cobrado, saldo').eq('custody_id', cusId).single()
+expect('v_custody_liquidacion: columnas del store', !r.error && r.data.unidades_entregadas === 6, r.error ?? r.data)
+r = await admin.from('custodies').select(CUSTODY_COLS).eq('id', cusId).single()
+expect('custodies: columnas del store', !r.error && r.data.status === 'cerrada', r.error ?? r.data)
+
+// 22) Autoridad por la API: la custodia solo se escribe por comando
+r = await admin.from('custody_lines').insert({ custody_id: cusId, kind: 'entrega', product_id: ids.prod, lot_id: lotCus, qty: 1, held_delta: 1 })
+expect('insertar en el libro de custodia por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.from('custodies').update({ status: 'abierta' }).eq('id', cusId)
+expect('reabrir una custodia por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.from('custodies').delete().eq('id', cusId)
+expect('borrar una custodia por la API ⇒ 42501', r.error?.code === '42501', r.error)
+r = await pos.from('custody_lines').select('id').eq('custody_id', cusId)
+expect('el tenedor SÍ lee su propio libro', !r.error && r.data.length > 0, r.error)
+r = await doc.from('custodies').select('id')
+expect('un doctor no ve custodias', !r.error && r.data.length === 0, r.error)
+r = await wh.rpc('custody_held_en', { p_custody: cusId, p_lot: lotCus })
+expect('el saldo por custodia no se pide por el helper interno', r.error?.code === '42501' || r.error?.code === 'PGRST202', r.error)
+
+// 23) La custodia LEGACY quedó inerte (C4) y NO se eliminó todavía (el DROP es C6)
+r = await admin.from('events').insert({ name: 'Fantasma' })
+expect('insertar un evento legacy ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.from('events').update({ status: 'cerrado' }).eq('id', '00000000-0000-0000-0000-000000000000')
+expect('reescribir un evento legacy ⇒ 42501', r.error?.code === '42501', r.error)
+r = await pos.from('consignment_stock').insert({ vendor: 'yo@x.mx', assigned: 999, sold: 0 })
+expect('fabricar un saldo de consignación legacy ⇒ 42501', r.error?.code === '42501', r.error)
+r = await admin.rpc('event_sell', { p_event: uuid(), p_sales: [] })
+expect('event_sell revocado por la API', r.error?.code === '42501' || r.error?.code === 'PGRST202', r.error)
+r = await admin.from('events').select('id')
+expect('las tablas legacy siguen EXISTIENDO y legibles (el DROP es C6)', !r.error, r.error)
+
+// 24) Conciliación de custodia
+r = await admin.rpc('conciliar_custodia')
+expect('conciliar_custodia por la API: 0 errores', !r.error && r.data.filter((x) => x.severidad === 'error').length === 0, r.error ?? r.data)
+r = await wh.rpc('conciliar_custodia')
+expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
 
 process.exit(failed)

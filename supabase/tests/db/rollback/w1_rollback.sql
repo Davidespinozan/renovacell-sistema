@@ -2,8 +2,11 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
--- Rollback EN CAPAS: W2 se apoya en objetos de W1 (refunds.return_id → stock_returns),
--- así que primero baja W2 y después W1. Ese es el orden real de una reversión.
+-- Rollback EN CAPAS: cada ola se apoya en objetos de la anterior (W2-C usa
+-- v_order_money de W2; W2 usa stock_returns de W1), así que se baja en orden
+-- inverso al de aplicación. Ese es el orden real de una reversión.
+\ir ../../../rollback/w2c/00_w2_snapshot.sql
+\ir ../../../rollback/w2c/99_down.sql
 \ir ../../../rollback/w2/99_down.sql
 \ir ../../../rollback/w1/99_down.sql
 do $t$

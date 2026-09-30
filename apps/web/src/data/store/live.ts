@@ -39,7 +39,9 @@ export function makeLive<T>(load: () => Promise<T[]>, fallback: T[]): Live<T> {
   if (hasSupabase) {
     // Nota: NO se hidrata en la carga del módulo — INITIAL_SESSION siempre dispara
     // al inicializar el cliente, y hacerlo aquí solo añade una carrera pre-sesión.
-    supabase.auth.onAuthStateChange((ev) => {
+    // `?.` a propósito: en pruebas unitarias el cliente puede estar simulado sin `auth`.
+    // Sin suscripción el store sigue funcionando (se hidrata con reload()).
+    supabase.auth?.onAuthStateChange?.((ev) => {
       if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') { loaded = false; reload() }
       else if (ev === 'TOKEN_REFRESHED') reload()
     })

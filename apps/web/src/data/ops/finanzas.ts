@@ -15,10 +15,17 @@ import type { OrderMoney } from './money'
 export type MoneyIndex = Record<string, OrderMoney | undefined>
 
 // Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
-const COGS_OUT = new Set(['surtido', 'venta', 'evento', 'consigna'])
-const COGS_IN = new Set(['cancelacion', 'evento-regreso', 'consigna-regreso', 'devolucion'])
-// Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad/daño.
-const MERMA = new Set(['merma', 'baja'])
+//
+// W2-C · El COGS nace en la VENTA, nunca al entregar producto en custodia: entregar no
+// mueve inventario, así que no hay movimiento que clasificar. Antes esta lista incluía
+// 'evento' y 'consigna' (y sus regresos), que reconocían costo de ventas en la
+// transferencia y lo revertían al devolver. Esas razones ya no existen: W1 cerró el
+// vocabulario del kardex a 9 (ck_invmov_reason) y 'baja' tampoco es una de ellas.
+const COGS_OUT = new Set(['surtido', 'venta'])
+const COGS_IN = new Set(['cancelacion', 'devolucion'])
+// Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad, daño, faltante.
+// Las pérdidas de producto en custodia entran aquí, como cualquier merma.
+const MERMA = new Set(['merma'])
 
 // Renglón mínimo de devolución que necesitan los reportes (evita acoplar a refundsStore).
 export interface RefundLine { order_id: string; monto: number; metodo?: string | null }

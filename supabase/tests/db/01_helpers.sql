@@ -225,9 +225,11 @@ declare it record; l record; v_need int; v_take int; v_out jsonb := '[]'::jsonb;
 begin
   for it in select id, product_id, qty from public.order_items where order_id = p_order order by id loop
     v_need := it.qty;
-    for l in select id, quantity from public.lots
-              where product_id = it.product_id and quantity > 0 and not public.lote_caducado(expiry_date)
-              order by expiry_date, id loop
+    -- W2-C: se asigna contra la DISPONIBILIDAD real (propio − custodia).
+    -- Sin custodia el resultado es idéntico al de antes.
+    for l in select d.lot_id as id, d.disponible as quantity from public.v_stock_disponible d
+              where d.product_id = it.product_id and d.disponible > 0 and not d.caducado
+              order by d.expiry_date, d.lot_id loop
       exit when v_need <= 0;
       v_take := least(v_need, l.quantity);
       v_out := v_out || jsonb_build_array(jsonb_build_object('order_item_id', it.id, 'lot_id', l.id, 'qty', v_take));
@@ -281,3 +283,51 @@ begin
 end $$;
 
 grant execute on all functions in schema tests to anon, authenticated, service_role;
+
+-- ── W2-C · custodia ──────────────────────────────────────────────────────────
+-- Abre una custodia por el comando real y devuelve su id.
+create or replace function tests.custodia(p_kind text default 'vendedor', p_holder uuid default null,
+                                          p_evento text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_op uuid := gen_random_uuid(); v_h uuid := coalesce(p_holder, tests.user('pos'));
+        v_claims text := current_setting('request.jwt.claims', true);
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  perform public.abrir_custodia(v_op, p_kind, 'staff', v_h, null,
+    case when p_kind = 'evento' then coalesce(p_evento, 'Expo ' || left(v_op::text, 8)) end);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_op;
+end $$;
+
+-- Entrega producto a una custodia por el comando real.
+create or replace function tests.entregar(p_custody uuid, p_lot uuid, p_qty int) returns jsonb
+  language plpgsql security definer set search_path = public as $$
+declare v_res jsonb; v_claims text := current_setting('request.jwt.claims', true);
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  v_res := public.entregar_custodia(gen_random_uuid(), p_custody,
+             jsonb_build_array(jsonb_build_object('lot_id', p_lot, 'qty', p_qty)));
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_res;
+end $$;
+
+-- Disponibilidad de un lote según la autoridad canónica.
+create or replace function tests.disp(p_lot uuid) returns int
+  language sql security definer set search_path = public as $$
+  select disponible from public.v_stock_disponible where lot_id = p_lot $$;
+
+-- Existencia en poder de una custodia para un lote.
+create or replace function tests.en_poder(p_custody uuid, p_lot uuid) returns int
+  language sql security definer set search_path = public as $$
+  select coalesce(public.custody_held_en(p_custody, p_lot), 0) $$;
+
+-- Errores de conciliación de custodia (severidad error).
+create or replace function tests.custodia_errores() returns int
+  language plpgsql security definer set search_path = public as $$
+declare n int; v_claims text := current_setting('request.jwt.claims', true);
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  select count(*) into n from public.conciliar_custodia() where severidad = 'error';
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return n;
+end $$;

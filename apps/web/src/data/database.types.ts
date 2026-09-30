@@ -572,6 +572,249 @@ export type Database = {
           },
         ]
       }
+      custodies: {
+        Row: {
+          close_reason: string | null
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          event_date: string | null
+          event_name: string | null
+          event_venue: string | null
+          holder_customer_id: string | null
+          holder_kind: string
+          holder_user_id: string | null
+          id: string
+          kind: string
+          op_id: string | null
+          opened_at: string
+          opened_by: string | null
+          status: string
+        }
+        Insert: {
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          event_date?: string | null
+          event_name?: string | null
+          event_venue?: string | null
+          holder_customer_id?: string | null
+          holder_kind: string
+          holder_user_id?: string | null
+          id: string
+          kind: string
+          op_id?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          status?: string
+        }
+        Update: {
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          event_date?: string | null
+          event_name?: string | null
+          event_venue?: string | null
+          holder_customer_id?: string | null
+          holder_kind?: string
+          holder_user_id?: string | null
+          id?: string
+          kind?: string
+          op_id?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custodies_holder_customer_id_fkey"
+            columns: ["holder_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custody_lines: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          created_at: string
+          custody_id: string
+          evidence_ref: string | null
+          held_delta: number
+          id: string
+          inventory_op_id: string | null
+          kind: string
+          lot_id: string
+          motivo: string | null
+          op_id: string | null
+          order_id: string | null
+          order_item_id: string | null
+          product_id: string
+          qty: number
+          reversal_of: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          custody_id: string
+          evidence_ref?: string | null
+          held_delta: number
+          id: string
+          inventory_op_id?: string | null
+          kind: string
+          lot_id: string
+          motivo?: string | null
+          op_id?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          product_id: string
+          qty: number
+          reversal_of?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          custody_id?: string
+          evidence_ref?: string | null
+          held_delta?: number
+          id?: string
+          inventory_op_id?: string | null
+          kind?: string
+          lot_id?: string
+          motivo?: string | null
+          op_id?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          product_id?: string
+          qty?: number
+          reversal_of?: string | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custody_lines_custody_id_fkey"
+            columns: ["custody_id"]
+            isOneToOne: false
+            referencedRelation: "custodies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_custody_id_fkey"
+            columns: ["custody_id"]
+            isOneToOne: false
+            referencedRelation: "v_custody_liquidacion"
+            referencedColumns: ["custody_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_inventory_op_id_fkey"
+            columns: ["inventory_op_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_operations"
+            referencedColumns: ["op_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_reversal_of_fkey"
+            columns: ["reversal_of"]
+            isOneToOne: false
+            referencedRelation: "custody_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custody_operations: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          created_at: string
+          kind: string
+          op_id: string
+          request: Json
+          result: Json | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          kind: string
+          op_id: string
+          request: Json
+          result?: Json | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          kind?: string
+          op_id?: string
+          request?: Json
+          result?: Json | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           active: boolean
@@ -895,6 +1138,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "inventory_movements_op_id_fkey"
@@ -1269,6 +1519,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "order_items_order_id_fkey"
@@ -2016,6 +2273,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "purchase_receipts_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
+          },
+          {
             foreignKeyName: "purchase_receipts_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -2537,6 +2801,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_return_lines_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
+          },
+          {
             foreignKeyName: "stock_return_lines_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -2822,6 +3093,85 @@ export type Database = {
           },
         ]
       }
+      v_custody_liquidacion: {
+        Row: {
+          cobrado: number | null
+          custody_id: string | null
+          importe_vendido: number | null
+          kind: string | null
+          saldo: number | null
+          status: string | null
+          unidades_devueltas: number | null
+          unidades_en_poder: number | null
+          unidades_entregadas: number | null
+          unidades_perdidas: number | null
+          unidades_vendidas: number | null
+        }
+        Relationships: []
+      }
+      v_custody_stock: {
+        Row: {
+          custody_id: string | null
+          devuelto: number | null
+          en_poder: number | null
+          entregado: number | null
+          lot_id: string | null
+          perdido: number | null
+          product_id: string | null
+          vendido: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custody_lines_custody_id_fkey"
+            columns: ["custody_id"]
+            isOneToOne: false
+            referencedRelation: "custodies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_custody_id_fkey"
+            columns: ["custody_id"]
+            isOneToOne: false
+            referencedRelation: "v_custody_liquidacion"
+            referencedColumns: ["custody_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "v_stock_disponible"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custody_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_order_money: {
         Row: {
           cobrado: number | null
@@ -2842,6 +3192,64 @@ export type Database = {
           vencido: boolean | null
         }
         Relationships: []
+      }
+      v_stock_disponible: {
+        Row: {
+          caducado: boolean | null
+          disponible: number | null
+          en_custodia: number | null
+          expiry_date: string | null
+          location: string | null
+          lot_code: string | null
+          lot_id: string | null
+          product_id: string | null
+          propio: number | null
+        }
+        Insert: {
+          caducado?: never
+          disponible?: never
+          en_custodia?: never
+          expiry_date?: string | null
+          location?: string | null
+          lot_code?: string | null
+          lot_id?: string | null
+          product_id?: string | null
+          propio?: number | null
+        }
+        Update: {
+          caducado?: never
+          disponible?: never
+          en_custodia?: never
+          expiry_date?: string | null
+          location?: string | null
+          lot_code?: string | null
+          lot_id?: string | null
+          product_id?: string | null
+          propio?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -2932,6 +3340,40 @@ export type Database = {
       }
       _w2_recalc_payment_status: { Args: { p_order: string }; Returns: string }
       _w2_trusted: { Args: { p_on: boolean }; Returns: undefined }
+      _w2c_op_begin: {
+        Args: { p_kind: string; p_op: string; p_req: Json }
+        Returns: Json
+      }
+      _w2c_op_finish: {
+        Args: { p_kind: string; p_op: string; p_req: Json; p_result: Json }
+        Returns: Json
+      }
+      _w2c_perdida: {
+        Args: {
+          p_custody: string
+          p_evidencia: string
+          p_kind: string
+          p_lot: string
+          p_motivo: string
+          p_op_id: string
+          p_qty: number
+        }
+        Returns: string
+      }
+      _w2c_trusted: { Args: { p_on: boolean }; Returns: undefined }
+      abrir_custodia: {
+        Args: {
+          p_event_date?: string
+          p_event_name?: string
+          p_event_venue?: string
+          p_holder_customer_id?: string
+          p_holder_kind: string
+          p_holder_user_id?: string
+          p_kind: string
+          p_op_id: string
+        }
+        Returns: Json
+      }
       admin_approve_doctor: {
         Args: {
           p_customer_id?: string
@@ -3018,9 +3460,25 @@ export type Database = {
         Args: { p_op_id: string; p_order: string; p_reason?: string }
         Returns: Json
       }
+      cerrar_custodia: {
+        Args: { p_custody: string; p_motivo: string; p_op_id: string }
+        Returns: Json
+      }
       cerrar_orden_compra: {
         Args: { p_op_id: string; p_reason: string; p_replenishment: string }
         Returns: Json
+      }
+      conciliar_custodia: {
+        Args: never
+        Returns: {
+          check_id: string
+          detalle: string
+          entidad: string
+          entidad_id: string
+          esperado: number
+          obtenido: number
+          severidad: string
+        }[]
       }
       conciliar_dinero: {
         Args: never
@@ -3070,6 +3528,20 @@ export type Database = {
         }
         Returns: Json
       }
+      custody_held: { Args: { p_lot: string }; Returns: number }
+      custody_held_en: {
+        Args: { p_custody: string; p_lot: string }
+        Returns: number
+      }
+      devolver_de_custodia: {
+        Args: {
+          p_custody: string
+          p_lines: Json
+          p_motivo?: string
+          p_op_id: string
+        }
+        Returns: Json
+      }
       disponer_devolucion: {
         Args: { p_lines: Json; p_op_id: string }
         Returns: Json
@@ -3078,7 +3550,13 @@ export type Database = {
         Args: { p_alcance?: string; p_cajero?: string; p_fecha: string }
         Returns: number
       }
+      entregar_custodia: {
+        Args: { p_custody: string; p_lines: Json; p_op_id: string }
+        Returns: Json
+      }
+      estado_custodia: { Args: { p_custody: string }; Returns: Json }
       estado_dinero_pedido: { Args: { p_order: string }; Returns: Json }
+      estado_operacion_custodia: { Args: { p_op_id: string }; Returns: Json }
       estado_operacion_dinero: { Args: { p_op_id: string }; Returns: Json }
       event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       finalize_shipment: {
@@ -3187,6 +3665,17 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_perdida_custodia: {
+        Args: {
+          p_custody: string
+          p_evidencia?: string
+          p_kind: string
+          p_lines: Json
+          p_motivo: string
+          p_op_id: string
+        }
+        Returns: Json
+      }
       reportar_pago: {
         Args: {
           p_amount: number
@@ -3256,6 +3745,7 @@ export type Database = {
       vender_pos: {
         Args: {
           p_allocations: Json
+          p_custody_id?: string
           p_customer_id?: string
           p_doctor_id: string
           p_efectivo_recibido?: number

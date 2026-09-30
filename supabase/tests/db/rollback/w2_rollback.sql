@@ -2,6 +2,9 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W2.
 -- Hashes capturados de un cluster con las migraciones hasta W1 inclusive.
 begin;
+-- W2-C se apoya en v_order_money, así que primero baja W2-C.
+\ir ../../../rollback/w2c/00_w2_snapshot.sql
+\ir ../../../rollback/w2c/99_down.sql
 \ir ../../../rollback/w2/99_down.sql
 do $t$
 declare r record;

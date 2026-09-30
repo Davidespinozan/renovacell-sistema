@@ -25,10 +25,11 @@ P2=$(one "select tests.product(80)"); one "select tests.stock('$P2', 'CT-G', 5)"
 O3=$(one "select tests.packed_order(tests.user('doctor'), jsonb_build_array(jsonb_build_object('product_id', '$P2'::uuid, 'qty', 1)))")
 ATT=$(one "insert into public.shipping_attempts (order_id, idempotency_key, status) values ('$O3', 'ct', 'succeeded') returning id")
 DOC=$(one "select tests.user('doctor')")
+POS2=$(one "select tests.user('pos', 'contrato-pos2@test.local')")
 OM=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 2)))")
 OC=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$P2'::uuid, 'qty', 1)))")
 one "select tests.stock('$P2', 'CT-C', 10)" >/dev/null
-CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s"}' "$ADMIN" "$WH" "$POS" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC")
+CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC")
 SOCK=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${PGHOST}")
 cat > /tmp/w1_pgrst.conf.$$ <<CONF
 db-uri = "postgres://authenticator@/${DB}?host=${SOCK}&port=${PGPORT}"

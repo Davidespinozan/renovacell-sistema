@@ -13,7 +13,9 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useCustomers, useCustomerSearch } from '../../data/hooks/useCustomers'
-import { useEvents } from '../../data/hooks/useEvents'
+import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
+import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodyStore'
+import { currentUserId } from '../../lib/supabase'
 import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
@@ -36,34 +38,38 @@ export function Caja() {
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
   const { data: allCustomers } = useCustomers()
-  const { data: events, sellAtEvent } = useEvents()
+  // W2-C · contexto de venta: MOSTRADOR o una CUSTODIA propia (consignación o evento).
+  // Las dos venden por la misma ruta (venderPOS); la custodia solo añade de qué saldo sale.
+  const { data: custodias } = useCustodies()
+  const { data: custodyStock } = useCustodyStock()
   const { data: volRules } = useVolumePrices()
   const { user } = useRole()
   // Precio unitario efectivo previsto = LEAST(precio base, volumen por cantidad). El servidor
   // (vender_pos → precio_de) es la autoridad del cobro; esto es previsualización para el vendedor.
   const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty) ?? (p.price ?? 0)
-  const eventosActivos = useMemo(() => events.filter((e) => e.status === 'activo'), [events])
-  // Contexto de venta: mostrador (null) o un evento activo. Se asigna a la venta para
-  // que el arqueo por evento y "Ventas del evento" cuadren (antes nunca se asignaba).
-  const [eventId, setEventId] = useState<string | null>(null)
+  const uid = currentUserId()
+  const misCustodias = useMemo(
+    () => custodias.filter((c) => c.status === 'abierta' && c.holder_user_id === uid),
+    [custodias, uid])
+  // Contexto de venta: mostrador (null) o una custodia propia. En custodia la venta
+  // descuenta el saldo del tenedor; de mostrador, la disponibilidad del almacén.
+  const [custodyId, setCustodyId] = useState<string | null>(null)
   // Solo productos activos y con precio (no se vende lo oculto).
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
-  // En un evento se vende del STAND (lo asignado − lo vendido), NO del almacén. Antes
-  // Caja mostraba/limitaba por almacén y cobraba con venderPOS, que descontaba el almacén
-  // OTRA VEZ (el stock ya se había movido al stand al asignarlo) — doble descuento y el
-  // stand nunca bajaba. Con evento seleccionado, el stock disponible es el del stand.
+  // W2-C · De qué se vende:
+  //  · en CUSTODIA, del saldo EN PODER del tenedor (derivado del libro, no de un contador);
+  //  · de MOSTRADOR, de la DISPONIBILIDAD del almacén (propio − lo que está en custodia).
+  // Las dos las define el servidor; aquí solo se muestran.
   const stockMap = useMemo(() => {
-    if (eventId) {
-      const ev = events.find((e) => e.id === eventId)
+    if (custodyId) {
       const m: Record<string, StockInfo> = {}
-      ev?.items.forEach((it) => {
-        const q = it.assigned - it.sold
-        m[it.product_id] = { qty: q, tracked: true, status: q <= 0 ? 'out' : q <= LOW_STOCK ? 'low' : 'ok' }
+      Object.entries(saldoPorProducto(custodyStock, custodyId)).forEach(([pid, q]) => {
+        m[pid] = { qty: q, tracked: true, status: q <= 0 ? 'out' : q <= LOW_STOCK ? 'low' : 'ok' }
       })
       return m
     }
     return stockByProduct(lots)
-  }, [eventId, events, lots])
+  }, [custodyId, custodyStock, lots])
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
   const [buscar, setBuscar] = useState('')
   // Buscador: por nombre, categoría o SKU (útil en un evento con fila; también sirve para
@@ -150,15 +156,11 @@ export function Caja() {
     setCobrando(true)
     setErr(null)
     const posLines = lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) }))
-    // Venta en evento → sellAtEvent (descuenta el STAND, registra el lote entregado y
-    // cuadra "Ventas del evento"). Mostrador → venderPOS (descuenta el almacén por FEFO).
+    // W2-C · UNA sola ruta económica: venderPOS. La custodia solo indica de qué saldo
+    // sale el producto; el pedido, el precio del servidor, el movimiento de inventario y
+    // el asiento de dinero son los mismos que en mostrador.
     let res: PosResult
-    if (eventId) {
-      const order = sellAtEvent(eventId, posLines, total, method, user?.email ?? null)
-      res = order
-        ? { ok: true, order }
-        : { ok: false, error: CUSTODY_INVENTORY_DISABLED ? CUSTODY_DISABLED_MSG : 'No hay suficiente stock en el stand del evento para esta venta. Revisa Eventos.' }
-    } else {
+    {
       // CFDI omnicanal: guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC y
       // congela el SNAPSHOT del receptor en el pedido (invoice_meta.receiver, atómico en vender_pos).
       let invoiceMeta: Record<string, unknown> | null = null
@@ -188,6 +190,7 @@ export function Caja() {
         customerId: client?.id ?? null,
         customer: client ? { name: client.name, phone: client.phone ?? null } : null,
         seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta, op,
+        custodyId,
         // Efectivo con el que paga el cliente: viaja al servidor como evidencia del
         // asiento (recibido/cambio) para que el corte de caja pueda explicarse.
         efectivoRecibido: method === 'efectivo' && recibido !== '' ? recibidoN : null,
@@ -275,14 +278,18 @@ export function Caja() {
           {lines.length > 0 && <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setCart({})}>Vaciar</button>}
         </div>
 
-        {eventosActivos.length > 0 && (
+        {misCustodias.length > 0 && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12.5, color: 'var(--ink-3)' }}>
-            <Icon name="store" style={{ width: 15, height: 15, color: eventId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
+            <Icon name="store" style={{ width: 15, height: 15, color: custodyId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
             <span style={{ whiteSpace: 'nowrap' }}>Vendiendo en</span>
-            <select value={eventId ?? ''} onChange={(e) => { setEventId(e.target.value || null); setCart({}) }}
-              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none', fontWeight: eventId ? 600 : 400 }}>
-              <option value="">Mostrador (sin evento)</option>
-              {eventosActivos.map((e) => <option key={e.id} value={e.id}>Evento · {e.name}</option>)}
+            <select value={custodyId ?? ''} onChange={(e) => { setCustodyId(e.target.value || null); setCart({}) }}
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none', fontWeight: custodyId ? 600 : 400 }}>
+              <option value="">Mostrador · del almacén</option>
+              {misCustodias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.kind === 'evento' ? `Evento · ${c.event_name ?? ''}` : 'Mi inventario en consignación'}
+                </option>
+              ))}
             </select>
           </label>
         )}
@@ -342,7 +349,7 @@ export function Caja() {
               </div>
             )}
 
-            {!eventId && (
+            {!custodyId && (
               <div style={{ marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                   <input type="checkbox" checked={invoiceReq} onChange={(e) => setInvoiceReq(e.target.checked)} />

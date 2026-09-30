@@ -4,6 +4,7 @@
 // pedido como Empacado. Conecta lotsStore + ordersStore.
 import type { Lot, OrderItem } from '../types'
 import { getSnapshotLots, consume, reloadInventory } from '../store/lotsStore'
+import { getDisponibleSnapshot, reloadCustody } from '../store/custodyStore'
 import { markPacked, reloadOrders, type OrderWithItems } from '../store/ordersStore'
 import { hasSupabase } from '../../lib/supabase'
 import { runW1Command, newOpId } from './w1Command'
@@ -26,28 +27,47 @@ function byExpiry(a: Lot, b: Lot): number {
   return a.expiry_date < b.expiry_date ? -1 : a.expiry_date > b.expiry_date ? 1 : 0
 }
 
-// Núcleo FEFO reutilizable: asigna `qty` de un producto desde sus lotes,
-// caducando primero. Lo usan Surtido (Almacén) y Punto de Venta.
-export function allocateFEFO(productId: string, qty: number, lots: Lot[]): { allocations: Alloc[]; shortfall: number } {
+// W2-C · Unidades del lote que están EN CUSTODIA (con un vendedor o en un evento).
+// `lots.quantity` es la existencia PROPIA e incluye la custodia, así que la cantidad
+// asignable es propio − en custodia. El mapa lo pone el servidor (v_stock_disponible);
+// si no llega, se asume 0 y el servidor sigue siendo la barrera real (piso de custodia
+// en surtir_pedido, vender_pos y ajustar_lote).
+export type EnCustodia = Record<string, number>
+
+export const disponibleDeLote = (lot: Lot, enCustodia: EnCustodia = {}): number =>
+  Math.max(0, lot.quantity - (enCustodia[lot.id] ?? 0))
+
+// Mapa lote → unidades en custodia, leído de la autoridad del servidor.
+export function mapaEnCustodia(): EnCustodia {
+  const m: EnCustodia = {}
+  getDisponibleSnapshot().forEach((d) => { if (d.en_custodia > 0) m[d.lot_id] = d.en_custodia })
+  return m
+}
+
+// Núcleo FEFO reutilizable: asigna `qty` de un producto desde sus lotes, caducando
+// primero y SOLO contra lo disponible. Lo usan Surtido (Almacén) y Punto de Venta.
+export function allocateFEFO(productId: string, qty: number, lots: Lot[], enCustodia: EnCustodia = {}): { allocations: Alloc[]; shortfall: number } {
   const today = new Date().toISOString().slice(0, 10)
-  // No surtir/vender producto YA caducado (regulado). Solo lotes vigentes con stock.
+  // No surtir/vender producto YA caducado (regulado) ni unidades que están en custodia.
   const avail = lots
-    .filter((l) => l.product_id === productId && l.quantity > 0 && !(l.expiry_date != null && l.expiry_date < today))
-    .sort(byExpiry)
+    .filter((l) => l.product_id === productId && !(l.expiry_date != null && l.expiry_date < today))
+    .map((l) => ({ lot: l, libre: disponibleDeLote(l, enCustodia) }))
+    .filter((x) => x.libre > 0)
+    .sort((a, b) => byExpiry(a.lot, b.lot))
   let need = qty
   const allocations: Alloc[] = []
-  for (const lot of avail) {
+  for (const { lot, libre } of avail) {
     if (need <= 0) break
-    const take = Math.min(need, lot.quantity)
+    const take = Math.min(need, libre)
     allocations.push({ lot, qty: take })
     need -= take
   }
   return { allocations, shortfall: Math.max(0, need) }
 }
 
-export function planSurtido(order: OrderWithItems, lots: Lot[]): ItemPlan[] {
+export function planSurtido(order: OrderWithItems, lots: Lot[], enCustodia: EnCustodia = {}): ItemPlan[] {
   return order.items.map((item) => {
-    const { allocations, shortfall } = allocateFEFO(item.product_id ?? '', item.qty, lots)
+    const { allocations, shortfall } = allocateFEFO(item.product_id ?? '', item.qty, lots, enCustodia)
     return { item, allocations, shortfall }
   })
 }
@@ -75,8 +95,8 @@ export async function surtirPedido(order: OrderWithItems, opId: string = newOpId
   if (!['paid', 'picking'].includes(order.status ?? '')) {
     return { ok: false, plans: [], error: 'Ese pedido todavía no se puede surtir (debe estar pagado).' }
   }
-  const plans = planSurtido(order, getSnapshotLots())
-  if (!canFulfill(plans)) return { ok: false, plans, error: 'No hay existencia suficiente para surtir este pedido.' }
+  const plans = planSurtido(order, getSnapshotLots(), mapaEnCustodia())
+  if (!canFulfill(plans)) return { ok: false, plans, error: 'No hay existencia disponible suficiente para surtir este pedido (revisa si hay producto en custodia).' }
 
   const itemLot: Record<string, string | null> = {}
   plans.forEach((p) => { itemLot[p.item.id] = p.allocations[0]?.lot.id ?? null })
@@ -84,10 +104,10 @@ export async function surtirPedido(order: OrderWithItems, opId: string = newOpId
   if (hasSupabase) {
     const allocations = plans.flatMap((p) => p.allocations.map((a) => ({ order_item_id: p.item.id, lot_id: a.lot.id, qty: a.qty })))
     const r = await runW1Command('surtir_pedido', { p_op_id: opId, p_order: order.id, p_allocations: allocations }, opId)
-    if (!r.ok) { reloadInventory(); reloadOrders(); return { ok: false, plans, error: r.error, ambiguous: r.ambiguous } }
+    if (!r.ok) { reloadInventory(); reloadOrders(); void reloadCustody(); return { ok: false, plans, error: r.error, ambiguous: r.ambiguous } }
     // Confirmado por el servidor: aviso/auditoría locales y recarga de la verdad.
     markPacked(order.id, itemLot, true)
-    reloadInventory(); reloadOrders()
+    reloadInventory(); reloadOrders(); void reloadCustody()
     return { ok: true, plans }
   }
 

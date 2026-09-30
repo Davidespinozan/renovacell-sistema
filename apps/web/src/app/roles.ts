@@ -59,6 +59,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
       { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
+      { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
       { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
@@ -92,7 +93,7 @@ export const ROLES: RoleDef[] = [
       { key: 'entradas', label: 'Registrar entradas', icon: 'download', section: 'Almacén' },
       { key: 'compras', label: 'Compras', icon: 'cart', section: 'Almacén' },
       { key: 'devoluciones', label: 'Devoluciones y reingresos', icon: 'box', section: 'Almacén' },
-      { key: 'consigna_alm', label: 'Consignación', icon: 'box', section: 'Almacén' },
+      { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Almacén' },
       { key: 'cola', label: 'Por empacar', icon: 'pkg', section: 'Empaque' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Empaque' },
       { key: 'guia', label: 'Guías', icon: 'truck', section: 'Empaque' },
@@ -138,7 +139,7 @@ export const CAPABILITIES: CapabilityDef[] = [
     modules: [
       { key: 'eventos', label: 'Eventos', icon: 'store', section: 'Eventos' },
       { key: 'caja', label: 'Caja', icon: 'store', section: 'Eventos' },
-      { key: 'vev', label: 'Ventas del evento', icon: 'grid', section: 'Eventos' },
+      { key: 'vev', label: 'Ventas desde custodia', icon: 'grid', section: 'Eventos' },
     ],
   },
   // Sin módulos propios: es un permiso (publicar/gestionar anuncios en Vista Común).

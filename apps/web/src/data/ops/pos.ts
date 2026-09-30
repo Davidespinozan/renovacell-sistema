@@ -7,7 +7,10 @@
 // optimista — el cajero recibe el error real, no un falso éxito.
 import { getSnapshotLots, consume, reloadInventory } from '../store/lotsStore'
 import { createPosOrder, posShippingMeta, reloadOrders, type OrderWithItems } from '../store/ordersStore'
-import { allocateFEFO } from './surtir'
+import { allocateFEFO, mapaEnCustodia } from './surtir'
+import { getCustodyStockSnapshot, reloadCustody } from '../store/custodyStore'
+import type { CustodyStock } from './custody'
+import type { Lot } from '../types'
 import { hasSupabase } from '../../lib/supabase'
 import { runW1Command, newOpId } from './w1Command'
 import type { Json } from '../database.types'
@@ -28,6 +31,28 @@ export interface PosResult {
 const isUuid = (v?: string | null): v is string =>
   !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
 
+// W2-C · asignación FEFO contra el SALDO DE LA CUSTODIA: el tenedor solo puede vender
+// los lotes que se le entregaron y hasta lo que le queda. El servidor reimpone ambas
+// cosas (`CUSTODIA_SALDO_INSUFICIENTE`); esto es para no ofrecer lo que va a rechazar.
+function allocateDesdeCustodia(productId: string, qty: number, lots: Lot[], custodyId: string) {
+  const hoy = new Date().toISOString().slice(0, 10)
+  const saldo: { s: CustodyStock; lot: Lot }[] = getCustodyStockSnapshot()
+    .filter((s) => s.custody_id === custodyId && s.product_id === productId && s.en_poder > 0)
+    .map((s) => ({ s, lot: lots.find((l) => l.id === s.lot_id) }))
+    .filter((x): x is { s: CustodyStock; lot: Lot } => x.lot != null)
+    .filter((x) => !(x.lot.expiry_date != null && x.lot.expiry_date < hoy))
+    .sort((a, b) => (a.lot.expiry_date ?? '9999').localeCompare(b.lot.expiry_date ?? '9999'))
+  let need = qty
+  const allocations: { lot: Lot; qty: number }[] = []
+  for (const { s, lot } of saldo) {
+    if (need <= 0) break
+    const take = Math.min(need, s.en_poder)
+    allocations.push({ lot, qty: take })
+    need -= take
+  }
+  return { allocations, shortfall: Math.max(0, need) }
+}
+
 // Identidad ESTABLE de una venta (W1): order_id = op_id de vender_pos. La caja la conserva
 // mientras la misma venta se reintenta (respuesta ambigua) y la renueva al confirmar.
 export interface PosOp { orderId: string; folio: string }
@@ -39,12 +64,19 @@ export async function venderPOS(
   lines: PosLine[],
   total: number,
   paymentMethod: string,
-  opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null; op?: PosOp; efectivoRecibido?: number | null } = {},
+  opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null; op?: PosOp; efectivoRecibido?: number | null
+    // W2-C: venta DESDE CUSTODIA. Con esto la venta descuenta el saldo del tenedor y
+    // se registra en su libro, por la MISMA ruta económica (no hay un segundo motor).
+    custodyId?: string | null } = {},
 ): Promise<PosResult & { ambiguous?: boolean }> {
   if (lines.length === 0) return { ok: false }
 
   const lots = getSnapshotLots()
-  const plans = lines.map((l) => ({ line: l, ...allocateFEFO(l.product_id, l.qty, lots) }))
+  // W2-C: de mostrador se asigna contra la DISPONIBILIDAD (propio − custodia); desde una
+  // custodia se asigna contra el saldo que ese tenedor tiene en la mano.
+  const plans = opts.custodyId
+    ? lines.map((l) => ({ line: l, ...allocateDesdeCustodia(l.product_id, l.qty, lots, opts.custodyId!) }))
+    : lines.map((l) => ({ line: l, ...allocateFEFO(l.product_id, l.qty, lots, mapaEnCustodia()) }))
 
   const shortfall = plans.filter((p) => p.shortfall > 0).map((p) => ({ product_id: p.line.product_id, missing: p.shortfall }))
   if (shortfall.length > 0) return { ok: false, shortfall }
@@ -83,9 +115,10 @@ export async function venderPOS(
       // (recibido/cambio), que es lo que el corte de caja necesita poder explicar.
       // No entra en la huella de idempotencia: corregirlo no crea otra venta.
       p_efectivo_recibido: (opts.efectivoRecibido ?? undefined),
+      p_custody_id: (opts.custodyId ?? undefined),
     }, op.orderId)
     if (!r.ok) {
-      reloadOrders(); reloadInventory()
+      reloadOrders(); reloadInventory(); void reloadCustody()
       return { ok: false, error: r.error, ambiguous: r.ambiguous }
     }
     if (r.data.value === false) {
@@ -94,7 +127,7 @@ export async function venderPOS(
     }
     // Confirmada: refleja el ticket con el MISMO id/folio del servidor y sincroniza.
     const order = createPosOrder({ ...orderInput, id: op.orderId, folio: op.folio }, true)
-    reloadOrders(); reloadInventory()
+    reloadOrders(); reloadInventory(); void reloadCustody()
     return { ok: true, order }
   }
 

@@ -46,8 +46,9 @@ import { Configuracion } from './admin/Configuracion'
 import { Mermas } from './admin/Mermas'
 import { Importar } from './admin/Importar'
 import { Eventos } from './pos/Eventos'
-import { MiConsigna } from './sales/MiConsigna'
-import { Consigna } from './warehouse/Consigna'
+import { MiCustodia } from './sales/MiCustodia'
+import { Custodia } from './warehouse/Custodia'
+import { Custodias } from './admin/Custodias'
 import { Caja } from './pos/Caja'
 import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
@@ -100,8 +101,9 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   eventos: () => <Eventos />,
   caja: () => <Caja />,
   vev: () => <VentasEvento />,
-  consigna: () => <MiConsigna />,
-  consigna_alm: () => <Consigna />,
+  consigna: () => <MiCustodia />,
+  consigna_alm: () => <Custodia />,
+  av_custodias: () => <Custodias />,
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

@@ -15,7 +15,6 @@ import { montoEnLetras } from '../../lib/enLetras'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
-import { useEvents } from '../../data/hooks/useEvents'
 import { useCierres, useRefunds } from '../../data/hooks/useFinanzas'
 import { useRole } from '../../auth/RoleContext'
 import { efectivoEsperado, localDay } from '../../data/ops/finanzas'
@@ -77,7 +76,6 @@ function CorteTicketPrint({ c }: { c: Cierre }) {
 
 export function CierreCaja() {
   const { data: orders } = useAllOrders()
-  const { data: events } = useEvents()
   const { data: cierres, registrarCierre, anularCierre } = useCierres()
   const { data: refunds } = useRefunds()
   const { user } = useRole()
@@ -91,7 +89,6 @@ export function CierreCaja() {
   const alcanceDb: 'dia' | 'cajero' = esMia ? 'cajero' : 'dia'
   const cajero = esMia ? currentUserId() : null
   const alcance = esMia ? `Mi caja · ${user?.name ?? 'Cajero'}` : 'Caja del día'
-  void events
 
   // TRAMO + ESPERADO: los dice el servidor. El tramo arranca donde terminó el último corte
   // vigente de este alcance (o al inicio del día si es el primero) y llega hasta ahora.
