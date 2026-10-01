@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       announcement_comments: {
@@ -438,58 +463,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      consignment_stock: {
-        Row: {
-          assigned: number
-          id: string
-          lots: Json
-          product_id: string | null
-          sold: number
-          updated_at: string | null
-          vendor: string
-        }
-        Insert: {
-          assigned?: number
-          id?: string
-          lots?: Json
-          product_id?: string | null
-          sold?: number
-          updated_at?: string | null
-          vendor: string
-        }
-        Update: {
-          assigned?: number
-          id?: string
-          lots?: Json
-          product_id?: string | null
-          sold?: number
-          updated_at?: string | null
-          vendor?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "consignment_stock_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "consignment_stock_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "consignment_stock_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products_safe"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       conversations: {
         Row: {
@@ -1019,42 +992,6 @@ export type Database = {
           },
         ]
       }
-      events: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          date: string | null
-          id: string
-          items: Json
-          members: Json
-          name: string
-          status: string
-          venue: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          date?: string | null
-          id?: string
-          items?: Json
-          members?: Json
-          name: string
-          status?: string
-          venue?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          date?: string | null
-          id?: string
-          items?: Json
-          members?: Json
-          name?: string
-          status?: string
-          venue?: string | null
-        }
-        Relationships: []
-      }
       expenses: {
         Row: {
           categoria: string
@@ -1082,6 +1019,206 @@ export type Database = {
           fecha?: string
           id?: string
           monto?: number
+        }
+        Relationships: []
+      }
+      fiscal_document_events: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          created_at: string
+          event: string
+          evidence: Json | null
+          fiscal_document_id: string
+          from_status: string | null
+          id: string
+          op_id: string | null
+          reason: string | null
+          to_status: string
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          event: string
+          evidence?: Json | null
+          fiscal_document_id: string
+          from_status?: string | null
+          id?: string
+          op_id?: string | null
+          reason?: string | null
+          to_status: string
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          event?: string
+          evidence?: Json | null
+          fiscal_document_id?: string
+          from_status?: string | null
+          id?: string
+          op_id?: string | null
+          reason?: string | null
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_document_events_fiscal_document_id_fkey"
+            columns: ["fiscal_document_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_documents: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          attempts: number
+          claim_id: string | null
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          currency: string | null
+          error_code: string | null
+          error_message: string | null
+          folio: string | null
+          forma_pago: string | null
+          id: string
+          iva: number | null
+          kind: string
+          metodo_pago: string | null
+          op_id: string | null
+          order_id: string
+          provider: string
+          provider_env: string | null
+          provider_ref: string | null
+          provider_stamped_at: string | null
+          receiver: Json
+          reconcile_note: string | null
+          reconciled_at: string | null
+          request_fingerprint: string | null
+          serie: string | null
+          status: string
+          subtotal: number | null
+          total: number | null
+          updated_at: string
+          uuid: string | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          attempts?: number
+          claim_id?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          currency?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          folio?: string | null
+          forma_pago?: string | null
+          id: string
+          iva?: number | null
+          kind?: string
+          metodo_pago?: string | null
+          op_id?: string | null
+          order_id: string
+          provider?: string
+          provider_env?: string | null
+          provider_ref?: string | null
+          provider_stamped_at?: string | null
+          receiver: Json
+          reconcile_note?: string | null
+          reconciled_at?: string | null
+          request_fingerprint?: string | null
+          serie?: string | null
+          status?: string
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string
+          uuid?: string | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          attempts?: number
+          claim_id?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          currency?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          folio?: string | null
+          forma_pago?: string | null
+          id?: string
+          iva?: number | null
+          kind?: string
+          metodo_pago?: string | null
+          op_id?: string | null
+          order_id?: string
+          provider?: string
+          provider_env?: string | null
+          provider_ref?: string | null
+          provider_stamped_at?: string | null
+          receiver?: Json
+          reconcile_note?: string | null
+          reconciled_at?: string | null
+          request_fingerprint?: string | null
+          serie?: string | null
+          status?: string
+          subtotal?: number | null
+          total?: number | null
+          updated_at?: string
+          uuid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_documents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_documents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
+      fiscal_operations: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          created_at: string
+          kind: string
+          op_id: string
+          request: Json
+          result: Json | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          kind: string
+          op_id: string
+          request: Json
+          result?: Json | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          created_at?: string
+          kind?: string
+          op_id?: string
+          request?: Json
+          result?: Json | null
         }
         Relationships: []
       }
@@ -3361,6 +3498,51 @@ export type Database = {
         Returns: string
       }
       _w2c_trusted: { Args: { p_on: boolean }; Returns: undefined }
+      _w3_fingerprint: {
+        Args: { p_order: string; p_receiver: Json }
+        Returns: string
+      }
+      _w3_norm_legacy: { Args: { p: Json; p_email?: string }; Returns: Json }
+      _w3_op_begin: {
+        Args: { p_kind: string; p_op: string; p_req: Json }
+        Returns: Json
+      }
+      _w3_op_finish: {
+        Args: { p_kind: string; p_op: string; p_req: Json; p_result: Json }
+        Returns: Json
+      }
+      _w3_proyectar: { Args: { p_order: string }; Returns: undefined }
+      _w3_receptor: {
+        Args: { p_order: string; p_override?: Json }
+        Returns: Json
+      }
+      _w3_reclamar: { Args: { p_claim: string; p_doc: string }; Returns: Json }
+      _w3_transicion: {
+        Args: {
+          p_claim?: string
+          p_doc: string
+          p_error_code?: string
+          p_error_message?: string
+          p_event: string
+          p_evidence?: Json
+          p_folio?: string
+          p_from_expected?: string
+          p_op?: string
+          p_provider_env?: string
+          p_provider_ref?: string
+          p_reason?: string
+          p_reconcile_note?: string
+          p_serie?: string
+          p_stamped_at?: string
+          p_to: string
+          p_uuid?: string
+        }
+        Returns: Json
+      }
+      _w3_transicion_valida: {
+        Args: { p_from: string; p_to: string }
+        Returns: boolean
+      }
       abrir_custodia: {
         Args: {
           p_event_date?: string
@@ -3468,6 +3650,16 @@ export type Database = {
         Args: { p_op_id: string; p_reason: string; p_replenishment: string }
         Returns: Json
       }
+      conciliar_cfdi: {
+        Args: never
+        Returns: {
+          check_id: string
+          detalle: string
+          entidad: string
+          entidad_id: string
+          severidad: string
+        }[]
+      }
       conciliar_custodia: {
         Args: never
         Returns: {
@@ -3533,6 +3725,10 @@ export type Database = {
         Args: { p_custody: string; p_lot: string }
         Returns: number
       }
+      descartar_solicitud_cfdi: {
+        Args: { p_doc_id: string; p_motivo: string; p_op_id: string }
+        Returns: Json
+      }
       devolver_de_custodia: {
         Args: {
           p_custody: string
@@ -3556,9 +3752,9 @@ export type Database = {
       }
       estado_custodia: { Args: { p_custody: string }; Returns: Json }
       estado_dinero_pedido: { Args: { p_order: string }; Returns: Json }
+      estado_fiscal_pedido: { Args: { p_order: string }; Returns: Json }
       estado_operacion_custodia: { Args: { p_op_id: string }; Returns: Json }
       estado_operacion_dinero: { Args: { p_op_id: string }; Returns: Json }
-      event_sell: { Args: { p_event: string; p_sales: Json }; Returns: boolean }
       finalize_shipment: {
         Args: { p_attempt_id: string; p_shipment: Json }
         Returns: Json
@@ -3726,6 +3922,10 @@ export type Database = {
         Args: { p_order_id: string; p_receiver: Json }
         Returns: Json
       }
+      solicitar_cfdi: {
+        Args: { p_op_id: string; p_order_id: string; p_receiver?: Json }
+        Returns: Json
+      }
       surtir_pedido: {
         Args: { p_allocations: Json; p_op_id: string; p_order: string }
         Returns: Json
@@ -3888,6 +4088,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

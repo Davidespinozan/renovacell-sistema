@@ -17,6 +17,7 @@ import { hasSupabase, supabase } from '../../lib/supabase'
 import { signedProofUrl } from '../../lib/uploads'
 import { billingSummary, isPosOrder } from '../../data/metrics'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
+import { estadoFiscalPedido, mensajeEstadoFiscal, SIN_SOLICITUD, type EstadoFiscalPedido } from '../../data/ops/fiscalIntent'
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
@@ -323,6 +324,23 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
   }
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
+  // ── W3-A · ESTADO FISCAL AUTORITATIVO ────────────────────────────────────────────────────
+  // La pantalla ya no deduce el estado del timbrado: lo lee del servidor (fiscal_documents).
+  // Regla que ordena la UI: si el estado es `incierto` NO se ofrece reintentar, porque un
+  // segundo intento podría producir un CFDI duplicado ante el SAT.
+  const [fis, setFis] = useState<EstadoFiscalPedido>(SIN_SOLICITUD)
+  const [solicitando, setSolicitando] = useState(false)
+  useEffect(() => { let vivo = true; estadoFiscalPedido(order.id).then((e) => { if (vivo) setFis(e) }); return () => { vivo = false } }, [order.id])
+  const solicitarFactura = async () => {
+    if (solicitando) return
+    setSolicitando(true)
+    try {
+      const r = await markInvoiced(order.id)
+      if (!r.ok) window.alert(r.error ?? 'No se pudo registrar la solicitud de factura.')
+      setFis(await estadoFiscalPedido(order.id))
+    } finally { setSolicitando(false) }
+  }
+
   // ── Datos fiscales del PEDIDO (snapshot congelado en invoice_meta.receiver) ──────────────
   const invMeta = (order.invoice_meta as Record<string, unknown> | null) ?? {}
   const snapshot = normalizeFiscalProfile(invMeta.receiver ?? {})
@@ -552,20 +570,31 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 </button>
               )
             )}
-            {/* GATE CFDI (front): no se puede timbrar sin pago. El servidor es la barrera real
-                (cfdi Edge exige payment_status='paid'); aquí solo se evita ofrecer la acción. */}
+            {/* W3-A · El estado manda. `incierto` NO ofrece reintento: se concilia.
+                Y "Solicitar factura" ya no promete un timbrado: registra la intención durable. */}
             {emitida ? (
               <button className="btn" type="button" disabled style={{ opacity: 0.6, cursor: 'default' }}>
                 <FileCheck2 size={15} /> CFDI emitido
               </button>
+            ) : fis.status === 'incierto' ? (
+              <span className="ms" style={{ color: 'var(--warn)' }}>
+                ⚠ No sabemos si el SAT ya timbró este pedido. Dirección debe conciliarlo antes de volver a intentar.
+              </span>
+            ) : fis.status === 'en_proceso' ? (
+              <span className="ms" style={{ color: 'var(--ink-3)' }}>Se está timbrando. Espera a que termine.</span>
             ) : !paid ? (
               <span className="ms" style={{ color: 'var(--ink-3)' }}>El pedido debe estar pagado antes de facturarse.</span>
             ) : !snapOk ? (
-              <span className="ms" style={{ color: 'var(--warn)' }}>Completa los datos fiscales del pedido antes de emitir el CFDI.</span>
+              <span className="ms" style={{ color: 'var(--warn)' }}>Completa los datos fiscales del pedido antes de solicitar la factura.</span>
             ) : (
-              <button className="btn" type="button" onClick={() => markInvoiced(order.id)}>
-                <FileText size={15} /> Emitir CFDI
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                <button className="btn" type="button" disabled={solicitando} onClick={solicitarFactura}>
+                  <FileText size={15} /> {solicitando ? 'Registrando…' : fis.status === 'pendiente' ? 'Actualizar solicitud' : 'Solicitar factura'}
+                </button>
+                <span className="ms" style={{ color: 'var(--ink-3)', maxWidth: 360, textAlign: 'right' }}>
+                  {mensajeEstadoFiscal(fis)}
+                </span>
+              </div>
             )}
           </div>
         </div>

@@ -22,7 +22,6 @@ begin
     ('precio_de(uuid,uuid,integer)',                          '9efe19506f40e19c3dc5baeca66b9014'),
     ('profiles_guard()',                                      '1a1d0a4cd4f3398b0d3d1ae865d3c741'),
     ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
-    ('set_order_fiscal_snapshot(uuid,jsonb)',                 'a009a07290c5029b1da7433aeea3b1a5'),
     ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
     ('upsert_customer_fiscal(uuid,jsonb)',                    '8fd937b882e85743582730ac7f132088')
   ) as t(sig, h) loop
@@ -47,6 +46,22 @@ begin
   perform tests.ok(to_regclass('public.events') is null and to_regclass('public.consignment_stock') is null
                    and to_regclass('public.custodies') is not null,
                    'W2-C: events / consignment_stock → custodies (retiro autorizado)');
+  -- W3-A · CAMBIO AUTORIZADO en set_order_fiscal_snapshot. Conserva su firma y su contrato
+  -- (el frontend y el POS siguen llamándola igual) y se endurece en dos puntos: no toca un
+  -- pedido cuya intención fiscal ya salió de `pendiente`, y mantiene sincronizado el receptor
+  -- del documento fiscal vivo para que la huella material no quede desfasada.
+  perform tests.eq(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)),
+                   'd27eba9834466d71e5a3439614801bb7',
+                   'W3-A: set_order_fiscal_snapshot endurecida (cambio autorizado, misma firma)');
+  perform tests.ok(to_regprocedure('public.set_order_fiscal_snapshot(uuid,jsonb)') is not null
+                   and has_function_privilege('authenticated', 'public.set_order_fiscal_snapshot(uuid,jsonb)', 'EXECUTE'),
+                   'W3-A: set_order_fiscal_snapshot sigue existiendo y ejecutable por el cliente');
+  -- Y lo que W3-A añade: la evidencia fiscal pasa a ser del servidor, con libro propio.
+  perform tests.ok(to_regclass('public.fiscal_documents') is not null
+                   and to_regclass('public.fiscal_document_events') is not null
+                   and to_regprocedure('public.solicitar_cfdi(uuid,uuid,jsonb)') is not null,
+                   'W3-A: la intención fiscal durable existe (fiscal_documents + solicitar_cfdi)');
+
   -- Comandos de W1 que NO se tocan (existencia + firma exacta).
   perform tests.ok((select count(*) = 9 from unnest(array[
       'public.recibir_lote(uuid,uuid,text,date,integer,uuid,text,numeric,text,text)',

@@ -157,6 +157,29 @@ const MENSAJES: Record<string, string> = {
   RECEPCION_INEXISTENTE: 'No se encontró esa recepción.',
   RECEPCION_DE_OTRO_LOTE: 'Esa recepción corresponde a otro lote.',
   RECEPCION_NO_APLICA: 'Solo una corrección de recepción se liga a una entrada previa.',
+
+  // --- W3-A · intención fiscal --------------------------------------------------
+  // La regla que ordena estos mensajes: un TIMEOUT no significa "no se timbró". Cuando
+  // el estado es incierto NO se ofrece reintentar, se pide conciliar.
+  FISCAL_SOLO_POR_COMANDO: 'La factura se solicita y se timbra con los comandos del sistema; no se edita a mano en el pedido.',
+  DATOS_FISCALES_REQUERIDOS: 'Faltan datos fiscales completos del cliente: RFC, razón social, régimen, CP, uso de CFDI y correo. Complétalos antes de solicitar la factura.',
+  FISCAL_INVALIDO: 'Los datos fiscales no son válidos. Revísalos y vuelve a guardarlos.',
+  CFDI_EN_PROCESO: 'Ya hay un timbrado en curso para este pedido. Espera a que termine; no lo vuelvas a enviar.',
+  CFDI_INCIERTO: 'No se sabe si el SAT ya timbró este pedido. Dirección debe conciliarlo antes de volver a intentar: un segundo intento podría generar una factura duplicada.',
+  CFDI_CAMBIO_MATERIAL: 'El contenido a facturar cambió respecto de la solicitud registrada. Cancela la solicitud y créala de nuevo con los datos correctos.',
+  YA_TIMBRADO: 'El CFDI ya fue emitido; el receptor no se puede cambiar. Si hay un error, requiere cancelación y refacturación.',
+  FISCAL_SOLICITUD_CONGELADA: 'La solicitud de factura ya salió del sistema: su contenido no se modifica. Consulta el estado fiscal del pedido.',
+  FISCAL_ESTADO_NO_DESCARTABLE: 'Solo se puede descartar una solicitud que todavía no se ha intentado timbrar.',
+  FISCAL_DOCUMENTO_INEXISTENTE: 'No se encontró la solicitud de factura. Recarga la pantalla.',
+  FISCAL_TRANSICION_INVALIDA: 'Ese cambio de estado fiscal no está permitido. Recarga la pantalla para ver el estado real.',
+  FISCAL_TRANSICION_SOLO_POR_COMANDO: 'El estado fiscal solo lo cambia el sistema, con registro. Recarga la pantalla.',
+  FISCAL_UUID_INMUTABLE: 'Ese pedido ya tiene un folio fiscal registrado y no se sobrescribe.',
+  FISCAL_ENTORNO_INMUTABLE: 'No se puede cambiar el entorno de un comprobante ya timbrado.',
+  FISCAL_IDENTIDAD_INMUTABLE: 'Una factura no cambia de pedido ni de tipo.',
+  FISCAL_NO_SE_BORRA: 'Un documento fiscal no se elimina: es evidencia. Se cancela o se concilia.',
+  CLAIM_REQUERIDO: 'Falta el identificador del intento. Recarga la pantalla.',
+  w3_contencion: 'El timbrado de CFDI está bloqueado mientras se instala el nuevo camino fiscal. Tu solicitud de factura sí queda registrada y no se pierde.',
+  config_incompleta: 'Falta configurar el entorno de facturación. Dirección debe declararlo antes de operar con el PAC.',
 }
 
 // El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones

@@ -4,6 +4,7 @@
 // PRESERVANDO el resto. NO toca order/pago/inventario/comisión/invoice_requested. NO motivo 01/04.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { accionAuditoria, auditarSeguro, construyeCancelMeta, construyeClaimMeta, mapeaStatusCancelacion, motivoCancelValido, puedeCancelar } from './rules.ts'
+import { resolverFacturama } from '../_shared/facturama.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,10 @@ Deno.serve(async (req) => {
   const user = Deno.env.get('FACTURAMA_USER'), pass = Deno.env.get('FACTURAMA_PASSWORD')
   if (!user || !pass) return json(501, { error: 'not_configured', message: 'CFDI no habilitado.' })
   const url = Deno.env.get('SUPABASE_URL')!, anon = Deno.env.get('SUPABASE_ANON_KEY')!, service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const facBase = (Deno.env.get('FACTURAMA_URL') ?? 'https://api.facturama.mx').replace(/\/$/, '')
+  // W3-A: el entorno fiscal es explícito y la URL se DERIVA de él. Sin default a producción.
+  const fac = resolverFacturama(Deno.env.get('FACTURAMA_ENV'))
+  if (!fac.ok) return json(501, { error: fac.error, message: fac.message })
+  const facBase = fac.base
 
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
   const { data: who } = await caller.auth.getUser()

@@ -8,6 +8,7 @@
 // Sin llamadas reales a la base ni a las Edge Functions.
 import { describe, it, expect } from 'vitest'
 import cfdiSrc from '../../../../../supabase/functions/cfdi/index.ts?raw'
+import { puedeTimbrar } from '../../../../../supabase/functions/cfdi/rules'
 import reportSrc from '../../../../../supabase/functions/report-transfer/index.ts?raw'
 import stripeSrc from '../../../../../supabase/functions/stripe-webhook/index.ts?raw'
 import n1Src from '../../../../../supabase/migrations/20261013120000_w2_n1_schema.sql?raw'
@@ -16,20 +17,25 @@ import n3Src from '../../../../../supabase/migrations/20261013120200_w2_n3_comma
 import n4Src from '../../../../../supabase/migrations/20261013120300_w2_n4_authority.sql?raw'
 import cierreSrc from '../../screens/admin/CierreCaja.tsx?raw'
 
+// W3-A · El gate de pago ya no vive dentro de la Edge Function (que fue CONTENIDA y no
+// puede llegar al PAC): vive como regla pura y probada en cfdi/rules.ts, lista para que
+// W3-B la aplique sobre la intención durable. El gate no se debilitó — se movió, y además
+// ahora es imposible timbrar desde ahí, con o sin pago.
 describe('GATE CFDI · no se timbra un pedido sin pagar', () => {
-  it('trae payment_status en el select del pedido', () => {
-    expect(cfdiSrc).toMatch(/payment_status/)
+  it('la regla existe, es pura y exige pago confirmado', () => {
+    expect(puedeTimbrar({ payment_status: 'paid' })).toEqual({ ok: true })
+    expect(puedeTimbrar({ payment_status: 'pending' })).toMatchObject({ ok: false, error: 'unpaid' })
+    expect(puedeTimbrar({ payment_status: 'partial' })).toMatchObject({ ok: false, error: 'unpaid' })
+    expect(puedeTimbrar({})).toMatchObject({ ok: false, error: 'unpaid' })
   })
-  it("bloquea con 422 cuando payment_status !== 'paid'", () => {
-    expect(cfdiSrc).toMatch(/payment_status !== 'paid'/)
-    expect(cfdiSrc).toMatch(/El pedido debe estar pagado antes de facturarse\./)
-    expect(cfdiSrc).toMatch(/422/)
+  it('el mensaje al operador se conserva', () => {
+    const r = puedeTimbrar({ payment_status: 'pending' })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toBe('El pedido debe estar pagado antes de facturarse.')
   })
-  it('el gate de pago ocurre ANTES de construir/timbrar el comprobante', () => {
-    const gate = cfdiSrc.indexOf("payment_status !== 'paid'")
-    const fiscal = cfdiSrc.indexOf('missing_fiscal')
-    expect(gate).toBeGreaterThan(-1)
-    expect(fiscal).toBeGreaterThan(gate)
+  it('y la función que timbraba ya no puede hacerlo, pagado o no', () => {
+    expect(cfdiSrc).not.toMatch(/fetch\s*\(/)
+    expect(cfdiSrc).toMatch(/w3_contencion/)
   })
 })
 

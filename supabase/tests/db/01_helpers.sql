@@ -81,7 +81,7 @@ end $$;
 
 -- Contexto compartido entre sesiones concurrentes (ids de fixtures confirmados).
 create table if not exists tests.ctx (key text primary key, val uuid not null);
-grant select on tests.ctx to anon, authenticated, service_role;
+grant select, insert on tests.ctx to anon, authenticated, service_role;
 create or replace function tests.id(p_key text) returns uuid language sql stable as $$ select val from tests.ctx where key = p_key $$;
 
 create or replace function tests.lives(p_sql text, p_name text) returns void language plpgsql as $$
@@ -330,4 +330,52 @@ begin
   select count(*) into n from public.conciliar_custodia() where severidad = 'error';
   perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
   return n;
+end $$;
+
+-- ---------------------------------------------------- fixtures fiscales (W3-A)
+-- Receptor canónico VÁLIDO (los 6 datos). RFC genérico del SAT para pruebas.
+create or replace function tests.fiscal(p_rfc text default 'XAXX010101000') returns jsonb
+  language sql immutable as $$
+  select jsonb_build_object('rfc', p_rfc, 'razon_social', 'Cliente de Prueba SA de CV',
+    'regimen', '601', 'cp', '80000', 'uso_cfdi', 'G03', 'email_facturacion', 'facturacion@test.local')
+$$;
+
+-- Registra la intención fiscal de un pedido y devuelve el id del documento.
+create or replace function tests.solicitud(p_order uuid, p_receiver jsonb default null, p_op uuid default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_op uuid := coalesce(p_op, gen_random_uuid()); v_r jsonb;
+begin
+  v_r := public.solicitar_cfdi(v_op, p_order, coalesce(p_receiver, tests.fiscal()));
+  return (v_r->>'doc_id')::uuid;
+end $$;
+
+-- Lleva un documento a `timbrado` por el ÚNICO camino legítimo (reclamo + evidencia).
+-- Simula lo que hará W3-B; aquí sirve para probar estados posteriores sin tocar el PAC.
+create or replace function tests.timbrar(p_doc uuid, p_uuid text default null, p_env text default 'sandbox')
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  -- SECURITY DEFINER: los internos de W3 están revocados para los clientes, y aquí se
+  -- invocan con los privilegios del dueño sin cambiar el rol de la sesión.
+  perform public._w3_reclamar(p_doc, gen_random_uuid());
+  return public._w3_transicion(p_doc, 'timbrado', 'timbre', 'en_proceso', 'prueba', null,
+    coalesce(p_uuid, upper(gen_random_uuid()::text)), 'FAC-' || left(p_doc::text, 6), p_env);
+end $$;
+
+-- Reclamo de una intención fiscal. Los internos de W3 están revocados para los clientes;
+-- este envoltorio SECURITY DEFINER es lo que usará W3-B desde el servidor.
+create or replace function tests.reclamar(p_doc uuid, p_claim uuid default null) returns jsonb
+  language plpgsql security definer set search_path = public as $$
+begin
+  return public._w3_reclamar(p_doc, coalesce(p_claim, gen_random_uuid()));
+end $$;
+grant execute on function tests.reclamar(uuid, uuid) to authenticated, service_role;
+
+create or replace function tests.fiscal_errores() returns int
+  language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', (select id from public.profiles where role_id = 'admin' limit 1), 'role', 'authenticated')::text, true);
+  select count(*) into v_n from public.conciliar_cfdi() where severidad = 'error';
+  return v_n;
 end $$;

@@ -1,41 +1,40 @@
-// Edge Function: CFDI 4.0 (timbrado) vía Facturama (PAC), lado servidor.
-// Recibe { order_id } → arma el CFDI, lo timbra en Facturama y devuelve { uuid, id }.
+// Edge Function: CFDI — CONTENIDA (W3-A · punto 8 del diseño congelado).
 //
-// SEAM: sin FACTURAMA_USER/FACTURAMA_PASSWORD responde 501 → el cliente usa el folio
-// simulado (demo). Activar = meter secrets, sin tocar código:
-//   FACTURAMA_USER, FACTURAMA_PASSWORD   (credenciales de la cuenta con CSD cargado)
-//   FACTURAMA_URL       base (default https://api.facturama.mx; sandbox: apisandbox…)
-//   FACTURAMA_SERIE     (opcional) serie de la factura
-//   FACTURAMA_PRODUCT_CODE  ClaveProdServ SAT por defecto de los productos (default 51241100)
-//   FACTURAMA_UNIT_CODE     ClaveUnidad SAT (default H87 = Pieza)
+// ─────────────────────────────────────────────────────────────────────────────
+// POR QUÉ ESTA FUNCIÓN YA NO TIMBRA
 //
-// NOTA fiscal: para timbrar de verdad hacen falta los 6 DATOS FISCALES DEL RECEPTOR
-// (RFC, razón social, régimen, CP fiscal, uso CFDI, correo). Se resuelven en orden de autoridad:
-// snapshot del pedido → master del cliente (customers.meta.fiscal) → perfil legacy. Si falta
-// alguno, responde 422 (no timbra a ciegas ni con defaults). Importes IVA-incluido (16%) → se desglosan.
+// La versión anterior tenía este camino, y bastaba un timeout para recorrerlo:
+//
+//   POST /3/cfdis (sin timeout)  → el PAC PUDO timbrar
+//   → se pierde la respuesta     → el cliente marcaba el fallo
+//   → el cliente escribía invoice_meta = null   ← se destruía la evidencia
+//   → la UI volvía a ofrecer "Emitir CFDI"      → segundo POST
+//   → DOS CFDI reales ante el SAT por un solo pedido
+//
+// Además persistía status:'timbrada' aunque el cuerpo del PAC viniera vacío o sin
+// UUID, no verificaba el resultado de la escritura, no tenía reclamo atómico y su
+// URL base caía por defecto a PRODUCCIÓN del PAC.
+//
+// W3-A no "cambia el mensaje": ELIMINA la salida al PAC de este archivo. No hay
+// salida de red, no hay credenciales, no hay escritura sobre el pedido. El camino peligroso
+// deja de existir mientras se construye el seguro.
+//
+// LO QUE SÍ EXISTE YA (W3-A, en la base de datos):
+//   · solicitar_cfdi()        intención fiscal durable, con receptor congelado
+//   · fiscal_documents        estados pendiente/en_proceso/timbrado/fallido/incierto/cancelado
+//   · _w3_reclamar()          reclamo atómico (imposible que dos workers ganen)
+//   · conciliar_cfdi()        conciliación local
+//   · orders_guard            invoice_meta/invoice_requested ya no los escribe el cliente
+//
+// LO QUE FALTA (W3-B): el timbrado real con timeout, clasificación de errores,
+// semántica de `incierto` y recuperación de timbre huérfano. Hasta entonces, timbrar
+// desde aquí sería volver a abrir el mismo agujero.
+//
+// Las reglas puras que esta función usaba (receptor canónico sin defaults, gate de
+// pago, lugar de expedición, idempotencia del timbre) NO se perdieron: viven en
+// ./rules.ts, probadas, listas para que W3-B las aplique sobre la intención durable.
+// ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { cfdiYaTimbrado, lugarDeExpedicion } from './rules.ts'
-
-// Receptor CANÓNICO { rfc, razon_social, regimen, cp, uso_cfdi, email_facturacion }.
-// Normaliza el snapshot/customer (forma nueva) o el perfil legacy (name/taxRegime/taxZip/cfdiUse).
-// NUNCA inventa valores: lo ausente queda vacío (y luego se rechaza con 422).
-function normFiscal(raw: unknown): Record<string, string> {
-  const r = (raw ?? {}) as Record<string, unknown>
-  const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
-  return {
-    rfc: s(r.rfc).toUpperCase(),
-    razon_social: s(r.razon_social) || s(r.name),
-    regimen: s(r.regimen) || s(r.taxRegime),
-    cp: s(r.cp) || s(r.taxZip),
-    uso_cfdi: s(r.uso_cfdi) || s(r.cfdiUse),
-    email_facturacion: (s(r.email_facturacion) || s(r.email)).toLowerCase(),
-  }
-}
-// Campos faltantes (para 422 explícito). Sin defaults 616/G03/nombre-visible.
-function fiscalFaltantes(f: Record<string, string>): string[] {
-  const req: [string, string][] = [['rfc', 'RFC'], ['razon_social', 'razón social'], ['regimen', 'régimen'], ['cp', 'CP fiscal'], ['uso_cfdi', 'uso CFDI'], ['email_facturacion', 'correo de facturación']]
-  return req.filter(([k]) => !f[k]).map(([, label]) => label)
-}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -45,25 +44,14 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const round2 = (n: number) => Math.round(n * 100) / 100
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
-  const user = Deno.env.get('FACTURAMA_USER')
-  const pass = Deno.env.get('FACTURAMA_PASSWORD')
-  if (!user || !pass) return json(501, { error: 'not_configured', message: 'CFDI no habilitado. Agrega FACTURAMA_USER/FACTURAMA_PASSWORD.' })
-
+  // Se conserva el control de acceso: una sonda anónima no aprende nada del estado fiscal.
   const url = Deno.env.get('SUPABASE_URL')!
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const facBase = (Deno.env.get('FACTURAMA_URL') ?? 'https://api.facturama.mx').replace(/\/$/, '')
-  const productCode = Deno.env.get('FACTURAMA_PRODUCT_CODE') ?? '51241100' // productos farmacéuticos (ajústalo)
-  const unitCode = Deno.env.get('FACTURAMA_UNIT_CODE') ?? 'H87' // Pieza
-  const serie = Deno.env.get('FACTURAMA_SERIE') ?? undefined
-
-  // Solo Dirección/Facturación timbra.
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
   const { data: who } = await caller.auth.getUser()
   if (!who?.user) return json(401, { error: 'No autenticado.' })
@@ -71,95 +59,10 @@ Deno.serve(async (req) => {
   const { data: me } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
   if (!['admin', 'billing'].includes(me?.role_id ?? '')) return json(403, { error: 'Solo Dirección/Facturación puede timbrar.' })
 
-  let payload: { order_id?: string; receiver?: Record<string, string> }
-  try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
-  if (!payload.order_id) return json(400, { error: 'Falta order_id.' })
-
-  // Pedido + renglones + datos fiscales del doctor.
-  const { data: order, error: oErr } = await admin.from('orders')
-    .select('id, external_ref, total, currency, doctor_id, customer_id, payment_method, payment_status, invoice_meta, order_items(description:product_id, qty, unit_price)')
-    .eq('id', payload.order_id).single()
-  if (oErr || !order) return json(404, { error: 'Pedido no encontrado.' })
-
-  // IDEMPOTENCIA (#3): si el pedido ya tiene un CFDI TIMBRADO, no se vuelve a timbrar
-  // (aunque el front reintente por doble clic o falle). Devuelve el UUID existente.
-  const yaTimbrado = cfdiYaTimbrado((order as { invoice_meta?: unknown }).invoice_meta)
-  if (yaTimbrado) return json(200, { uuid: yaTimbrado.uuid, id: yaTimbrado.facturama_id, idempotent: true })
-
-  // GATE DE PAGO (autoridad server-side): NO se timbra un pedido que no está pagado.
-  // El front oculta el botón, pero esta es la barrera real (no confiar en el cliente).
-  if ((order as { payment_status?: string }).payment_status !== 'paid') {
-    return json(422, { error: 'unpaid', message: 'El pedido debe estar pagado antes de facturarse.' })
-  }
-
-  // LUGAR DE EXPEDICIÓN (#2): CP fiscal del EMISOR (Configuración de la empresa), nunca el
-  // del receptor. Si falta, falla explícito en vez de usar el CP del receptor.
-  const { data: company } = await admin.from('company_settings').select('cp').eq('id', 'default').maybeSingle()
-  const expedicion = lugarDeExpedicion(company)
-  if (!expedicion.ok) return json(422, { error: expedicion.error, message: expedicion.message })
-
-  // RECEPTOR — resolución canónica, en orden de autoridad:
-  //   1) SNAPSHOT del pedido (invoice_meta.receiver) — lo confirmado para ESTE CFDI.
-  //   2) MASTER del cliente (customers.meta.fiscal).
-  //   3) perfil legacy (profiles.meta.fiscal) — SOLO transición.
-  // Sin defaults silenciosos (616/G03/nombre visible): si falta algo, 422 controlado.
-  const inv = ((order as { invoice_meta?: unknown }).invoice_meta ?? {}) as Record<string, unknown>
-  let receiver = normFiscal(inv.receiver)
-  if (fiscalFaltantes(receiver).length > 0 && (order as { customer_id?: string }).customer_id) {
-    const { data: cust } = await admin.from('customers').select('meta').eq('id', (order as { customer_id: string }).customer_id).maybeSingle()
-    const cf = (cust?.meta as Record<string, unknown> | null)?.fiscal
-    if (cf) receiver = normFiscal(cf)
-  }
-  if (fiscalFaltantes(receiver).length > 0 && order.doctor_id) {
-    const { data: doc } = await admin.from('profiles').select('meta, email').eq('id', order.doctor_id).single()
-    const lf = (doc?.meta as Record<string, unknown> | null)?.fiscal
-    if (lf) receiver = normFiscal({ ...(lf as Record<string, unknown>), email: (lf as Record<string, unknown>).email ?? doc?.email })
-  }
-  const faltan = fiscalFaltantes(receiver)
-  if (faltan.length > 0) {
-    return json(422, { error: 'missing_fiscal', message: `Faltan datos fiscales del receptor (${faltan.join(', ')}). Confirma la solicitud de CFDI con datos completos.` })
-  }
-  const fiscal = { Rfc: receiver.rfc, Name: receiver.razon_social, CfdiUse: receiver.uso_cfdi, FiscalRegime: receiver.regimen, TaxZipCode: receiver.cp }
-
-  // Renglones: precios IVA-incluido → se desglosa 16%.
-  // deno-lint-ignore no-explicit-any
-  const items = ((order.order_items ?? []) as any[]).map((it) => {
-    const gross = Number(it.unit_price ?? 0)
-    const unitPre = round2(gross / 1.16)
-    const qty = Number(it.qty ?? 1)
-    const subtotal = round2(unitPre * qty)
-    const iva = round2(subtotal * 0.16)
-    return {
-      ProductCode: productCode, Description: 'Producto Renovacell', UnitCode: unitCode, Unit: 'Pieza',
-      Quantity: qty, UnitPrice: unitPre, Subtotal: subtotal, TaxObject: '02',
-      Taxes: [{ Total: iva, Name: 'IVA', Base: subtotal, Rate: 0.16, IsRetention: false }],
-      Total: round2(subtotal + iva),
-    }
+  // CONTENCIÓN. Ni red, ni credenciales, ni escritura. 423 = bloqueado a propósito.
+  return json(423, {
+    error: 'w3_contencion',
+    message: 'El timbrado de CFDI está temporalmente bloqueado mientras se instala el nuevo camino fiscal. La solicitud de factura sí queda registrada y no se pierde. Dirección habilitará la emisión al completar W3-B.',
+    fiscal_intent: 'solicitar_cfdi',
   })
-  if (items.length === 0) return json(400, { error: 'El pedido no tiene renglones.' })
-
-  const cfdi = {
-    Serie: serie, Currency: (order.currency ?? 'MXN'), CfdiType: 'I',
-    PaymentForm: order.payment_method === 'efectivo' ? '01' : '03', PaymentMethod: 'PUE',
-    ExpeditionPlace: expedicion.cp, // CP fiscal del EMISOR (Configuración de la empresa)
-    Receiver: { Rfc: fiscal.Rfc, Name: fiscal.Name, CfdiUse: fiscal.CfdiUse, FiscalRegime: fiscal.FiscalRegime, TaxZipCode: fiscal.TaxZipCode },
-    Items: items,
-  }
-
-  const auth = 'Basic ' + btoa(`${user}:${pass}`)
-  const r = await fetch(`${facBase}/3/cfdis`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth }, body: JSON.stringify(cfdi) })
-  const data = await r.json().catch(() => ({}))
-  if (!r.ok) return json(502, { error: 'facturama', message: (data?.Message ?? data?.message ?? 'No se pudo timbrar.'), detail: data })
-
-  // deno-lint-ignore no-explicit-any
-  const d = data as any
-  const uuid = d?.Complement?.TaxStamp?.Uuid ?? d?.Uuid ?? d?.uuid
-  const facturamaId = d?.Id ?? d?.id ?? null
-  // Persiste el timbre SERVER-SIDE: es la autoridad para la idempotencia (#3). Un 2º intento
-  // encontrará 'timbrada' arriba y no volverá a timbrar, sin depender de que el front escriba.
-  // Persiste el timbre CONSERVANDO el snapshot del receptor efectivamente usado (autoridad de
-  // lo que se timbró; #9: no se recalcula ni se pierde tras editar el master del cliente).
-  const stamp = { receiver, status: 'timbrada', uuid, facturama_id: facturamaId, emitida_at: new Date().toISOString(), simulated: false }
-  await admin.from('orders').update({ invoice_requested: true, invoice_meta: stamp }).eq('id', order.id)
-  return json(200, { uuid, id: facturamaId, folio: d?.Folio, date: d?.Date, invoice_meta: stamp })
 })

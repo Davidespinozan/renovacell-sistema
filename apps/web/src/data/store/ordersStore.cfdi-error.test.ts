@@ -1,9 +1,15 @@
-// P0-CFDI (hardening) — un fallo de Facturama JAMÁS deja el pedido como CFDI emitido.
-// Fuerzan la ruta BACKEND (mockeando lib/supabase con hasSupabase=true) y verifican que
-// markInvoiced: (1) solo marca `timbrada` con UUID real tras éxito; (2) ante error de invoke
-// deja invoice_meta=null e invoice_requested=true (reintentable) sin falso éxito; (3) ante
-// 501/not_configured no persiste ningún CFDI falso; (4) el notify/logAudit "CFDI emitido"
-// ocurre EXCLUSIVAMENTE tras el timbre real.
+// P0-CFDI · W3-A — EL CLIENTE YA NO DECIDE NADA FISCAL.
+//
+// Este archivo probaba el comportamiento anterior: ante un fallo, markInvoiced escribía
+// `invoice_meta = null` y dejaba `invoice_requested = true` "para reintentar". Esa pareja
+// de escrituras ERA el mecanismo P0: en un timeout DESPUÉS de que el PAC ya hubiera timbrado,
+// borraba el folio real y volvía a habilitar la emisión → segundo CFDI ante el SAT.
+//
+// Las pruebas se reescriben sobre los invariantes nuevos, que son estrictamente más fuertes:
+//   1) markInvoiced NO invoca la Edge Function de timbrado;
+//   2) NO escribe invoice_meta ni invoice_requested, ni en éxito ni en fallo;
+//   3) pasa por el comando del servidor (solicitar_cfdi) y respeta lo que este responda;
+//   4) "CFDI emitido" ya no se anuncia desde el cliente: el cliente solo registra la solicitud.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
@@ -13,16 +19,17 @@ const h = vi.hoisted(() => {
   }
   ;(chain as { then: unknown }).then = (res: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res)
   const from = vi.fn(() => chain)
-  const invoke = vi.fn(async () => ({ data: { uuid: 'SAT-REAL-1', id: 'FAC-1' }, error: null }))
+  const invoke = vi.fn(async () => ({ data: null, error: null }))
+  const rpc = vi.fn(async () => ({ data: { status: 'applied', doc_id: 'd-1' }, error: null }))
   const notify = vi.fn()
   const logAudit = vi.fn()
-  return { chain, from, invoke, notify, logAudit }
+  return { chain, from, invoke, rpc, notify, logAudit }
 })
 
 vi.mock('../../lib/supabase', () => ({
   hasSupabase: true,
   currentUserId: () => 'd0000000-0000-4000-8000-000000000001',
-  supabase: { from: h.from, functions: { invoke: h.invoke }, auth: { onAuthStateChange: vi.fn() } },
+  supabase: { from: h.from, rpc: h.rpc, functions: { invoke: h.invoke }, auth: { onAuthStateChange: vi.fn() } },
 }))
 vi.mock('./notificationsStore', () => ({ notify: h.notify }))
 vi.mock('./auditStore', () => ({ logAudit: h.logAudit }))
@@ -31,76 +38,82 @@ vi.mock('./lotsStore', () => ({ restockByReference: vi.fn() }))
 import { markInvoiced } from './ordersStore'
 
 const ORDER = 'a0000000-0000-4000-8000-0000000000cf'
-const tick = () => new Promise((r) => setTimeout(r, 0))
 
-// La última llamada a orders.update(...) es la persistencia decidida por markInvoiced.
-const lastUpdatePayload = (): Record<string, unknown> => {
-  const calls = h.chain.update.mock.calls
-  return calls[calls.length - 1][0] as Record<string, unknown>
-}
-// Un error de invoke tipo FunctionsHttpError: el detalle vive en context.json().
-const httpError = (message: string) => ({
-  message: `Edge Function returned a non-2xx status`,
-  context: { json: async () => ({ message }) },
-})
+// Toda escritura que el store haya intentado sobre la tabla `orders`.
+const updatePayloads = (): Record<string, unknown>[] =>
+  h.chain.update.mock.calls.map((c) => c[0] as Record<string, unknown>)
 
 beforeEach(() => {
-  h.chain.update.mockClear()
-  h.from.mockClear()
-  h.invoke.mockClear()
-  h.notify.mockClear()
-  h.logAudit.mockClear()
-  h.invoke.mockResolvedValue({ data: { uuid: 'SAT-REAL-1', id: 'FAC-1' }, error: null } as never)
+  h.chain.update.mockClear(); h.from.mockClear(); h.invoke.mockClear()
+  h.rpc.mockClear(); h.notify.mockClear(); h.logAudit.mockClear()
+  h.rpc.mockResolvedValue({ data: { status: 'applied', doc_id: 'd-1' }, error: null } as never)
 })
 
-describe('markInvoiced · un fallo de Facturama nunca deja CFDI emitido', () => {
-  it('1) ÉXITO real → persiste status=timbrada, UUID real, facturama_id real, simulated=false', async () => {
-    markInvoiced(ORDER)
-    await tick()
-    const meta = lastUpdatePayload().invoice_meta as Record<string, unknown>
-    expect(meta).toMatchObject({ status: 'timbrada', uuid: 'SAT-REAL-1', facturama_id: 'FAC-1', simulated: false })
-    expect(lastUpdatePayload().invoice_requested).toBe(true)
+describe('markInvoiced · el cliente registra la intención, no timbra', () => {
+  it('1) NO invoca la Edge Function de timbrado', async () => {
+    await markInvoiced(ORDER)
+    expect(h.invoke).not.toHaveBeenCalled()
   })
 
-  it('2) ERROR de invoke → invoice_meta=null, invoice_requested=true (reintentable), sin falso éxito', async () => {
-    h.invoke.mockResolvedValueOnce({ data: null, error: httpError('RFC del receptor inválido') } as never)
-    markInvoiced(ORDER)
-    await tick()
-    const payload = lastUpdatePayload()
-    expect(payload.invoice_meta).toBeNull() // no queda emitido → reintentable
-    expect(payload.invoice_requested).toBe(true)
-    // Nunca se generó un UUID/folio falso ni un status 'emitida'/'timbrada'.
-    expect(payload.invoice_meta).not.toMatchObject({ status: 'emitida' })
-    // No hubo aviso/auditoría de éxito; sí se notificó el error real.
+  it('2) pasa por el comando del servidor con un identificador de operación', async () => {
+    await markInvoiced(ORDER)
+    expect(h.rpc).toHaveBeenCalledWith('solicitar_cfdi', expect.objectContaining({ p_order_id: ORDER }))
+    const args = h.rpc.mock.calls[0] as unknown as [string, { p_op_id?: string }]
+    expect(args[1].p_op_id).toMatch(/^[0-9a-f-]{36}$/i)
+  })
+
+  it('3) NO escribe evidencia fiscal sobre el pedido (el P0, cerrado)', async () => {
+    await markInvoiced(ORDER)
+    for (const p of updatePayloads()) {
+      expect(p).not.toHaveProperty('invoice_meta')
+      expect(p).not.toHaveProperty('invoice_requested')
+    }
+  })
+
+  it('4) ante un FALLO del servidor tampoco borra ni fabrica evidencia', async () => {
+    h.rpc.mockResolvedValueOnce({ data: null, error: { message: 'DATOS_FISCALES_REQUERIDOS: faltan datos' } } as never)
+    const r = await markInvoiced(ORDER)
+    expect(r.ok).toBe(false)
+    for (const p of updatePayloads()) {
+      expect(p).not.toHaveProperty('invoice_meta')
+      expect(p).not.toHaveProperty('invoice_requested')
+    }
+    // Y el mensaje que ve el operador está en español, sin tokens internos.
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining('Faltan datos fiscales'),
+    }))
+    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining('DATOS_FISCALES_REQUERIDOS'),
+    }))
     expect(h.logAudit).not.toHaveBeenCalled()
-    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('CFDI emitido') }))
-    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('RFC del receptor inválido') }))
   })
 
-  it('3) 501/not_configured → no persiste ningún CFDI falso (invoice_meta=null) y no ruidea al admin', async () => {
-    h.invoke.mockResolvedValueOnce({ data: null, error: httpError('not_configured') } as never)
-    markInvoiced(ORDER)
-    await tick()
-    expect(lastUpdatePayload().invoice_meta).toBeNull()
-    expect(h.logAudit).not.toHaveBeenCalled()
-    // not_configured es estado de demo, no un fallo: no se notifica (ni de éxito ni de error).
-    expect(h.notify).not.toHaveBeenCalled()
+  it('5) un resultado AMBIGUO (timeout de red) no invita a duplicar', async () => {
+    h.rpc.mockResolvedValueOnce({ data: null, error: { message: 'Failed to fetch' } } as never)
+    const r = await markInvoiced(ORDER)
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/NO la duplicará/)
+    for (const p of updatePayloads()) expect(p).not.toHaveProperty('invoice_meta')
   })
 
-  it('4) notify/logAudit "CFDI emitido" SOLO tras el timbre real', async () => {
-    // Primero un fallo: no debe avisar ni auditar éxito.
-    h.invoke.mockResolvedValueOnce({ data: null, error: httpError('El emisor requiere régimen fiscal') } as never)
-    markInvoiced(ORDER)
-    await tick()
-    expect(h.logAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'CFDI emitido' }))
-    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('CFDI emitido') }))
+  it('6) si el servidor dice que YA está timbrado, se informa sin reintentar', async () => {
+    h.rpc.mockResolvedValueOnce({ data: { status: 'already_stamped', doc_id: 'd-1' }, error: null } as never)
+    const r = await markInvoiced(ORDER)
+    expect(r.status).toBe('already_stamped')
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining('ya tiene CFDI emitido'),
+    }))
+    expect(h.invoke).not.toHaveBeenCalled()
+  })
 
-    // Ahora un éxito real: recién entonces avisa y audita.
-    h.notify.mockClear()
-    h.logAudit.mockClear()
-    markInvoiced(ORDER)
-    await tick()
-    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining('CFDI emitido') }))
-    expect(h.logAudit).toHaveBeenCalledWith(expect.objectContaining({ action: 'CFDI emitido' }))
+  it('7) el cliente NO anuncia "CFDI emitido": solo que la solicitud quedó registrada', async () => {
+    await markInvoiced(ORDER)
+    expect(h.notify).not.toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining('CFDI emitido'),
+    }))
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining('Factura solicitada'),
+    }))
+    expect(h.logAudit).toHaveBeenCalledWith(expect.objectContaining({ action: 'Solicitud de CFDI registrada' }))
   })
 })

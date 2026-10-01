@@ -26,6 +26,7 @@ import {
   type PaymentMethod,
 } from '../ops/money'
 import { reloadMoney, setDemoCredit } from './moneyStore'
+import { solicitarCFDI } from '../ops/fiscalIntent'
 
 // Traduce la forma de pago de la UI al vocabulario cerrado del libro (ck_entry_method).
 export function metodoW2(m: string | null | undefined): PaymentMethod {
@@ -370,50 +371,50 @@ export async function setOrderFiscalSnapshot(orderId: string, receiver: FiscalPr
   return { ok: true }
 }
 
-export function markInvoiced(orderId: string) {
+// W3-A · SOLICITAR LA FACTURA. Ya NO timbra desde el cliente.
+//
+// Lo que había aquí era el mecanismo P0 completo: se invocaba la Edge Function `cfdi` y, ante
+// cualquier fallo —incluido un timeout DESPUÉS de que el PAC ya hubiera timbrado—, el cliente
+// ejecutaba `update({ invoice_meta: null })`. Eso borraba el folio fiscal que el servidor sí
+// había guardado, dejaba `invoice_requested = true` y la UI volvía a ofrecer "Emitir CFDI":
+// un segundo CFDI real ante el SAT, sin que el operador hiciera nada mal.
+//
+// Ese camino está cerrado por tres lados a la vez:
+//   1. la base rechaza toda escritura del cliente sobre invoice_meta/invoice_requested
+//      (FISCAL_SOLO_POR_COMANDO);
+//   2. aquí no queda ninguna escritura de evidencia fiscal, ni en el éxito ni en el fallo;
+//   3. la Edge Function `cfdi` no sale al PAC (contención W3-A).
+//
+// Lo único que hace esta función es registrar la INTENCIÓN durable. Nada se pierde y nada
+// se duplica: si el timbrado ya estuviera hecho, el servidor lo dice y no se vuelve a intentar.
+export async function markInvoiced(orderId: string): Promise<{ ok: boolean; error?: string; status?: string }> {
   const now = new Date().toISOString()
-  // Modo MOCK (sin backend / id no-UUID): folio SIMULADO optimista (marca `simulated`).
-  // Se conserva el comportamiento demo existente: el CFDI es de mentira y se marca al vuelo.
+  // Modo MOCK (sin backend / id no-UUID): folio SIMULADO en memoria (marca `simulated`).
+  // Se conserva el comportamiento demo existente: no hay base, no hay evidencia fiscal real.
   if (!hasSupabase || !isUuid(orderId)) {
     const meta: Record<string, unknown> = { status: 'emitida', uuid: fakeFiscalUuid(orderId), emitida_at: now, simulated: true }
     orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true, invoice_meta: meta } : o))
     emit()
     notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
     logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
-    return
+    return { ok: true, status: 'simulado' }
   }
-  // Backend REAL: un fallo de Facturama JAMÁS debe dejar el pedido como CFDI emitido.
-  // Optimista solo marcamos la SOLICITUD (invoice_requested=true); invoice_meta queda null
-  // hasta recibir un UUID real del SAT. Nada de folio falso, nada de notify/logAudit de éxito.
-  orders = orders.map((o) => (o.id === orderId ? { ...o, invoice_requested: true } : o))
-  emit()
-  ;(async () => {
-    // Timbrado REAL vía Facturama (Edge Function cfdi). 501=no configurado · 422=faltan datos
-    // fiscales · éxito=UUID real del SAT. Solo el éxito marca el pedido como emitido.
-    const { data, error } = await supabase.functions.invoke('cfdi', { body: { order_id: orderId } })
-    if (!error && data?.uuid) {
-      // ÉXITO: UUID real del SAT. Única vía para marcar el CFDI y avisar/auditar el éxito.
-      const finalMeta: Record<string, unknown> = { status: 'timbrada', uuid: data.uuid, facturama_id: data.id ?? null, emitida_at: now, simulated: false }
-      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: finalMeta as unknown as Json }).eq('id', orderId)
-      notify({ text: `CFDI emitido · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
-      logAudit({ actor: 'Administración', action: 'CFDI emitido', resource: folioOf(orderId) })
-    } else {
-      // FALLO (error de invoke, 501/not_configured, o respuesta sin uuid): NO se marca CFDI.
-      // invoice_meta se mantiene/restaura a null; invoice_requested sigue true → reintentable.
-      let reason = ''
-      if (error) {
-        try { const b = await (error as { context?: { json?: () => Promise<{ message?: string }> } }).context?.json?.(); reason = b?.message ?? '' } catch { /* noop */ }
-        console.warn('[cfdi]', error.message, reason)
-      }
-      await supabase.from('orders').update({ invoice_requested: true, invoice_meta: null }).eq('id', orderId)
-      // Mostrar el error real (salvo 501/not_configured, que es estado de demo, no un fallo).
-      if (!/not_configured/.test(reason)) {
-        const msg = reason || (error ? error.message : 'no se pudo emitir el CFDI')
-        notify({ text: `CFDI · ${msg}`, roles: ['admin'], screen: 'av_fin' })
-      }
-    }
-    hydrate()
-  })()
+
+  const r = await solicitarCFDI(orderId)
+  if (!r.ok) {
+    notify({ text: `Factura · ${r.error}`, roles: ['admin'], screen: 'av_fin' })
+    await hydrate()
+    return { ok: false, error: r.error }
+  }
+  // El servidor decide qué pasó. `already_stamped` significa que el CFDI YA existe: no se
+  // reintenta ni se reescribe nada.
+  const texto = r.data.status === 'already_stamped'
+    ? `Este pedido ya tiene CFDI emitido · ${folioOf(orderId)}`
+    : `Factura solicitada · ${folioOf(orderId)} · el timbrado se habilita al completar W3-B`
+  notify({ text: texto, roles: ['admin'], screen: 'av_fin' })
+  logAudit({ actor: 'Administración', action: 'Solicitud de CFDI registrada', resource: folioOf(orderId) })
+  await hydrate()
+  return { ok: true, status: r.data.status }
 }
 
 // COBRO DIRECTO (Dirección/Facturación/POS): el dinero ya está en la casa y se
