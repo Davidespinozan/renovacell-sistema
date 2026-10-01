@@ -20,10 +20,8 @@ begin
   perform tests.act_as(v_admin);
   perform public.solicitar_cfdi(v_d, v_o, v_fiscal);
   -- Se lleva a `timbrado` por el único camino legítimo: reclamo + transición con evidencia.
+  perform tests.timbrar(v_d, 'A1B2C3D4-1111-2222-3333-444455556666');
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
-  perform public._w3_transicion(v_d, 'timbrado', 'timbre', 'en_proceso', 'prueba de la guarda',
-    null, 'A1B2C3D4-1111-2222-3333-444455556666', 'FAC-1', 'sandbox');
   perform tests.eq((select status from public.fiscal_documents where id = v_d), 'timbrado',
     'la guarda parte de un documento realmente timbrado');
 end $t$;
@@ -49,10 +47,18 @@ rollback to savepoint antes_de_la_guarda;
 -- presentes es el comportamiento correcto, así que aquí se limpian DENTRO de esta
 -- transacción (que se revierte al final) para poder ejercitar el camino limpio.
 select set_config('renovacell.purge', 'on', true);
+delete from public.fiscal_reconciliations;
 delete from public.fiscal_document_events;
 delete from public.fiscal_documents;
 delete from public.fiscal_operations;
+-- También la numeración: el rollback de W3-B se niega —con razón— si hay folios ya
+-- entregados, y las carreras de concurrencia dejan varios consumidos en el cluster.
+delete from public.fiscal_folio_domains;
 select set_config('renovacell.purge', 'off', true);
+
+-- W3-B primero: su bitácora de conciliación referencia fiscal_documents.
+\ir ../../../rollback/w3b/00_w3a_snapshot.sql
+\ir ../../../rollback/w3b/99_down.sql
 
 \ir ../../../rollback/w3a/00_w2c_snapshot.sql
 \ir ../../../rollback/w3a/99_down.sql
@@ -74,7 +80,7 @@ begin
   perform tests.eq((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                      where n.nspname = 'public' and p.proname in ('solicitar_cfdi','descartar_solicitud_cfdi',
                        'estado_fiscal_pedido','conciliar_cfdi','fiscal_documents_guard','_w3_op_begin','_w3_op_finish',
-                       '_w3_transicion','_w3_transicion_valida','_w3_reclamar','_w3_receptor','_w3_norm_legacy',
+                       '_w3_transicion','_w3_transicion_valida','_w3_receptor','_w3_norm_legacy',
                        '_w3_fingerprint','_w3_proyectar')), 0,
     'rollback W3-A: los comandos fiscales desaparecen');
   perform tests.eq((select count(*)::int from pg_indexes where schemaname = 'public'

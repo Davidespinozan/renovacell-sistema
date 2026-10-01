@@ -45,9 +45,9 @@ begin
     'FISCAL_TRANSICION_INVALIDA', 'no se puede timbrar una solicitud sin reclamarla primero');
 
   -- ── TIMEOUT: se va a `incierto`, conservando el rastro del intento ─────────
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   v_r := public._w3_transicion(v_d, 'incierto', 'incierto', 'en_proceso', 'timeout al PAC', null,
-    null, null, 'produccion', null, null, null, 'timeout', 'no llegó respuesta del proveedor');
+    null, null, null, null, null, null, 'timeout', 'no llegó respuesta del proveedor');
   perform tests.eq(v_r->>'status', 'incierto', 'un timeout deja la intención en incierto, no en fallido');
   perform tests.eq((select error_code from public.fiscal_documents where id = v_d), 'timeout',
     'se conserva por qué quedó ambigua');
@@ -59,12 +59,12 @@ begin
   -- De incierto NO se sale reintentando.
   perform tests.throws(format($q$select public._w3_transicion(%L, 'en_proceso', 'claim', null, 'reintento')$q$, v_d),
     'FISCAL_TRANSICION_INVALIDA', 'de un estado incierto NO se reintenta: se concilia');
-  perform tests.ok(public._w3_reclamar(v_d, gen_random_uuid()) is null,
-    'el reclamo no toca un documento incierto (solo reclama pendientes)');
+  perform tests.throws(format('select tests.reclamar(%L)', v_d), 'CFDI_INCIERTO',
+    'el reclamo no toca un documento incierto: ni lo mueve ni le asigna otro folio');
 
   -- La conciliación SÍ puede resolverlo, en cualquiera de los dos sentidos.
   v_r := public._w3_transicion(v_d, 'timbrado', 'conciliacion', 'incierto', 'el PAC sí lo tenía', null,
-    'AAAABBBB-1111-2222-3333-444455556666', 'FAC-9', 'produccion', null, null, now(),
+    'AAAABBBB-1111-2222-3333-444455556666', 'FAC-9', null, null, null, now(),
     null, null, null, 'adoptado por conciliación');
   perform tests.eq(v_r->>'status', 'timbrado', 'la conciliación adopta un timbre huérfano');
   perform tests.eq((select uuid from public.fiscal_documents where id = v_d), 'AAAABBBB-1111-2222-3333-444455556666',
@@ -114,9 +114,9 @@ begin
   -- Un incierto NO se puede descartar: sería declarar que no se timbró sin saberlo.
   v_d := tests.solicitud(v_o);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform public._w3_transicion(v_d, 'incierto', 'incierto', 'en_proceso', 'red caída', null,
-    null, null, 'produccion', null, null, null, 'red', 'sin respuesta');
+    null, null, null, null, null, null, 'red', 'sin respuesta');
   perform tests.act_as(v_admin);
   perform tests.throws(format('select public.descartar_solicitud_cfdi(%L, %L, ''ya no la quiero'')', gen_random_uuid(), v_d),
     'CFDI_INCIERTO', 'un estado incierto no se descarta: hay que conciliarlo');
@@ -143,9 +143,9 @@ begin
   perform tests.ok(not (v_e->>'puede_reintentar')::boolean, 'nada que reintentar todavía');
 
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform public._w3_transicion(v_d, 'incierto', 'incierto', 'en_proceso', 'timeout', null,
-    null, null, 'produccion', null, null, null, 'timeout', 'sin respuesta del PAC');
+    null, null, null, null, null, null, 'timeout', 'sin respuesta del PAC');
   perform tests.act_as(v_admin);
   v_e := public.estado_fiscal_pedido(v_o);
   perform tests.eq(v_e->>'status', 'incierto', 'el estado ambiguo se muestra tal cual');
@@ -157,9 +157,9 @@ begin
   v_o := tests.order(v_doctor, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1)));
   v_d := tests.solicitud(v_o);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform public._w3_transicion(v_d, 'fallido', 'fallo', 'en_proceso', 'rechazo de validación', null,
-    null, null, 'sandbox', null, null, null, 'validacion', 'RFC del receptor no existe');
+    null, null, null, null, null, null, 'validacion', 'RFC del receptor no existe');
   perform tests.act_as(v_admin);
   v_e := public.estado_fiscal_pedido(v_o);
   perform tests.ok((v_e->>'puede_reintentar')::boolean, 'un fallo demostrado SÍ es reintentable');

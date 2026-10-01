@@ -353,20 +353,32 @@ end $$;
 -- Simula lo que hará W3-B; aquí sirve para probar estados posteriores sin tocar el PAC.
 create or replace function tests.timbrar(p_doc uuid, p_uuid text default null, p_env text default 'sandbox')
 returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_claim uuid := gen_random_uuid(); v_claims text := current_setting('request.jwt.claims', true); v_r jsonb;
 begin
-  -- SECURITY DEFINER: los internos de W3 están revocados para los clientes, y aquí se
-  -- invocan con los privilegios del dueño sin cambiar el rol de la sesión.
-  perform public._w3_reclamar(p_doc, gen_random_uuid());
-  return public._w3_transicion(p_doc, 'timbrado', 'timbre', 'en_proceso', 'prueba', null,
-    coalesce(p_uuid, upper(gen_random_uuid()::text)), 'FAC-' || left(p_doc::text, 6), p_env);
+  perform tests.emisor();
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  perform public.reclamar_cfdi(gen_random_uuid(), p_doc, p_env, v_claim);
+  v_r := public.registrar_resultado_cfdi(gen_random_uuid(), p_doc, v_claim, 'timbrado',
+    coalesce(p_uuid, upper(gen_random_uuid()::text)), 'FAC-' || left(p_doc::text, 6), now());
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_r;
 end $$;
 
 -- Reclamo de una intención fiscal. Los internos de W3 están revocados para los clientes;
 -- este envoltorio SECURITY DEFINER es lo que usará W3-B desde el servidor.
 create or replace function tests.reclamar(p_doc uuid, p_claim uuid default null) returns jsonb
   language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v_r jsonb;
 begin
-  return public._w3_reclamar(p_doc, coalesce(p_claim, gen_random_uuid()));
+  -- W3-B retiró `_w3_reclamar`: un reclamo SIN identidad ante el proveedor ya no es
+  -- un estado válido. El camino real asigna serie, folio, Date y RFC del emisor.
+  -- reclamar_cfdi autoriza por auth_role() (JWT), no por el rol de base: el fixture
+  -- se anuncia como service_role y restaura las claims al salir.
+  perform tests.emisor();
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  v_r := public.reclamar_cfdi(gen_random_uuid(), p_doc, 'sandbox', p_claim);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_r;
 end $$;
 grant execute on function tests.reclamar(uuid, uuid) to authenticated, service_role;
 
@@ -378,4 +390,66 @@ begin
     json_build_object('sub', (select id from public.profiles where role_id = 'admin' limit 1), 'role', 'authenticated')::text, true);
   select count(*) into v_n from public.conciliar_cfdi() where severidad = 'error';
   return v_n;
+end $$;
+
+-- ------------------------------------------------- fixtures de W3-B (identidad)
+-- Emisor con RFC: el reclamo lo exige (lo necesita la consulta de estatus del SAT).
+create or replace function tests.emisor(p_rfc text default 'AAA010101AAA', p_cp text default '80000')
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform set_config('app.trusted', 'on', true);
+  insert into public.company_settings (id, razon_social, rfc, regimen_fiscal, cp)
+  values ('default', 'Renovacell de Prueba', p_rfc, '601', p_cp)
+  on conflict (id) do update set rfc = excluded.rfc, cp = excluded.cp,
+    razon_social = excluded.razon_social, regimen_fiscal = excluded.regimen_fiscal;
+  perform set_config('app.trusted', 'off', true);
+end $$;
+
+-- Reclama la intención asignando identidad ante el proveedor.
+create or replace function tests.reclamar_id(p_doc uuid, p_env text default 'sandbox', p_op uuid default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  return public.reclamar_cfdi(coalesce(p_op, gen_random_uuid()), p_doc, p_env);
+end $$;
+grant execute on function tests.reclamar_id(uuid, text, uuid) to authenticated, service_role;
+
+-- Registra un sondeo de conciliación (evidencia).
+create or replace function tests.sondeo(p_doc uuid, p_outcome text, p_uuid text default null,
+  p_kind text default 'lookup_serie_folio', p_edad interval default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  perform public.registrar_sondeo_cfdi(gen_random_uuid(), p_doc, p_kind, p_outcome, 0, p_uuid);
+  -- Envejecer el sondeo para poder probar la separación temporal sin esperar.
+  if p_edad is not null then
+    select id into v_id from public.fiscal_reconciliations
+     where fiscal_document_id = p_doc order by created_at desc limit 1;
+    perform set_config('renovacell.purge', 'on', true);
+    update public.fiscal_reconciliations set created_at = clock_timestamp() - p_edad where id = v_id;
+    perform set_config('renovacell.purge', 'off', true);
+  end if;
+end $$;
+
+-- Envejece el reclamo de un documento (antigüedad mínima del intento).
+create or replace function tests.envejecer_reclamo(p_doc uuid, p_edad interval)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform set_config('app.trusted', 'on', true);
+  update public.fiscal_documents set claimed_at = now() - p_edad where id = p_doc;
+  perform set_config('app.trusted', 'off', true);
+end $$;
+
+-- Envejece la Fecha enviada al PAC (para probar la ventana de reenvío).
+create or replace function tests.envejecer_date(p_doc uuid, p_edad interval)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  -- `app.trusted` NO basta: la guarda congela la identidad ante el proveedor en
+  -- cuanto el documento sale de `pendiente`, que es precisamente el invariante
+  -- que se quiere probar. Para MOVER el reloj en una prueba se usa el mismo
+  -- interruptor de purga que las limpiezas controladas.
+  perform set_config('renovacell.purge', 'on', true);
+  update public.fiscal_documents
+     set provider_date_sent = to_char((now() - p_edad) at time zone 'America/Mazatlan', 'YYYY-MM-DD"T"HH24:MI:SS')
+   where id = p_doc;
+  perform set_config('renovacell.purge', 'off', true);
 end $$;

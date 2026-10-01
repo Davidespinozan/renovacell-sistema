@@ -56,9 +56,10 @@ sql "do \$\$ declare v_p uuid := tests.product(100); v_o uuid; v_d uuid; v_admin
 end \$\$;" >/dev/null
 CMD3="select tests.act_as(tests.id('f3_admin')); select coalesce(tests.reclamar(tests.id('f3_d')) ->> 'status', 'PERDIO')"
 race "$CMD3" "$CMD3"
-has "f3: A gana el reclamo" "^en_proceso$" "$T/a.out"
-has "f3: B NO gana el mismo reclamo" "^PERDIO$|deadlock|could not serialize" "$T/b.out"
+has "f3: A gana el reclamo" "^applied$" "$T/a.out"
+has "f3: B NO gana el mismo reclamo" "CFDI_EN_PROCESO|deadlock|could not serialize" "$T/b.out"
 check "f3: un solo intento contado (no dos)" "select attempts = 1 from public.fiscal_documents where id = tests.id('f3_d')"
+check "f3: un solo folio asignado" "select folio is not null from public.fiscal_documents where id = tests.id('f3_d')"
 check "f3: un solo reclamo en la bitácora" "select count(*) = 1 from public.fiscal_document_events where fiscal_document_id = tests.id('f3_d') and event = 'claim'"
 check "f3: el documento quedó en_proceso con un claim_id" "select status = 'en_proceso' and claim_id is not null from public.fiscal_documents where id = tests.id('f3_d')"
 
@@ -71,7 +72,7 @@ sql "do \$\$ declare v_p uuid := tests.product(100); v_o uuid; v_d uuid; v_admin
 end \$\$;" >/dev/null
 race "select tests.act_as(tests.id('f4_admin')); select coalesce(tests.reclamar(tests.id('f4_d')) ->> 'status', 'PERDIO')" \
      "select tests.act_as(tests.id('f4_admin')); select public.solicitar_cfdi(gen_random_uuid(), tests.id('f4_o'), tests.fiscal()) ->> 'status'"
-has "f4: el reclamo se aplica" "^en_proceso$" "$T/a.out"
+has "f4: el reclamo se aplica" "^applied$" "$T/a.out"
 has "f4: la solicitud en paralelo no abre una segunda emisión" "CFDI_EN_PROCESO|already_requested|deadlock|could not serialize" "$T/b.out"
 check "f4: sigue habiendo un solo documento" "select count(*) = 1 from public.fiscal_documents where order_id = tests.id('f4_o')"
 

@@ -9,13 +9,14 @@ declare
   v_o uuid; v_o2 uuid; v_f jsonb := tests.fiscal(); v_d uuid := gen_random_uuid();
   v_ins text;
 begin
+  perform tests.emisor('AAA010101AAA');
   v_o  := tests.order(v_doctor, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1)));
   v_o2 := tests.order(v_doctor, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1)));
   perform tests.act_as_owner();
 
   -- ── I-3 · TIMBRADO SIN UUID: rechazado ─────────────────────────────────────
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver)
-      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb)$q$, v_o, v_f),
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, serie, folio, issuer_rfc, provider_env, provider_date_sent)
+      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, 'REN', '9001', 'AAA010101AAA', 'sandbox', '2026-10-01T10:00:00')$q$, v_o, v_f),
     'ck_fiscal_uuid_estado', 'no existe un documento timbrado sin UUID del SAT');
 
   -- ── I-3 · UUID EN UN ESTADO QUE NO LO ADMITE: rechazado ────────────────────
@@ -24,24 +25,28 @@ begin
     'ck_fiscal_uuid_estado', 'no hay UUID en un estado que no sea timbrado o cancelado');
 
   -- ── I-3 · UUID CON FORMA INVÁLIDA: rechazado ──────────────────────────────
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env)
-      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, 'NO-ES-UN-UUID', 'sandbox')$q$, v_o, v_f),
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env, serie, folio, issuer_rfc, provider_date_sent)
+      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, 'NO-ES-UN-UUID', 'sandbox', 'REN', '9002', 'AAA010101AAA', '2026-10-01T10:00:00')$q$, v_o, v_f),
     'ck_fiscal_uuid_formato', 'un folio fiscal sin forma de UUID se rechaza');
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env)
-      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, '00000000-0000-0000-0000-000000000000', 'sandbox')$q$, v_o, v_f),
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env, serie, folio, issuer_rfc, provider_date_sent)
+      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, '00000000-0000-0000-0000-000000000000', 'sandbox', 'REN', '9003', 'AAA010101AAA', '2026-10-01T10:00:00')$q$, v_o, v_f),
     'ck_fiscal_uuid_formato', 'un UUID de ceros no cuenta como folio del SAT');
 
   -- ── I-4 · UUID SIN ENTORNO: rechazado (un sandbox no puede pasar por real) ─
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid)
-      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, 'AAAABBBB-1111-2222-3333-444455556666')$q$, v_o, v_f),
-    'ck_fiscal_env_presente', 'un comprobante con folio siempre declara su entorno');
+  -- Aquí el entorno DEBE faltar, así que también salta la constraint de identidad de
+  -- W3-B. Se aceptan ambos nombres: las dos protegen exactamente lo mismo —que un
+  -- comprobante de sandbox nunca pueda confundirse con uno real.
+  perform tests.throws_any(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, serie, folio, issuer_rfc, provider_date_sent)
+      values (gen_random_uuid(), %L, 'timbrado', %L::jsonb, 'AAAABBBB-1111-2222-3333-444455556666', 'REN', '9004', 'AAA010101AAA', '2026-10-01T10:00:00')$q$, v_o, v_f),
+    array['ck_fiscal_env_presente', 'ck_fiscal_identidad_proveedor'],
+    'un comprobante con folio siempre declara su entorno');
 
   -- ── I-5 · EN PROCESO SIN RECLAMO: rechazado ───────────────────────────────
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver)
-      values (gen_random_uuid(), %L, 'en_proceso', %L::jsonb)$q$, v_o, v_f),
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, serie, folio, issuer_rfc, provider_env, provider_date_sent)
+      values (gen_random_uuid(), %L, 'en_proceso', %L::jsonb, 'REN', '9005', 'AAA010101AAA', 'sandbox', '2026-10-01T10:00:00')$q$, v_o, v_f),
     'ck_fiscal_claim', 'no hay "en proceso" sin un reclamo real detrás');
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver)
-      values (gen_random_uuid(), %L, 'incierto', %L::jsonb)$q$, v_o, v_f),
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, serie, folio, issuer_rfc, provider_env, provider_date_sent)
+      values (gen_random_uuid(), %L, 'incierto', %L::jsonb, 'REN', '9006', 'AAA010101AAA', 'sandbox', '2026-10-01T10:00:00')$q$, v_o, v_f),
     'ck_fiscal_incierto', 'no se llega a incierto sin haber intentado');
 
   -- ── I-6 · RECEPTOR INCOMPLETO: rechazado ──────────────────────────────────
@@ -74,10 +79,10 @@ begin
     'un fallido (sin efecto ante el PAC) libera la ranura del pedido');
 
   -- ── I-2 · UN UUID, UNA SOLA VEZ EN TODO EL SISTEMA ────────────────────────
-  insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env)
-  values (gen_random_uuid(), v_o2, 'timbrado', v_f, 'CCCCDDDD-1111-2222-3333-444455556666', 'produccion');
-  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env)
-      values (gen_random_uuid(), %L, 'cancelado', %L::jsonb, 'CCCCDDDD-1111-2222-3333-444455556666', 'produccion')$q$,
+  insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env, serie, folio, issuer_rfc, provider_date_sent)
+  values (gen_random_uuid(), v_o2, 'timbrado', v_f, 'CCCCDDDD-1111-2222-3333-444455556666', 'produccion', 'REN', '9007', 'AAA010101AAA', '2026-10-01T10:00:00');
+  perform tests.throws(format($q$insert into public.fiscal_documents (id, order_id, status, receiver, uuid, provider_env, serie, folio, issuer_rfc, provider_date_sent)
+      values (gen_random_uuid(), %L, 'cancelado', %L::jsonb, 'CCCCDDDD-1111-2222-3333-444455556666', 'produccion', 'REN', '9008', 'AAA010101AAA', '2026-10-01T10:00:00')$q$,
       tests.order(v_doctor, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1))), v_f),
     'uq_fiscal_doc_uuid', 'el mismo folio del SAT no puede existir dos veces');
 

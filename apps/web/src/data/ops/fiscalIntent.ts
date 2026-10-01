@@ -23,6 +23,9 @@ export interface EstadoFiscalPedido {
   doc_id?: string
   status: EstadoFiscal
   uuid?: string | null
+  /** Identidad ante el PAC, asignada por el servidor (D-W3-7). El cliente nunca la elige. */
+  serie?: string | null
+  folio?: string | null
   provider_env?: string | null
   attempts?: number
   error_code?: string | null
@@ -30,6 +33,10 @@ export interface EstadoFiscalPedido {
   puede_solicitar: boolean
   puede_reintentar: boolean
   requiere_conciliacion: boolean
+  requiere_revision_manual?: boolean
+  /** Reenvío IDEMPOTENTE (misma Folio+Date), NO un reintento. Caduca con la ventana segura. */
+  replay_permitido?: boolean
+  replay_vence_en?: string | null
   timbrado_habilitado: boolean
   updated_at?: string
 }
@@ -39,20 +46,40 @@ export type FiscalResult<T> = { ok: true; data: T } | { ok: false; error: string
 // Estado por defecto sin backend (demo): no hay intención fiscal registrada.
 export const SIN_SOLICITUD: EstadoFiscalPedido = {
   status: 'sin_solicitud', puede_solicitar: true, puede_reintentar: false,
-  requiere_conciliacion: false, timbrado_habilitado: false,
+  requiere_conciliacion: false, requiere_revision_manual: false,
+  replay_permitido: false, timbrado_habilitado: false,
 }
 
-// Mensaje de operador para cada estado. `incierto` NUNCA invita a reintentar.
+// Mensaje de operador para cada estado. `incierto` NUNCA invita a reintentar: las tres
+// cosas que tiene que comunicar son que no se sabe si el CFDI existe, que volver a
+// emitir está prohibido, y que hace falta conciliar.
 export function mensajeEstadoFiscal(e: EstadoFiscalPedido): string {
+  const id = e.serie && e.folio ? ` · ${e.serie}-${e.folio}` : ''
   switch (e.status) {
     case 'sin_solicitud': return 'Sin solicitud de factura.'
-    case 'pendiente':     return 'Factura solicitada. Queda registrada y no se pierde; el timbrado se habilita al completar W3-B.'
-    case 'en_proceso':    return 'Se está timbrando. Espera a que termine; no lo vuelvas a enviar.'
-    case 'timbrado':      return `CFDI emitido${e.uuid ? ` · folio fiscal ${e.uuid}` : ''}.`
+    case 'pendiente':     return 'Factura solicitada. Queda registrada y no se pierde; la emisión se habilita cuando Dirección cierre las decisiones fiscales pendientes.'
+    case 'en_proceso':    return `Se está timbrando${id}. Espera a que termine; no lo vuelvas a enviar.`
+    case 'timbrado':      return `CFDI emitido${id}${e.uuid ? ` · folio fiscal ${e.uuid}` : ''}.`
     case 'fallido':       return `No se emitió${e.error_message ? `: ${e.error_message}` : '.'}`
-    case 'incierto':      return 'No sabemos si el SAT ya lo timbró. Dirección debe conciliarlo antes de volver a intentar: un segundo intento podría generar una factura duplicada.'
-    case 'cancelado':     return 'CFDI cancelado.'
+    case 'incierto':      return e.requiere_revision_manual
+      ? `No sabemos si el SAT ya timbró este pedido${id}, y la búsqueda encontró más de un comprobante posible. Requiere revisión manual de Dirección. No se puede volver a emitir.`
+      : `No sabemos si el SAT ya timbró este pedido${id}. Volver a emitir está PROHIBIDO: podría generar una factura duplicada ante el SAT. Dirección debe conciliarlo.`
+    case 'cancelado':     return `CFDI cancelado${id}.`
     default:              return 'Estado fiscal desconocido.'
+  }
+}
+
+// Etiqueta corta para listados y pastillas.
+export function etiquetaEstadoFiscal(e: EstadoFiscalPedido): string {
+  switch (e.status) {
+    case 'sin_solicitud': return 'Sin factura'
+    case 'pendiente':     return 'Solicitada'
+    case 'en_proceso':    return 'Timbrando'
+    case 'timbrado':      return 'Emitido'
+    case 'fallido':       return 'No emitido'
+    case 'incierto':      return e.requiere_revision_manual ? 'Revisión manual' : 'Sin confirmar'
+    case 'cancelado':     return 'Cancelado'
+    default:              return 'Desconocido'
   }
 }
 

@@ -1087,12 +1087,14 @@ export type Database = {
           folio: string | null
           forma_pago: string | null
           id: string
+          issuer_rfc: string | null
           iva: number | null
           kind: string
           metodo_pago: string | null
           op_id: string | null
           order_id: string
           provider: string
+          provider_date_sent: string | null
           provider_env: string | null
           provider_ref: string | null
           provider_stamped_at: string | null
@@ -1121,12 +1123,14 @@ export type Database = {
           folio?: string | null
           forma_pago?: string | null
           id: string
+          issuer_rfc?: string | null
           iva?: number | null
           kind?: string
           metodo_pago?: string | null
           op_id?: string | null
           order_id: string
           provider?: string
+          provider_date_sent?: string | null
           provider_env?: string | null
           provider_ref?: string | null
           provider_stamped_at?: string | null
@@ -1155,12 +1159,14 @@ export type Database = {
           folio?: string | null
           forma_pago?: string | null
           id?: string
+          issuer_rfc?: string | null
           iva?: number | null
           kind?: string
           metodo_pago?: string | null
           op_id?: string | null
           order_id?: string
           provider?: string
+          provider_date_sent?: string | null
           provider_env?: string | null
           provider_ref?: string | null
           provider_stamped_at?: string | null
@@ -1192,6 +1198,30 @@ export type Database = {
           },
         ]
       }
+      fiscal_folio_domains: {
+        Row: {
+          issuer_rfc: string
+          next_folio: number
+          provider: string
+          provider_env: string
+          updated_at: string
+        }
+        Insert: {
+          issuer_rfc: string
+          next_folio?: number
+          provider: string
+          provider_env: string
+          updated_at?: string
+        }
+        Update: {
+          issuer_rfc?: string
+          next_folio?: number
+          provider?: string
+          provider_env?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fiscal_operations: {
         Row: {
           actor: string | null
@@ -1219,6 +1249,86 @@ export type Database = {
           op_id?: string
           request?: Json
           result?: Json | null
+        }
+        Relationships: []
+      }
+      fiscal_reconciliations: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          candidates: number
+          created_at: string
+          detail: string | null
+          fiscal_document_id: string
+          id: string
+          op_id: string | null
+          outcome: string
+          probe_kind: string
+          provider_env: string | null
+          sat_status: string | null
+          uuid_found: string | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          candidates?: number
+          created_at?: string
+          detail?: string | null
+          fiscal_document_id: string
+          id?: string
+          op_id?: string | null
+          outcome: string
+          probe_kind: string
+          provider_env?: string | null
+          sat_status?: string | null
+          uuid_found?: string | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          candidates?: number
+          created_at?: string
+          detail?: string | null
+          fiscal_document_id?: string
+          id?: string
+          op_id?: string | null
+          outcome?: string
+          probe_kind?: string
+          provider_env?: string | null
+          sat_status?: string | null
+          uuid_found?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_reconciliations_fiscal_document_id_fkey"
+            columns: ["fiscal_document_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_series: {
+        Row: {
+          activa: boolean
+          created_at: string
+          descripcion: string | null
+          provider: string
+          serie: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          descripcion?: string | null
+          provider?: string
+          serie: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          descripcion?: string | null
+          provider?: string
+          serie?: string
         }
         Relationships: []
       }
@@ -3498,10 +3608,16 @@ export type Database = {
         Returns: string
       }
       _w2c_trusted: { Args: { p_on: boolean }; Returns: undefined }
+      _w3_asignar_folio: {
+        Args: { p_env: string; p_provider: string; p_rfc: string }
+        Returns: string
+      }
+      _w3_edad_minima_sondeo: { Args: never; Returns: string }
       _w3_fingerprint: {
         Args: { p_order: string; p_receiver: Json }
         Returns: string
       }
+      _w3_margen_replay: { Args: never; Returns: string }
       _w3_norm_legacy: { Args: { p: Json; p_email?: string }; Returns: Json }
       _w3_op_begin: {
         Args: { p_kind: string; p_op: string; p_req: Json }
@@ -3511,12 +3627,14 @@ export type Database = {
         Args: { p_kind: string; p_op: string; p_req: Json; p_result: Json }
         Returns: Json
       }
+      _w3_plazo_timbrado: { Args: never; Returns: string }
       _w3_proyectar: { Args: { p_order: string }; Returns: undefined }
       _w3_receptor: {
         Args: { p_order: string; p_override?: Json }
         Returns: Json
       }
-      _w3_reclamar: { Args: { p_claim: string; p_doc: string }; Returns: Json }
+      _w3_replay_vence: { Args: { p_date_sent: string }; Returns: string }
+      _w3_separacion_sondeos: { Args: never; Returns: string }
       _w3_transicion: {
         Args: {
           p_claim?: string
@@ -3543,6 +3661,7 @@ export type Database = {
         Args: { p_from: string; p_to: string }
         Returns: boolean
       }
+      _w3_ventana_replay: { Args: never; Returns: string }
       abrir_custodia: {
         Args: {
           p_event_date?: string
@@ -3561,6 +3680,18 @@ export type Database = {
           p_customer_id?: string
           p_new_customer?: Json
           p_profile: string
+        }
+        Returns: Json
+      }
+      adoptar_cfdi: {
+        Args: {
+          p_doc_id: string
+          p_evidencia?: string
+          p_op_id: string
+          p_provider_ref?: string
+          p_sat_status?: string
+          p_stamped_at?: string
+          p_uuid: string
         }
         Returns: Json
       }
@@ -3755,12 +3886,14 @@ export type Database = {
       estado_fiscal_pedido: { Args: { p_order: string }; Returns: Json }
       estado_operacion_custodia: { Args: { p_op_id: string }; Returns: Json }
       estado_operacion_dinero: { Args: { p_op_id: string }; Returns: Json }
+      evidencia_inexistencia_cfdi: { Args: { p_doc_id: string }; Returns: Json }
       finalize_shipment: {
         Args: { p_attempt_id: string; p_shipment: Json }
         Returns: Json
       }
       has_cap: { Args: { cap: string }; Returns: boolean }
       hoy_local: { Args: never; Returns: string }
+      identidad_cfdi: { Args: { p_doc_id: string }; Returns: Json }
       importar_lote: {
         Args: {
           p_caducidad: string
@@ -3836,6 +3969,15 @@ export type Database = {
         }
         Returns: Json
       }
+      reclamar_cfdi: {
+        Args: {
+          p_claim_id?: string
+          p_doc_id: string
+          p_op_id: string
+          p_provider_env: string
+        }
+        Returns: Json
+      }
       registrar_cobro: {
         Args: {
           p_amount: number
@@ -3872,6 +4014,33 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_resultado_cfdi: {
+        Args: {
+          p_claim_id: string
+          p_doc_id: string
+          p_error_code?: string
+          p_error_message?: string
+          p_op_id: string
+          p_provider_ref?: string
+          p_resultado: string
+          p_stamped_at?: string
+          p_uuid?: string
+        }
+        Returns: Json
+      }
+      registrar_sondeo_cfdi: {
+        Args: {
+          p_candidates?: number
+          p_detail?: string
+          p_doc_id: string
+          p_op_id: string
+          p_outcome: string
+          p_probe_kind: string
+          p_sat_status?: string
+          p_uuid?: string
+        }
+        Returns: Json
+      }
       reportar_pago: {
         Args: {
           p_amount: number
@@ -3893,6 +4062,10 @@ export type Database = {
           p_profile_id?: string
           p_source?: string
         }
+        Returns: Json
+      }
+      resolver_cfdi_inexistente: {
+        Args: { p_doc_id: string; p_motivo: string; p_op_id: string }
         Returns: Json
       }
       reversar_asiento: {

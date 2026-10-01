@@ -48,7 +48,7 @@ begin
   -- ── TODA transición queda registrada ──────────────────────────────────────
   perform tests.eq((select count(*)::int from public.fiscal_document_events where fiscal_document_id = v_d), 1,
     'la solicitud dejó su fila en la bitácora');
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform tests.eq((select count(*)::int from public.fiscal_document_events where fiscal_document_id = v_d), 2,
     'el reclamo dejó su propia fila: ninguna transición pasa sin bitácora');
   perform tests.eq((select to_status from public.fiscal_document_events

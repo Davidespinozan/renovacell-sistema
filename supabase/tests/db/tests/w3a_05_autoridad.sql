@@ -129,7 +129,7 @@ begin
   -- ══ Internos fuera del alcance de los clientes ═══════════════════════════
   perform tests.act_as(v_admin);
   for r in select * from (values
-      ('_w3_reclamar', format('select public._w3_reclamar(%L, gen_random_uuid())', v_d)),
+      ('_w3_asignar_folio', $q$select public._w3_asignar_folio('facturama','sandbox','AAA010101AAA')$q$),
       ('_w3_transicion', format('select public._w3_transicion(%L, ''fallido'', ''fallo'')', v_d)),
       ('_w3_op_finish', format('select public._w3_op_finish(gen_random_uuid(), ''cfdi_solicitado'', ''{}''::jsonb, ''{}''::jsonb)')),
       ('_w3_proyectar', format('select public._w3_proyectar(%L)', v_o)),

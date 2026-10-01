@@ -22,7 +22,9 @@
 // LO QUE SÍ EXISTE YA (W3-A, en la base de datos):
 //   · solicitar_cfdi()        intención fiscal durable, con receptor congelado
 //   · fiscal_documents        estados pendiente/en_proceso/timbrado/fallido/incierto/cancelado
-//   · _w3_reclamar()          reclamo atómico (imposible que dos workers ganen)
+//   · reclamar_cfdi()         reclamo atómico que además fija serie, folio y Date
+//                             (W3-B retiró _w3_reclamar: un reclamo sin identidad ante
+//                             el proveedor ya no es un estado válido)
 //   · conciliar_cfdi()        conciliación local
 //   · orders_guard            invoice_meta/invoice_requested ya no los escribe el cliente
 //

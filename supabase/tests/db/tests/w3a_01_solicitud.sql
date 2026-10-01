@@ -55,9 +55,9 @@ begin
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o2);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform public._w3_transicion(v_d, 'incierto', 'incierto', 'en_proceso', 'timeout de red', null,
-    null, null, 'produccion', null, null, null, 'timeout', 'se perdió la respuesta del PAC');
+    null, null, null, null, null, null, 'timeout', 'se perdió la respuesta del PAC');
   perform tests.act_as(v_admin);
   perform tests.throws(format('select public.solicitar_cfdi(%L, %L, %L::jsonb)', gen_random_uuid(), v_o2, tests.fiscal()),
     'CFDI_INCIERTO', 'un estado incierto BLOQUEA una nueva emisión: no se reintenta a ciegas');
@@ -67,7 +67,7 @@ begin
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o3);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   perform tests.act_as(v_admin);
   perform tests.throws(format('select public.solicitar_cfdi(%L, %L, %L::jsonb)', gen_random_uuid(), v_o3, tests.fiscal()),
     'CFDI_EN_PROCESO', 'con un timbrado en curso no se lanza otro');
@@ -75,7 +75,7 @@ begin
   -- ── DESCARTAR libera la ranura (sin inventar ni borrar nada) ──────────────
   perform tests.act_as_owner();
   perform public._w3_transicion(v_d, 'fallido', 'fallo', 'en_proceso', 'rechazo de validación', null,
-    null, null, 'sandbox', null, null, null, 'validacion', 'el PAC rechazó el comprobante');
+    null, null, null, null, null, null, 'validacion', 'el PAC rechazó el comprobante');
   perform tests.act_as(v_admin);
   v_r := public.solicitar_cfdi(gen_random_uuid(), v_o3, tests.fiscal());
   perform tests.eq(v_r->>'status', 'applied', 'tras un fallo demostrado se puede volver a solicitar');

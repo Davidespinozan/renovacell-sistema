@@ -577,11 +577,13 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 <FileCheck2 size={15} /> CFDI emitido
               </button>
             ) : fis.status === 'incierto' ? (
-              <span className="ms" style={{ color: 'var(--warn)' }}>
-                ⚠ No sabemos si el SAT ya timbró este pedido. Dirección debe conciliarlo antes de volver a intentar.
+              // Sin acción. Ni "reintentar", ni "emitir": de un estado ambiguo no se
+              // vuelve a emitir, y la UI no debe ofrecer lo que el servidor prohíbe.
+              <span className="ms" style={{ color: 'var(--warn)', maxWidth: 420, textAlign: 'right' }}>
+                ⚠ {mensajeEstadoFiscal(fis)}
               </span>
             ) : fis.status === 'en_proceso' ? (
-              <span className="ms" style={{ color: 'var(--ink-3)' }}>Se está timbrando. Espera a que termine.</span>
+              <span className="ms" style={{ color: 'var(--ink-3)' }}>{mensajeEstadoFiscal(fis)}</span>
             ) : !paid ? (
               <span className="ms" style={{ color: 'var(--ink-3)' }}>El pedido debe estar pagado antes de facturarse.</span>
             ) : !snapOk ? (

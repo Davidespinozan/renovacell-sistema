@@ -15,7 +15,7 @@ begin
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o);
   perform tests.eq(tests.fiscal_errores(), 0, 'una solicitud pendiente no es un hallazgo');
-  perform tests.timbrar(v_d, 'AAAA1111-2222-3333-4444-555566667777', 'produccion');
+  perform tests.timbrar(v_d, 'AAAA1111-2222-3333-4444-555566667777');
   perform tests.eq(tests.fiscal_errores(), 0, 'un timbre correcto y proyectado no es un hallazgo');
 
   -- ── C4 · una intención AMBIGUA se reporta siempre ──────────────────────────
@@ -23,15 +23,18 @@ begin
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o2);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
+  -- El entorno lo fijó el reclamo y ya es inmutable: no se pasa aquí.
   perform public._w3_transicion(v_d, 'incierto', 'incierto', 'en_proceso', 'timeout', null,
-    null, null, 'produccion', null, null, null, 'timeout', 'sin respuesta');
+    null, null, null, null, null, null, 'timeout', 'sin respuesta');
   perform tests.act_as(v_admin);
   perform tests.eq((select count(*)::int from public.conciliar_cfdi() where check_id = 'C4_incierto_sin_conciliar'), 1,
     'C4: la intención ambigua se reporta como pendiente de conciliar contra el PAC');
-  perform tests.ok((select detalle like '%no implementada (W3-B)%' from public.conciliar_cfdi()
+  -- W3-B implementó la conciliación externa, así que C4 ya no declara "no implementada":
+  -- ahora informa cuántos sondeos se han hecho, que es la evidencia que importa.
+  perform tests.ok((select detalle like '%sondeos registrados%' from public.conciliar_cfdi()
                      where check_id = 'C4_incierto_sin_conciliar'),
-    'C4: se declara explícitamente que la conciliación externa NO está implementada');
+    'C4: el hallazgo informa cuántos sondeos de conciliación se han registrado');
   perform tests.ok(tests.fiscal_errores() > 0, 'un incierto mantiene la conciliación en rojo hasta resolverse');
 
   -- Al conciliarla, deja de ser hallazgo.
@@ -54,7 +57,7 @@ begin
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o);
   perform tests.act_as_owner();
-  perform public._w3_reclamar(v_d, gen_random_uuid());
+  perform tests.reclamar(v_d);
   -- Se envejece el reclamo: es lo que pasaría si el proceso muriera a media llamada.
   perform set_config('app.trusted', 'on', true);
   update public.fiscal_documents set claimed_at = now() - interval '2 hours' where id = v_d;
@@ -77,7 +80,7 @@ begin
   v_o := tests.order(v_doctor, 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1)));
   perform tests.act_as(v_admin);
   v_d := tests.solicitud(v_o);
-  perform tests.timbrar(v_d, 'BBBB1111-2222-3333-4444-555566667777', 'produccion');
+  perform tests.timbrar(v_d, 'BBBB1111-2222-3333-4444-555566667777');
   perform tests.force_status(v_o, 'cancelled');
   perform tests.act_as(v_admin);
   perform tests.eq((select count(*)::int from public.conciliar_cfdi() where check_id = 'C5_pedido_cancelado_con_cfdi'), 1,

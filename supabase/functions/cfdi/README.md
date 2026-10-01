@@ -29,7 +29,7 @@ Principio que ordena W3: **TIMEOUT / ERROR DE RED ≠ "NO SE TIMBRÓ".**
 | `fiscal_document_events` | bitácora append-only: ninguna transición de estado ocurre sin registrarse |
 | `fiscal_operations` | idempotencia por `op_id` (gemelo de inventario / dinero / custodia) |
 | `solicitar_cfdi()` | registra o corrige la solicitud, con el receptor **congelado** |
-| `_w3_reclamar()` | reclamo **atómico**: es imposible que dos workers ganen la misma intención |
+| `reclamar_cfdi()` | reclamo **atómico** que además fija la identidad ante el PAC (serie REN, folio y `Date`). W3-B retiró `_w3_reclamar`: un reclamo sin identidad ya no es un estado válido |
 | `conciliar_cfdi()` | conciliación **local** (C1…C11). La externa contra el PAC es W3-B/D |
 | `orders_guard` | `invoice_meta` / `invoice_requested` ya **no los escribe ningún cliente** |
 

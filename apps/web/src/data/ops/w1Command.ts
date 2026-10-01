@@ -180,6 +180,28 @@ const MENSAJES: Record<string, string> = {
   CLAIM_REQUERIDO: 'Falta el identificador del intento. Recarga la pantalla.',
   w3_contencion: 'El timbrado de CFDI está bloqueado mientras se instala el nuevo camino fiscal. Tu solicitud de factura sí queda registrada y no se pierde.',
   config_incompleta: 'Falta configurar el entorno de facturación. Dirección debe declararlo antes de operar con el PAC.',
+
+  // --- W3-B · numeración fiscal e identidad ante el proveedor -------------------
+  EMISOR_SIN_RFC: 'Falta el RFC fiscal de la empresa en Configuración. Sin él no se puede numerar ni emitir un comprobante.',
+  ENTORNO_FISCAL_INVALIDO: 'El entorno de facturación no es válido. Dirección debe declararlo como pruebas o producción.',
+  SERIE_FISCAL_INEXISTENTE: 'No hay una serie fiscal activa configurada. Dirección debe definirla antes de facturar.',
+  FISCAL_NUMERACION_SOLO_POR_COMANDO: 'La numeración fiscal la asigna el sistema; no se edita a mano.',
+  FISCAL_IDENTIDAD_PROVEEDOR_CONGELADA: 'La serie, el folio y la fecha de este comprobante ya salieron del sistema y no se pueden cambiar: reutilizarlos tal cual es lo que evita una factura duplicada.',
+  CFDI_YA_TIMBRADO: 'Este pedido ya tiene comprobante emitido; no se vuelve a timbrar.',
+  FISCAL_ESTADO_NO_RECLAMABLE: 'La solicitud de factura no está en un estado que permita emitirla. Recarga la pantalla.',
+  // --- W3-B · resultado del intento y conciliación ------------------------------
+  FISCAL_SIN_RECLAMO_ACTIVO: 'Este intento de timbrado ya se resolvió. Recarga la pantalla para ver el estado real.',
+  FISCAL_RECLAMO_AJENO: 'Otro intento tiene el control de este timbrado. No se registran dos resultados para el mismo comprobante.',
+  FISCAL_TIMBRE_SIN_UUID: 'No se puede marcar como emitido sin el folio fiscal del SAT.',
+  FISCAL_ESTADO_NO_ADOPTABLE: 'Ese comprobante no está en un estado que permita adoptar un folio encontrado.',
+  FISCAL_ESTADO_NO_RESOLUBLE: 'Esa vía es solo para un comprobante cuyo resultado se desconoce. Recarga la pantalla.',
+  FISCAL_EVIDENCIA_POSITIVA: 'Una búsqueda ya encontró comprobante para este pedido: no se puede declarar que no existe. Adóptalo o pide revisión manual.',
+  FISCAL_INTENTO_RECIENTE: 'El intento es demasiado reciente para concluir que no se timbró. Espera y vuelve a consultar antes de decidir.',
+  FISCAL_EVIDENCIA_INSUFICIENTE: 'Hacen falta al menos dos consultas al proveedor, separadas en el tiempo y sin resultado, antes de declarar que no existe comprobante.',
+  SAT_NO_ENCONTRADO: 'El SAT no reconoce ese folio fiscal, así que no se adopta como comprobante de este pedido.',
+  SAT_STATUS_INVALIDO: 'La respuesta del SAT no es un estatus reconocido. Vuelve a consultar.',
+  RESULTADO_INVALIDO: 'Resultado de timbrado no válido.',
+  construccion_fiscal_pendiente: 'La emisión de CFDI todavía no está habilitada: faltan decisiones fiscales de Dirección (impuestos por producto, clave de producto y forma de pago). Tu solicitud queda registrada.',
 }
 
 // El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones
