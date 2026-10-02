@@ -453,3 +453,35 @@ begin
    where id = p_doc;
   perform set_config('renovacell.purge', 'off', true);
 end $$;
+
+-- ------------------------------------------- fixtures de W3-C (catálogo fiscal)
+-- Producto vendible con categoría, para ejercitar la configuración fiscal.
+create or replace function tests.producto_cat(p_cat text, p_price numeric default 1160, p_unit text default 'Unidades')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid := gen_random_uuid();
+begin
+  insert into public.products (id, sku, name, price, category, unit, active, sellable, line)
+  values (v_id, 'T-'||left(v_id::text,8), 'Producto '||p_cat||' '||left(v_id::text,4),
+          p_price, p_cat, p_unit, true, true, 'prof');
+  return v_id;
+end $$;
+
+-- Configuración fiscal COMPLETA y válida (gravado 16%), sin validar.
+create or replace function tests.fiscal_completo(p_product uuid, p_trat text default 'gravado',
+  p_tasa numeric default 0.160000) returns jsonb language sql immutable as $$
+  select jsonb_build_object(
+    'clave_prod_serv', '51241100', 'clave_unidad', 'H87', 'objeto_imp', '02',
+    'tratamiento_iva', p_trat, 'iva_tasa', p_tasa,
+    'descripcion_fiscal', 'Descripción fiscal de prueba')
+$$;
+
+-- Deja un producto configurado y VALIDADO por el camino real.
+create or replace function tests.pf_validado(p_product uuid, p_trat text default 'gravado',
+  p_tasa numeric default 0.160000) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform public.editar_fiscal_producto(gen_random_uuid(), p_product,
+    tests.fiscal_completo(p_product, p_trat, p_tasa));
+  perform public.validar_fiscal_producto(gen_random_uuid(), p_product, 'criterio del contador');
+end $$;
+grant execute on function tests.pf_validado(uuid, text, numeric) to authenticated, service_role;

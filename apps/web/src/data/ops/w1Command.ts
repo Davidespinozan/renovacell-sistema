@@ -202,6 +202,29 @@ const MENSAJES: Record<string, string> = {
   SAT_STATUS_INVALIDO: 'La respuesta del SAT no es un estatus reconocido. Vuelve a consultar.',
   RESULTADO_INVALIDO: 'Resultado de timbrado no válido.',
   construccion_fiscal_pendiente: 'La emisión de CFDI todavía no está habilitada: faltan decisiones fiscales de Dirección (impuestos por producto, clave de producto y forma de pago). Tu solicitud queda registrada.',
+
+  // --- W3-C · catálogo fiscal del producto --------------------------------------
+  // El catálogo real es heterogéneo (medicamentos y toxinas junto a sérums y
+  // aparatología), así que no hay valor de respaldo: cada producto se valida.
+  FISCAL_PRODUCTO_SOLO_POR_COMANDO: 'Los datos fiscales del producto se editan y se validan desde la pantalla de revisión fiscal, no a mano.',
+  FISCAL_DEFAULTS_SOLO_POR_COMANDO: 'Los valores sugeridos por categoría los define Dirección desde la pantalla de revisión fiscal.',
+  FISCAL_PRODUCTO_NO_SE_BORRA: 'La configuración fiscal de un producto no se elimina: se retira la validación indicando el motivo.',
+  FISCAL_PRODUCTO_INMUTABLE: 'Una configuración fiscal no se puede pasar de un producto a otro.',
+  FISCAL_PRODUCTO_SIN_CONFIGURAR: 'Ese producto todavía no tiene datos fiscales capturados. Captúralos antes de validarlo.',
+  FISCAL_CONFIGURACION_INCOMPLETA: 'Faltan datos para poder validar este producto.',
+  FUENTE_REQUERIDA: 'Indica en qué te basas para validar: criterio del contador, oficio o catálogo del SAT. Queda registrado junto con tu nombre.',
+  CAMPO_FISCAL_DESCONOCIDO: 'Ese campo no es un dato fiscal editable. Revisa el nombre: no se aplicó ningún cambio.',
+  SIN_CAMBIOS: 'No indicaste ningún dato fiscal a modificar.',
+  PRODUCTO_REQUERIDO: 'Falta indicar el producto.',
+  PRODUCTO_INEXISTENTE: 'Ese producto no existe en el catálogo.',
+  CATEGORIA_REQUERIDA: 'Falta indicar la categoría.',
+  DEFAULTS_CATEGORIA_INEXISTENTES: 'Dirección todavía no definió valores sugeridos para esa categoría.',
+  ck_pf_tasa: 'La tasa no corresponde al tratamiento de IVA elegido: gravado lleva tasa mayor a cero, tasa cero lleva exactamente 0, y exento o no objeto no llevan tasa.',
+  ck_pf_tratamiento: 'El tratamiento de IVA debe ser gravado, tasa cero, exento o no objeto.',
+  ck_pf_objeto: 'El objeto de impuesto debe ser 01, 02 o 03.',
+  ck_pf_clave_prod: 'La clave de producto o servicio del SAT son 8 dígitos.',
+  ck_pf_clave_unidad: 'La clave de unidad del SAT son hasta 3 caracteres.',
+  ck_pf_validado_completo: 'No se puede dejar validado un producto con datos fiscales incompletos.',
 }
 
 // El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones
@@ -233,7 +256,20 @@ export function w1Code(message: string): string | undefined {
   return m && MENSAJES[m[1]] ? m[1] : m?.[1]
 }
 
+// Una violación de constraint llega como mensaje de Postgres, con el nombre en
+// minúsculas: `... violates check constraint "ck_pf_tasa"`. El extractor de códigos
+// solo reconoce tokens en MAYÚSCULAS, así que sin esto los mensajes de constraint
+// jamás llegaban al operador y caían al texto degradado. Y es justo cuando más
+// falta hace una explicación clara: el operador acaba de capturar algo incoherente.
+const CONSTRAINT = /violates (?:check |unique )?constraint "([a-z][a-z0-9_]+)"/i
+export function constraintCode(message: string): string | undefined {
+  const m = CONSTRAINT.exec(message)
+  return m && MENSAJES[m[1]] ? m[1] : undefined
+}
+
 export function w1Message(message: string): string {
+  const ck = constraintCode(message)
+  if (ck) return MENSAJES[ck]
   const code = w1Code(message)
   if (code && MENSAJES[code]) {
     // Conserva el detalle del servidor cuando aporta: una cantidad concreta
