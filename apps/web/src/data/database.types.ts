@@ -1022,6 +1022,48 @@ export type Database = {
         }
         Relationships: []
       }
+      fiscal_category_defaults: {
+        Row: {
+          categoria: string
+          clave_prod_serv: string | null
+          clave_unidad: string | null
+          created_at: string
+          definido_at: string | null
+          definido_por: string | null
+          iva_tasa: number | null
+          notas: string | null
+          objeto_imp: string | null
+          tratamiento_iva: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          definido_at?: string | null
+          definido_por?: string | null
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          tratamiento_iva?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          definido_at?: string | null
+          definido_por?: string | null
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          tratamiento_iva?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fiscal_document_events: {
         Row: {
           actor: string | null
@@ -1251,6 +1293,88 @@ export type Database = {
           result?: Json | null
         }
         Relationships: []
+      }
+      fiscal_price_evidence: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          clasificacion: string
+          created_at: string
+          familia_publicada: string | null
+          id: string
+          import_op_id: string
+          mapeo_estado: string
+          mapeo_metodo: string | null
+          mapeo_motivo: string | null
+          precio_historico: number | null
+          precio_publicado: number | null
+          procedencia: string | null
+          product_id: string | null
+          source_nombre: string
+          source_ref: string
+          source_referencia: string | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          clasificacion: string
+          created_at?: string
+          familia_publicada?: string | null
+          id?: string
+          import_op_id: string
+          mapeo_estado: string
+          mapeo_metodo?: string | null
+          mapeo_motivo?: string | null
+          precio_historico?: number | null
+          precio_publicado?: number | null
+          procedencia?: string | null
+          product_id?: string | null
+          source_nombre: string
+          source_ref: string
+          source_referencia?: string | null
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          clasificacion?: string
+          created_at?: string
+          familia_publicada?: string | null
+          id?: string
+          import_op_id?: string
+          mapeo_estado?: string
+          mapeo_metodo?: string | null
+          mapeo_motivo?: string | null
+          precio_historico?: number | null
+          precio_publicado?: number | null
+          procedencia?: string | null
+          product_id?: string | null
+          source_nombre?: string
+          source_ref?: string
+          source_referencia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_price_evidence_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_price_evidence_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_price_evidence_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fiscal_reconciliations: {
         Row: {
@@ -2151,6 +2275,155 @@ export type Database = {
             foreignKeyName: "product_costs_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_fiscal: {
+        Row: {
+          clave_prod_serv: string | null
+          clave_unidad: string | null
+          created_at: string
+          descripcion_fiscal: string | null
+          evidencia_historica: string | null
+          evidencia_procedencia: string | null
+          fuente: string | null
+          iva_tasa: number | null
+          notas: string | null
+          objeto_imp: string | null
+          precio_historico: number | null
+          precio_publicado: number | null
+          product_id: string
+          tratamiento_iva: string | null
+          updated_at: string
+          validado: boolean
+          validado_at: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          descripcion_fiscal?: string | null
+          evidencia_historica?: string | null
+          evidencia_procedencia?: string | null
+          fuente?: string | null
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          precio_historico?: number | null
+          precio_publicado?: number | null
+          product_id: string
+          tratamiento_iva?: string | null
+          updated_at?: string
+          validado?: boolean
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          descripcion_fiscal?: string | null
+          evidencia_historica?: string | null
+          evidencia_procedencia?: string | null
+          fuente?: string | null
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          precio_historico?: number | null
+          precio_publicado?: number | null
+          product_id?: string
+          tratamiento_iva?: string | null
+          updated_at?: string
+          validado?: boolean
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_fiscal_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_fiscal_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_fiscal_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_fiscal_events: {
+        Row: {
+          actor: string | null
+          actor_role: string
+          antes: Json | null
+          campo: string | null
+          created_at: string
+          despues: Json | null
+          evento: string
+          id: string
+          motivo: string | null
+          op_id: string | null
+          product_id: string
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string
+          antes?: Json | null
+          campo?: string | null
+          created_at?: string
+          despues?: Json | null
+          evento: string
+          id?: string
+          motivo?: string | null
+          op_id?: string | null
+          product_id: string
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string
+          antes?: Json | null
+          campo?: string | null
+          created_at?: string
+          despues?: Json | null
+          evento?: string
+          id?: string
+          motivo?: string | null
+          op_id?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_fiscal_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_fiscal_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_fiscal_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products_safe"
             referencedColumns: ["id"]
           },
@@ -3508,6 +3781,11 @@ export type Database = {
       _fiscal_error: { Args: { p: Json }; Returns: string }
       _norm_email: { Args: { p: string }; Returns: string }
       _norm_phone: { Args: { p: string }; Returns: string }
+      _pf_autorizar: { Args: never; Returns: string }
+      _pf_campos_editables: { Args: never; Returns: string[] }
+      _pf_campos_materiales: { Args: never; Returns: string[] }
+      _pf_faltantes: { Args: { p_product: string }; Returns: string[] }
+      _pf_snapshot: { Args: { p_product: string }; Returns: Json }
       _w1_op_begin: {
         Args: { p_kind: string; p_op: string; p_req: Json }
         Returns: Json
@@ -3719,6 +3997,10 @@ export type Database = {
         }
         Returns: Json
       }
+      aplicar_defaults_categoria: {
+        Args: { p_categoria: string; p_op_id: string }
+        Returns: Json
+      }
       app_role: { Args: never; Returns: string }
       apply_lot_movement: {
         Args: {
@@ -3856,6 +4138,10 @@ export type Database = {
         Args: { p_custody: string; p_lot: string }
         Returns: number
       }
+      definir_defaults_categoria: {
+        Args: { p_cambios: Json; p_categoria: string; p_op_id: string }
+        Returns: Json
+      }
       descartar_solicitud_cfdi: {
         Args: { p_doc_id: string; p_motivo: string; p_op_id: string }
         Returns: Json
@@ -3873,6 +4159,15 @@ export type Database = {
         Args: { p_lines: Json; p_op_id: string }
         Returns: Json
       }
+      editar_fiscal_producto: {
+        Args: {
+          p_cambios: Json
+          p_motivo?: string
+          p_op_id: string
+          p_product_id: string
+        }
+        Returns: Json
+      }
       efectivo_esperado: {
         Args: { p_alcance?: string; p_cajero?: string; p_fecha: string }
         Returns: number
@@ -3886,7 +4181,43 @@ export type Database = {
       estado_fiscal_pedido: { Args: { p_order: string }; Returns: Json }
       estado_operacion_custodia: { Args: { p_op_id: string }; Returns: Json }
       estado_operacion_dinero: { Args: { p_op_id: string }; Returns: Json }
+      estado_validacion_fiscal: {
+        Args: never
+        Returns: {
+          advertencias: string[]
+          categoria: string
+          clave_prod_serv: string
+          clave_unidad: string
+          descripcion_fiscal: string
+          evidencia_historica: string
+          faltantes: string[]
+          iva_tasa: number
+          nombre: string
+          objeto_imp: string
+          precio_final: number
+          precio_historico: number
+          precio_publicado: number
+          product_id: string
+          sku: string
+          tratamiento_iva: string
+          unidad_comercial: string
+          validado: boolean
+          validado_at: string
+          validado_por_nombre: string
+        }[]
+      }
       evidencia_inexistencia_cfdi: { Args: { p_doc_id: string }; Returns: Json }
+      excepciones_evidencia_fiscal: {
+        Args: never
+        Returns: {
+          advertencia: string
+          clasificacion: string
+          filas: number
+          mapeo_estado: string
+          procedencia: string
+          productos: number
+        }[]
+      }
       finalize_shipment: {
         Args: { p_attempt_id: string; p_shipment: Json }
         Returns: Json
@@ -3894,6 +4225,10 @@ export type Database = {
       has_cap: { Args: { cap: string }; Returns: boolean }
       hoy_local: { Args: never; Returns: string }
       identidad_cfdi: { Args: { p_doc_id: string }; Returns: Json }
+      importar_evidencia_precios: {
+        Args: { p_filas: Json; p_op_id: string }
+        Returns: Json
+      }
       importar_lote: {
         Args: {
           p_caducidad: string
@@ -3905,6 +4240,10 @@ export type Database = {
         Returns: Json
       }
       inv_estado_operacion: { Args: { p_op_id: string }; Returns: Json }
+      invalidar_fiscal_producto: {
+        Args: { p_motivo: string; p_op_id: string; p_product_id: string }
+        Returns: Json
+      }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
       is_verified: { Args: never; Returns: boolean }
       log_audit: {
@@ -4113,6 +4452,15 @@ export type Database = {
       }
       upsert_customer_fiscal: {
         Args: { p_customer_id: string; p_fiscal: Json }
+        Returns: Json
+      }
+      validar_fiscal_producto: {
+        Args: {
+          p_fuente: string
+          p_notas?: string
+          p_op_id: string
+          p_product_id: string
+        }
         Returns: Json
       }
       vender_pos: {

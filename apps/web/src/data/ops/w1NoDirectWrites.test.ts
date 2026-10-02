@@ -13,6 +13,11 @@ const FORBIDDEN: { name: string; re: RegExp }[] = [
   { name: 'estado/acumulado de compra directo', re: /from\(\s*['"]replenishments['"]\s*\)\s*\.\s*update\(\s*\{\s*(status|received_qty)/ },
   { name: "orders → 'cancelled'/'packed' directo", re: /from\(\s*['"]orders['"]\s*\)\s*\.\s*update\(\s*\{\s*status:\s*['"](cancelled|packed)['"]/ },
   { name: 'RPC W1 sin el cliente de comandos', re: /\.rpc\(\s*['"](recibir_lote|surtir_pedido|importar_lote|cancelar_pedido|ajustar_lote|confirmar_reingreso|recibir_devolucion|disponer_devolucion|anular_guia_manual)['"]/ },
+  // W3-C · la configuración fiscal del catálogo solo cambia por comando de C1.
+  { name: 'escritura directa a product_fiscal', re: /from\(\s*['"]product_fiscal['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
+  { name: 'escritura directa a fiscal_category_defaults', re: /from\(\s*['"]fiscal_category_defaults['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
+  { name: 'escritura directa a la evidencia fiscal', re: /from\(\s*['"]fiscal_price_evidence['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
+  { name: 'escritura directa a la bitácora fiscal del producto', re: /from\(\s*['"]product_fiscal_events['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
 ]
 
 const CONTROLS = [
@@ -23,6 +28,10 @@ const CONTROLS = [
   "supabase.from('replenishments').update({ status: 'recibida' })",
   "supabase.from('orders').update({ status: 'cancelled' })",
   "supabase.rpc('surtir_pedido', {})",
+  "supabase.from('product_fiscal').update({ validado: true })",
+  "supabase.from('fiscal_category_defaults').upsert({})",
+  "supabase.from('fiscal_price_evidence').insert({})",
+  "supabase.from('product_fiscal_events').delete()",
 ]
 
 describe('W1: sin escrituras directas de inventario en el cliente', () => {

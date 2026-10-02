@@ -66,6 +66,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
       { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt', section: 'Finanzas' },
       { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
+      { key: 'av_fiscal', label: 'Revisión fiscal', icon: 'shield', section: 'Finanzas' },
       { key: 'av_cierre', label: 'Cierre de caja', icon: 'store', section: 'Finanzas' },
       { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Finanzas' },
       { key: 'av_config', label: 'Configuración', icon: 'store', section: 'Sistema' },
