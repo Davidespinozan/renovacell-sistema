@@ -225,6 +225,21 @@ const MENSAJES: Record<string, string> = {
   ck_pf_clave_prod: 'La clave de producto o servicio del SAT son 8 dígitos.',
   ck_pf_clave_unidad: 'La clave de unidad del SAT son hasta 3 caracteres.',
   ck_pf_validado_completo: 'No se puede dejar validado un producto con datos fiscales incompletos.',
+
+  // --- W3-C · C2 · evidencia histórica de precio --------------------------------
+  // La evidencia es de PRECIO, nunca de impuesto: "el histórico coincide con el
+  // final" no significa exento, y "histórico × 1.16" no autoriza el 16%.
+  FISCAL_EVIDENCIA_SOLO_POR_COMANDO: 'La evidencia histórica de precios se carga con la importación del sistema, no a mano.',
+  EVIDENCIA_VACIA: 'No hay filas que importar.',
+  EVIDENCIA_CAMPO_DESCONOCIDO: 'Una de las filas trae un campo que no corresponde a la evidencia de precios. Revisa el archivo: no se importó nada.',
+  EVIDENCIA_ORIGEN_REQUERIDO: 'Cada fila de la evidencia necesita su identificador de origen y el nombre histórico del producto.',
+  ck_fpe_clasificacion: 'La clasificación de la evidencia debe ser una de las cuatro conocidas: histórico más 16%, histórico igual al final, no reconcilia, o sin referencia pública.',
+  ck_fpe_procedencia: 'La procedencia de la evidencia debe ser coincidencia directa o a nivel de familia.',
+  ck_fpe_mapeo_coherente: 'Para ligar una fila histórica a un producto hay que indicar también cómo se obtuvo la coincidencia: directa o por familia.',
+  ck_fpe_familia: 'Una coincidencia a nivel de familia debe indicar de qué familia publicada proviene.',
+  ck_fpe_motivo: 'Una fila que no se pudo ligar a ningún producto debe explicar por qué.',
+  ck_fpe_sin_referencia: 'Una fila sin referencia en el listado público no puede traer precio publicado.',
+  ck_pf_procedencia: 'La procedencia de la evidencia debe ser coincidencia directa o a nivel de familia.',
 }
 
 // El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones

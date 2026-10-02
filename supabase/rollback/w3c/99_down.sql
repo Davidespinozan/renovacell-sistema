@@ -11,7 +11,7 @@
 -- ============================================================================
 
 do $$
-declare v_val int; v_ev int;
+declare v_val int; v_ev int; v_eviP int;
 begin
   if to_regclass('public.product_fiscal') is null then
     raise notice 'W3-C C1 no está aplicado: nada que bajar.';
@@ -22,7 +22,29 @@ begin
   if v_val > 0 or v_ev > 0 then
     raise exception 'ROLLBACK_ABORTADO: hay % producto(s) con validación fiscal humana y % registro(s) de validación. No se borra el trabajo del contador: se corrige hacia adelante.', v_val, v_ev;
   end if;
+  -- C2: la evidencia histórica reconciliada tampoco se descarta a la ligera. Es el
+  -- punto de partida del trabajo fiscal de todo el catálogo y no se puede reconstruir
+  -- desde la base: viene de un Excel y de un listado publicado.
+  if to_regclass('public.fiscal_price_evidence') is not null then
+    select count(*) into v_eviP from public.fiscal_price_evidence;
+    if v_eviP > 0 then
+      raise exception 'ROLLBACK_ABORTADO: hay % fila(s) de evidencia histórica de precio importada. No se descarta: su origen es externo y no se reconstruye desde la base.', v_eviP;
+    end if;
+  end if;
 end $$;
+
+-- C2 primero: la evidencia referencia productos y la proyección vive en product_fiscal.
+drop function if exists public.excepciones_evidencia_fiscal();
+drop function if exists public.importar_evidencia_precios(uuid, jsonb);
+drop trigger if exists trg_fpe_guard on public.fiscal_price_evidence;
+drop trigger if exists trg_fpe_append_only on public.fiscal_price_evidence;
+drop trigger if exists trg_fpe_no_truncate on public.fiscal_price_evidence;
+select set_config('renovacell.purge', 'on', true);
+drop table if exists public.fiscal_price_evidence;
+select set_config('renovacell.purge', 'off', true);
+drop function if exists public.fiscal_price_evidence_guard();
+alter table public.product_fiscal drop constraint if exists ck_pf_procedencia;
+alter table public.product_fiscal drop column if exists evidencia_procedencia;
 
 drop function if exists public.estado_validacion_fiscal();
 drop function if exists public.aplicar_defaults_categoria(uuid, text);

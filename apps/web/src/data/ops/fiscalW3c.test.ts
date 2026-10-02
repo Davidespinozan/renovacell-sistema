@@ -9,6 +9,7 @@ import { w1Message } from './w1Command'
 import c1Src from '../../../../../supabase/migrations/20261018120000_w3c_c1_catalogo_fiscal.sql?raw'
 import cmdSrc from '../../../../../supabase/migrations/20261018120100_w3c_c1_comandos.sql?raw'
 import downSrc from '../../../../../supabase/rollback/w3c/99_down.sql?raw'
+import c2Src from '../../../../../supabase/migrations/20261019120000_w3c_c2_evidencia.sql?raw'
 
 const soloCodigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
@@ -150,5 +151,57 @@ describe('rollback y mensajes de operador', () => {
     expect(m).toMatch(/tasa cero/)
     expect(m).toMatch(/exento/)
     expect(m).not.toMatch(/product_fiscal|constraint/)
+  })
+})
+
+// ── W3-C · C2 — la evidencia de precio no autoriza nada fiscal ───────────────────────────
+describe('C2 · evidencia histórica de PRECIO, nunca de impuesto', () => {
+  it('declara explícitamente lo que las clasificaciones NO significan', () => {
+    expect(c2Src).toMatch(/HISTORICAL_EQUALS_FINAL\s+≠\s+exento/)
+    expect(c2Src).toMatch(/HISTORICAL_BASE_PLUS_16\s+≠\s+tratamiento de IVA al 16% autorizado/)
+    expect(c2Src).toMatch(/NUNCA se deduce ObjetoImp, gravado, tasa cero, exento, no objeto, tasa de IVA/)
+  })
+  it('el importador no escribe NINGÚN campo fiscal', () => {
+    const i = c2Src.indexOf('create function public.importar_evidencia_precios')
+    const cuerpo = soloCodigo(c2Src.slice(i))
+    for (const campo of ['clave_prod_serv', 'clave_unidad', 'objeto_imp', 'tratamiento_iva', 'iva_tasa']) {
+      expect(cuerpo).not.toMatch(new RegExp(`${campo}\\s*=`))
+    }
+    expect(cuerpo).not.toMatch(/validado\s*=\s*true/)
+  })
+  it('declara el invariante duro en su propio resultado', () => {
+    expect(c2Src).toMatch(/'validados_por_esta_importacion', 0/)
+    expect(c2Src).toMatch(/count\(product_fiscal where validado\) = 0/)
+  })
+  it('no empareja productos en tiempo de ejecución: recibe el mapeo revisado', () => {
+    expect(c2Src).toMatch(/Nada de emparejamiento difuso/)
+    const i = c2Src.indexOf('create function public.importar_evidencia_precios')
+    const cuerpo = soloCodigo(c2Src.slice(i))
+    expect(cuerpo).not.toMatch(/similarity|levenshtein|ilike|~\*/)
+  })
+  it('una fila sin mapeo conserva su evidencia y no inventa producto', () => {
+    expect(c2Src).toMatch(/ck_fpe_mapeo_coherente/)
+    expect(c2Src).toMatch(/'NO_MAPEADO' and product_id is null/)
+    expect(c2Src).toMatch(/ck_fpe_motivo/)
+  })
+  it('preserva coincidencia DIRECTA vs a nivel de FAMILIA', () => {
+    expect(c2Src).toMatch(/DIRECT_MATCH','FAMILY_LEVEL_MATCH/)
+    expect(c2Src).toMatch(/ck_fpe_familia/)
+    expect(c2Src).toMatch(/Hidrolizados, \n?--\s*Implantes|Hidrolizados/)
+  })
+  it('la evidencia es append-only y subordinada a la autoridad humana', () => {
+    expect(c2Src).toMatch(/trg_fpe_append_only/)
+    expect(c2Src).toMatch(/La evidencia es SUBORDINADA a la autoridad humana/)
+  })
+  it('no toca precios comerciales ni lo fiscal de W3-A\/B', () => {
+    const cuerpo = soloCodigo(c2Src)
+    expect(cuerpo).not.toMatch(/update public\.products\b/)
+    expect(cuerpo).not.toMatch(/update public\.product_volume_prices|precio_de/)
+    expect(cuerpo).not.toMatch(/insert into public\.fiscal_documents|_w3_asignar_folio/)
+    expect(cuerpo.toLowerCase()).not.toMatch(/https?:\/\/|facturama/)
+  })
+  it('las excepciones de mayor revisión traen su advertencia', () => {
+    expect(c2Src).toMatch(/NO significa exento, tasa cero ni no objeto/)
+    expect(c2Src).toMatch(/no una autorización de tratamiento fiscal/)
   })
 })

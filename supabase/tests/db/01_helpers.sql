@@ -485,3 +485,24 @@ begin
   perform public.validar_fiscal_producto(gen_random_uuid(), p_product, 'criterio del contador');
 end $$;
 grant execute on function tests.pf_validado(uuid, text, numeric) to authenticated, service_role;
+
+-- ---------------------------------------- fixtures de W3-C C2 (evidencia de precio)
+-- Fila de evidencia con la forma exacta que acepta el importador.
+create or replace function tests.ev(p_ref text, p_clas text, p_product uuid default null,
+  p_proc text default null, p_hist numeric default 1000, p_pub numeric default 1160,
+  p_familia text default null, p_motivo text default null, p_nombre text default null,
+  p_metodo text default 'NOMBRE+REFERENCIA')
+returns jsonb language sql immutable as $$
+  select jsonb_strip_nulls(jsonb_build_object(
+    'source_ref', p_ref,
+    'source_nombre', coalesce(p_nombre, 'Histórico ' || p_ref),
+    'clasificacion', p_clas,
+    'precio_historico', p_hist::text,
+    'precio_publicado', case when p_clas = 'NO_PUBLIC_REFERENCE' then null else p_pub::text end,
+    'product_id', p_product::text,
+    'procedencia', p_proc,
+    'familia_publicada', p_familia,
+    -- Un mapeo declara CÓMO se decidió; lo no mapeado declara por qué no.
+    'mapeo_metodo', case when p_product is null then null else p_metodo end,
+    'mapeo_motivo', case when p_product is null then coalesce(p_motivo, 'sin coincidencia revisada') else null end))
+$$;
