@@ -1240,6 +1240,48 @@ export type Database = {
           },
         ]
       }
+      fiscal_family_defaults: {
+        Row: {
+          clave_prod_serv: string | null
+          clave_unidad: string | null
+          created_at: string
+          definido_at: string | null
+          definido_por: string | null
+          familia: string
+          iva_tasa: number | null
+          notas: string | null
+          objeto_imp: string | null
+          tratamiento_iva: string | null
+          updated_at: string
+        }
+        Insert: {
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          definido_at?: string | null
+          definido_por?: string | null
+          familia: string
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          tratamiento_iva?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string
+          definido_at?: string | null
+          definido_por?: string | null
+          familia?: string
+          iva_tasa?: number | null
+          notas?: string | null
+          objeto_imp?: string | null
+          tratamiento_iva?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fiscal_folio_domains: {
         Row: {
           issuer_rfc: string
@@ -3785,6 +3827,10 @@ export type Database = {
       _pf_campos_editables: { Args: never; Returns: string[] }
       _pf_campos_materiales: { Args: never; Returns: string[] }
       _pf_faltantes: { Args: { p_product: string }; Returns: string[] }
+      _pf_objeto_coherente: {
+        Args: { p_objeto: string; p_trat: string }
+        Returns: boolean
+      }
       _pf_snapshot: { Args: { p_product: string }; Returns: Json }
       _w1_op_begin: {
         Args: { p_kind: string; p_op: string; p_req: Json }
@@ -4001,6 +4047,10 @@ export type Database = {
         Args: { p_categoria: string; p_op_id: string }
         Returns: Json
       }
+      aplicar_defaults_familia: {
+        Args: { p_familia: string; p_op_id: string }
+        Returns: Json
+      }
       app_role: { Args: never; Returns: string }
       apply_lot_movement: {
         Args: {
@@ -4142,6 +4192,10 @@ export type Database = {
         Args: { p_cambios: Json; p_categoria: string; p_op_id: string }
         Returns: Json
       }
+      definir_defaults_familia: {
+        Args: { p_cambios: Json; p_familia: string; p_op_id: string }
+        Returns: Json
+      }
       descartar_solicitud_cfdi: {
         Args: { p_doc_id: string; p_motivo: string; p_op_id: string }
         Returns: Json
@@ -4273,6 +4327,15 @@ export type Database = {
       pay_order: {
         Args: { p_method: string; p_order: string; p_ref: string }
         Returns: undefined
+      }
+      pedido_fiscalmente_listo: {
+        Args: { p_order: string }
+        Returns: {
+          faltantes: string[]
+          nombre: string
+          product_id: string
+          sku: string
+        }[]
       }
       pedido_liberado_para_surtir: {
         Args: { p_order: string }
