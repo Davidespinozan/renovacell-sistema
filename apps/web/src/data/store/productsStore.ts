@@ -25,7 +25,7 @@ const live = makeLive<ProductSafe>(async () => {
     category: r.category ?? '',
     description: r.description ?? '',
     price: r.price,
-    unit: r.unit ?? 'unit',
+    unit: r.unit ?? null,
     image_url: r.image_url,
     active: r.active ?? true,
     show_landing: r.show_landing ?? true,
@@ -42,6 +42,9 @@ export const ready = live.ready
 
 export interface ProductInput {
   name: string
+  // Presentación comercial con la que se vende (pieza, caja, vial…). Es dato
+  // COMERCIAL: no es, ni se convierte sola en, la clave de unidad del SAT.
+  unit?: string | null
   sku: string
   line: 'cosm' | 'prof'
   category: string
@@ -63,7 +66,7 @@ export function createProduct(input: ProductInput): ProductSafe {
   const temp: ProductSafe = {
     id: `p-new-${seq}`, sku: input.sku || `SKU-${seq}`, name: input.name,
     line: input.line, category: input.category, description: input.description,
-    price: input.price, unit: 'unit', image_url: input.image_url, active: input.active,
+    price: input.price, unit: input.unit?.trim() || null, image_url: input.image_url, active: input.active,
     show_landing: showLanding, show_portal: showPortal,
   }
   live.setLocal([temp, ...live.current()]) // optimista
@@ -73,7 +76,7 @@ export function createProduct(input: ProductInput): ProductSafe {
     // antes el costo capturado al CREAR se descartaba y las casillas de visibilidad se ignoraban.
     supabase.from('products').insert({
       sku: temp.sku, name: input.name, line: input.line, category: input.category,
-      description: input.description, price: input.price, unit: 'unit',
+      description: input.description, price: input.price, unit: input.unit?.trim() || null,
       image_url: input.image_url, active: input.active,
       show_landing: showLanding, show_portal: showPortal,
     }).select('id').single().then(({ data, error }) => {
@@ -163,7 +166,7 @@ export async function importCatalog(rows: ImportRow[]): Promise<ImportResult> {
     let sku = (r.sku || '').trim()
     if (sku && have.has(sku.toLowerCase())) { res.skipped += 1; continue }
     if (!sku) sku = `IMP-${String(n).padStart(4, '0')}` // sin SKU en el origen → uno estable
-    const ins = await supabase.from('products').insert({ sku, name: r.name.trim(), line: r.line, category: r.category ?? '', price: r.price, unit: 'unit', active: true }).select('id').single()
+    const ins = await supabase.from('products').insert({ sku, name: r.name.trim(), line: r.line, category: r.category ?? '', price: r.price, unit: null, active: true }).select('id').single()
     if (ins.error || !ins.data) { reject(r, `${r.name}: ${ins.error?.message ?? 'no se pudo crear'}`); continue }
     res.created += 1
     if (sku) have.add(sku.toLowerCase())

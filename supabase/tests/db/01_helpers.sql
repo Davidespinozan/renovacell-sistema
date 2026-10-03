@@ -467,6 +467,19 @@ begin
 end $$;
 
 -- Configuración fiscal COMPLETA y válida (gravado 16%), sin validar.
+-- Producto vendible con CATEGORÍA y FAMILIA (W3-C C4-D: los candidatos por familia).
+create or replace function tests.producto_fam(p_cat text, p_fam text, p_price numeric default 1160,
+  p_unit text default 'Unidades')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid := gen_random_uuid();
+begin
+  insert into public.products (id, sku, name, price, category, family, unit, active, sellable, line)
+  values (v_id, 'T-'||left(v_id::text,8), 'Producto '||p_fam||' '||left(v_id::text,4),
+          p_price, p_cat, p_fam, p_unit, true, true, 'prof');
+  return v_id;
+end $$;
+grant execute on function tests.producto_fam(text, text, numeric, text) to authenticated, service_role;
+
 create or replace function tests.fiscal_completo(p_product uuid, p_trat text default 'gravado',
   p_tasa numeric default 0.160000) returns jsonb language sql immutable as $$
   select jsonb_build_object(

@@ -44,8 +44,9 @@ begin
       gen_random_uuid(), v_p), 'ck_pf_clave_prod', 'la clave de producto exige 8 dígitos');
   perform tests.throws(format($q$select public.editar_fiscal_producto(%L, %L, '{"clave_unidad":"PIEZAS"}'::jsonb)$q$,
       gen_random_uuid(), v_p), 'ck_pf_clave_unidad', 'la clave de unidad admite hasta 3 caracteres');
-  perform tests.throws(format($q$select public.editar_fiscal_producto(%L, %L, '{"objeto_imp":"99"}'::jsonb)$q$,
-      gen_random_uuid(), v_p), 'ck_pf_objeto', 'el objeto de impuesto es un vocabulario cerrado');
+  perform tests.throws_any(format($q$select public.editar_fiscal_producto(%L, %L, '{"objeto_imp":"99"}'::jsonb)$q$,
+      gen_random_uuid(), v_p), array['ck_pf_objeto', 'ck_pf_objeto_tratamiento'],
+    'el objeto de impuesto es un vocabulario cerrado');
 
   -- ── COHERENCIA tratamiento ↔ tasa: la confusión más común del CFDI ────────
   perform tests.throws(format($q$select public.editar_fiscal_producto(%L, %L, '{"tratamiento_iva":"gravado","iva_tasa":"0"}'::jsonb)$q$,
@@ -57,7 +58,7 @@ begin
   -- El orden de evaluación entre constraints no está definido: un tratamiento
   -- inventado viola a la vez el vocabulario y la coherencia con la tasa.
   perform tests.throws_any(format($q$select public.editar_fiscal_producto(%L, %L, '{"tratamiento_iva":"inventado","iva_tasa":"0.16"}'::jsonb)$q$,
-      gen_random_uuid(), v_p), array['ck_pf_tratamiento', 'ck_pf_tasa'],
+      gen_random_uuid(), v_p), array['ck_pf_tratamiento', 'ck_pf_tasa', 'ck_pf_objeto_tratamiento'],
     'el tratamiento de IVA es un vocabulario cerrado');
 
   -- ── Un campo desconocido se RECHAZA, no se ignora ─────────────────────────
@@ -100,7 +101,10 @@ begin
     foreach v_cambio in array array[
         jsonb_build_object('clave_prod_serv','01010101'),
         jsonb_build_object('clave_unidad','E48'),
-        jsonb_build_object('objeto_imp','01'),
+        -- '03' y no '01': el producto está en tasa_cero, y 01 (no objeto) con
+        -- tasa_cero es contradictorio — la base lo rechaza desde C4-D. Lo que aquí
+        -- se prueba es que CAMBIAR objeto_imp invalida, no una combinación imposible.
+        jsonb_build_object('objeto_imp','03'),
         jsonb_build_object('descripcion_fiscal','otra descripción')] loop
       perform tests.pf_validado(v_p, 'tasa_cero', 0);
       select string_agg(k, ',') into v_campo from jsonb_object_keys(v_cambio) k;

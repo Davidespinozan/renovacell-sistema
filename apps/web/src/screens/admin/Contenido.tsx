@@ -43,6 +43,12 @@ export function SitioWeb() {
 function ProductsEditor() {
   const { data, createProduct, updateProduct, toggleActive, deleteProduct } = useCatalogAdmin()
   const [editing, setEditing] = useState<ProductSafe | 'new' | null>(null)
+  // Las presentaciones que el catálogo ya usa: capturar reutilizando evita que
+  // "Caja/20 pzas" y "caja 20 piezas" convivan como si fueran cosas distintas.
+  const unidadesEnUso = useMemo(
+    () => Array.from(new Set(data.map((p) => p.unit).filter((u): u is string => !!u && u.trim() !== ''))).sort(),
+    [data],
+  )
 
   const onDelete = async (p: ProductSafe) => {
     if (!window.confirm(`¿Eliminar "${p.name}" del catálogo? Si ya tuvo pedidos, mejor ocúltalo.`)) return
@@ -75,6 +81,7 @@ function ProductsEditor() {
 
       {editing && (
         <ProductModal
+          unidadesUsadas={unidadesEnUso}
           product={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSave={(input) => {
@@ -128,8 +135,9 @@ function Section({ title, items, onEdit, onToggle, onDelete }: {
   )
 }
 
-function ProductModal({ product, onClose, onSave }: {
+function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
   product: ProductSafe | null
+  unidadesUsadas: string[]
   onClose: () => void
   onSave: (input: ProductInput) => void
 }) {
@@ -138,6 +146,7 @@ function ProductModal({ product, onClose, onSave }: {
   const [line, setLine] = useState<'cosm' | 'prof'>((product?.line as 'cosm' | 'prof') ?? 'cosm')
   const [category, setCategory] = useState(product?.category ?? '')
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : '')
+  const [unit, setUnit] = useState(product?.unit ?? '')
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
   const [active, setActive] = useState(product?.active !== false)
@@ -196,6 +205,21 @@ function ProductModal({ product, onClose, onSave }: {
 
           <div className="form-grid-2">
             <div>
+              <label style={label}>Presentación / unidad comercial</label>
+              <input style={input} value={unit} onChange={(e) => setUnit(e.target.value)}
+                list="unidades-comerciales" placeholder="Ej. Unidades, Caja/20 pzas, vial" />
+              <datalist id="unidades-comerciales">
+                {unidadesUsadas.map((u) => <option key={u} value={u} />)}
+              </datalist>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5, lineHeight: 1.45 }}>
+                Cómo se vende: pieza, caja, vial. Es dato comercial —{' '}
+                <b>no</b> es la clave de unidad del SAT, ésa la define el contador.
+              </div>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div>
               <label style={label}>Costo (MXN)</label>
               <input style={input} type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)}
                 placeholder={costLoading ? 'Cargando…' : 'Sin costo registrado'} disabled={costLoading} />
@@ -241,7 +265,7 @@ function ProductModal({ product, onClose, onSave }: {
                 const cValid = c == null || Number.isFinite(c)
                 // El costo va a `product_costs`, no a `products`: se guarda aparte. Al CREAR,
                 // createProduct lo persiste con el id real; al EDITAR, aquí con setProductCost.
-                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
+                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), unit: unit.trim() || null, description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
                 if (product && cValid) {
                   void setProductCost(product.id, c, name.trim()).then(reloadInventory)
                 }
