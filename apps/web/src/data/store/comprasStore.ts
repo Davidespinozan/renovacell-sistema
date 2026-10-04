@@ -7,6 +7,7 @@ import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import { runW1Command } from '../ops/w1Command'
 import { confirmar, type Escritura } from './escritura'
+import { leerTodo } from './lectura'
 
 export type ReplenKind = 'compra' | 'produccion'
 // W1: recepción parcial y acumulada; 'recibida' y 'cerrada_incompleta' son terminales (no se reabren).
@@ -33,9 +34,9 @@ export const isOpen = (o: PurchaseOrder): boolean => o.status === 'pendiente' ||
 const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
 
 const live = makeLive<PurchaseOrder>(async () => {
-  const { data, error } = await supabase.from('replenishments')
+  const { data, error } = await leerTodo('las compras', (a, b) => supabase.from('replenishments')
     .select('id, product_id, product_name, qty, unit_cost, kind, supplier, status, paid, created_at, received_qty, close_reason')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as PurchaseOrder[]
 }, [])

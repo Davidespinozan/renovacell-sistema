@@ -5,6 +5,7 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import { confirmar, type Escritura } from './escritura'
+import { leerTodo } from './lectura'
 
 export type GastoCategoria = 'Renta' | 'Nómina' | 'Logística' | 'Marketing' | 'Insumos' | 'Servicios' | 'Otros'
 export const GASTO_CATEGORIAS: GastoCategoria[] = ['Renta', 'Nómina', 'Logística', 'Marketing', 'Insumos', 'Servicios', 'Otros']
@@ -30,9 +31,9 @@ const SEED: Gasto[] = [
 ]
 
 const live = makeLive<Gasto>(async () => {
-  const { data, error } = await supabase.from('expenses')
+  const { data, error } = await leerTodo('los gastos', (a, b) => supabase.from('expenses')
     .select('id, fecha, categoria, concepto, monto, created_at')
-    .order('fecha', { ascending: false })
+    .order('fecha', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Gasto[]
 }, [...SEED].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)))

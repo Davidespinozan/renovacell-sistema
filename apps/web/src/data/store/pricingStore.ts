@@ -5,6 +5,7 @@
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { confirmar, type Escritura } from './escritura'
+import { leerTodo } from './lectura'
 
 export interface PriceList { id: string; name: string; is_default: boolean; sort: number }
 export interface ProductPrice { product_id: string; list_id: string; price: number }
@@ -16,7 +17,9 @@ const listsLive = makeLive<PriceList>(async () => {
 }, [])
 
 const pricesLive = makeLive<ProductPrice>(async () => {
-  const { data, error } = await supabase.from('product_prices').select('product_id, list_id, price')
+  // productos × listas: con 6 listas ya rebasa las 1,000 filas que PostgREST entrega de una vez.
+  const { data, error } = await leerTodo('los precios por lista', (a, b) =>
+    supabase.from('product_prices').select('product_id, list_id, price').order('product_id').order('list_id').range(a, b))
   if (error) throw error
   return (data ?? []).map((p) => ({ product_id: p.product_id as string, list_id: p.list_id as string, price: Number(p.price) || 0 }))
 }, [])

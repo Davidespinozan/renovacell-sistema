@@ -13,6 +13,7 @@
 //    `autorizar_reembolso` no mueve dinero; `pagar_reembolso` lo saca del libro.
 import { supabase, hasSupabase } from '../../lib/supabase'
 import { runW2Command, type W1Result } from './w1Command'
+import { leerTodo } from '../store/lectura'
 
 export type PaymentMethod = 'transferencia' | 'efectivo' | 'tarjeta' | 'stripe' | 'otro'
 export type EstadoPago = 'pending' | 'parcial' | 'paid' | 'refunded'
@@ -115,10 +116,14 @@ export async function moneyOf(orderId: string): Promise<OrderMoney | null> {
 // El dinero de varios pedidos de un jalón (cobranza, listas). Mapa por order_id.
 export async function moneyByOrder(orderIds?: string[]): Promise<Record<string, OrderMoney>> {
   if (!hasSupabase) return {}
-  let q = supabase.from('v_order_money').select(MONEY_COLS)
-  if (orderIds && orderIds.length > 0) q = q.in('order_id', orderIds)
-  const { data, error } = await q
-  if (error || !data) return {}
+  // Por páginas: sin esto, pasado el pedido 1,000 la cobranza se quedaba sin saldo
+  // para los demás, y sin ningún aviso.
+  const { data, error } = await leerTodo('el estado de cobro de los pedidos', (a, b) => {
+    let q = supabase.from('v_order_money').select(MONEY_COLS)
+    if (orderIds && orderIds.length > 0) q = q.in('order_id', orderIds)
+    return q.order('order_id').range(a, b)
+  })
+  if (error) return {}
   return Object.fromEntries((data as unknown as OrderMoney[]).map((m) => [m.order_id, m]))
 }
 

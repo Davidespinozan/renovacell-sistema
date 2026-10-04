@@ -66,13 +66,22 @@ const emit = () => { snap = fallos; listeners.forEach((l) => l()) }
 export const subscribeFallos = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb) } }
 export const getFallosSnapshot = (): Fallo[] => snap
 
-export function reportarFallo(que: string, error: string, ambiguous = false): Fallo {
+export function reportarFallo(que: string, error: string, ambiguous = false, opciones: { unico?: boolean } = {}): Fallo {
   seq += 1
   const f: Fallo = { id: seq, que, error, ambiguous, at: new Date().toISOString() }
+  // `unico`: un mismo aviso (p. ej. "no se pudo cargar los pedidos") no se apila una
+  // vez por cada recarga; reemplaza al anterior con el mismo `que`.
+  const resto = opciones.unico ? fallos.filter((x) => x.que !== que) : fallos
   // Se conservan los más recientes; el operador los descarta a mano.
-  fallos = [f, ...fallos].slice(0, 6)
+  fallos = [f, ...resto].slice(0, 6)
   emit()
   return f
+}
+/** Retira un aviso por su `que` cuando la condición que lo causó ya no existe. */
+export function limpiarAviso(que: string) {
+  if (!fallos.some((f) => f.que === que)) return
+  fallos = fallos.filter((f) => f.que !== que)
+  emit()
 }
 export function descartarFallo(id: number) { fallos = fallos.filter((f) => f.id !== id); emit() }
 export function limpiarFallos() { fallos = []; emit() }

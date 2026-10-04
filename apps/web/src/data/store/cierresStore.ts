@@ -10,6 +10,7 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { registrarCorteCaja as cmdCorte, anularCorteCaja as cmdAnular } from '../ops/money'
+import { leerTodo } from './lectura'
 
 export interface Cierre {
   id: string
@@ -32,9 +33,9 @@ export interface Cierre {
 }
 
 const live = makeLive<Cierre>(async () => {
-  const { data, error } = await supabase.from('cash_closings')
+  const { data, error } = await leerTodo('los cortes de caja', (a, b) => supabase.from('cash_closings')
     .select('id, fecha, alcance, esperado, fondo, contado, diferencia, motivo, usuario, created_at, voids_closing_id, void_reason, cajero, corte_desde, corte_hasta, prev_closing_id')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []).map((c) => ({ ...c, fondo: (c as { fondo?: number }).fondo ?? 0 })) as unknown as Cierre[]
 }, [])

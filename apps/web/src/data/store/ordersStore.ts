@@ -28,6 +28,7 @@ import {
 } from '../ops/money'
 import { reloadMoney, setDemoCredit } from './moneyStore'
 import { solicitarCFDI } from '../ops/fiscalIntent'
+import { leerTodo } from './lectura'
 
 // Traduce la forma de pago de la UI al vocabulario cerrado del libro (ck_entry_method).
 export function metodoW2(m: string | null | undefined): PaymentMethod {
@@ -88,10 +89,12 @@ let hgen = 0 // guard de generación: una hidratación obsoleta no pisa la más 
 async function hydrate() {
   if (!hasSupabase) return
   const g = ++hgen
-  const { data, error } = await supabase
+  // Por páginas y con desempate por id: sin esto PostgREST cortaba en 1,000 pedidos sin
+  // avisar, y las colas y la cobranza se calculaban sobre un historial incompleto.
+  const { data, error } = await leerTodo('los pedidos', (desde, hasta) => supabase
     .from('orders')
     .select('id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(desde, hasta))
   if (g !== hgen) return // llegó una hidratación más nueva; ignora esta
   if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
   const rows = data ?? []

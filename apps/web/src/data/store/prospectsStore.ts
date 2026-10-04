@@ -9,6 +9,7 @@ import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import type { Json } from '../database.types'
 import { mensajeDeError, reportarFallo } from './escritura'
+import { leerTodo } from './lectura'
 
 export type ProspectStatus = 'nuevo' | 'contactado' | 'cotizado' | 'convertido' | 'descartado'
 export interface ProspectNote { text: string; at: string }
@@ -80,9 +81,9 @@ const SEED: Prospect[] = [
 ]
 
 const live = makeLive<Prospect>(async () => {
-  const { data, error } = await supabase.from('prospects')
+  const { data, error } = await leerTodo('los prospectos', (a, b) => supabase.from('prospects')
     .select('id, name, email, phone, cedula, source, status, assigned_to, created_at, meta')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Prospect[]
 }, SEED)

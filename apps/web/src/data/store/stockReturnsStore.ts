@@ -11,6 +11,7 @@ import { makeLive } from './live'
 import { runW1Command, type W1Result } from '../ops/w1Command'
 import { reloadInventory } from './lotsStore'
 import { reloadOrders } from './ordersStore'
+import { leerTodo } from './lectura'
 
 export type Inspection = 'ok' | 'dañado' | 'caducado'
 export type Disposition = 'vendible' | 'merma'
@@ -38,9 +39,9 @@ export interface StockReturn {
 }
 
 const live = makeLive<StockReturn>(async () => {
-  const { data, error } = await supabase.from('stock_returns')
+  const { data, error } = await leerTodo<StockReturn>('las devoluciones', (a, b) => supabase.from('stock_returns')
     .select('id, order_id, origin, notes, created_at, lines:stock_return_lines(id, return_id, order_id, order_item_id, product_id, lot_id, qty, inspection, notes, disposition, created_at)')
-    .order('created_at', { ascending: false }) as unknown as { data: StockReturn[] | null; error: { message: string } | null }
+    .order('created_at', { ascending: false }).order('id').range(a, b) as unknown as PromiseLike<{ data: StockReturn[] | null; error: { message: string } | null }>)
   if (error) throw error
   return (data ?? []).map((r) => ({ ...r, lines: r.lines ?? [] }))
 }, [])

@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
   const chain: Record<string, ReturnType<typeof vi.fn>> & { then?: unknown } = {}
-  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'order', 'maybeSingle', 'single']) {
+  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'order', 'range', 'limit', 'maybeSingle', 'single']) {
     chain[m] = vi.fn(() => chain)
   }
   // Lo que responde una lectura/escritura directa a tabla. Configurable: W4 necesita

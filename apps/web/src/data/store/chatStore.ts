@@ -71,6 +71,10 @@ export function subscribe(cb: () => void): () => void {
 export const getConversations = (): Conversation[] => snapConvs
 export const getMessages = (): Record<string, Message[]> => snapMsgs
 
+// Ventana del chat: los mensajes más recientes que se cargan al abrir. El historial
+// anterior sigue en la base; no se trae al navegador.
+const MENSAJES_RECIENTES = 2000
+
 // ---- Hidratación + Realtime (solo con backend) ----
 async function hydrate() {
   if (!hasSupabase) return
@@ -79,12 +83,17 @@ async function hydrate() {
   if (me) CURRENT_USER.name = me.name
   const [{ data: convs, error: ce }, { data: msgs, error: me2 }] = await Promise.all([
     supabase.from('conversations').select('id, kind, title, area, member_ids, created_at, last_message_at'),
-    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, created_at').order('created_at', { ascending: true }),
+    // Se piden los MÁS RECIENTES (descendente + tope) y se reordenan abajo. Antes iba
+    // ascendente y sin tope: al pasar de 1,000 mensajes PostgREST habría devuelto los más
+    // VIEJOS, y los mensajes nuevos habrían desaparecido del chat al recargar.
+    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, created_at')
+      .order('created_at', { ascending: false }).order('id').limit(MENSAJES_RECIENTES),
   ])
   if (ce || me2) { console.warn('[chat] hydrate', ce?.message ?? me2?.message); return }
   conversations = (convs ?? []) as unknown as Conversation[]
   const map: Record<string, Message[]> = {}
-  ;(msgs ?? []).forEach((m) => { (map[m.conversation_id] ??= []).push(m as unknown as Message) })
+  // Llegaron del más nuevo al más viejo: se invierten para que cada conversación quede en orden de lectura.
+  ;[...(msgs ?? [])].reverse().forEach((m) => { (map[m.conversation_id] ??= []).push(m as unknown as Message) })
   messages = map
   emit()
 }

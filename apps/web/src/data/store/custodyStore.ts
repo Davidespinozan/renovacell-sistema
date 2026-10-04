@@ -6,6 +6,7 @@
 // Ninguna pantalla lleva contadores propios. Toda mutación pasa por ops/custody.ts y
 // después llama a `reloadCustody()` (write-through, sin éxito optimista).
 import { supabase, hasSupabase } from '../../lib/supabase'
+import { leerTodo } from './lectura'
 import { makeLive } from './live'
 import {
   CUSTODY_COLS, CUSTODY_LINE_COLS, CUSTODY_STOCK_COLS, DISPONIBLE_COLS,
@@ -13,25 +14,25 @@ import {
 } from '../ops/custody'
 
 const custodiesLive = makeLive<Custody>(async () => {
-  const { data, error } = await supabase.from('custodies').select(CUSTODY_COLS).order('opened_at', { ascending: false })
+  const { data, error } = await leerTodo('las custodias', (a, b) => supabase.from('custodies').select(CUSTODY_COLS).order('opened_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Custody[]
 }, [])
 
 const stockLive = makeLive<CustodyStock>(async () => {
-  const { data, error } = await supabase.from('v_custody_stock').select(CUSTODY_STOCK_COLS)
+  const { data, error } = await leerTodo('el inventario en custodia', (a, b) => supabase.from('v_custody_stock').select(CUSTODY_STOCK_COLS).order('custody_id').order('lot_id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as CustodyStock[]
 }, [])
 
 const linesLive = makeLive<CustodyLine>(async () => {
-  const { data, error } = await supabase.from('custody_lines').select(CUSTODY_LINE_COLS).order('created_at', { ascending: false })
+  const { data, error } = await leerTodo('los movimientos de custodia', (a, b) => supabase.from('custody_lines').select(CUSTODY_LINE_COLS).order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as CustodyLine[]
 }, [])
 
 const dispLive = makeLive<StockDisponible>(async () => {
-  const { data, error } = await supabase.from('v_stock_disponible').select(DISPONIBLE_COLS)
+  const { data, error } = await leerTodo('la disponibilidad de inventario', (a, b) => supabase.from('v_stock_disponible').select(DISPONIBLE_COLS).order('lot_id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as StockDisponible[]
 }, [])

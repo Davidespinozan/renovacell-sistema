@@ -11,6 +11,7 @@ import { logAudit } from './auditStore'
 import { makeLive } from './live'
 import { autorizarReembolso as cmdAutorizar, pagarReembolso as cmdPagar, type PaymentMethod } from '../ops/money'
 import { reloadMoney } from './moneyStore'
+import { leerTodo } from './lectura'
 
 export type RefundTipo = 'devolucion' | 'correccion' | 'cortesia'
 
@@ -30,9 +31,9 @@ export interface Refund {
 }
 
 const live = makeLive<Refund>(async () => {
-  const { data, error } = await supabase.from('refunds')
+  const { data, error } = await leerTodo('los reembolsos', (a, b) => supabase.from('refunds')
     .select('id, order_id, tipo, monto, motivo, metodo, usuario, created_at, items')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Refund[]
 }, [])

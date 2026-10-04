@@ -7,21 +7,22 @@
 import { supabase, hasSupabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { CLAIM_COLS, ENTRY_COLS, MONEY_COLS, type OrderMoney, type PaymentClaim, type PaymentEntry } from '../ops/money'
+import { leerTodo } from './lectura'
 
 const moneyLive = makeLive<OrderMoney>(async () => {
-  const { data, error } = await supabase.from('v_order_money').select(MONEY_COLS)
+  const { data, error } = await leerTodo('el estado de cobro de los pedidos', (a, b) => supabase.from('v_order_money').select(MONEY_COLS).order('order_id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as OrderMoney[]
 }, [])
 
 const claimsLive = makeLive<PaymentClaim>(async () => {
-  const { data, error } = await supabase.from('payment_claims').select(CLAIM_COLS).order('declared_at', { ascending: false })
+  const { data, error } = await leerTodo('los pagos declarados', (a, b) => supabase.from('payment_claims').select(CLAIM_COLS).order('declared_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as PaymentClaim[]
 }, [])
 
 const entriesLive = makeLive<PaymentEntry>(async () => {
-  const { data, error } = await supabase.from('payment_entries').select(ENTRY_COLS).order('created_at', { ascending: false })
+  const { data, error } = await leerTodo('los cobros', (a, b) => supabase.from('payment_entries').select(ENTRY_COLS).order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as PaymentEntry[]
 }, [])

@@ -7,6 +7,7 @@ import { MOCK_LOTS } from '../mock/inventory'
 import type { Lot } from '../types'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { leerTodo } from './lectura'
 
 interface StockRow { product_id: string; available: number }
 
@@ -17,7 +18,7 @@ const rowsFromLots = (lots: Lot[]): StockRow[] =>
 const fallback: StockRow[] = rowsFromLots(MOCK_LOTS)
 
 const live = makeLive<StockRow>(async () => {
-  const { data, error } = await supabase.from('product_stock').select('product_id, available')
+  const { data, error } = await leerTodo('las existencias', (a, b) => supabase.from('product_stock').select('product_id, available').order('product_id').range(a, b))
   if (error) throw error
   return (data ?? []).map((r) => ({ product_id: r.product_id ?? '', available: r.available ?? 0 }))
 }, fallback)
