@@ -48,19 +48,25 @@ export function MisEntregas() {
   const [loadNote, setLoadNote] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<string | null>(null)
 
-  const reportInc = (shipmentId: string, folio: string) => {
-    reportIncident(shipmentId, incType[shipmentId] ?? INCIDENT_TYPES[0], incNote[shipmentId]?.trim() || null, folio)
-    setToast(`Incidencia reportada: ${folio}`)
-    window.setTimeout(() => setToast(null), 2600)
+  // El aviso dice lo que el SERVIDOR confirmó. Un fallo se queda más tiempo en
+  // pantalla (y además aparece en la franja global, que no se va sola).
+  const avisar = (ok: boolean, texto: string) => {
+    setToast(texto)
+    window.setTimeout(() => setToast(null), ok ? 2600 : 7000)
+  }
+
+  const reportInc = async (shipmentId: string, folio: string) => {
+    const r = await reportIncident(shipmentId, incType[shipmentId] ?? INCIDENT_TYPES[0], incNote[shipmentId]?.trim() || null, folio)
+    avisar(r.ok, r.ok ? `Incidencia reportada: ${folio}` : `La incidencia de ${folio} NO se registró. ${r.error}`)
   }
 
   // Problema al contar la carga (faltan piezas / producto equivocado): avisa a Almacén
   // para que corrija ANTES de que el chofer salga a reparto — no confirmar a ciegas.
-  const reportLoad = (shipmentId: string, folio: string) => {
-    reportIncident(shipmentId, loadType[shipmentId] ?? LOAD_INCIDENT_TYPES[0], loadNote[shipmentId]?.trim() || null, folio, { toWarehouse: true })
-    setLoadOpen((m) => ({ ...m, [shipmentId]: false }))
-    setToast(`Problema de carga reportado a Almacén: ${folio}`)
-    window.setTimeout(() => setToast(null), 2600)
+  const reportLoad = async (shipmentId: string, folio: string) => {
+    const r = await reportIncident(shipmentId, loadType[shipmentId] ?? LOAD_INCIDENT_TYPES[0], loadNote[shipmentId]?.trim() || null, folio, { toWarehouse: true })
+    // El formulario solo se cierra si el reporte quedó: si no, el chofer conserva lo que escribió.
+    if (r.ok) setLoadOpen((m) => ({ ...m, [shipmentId]: false }))
+    avisar(r.ok, r.ok ? `Problema de carga reportado a Almacén: ${folio}` : `El problema de ${folio} NO se reportó. ${r.error}`)
   }
 
   // Ver la prueba de una entrega YA cerrada (foto en bucket privado → URL firmada temporal).
@@ -72,10 +78,9 @@ export function MisEntregas() {
 
   // Entregar SIN foto cuando la subida falla por mala señal: exige un motivo y lo deja en
   // el registro (received_by) para que Almacén/Dirección reclamen la evidencia después.
-  const deliverNoPhoto = (shipmentId: string, orderId: string, folio: string, who: string, motivo: string) => {
-    entregar(shipmentId, orderId, null, `${who} (sin foto: ${motivo})`)
-    setToast(`Entrega registrada sin foto: ${folio}`)
-    window.setTimeout(() => setToast(null), 2600)
+  const deliverNoPhoto = async (shipmentId: string, orderId: string, folio: string, who: string, motivo: string) => {
+    const r = await entregar(shipmentId, orderId, null, `${who} (sin foto: ${motivo})`)
+    avisar(r.ok, r.ok ? `Entrega registrada sin foto: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
   }
 
   // Solo con chofer resuelto: si driverId es null (aún cargando) no se listan
@@ -166,10 +171,9 @@ export function MisEntregas() {
     else setUpErr((e) => ({ ...e, [shipmentId]: true }))
   }
 
-  const deliver = (shipmentId: string, orderId: string, folio: string) => {
-    entregar(shipmentId, orderId, proofPath[shipmentId] ?? null, received[shipmentId]?.trim() || null)
-    setToast(`Entrega confirmada: ${folio}`)
-    window.setTimeout(() => setToast(null), 2600)
+  const deliver = async (shipmentId: string, orderId: string, folio: string) => {
+    const r = await entregar(shipmentId, orderId, proofPath[shipmentId] ?? null, received[shipmentId]?.trim() || null)
+    avisar(r.ok, r.ok ? `Entrega confirmada: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
   }
 
   return (

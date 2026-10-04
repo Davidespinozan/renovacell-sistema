@@ -24,6 +24,7 @@ import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, ty
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
+import type { PedidoCreado } from '../../data/store/ordersStore'
 
 type LineFilter = 'all' | 'cosm' | 'prof'
 type Cart = Record<string, number>
@@ -444,7 +445,7 @@ function CheckoutModal({
   total: number
   priceOf: (p: ProductSafe) => number | null
   base: ShippingAddress | null
-  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => OrderWithItems
+  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => Promise<PedidoCreado>
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
@@ -460,6 +461,8 @@ function CheckoutModal({
   const [editingFiscal, setEditingFiscal] = useState(false)
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const [savingFiscal, setSavingFiscal] = useState(false)
+  const [creando, setCreando] = useState(false)
+  const [errorPedido, setErrorPedido] = useState<string | null>(null)
   const fiscalOk = isFiscalProfileComplete(fiscal)
 
   // Al activar "Solicitar factura", carga el master del cliente (o legacy) una sola vez.
@@ -497,9 +500,14 @@ function CheckoutModal({
       setSavingFiscal(false)
       if (!res.ok) { setShowFiscalErr(true); window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
     }
-    const created = onConfirm(invoice, choice, invoice ? fiscal : null)
-    setOrder(created)
-    onDone() // limpia el carrito
+    setCreando(true); setErrorPedido(null)
+    const r = await onConfirm(invoice, choice, invoice ? fiscal : null)
+    setCreando(false)
+    // Si el servidor NO creó el pedido, el carrito se conserva: vaciarlo aquí
+    // haría que el doctor pierda su selección por un pedido que no existe.
+    if (!r.ok) { setErrorPedido(r.error); return }
+    setOrder(r.order)
+    onDone() // limpia el carrito — solo con el pedido confirmado
   }
 
   // Paso de pago en línea (al elegir "Pagar ahora").
@@ -580,9 +588,14 @@ function CheckoutModal({
                 </div>
               )}
 
+              {errorPedido && (
+                <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13 }}>
+                  <b>Tu pedido no se creó.</b> {errorPedido} Tu selección sigue en el carrito.
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address || savingFiscal || (invoice && !fiscalOk)} style={(!choice?.address || savingFiscal || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> {savingFiscal ? 'Guardando…' : 'Crear pedido'}</button>
+                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address || savingFiscal || creando || (invoice && !fiscalOk)} style={(!choice?.address || savingFiscal || creando || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> {savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : 'Crear pedido'}</button>
               </div>
             </div>
           </>

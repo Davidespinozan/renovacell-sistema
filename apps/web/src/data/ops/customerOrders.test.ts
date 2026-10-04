@@ -10,11 +10,20 @@ import ordersRaw from '../store/ordersStore.ts?raw'
 import nuevoPedidoSrc from '../../screens/sales/NuevoPedido.tsx?raw'
 import cajaSrc from '../../screens/pos/Caja.tsx?raw'
 
+// W4: un pedido solo "existe" cuando el store lo confirmó. Aquí se desenvuelve el
+// resultado y, si no se creó, la prueba falla con el motivo real.
+const crear = async (input: Parameters<typeof createOrder>[0]) => {
+  const r = await createOrder(input)
+  if (!r.ok) throw new Error(r.error)
+  return r.order
+}
+
+
 const lines = [{ product_id: 'p1', qty: 2, unit_price: 100 }]
 
 describe('createOrder — customer-only vs legacy doctor', () => {
-  it('customer-only: doctor_id NULL, customer_id set, snapshot en shipping_meta.customer', () => {
-    const o = createOrder({ lines, total: 200, invoice_requested: false, customer_id: 'cust-1', customer: { name: 'Dra. Ana', phone: '55' }, shipping: { line1: 'Calle 1', city: 'CDMX' }, placedBy: 'Ventas' })
+  it('customer-only: doctor_id NULL, customer_id set, snapshot en shipping_meta.customer', async () => {
+    const o = await crear({ lines, total: 200, invoice_requested: false, customer_id: 'cust-1', customer: { name: 'Dra. Ana', phone: '55' }, shipping: { line1: 'Calle 1', city: 'CDMX' }, placedBy: 'Ventas' })
     expect(o.doctor_id).toBeNull()
     expect(o.customer_id).toBe('cust-1')
     const snap = customerSnapshot(o.shipping_meta)
@@ -22,8 +31,8 @@ describe('createOrder — customer-only vs legacy doctor', () => {
     expect(snap?.id).toBe('cust-1')
     expect((o.shipping_meta as { address?: unknown }).address).toEqual({ line1: 'Calle 1', city: 'CDMX' })
   })
-  it('legacy doctor sigue funcionando (doctor_id set, customer_id null)', () => {
-    const o = createOrder({ lines, total: 200, invoice_requested: false, doctor_id: 'doc-1', shipping: { line1: 'X', city: 'Y' } })
+  it('legacy doctor sigue funcionando (doctor_id set, customer_id null)', async () => {
+    const o = await crear({ lines, total: 200, invoice_requested: false, doctor_id: 'doc-1', shipping: { line1: 'X', city: 'Y' } })
     expect(o.doctor_id).toBe('doc-1')
     expect(o.customer_id).toBeNull()
     expect(customerSnapshot(o.shipping_meta)).toBeNull()

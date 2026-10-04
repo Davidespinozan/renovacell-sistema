@@ -98,7 +98,7 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
   const [parcel, setParcel] = useState({ weightKg: '', lengthCm: '', widthCm: '', heightCm: '', pieces: '1' })
   const [rates, setRates] = useState<RateQuote[] | null>(null)
   const [rateId, setRateId] = useState('')
-  const [busy, setBusy] = useState<false | 'quote' | 'label'>(false)
+  const [busy, setBusy] = useState<false | 'quote' | 'label' | 'chofer'>(false)
   const [result, setResult] = useState<LabelResult | null>(null)
   const [doneChofer, setDoneChofer] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,24 +134,31 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
-        createShipment({
+        await createShipment({
           order_id: order.id, carrier: label.carrier, tracking_number: label.tracking,
           label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
         })
       }
-      markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
+      const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
+      // La guía YA existe aunque el pedido no haya cambiado de estado: se muestra
+      // siempre, para que el operador no pierda el número de rastreo, y se le dice
+      // exactamente qué fue lo que no quedó.
       setResult(label)
+      if (!enviado.ok) setError(`La guía ${label.tracking} sí se generó, pero el pedido NO se marcó como enviado. ${enviado.error}`)
     } catch (e) { setError((e as Error).message || 'No se pudo generar la guía. El pedido NO se marcó como enviado.') }
     setBusy(false)
   }
 
-  const asignarChofer = () => {
+  const asignarChofer = async () => {
     if (!driverId) return
     const drv = getDrivers().find((d) => d.id === driverId)
-    createShipment({
+    setBusy('chofer'); setError(null)
+    const r = await createShipment({
       order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
       estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
     })
+    setBusy(false)
+    if (!r.ok) { setError(`No se asignó el chofer. ${r.error}`); return }
     // R-62: NO marcamos el pedido "En camino" aquí (sigue en el almacén, por_despachar). El
     // chofer y el manifiesto ya lo ven por el shipment. El pedido pasa a "enviado" al DESPACHAR
     // el manifiesto (Despacho), para no falsear el Tablero mostrando en tránsito lo que sigue

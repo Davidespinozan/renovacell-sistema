@@ -56,13 +56,26 @@ export function Despacho() {
 
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 2600) }
 
-  const despacharTodo = (mf: Manifiesto) => {
-    mf.paradas.forEach((p) => {
-      dispatchShipment(p.shipmentId, who, p.folio)
-      // R-62: el pedido pasa a "enviado" (En camino) AL DESPACHAR, no al asignar el chofer.
-      markShipped(p.orderId, { method: 'chofer', driver: mf.chofer, driver_id: mf.driverId })
-    })
-    flash(`Manifiesto despachado a ${mf.chofer} · ${mf.paradas.length} pedido(s) · falta que confirme`)
+  // Despacha UNA parada: primero el envío y, solo si quedó, el pedido pasa a "enviado".
+  // R-62: el pedido pasa a "enviado" (En camino) AL DESPACHAR, no al asignar el chofer.
+  const despacharParada = async (p: Manifiesto['paradas'][number], mf: Manifiesto): Promise<boolean> => {
+    const d = await dispatchShipment(p.shipmentId, who, p.folio)
+    if (!d.ok) return false
+    const e = await markShipped(p.orderId, { method: 'chofer', driver: mf.chofer, driver_id: mf.driverId })
+    return e.ok
+  }
+
+  const [despachando, setDespachando] = useState(false)
+  const despacharTodo = async (mf: Manifiesto) => {
+    setDespachando(true)
+    let ok = 0
+    // En serie y contando: antes se anunciaban todas las paradas sin esperar ninguna.
+    for (const p of mf.paradas) if (await despacharParada(p, mf)) ok += 1
+    setDespachando(false)
+    const total = mf.paradas.length
+    flash(ok === total
+      ? `Manifiesto despachado a ${mf.chofer} · ${total} pedido(s) · falta que confirme`
+      : `Se despacharon ${ok} de ${total} pedido(s) a ${mf.chofer}. Los demás NO salieron: revisa los avisos.`)
   }
 
   // Imprime la hoja de salida de un chofer (misma técnica que el recibo del POS: monta el
@@ -99,7 +112,7 @@ export function Despacho() {
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn ghost sm" type="button" onClick={() => imprimir(mf)}><Icon name="download" /> Imprimir manifiesto</button>
-              <button className="btn sm" type="button" onClick={() => despacharTodo(mf)}><Icon name="truck" /> Despachar todo ({mf.paradas.length})</button>
+              <button className="btn sm" type="button" disabled={despachando} onClick={() => void despacharTodo(mf)}><Icon name="truck" /> {despachando ? 'Despachando…' : `Despachar todo (${mf.paradas.length})`}</button>
             </div>
           </div>
           <div style={{ padding: '0 14px 8px' }}>
@@ -113,7 +126,7 @@ export function Despacho() {
                     <td data-label="Dirección" style={{ color: 'var(--ink-3)', fontSize: 12.5 }}>{p.direccion}</td>
                     <td data-label="Piezas" className="mono">{p.piezas}</td>
                     <td data-label="" style={{ textAlign: 'right' }}>
-                      <button className="btn ghost sm" type="button" title="Despachar solo este pedido" onClick={() => { dispatchShipment(p.shipmentId, who, p.folio); flash(`Despachado ${p.folio}`) }}>Despachar</button>
+                      <button className="btn ghost sm" type="button" title="Despachar solo este pedido" disabled={despachando} onClick={async () => { const ok = await despacharParada(p, mf); flash(ok ? `Despachado ${p.folio}` : `${p.folio} NO se despachó: revisa los avisos.`) }}>Despachar</button>
                     </td>
                   </tr>
                 ))}

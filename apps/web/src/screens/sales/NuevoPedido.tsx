@@ -58,6 +58,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const [editingFiscal, setEditingFiscal] = useState(false)
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const [savingFiscal, setSavingFiscal] = useState(false)
+  // El pedido solo "se creó" cuando el servidor lo confirmó. Mientras tanto el
+  // botón queda ocupado, para que un segundo clic no mande otro pedido.
+  const [creando, setCreando] = useState(false)
+  const [errorPedido, setErrorPedido] = useState<string | null>(null)
   const fiscalOk = isFiscalProfileComplete(fiscal)
 
   useEffect(() => {
@@ -109,7 +113,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
       setSavingFiscal(false)
       if (!res.ok) { window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
     }
-    const order = createOrder({
+    setCreando(true); setErrorPedido(null)
+    const r = await createOrder({
       lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
       total,
       invoice_requested: invoice,
@@ -120,7 +125,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
         ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
         : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
     })
-    setFolio(order.external_ref ?? '—')
+    setCreando(false)
+    if (!r.ok) { setErrorPedido(r.error); return }
+    setFolio(r.order.external_ref ?? '—')
   }
 
   return (
@@ -192,9 +199,14 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
                 </div>
               )}
 
+              {errorPedido && (
+                <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13 }}>
+                  <b>El pedido no se creó.</b> {errorPedido}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0 || !shipping || savingFiscal || (invoice && !fiscalOk)} style={(lines.length === 0 || !shipping || savingFiscal || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : 'Crear pedido'}</button>
+                <button className="btn" type="button" disabled={lines.length === 0 || !shipping || savingFiscal || creando || (invoice && !fiscalOk)} style={(lines.length === 0 || !shipping || savingFiscal || creando || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : 'Crear pedido'}</button>
               </div>
             </div>
           </>

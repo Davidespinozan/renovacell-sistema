@@ -4,6 +4,14 @@ import * as doctors from './doctorsStore'
 import * as prospects from './prospectsStore'
 import * as ship from './shipmentsStore'
 
+// W4: un envío solo "existe" cuando el store lo confirmó.
+const envio = async (p: ReturnType<typeof ship.createShipment>) => {
+  const r = await p
+  if (!r.ok) throw new Error(r.error)
+  return r.shipment
+}
+
+
 describe('doctorsStore — verificación con cédula', () => {
   it('NO verifica a un doctor sin cédula', async () => {
     const d = await doctors.addDoctor({ full_name: 'Dra. Sin Cédula', email: 'sincedula@x.mx', organization: null })
@@ -31,18 +39,18 @@ describe('prospectsStore', () => {
 })
 
 describe('shipmentsStore', () => {
-  it('createShipment crea un envío', () => {
-    const s = ship.createShipment({ order_id: 'o-x', carrier: 'Estafeta', tracking_number: 'T1', driver_id: null, estimated_delivery_at: null, status: 'assigned' })
+  it('createShipment crea un envío', async () => {
+    const s = await envio(ship.createShipment({ order_id: 'o-x', carrier: 'Estafeta', tracking_number: 'T1', driver_id: null, estimated_delivery_at: null, status: 'assigned' }))
     expect(ship.getSnapshot().some((x) => x.id === s.id)).toBe(true)
   })
-  it('dispatchShipment lo pasa a despachado', () => {
-    const s = ship.createShipment({ order_id: 'o-y', carrier: null, tracking_number: null, driver_id: null, estimated_delivery_at: null, status: 'assigned' })
-    ship.dispatchShipment(s.id, 'Empaque', 'S-Y')
+  it('dispatchShipment lo pasa a despachado', async () => {
+    const s = await envio(ship.createShipment({ order_id: 'o-y', carrier: null, tracking_number: null, driver_id: null, estimated_delivery_at: null, status: 'assigned' }))
+    await ship.dispatchShipment(s.id, 'Empaque', 'S-Y')
     expect(ship.getSnapshot().find((x) => x.id === s.id)?.status).toBe('despachado')
   })
-  it('markDelivered marca entregado con la prueba', () => {
-    const s = ship.createShipment({ order_id: 'o-z', carrier: null, tracking_number: null, driver_id: null, estimated_delivery_at: null, status: 'out_for_delivery' })
-    ship.markDelivered(s.id, 'http://x/proof.png', 'Recepción')
+  it('markDelivered marca entregado con la prueba', async () => {
+    const s = await envio(ship.createShipment({ order_id: 'o-z', carrier: null, tracking_number: null, driver_id: null, estimated_delivery_at: null, status: 'out_for_delivery' }))
+    await ship.markDelivered(s.id, 'http://x/proof.png', 'Recepción')
     const got = ship.getSnapshot().find((x) => x.id === s.id)
     expect(got?.status).toBe('delivered')
     expect(got?.proof_image_url).toBe('http://x/proof.png')

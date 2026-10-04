@@ -19,7 +19,8 @@ import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import type { Json } from '../database.types'
-import { runW1Command, newOpId } from '../ops/w1Command'
+import { runW1Command, newOpId, constraintCode, isAmbiguous, w1Code } from '../ops/w1Command'
+import { confirmar, mensajeDeError, reportarFallo, type Escritura } from './escritura'
 import {
   reportarPago as cmdReportarPago, registrarCobro as cmdRegistrarCobro, revisarPago as cmdRevisarPago,
   autorizarCredito as cmdAutorizarCredito, revocarCredito as cmdRevocarCredito,
@@ -111,7 +112,12 @@ if (hasSupabase) {
   })
 }
 
-export function createOrder(input: {
+// El pedido solo "se creó" cuando el servidor lo confirmó. `ambiguous` = no se sabe.
+export type PedidoCreado =
+  | { ok: true; order: OrderWithItems }
+  | { ok: false; error: string; ambiguous: boolean }
+
+export async function createOrder(input: {
   lines: NewOrderLine[]
   total: number
   invoice_requested: boolean
@@ -122,7 +128,7 @@ export function createOrder(input: {
   location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
   customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
   receiver?: FiscalProfile | null   // perfil fiscal CONFIRMADO → congela invoice_meta.receiver del pedido
-}): OrderWithItems {
+}): Promise<PedidoCreado> {
   const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
   const folio = `S${Date.now().toString().slice(-6)}`
   const now = new Date().toISOString()
@@ -154,55 +160,89 @@ export function createOrder(input: {
     qty: l.qty, unit_price: l.unit_price, created_at: now,
   }))
 
-  orders = [order, ...orders]
-  items = [...items, ...newItems]
-  emit()
-  notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
-  logAudit({ actor: input.placedBy ?? 'Portal del Doctor', action: 'Pedido creado', resource: folio })
-
-  // Persistir si hay identidad real: doctor uuid (portal/legacy) O customer uuid (comercial).
-  if (hasSupabase && (isUuid(doctorId) || isUuid(input.customer_id))) {
-    (async () => {
-      // EL PRECIO NO LO PONE EL CLIENTE. El servidor (RPC crear_pedido, SECURITY DEFINER)
-      // calcula unit_price/total desde la lista del doctor (o base/General si es customer-only);
-      // aquí solo se manda {product_id, qty}. El total optimista se reemplaza por el del servidor.
-      // IDENTIDAD COMERCIAL: un pedido Portal de un doctor debe llevar customer_id ADEMÁS de
-      // doctor_id. Resuelve el customer ligado al profile del doctor (RLS: el doctor lee el suyo).
-      let resolvedCustomerId: string | null = isUuid(input.customer_id) ? (input.customer_id as string) : null
-      if (!resolvedCustomerId && isUuid(doctorId)) {
-        const { data: c } = await supabase.from('customers').select('id').eq('profile_id', doctorId as string).maybeSingle()
-        if (c?.id) resolvedCustomerId = c.id
-      }
-      const { data, error } = await supabase.rpc('crear_pedido', {
-        p_order_id: id,
-        p_folio: folio,
-        p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
-        p_customer_id: resolvedCustomerId as unknown as string,
-        p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
-        p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
-        p_invoice_requested: input.invoice_requested,
-      })
-      if (error || !data) {
-        // Servidor rechazó (precio inválido, producto inactivo, no autorizado…): revierte el
-        // pedido optimista para no dejar una orden fantasma sin persistir.
-        console.warn('[orders] crear_pedido', error?.message)
-        orders = orders.filter((o) => o.id !== id)
-        items = items.filter((it) => it.order_id !== id)
-        emit()
-        return
-      }
-      const t = Number((data as { total?: number }).total)
-      if (Number.isFinite(t)) { orders = orders.map((o) => (o.id === id ? { ...o, total: t } : o)); emit() }
-      // Congela el snapshot fiscal server-side una vez que el pedido ya existe (RPC acotada).
-      if (input.receiver) {
-        const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
-        const { error: fErr } = await rpc('set_order_fiscal_snapshot', { p_order_id: id, p_receiver: normalizeFiscalProfile(input.receiver) })
-        if (fErr) console.warn('[orders] snapshot fiscal', fErr.message)
-      }
-      hydrate() // trae unit_price/total AUTORITATIVOS del servidor
-    })()
+  // Asienta el pedido en pantalla, avisa a Almacén y deja bitácora. SOLO se llama
+  // cuando el pedido existe de verdad: antes se hacía todo esto ANTES de la respuesta
+  // del servidor, así que un rechazo dejaba un aviso a Almacén de un pedido fantasma.
+  const asentar = (totalServidor?: number): OrderWithItems => {
+    const o = totalServidor != null && Number.isFinite(totalServidor) ? { ...order, total: totalServidor } : order
+    orders = [o, ...orders]
+    items = [...items, ...newItems]
+    emit()
+    notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
+    logAudit({ actor: input.placedBy ?? 'Portal del Doctor', action: 'Pedido creado', resource: folio })
+    return { ...o, items: newItems }
   }
-  return { ...order, items: newItems }
+
+  // Sin backend, o sin identidad real que persistir: el pedido solo vive en pantalla.
+  if (!(hasSupabase && (isUuid(doctorId) || isUuid(input.customer_id)))) return { ok: true, order: asentar() }
+
+  const QUE = `crear el pedido ${folio}`
+  // EL PRECIO NO LO PONE EL CLIENTE. El servidor (RPC crear_pedido, SECURITY DEFINER)
+  // calcula unit_price/total desde la lista del doctor (o base/General si es customer-only);
+  // aquí solo se manda {product_id, qty}.
+  // IDENTIDAD COMERCIAL: un pedido Portal de un doctor debe llevar customer_id ADEMÁS de
+  // doctor_id. Resuelve el customer ligado al profile del doctor (RLS: el doctor lee el suyo).
+  let resolvedCustomerId: string | null = isUuid(input.customer_id) ? (input.customer_id as string) : null
+  if (!resolvedCustomerId && isUuid(doctorId)) {
+    const { data: c } = await supabase.from('customers').select('id').eq('profile_id', doctorId as string).maybeSingle()
+    if (c?.id) resolvedCustomerId = c.id
+  }
+
+  let data: unknown = null
+  let error: { message: string; code?: string } | null = null
+  try {
+    const r = await supabase.rpc('crear_pedido', {
+      p_order_id: id,
+      p_folio: folio,
+      p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
+      p_customer_id: resolvedCustomerId as unknown as string,
+      p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
+      p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
+      p_invoice_requested: input.invoice_requested,
+    })
+    data = r.data; error = r.error
+  } catch {
+    error = { message: 'Failed to fetch' }
+  }
+
+  if (error || !data) {
+    const e = error ?? { message: 'respuesta vacía del servidor' }
+    const reconocido = constraintCode(e.message) ?? w1Code(e.message)
+    if (!reconocido && isAmbiguous(e)) {
+      // RESULTADO DESCONOCIDO. El id del pedido lo generó este cliente, así que en
+      // vez de adivinar se le pregunta al servidor si el pedido existe.
+      const ver = await supabase.from('orders').select('id, total').eq('id', id).maybeSingle()
+      if (!ver.error && ver.data) {
+        const creado = asentar(Number(ver.data.total))
+        hydrate()
+        return { ok: true, order: creado }
+      }
+      if (!ver.error) {
+        const msg = 'El pedido NO se registró. Puedes intentarlo de nuevo.'
+        reportarFallo(QUE, msg, false)
+        return { ok: false, error: msg, ambiguous: false }
+      }
+      const msg = 'No se pudo confirmar si el pedido quedó registrado. Revisa en "Pedidos" antes de crearlo otra vez.'
+      reportarFallo(QUE, msg, true)
+      return { ok: false, error: msg, ambiguous: true }
+    }
+    // Servidor rechazó (precio inválido, producto inactivo, no autorizado…).
+    const msg = mensajeDeError(e, 'comando')
+    reportarFallo(QUE, msg, false)
+    return { ok: false, error: msg, ambiguous: false }
+  }
+
+  const creado = asentar(Number((data as { total?: number }).total))
+  // Congela el snapshot fiscal server-side una vez que el pedido ya existe (RPC acotada).
+  if (input.receiver) {
+    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+    const { error: fErr } = await rpc('set_order_fiscal_snapshot', { p_order_id: id, p_receiver: normalizeFiscalProfile(input.receiver) })
+    // El pedido SÍ existe; lo que no quedó son sus datos fiscales. Se dice tal cual.
+    if (fErr) reportarFallo(`guardar los datos fiscales del pedido ${folio}`,
+      'El pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.', false)
+  }
+  hydrate() // trae unit_price/total AUTORITATIVOS del servidor
+  return { ok: true, order: creado }
 }
 
 const CANCELABLE = ['draft', 'pending_payment', 'paid', 'picking', 'packed']
@@ -312,32 +352,41 @@ export function markPacked(orderId: string, itemLot: Record<string, string | nul
   void localOnly
 }
 
-export function markShipped(orderId: string, shipping_meta: Record<string, unknown>) {
+export async function markShipped(orderId: string, shipping_meta: Record<string, unknown>): Promise<Escritura> {
   const merged = orders.find((o) => o.id === orderId)
-  if (!merged || merged.status !== 'packed') return // solo se envía lo ya empacado
+  // Solo se envía lo ya empacado. No es un fallo del servidor: la pantalla está desfasada.
+  if (!merged || merged.status !== 'packed') return { ok: false, error: 'Este pedido ya no está empacado: recarga para ver su estado actual.', ambiguous: false }
   const nextMeta = { ...((merged?.shipping_meta as object | null) ?? {}), ...shipping_meta }
+  if (hasSupabase && isUuid(orderId)) {
+    const r = await confirmar(`marcar el pedido ${folioOf(orderId)} como enviado`,
+      supabase.from('orders').update({ status: 'shipped', shipping_meta: nextMeta as unknown as Json }).eq('id', orderId))
+    if (!r.ok) { hydrate(); return r }
+  }
+  // Recién ahora, con el servidor confirmado: estado, aviso y bitácora.
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta: nextMeta } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
   logAudit({ actor: 'Empaque', action: 'Envío asignado', resource: folioOf(orderId) })
-  if (hasSupabase && isUuid(orderId)) {
-    supabase.from('orders').update({ status: 'shipped', shipping_meta: nextMeta as unknown as Json }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] ship', error.message); hydrate() })
-  }
+  return { ok: true }
 }
 
 // `remote: false` actualiza solo la pantalla: lo usa ops/entregar, donde quien
 // escribe en la base es el RPC `confirmar_entrega` (el chofer no tiene permiso
 // de escribir `orders` directamente).
-export function markDelivered(orderId: string, opts: { remote?: boolean } = {}) {
+export async function markDelivered(orderId: string, opts: { remote?: boolean } = {}): Promise<Escritura> {
   const cur = orders.find((o) => o.id === orderId)
-  if (!cur || cur.status !== 'shipped') return // solo se entrega lo que salió (enviado)
+  // Solo se entrega lo que salió (enviado).
+  if (!cur || cur.status !== 'shipped') return { ok: false, error: 'Este pedido no está en camino: recarga para ver su estado actual.', ambiguous: false }
+  if (opts.remote !== false && hasSupabase && isUuid(orderId)) {
+    const r = await confirmar(`marcar el pedido ${folioOf(orderId)} como entregado`,
+      supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId))
+    if (!r.ok) { hydrate(); return r }
+  }
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor: 'Chofer', action: 'Entrega confirmada', resource: folioOf(orderId) })
-  if (opts.remote !== false && hasSupabase && isUuid(orderId)) {
-    supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId).then(({ error }) => { if (error) console.warn('[orders] deliver', error.message); hydrate() })
-  }
+  return { ok: true }
 }
 
 function fakeFiscalUuid(seed: string): string {

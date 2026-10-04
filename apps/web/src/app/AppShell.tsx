@@ -5,6 +5,7 @@ import { TopBar } from './TopBar'
 import { BottomNav } from './BottomNav'
 import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
+import { FallosEscritura } from './FallosEscritura'
 
 export function AppShell() {
   const { role, screen } = useRole()
@@ -25,6 +26,8 @@ export function AppShell() {
       <div className="main" data-area={role}>
         <TopBar onMenu={() => setDrawer(true)} />
         <main className="canvas">
+          {/* Fuera de #content: no se desmonta al cambiar de pantalla. */}
+          <FallosEscritura />
           <div id="content" key={`${role}:${screen}`}>
             {renderScreen(role, screen)}
           </div>

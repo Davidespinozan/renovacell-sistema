@@ -163,10 +163,12 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
     if (url) window.open(url, '_blank', 'noopener')
     else window.alert('No se pudo abrir la evidencia de entrega.')
   }
-  const cerrarPaqueteria = () => {
+  const cerrarPaqueteria = async () => {
     if (!shipment || !recibio.trim()) return
-    entregar(shipment.id, order.id, null, recibio.trim())
-    setMarcando(false)
+    const r = await entregar(shipment.id, order.id, null, recibio.trim())
+    // Si no quedó, el formulario sigue abierto con lo capturado; el motivo aparece
+    // en la franja de avisos.
+    if (r.ok) setMarcando(false)
   }
 
   return (

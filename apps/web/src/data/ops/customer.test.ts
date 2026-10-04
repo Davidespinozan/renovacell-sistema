@@ -12,6 +12,15 @@ import doctoresSrc from '../../screens/admin/DoctoresDirectorio.tsx?raw'
 import directorySrc from '../../app/CustomerDirectory.tsx?raw'
 import registrySrc from '../../screens/registry.tsx?raw'
 
+// W4: un pedido solo "existe" cuando el store lo confirmó. Aquí se desenvuelve el
+// resultado y, si no se creó, la prueba falla con el motivo real.
+const crear = async (input: Parameters<typeof createOrder>[0]) => {
+  const r = await createOrder(input)
+  if (!r.ok) throw new Error(r.error)
+  return r.order
+}
+
+
 const mkCustomer = (o: Partial<Customer> = {}): Customer => ({
   id: 'c1', full_name: 'Dra. Ana', email: null, phone: null, city: null, country: null,
   seller_name: null, external_id: null, source: null, import_hash: null, profile_id: null,
@@ -253,17 +262,17 @@ describe('paginación (PAGE_SIZE=100, aplica después de filtro/búsqueda)', () 
 })
 
 describe('orders — customer_id independiente del portal y del snapshot', () => {
-  it('createOrder acepta customer_id y lo guarda sin exigir doctor de portal', () => {
-    const o = createOrder({ lines: [{ product_id: 'p1', qty: 1, unit_price: 100 }], total: 100, invoice_requested: false, customer_id: 'cust-9' })
+  it('createOrder acepta customer_id y lo guarda sin exigir doctor de portal', async () => {
+    const o = await crear({ lines: [{ product_id: 'p1', qty: 1, unit_price: 100 }], total: 100, invoice_requested: false, customer_id: 'cust-9' })
     expect(o.customer_id).toBe('cust-9')
   })
   it('createPosOrder acepta customer_id (POS a nombre de cliente comercial)', () => {
     const o = createPosOrder({ lines: [{ product_id: 'p1', qty: 1, unit_price: 100, lot_id: null }], total: 100, payment_method: 'efectivo', customer_id: 'cust-1' }, true)
     expect(o.customer_id).toBe('cust-1')
   })
-  it('el snapshot de dirección sigue siendo independiente del customer', () => {
+  it('el snapshot de dirección sigue siendo independiente del customer', async () => {
     const addr = { line1: 'Calle 1', city: 'CDMX' }
-    const o = createOrder({ lines: [{ product_id: 'p1', qty: 1, unit_price: 100 }], total: 100, invoice_requested: false, customer_id: 'cust-2', shipping: addr })
+    const o = await crear({ lines: [{ product_id: 'p1', qty: 1, unit_price: 100 }], total: 100, invoice_requested: false, customer_id: 'cust-2', shipping: addr })
     expect((o.shipping_meta as { address?: unknown }).address).toEqual(addr)
     expect(o.customer_id).toBe('cust-2')
   })

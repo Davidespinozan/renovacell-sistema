@@ -109,26 +109,32 @@ export function Asistente() {
 
   const draftTotal = draft.reduce((s, d) => s + (priceOf(d.product) ?? 0) * d.qty, 0)
 
-  const crearPedido = () => {
+  const crearPedido = async () => {
     if (draft.length === 0) return
     const d = resolveDelivery()
     if (!d.ok) { push({ role: 'assistant', text: d.reason }); return }
-    const order = createOrder({
+    const r = await createOrder({
       lines: draft.map((dl) => ({ product_id: dl.product.id, qty: dl.qty, unit_price: priceOf(dl.product) })),
       total: draftTotal,
       invoice_requested: false,
       shipping: d.address,
       location_id: d.locationId ?? null,
     })
+    // El asistente solo dice "listo" cuando el servidor confirmó el pedido. Si no,
+    // lo dice con la misma claridad y conserva el borrador para reintentar.
+    if (!r.ok) {
+      push({ role: 'assistant', text: `No pude crear tu pedido. ${r.error} Tu selección sigue aquí por si quieres intentarlo de nuevo.` })
+      return
+    }
     push({
       role: 'assistant',
-      text: `¡Listo! Creé tu pedido ${order.external_ref} como pago contra pedido. Ya aparece en “Mis pedidos”.`,
-      created: { folio: order.external_ref ?? '—' },
+      text: `¡Listo! Creé tu pedido ${r.order.external_ref} como pago contra pedido. Ya aparece en “Mis pedidos”.`,
+      created: { folio: r.order.external_ref ?? '—' },
     })
     setDraft([])
   }
 
-  const reorder = (o: OrderWithItems) => {
+  const reorder = async (o: OrderWithItems) => {
     // Topa cada renglón al inventario disponible; descarta lo agotado.
     const lines = o.items
       .map((it) => {
@@ -148,11 +154,15 @@ export function Asistente() {
     const total = lines.reduce((s, l) => s + (l.unit_price != null ? l.unit_price * l.qty : 0), 0)
     const del = resolveDelivery()
     if (!del.ok) { push({ role: 'assistant', text: del.reason }); return }
-    const order = createOrder({ lines, total, invoice_requested: false, shipping: del.address, location_id: del.locationId ?? null })
+    const r = await createOrder({ lines, total, invoice_requested: false, shipping: del.address, location_id: del.locationId ?? null })
+    if (!r.ok) {
+      push({ role: 'assistant', text: `No pude recrear ${o.external_ref}. ${r.error}` })
+      return
+    }
     push({
       role: 'assistant',
-      text: `Recreé tu pedido ${o.external_ref} como ${order.external_ref} (pago contra pedido).${adjusted ? ' Ajusté algunas cantidades al inventario disponible.' : ''} Lo ves en “Mis pedidos”.`,
-      created: { folio: order.external_ref ?? '—' },
+      text: `Recreé tu pedido ${o.external_ref} como ${r.order.external_ref} (pago contra pedido).${adjusted ? ' Ajusté algunas cantidades al inventario disponible.' : ''} Lo ves en “Mis pedidos”.`,
+      created: { folio: r.order.external_ref ?? '—' },
     })
   }
 
