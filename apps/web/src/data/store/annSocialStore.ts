@@ -2,6 +2,7 @@
 // lectura, PERSISTENTES por usuario (antes eran solo estado local). Hidrata de
 // announcement_comments/reactions/reads y escribe write-through. Sin backend, mock.
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export interface AnnComment { id: string; announcement_id: string; author: string; body: string; created_at: string }
 
@@ -49,13 +50,13 @@ export function addComment(announcementId: string, body: string, author: string)
   comments = { ...comments, [announcementId]: [...(comments[announcementId] ?? []), c] }
   emit()
   if (hasSupabase) supabase.from('announcement_comments').insert({ id: c.id, announcement_id: announcementId, user_id: uid, author, body: text })
-    .then(({ error }) => { if (error) { console.warn('[annSocial] comment', error.message); comments = { ...comments, [announcementId]: (comments[announcementId] ?? []).filter((x) => x.id !== c.id) }; emit() } })
+    .then(({ error }) => { if (error) { reportarFallo('publicar tu comentario', mensajeDeError(error)); comments = { ...comments, [announcementId]: (comments[announcementId] ?? []).filter((x) => x.id !== c.id) }; emit() } })
 }
 
 export function deleteComment(announcementId: string, commentId: string) {
   comments = { ...comments, [announcementId]: (comments[announcementId] ?? []).filter((c) => c.id !== commentId) }
   emit()
-  if (hasSupabase) supabase.from('announcement_comments').delete().eq('id', commentId).then(({ error }) => { if (error) console.warn('[annSocial] del comment', error.message) })
+  if (hasSupabase) supabase.from('announcement_comments').delete().eq('id', commentId).then(({ error }) => { if (error) reportarFallo('borrar el comentario', mensajeDeError(error)) })
 }
 
 export function toggleReaction(announcementId: string) {
@@ -71,7 +72,7 @@ export function toggleReaction(announcementId: string) {
     const q = has
       ? supabase.from('announcement_reactions').delete().eq('announcement_id', announcementId).eq('user_id', id)
       : supabase.from('announcement_reactions').insert({ announcement_id: announcementId, user_id: id })
-    q.then(({ error }) => { if (error) { console.warn('[annSocial] reaction', error.message); revert() } })
+    q.then(({ error }) => { if (error) { reportarFallo('guardar tu reacción', mensajeDeError(error)); revert() } })
   }
 }
 
@@ -87,5 +88,5 @@ export function markRead(announcementId: string) {
   // no UPDATE. Ya evitamos duplicados con el early-return de arriba; ignoreDuplicates
   // cubre la carrera sin requerir permiso de UPDATE.
   if (hasSupabase) supabase.from('announcement_reads').upsert({ announcement_id: announcementId, user_id: id }, { onConflict: 'announcement_id,user_id', ignoreDuplicates: true })
-    .then(({ error }) => { if (error) { console.warn('[annSocial] read', error.message); readUsers = { ...readUsers, [announcementId]: cur }; emit() } })
+    .then(({ error }) => { if (error) { reportarFallo('marcar el anuncio como leído', mensajeDeError(error)); readUsers = { ...readUsers, [announcementId]: cur }; emit() } })
 }

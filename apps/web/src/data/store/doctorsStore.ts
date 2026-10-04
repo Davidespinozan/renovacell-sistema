@@ -13,6 +13,7 @@ import { decideVerification, simulateSep, type VerifyDecision } from '../verific
 import { buildVerificationMeta, type VerificationStatus } from '../ops/verification'
 import type { CustomerFields } from './customersStore'
 import type { Json } from '../database.types'
+import { confirmar, reportarFallo, type Escritura } from './escritura'
 
 // Merge no destructivo del bloque meta.verification (estado legible; la autoridad de
 // acceso sigue siendo profiles.verified). No borra otras llaves de meta.
@@ -46,16 +47,22 @@ export function verifiedByEmail(email: string): boolean | undefined {
   return live.current().find((d) => d.email?.toLowerCase() === email.trim().toLowerCase())?.verified
 }
 
-export function setVerified(id: string, verified: boolean): boolean {
+// W4: el doctor recibía "tu acceso fue aprobado" ANTES de que el servidor confirmara.
+// Si el servidor rechazaba el cambio, el aviso ya estaba dado y el acceso no existía.
+export async function setVerified(id: string, verified: boolean): Promise<boolean> {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return false
   if (verified && !((doc.meta?.cedula as string) ?? '').trim()) return false // gate: sin cédula no se verifica
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(verified ? `verificar a ${doc.full_name ?? 'el doctor'}` : `revocar el acceso de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ verified }).eq('id', id))
+    if (!r.ok) { void live.reload(); return false }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified } : d)))
   logAudit({ actor: 'Administración', action: verified ? 'Doctor verificado' : 'Acceso revocado', resource: doc.full_name ?? id })
   // Al aprobarse, avisar al doctor (la landing le prometió "te avisaremos"). Dirigido al
   // dueño de la cuenta, como el resto de avisos al doctor (patrón de markPaid).
   if (verified) notify({ text: 'Tu acceso al portal Renovacell fue aprobado. Ya puedes iniciar sesión.', userIds: [id], screen: 'pedidosdr' })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verify', error.message); live.reload() })
   return true
 }
 
@@ -63,21 +70,32 @@ export function setVerified(id: string, verified: boolean): boolean {
 // el estado local ni en mock hacía nada → el <select> no reflejaba el cambio y Dirección
 // creía que había asignado "Mayoreo" (el doctor pagaba el precio equivocado). Ahora es
 // optimista local + persiste + recarga, y queda en bitácora (acción de dinero sensible).
-export function setPriceList(id: string, listId: string | null): void {
+export async function setPriceList(id: string, listId: string | null): Promise<Escritura> {
   const doc = live.current().find((d) => d.id === id)
-  if (!doc) return
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
+  // La lista decide cuánto paga el doctor: el <select> solo cambia si quedó guardado.
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`asignar la lista de precios de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ price_list_id: listId }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, price_list_id: listId } : d)))
   logAudit({ actor: 'Administración', action: 'Lista de precios asignada', resource: doc.full_name ?? id, detail: listId ?? 'General (base)' })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ price_list_id: listId }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] price_list', error.message); live.reload() })
+  return { ok: true }
 }
 
-export function setCedula(id: string, cedula: string) {
+export async function setCedula(id: string, cedula: string): Promise<Escritura> {
   const doc = live.current().find((d) => d.id === id)
-  if (!doc) return
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
   const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), cedula: cedula.trim() }
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`registrar la cédula de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] cedula', error.message); live.reload() })
+  return { ok: true }
 }
 
 // VERIFICACIÓN AUTOMÁTICA (IA + SEP). Con backend llama a la Edge Function
@@ -93,23 +111,28 @@ export async function autoVerify(id: string): Promise<VerifyDecision | null> {
   let result: VerifyDecision
   if (hasSupabase && isUuid(id)) {
     const { data, error } = await supabase.functions.invoke('verify-cedula', { body: { cedula, name } })
-    if (error || !data) { console.warn('[verify] función', error?.message); return null }
+    if (error || !data) { reportarFallo(`verificar la cédula de ${name}`, 'El servicio de verificación no respondió. Puedes revisar la cédula manualmente.', true); return null }
     result = data as VerifyDecision
   } else {
     result = decideVerification(name, simulateSep(cedula, name))
   }
-  applyVerifyDecision(id, result)
+  await applyVerifyDecision(id, result)
   return result
 }
 
-function applyVerifyDecision(id: string, result: VerifyDecision) {
+async function applyVerifyDecision(id: string, result: VerifyDecision): Promise<Escritura> {
   const doc = live.current().find((d) => d.id === id)
-  if (!doc) return
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
   // POLÍTICA Fase 1: la auto-verificación (IA+SEP) es EVIDENCIA, NO concede acceso. El
   // acceso lo da SOLO la aprobación manual con cliente vinculado (approveDoctor). Aquí se
   // guarda el dictamen y, si salió verde, se marca auto_ok para que el admin lo vea.
   const autoOk = result.decision === 'auto'
   const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result, verification: { status: 'pending', auto_ok: autoOk } }
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`guardar el dictamen de verificación de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta: meta as unknown as Profile['meta'] } : d)))
   logAudit({
     actor: 'Verificación IA',
@@ -117,19 +140,24 @@ function applyVerifyDecision(id: string, result: VerifyDecision) {
     resource: doc.full_name ?? id, detail: `score ${result.score}`,
   })
   notify({ text: autoOk ? `Validación automática OK, pendiente de aprobar: ${doc.full_name}` : `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] verifyResult', error.message); live.reload() })
+  return { ok: true }
 }
 
 // Editar datos del doctor (nombre, organización). Admin por RLS/guard.
-export function updateDoctor(id: string, patch: { full_name?: string; organization?: string | null }) {
+export async function updateDoctor(id: string, patch: { full_name?: string; organization?: string | null }): Promise<Escritura> {
   const cur = live.current().find((d) => d.id === id)
-  if (!cur) return
+  if (!cur) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
   const meta = { ...((cur.meta ?? {}) as Record<string, unknown>) }
   if (patch.full_name != null) meta.name = patch.full_name
   const next = { ...cur, full_name: patch.full_name ?? cur.full_name, organization: patch.organization !== undefined ? patch.organization : cur.organization, meta }
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`guardar los datos de ${cur.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ full_name: next.full_name, organization: next.organization, meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? next : d)))
   logAudit({ actor: 'Administración', action: 'Doctor editado', resource: next.full_name ?? id })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ full_name: next.full_name, organization: next.organization, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] update', error.message); live.reload() })
+  return { ok: true }
 }
 
 // Eliminar un doctor. Es un usuario de auth → se borra vía la Edge Function
@@ -156,14 +184,19 @@ export async function deleteDoctor(id: string): Promise<{ ok: boolean; error?: s
 // canal externo (email/WhatsApp) ni mecanismo de reclamación de cuenta — eso es FASE 2.
 // Antes esto afirmaba "acceso enviado / ya puedes iniciar sesión", lo cual era FALSO
 // (el doctor convertido no tiene credencial y no recibe correo). Copy corregido.
-export function inviteDoctor(id: string) {
+export async function inviteDoctor(id: string): Promise<Escritura> {
   const doc = live.current().find((d) => d.id === id)
-  if (!doc) return
+  if (!doc) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
   const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), accessPending: true }
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`marcar el acceso pendiente de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Administración', action: 'Acceso marcado pendiente de activación', resource: doc.full_name ?? id })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id).then(() => live.reload())
   // La activación real del acceso (que el doctor fije su contraseña) es FASE 2.
+  return { ok: true }
 }
 
 // ============================================================================
@@ -210,25 +243,36 @@ export async function approveDoctor(
 }
 
 // RECHAZAR: verified=false + estado 'rejected' + razón. NO borra Auth/profile ni crea customer.
-export function rejectDoctor(id: string, reason: string, reviewedBy?: string | null): { ok: boolean; error?: string } {
+// W4: el doctor NO recibe "tu solicitud no fue aprobada" si el rechazo no quedó guardado.
+export async function rejectDoctor(id: string, reason: string, reviewedBy?: string | null): Promise<{ ok: boolean; error?: string }> {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return { ok: false, error: 'Doctor no encontrado.' }
   const meta = withVerification(doc.meta, 'rejected', reviewedBy ?? 'Administración', reason)
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`rechazar la solicitud de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return { ok: false, error: r.error } }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified: false, meta: meta as unknown as Profile['meta'] } : d)))
   logAudit({ actor: 'Administración', action: 'Doctor rechazado', resource: doc.full_name ?? id, detail: (reason ?? '').slice(0, 200) })
   if (isUuid(id)) notify({ text: 'Tu solicitud de verificación no fue aprobada. Contacta a Renovacell para más información.', userIds: [id], screen: 'pedidosdr' })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] reject', error.message); live.reload() })
   return { ok: true }
 }
 
 // REVOCAR: verified=false + estado 'revoked' (mantiene el comportamiento previo + estado legible).
-export function revokeDoctor(id: string, reviewedBy?: string | null): { ok: boolean; error?: string } {
+// W4: revocar es una acción de seguridad. Antes devolvía `ok` sin esperar al servidor:
+// Dirección creía haber cortado un acceso que seguía vigente.
+export async function revokeDoctor(id: string, reviewedBy?: string | null): Promise<{ ok: boolean; error?: string }> {
   const doc = live.current().find((d) => d.id === id)
   if (!doc) return { ok: false, error: 'Doctor no encontrado.' }
   const meta = withVerification(doc.meta, 'revoked', reviewedBy ?? 'Administración')
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`revocar el acceso de ${doc.full_name ?? 'el doctor'}`,
+      supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id))
+    if (!r.ok) { void live.reload(); return { ok: false, error: r.error } }
+  }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, verified: false, meta: meta as unknown as Profile['meta'] } : d)))
   logAudit({ actor: 'Administración', action: 'Acceso revocado', resource: doc.full_name ?? id })
-  if (hasSupabase && isUuid(id)) supabase.from('profiles').update({ verified: false, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[doctors] revoke', error.message); live.reload() })
   return { ok: true }
 }
 

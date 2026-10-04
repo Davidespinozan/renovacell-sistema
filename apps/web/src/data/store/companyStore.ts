@@ -4,6 +4,7 @@
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { confirmar, type Escritura } from './escritura'
 
 export interface CompanySettings {
   razon_social: string
@@ -88,12 +89,16 @@ export function currentCompany(): CompanySettings {
   return live.current()[0] ?? EMPTY_COMPANY
 }
 
-export function saveCompany(patch: Partial<CompanySettings>): void {
+// W4: estos son los datos del emisor que viajan en cada factura. "Guardado" solo se
+// dice cuando el servidor los tiene.
+export async function saveCompany(patch: Partial<CompanySettings>): Promise<Escritura> {
   const next = { ...currentCompany(), ...patch }
+  if (hasSupabase) {
+    const r = await confirmar('guardar los datos de la empresa',
+      supabase.from('company_settings').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 'default'))
+    if (!r.ok) return r
+  }
   live.setLocal([next])
   logAudit({ actor: 'Administración', action: 'Datos de empresa actualizados', resource: next.razon_social || 'empresa' })
-  if (hasSupabase) {
-    supabase.from('company_settings').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 'default')
-      .then(({ error }) => { if (error) console.warn('[company] update', error.message); live.reload() })
-  }
+  return { ok: true }
 }

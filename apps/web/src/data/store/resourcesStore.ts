@@ -6,6 +6,7 @@
 import { notify } from './notificationsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export type ResourceStatus = 'solicitado' | 'en_proceso' | 'entregado'
 // origin: 'equipo' = lo pidió alguien del equipo; 'propio' = lo planeó Diseño por
@@ -62,14 +63,14 @@ export function addRequest(input: { title: string; description: string; requeste
     supabase.from('resource_requests').insert({
       id: r.id, title: r.title, description: r.description, requested_by: r.requestedBy,
       requested_by_id: r.requestedById, origin: r.origin, status: r.status,
-    }).then(({ error }) => { if (error) console.warn('[resources] insert', error.message); live.reload() })
+    }).then(({ error }) => { if (error) reportarFallo('registrar la solicitud de recurso', mensajeDeError(error)); live.reload() })
   }
   return r
 }
 
 export function setStatus(id: string, status: ResourceStatus) {
   live.setLocal(live.current().map((r) => (r.id === id ? { ...r, status } : r)))
-  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status }).eq('id', id).then(({ error }) => { if (error) console.warn('[resources] status', error.message); live.reload() })
+  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status }).eq('id', id).then(({ error }) => { if (error) reportarFallo('actualizar la solicitud de recurso', mensajeDeError(error)); live.reload() })
 }
 
 // Entregar el recurso: adjunta el archivo subido y marca entregado. AVISA al solicitante
@@ -78,12 +79,12 @@ export function deliver(id: string, assetUrl: string) {
   const req = live.current().find((r) => r.id === id)
   live.setLocal(live.current().map((r) => (r.id === id ? { ...r, status: 'entregado', assetUrl } : r)))
   if (req?.requestedById) notify({ text: `Tu recurso ya está listo: ${req.title}`, userIds: [req.requestedById], screen: 'comun' })
-  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status: 'entregado', asset_url: assetUrl }).eq('id', id).then(({ error }) => { if (error) console.warn('[resources] deliver', error.message); live.reload() })
+  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').update({ status: 'entregado', asset_url: assetUrl }).eq('id', id).then(({ error }) => { if (error) reportarFallo('entregar el recurso', mensajeDeError(error)); live.reload() })
 }
 
 // Eliminar una solicitud. Reservado a quien gestiona Diseño (RLS lo respalda:
 // solo admin o cap 'diseno').
 export function remove(id: string) {
   live.setLocal(live.current().filter((r) => r.id !== id))
-  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[resources] remove', error.message); live.reload() })
+  if (hasSupabase && isUuid(id)) supabase.from('resource_requests').delete().eq('id', id).then(({ error }) => { if (error) reportarFallo('eliminar la solicitud de recurso', mensajeDeError(error)); live.reload() })
 }

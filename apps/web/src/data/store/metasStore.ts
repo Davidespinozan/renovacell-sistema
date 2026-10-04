@@ -4,6 +4,7 @@
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { trasEscribir } from './escritura'
 
 export interface SalesTarget { seller: string; target: number; commission_rate: number }
 
@@ -58,8 +59,9 @@ function upsert(row: SalesTarget) {
   const exists = cur.some((t) => t.seller === row.seller)
   live.setLocal(exists ? cur.map((t) => (t.seller === row.seller ? row : t)) : [...cur, row])
   if (hasSupabase) {
-    supabase.from('sales_targets').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'seller' })
-      .then(({ error }) => { if (error) console.warn('[metas] upsert', error.message); live.reload() })
+    trasEscribir('guardar la meta o la comisión',
+      supabase.from('sales_targets').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'seller' }),
+      () => { void live.reload() })
   }
 }
 

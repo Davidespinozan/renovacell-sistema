@@ -10,6 +10,7 @@ import { getSnapshot as teamSnapshot } from './teamStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { notify } from './notificationsStore'
 import { CHAT_SCREEN } from '../../app/roles'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 const uuid = (): string => (globalThis.crypto?.randomUUID?.() ?? `c-${Math.random().toString(16).slice(2)}`)
 const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -153,7 +154,7 @@ export function sendMessage(conversationId: string, body: string) {
     supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, sender_name: CURRENT_USER.name, body: trimmed })
       .then(({ error }) => {
         // Si el envío falla (RLS/red), quita el mensaje optimista (no fingir envío).
-        if (error) { console.warn('[chat] send', error.message); messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((x) => x.id !== id) }; emit() }
+        if (error) { reportarFallo('enviar tu mensaje', mensajeDeError(error)); messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((x) => x.id !== id) }; emit() }
         else notifyMembers(conversationId, senderId, trimmed)
       })
   }
@@ -193,7 +194,7 @@ export function ensureDirect(user: { id: string; name: string }): string | null 
     if (!messages[id]) messages = { ...messages, [id]: [] }
     emit()
     supabase.from('conversations').insert({ id, kind: 'dm', title: user.name, member_ids: [me, user.id] })
-      .then(({ error }) => { if (error) console.warn('[chat] dm', error.message); hydrate() })
+      .then(({ error }) => { if (error) reportarFallo('abrir la conversación', mensajeDeError(error)); hydrate() })
     return id
   }
   // ---- mock ----
@@ -216,7 +217,7 @@ export function deleteMessage(conversationId: string, messageId: string) {
   messages = { ...messages, [conversationId]: prev.filter((m) => m.id !== messageId) }
   emit()
   if (hasSupabase && isUuid(messageId)) supabase.from('messages').delete().eq('id', messageId)
-    .then(({ error }) => { if (error) { console.warn('[chat] del msg', error.message); messages = { ...messages, [conversationId]: prev }; emit() } })
+    .then(({ error }) => { if (error) { reportarFallo('borrar el mensaje', mensajeDeError(error)); messages = { ...messages, [conversationId]: prev }; emit() } })
 }
 
 // Borra una conversación completa (DM: cualquier miembro; grupo: solo admin).
@@ -229,5 +230,5 @@ export function deleteConversation(conversationId: string) {
   messages = rest
   emit()
   if (hasSupabase && isUuid(conversationId)) supabase.from('conversations').delete().eq('id', conversationId)
-    .then(({ error }) => { if (error) { console.warn('[chat] del conv', error.message); conversations = prevConvs; messages = prevMsgs; emit() } })
+    .then(({ error }) => { if (error) { reportarFallo('borrar la conversación', mensajeDeError(error)); conversations = prevConvs; messages = prevMsgs; emit() } })
 }

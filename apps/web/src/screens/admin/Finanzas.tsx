@@ -163,7 +163,7 @@ export function Finanzas() {
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.product_name}{p.supplier ? ` · ${p.supplier}` : ''}</span>
                   <span className="mono">{money(p.unit_cost * p.qty)}</span>
-                  <button className="btn ghost sm" type="button" onClick={() => markPaid(p.id)}>Pagar</button>
+                  <button className="btn ghost sm" type="button" onClick={() => void markPaid(p.id)}>Pagar</button>
                 </div>
               ))}
             </div>
@@ -193,7 +193,7 @@ export function Finanzas() {
                   <td data-label="Concepto">{g.concepto}</td>
                   <td data-label="Monto" className="mono">{money(g.monto)}</td>
                   <td data-label="" style={{ textAlign: 'right' }}>
-                    <button className="btn ghost sm" type="button" onClick={() => { if (window.confirm(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`)) removeGasto(g.id) }}><Trash2 size={14} /></button>
+                    <button className="btn ghost sm" type="button" onClick={() => { if (window.confirm(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`)) void removeGasto(g.id) }}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}
@@ -203,7 +203,8 @@ export function Finanzas() {
         </div>
       </div>
 
-      {open && <GastoModal onClose={() => setOpen(false)} onSave={(g) => { addGasto(g); setOpen(false) }} />}
+      {/* El modal solo se cierra si el gasto quedó guardado; si no, conserva lo capturado. */}
+      {open && <GastoModal onClose={() => setOpen(false)} onSave={async (g) => { const r = await addGasto(g); if (r.ok) setOpen(false) }} />}
     </div>
   )
 }

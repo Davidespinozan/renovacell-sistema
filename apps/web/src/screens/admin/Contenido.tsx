@@ -84,10 +84,12 @@ function ProductsEditor() {
           unidadesUsadas={unidadesEnUso}
           product={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onSave={(input) => {
-            if (editing === 'new') createProduct(input)
-            else updateProduct(editing.id, input)
-            setEditing(null)
+          onSave={async (input) => {
+            // El modal solo se cierra si el producto QUEDÓ guardado: si el servidor lo
+            // rechaza, se queda abierto con lo capturado y el motivo a la vista.
+            const r = editing === 'new' ? await createProduct(input) : await updateProduct(editing.id, input)
+            if (r.ok) setEditing(null)
+            return r
           }}
         />
       )}
@@ -139,8 +141,10 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
   product: ProductSafe | null
   unidadesUsadas: string[]
   onClose: () => void
-  onSave: (input: ProductInput) => void
+  onSave: (input: ProductInput) => Promise<{ ok: boolean; error?: string }>
 }) {
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null)
   const [name, setName] = useState(product?.name ?? '')
   const [sku, setSku] = useState(product?.sku ?? '')
   const [line, setLine] = useState<'cosm' | 'prof'>((product?.line as 'cosm' | 'prof') ?? 'cosm')
@@ -257,20 +261,28 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
             </div>
           </div>
 
+          {errorGuardar && (
+            <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13 }}>
+              <b>No se guardó.</b> {errorGuardar}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-            <button className="btn" type="button" disabled={!valid} style={!valid ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              onClick={() => {
+            <button className="btn" type="button" disabled={!valid || guardando} style={!valid || guardando ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              onClick={async () => {
                 const c = cost.trim() === '' ? null : Number(cost)
                 const cValid = c == null || Number.isFinite(c)
+                setGuardando(true); setErrorGuardar(null)
                 // El costo va a `product_costs`, no a `products`: se guarda aparte. Al CREAR,
                 // createProduct lo persiste con el id real; al EDITAR, aquí con setProductCost.
-                onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), unit: unit.trim() || null, description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
+                const r = await onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), unit: unit.trim() || null, description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
+                setGuardando(false)
+                if (!r.ok) { setErrorGuardar(r.error ?? 'No se pudo guardar el producto.'); return }
                 if (product && cValid) {
                   void setProductCost(product.id, c, name.trim()).then(reloadInventory)
                 }
               }}>
-              {product ? 'Guardar cambios' : 'Crear producto'}
+              {guardando ? 'Guardando…' : product ? 'Guardar cambios' : 'Crear producto'}
             </button>
           </div>
         </div>

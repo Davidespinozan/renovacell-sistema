@@ -19,7 +19,7 @@ import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import type { Json } from '../database.types'
-import { runW1Command, newOpId, constraintCode, isAmbiguous, w1Code } from '../ops/w1Command'
+import { runW1Command, newOpId, codigoConocido, isAmbiguous } from '../ops/w1Command'
 import { confirmar, mensajeDeError, reportarFallo, type Escritura } from './escritura'
 import {
   reportarPago as cmdReportarPago, registrarCobro as cmdRegistrarCobro, revisarPago as cmdRevisarPago,
@@ -207,7 +207,7 @@ export async function createOrder(input: {
 
   if (error || !data) {
     const e = error ?? { message: 'respuesta vacía del servidor' }
-    const reconocido = constraintCode(e.message) ?? w1Code(e.message)
+    const reconocido = codigoConocido(e.message)
     if (!reconocido && isAmbiguous(e)) {
       // RESULTADO DESCONOCIDO. El id del pedido lo generó este cliente, así que en
       // vez de adivinar se le pregunta al servidor si el pedido existe.

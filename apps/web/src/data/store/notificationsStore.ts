@@ -89,6 +89,9 @@ if (hasSupabase) {
   })
 }
 
+// W4 · CLASE D (deliberado): un aviso interno que no se pudo emitir NO se muestra como
+// fallo al operador — quien emite casi nunca es el destinatario, y lo que requiere
+// acción ya no depende de estos avisos: las bandejas se derivan del estado del servidor.
 // Emitido por los stores en cada transición. Con backend inserta y deja que el
 // Realtime lo entregue a la audiencia correcta (no se agrega optimista local: el
 // emisor no siempre es audiencia, y si lo es le llega por Realtime).

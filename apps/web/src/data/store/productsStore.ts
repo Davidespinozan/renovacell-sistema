@@ -7,6 +7,7 @@ import { MOCK_PRODUCTS } from '../mock/catalog'
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { confirmar, type Escritura } from './escritura'
 
 const fallback: ProductSafe[] = MOCK_PRODUCTS.map((p) => ({ active: true, ...p }))
 
@@ -59,7 +60,10 @@ export interface ProductInput {
 
 let seq = 0
 
-export function createProduct(input: ProductInput): ProductSafe {
+// W4: el producto solo "se creó" cuando el servidor lo confirmó. Antes aparecía en el
+// catálogo de inmediato y, si la base lo rechazaba (SKU repetido, permiso), se
+// esfumaba al recargar sin que nadie supiera por qué.
+export async function createProduct(input: ProductInput): Promise<Escritura> {
   seq += 1
   const showLanding = input.show_landing ?? true
   const showPortal = input.show_portal ?? true
@@ -69,60 +73,69 @@ export function createProduct(input: ProductInput): ProductSafe {
     price: input.price, unit: input.unit?.trim() || null, image_url: input.image_url, active: input.active,
     show_landing: showLanding, show_portal: showPortal,
   }
-  live.setLocal([temp, ...live.current()]) // optimista
-  logAudit({ actor: 'Administración', action: 'Producto creado', resource: input.name })
-  if (hasSupabase) {
-    // .select('id') para conocer el id REAL y poder guardar el costo (product_costs) —
-    // antes el costo capturado al CREAR se descartaba y las casillas de visibilidad se ignoraban.
+  if (!hasSupabase) {
+    live.setLocal([temp, ...live.current()])
+    logAudit({ actor: 'Administración', action: 'Producto creado', resource: input.name })
+    return { ok: true }
+  }
+  // .select('id') para conocer el id REAL y poder guardar el costo (product_costs).
+  let nuevoId: string | undefined
+  const r = await confirmar(`crear el producto "${input.name}"`,
     supabase.from('products').insert({
       sku: temp.sku, name: input.name, line: input.line, category: input.category,
       description: input.description, price: input.price, unit: input.unit?.trim() || null,
       image_url: input.image_url, active: input.active,
       show_landing: showLanding, show_portal: showPortal,
-    }).select('id').single().then(({ data, error }) => {
-      if (error) { console.warn('[products] insert', error.message); live.reload(); return }
-      if (input.cost != null && !Number.isNaN(input.cost) && data?.id) {
-        void setProductCost(data.id, input.cost, input.name).finally(() => live.reload())
-      } else live.reload()
-    })
-  }
-  return temp
+    }).select('id').single().then((res) => { nuevoId = res.data?.id; return res }))
+  if (!r.ok) return r
+  logAudit({ actor: 'Administración', action: 'Producto creado', resource: input.name })
+  if (input.cost != null && !Number.isNaN(input.cost) && nuevoId) await setProductCost(nuevoId, input.cost, input.name)
+  await live.reload()
+  return { ok: true }
 }
 
 // PRECIO GENERAL (products.price): edición segura desde Admin → Precios. Valida, audita
 // con valor anterior→nuevo y persiste (RLS admin). No toca listas ni reglas de volumen.
 // No permite editar productos NO vendibles / parents visuales (no son SKU comercial).
-export function setBasePrice(id: string, price: number, name?: string): { ok: boolean; error?: string } {
+export async function setBasePrice(id: string, price: number, name?: string): Promise<{ ok: boolean; error?: string }> {
   const before = live.current().find((p) => p.id === id)
   if (!before) return { ok: false, error: 'Producto no encontrado.' }
   if (before.sellable === false) return { ok: false, error: 'Este producto no es vendible (variante/tarjeta visual); no tiene precio comercial editable.' }
   if (!(price > 0)) return { ok: false, error: 'El precio debe ser mayor que 0.' }
+  // El precio es lo que se cobra: "Guardado" solo se dice con el servidor confirmado.
+  if (hasSupabase) {
+    const r = await confirmar(`cambiar el precio de "${name ?? before.name}"`, supabase.from('products').update({ price }).eq('id', id))
+    if (!r.ok) return { ok: false, error: r.error }
+  }
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, price } : p)))
   logAudit({ actor: 'Administración', action: 'Precio general actualizado', resource: name ?? before.name, detail: `$${before.price ?? 0} ⇒ $${price}` })
-  if (hasSupabase) supabase.from('products').update({ price }).eq('id', id).then(({ error }) => { if (error) console.warn('[products] setBasePrice', error.message); live.reload() })
   return { ok: true }
 }
 
-export function updateProduct(id: string, patch: Partial<ProductInput>) {
+export async function updateProduct(id: string, patch: Partial<ProductInput>): Promise<Escritura> {
   const before = live.current().find((p) => p.id === id)
   // `cost` no es columna de products (va a product_costs, lo maneja el modal aparte);
   // se excluye del UPDATE para no romper el escritura con una columna inexistente.
   const { cost: _cost, ...cols } = patch
+  if (hasSupabase) {
+    const r = await confirmar(`guardar los cambios de "${before?.name ?? 'el producto'}"`, supabase.from('products').update(cols).eq('id', id))
+    if (!r.ok) return r
+  }
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, ...cols } : p)))
   if (before) logAudit({ actor: 'Administración', action: 'Producto editado', resource: before.name })
-  if (hasSupabase) {
-    supabase.from('products').update(cols).eq('id', id).then(({ error }) => { if (error) console.warn('[products] update', error.message); live.reload() })
-  }
+  return { ok: true }
 }
 
-export function toggleActive(id: string) {
+export async function toggleActive(id: string): Promise<Escritura> {
   const cur = live.current().find((p) => p.id === id)
   const now = !(cur?.active !== false)
+  if (hasSupabase) {
+    const r = await confirmar(`${now ? 'mostrar' : 'ocultar'} "${cur?.name ?? 'el producto'}"`, supabase.from('products').update({ active: now }).eq('id', id))
+    if (!r.ok) return r
+  }
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, active: now } : p)))
   logAudit({ actor: 'Administración', action: now ? 'Producto activado' : 'Producto ocultado', resource: cur?.name ?? '' })
-  if (hasSupabase) {
-    supabase.from('products').update({ active: now }).eq('id', id).then(({ error }) => { if (error) console.warn('[products] toggle', error.message); live.reload() })
-  }
+  return { ok: true }
 }
 
 // Elimina un producto del catálogo (solo admin por RLS). Si el producto ya tuvo
@@ -199,8 +212,8 @@ export async function setProductCost(productId: string, cost: number | null, pro
   const q = cost == null
     ? supabase.from('product_costs').delete().eq('product_id', productId)
     : supabase.from('product_costs').upsert({ product_id: productId, unit_cost: cost }, { onConflict: 'product_id' })
-  const { error } = await q
-  if (error) { console.warn('[costos] guardar', error.message); return }
+  const r = await confirmar(`guardar el costo de "${productName || 'el producto'}"`, q)
+  if (!r.ok) return
   logAudit({
     actor: 'Administración', action: cost == null ? 'Costo eliminado' : 'Costo actualizado',
     resource: productName || productId, detail: cost == null ? undefined : `$${cost}`,

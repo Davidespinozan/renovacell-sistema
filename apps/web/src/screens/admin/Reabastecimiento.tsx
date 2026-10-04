@@ -175,7 +175,7 @@ export function Reabastecimiento() {
                       )}
                       {o.kind === 'compra' && !o.paid && (
                         <button className="btn ghost sm" type="button" title="Registrar el pago al proveedor (independiente de la recepción)"
-                          onClick={() => { markPaid(o.id); toast(true, 'Compra marcada como pagada.') }}><DollarSign size={13} /> Marcar pagado</button>
+                          onClick={async () => { const r = await markPaid(o.id); toast(r.ok, r.ok ? 'Compra marcada como pagada.' : `No se marcó como pagada. ${r.error}`) }}><DollarSign size={13} /> Marcar pagado</button>
                       )}
                       {o.kind === 'compra' && o.paid && <span className="pill p-ok" style={{ fontSize: 10.5 }}>Pagada</span>}
                     </span>
@@ -193,8 +193,10 @@ export function Reabastecimiento() {
           product={replen.product}
           suggested={replen.suggested}
           onClose={() => setReplen(null)}
-          onConfirm={(input) => {
-            createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, unit_cost: input.unitCost, kind: input.kind, supplier: input.supplier })
+          onConfirm={async (input) => {
+            const r = await createReplenishment({ product_id: replen.product.id, product_name: replen.product.name, qty: input.qty, unit_cost: input.unitCost, kind: input.kind, supplier: input.supplier })
+            // El modal solo se cierra si la orden quedó registrada.
+            if (!r.ok) { toast(false, `La orden NO se registró. ${r.error}`); return }
             setReplen(null)
             toast(true, input.kind === 'compra'
               ? 'Compra registrada. El inventario se actualizará cuando recibas la mercancía (Recibir y dar de alta).'

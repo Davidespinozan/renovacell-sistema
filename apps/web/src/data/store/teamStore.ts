@@ -13,6 +13,7 @@ import { hasSupabase, supabase } from '../../lib/supabase'
 import { ROLE_MAP } from '../../auth/supabaseAuth'
 import { makeLive } from './live'
 import type { Json } from '../database.types'
+import { trasEscribir } from './escritura'
 
 export interface TeamUser {
   id: string
@@ -62,8 +63,11 @@ function writeMeta(id: string, patch: Record<string, unknown>) {
   if (!hasSupabase || !isUuid(id)) return
   const merged = { ...(rawMeta.get(id) ?? {}), ...patch }
   rawMeta.set(id, merged)
-  supabase.from('profiles').update({ meta: merged as unknown as Json }).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('[team] meta', error.message); live.reload() })
+  // Optimista a propósito (son ajustes del equipo), pero el rechazo ya no se queda
+  // en la consola: se avisa en pantalla y se relee el estado real.
+  trasEscribir('guardar el cambio del integrante del equipo',
+    supabase.from('profiles').update({ meta: merged as unknown as Json }).eq('id', id),
+    () => { rawMeta.delete(id); void live.reload() })
 }
 
 // El login lee capabilities de aquí (refleja lo que Admin haya asignado).

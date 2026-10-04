@@ -8,6 +8,7 @@ import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { notify } from '../store/notificationsStore'
 import { useRole } from '../../auth/RoleContext'
 import type { Json } from '../database.types'
+import { mensajeDeError, reportarFallo } from '../store/escritura'
 
 export type AnnouncementKind = 'anuncio' | 'aviso'
 
@@ -55,7 +56,7 @@ export function useAnnouncements() {
     notify({ text: `${input.kind === 'aviso' ? 'Nuevo aviso' : 'Nuevo anuncio'}: ${input.title}`, roles: input.audience ? [input.audience] : undefined, screen: 'comun' })
     if (hasSupabase) {
       supabase.from('announcements').insert({ id, title: input.title, body: input.body, start_at: now, created_by: currentUserId(), metadata: metadata as unknown as Json })
-        .then(({ error }) => { if (error) console.warn('[announcements] insert', error.message); reload() })
+        .then(({ error }) => { if (error) reportarFallo('publicar el anuncio', mensajeDeError(error)); reload() })
     }
   }
 
@@ -63,12 +64,12 @@ export function useAnnouncements() {
     const cur = data.find((a) => a.id === id)
     const metadata = { ...((cur?.metadata ?? {}) as Record<string, unknown>), kind: input.kind, pinned: input.pinned, audience: input.audience }
     setData((prev) => prev.map((a) => (a.id === id ? { ...a, title: input.title, body: input.body, metadata } : a)))
-    if (hasSupabase) supabase.from('announcements').update({ title: input.title, body: input.body, metadata: metadata as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[announcements] update', error.message); reload() })
+    if (hasSupabase) supabase.from('announcements').update({ title: input.title, body: input.body, metadata: metadata as unknown as Json }).eq('id', id).then(({ error }) => { if (error) reportarFallo('guardar el anuncio', mensajeDeError(error)); reload() })
   }
 
   const remove = (id: string) => {
     setData((prev) => prev.filter((a) => a.id !== id))
-    if (hasSupabase) supabase.from('announcements').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[announcements] remove', error.message); reload() })
+    if (hasSupabase) supabase.from('announcements').delete().eq('id', id).then(({ error }) => { if (error) reportarFallo('eliminar el anuncio', mensajeDeError(error)); reload() })
   }
 
   const togglePin = (id: string) => {
@@ -76,7 +77,9 @@ export function useAnnouncements() {
     const pinned = !(cur?.metadata?.pinned)
     const metadata = { ...((cur?.metadata ?? {}) as Record<string, unknown>), pinned }
     setData((prev) => prev.map((a) => (a.id === id ? { ...a, metadata } : a)))
-    if (hasSupabase) supabase.from('announcements').update({ metadata: metadata as unknown as Json }).eq('id', id).then(() => reload())
+    // Antes el error se ignoraba por completo: el anuncio "se fijaba" y al recargar volvía solo.
+    if (hasSupabase) supabase.from('announcements').update({ metadata: metadata as unknown as Json }).eq('id', id)
+      .then(({ error }) => { if (error) reportarFallo(pinned ? 'fijar el anuncio' : 'desfijar el anuncio', mensajeDeError(error)); reload() })
   }
 
   return { data, loading, error: null as string | null, create, update, remove, togglePin }

@@ -23,9 +23,15 @@ export function Configuracion() {
   const rfcOk = !form.rfc || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
   const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
 
-  const guardar = () => {
-    if (!puedeGuardar) return
-    saveCompany({ ...form, rfc: (form.rfc ?? '').trim().toUpperCase() })
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null)
+  const guardar = async () => {
+    if (!puedeGuardar || guardando) return
+    setGuardando(true); setErrorGuardar(null)
+    // Son los datos del emisor de cada factura: "Guardado ✓" solo con el servidor confirmado.
+    const r = await saveCompany({ ...form, rfc: (form.rfc ?? '').trim().toUpperCase() })
+    setGuardando(false)
+    if (!r.ok) { setErrorGuardar(r.error); return }
     setSaved(true)
   }
 
@@ -132,6 +138,7 @@ export function Configuracion() {
             <Save size={15} /> Guardar cambios
           </button>
           {saved && !dirty && <span style={{ fontSize: 13, color: 'var(--green-deep, #1e7a4b)' }}>Guardado ✓</span>}
+          {errorGuardar && <span role="alert" style={{ fontSize: 13, color: 'var(--danger)' }}>No se guardó. {errorGuardar}</span>}
         </div>
       </div>
 
@@ -175,9 +182,9 @@ function BankAccountsEditor() {
 
 function BankAccountRow({ a, onUpdate, onDefault, onActive }: {
   a: BankAccount
-  onUpdate: (id: string, patch: Partial<{ bank_name: string; beneficiary_name: string; clabe: string | null; account_number: string | null }>) => void
-  onDefault: (id: string) => void
-  onActive: (id: string, active: boolean) => void
+  onUpdate: (id: string, patch: Partial<{ bank_name: string; beneficiary_name: string; clabe: string | null; account_number: string | null }>) => Promise<{ ok: boolean }>
+  onDefault: (id: string) => Promise<{ ok: boolean }>
+  onActive: (id: string, active: boolean) => Promise<{ ok: boolean }>
 }) {
   // Draft local: se edita sin guardar en cada tecla; se PERSISTE al salir del campo
   // (onBlur) y solo si cambió. La CLABE inválida no se guarda (se avisa).
@@ -188,13 +195,14 @@ function BankAccountRow({ a, onUpdate, onDefault, onActive }: {
 
   const clabeOk = clabeValida(draft.clabe)
   const flashSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 1500) }
-  const commit = (field: 'bank_name' | 'beneficiary_name' | 'account_number') => {
+  // "Guardado ✓" solo si el servidor guardó: a esta cuenta transfiere el cliente.
+  const commit = async (field: 'bank_name' | 'beneficiary_name' | 'account_number') => {
     const cur = (a[field] ?? '') as string
-    if (draft[field].trim() !== cur.trim()) { onUpdate(a.id, { [field]: draft[field] }); flashSaved() }
+    if (draft[field].trim() !== cur.trim()) { const r = await onUpdate(a.id, { [field]: draft[field] }); if (r.ok) flashSaved() }
   }
-  const commitClabe = () => {
+  const commitClabe = async () => {
     if (!clabeOk) return // no persistir CLABE inválida
-    if ((draft.clabe.trim() || null) !== (a.clabe ?? null)) { onUpdate(a.id, { clabe: draft.clabe }); flashSaved() }
+    if ((draft.clabe.trim() || null) !== (a.clabe ?? null)) { const r = await onUpdate(a.id, { clabe: draft.clabe }); if (r.ok) flashSaved() }
   }
 
   return (

@@ -44,14 +44,21 @@ describe('ordersStore — ciclo de pago', () => {
   })
 })
 
+// W4: un gasto solo "existe" cuando el store lo confirmó.
+const gasto = async (p: ReturnType<typeof addGasto>) => {
+  const r = await p
+  if (!r.ok) throw new Error(r.error)
+  return r.gasto
+}
+
 describe('gastosStore', () => {
-  it('addGasto lo registra', () => {
-    const g = addGasto({ fecha: '2026-07-01', categoria: 'Marketing', concepto: 'Anuncios QA', monto: 1500 })
+  it('addGasto lo registra', async () => {
+    const g = await gasto(addGasto({ fecha: '2026-07-01', categoria: 'Marketing', concepto: 'Anuncios QA', monto: 1500 }))
     expect(gastosSnapshot().some((x) => x.id === g.id && x.monto === 1500)).toBe(true)
   })
-  it('removeGasto lo elimina', () => {
-    const g = addGasto({ fecha: '2026-07-02', categoria: 'Renta', concepto: 'QA borrar', monto: 100 })
-    removeGasto(g.id)
+  it('removeGasto lo elimina', async () => {
+    const g = await gasto(addGasto({ fecha: '2026-07-02', categoria: 'Renta', concepto: 'QA borrar', monto: 100 }))
+    await removeGasto(g.id)
     expect(gastosSnapshot().some((x) => x.id === g.id)).toBe(false)
   })
 })

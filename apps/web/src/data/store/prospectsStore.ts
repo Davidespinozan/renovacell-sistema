@@ -8,6 +8,7 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import type { Json } from '../database.types'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export type ProspectStatus = 'nuevo' | 'contactado' | 'cotizado' | 'convertido' | 'descartado'
 export interface ProspectNote { text: string; at: string }
@@ -115,14 +116,14 @@ export function addProspect(input: {
     supabase.from('prospects').insert({
       id: p.id, name: p.name, email: p.email, phone: p.phone, cedula: p.cedula,
       source: p.source, status: 'nuevo', assigned_to: assigned, meta: meta as unknown as Json,
-    }).then(({ error }) => { if (error) console.warn('[prospects] insert', error.message); live.reload() })
+    }).then(({ error }) => { if (error) reportarFallo('registrar el prospecto', mensajeDeError(error)); live.reload() })
   }
   return p
 }
 
 export function setStatus(id: string, status: ProspectStatus) {
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, status } : p)))
-  if (hasSupabase) supabase.from('prospects').update({ status }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] status', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ status }).eq('id', id).then(({ error }) => { if (error) reportarFallo('cambiar el estatus del prospecto', mensajeDeError(error)); live.reload() })
 }
 
 export function addNote(id: string, text: string) {
@@ -131,7 +132,7 @@ export function addNote(id: string, text: string) {
   const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>) }
   meta.notes = [...(((meta.notes as ProspectNote[]) ?? [])), note]
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, meta } : p)))
-  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] note', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) reportarFallo('guardar la nota del prospecto', mensajeDeError(error)); live.reload() })
 }
 
 // Agrega un mensaje al HILO de conversación del prospecto (bandeja multicanal).
@@ -142,7 +143,7 @@ function pushMessage(id: string, msg: ProspectMessage) {
   const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>) }
   meta.messages = [...(((meta.messages as ProspectMessage[]) ?? [])), msg]
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, meta } : p)))
-  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] message', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) reportarFallo('guardar el mensaje del prospecto', mensajeDeError(error)); live.reload() })
 }
 
 // RESPUESTA del vendedor en la conversación. Se agrega al hilo AL INSTANTE (optimista)
@@ -162,7 +163,7 @@ export async function replyProspect(id: string, text: string) {
 
   // Persistir el saliente (pending) ANTES de invocar, para que meta-send lo encuentre.
   const { error: upErr } = await supabase.from('prospects').update({ meta: meta as unknown as Json }).eq('id', id)
-  if (upErr) { console.warn('[prospects] reply persist', upErr.message); return }
+  if (upErr) { reportarFallo('guardar tu respuesta al prospecto', mensajeDeError(upErr)); return }
   const { data, error } = await supabase.functions.invoke('meta-send', { body: { prospectId: id, at } })
   if (error) { console.warn('[prospects] meta-send', error.message); return } // seam/sin credenciales: queda pending
   if ((data as { delivered?: boolean })?.delivered) live.reload() // la función ya quitó "pending" en BD
@@ -183,7 +184,7 @@ export function updateProspect(id: string, patch: { name?: string; email?: strin
     meta,
   }
   live.setLocal(live.current().map((p) => (p.id === id ? next : p)))
-  if (hasSupabase) supabase.from('prospects').update({ name: next.name, email: next.email, phone: next.phone, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] update', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ name: next.name, email: next.email, phone: next.phone, meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) reportarFallo('guardar los datos del prospecto', mensajeDeError(error)); live.reload() })
 }
 
 // Eliminar prospecto (solo admin por RLS: prospects_delete_admin).
@@ -201,7 +202,7 @@ export function markConverted(id: string, doctorId: string) {
   const cur = live.current().find((p) => p.id === id)
   const meta = { ...((cur?.meta ?? {}) as Record<string, unknown>), convertedDoctorId: doctorId }
   live.setLocal(live.current().map((p) => (p.id === id ? { ...p, status: 'convertido', meta } : p)))
-  if (hasSupabase) supabase.from('prospects').update({ status: 'convertido', meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] convert', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ status: 'convertido', meta: meta as unknown as Json }).eq('id', id).then(({ error }) => { if (error) reportarFallo('marcar el prospecto como convertido', mensajeDeError(error)); live.reload() })
 }
 
 export interface CaptureResult { prospect: Prospect; assignedTo: string | null; duplicate: boolean }
@@ -260,7 +261,7 @@ export function captureLead(input: {
     supabase.from('prospects').insert({
       id: p.id, name: p.name, email: p.email, phone: p.phone, cedula: null,
       source: p.source, status: 'nuevo', assigned_to: assigned, meta: meta as unknown as Json,
-    }).then(({ error }) => { if (error) console.warn('[prospects] captureLead', error.message); live.reload() })
+    }).then(({ error }) => { if (error) reportarFallo('registrar el prospecto', mensajeDeError(error)); live.reload() })
   }
   return { prospect: p, assignedTo: assigned, duplicate: false }
 }
@@ -273,5 +274,5 @@ export function reassign(id: string, sellerId: string | null) {
   // Aviso DIRIGIDO al nuevo dueño (como captureLead): antes el traspaso era silencioso
   // y el lead caía en su lista sin señal, sin campana ni contador.
   if (sellerId) notify({ text: `Te reasignaron un prospecto: ${p?.name ?? id}`, userIds: [sellerId], screen: 'av_prosp' })
-  if (hasSupabase) supabase.from('prospects').update({ assigned_to: sellerId }).eq('id', id).then(({ error }) => { if (error) console.warn('[prospects] reassign', error.message); live.reload() })
+  if (hasSupabase) supabase.from('prospects').update({ assigned_to: sellerId }).eq('id', id).then(({ error }) => { if (error) reportarFallo('reasignar el prospecto', mensajeDeError(error)); live.reload() })
 }

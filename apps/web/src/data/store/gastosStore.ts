@@ -4,6 +4,7 @@
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
+import { confirmar, type Escritura } from './escritura'
 
 export type GastoCategoria = 'Renta' | 'Nómina' | 'Logística' | 'Marketing' | 'Insumos' | 'Servicios' | 'Otros'
 export const GASTO_CATEGORIAS: GastoCategoria[] = ['Renta', 'Nómina', 'Logística', 'Marketing', 'Insumos', 'Servicios', 'Otros']
@@ -40,21 +41,29 @@ export const subscribe = live.subscribe
 export const getSnapshot = live.getSnapshot
 
 let seq = 100
-export function addGasto(input: { fecha: string; categoria: GastoCategoria; concepto: string; monto: number }): Gasto {
+// W4: un gasto mueve el estado de resultados. Solo cuenta si el servidor lo guardó.
+export type GastoRegistrado = { ok: true; gasto: Gasto } | { ok: false; error: string; ambiguous: boolean }
+
+export async function addGasto(input: { fecha: string; categoria: GastoCategoria; concepto: string; monto: number }): Promise<GastoRegistrado> {
   seq += 1
   const g: Gasto = { id: hasSupabase ? (globalThis.crypto?.randomUUID?.() ?? `g-${seq}`) : `g-${seq}`, ...input, created_at: new Date().toISOString() }
+  if (hasSupabase) {
+    const r = await confirmar(`registrar el gasto "${input.concepto}"`,
+      supabase.from('expenses').insert({ id: g.id, fecha: input.fecha, categoria: input.categoria, concepto: input.concepto, monto: input.monto, created_by: currentUserId() }))
+    if (!r.ok) return r
+  }
   live.setLocal([g, ...live.current()].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)))
   logAudit({ actor: 'Dirección', action: 'Gasto registrado', resource: input.concepto, detail: `${input.categoria} · $${input.monto}` })
-  if (hasSupabase) {
-    supabase.from('expenses').insert({ id: g.id, fecha: input.fecha, categoria: input.categoria, concepto: input.concepto, monto: input.monto, created_by: currentUserId() })
-      .then(({ error }) => { if (error) console.warn('[expenses] insert', error.message); live.reload() })
-  }
-  return g
+  return { ok: true, gasto: g }
 }
 
-export function removeGasto(id: string) {
+export async function removeGasto(id: string): Promise<Escritura> {
   const g = live.current().find((x) => x.id === id)
+  if (hasSupabase) {
+    const r = await confirmar(`eliminar el gasto "${g?.concepto ?? ''}"`, supabase.from('expenses').delete().eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().filter((x) => x.id !== id))
   if (g) logAudit({ actor: 'Dirección', action: 'Gasto eliminado', resource: g.concepto })
-  if (hasSupabase) supabase.from('expenses').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[expenses] remove', error.message); live.reload() })
+  return { ok: true }
 }

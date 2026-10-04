@@ -5,6 +5,7 @@
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { confirmar, type Escritura } from './escritura'
 
 export interface BankAccount {
   id: string
@@ -58,7 +59,9 @@ export interface BankAccountInput {
   display_order?: number
 }
 
-export function addBankAccount(input: BankAccountInput): void {
+// W4: a estas cuentas transfiere el cliente. Una cuenta que Dirección cree haber
+// cambiado y que el servidor rechazó significa dinero enviado al lugar equivocado.
+export async function addBankAccount(input: BankAccountInput): Promise<Escritura> {
   const list = live.current()
   const row: BankAccount = {
     id: uuid(), bank_name: input.bank_name.trim(), beneficiary_name: input.beneficiary_name.trim(),
@@ -66,50 +69,60 @@ export function addBankAccount(input: BankAccountInput): void {
     active: input.active ?? true, is_default: input.is_default ?? list.length === 0,
     display_order: input.display_order ?? list.length,
   }
-  live.setLocal([...list, row])
-  logAudit({ actor: 'Administración', action: 'Cuenta bancaria agregada', resource: row.bank_name })
   if (hasSupabase) {
-    const persist = async () => {
-      if (row.is_default) await supabase.from('company_bank_accounts').update({ is_default: false }).eq('is_default', true)
-      const { error } = await supabase.from('company_bank_accounts').insert({
+    if (row.is_default) {
+      const d = await confirmar('quitar la cuenta principal anterior',
+        supabase.from('company_bank_accounts').update({ is_default: false }).eq('is_default', true))
+      if (!d.ok) return d
+    }
+    const r = await confirmar(`agregar la cuenta de ${row.bank_name}`,
+      supabase.from('company_bank_accounts').insert({
         id: row.id, bank_name: row.bank_name, beneficiary_name: row.beneficiary_name, clabe: row.clabe,
         account_number: row.account_number, active: row.active, is_default: row.is_default, display_order: row.display_order,
-      })
-      if (error) console.warn('[bank] insert', error.message)
-      live.reload()
-    }
-    void persist()
+      }))
+    // Pase lo que pase se relee: si la inserción falló tras quitar la principal
+    // anterior, la pantalla debe mostrar el estado REAL, no el que se quería.
+    await live.reload()
+    if (!r.ok) return r
+  } else {
+    live.setLocal([...list, row])
   }
+  logAudit({ actor: 'Administración', action: 'Cuenta bancaria agregada', resource: row.bank_name })
+  return { ok: true }
 }
 
-export function updateBankAccount(id: string, patch: Partial<BankAccountInput>): void {
+export async function updateBankAccount(id: string, patch: Partial<BankAccountInput>): Promise<Escritura> {
   const clean: Partial<BankAccount> = { ...patch } as Partial<BankAccount>
   if (patch.clabe !== undefined) clean.clabe = (patch.clabe ?? '').trim() || null
   if (patch.account_number !== undefined) clean.account_number = (patch.account_number ?? '').trim() || null
+  if (hasSupabase) {
+    const r = await confirmar('guardar la cuenta bancaria',
+      supabase.from('company_bank_accounts').update({ ...clean, updated_at: new Date().toISOString() } as never).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((a) => (a.id === id ? { ...a, ...clean } : a)))
   logAudit({ actor: 'Administración', action: 'Cuenta bancaria actualizada', resource: id })
-  if (hasSupabase) {
-    supabase.from('company_bank_accounts').update({ ...clean, updated_at: new Date().toISOString() } as never).eq('id', id)
-      .then(({ error }) => { if (error) console.warn('[bank] update', error.message); live.reload() })
-  }
+  return { ok: true }
 }
 
 // Marca una cuenta como principal (desmarca la anterior). Solo activas.
-export function setDefaultBankAccount(id: string): void {
-  live.setLocal(live.current().map((a) => ({ ...a, is_default: a.id === id })))
-  logAudit({ actor: 'Administración', action: 'Cuenta principal actualizada', resource: id })
+export async function setDefaultBankAccount(id: string): Promise<Escritura> {
   if (hasSupabase) {
-    const run = async () => {
-      await supabase.from('company_bank_accounts').update({ is_default: false }).eq('is_default', true)
-      const { error } = await supabase.from('company_bank_accounts').update({ is_default: true, updated_at: new Date().toISOString() }).eq('id', id)
-      if (error) console.warn('[bank] setDefault', error.message)
-      live.reload()
-    }
-    void run()
+    const a = await confirmar('quitar la cuenta principal anterior',
+      supabase.from('company_bank_accounts').update({ is_default: false }).eq('is_default', true))
+    if (!a.ok) { void live.reload(); return a }
+    const b = await confirmar('marcar la cuenta como principal',
+      supabase.from('company_bank_accounts').update({ is_default: true, updated_at: new Date().toISOString() }).eq('id', id))
+    await live.reload()
+    if (!b.ok) return b
+  } else {
+    live.setLocal(live.current().map((x) => ({ ...x, is_default: x.id === id })))
   }
+  logAudit({ actor: 'Administración', action: 'Cuenta principal actualizada', resource: id })
+  return { ok: true }
 }
 
 // Activar/desactivar (las inactivas no se muestran al doctor; no se borra historial).
-export function setBankActive(id: string, active: boolean): void {
-  updateBankAccount(id, { active })
+export function setBankActive(id: string, active: boolean): Promise<Escritura> {
+  return updateBankAccount(id, { active })
 }

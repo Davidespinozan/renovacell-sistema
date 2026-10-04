@@ -6,6 +6,7 @@ import { MOCK_ASSETS } from '../mock/comunicacion'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import type { Json } from '../database.types'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export interface AssetInput { key: string; url: string; tags: string[] }
 
@@ -33,12 +34,12 @@ export function create(input: AssetInput): Asset {
     supabase.from('assets').insert({
       id: row.id, key: input.key, url: input.url, uploaded_by: currentUserId(),
       tags: input.tags, metadata: { type: 'image' } as unknown as Json,
-    }).then(({ error }) => { if (error) console.warn('[assets] insert', error.message); live.reload() })
+    }).then(({ error }) => { if (error) reportarFallo('guardar el recurso', mensajeDeError(error)); live.reload() })
   }
   return row
 }
 
 export function remove(id: string) {
   live.setLocal(live.current().filter((a) => a.id !== id))
-  if (hasSupabase) supabase.from('assets').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[assets] remove', error.message); live.reload() })
+  if (hasSupabase) supabase.from('assets').delete().eq('id', id).then(({ error }) => { if (error) reportarFallo('eliminar el recurso', mensajeDeError(error)); live.reload() })
 }

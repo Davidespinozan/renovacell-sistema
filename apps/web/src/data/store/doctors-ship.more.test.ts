@@ -15,13 +15,13 @@ const envio = async (p: ReturnType<typeof ship.createShipment>) => {
 describe('doctorsStore — verificación con cédula', () => {
   it('NO verifica a un doctor sin cédula', async () => {
     const d = await doctors.addDoctor({ full_name: 'Dra. Sin Cédula', email: 'sincedula@x.mx', organization: null })
-    expect(doctors.setVerified(d.id!, true)).toBe(false)
+    expect(await doctors.setVerified(d.id!, true)).toBe(false)
     expect(doctors.getSnapshot().find((x) => x.id === d.id)?.verified).toBe(false)
   })
   it('verifica una vez que se captura la cédula', async () => {
     const d = await doctors.addDoctor({ full_name: 'Dra. Con Cédula', email: 'concedula@x.mx', organization: null })
-    doctors.setCedula(d.id!, '1234567')
-    expect(doctors.setVerified(d.id!, true)).toBe(true)
+    await doctors.setCedula(d.id!, '1234567')
+    expect(await doctors.setVerified(d.id!, true)).toBe(true)
     expect(doctors.getSnapshot().find((x) => x.id === d.id)?.verified).toBe(true)
   })
 })

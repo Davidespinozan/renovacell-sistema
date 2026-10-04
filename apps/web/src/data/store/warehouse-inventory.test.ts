@@ -6,6 +6,14 @@ import { createReplenishment, markPaid, getSnapshot as getCompras } from './comp
 import { stockByProduct } from '../ops/stock'
 import type { Lot } from '../types'
 
+// W4: una orden solo "existe" cuando el store la confirmó.
+const orden = async (p: ReturnType<typeof createReplenishment>) => {
+  const r = await p
+  if (!r.ok) throw new Error(r.error)
+  return r.order
+}
+
+
 const lotOf = (pid: string, code: string): Lot | undefined =>
   getSnapshotLots().find((l) => l.product_id === pid && (l.lot_code ?? '').toLowerCase() === code.toLowerCase())
 const qtyOf = (pid: string, code: string): number => lotOf(pid, code)?.quantity ?? 0
@@ -41,17 +49,17 @@ describe('recibirLote (mock) — entrada/recepción', () => {
 })
 
 describe('compra ≠ recepción (no aumenta stock)', () => {
-  it('createReplenishment NO crea lote/stock', () => {
+  it('createReplenishment NO crea lote/stock', async () => {
     const before = getSnapshotLots().length
-    createReplenishment({ product_id: 'WP', product_name: 'Prod WP', qty: 20, unit_cost: 950, kind: 'compra', supplier: 'ACME' })
+    await orden(createReplenishment({ product_id: 'WP', product_name: 'Prod WP', qty: 20, unit_cost: 950, kind: 'compra', supplier: 'ACME' }))
     expect(getSnapshotLots().length).toBe(before)   // ningún lote nuevo
     expect(qtyOf('WP', 'cualquiera')).toBe(0)
     expect(getCompras().some((o) => o.product_id === 'WP' && o.status === 'pendiente')).toBe(true)
   })
-  it('markPaid NO afecta stock', () => {
-    const po = createReplenishment({ product_id: 'WP2', product_name: 'Prod WP2', qty: 5, unit_cost: 100, kind: 'compra', supplier: 'ACME' })
+  it('markPaid NO afecta stock', async () => {
+    const po = await orden(createReplenishment({ product_id: 'WP2', product_name: 'Prod WP2', qty: 5, unit_cost: 100, kind: 'compra', supplier: 'ACME' }))
     const before = getSnapshotLots().length
-    markPaid(po.id)
+    await markPaid(po.id)
     expect(getSnapshotLots().length).toBe(before)
     expect(getCompras().find((o) => o.id === po.id)?.paid).toBe(true)
     expect(getCompras().find((o) => o.id === po.id)?.status).toBe('pendiente') // pago independiente de recepción

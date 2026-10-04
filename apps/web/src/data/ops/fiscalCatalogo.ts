@@ -9,7 +9,7 @@
 // impuesto. Ninguna función de aquí deduce un tratamiento fiscal de una relación
 // aritmética entre precios, y la UI tampoco debe sugerirlo.
 import { hasSupabase, supabase } from '../../lib/supabase'
-import { AMBIGUO_MSG, constraintCode, isAmbiguous, newOpId, w1Code, w1Message } from './w1Command'
+import { AMBIGUO_MSG, codigoConocido, isAmbiguous, newOpId, w1Message } from './w1Command'
 import type { Json } from '../database.types'
 
 export type TratamientoIva = 'gravado' | 'tasa_cero' | 'exento' | 'no_objeto'
@@ -71,7 +71,7 @@ function falla(e: { message: string; code?: string } | null): Resultado<never> {
   // leer, el servidor YA respondió y respondió que no. Decirle "no se pudo
   // confirmar, reintenta" a un rechazo definitivo manda al operador a repetir algo
   // que nunca va a pasar; la ambigüedad se reserva para las fallas de transporte.
-  const reconocido = constraintCode(e.message) ?? w1Code(e.message)
+  const reconocido = codigoConocido(e.message)
   if (!reconocido && isAmbiguous(e)) return { ok: false, error: AMBIGUO_MSG, ambiguous: true }
   return { ok: false, error: w1Message(e.message) }
 }

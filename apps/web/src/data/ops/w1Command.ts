@@ -282,6 +282,16 @@ export function constraintCode(message: string): string | undefined {
   return m && MENSAJES[m[1]] ? m[1] : undefined
 }
 
+// Código o restricción que SÍ está en el catálogo de mensajes. `w1Code` devuelve
+// cualquier palabra en mayúsculas ("ERROR", "JWT"…), así que no sirve para decidir
+// si el servidor respondió algo que sabemos leer: para eso está esta función.
+export function codigoConocido(message: string): string | undefined {
+  const ck = constraintCode(message)
+  if (ck) return ck
+  const code = w1Code(message)
+  return code && MENSAJES[code] ? code : undefined
+}
+
 export function w1Message(message: string): string {
   const ck = constraintCode(message)
   if (ck) return MENSAJES[ck]

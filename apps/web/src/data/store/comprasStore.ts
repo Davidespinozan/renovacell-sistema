@@ -6,6 +6,7 @@ import { logAudit } from './auditStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
 import { runW1Command } from '../ops/w1Command'
+import { confirmar, type Escritura } from './escritura'
 
 export type ReplenKind = 'compra' | 'produccion'
 // W1: recepción parcial y acumulada; 'recibida' y 'cerrada_incompleta' son terminales (no se reabren).
@@ -68,7 +69,11 @@ export async function cerrarOrdenCompra(opId: string, id: string, reason: string
 }
 
 let seq = 0
-export function createReplenishment(input: { product_id: string; product_name: string; qty: number; unit_cost: number; kind: ReplenKind; supplier?: string | null }): PurchaseOrder {
+// W4: la orden solo "existe" cuando el servidor la confirmó. Antes Almacén recibía
+// "compra por recibir" de una orden que el servidor podía haber rechazado.
+export type OrdenCreada = { ok: true; order: PurchaseOrder } | { ok: false; error: string; ambiguous: boolean }
+
+export async function createReplenishment(input: { product_id: string; product_name: string; qty: number; unit_cost: number; kind: ReplenKind; supplier?: string | null }): Promise<OrdenCreada> {
   seq += 1
   const po: PurchaseOrder = {
     id: hasSupabase ? (globalThis.crypto?.randomUUID?.() ?? `po-${seq}`) : `po-${seq}`,
@@ -76,17 +81,19 @@ export function createReplenishment(input: { product_id: string; product_name: s
     kind: input.kind, supplier: input.kind === 'compra' ? (input.supplier ?? null) : null,
     status: 'pendiente', paid: input.kind !== 'compra', created_at: new Date().toISOString(), received_qty: 0,
   }
-  live.setLocal([po, ...live.current()])
   const verbo = input.kind === 'compra' ? 'Compra' : 'Producción'
+  if (hasSupabase) {
+    const r = await confirmar(`registrar la ${verbo.toLowerCase()} de ${input.product_name}`,
+      supabase.from('replenishments').insert({
+        id: po.id, product_id: isUuid(input.product_id) ? input.product_id : null, product_name: input.product_name,
+        qty: input.qty, unit_cost: input.unit_cost, kind: input.kind, supplier: po.supplier, status: 'pendiente', paid: po.paid, created_by: currentUserId(),
+      }))
+    if (!r.ok) return r
+  }
+  live.setLocal([po, ...live.current()])
   notify({ text: `${verbo} por recibir: ${input.product_name} ×${input.qty}`, roles: ['warehouse'], screen: 'compras' })
   logAudit({ actor: 'Dirección', action: input.kind === 'compra' ? 'Compra a proveedor' : 'Orden de producción', resource: input.product_name, detail: `×${input.qty}${po.supplier ? ` · ${po.supplier}` : ''}` })
-  if (hasSupabase) {
-    supabase.from('replenishments').insert({
-      id: po.id, product_id: isUuid(input.product_id) ? input.product_id : null, product_name: input.product_name,
-      qty: input.qty, unit_cost: input.unit_cost, kind: input.kind, supplier: po.supplier, status: 'pendiente', paid: po.paid, created_by: currentUserId(),
-    }).then(({ error }) => { if (error) console.warn('[replenishments] insert', error.message); live.reload() })
-  }
-  return po
+  return { ok: true, order: po }
 }
 
 // Modo demo: marca la orden como recibida por completo. Con backend el estado y el
@@ -98,9 +105,15 @@ export function markReceived(id: string) {
   if (po) logAudit({ actor: 'Almacén', action: 'Reabastecimiento recibido', resource: po.product_name, detail: `×${po.qty}` })
 }
 
-export function markPaid(id: string) {
+// W4: "pagada" es un hecho de dinero. No se anuncia ni se audita hasta confirmarlo.
+export async function markPaid(id: string): Promise<Escritura> {
   const po = live.current().find((o) => o.id === id)
+  if (hasSupabase && isUuid(id)) {
+    const r = await confirmar(`marcar como pagada la compra de ${po?.product_name ?? 'el producto'}`,
+      supabase.from('replenishments').update({ paid: true }).eq('id', id))
+    if (!r.ok) { void live.reload(); return r }
+  }
   live.setLocal(live.current().map((o) => (o.id === id ? { ...o, paid: true } : o)))
   if (po) logAudit({ actor: 'Dirección', action: 'Pago a proveedor', resource: po.product_name, detail: `$${po.unit_cost * po.qty}${po.supplier ? ` · ${po.supplier}` : ''}` })
-  if (hasSupabase && isUuid(id)) supabase.from('replenishments').update({ paid: true }).eq('id', id).then(({ error }) => { if (error) console.warn('[replenishments] paid', error.message); live.reload() })
+  return { ok: true }
 }

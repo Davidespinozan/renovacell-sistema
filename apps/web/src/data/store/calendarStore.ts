@@ -4,6 +4,7 @@
 // opera sobre unas semillas mock. La firma del hook no cambia.
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { makeLive } from './live'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export type CalKind = 'entrega' | 'produccion' | 'campana'
 export type CalStatus = 'planeado' | 'listo'
@@ -47,7 +48,7 @@ export function addEntry(input: { title: string; date: string; kind: CalKind; no
   live.setLocal([...live.current(), e])
   if (hasSupabase) {
     supabase.from('design_calendar').insert({ id: e.id, title: e.title, date: e.date, kind: e.kind, notes: e.notes, created_by: currentUserId() })
-      .then(({ error }) => { if (error) console.warn('[calendar] insert', error.message); live.reload() })
+      .then(({ error }) => { if (error) reportarFallo('agregar al calendario', mensajeDeError(error)); live.reload() })
   }
   return e
 }
@@ -57,10 +58,10 @@ export function toggleDone(id: string) {
   if (!cur) return
   const status: CalStatus = cur.status === 'listo' ? 'planeado' : 'listo'
   live.setLocal(live.current().map((e) => (e.id === id ? { ...e, status } : e)))
-  if (hasSupabase && isUuid(id)) supabase.from('design_calendar').update({ status }).eq('id', id).then(({ error }) => { if (error) console.warn('[calendar] status', error.message); live.reload() })
+  if (hasSupabase && isUuid(id)) supabase.from('design_calendar').update({ status }).eq('id', id).then(({ error }) => { if (error) reportarFallo('actualizar el calendario', mensajeDeError(error)); live.reload() })
 }
 
 export function removeEntry(id: string) {
   live.setLocal(live.current().filter((e) => e.id !== id))
-  if (hasSupabase && isUuid(id)) supabase.from('design_calendar').delete().eq('id', id).then(({ error }) => { if (error) console.warn('[calendar] delete', error.message); live.reload() })
+  if (hasSupabase && isUuid(id)) supabase.from('design_calendar').delete().eq('id', id).then(({ error }) => { if (error) reportarFallo('eliminar del calendario', mensajeDeError(error)); live.reload() })
 }

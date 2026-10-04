@@ -75,10 +75,14 @@ function GeneralRow({ p }: { p: ProductSafe }) {
   const [val, setVal] = useState(p.price != null ? String(p.price) : '')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const dirty = val.trim() !== '' && Number(val) !== p.price
-  const save = () => {
+  const [guardando, setGuardando] = useState(false)
+  const save = async () => {
     const price = Number(val)
-    const r = setBasePrice(p.id, price, p.name)
-    setMsg(r.ok ? { ok: true, text: 'Guardado ✓' } : { ok: false, text: r.error ?? 'Error' })
+    setGuardando(true); setMsg(null)
+    // "Guardado ✓" solo cuando el servidor confirmó: es el precio que se va a cobrar.
+    const r = await setBasePrice(p.id, price, p.name)
+    setGuardando(false)
+    setMsg(r.ok ? { ok: true, text: 'Guardado ✓' } : { ok: false, text: r.error ?? 'No se guardó' })
     if (r.ok) setTimeout(() => setMsg(null), 2000)
   }
   return (
@@ -89,7 +93,7 @@ function GeneralRow({ p }: { p: ProductSafe }) {
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && dirty && save()} inputMode="decimal"
             style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
-          <button className="btn ghost sm" type="button" title="Guardar" disabled={!dirty} onClick={save}><Check size={13} /></button>
+          <button className="btn ghost sm" type="button" title="Guardar" disabled={!dirty || guardando} onClick={save}><Check size={13} /></button>
           {msg && <span style={{ fontSize: 11.5, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
         </span>
       </td>
@@ -109,7 +113,12 @@ function MayoreoTab({ skus }: { skus: ProductSafe[] }) {
   const active = clientLists.find((l) => l.id === activeId) ?? clientLists[0]
   const assigned = useMemo(() => (active ? doctors.filter((d) => d.price_list_id === active.id).length : 0), [doctors, active])
   const overrides = useMemo(() => (active ? skus.filter((p) => { const c = priceFor(p.id, p.price, active.id); return c != null && c !== p.price }) : []), [skus, active, priceFor])
-  const addList = () => { const n = newName.trim(); if (!n) return; const id = createList(n); setNewName(''); setActiveId(id) }
+  const addList = async () => {
+    const n = newName.trim(); if (!n) return
+    const r = await createList(n)
+    // Si no se creó, el nombre se queda escrito para reintentar (el motivo va en la franja de avisos).
+    if (r.ok && r.id) { setNewName(''); setActiveId(r.id) }
+  }
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -160,10 +169,17 @@ function MayoreoTab({ skus }: { skus: ProductSafe[] }) {
   )
 }
 
-function MayoreoRow({ name, base, current, onSet }: { name: string; base: number | null; current: number | null; onSet: (v: number | null) => void }) {
+function MayoreoRow({ name, base, current, onSet }: { name: string; base: number | null; current: number | null; onSet: (v: number | null) => Promise<{ ok: boolean; error?: string }> }) {
   const hasOverride = current != null && current !== base
   const [val, setVal] = useState(hasOverride ? String(current) : '')
-  const save = () => { const t = val.trim(); onSet(t === '' ? null : Number(t)) }
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const save = async () => {
+    const t = val.trim()
+    setMsg(null)
+    const r = await onSet(t === '' ? null : Number(t))
+    setMsg(r.ok ? { ok: true, text: 'Guardado ✓' } : { ok: false, text: r.error ?? 'No se guardó' })
+    if (r.ok) setTimeout(() => setMsg(null), 2000)
+  }
   const diff = hasOverride && base != null && current != null ? current - base : null
   return (
     <tr>
@@ -175,6 +191,7 @@ function MayoreoRow({ name, base, current, onSet }: { name: string; base: number
             style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
           <button className="btn ghost sm" type="button" title="Guardar" onClick={save}><Check size={13} /></button>
           {hasOverride && <span className="pill p-ok" style={{ fontSize: 10.5 }}>override</span>}
+          {msg && <span style={{ fontSize: 12, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
         </span>
       </td>
       <td data-label="Diferencia" className="mono" style={{ color: diff == null ? 'var(--ink-3)' : diff < 0 ? 'var(--green-deep)' : 'var(--warn)' }}>
@@ -222,18 +239,18 @@ function VolumenTab({ skus }: { skus: ProductSafe[] }) {
 function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: {
   product: ProductSafe
   tiers: VolumeRule[]
-  onCreate: (min: number, price: number) => { ok: boolean; error?: string }
-  onUpdate: (id: string, min: number, price: number) => { ok: boolean; error?: string }
-  onToggle: (id: string, active: boolean) => { ok: boolean; error?: string }
-  onDelete: (id: string) => { ok: boolean; error?: string }
+  onCreate: (min: number, price: number) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, min: number, price: number) => Promise<{ ok: boolean; error?: string }>
+  onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
+  onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [addMin, setAddMin] = useState('')
   const [addPrice, setAddPrice] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const add = () => {
+  const add = async () => {
     setErr(null)
-    const r = onCreate(Number(addMin), Number(addPrice))
-    if (!r.ok) { setErr(r.error ?? 'Error'); return }
+    const r = await onCreate(Number(addMin), Number(addPrice))
+    if (!r.ok) { setErr(r.error ?? 'No se guardó'); return }
     setAddMin(''); setAddPrice('')
   }
   return (
@@ -266,16 +283,17 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
 
 function TierRow({ tier, base, onUpdate, onToggle, onDelete }: {
   tier: VolumeRule; base: number | null
-  onUpdate: (id: string, min: number, price: number) => { ok: boolean; error?: string }
-  onToggle: (id: string, active: boolean) => { ok: boolean; error?: string }
-  onDelete: (id: string) => { ok: boolean; error?: string }
+  onUpdate: (id: string, min: number, price: number) => Promise<{ ok: boolean; error?: string }>
+  onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
+  onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [edit, setEdit] = useState(false)
   const [min, setMin] = useState(String(tier.min_quantity))
   const [price, setPrice] = useState(String(tier.price))
   const [err, setErr] = useState<string | null>(null)
   const pct = tierDiscountPct(base, tier.price)
-  const save = () => { setErr(null); const r = onUpdate(tier.id!, Number(min), Number(price)); if (!r.ok) { setErr(r.error ?? 'Error'); return } setEdit(false) }
+  // La fila solo sale del modo edición si el servidor guardó el cambio.
+  const save = async () => { setErr(null); const r = await onUpdate(tier.id!, Number(min), Number(price)); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
   return (
     <tr style={{ opacity: tier.active ? 1 : 0.55 }}>
       <td data-label="Desde">{edit ? <input value={min} onChange={(e) => setMin(e.target.value)} inputMode="numeric" style={inp(70)} /> : <span className="mono">{tier.min_quantity}</span>}</td>

@@ -13,7 +13,7 @@
 //      el servidor sí haya guardado. Para una escritura directa —que no lleva
 //      identificador de operación— eso significa "verifica antes de repetir", no
 //      "reintenta tranquilo".
-import { constraintCode, isAmbiguous, w1Code, w1Message } from '../ops/w1Command'
+import { codigoConocido, isAmbiguous, w1Message } from '../ops/w1Command'
 
 export type Escritura = { ok: true } | { ok: false; error: string; ambiguous: boolean }
 
@@ -49,7 +49,7 @@ const CRUDOS: [RegExp, string][] = [
 
 export function mensajeDeError(e: ErrorServidor, origen: 'tabla' | 'comando' = 'tabla'): string {
   // Un código de negocio o una restricción que sabemos leer manda sobre todo lo demás.
-  if (constraintCode(e.message) || w1Code(e.message)) return w1Message(e.message)
+  if (codigoConocido(e.message)) return w1Message(e.message)
   for (const [re, texto] of CRUDOS) if (re.test(e.message)) return texto
   // Un COMANDO del servidor redacta sus rechazos para el operador; una escritura
   // directa a tabla solo devuelve texto de Postgres, que no se muestra.
@@ -101,7 +101,7 @@ export async function confirmar(que: string, op: PromiseLike<Respuesta>, opcione
     return { ok: false, error: desconocido, ambiguous: true }
   }
   if (!res.error) return { ok: true }
-  const reconocido = constraintCode(res.error.message) ?? w1Code(res.error.message)
+  const reconocido = codigoConocido(res.error.message)
   const ambiguous = !reconocido && isAmbiguous(res.error) && !CRUDOS.some(([re]) => re.test(res.error!.message))
   const error = ambiguous ? desconocido : mensajeDeError(res.error, opciones.origen ?? 'tabla')
   reportarFallo(que, error, ambiguous)

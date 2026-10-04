@@ -13,6 +13,7 @@
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import type { Json } from '../database.types'
+import { mensajeDeError, reportarFallo } from './escritura'
 
 export interface NavLink { label: string; href: string }
 export interface Certification { label: string; sub: string }
@@ -191,13 +192,13 @@ export function saveLanding(next: LandingContent) {
   logAudit({ actor: 'Administración', action: 'Landing actualizada', resource: 'Página pública' })
   if (hasSupabase) {
     supabase.from('landing_content').upsert({ id: ROW_ID, content: content as unknown as Json, updated_at: new Date().toISOString() })
-      .then(({ error }) => { if (error) console.warn('[landing] save', error.message) })
+      .then(({ error }) => { if (error) reportarFallo('guardar el contenido del sitio web', mensajeDeError(error)) })
   }
 }
 
 export function resetLanding(): LandingContent {
   content = clone(DEFAULT)
   emit()
-  if (hasSupabase) supabase.from('landing_content').upsert({ id: ROW_ID, content: content as unknown as Json, updated_at: new Date().toISOString() }).then(({ error }) => { if (error) console.warn('[landing] reset', error.message) })
+  if (hasSupabase) supabase.from('landing_content').upsert({ id: ROW_ID, content: content as unknown as Json, updated_at: new Date().toISOString() }).then(({ error }) => { if (error) reportarFallo('restablecer el contenido del sitio web', mensajeDeError(error)) })
   return content
 }
