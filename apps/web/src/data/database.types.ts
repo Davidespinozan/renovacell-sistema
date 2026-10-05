@@ -341,6 +341,96 @@ export type Database = {
           },
         ]
       }
+      comm_outbox: {
+        Row: {
+          attempts: number
+          canal: string
+          claim_token: string | null
+          claimed_at: string | null
+          created_at: string
+          customer_id: string | null
+          event_key: string
+          first_attempt_at: string | null
+          generacion: number
+          id: string
+          last_error: string | null
+          order_id: string | null
+          payload: Json
+          plantilla: string
+          profile_id: string | null
+          provider: string | null
+          provider_message_id: string | null
+          sent_at: string | null
+          status: string
+          to_address: string | null
+          to_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          canal?: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          customer_id?: string | null
+          event_key: string
+          first_attempt_at?: string | null
+          generacion?: number
+          id?: string
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json
+          plantilla: string
+          profile_id?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          to_address?: string | null
+          to_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          canal?: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          customer_id?: string | null
+          event_key?: string
+          first_attempt_at?: string | null
+          generacion?: number
+          id?: string
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json
+          plantilla?: string
+          profile_id?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          to_address?: string | null
+          to_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_outbox_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_outbox_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
       company_bank_accounts: {
         Row: {
           account_number: string | null
@@ -3815,6 +3905,19 @@ export type Database = {
       }
     }
     Functions: {
+      _comm_autorizar: { Args: never; Returns: string }
+      _comm_encolar: {
+        Args: {
+          p_event_key: string
+          p_order: string
+          p_payload: Json
+          p_plantilla: string
+        }
+        Returns: undefined
+      }
+      _comm_max_intentos: { Args: never; Returns: number }
+      _comm_reclamo_caduco: { Args: never; Returns: string }
+      _comm_ventana_idempotencia: { Args: never; Returns: string }
       _fiscal_audit: {
         Args: { p_action: string; p_fiscal: Json; p_resource: string }
         Returns: undefined
@@ -4111,6 +4214,33 @@ export type Database = {
       }
       cerrar_orden_compra: {
         Args: { p_op_id: string; p_reason: string; p_replenishment: string }
+        Returns: Json
+      }
+      comm_reclamar: {
+        Args: { p_limite?: number }
+        Returns: {
+          claim_token: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          plantilla: string
+          to_address: string
+          to_name: string
+        }[]
+      }
+      comm_reintentar: {
+        Args: { p_acepto_posible_duplicado?: boolean; p_id: string }
+        Returns: Json
+      }
+      comm_resolver: {
+        Args: {
+          p_claim: string
+          p_error?: string
+          p_id: string
+          p_message_id?: string
+          p_provider?: string
+          p_resultado: string
+        }
         Returns: Json
       }
       conciliar_cfdi: {

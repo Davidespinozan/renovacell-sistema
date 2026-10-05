@@ -23,21 +23,12 @@ export interface MensajeCliente {
   payload: Record<string, unknown>
 }
 
-// La tabla y sus comandos aún no están en `database.types.ts` (se regenera al aplicar la
-// migración). Estos dos accesos concentran el tipado manual para retirarlo en un solo lugar.
-type Fila = Record<string, unknown>
-const tabla = () => (supabase.from as unknown as (t: string) => {
-  select: (c: string) => { order: (c: string, o: { ascending: boolean }) => { limit: (n: number) => PromiseLike<{ data: Fila[] | null; error: { message: string } | null }> } }
-})('comm_outbox')
-const rpc = (fn: string, args: Record<string, unknown>) =>
-  (supabase.rpc as unknown as (f: string, a: unknown) => PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>)(fn, args)
-
 /** Los mensajes más recientes. Acotado: el buzón crece con cada operación. */
 export const MENSAJES_VISIBLES = 300
 
 export async function cargarMensajes(): Promise<{ data: MensajeCliente[]; error: string | null }> {
   if (!hasSupabase) return { data: [], error: null }
-  const { data, error } = await tabla()
+  const { data, error } = await supabase.from('comm_outbox')
     .select('id, event_key, plantilla, order_id, to_address, to_name, status, attempts, last_error, sent_at, created_at, payload')
     .order('created_at', { ascending: false }).limit(MENSAJES_VISIBLES)
   if (error) return { data: [], error: 'No se pudo cargar el buzón de mensajes.' }
@@ -69,7 +60,7 @@ export type Reintento = { ok: true } | { ok: false; error: string; pideConfirmar
 
 export async function reintentarMensaje(id: string, aceptoPosibleDuplicado = false): Promise<Reintento> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.', pideConfirmarDuplicado: false }
-  const { error } = await rpc('comm_reintentar', { p_id: id, p_acepto_posible_duplicado: aceptoPosibleDuplicado })
+  const { error } = await supabase.rpc('comm_reintentar', { p_id: id, p_acepto_posible_duplicado: aceptoPosibleDuplicado })
   if (!error) return { ok: true }
   // El servidor pide una decisión explícita: no se sabe si el correo llegó.
   if (/COMM_POSIBLE_DUPLICADO/.test(error.message)) {
