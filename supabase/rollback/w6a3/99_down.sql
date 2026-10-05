@@ -65,16 +65,20 @@ REVOKE ALL ON FUNCTION public.avisar_cuentas_por_cobrar() FROM PUBLIC, anon, aut
 GRANT EXECUTE ON FUNCTION public.avisar_lotes_por_caducar()  TO service_role;
 GRANT EXECUTE ON FUNCTION public.avisar_cuentas_por_cobrar() TO service_role;
 
+-- Job anterior, por firma exacta (to_regproc es ambiguo con las sobrecargas de pg_cron).
+-- El GRANT a PUBLIC sobre cron.* no se toca: lo gobierna supabase_admin (gate externo).
 do $$
 begin
-  if to_regclass('cron.job_run_details') is not null then
-    grant select on cron.job, cron.job_run_details to public;
-    if exists (select 1 from cron.job where jobname = 'renovacell-alertas-diarias') then
-      perform cron.unschedule('renovacell-alertas-diarias');
-    end if;
-    perform cron.schedule('renovacell-alertas-diarias', '0 15 * * *',
-      'SELECT public.avisar_lotes_por_caducar(); SELECT public.avisar_cuentas_por_cobrar();');
+  if to_regprocedure('cron.schedule(text,text,text)') is null then
+    raise notice 'pg_cron no disponible: agendar el job anterior aparte.';
+    return;
   end if;
-exception when others then
-  raise notice 'pg_cron no disponible al restaurar el job (%).', sqlerrm;
+  if exists (select 1 from cron.job where jobname = 'renovacell-alertas-diarias') then
+    perform cron.unschedule('renovacell-alertas-diarias'::text);
+  end if;
+  perform cron.schedule('renovacell-alertas-diarias'::text, '0 15 * * *'::text,
+    'SELECT public.avisar_lotes_por_caducar(); SELECT public.avisar_cuentas_por_cobrar();'::text);
+  if (select count(*) from cron.job where jobname = 'renovacell-alertas-diarias') <> 1 then
+    raise exception 'ROLLBACK_W6A3: no se pudo restaurar el job anterior';
+  end if;
 end $$;

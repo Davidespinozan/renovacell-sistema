@@ -134,4 +134,18 @@ BEGIN
   DELETE FROM cron.job WHERE jobname = job_name;
   RETURN found;
 END $$;
+-- Las MISMAS sobrecargas que pg_cron 1.6 en producción. Importan: con ellas
+-- to_regproc('cron.schedule') / to_regproc('cron.unschedule') devuelven NULL (ambiguo),
+-- que es exactamente lo que hizo saltarse el re-agendado en el rollout de A3.1.
+CREATE FUNCTION cron.schedule(schedule text, command text) RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE v bigint;
+BEGIN
+  INSERT INTO cron.job (schedule, command) VALUES (schedule, command) RETURNING jobid INTO v;
+  RETURN v;
+END $$;
+CREATE FUNCTION cron.unschedule(job_id bigint) RETURNS boolean LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM cron.job WHERE jobid = job_id;
+  RETURN found;
+END $$;
 GRANT SELECT ON cron.job, cron.job_run_details TO PUBLIC;

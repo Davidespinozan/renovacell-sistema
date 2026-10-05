@@ -12,7 +12,6 @@ begin
                and to_regclass('public.sistema_latidos') is null, 'objetos A3.1 retirados');
   perform tests.eq((select command from cron.job where jobname = 'renovacell-alertas-diarias'),
     'SELECT public.avisar_lotes_por_caducar(); SELECT public.avisar_cuentas_por_cobrar();', 'job anterior restaurado');
-  perform tests.ok(has_table_privilege('public', 'cron.job_run_details', 'select'), 'SELECT de PUBLIC sobre cron.* restaurado');
   perform tests.ok((select proacl::text like '%service_role=X%' from pg_proc where proname = 'avisar_cuentas_por_cobrar'), 'grants originales (service_role)');
 end $t$;
 rollback;
