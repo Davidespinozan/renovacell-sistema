@@ -30,6 +30,12 @@ Deno.serve(async (req) => {
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
   const q = await resolverQuien(caller, createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
   if (!q.ok) return json(q.status, q.body)
+  // CC-0A · UNVERIFIED CANNOT CHECKOUT: invariante explícita (antes solo la cubría la RLS de
+  // orders de forma indirecta). La verdad es `is_verified()` del servidor; falla cerrado.
+  if (q.quien.role === 'doctor') {
+    const { data: verificado, error: vErr } = await caller.rpc('is_verified')
+    if (vErr || verificado !== true) return json(403, { error: 'NO_VERIFICADO', message: 'Tu cuenta aún no está verificada por Renovacell.' })
+  }
   const who = { user: { id: q.quien.uid, email: q.quien.email ?? undefined } }
 
   let payload: { order_id?: string; success_url?: string; cancel_url?: string }

@@ -22,7 +22,7 @@ const json = (status: number, body: unknown) =>
 // deno-lint-ignore no-explicit-any
 function catalogText(products: any[]): string {
   if (!Array.isArray(products) || products.length === 0) return '(sin catálogo provisto)'
-  return products.slice(0, 60).map((p) => {
+  return products.slice(0, 120).map((p) => {
     // Topa longitudes: el catálogo va en el prompt de sistema; nombres/categorías del cliente
     // no deben poder inflarlo ni inyectar instrucciones largas.
     const name = String(p.name ?? '').slice(0, 80)
@@ -102,15 +102,30 @@ Deno.serve(async (req) => {
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const mode = p.mode === 'landing' ? 'landing' : 'doctor'
 
+  const sbUrl = Deno.env.get('SUPABASE_URL')!
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')!
+  const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
+
   // El concierge del doctor exige sesión (no debe alcanzarse con la sola clave anon, ni
   // usarse como proxy gratis a la API de Anthropic). La landing SÍ es pública por diseño.
   if (mode === 'doctor') {
-    const sbUrl = Deno.env.get('SUPABASE_URL')!
-    const anon = Deno.env.get('SUPABASE_ANON_KEY')!
-    const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
     const q = await resolverQuien(caller, createClient(sbUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
     if (!q.ok) return json(q.status, q.body)
   }
+
+  // CC-0A · El catálogo que el modelo considera verdadero lo carga el SERVIDOR desde la
+  // fuente autorizada para cada modo: `catalog_public` (anon, sin precio) en la landing y
+  // `products_safe` (la RLS del llamante: solo un doctor verificado ve filas) en el portal.
+  // `p.products` era el contrato viejo del cliente: se IGNORA; nunca es autoridad.
+  // Si la carga falla, el modelo trabaja sin catálogo (y así lo dice) antes que con uno ajeno.
+  // deno-lint-ignore no-explicit-any
+  let products: any[] = []
+  try {
+    const r = mode === 'landing'
+      ? await createClient(sbUrl, anon, { auth: { persistSession: false } }).from('catalog_public').select('name, line, category').order('category').order('name').limit(120)
+      : await caller.from('products_safe').select('name, line, category').eq('active', true).eq('show_portal', true).order('category').order('name').limit(120)
+    products = Array.isArray(r.data) ? r.data : []
+  } catch { products = [] }
 
   // deno-lint-ignore no-explicit-any
   const history: any[] = Array.isArray(p.messages) ? p.messages : []
@@ -143,7 +158,7 @@ Deno.serve(async (req) => {
     // El doctor pide recomendaciones/comparaciones: dale margen para responder con
     // sustancia. La landing es captación breve, con menos.
     const maxTokens = mode === 'doctor' ? 900 : 500
-    const body: any = { model, max_tokens: maxTokens, system: systemPrompt(mode, p.products ?? []), messages }
+    const body: any = { model, max_tokens: maxTokens, system: systemPrompt(mode, products), messages }
     if (tools) body.tools = tools
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

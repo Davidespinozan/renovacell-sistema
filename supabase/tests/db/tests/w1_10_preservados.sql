@@ -22,7 +22,9 @@ begin
     ('pay_order(uuid,text,text)',                             '3717294aa7b93a4322f5c378f6db9e38'),
     ('precio_de(uuid,uuid)',                                  'b256810a5e089355712bdeffcb423832'),
     ('precio_de(uuid,uuid,integer)',                          '9efe19506f40e19c3dc5baeca66b9014'),
-    ('profiles_guard()',                                      'e701d0cb758330d71210eac028df7211'),
+    -- CC-0A (autorizado): profiles_guard protege además la evidencia de verificación y la
+    -- autoridad comercial en meta (META_PROTEGIDA). Hash re-anclado; el resto sigue intacto.
+    ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),
     ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
     ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
     ('upsert_customer_fiscal(uuid,jsonb)',                    '8fd937b882e85743582730ac7f132088')
