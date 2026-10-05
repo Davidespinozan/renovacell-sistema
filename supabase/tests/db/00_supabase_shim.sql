@@ -102,3 +102,36 @@ GRANT EXECUTE ON FUNCTION storage.foldername(text) TO anon, authenticated, servi
 -- ---------------------------------------------------------------------------
 SET client_min_messages = error;
 CREATE PUBLICATION supabase_realtime;
+
+-- ---------------------------------------------------------------------------
+-- pg_cron (W6-A3): emulación MÍNIMA del esquema `cron` con la forma real de pg_cron
+-- 1.6 (tablas job / job_run_details y schedule/unschedule por nombre). No ejecuta
+-- nada: las pruebas insertan corridas a mano para simular lo que pg_cron registra.
+-- Reproduce también el default de pg_cron de SELECT a PUBLIC (lo que A3.1 revoca).
+-- ---------------------------------------------------------------------------
+SET client_min_messages = notice;
+CREATE SCHEMA IF NOT EXISTS cron;
+CREATE TABLE cron.job (
+  jobid bigserial PRIMARY KEY, schedule text NOT NULL, command text NOT NULL,
+  nodename text NOT NULL DEFAULT 'localhost', nodeport int NOT NULL DEFAULT 5432,
+  database text NOT NULL DEFAULT current_database(), username text NOT NULL DEFAULT current_user,
+  active boolean NOT NULL DEFAULT true, jobname text UNIQUE
+);
+CREATE TABLE cron.job_run_details (
+  jobid bigint, runid bigserial PRIMARY KEY, job_pid int, database text, username text, command text,
+  status text, return_message text, start_time timestamptz, end_time timestamptz
+);
+CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE v bigint;
+BEGIN
+  INSERT INTO cron.job (schedule, command, jobname) VALUES (schedule, command, job_name)
+  ON CONFLICT (jobname) DO UPDATE SET schedule = excluded.schedule, command = excluded.command, active = true
+  RETURNING jobid INTO v;
+  RETURN v;
+END $$;
+CREATE FUNCTION cron.unschedule(job_name text) RETURNS boolean LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM cron.job WHERE jobname = job_name;
+  RETURN found;
+END $$;
+GRANT SELECT ON cron.job, cron.job_run_details TO PUBLIC;
