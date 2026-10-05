@@ -6,6 +6,7 @@
 // SEAM: sin FACTURAMA_USER/FACTURAMA_PASSWORD responde 501 (igual que `cfdi`).
 // NO toca el timbrado (función `cfdi`): es solo lectura de un CFDI ya timbrado.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { formatoValido, mimeDe, nombreArchivo, puedeDescargar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
 
@@ -35,11 +36,11 @@ Deno.serve(async (req) => {
 
   // Solo Dirección/Facturación descarga (misma autoridad que el timbrado).
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: me } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (!['admin', 'billing'].includes(me?.role_id ?? '')) return json(403, { error: 'Solo Dirección/Facturación puede descargar.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid } }
+  if (!tieneRol(q.quien, ['admin', 'billing'])) return json(403, { error: 'Solo Dirección/Facturación puede descargar.' })
 
   let payload: { order_id?: string; format?: unknown }
   try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }

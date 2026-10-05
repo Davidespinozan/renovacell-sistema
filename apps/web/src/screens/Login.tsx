@@ -1,6 +1,7 @@
 // Pantalla de Login (UI real, mock por dentro). Dos paneles: marca (verde
 // profundo) + formulario. Al entrar setea rol/usuario/capabilities (useAuth).
 import React, { useState } from 'react'
+import { motivoCierreSesion } from '../auth/suspension'
 import { Mail, Lock, LogIn, Sparkles, User, IdCard, ShieldCheck, ScanSearch } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
 import { BrandLogo } from '../app/BrandLogo'
@@ -18,7 +19,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [cedula, setCedula] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => motivoCierreSesion())
   // Si la landing manda al doctor con #registro, abrimos directo la verificación
   // (no el login genérico) — el acceso es lo primero, no algo escondido abajo.
   const [view, setView] = useState<'login' | 'recover' | 'register'>(

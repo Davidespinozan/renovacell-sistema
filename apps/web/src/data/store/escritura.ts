@@ -14,6 +14,7 @@
 //      identificador de operación— eso significa "verifica antes de repetir", no
 //      "reintenta tranquilo".
 import { codigoConocido, isAmbiguous, w1Message } from '../ops/w1Command'
+import { atenderSuspension } from '../../auth/suspension'
 
 export type Escritura = { ok: true } | { ok: false; error: string; ambiguous: boolean }
 
@@ -48,6 +49,8 @@ const CRUDOS: [RegExp, string][] = [
 ]
 
 export function mensajeDeError(e: ErrorServidor, origen: 'tabla' | 'comando' = 'tabla'): string {
+  // W6-A1: una cuenta suspendida no sigue operando en esta pestaña.
+  atenderSuspension(e.message)
   // Un código de negocio o una restricción que sabemos leer manda sobre todo lo demás.
   if (codigoConocido(e.message)) return w1Message(e.message)
   for (const [re, texto] of CRUDOS) if (re.test(e.message)) return texto

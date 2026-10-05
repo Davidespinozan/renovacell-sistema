@@ -9,6 +9,7 @@
 // SEAM: sin ANTHROPIC_API_KEY responde 501 → el cliente usa su motor local (mock).
 // Activar = `supabase secrets set ANTHROPIC_API_KEY=...` (opcional ANTHROPIC_MODEL).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -107,8 +108,8 @@ Deno.serve(async (req) => {
     const sbUrl = Deno.env.get('SUPABASE_URL')!
     const anon = Deno.env.get('SUPABASE_ANON_KEY')!
     const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-    const { data: who } = await caller.auth.getUser()
-    if (!who?.user) return json(401, { error: 'No autenticado.' })
+    const q = await resolverQuien(caller, createClient(sbUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
+    if (!q.ok) return json(q.status, q.body)
   }
 
   // deno-lint-ignore no-explicit-any

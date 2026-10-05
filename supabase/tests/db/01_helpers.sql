@@ -626,3 +626,25 @@ end $$;
 grant execute on function tests.fechar(uuid, timestamptz), tests.stock_costo(uuid, text, int, numeric),
   tests.cobrar_el(uuid, numeric, date, text), tests.surtir(uuid), tests.kpi(text, date, date),
   tests.jsonb_igual(jsonb, jsonb, text) to authenticated, service_role;
+
+-- ------------------------------------------- fixtures de W6-A1 (suspensión)
+-- Suspende / reactiva por el comando real, como Dirección (fixture admin).
+create or replace function tests.suspender(p_uid uuid, p_motivo text default 'prueba', p_baja boolean default false)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  v := public.suspender_staff(p_uid, p_motivo, p_baja);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v;
+end $$;
+create or replace function tests.reactivar(p_uid uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  v := public.reactivar_staff(p_uid);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v;
+end $$;
+grant execute on function tests.suspender(uuid, text, boolean), tests.reactivar(uuid) to authenticated, service_role;

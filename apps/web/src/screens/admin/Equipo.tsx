@@ -29,9 +29,22 @@ export function Equipo() {
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 3200) }
 
   const onDelete = async (u: TeamUser) => {
-    if (!window.confirm(`¿Eliminar a ${u.name}? Perderá el acceso al sistema. Esta acción no se puede deshacer.`)) return
-    const r = await removeUser(u.id)
-    flash(r.ok ? `Usuario eliminado: ${u.name}` : `No se pudo eliminar: ${r.error}`)
+    const motivo = window.prompt(`Dar de baja a ${u.name}: pierde el acceso al sistema desde ahora. Su historial (recepciones, cobros, entregas) se conserva. Motivo:`, 'Baja del equipo')
+    if (motivo == null) return
+    const r = await removeUser(u.id, motivo.trim() || 'Baja del equipo')
+    flash(r.ok ? `Baja registrada: ${u.name}` : `No se pudo dar de baja: ${r.error}`)
+  }
+  const onToggle = async (u: TeamUser) => {
+    if (u.active) {
+      const motivo = window.prompt(`Suspender a ${u.name}: pierde el acceso al sistema desde ahora (también en sesiones abiertas). Motivo:`, '')
+      if (motivo == null) return
+      if (!motivo.trim()) { flash('Escribe el motivo de la suspensión.'); return }
+      const r = await setActive(u.id, false, motivo.trim())
+      flash(r.ok ? `Acceso suspendido: ${u.name}` : `No se pudo suspender: ${r.error}`)
+      return
+    }
+    const r = await setActive(u.id, true)
+    flash(r.ok ? `Acceso reactivado: ${u.name}` : `No se pudo reactivar: ${r.error}`)
   }
 
   return (
@@ -42,7 +55,7 @@ export function Equipo() {
           { key: 'name', label: 'Nombre' },
           { key: 'email', label: 'Correo' },
           { key: 'role', label: 'Rol', format: (v) => getRole(v as RoleKey).label },
-          { key: 'active', label: 'Estado', format: (v) => (v ? 'Activo' : 'Suspendido') },
+          { key: 'active', label: 'Estado', format: (v, row) => (v ? 'Activo' : row.baja ? 'Baja' : 'Suspendido') },
           { key: 'capabilities', label: 'Permisos', format: (v) => (Array.isArray(v) ? v.join(', ') : '') },
         ]} />
         <button className="btn sm" type="button" onClick={() => setOpen(true)}><UserPlus size={14} /> Nuevo usuario</button>
@@ -57,17 +70,17 @@ export function Equipo() {
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{u.email}</div>
             </div>
             <span className="pill p-neu">{getRole(u.role).label}</span>
-            {!u.active && <span className="pill p-dang">Suspendido</span>}
+            {!u.active && <span className="pill p-dang">{u.baja ? 'Baja' : 'Suspendido'}</span>}
           </div>
 
           {/* Acciones sobre la cuenta */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             <button className="btn ghost sm" type="button" onClick={() => setEditing(u)}><Pencil size={14} /> Editar</button>
             <button className="btn ghost sm" type="button" onClick={() => setPwFor(u)}><KeyRound size={14} /> Contraseña</button>
-            <button className="btn ghost sm" type="button" style={{ color: u.active ? 'var(--danger)' : 'var(--green-deep)' }} onClick={() => setActive(u.id, !u.active)}>
+            <button className="btn ghost sm" type="button" style={{ color: u.active ? 'var(--danger)' : 'var(--green-deep)' }} onClick={() => void onToggle(u)}>
               {u.active ? <><Ban size={14} /> Suspender</> : <><RotateCcw size={14} /> Reactivar</>}
             </button>
-            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => onDelete(u)}><Trash2 size={14} /> Eliminar</button>
+            {u.active && <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => onDelete(u)}><Trash2 size={14} /> Dar de baja</button>}
           </div>
 
           <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>

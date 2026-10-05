@@ -5,6 +5,7 @@
 // verified=false) para que no se pierda al recargar. El envío del enlace de acceso
 // (magic link) queda para cuando haya SMTP configurado (fase de correo).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -25,14 +26,13 @@ Deno.serve(async (req) => {
 
   // 1) Identifica a quien llama por su JWT.
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
 
   const admin = createClient(url, service, { auth: { persistSession: false } })
 
   // 2) Solo un admin puede dar de alta doctores.
-  const { data: prof } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (prof?.role_id !== 'admin') return json(403, { error: 'Solo Administración puede dar de alta doctores.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'Solo Administración puede dar de alta doctores.' })
 
   // 3) Datos del doctor.
   let payload: { email?: string; full_name?: string; organization?: string; meta?: Record<string, unknown> }

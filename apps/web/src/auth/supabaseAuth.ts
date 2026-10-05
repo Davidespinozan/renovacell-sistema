@@ -3,6 +3,7 @@
 // La seguridad real la impone el RLS; aquí solo mapeamos.
 import { supabase } from '../lib/supabase'
 import type { RoleKey } from '../app/roles'
+import { atenderSuspension, CUENTA_SUSPENDIDA_MSG } from './suspension'
 
 // La base tiene 8 roles; la app usa 5. Mapeo seguro (packing→almacén, billing/comm→admin).
 export const ROLE_MAP: Record<string, RoleKey> = {
@@ -31,13 +32,17 @@ function toSessionRow(row: { role_id: string | null; verified: boolean | null; f
   }
 }
 
-async function fetchProfile(userId: string, email: string): Promise<Session | null> {
+// Resultado de leer el perfil: la sesión, `null` si no hay perfil, o 'suspendida' si el
+// servidor negó la lectura con CUENTA_SUSPENDIDA o el perfil trae active = false.
+async function fetchProfile(userId: string, email: string): Promise<Session | null | 'suspendida'> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('role_id, verified, full_name, meta')
+    .select('role_id, verified, full_name, meta, active')
     .eq('id', userId)
     .single()
-  if (error || !data) return null
+  if (error) return atenderSuspension(error.message) ? 'suspendida' : null
+  if (!data) return null
+  if (data.active === false) return 'suspendida'
   return toSessionRow(data, email)
 }
 
@@ -48,6 +53,11 @@ export async function signInSupabase(email: string, password: string): Promise<{
     return { error: m }
   }
   const session = await fetchProfile(data.user.id, data.user.email ?? email)
+  if (session === 'suspendida') {
+    // W6-A1: la cuenta existe pero Dirección la suspendió. Sin sesión colgada.
+    await supabase.auth.signOut()
+    return { error: CUENTA_SUSPENDIDA_MSG }
+  }
   if (!session) {
     // #9: no dejar una sesión autenticada colgada si el perfil no existe.
     await supabase.auth.signOut()
@@ -61,7 +71,13 @@ export async function currentSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession()
   const u = data.session?.user
   if (!u) return null
-  return fetchProfile(u.id, u.email ?? '')
+  const s = await fetchProfile(u.id, u.email ?? '')
+  if (s === 'suspendida') {
+    // Sesión guardada de una cuenta que ya fue suspendida: se cierra y se avisa.
+    await supabase.auth.signOut()
+    return null
+  }
+  return s
 }
 
 export async function signOutSupabase(): Promise<void> {

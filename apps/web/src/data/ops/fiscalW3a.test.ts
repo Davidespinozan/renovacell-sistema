@@ -77,8 +77,9 @@ describe('CONTENCIÓN · la función cfdi no puede llegar al PAC', () => {
     expect(cfdiSrc).toMatch(/w3_contencion/)
   })
   it('conserva el control de acceso (no es un endpoint abierto)', () => {
-    expect(cfdiSrc).toMatch(/\['admin', 'billing'\]\.includes/)
-    expect(cfdiSrc).toMatch(/401/)
+    expect(cfdiSrc).toMatch(/tieneRol\(q\.quien, \['admin', 'billing'\]\)/)
+    // W6-A1: 401 (sin sesión) y 403 (suspendido) los responde resolverQuien; el 403 de rol sigue aquí.
+    expect(cfdiSrc).toMatch(/if \(!q\.ok\) return json\(q\.status, q\.body\)/)
     expect(cfdiSrc).toMatch(/403/)
   })
   it('no persiste un timbre: la construcción del stamp desapareció', () => {

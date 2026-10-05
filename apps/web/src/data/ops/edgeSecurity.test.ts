@@ -6,14 +6,14 @@ import assistantSrc from '../../../../../supabase/functions/assistant/index.ts?r
 import cedulaSrc from '../../../../../supabase/functions/verify-cedula/index.ts?raw'
 
 describe('A-03 · shipping exige usuario + rol de logística antes de llamar al agregador', () => {
-  it('tiene getUser() y whitelist admin/warehouse/packing', () => {
-    expect(shippingSrc).toMatch(/auth\.getUser\(\)/)
+  it('resuelve al llamante (W6-A1: resolverQuien) y whitelist admin/warehouse/packing', () => {
+    expect(shippingSrc).toMatch(/resolverQuien\(/)
     expect(shippingSrc).toMatch(/\['admin', 'warehouse', 'packing'\]/)
     expect(shippingSrc).toMatch(/401/)
     expect(shippingSrc).toMatch(/403/)
   })
   it('la autenticación ocurre ANTES del fetch al proveedor', () => {
-    const auth = shippingSrc.indexOf('auth.getUser()')
+    const auth = shippingSrc.indexOf('resolverQuien(')
     const firstFetch = shippingSrc.indexOf('fetch(') // primer llamado saliente al proveedor
     expect(auth).toBeGreaterThan(-1)
     expect(firstFetch).toBeGreaterThan(auth)
@@ -21,10 +21,10 @@ describe('A-03 · shipping exige usuario + rol de logística antes de llamar al 
 })
 
 describe('A-04 · assistant: modo doctor exige sesión, topa entradas y no filtra el error', () => {
-  it('modo doctor requiere getUser()', () => {
+  it('modo doctor requiere sesión (W6-A1: resolverQuien responde 401/403)', () => {
     expect(assistantSrc).toMatch(/mode === 'doctor'/)
-    expect(assistantSrc).toMatch(/auth\.getUser\(\)/)
-    expect(assistantSrc).toMatch(/No autenticado/)
+    expect(assistantSrc).toMatch(/resolverQuien\(/)
+    expect(assistantSrc).toMatch(/if \(!q\.ok\) return json\(q\.status, q\.body\)/)
   })
   it('topa el contenido de cada turno y el catálogo', () => {
     expect(assistantSrc).toMatch(/slice\(0, 4000\)/)

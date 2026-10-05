@@ -11,6 +11,7 @@
 //   DHL_API_USERNAME, DHL_API_PASSWORD, DHL_ACCOUNT_NUMBER, DHL_API_ENV(test|production)
 //   (legado) SHIPPING_API_KEY, SHIPPING_API_URL, SHIPPING_RATE_PATH, SHIPPING_LABEL_PATH
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
   dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
@@ -95,11 +96,11 @@ Deno.serve(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const caller = createClient(sbUrl, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(sbUrl, service, { auth: { persistSession: false } })
-  const { data: me } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (!['admin', 'warehouse', 'packing'].includes(me?.role_id ?? '')) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid } }
+  if (!tieneRol(q.quien, ['admin', 'warehouse', 'packing'])) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
 
   // deno-lint-ignore no-explicit-any
   let p: any

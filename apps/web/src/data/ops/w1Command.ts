@@ -14,6 +14,7 @@
 //    de dinero nunca se busca en el registro de inventario ni al revés.
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../database.types'
+import { atenderSuspension } from '../../auth/suspension'
 
 type Fns = Database['public']['Functions']
 // Comandos W1 que pasan por este cliente (firmas tipadas desde database.types.ts).
@@ -43,6 +44,12 @@ export const newOpId = (): string =>
 // Mensajes de operador para los códigos que RAISEan los comandos W1.
 const MENSAJES: Record<string, string> = {
   NO_AUTORIZADO: 'No tienes permiso para esta operación.',
+  CUENTA_SUSPENDIDA: 'Tu acceso fue suspendido por Dirección.',
+  ACCESO_SOLO_POR_COMANDO: 'El acceso del personal se suspende o reactiva desde Equipo, no editando el perfil.',
+  ROL_SOLO_POR_COMANDO: 'El rol se cambia desde Equipo, no editando el perfil.',
+  AUTOSUSPENSION_PROHIBIDA: 'No puedes cambiar tu propio acceso.',
+  SOLO_STAFF: 'Los doctores no se suspenden por aquí: su acceso se gobierna con la verificación.',
+  STAFF_INEXISTENTE: 'Ese usuario no existe.',
   OP_ID_REUTILIZADO: 'Esta operación ya se registró con otros datos. Recarga la pantalla para ver el estado real antes de volver a intentar.',
   OP_ID_REQUERIDO: 'Falta el identificador de la operación. Recarga la pantalla.',
   MOTIVO_REQUERIDO: 'Escribe el motivo — es obligatorio.',
@@ -352,6 +359,7 @@ async function run<T>(rpc: string, params: unknown, opId: string,
       return { ok: false, ambiguous: true, error: AMBIGUO_MSG }
     }
     const msg = error.message ?? ''
+    atenderSuspension(msg)
     return { ok: false, code: w1Code(msg), error: w1Message(msg) }
   }
   const obj = (data && typeof data === 'object' ? data : { value: data }) as Record<string, unknown>

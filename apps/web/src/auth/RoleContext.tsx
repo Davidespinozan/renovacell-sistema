@@ -110,6 +110,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setCapabilities([])
         setMode('login')
+      } else if (event === 'TOKEN_REFRESHED') {
+        // W6-A1: cada renovación vuelve a leer el perfil; una cuenta suspendida cierra sesión.
+        void currentSession()
       }
     })
     return () => { active = false; sub.subscription.unsubscribe() }

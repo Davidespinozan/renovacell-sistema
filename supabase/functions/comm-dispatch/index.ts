@@ -44,6 +44,9 @@ Deno.serve(async (req) => {
 
   const { data: lote, error: eRec } = await caller.rpc('comm_reclamar', { p_limite: 20 })
   if (eRec) {
+    // W6-A1: la base niega a una cuenta suspendida (CUENTA_SUSPENDIDA) con el JWT del
+    // llamante; aquí no hace falta llave de servicio para saberlo.
+    if (/CUENTA_SUSPENDIDA/.test(eRec.message)) return json(403, { error: 'CUENTA_SUSPENDIDA', message: 'Tu acceso fue suspendido por Dirección.' })
     const negado = /NO_AUTORIZADO/.test(eRec.message)
     return json(negado ? 403 : 500, { error: negado ? 'Solo Dirección envía mensajes al cliente.' : 'No se pudo leer la cola de mensajes.' })
   }

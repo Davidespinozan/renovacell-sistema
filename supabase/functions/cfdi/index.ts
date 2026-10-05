@@ -37,6 +37,7 @@
 // ./rules.ts, probadas, listas para que W3-B las aplique sobre la intención durable.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -55,11 +56,11 @@ Deno.serve(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: me } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (!['admin', 'billing'].includes(me?.role_id ?? '')) return json(403, { error: 'Solo Dirección/Facturación puede timbrar.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid } }
+  if (!tieneRol(q.quien, ['admin', 'billing'])) return json(403, { error: 'Solo Dirección/Facturación puede timbrar.' })
 
   // CONTENCIÓN. Ni red, ni credenciales, ni escritura. 423 = bloqueado a propósito.
   return json(423, {

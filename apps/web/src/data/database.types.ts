@@ -2756,6 +2756,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active: boolean
           email: string | null
           full_name: string | null
           id: string
@@ -2766,6 +2767,7 @@ export type Database = {
           verified: boolean | null
         }
         Insert: {
+          active?: boolean
           email?: string | null
           full_name?: string | null
           id: string
@@ -2776,6 +2778,7 @@ export type Database = {
           verified?: boolean | null
         }
         Update: {
+          active?: boolean
           email?: string | null
           full_name?: string | null
           id?: string
@@ -4591,6 +4594,7 @@ export type Database = {
         }
         Returns: Json
       }
+      reactivar_staff: { Args: { p_uid: string }; Returns: Json }
       reportar_pago: {
         Args: {
           p_amount: number
@@ -4601,6 +4605,10 @@ export type Database = {
           p_proof_path?: string
           p_reference?: string
         }
+        Returns: Json
+      }
+      suspender_staff: {
+        Args: { p_baja?: boolean; p_motivo: string; p_uid: string }
         Returns: Json
       }
       resolve_customer_identity: {

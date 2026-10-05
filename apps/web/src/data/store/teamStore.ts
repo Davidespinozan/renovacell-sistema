@@ -6,6 +6,12 @@
 // toggleCapability/setActive escriben write-through a profiles.meta. El alta de
 // usuario crea un usuario de auth (server-side): queda LOCAL hasta el flujo de
 // invitación (Edge Function), igual que el alta de doctores.
+//
+// W6-A1 · `active` es la COLUMNA `profiles.active` (autoridad del servidor), no una
+// llave del JSON. Suspender, reactivar y dar de baja pasan por `staff-admin`, que
+// ejecuta los comandos de la base (`suspender_staff` / `reactivar_staff`) con el JWT
+// de Dirección y pide a Auth que la cuenta no renueve tokens. La baja ya no borra
+// la cuenta: la deja suspendida y marcada, para no perder quién hizo qué.
 import type { RoleKey, CapabilityKey } from '../../app/roles'
 import { MOCK_ACCOUNTS } from '../mock/accounts'
 import { logAudit } from './auditStore'
@@ -22,6 +28,7 @@ export interface TeamUser {
   role: RoleKey
   capabilities: CapabilityKey[]
   active: boolean
+  baja?: boolean          // suspendido y marcado como baja (informativo)
   avatarUrl?: string
 }
 
@@ -37,19 +44,20 @@ const rawMeta = new Map<string, Record<string, unknown>>()
 
 const live = makeLive<TeamUser>(async () => {
   const { data, error } = await supabase.from('profiles')
-    .select('id, email, full_name, role_id, meta')
+    .select('id, email, full_name, role_id, meta, active')
     .neq('role_id', 'doctor')
     .order('full_name')
   if (error) throw error
   rawMeta.clear()
   return (data ?? []).map((p) => {
-    const meta = (p.meta ?? {}) as { capabilities?: string[]; name?: string; active?: boolean; avatar_url?: string }
+    const meta = (p.meta ?? {}) as { capabilities?: string[]; name?: string; avatar_url?: string; baja?: unknown }
     rawMeta.set(p.id, meta as Record<string, unknown>)
     return {
       id: p.id, email: p.email ?? '', name: meta.name ?? p.full_name ?? p.email ?? 'Usuario',
       role: ROLE_MAP[p.role_id ?? 'admin'] ?? 'admin',
       capabilities: (meta.capabilities ?? []) as CapabilityKey[],
-      active: meta.active ?? true,
+      active: p.active !== false,
+      baja: !p.active && !!meta.baja,
       avatarUrl: meta.avatar_url ?? undefined,
     }
   })
@@ -131,16 +139,18 @@ export async function updateUser(id: string, patch: { name?: string; role?: Role
   return { ok: true }
 }
 
-// ELIMINAR un usuario (borra su cuenta de auth).
-export async function removeUser(id: string): Promise<{ ok: boolean; error?: string }> {
+// DAR DE BAJA a un usuario. Con backend NO borra la cuenta: la suspende y la marca como
+// baja (el servidor registra quién y por qué). Sin backend (demo) lo quita de la lista.
+export async function removeUser(id: string, motivo = 'Baja del equipo'): Promise<{ ok: boolean; error?: string }> {
   const cur = live.current().find((u) => u.id === id)
+  if (hasSupabase && isUuid(id)) {
+    const r = await callStaffAdmin({ action: 'delete', id, motivo })
+    if (!r.ok) return { ok: false, error: r.error }
+    await live.reload()
+    return { ok: true }
+  }
   live.setLocal(live.current().filter((u) => u.id !== id))
   logAudit({ actor: 'Administración', action: 'Usuario eliminado', resource: cur?.name ?? id })
-  if (hasSupabase && isUuid(id)) {
-    const r = await callStaffAdmin({ action: 'delete', id })
-    if (!r.ok) { await live.reload(); return { ok: false, error: r.error } }
-    await live.reload()
-  }
   return { ok: true }
 }
 
@@ -174,10 +184,19 @@ export function toggleCapability(id: string, cap: CapabilityKey) {
   writeMeta(id, { capabilities })
 }
 
-export function setActive(id: string, active: boolean) {
+// SUSPENDER / REACTIVAR el acceso. Con backend la autoridad es el comando del servidor
+// (con motivo, nunca a uno mismo, auditado); la pantalla solo refleja lo que confirmó.
+// Sin backend (demo) se cambia localmente.
+export async function setActive(id: string, active: boolean, motivo = ''): Promise<{ ok: boolean; error?: string }> {
   const cur = live.current().find((u) => u.id === id)
-  if (!cur) return
-  live.setLocal(live.current().map((u) => (u.id === id ? { ...u, active } : u)))
+  if (!cur) return { ok: false, error: 'Usuario no encontrado.' }
+  if (hasSupabase && isUuid(id)) {
+    const r = await callStaffAdmin(active ? { action: 'reactivate', id } : { action: 'suspend', id, motivo })
+    if (!r.ok) return { ok: false, error: r.error }
+    await live.reload()
+    return { ok: true }
+  }
+  live.setLocal(live.current().map((u) => (u.id === id ? { ...u, active, baja: active ? false : u.baja } : u)))
   logAudit({ actor: 'Administración', action: active ? 'Acceso reactivado' : 'Acceso suspendido', resource: cur.name })
-  writeMeta(id, { active })
+  return { ok: true }
 }

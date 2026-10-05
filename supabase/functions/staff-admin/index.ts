@@ -1,8 +1,18 @@
 // Edge Function: gestión de USUARIOS del equipo (staff) — server-side.
-// Crear/editar/eliminar un usuario y fijar su contraseña requiere el service role
-// (nunca en el cliente). Todas las acciones exigen que quien invoca sea ADMIN.
-// Acciones: create | setPassword | update | delete.
+// Crear/editar un usuario y fijar su contraseña requiere el service role (nunca en el
+// cliente). Todas las acciones exigen que quien invoca sea ADMIN y esté activo.
+// Acciones: create | setPassword | update | suspend | reactivate | delete.
+//
+// W6-A1 · La AUTORIDAD de suspender/reactivar vive en la base (`suspender_staff` /
+// `reactivar_staff`, con el JWT del llamante: ahí se decide quién puede y a quién).
+// Esta función solo añade lo que la base no puede hacer: pedirle a Auth que la cuenta
+// suspendida no vuelva a obtener tokens (revocación administrativa, best-effort). Un
+// access token ya emitido vive hasta expirar (≤ 1 h); desde el instante del comando la
+// base ya le niega todo, así que esa pestaña solo verá "cuenta suspendida".
+// `delete` ya NO borra la cuenta: es una baja = suspensión marcada. La identidad
+// histórica (quién recibió, cobró, surtió, entregó) se conserva.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -22,23 +32,22 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? ''
 
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
-
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: prof } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (prof?.role_id !== 'admin') return json(403, { error: 'Solo Administración puede gestionar usuarios.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'Solo Administración puede gestionar usuarios.' })
+  const who = { user: { id: q.quien.uid } }
 
   let body: {
     action?: string; id?: string; email?: string; password?: string
-    full_name?: string; role?: string; capabilities?: string[]
+    full_name?: string; role?: string; capabilities?: string[]; motivo?: string
   }
   try { body = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const action = body.action
 
-  // No permitir que un admin se elimine/degrade a sí mismo (evita quedarse sin acceso).
-  if ((action === 'delete' || (action === 'update' && body.role && body.role !== 'admin')) && body.id === who.user.id) {
-    return json(400, { error: 'No puedes eliminar ni cambiar tu propio rol de administrador.' })
+  // No permitir que un admin se dé de baja/suspenda/degrade a sí mismo (evita quedarse sin acceso).
+  if ((['delete', 'suspend'].includes(action ?? '') || (action === 'update' && body.role && body.role !== 'admin')) && body.id === who.user.id) {
+    return json(400, { error: 'No puedes suspender, dar de baja ni cambiar tu propio rol de administrador.' })
   }
 
   if (action === 'create') {
@@ -84,11 +93,35 @@ Deno.serve(async (req) => {
     return json(200, { ok: true })
   }
 
-  if (action === 'delete') {
+  // Revocación administrativa (best-effort): la cuenta deja de poder iniciar sesión y de
+  // renovar su token. No se promete más: el access token vigente expira solo.
+  const revocar = async (id: string): Promise<boolean> => {
+    const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: '876000h' })
+    return !error
+  }
+  const readmitir = async (id: string): Promise<boolean> => {
+    const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: 'none' })
+    return !error
+  }
+
+  if (action === 'suspend' || action === 'delete') {
     if (!body.id) return json(400, { error: 'Falta el id del usuario.' })
-    const { error } = await admin.auth.admin.deleteUser(body.id)
+    const baja = action === 'delete'
+    const motivo = (body.motivo ?? '').trim() || (baja ? 'Baja del equipo' : '')
+    if (!motivo) return json(400, { error: 'Escribe el motivo de la suspensión.' })
+    // La base decide (admin, no a sí mismo, solo personal, motivo, bitácora).
+    const { data, error } = await caller.rpc('suspender_staff', { p_uid: body.id, p_motivo: motivo, p_baja: baja })
     if (error) return json(400, { error: error.message })
-    return json(200, { ok: true })
+    const sesionesRevocadas = await revocar(body.id)
+    return json(200, { ok: true, ...(data as Record<string, unknown>), sesiones_revocadas: sesionesRevocadas })
+  }
+
+  if (action === 'reactivate') {
+    if (!body.id) return json(400, { error: 'Falta el id del usuario.' })
+    const { data, error } = await caller.rpc('reactivar_staff', { p_uid: body.id })
+    if (error) return json(400, { error: error.message })
+    const readmitido = await readmitir(body.id)
+    return json(200, { ok: true, ...(data as Record<string, unknown>), readmitido })
   }
 
   return json(400, { error: 'Acción no reconocida.' })

@@ -5,6 +5,7 @@
 // el cliente redirige a esa URL (página de pago de Stripe). La confirmación del
 // pago la hace `stripe-webhook` (marca el pedido pagado).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien } from '../_shared/quien.ts'
 import Stripe from 'npm:stripe@17'
 
 const cors = {
@@ -27,8 +28,9 @@ Deno.serve(async (req) => {
 
   // Identifica al usuario; la RLS de orders limita a su propio pedido / staff.
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
+  const q = await resolverQuien(caller, createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid, email: q.quien.email ?? undefined } }
 
   let payload: { order_id?: string; success_url?: string; cancel_url?: string }
   try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }

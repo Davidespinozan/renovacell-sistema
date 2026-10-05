@@ -7,6 +7,7 @@
 // La LÓGICA DE DECISIÓN vive aquí (misma que el cliente en data/verification/decide.ts)
 // para que la fuente de verdad y el criterio no dependan del navegador.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -160,11 +161,12 @@ Deno.serve(async (req) => {
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
   const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: prof } = await admin.from('profiles').select('role_id, full_name, meta').eq('id', who.user.id).single()
-  const callerRole = prof?.role_id ?? ''
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid } }
+  const prof = { role_id: q.quien.role, full_name: q.quien.full_name, meta: q.quien.meta }
+  const callerRole = q.quien.role
   const isStaff = ['admin', 'billing', 'comm'].includes(callerRole)
   const isDoctor = callerRole === 'doctor'
   if (!isStaff && !isDoctor) return json(403, { error: 'No autorizado.' })

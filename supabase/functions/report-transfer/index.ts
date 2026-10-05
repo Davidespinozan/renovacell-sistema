@@ -14,6 +14,7 @@
 // (declared_by) y la validación de dueño son las del cliente real, no del service role.
 // Requiere JWT (cliente autenticado). Desplegar SIN --no-verify-jwt.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -62,8 +63,9 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? ''
 
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
+  const q = await resolverQuien(caller, createClient(url, service, { auth: { persistSession: false } }))
+  if (!q.ok) return json(q.status, q.body)
+  const who = { user: { id: q.quien.uid, email: q.quien.email ?? undefined } }
 
   let body: {
     orderId?: string; reference?: string; proof?: string

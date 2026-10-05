@@ -12,6 +12,7 @@
 //
 // Requiere JWT (se despliega SIN --no-verify-jwt): solo staff autenticado responde.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -42,11 +43,10 @@ Deno.serve(async (req) => {
 
   // El llamador debe ser staff autenticado (no un doctor).
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const { data: prof } = await admin.from('profiles').select('role_id').eq('id', who.user.id).single()
-  if (!prof || prof.role_id === 'doctor') return json(403, { error: 'Solo el equipo puede responder.' })
+  const q = await resolverQuien(caller, admin)
+  if (!q.ok) return json(q.status, q.body)
+  if (q.quien.role === '' || q.quien.role === 'doctor') return json(403, { error: 'Solo el equipo puede responder.' })
 
   let body: { prospectId?: string; at?: string; text?: string }
   try { body = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
