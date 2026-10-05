@@ -7,6 +7,7 @@ import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
+import { confirmar } from '../data/store/escritura'
 
 export type AppMode = 'app' | 'landing' | 'login' | 'reset'
 
@@ -66,6 +67,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   // La foto ya viene como URL de Storage (la sube MiPerfil). Preserva el resto del
   // meta (capabilities, cédula…) haciendo merge.
   const updateProfile = async (patch: Partial<SessionUser> & { fiscal?: Record<string, string> }) => {
+    const antes = user
     setUser((u) => (u ? { ...u, ...patch } : u))
     if (!hasSupabase) return
     const uid = currentUserId()
@@ -77,7 +79,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     if (patch.fiscal) meta.fiscal = { ...((meta.fiscal ?? {}) as Record<string, unknown>), ...patch.fiscal }
     const fields: Record<string, unknown> = { meta }
     if (patch.name != null) fields.full_name = patch.name
-    await supabase.from('profiles').update(fields as never).eq('id', uid)
+    // W4: antes el resultado se descartaba — el perfil (y sus datos fiscales) podía NO
+    // guardarse y la pantalla seguir mostrándolo como guardado. Si el servidor lo
+    // rechaza, se avisa y la sesión vuelve a lo que realmente está en la base.
+    const r = await confirmar('guardar tu perfil', supabase.from('profiles').update(fields as never).eq('id', uid))
+    if (!r.ok) { setUser(antes); return }
     // Refresca el directorio para que tu nueva foto/nombre se vea en chat/anuncios.
     const { reload } = await import('../data/store/directoryStore')
     reload()

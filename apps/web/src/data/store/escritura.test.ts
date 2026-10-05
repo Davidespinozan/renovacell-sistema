@@ -160,6 +160,22 @@ describe('guarda: ninguna escritura vuelve a ser silenciosa', () => {
     expect(culpables).toEqual([])
   })
 
+  it('ninguna parte de la app ESPERA una escritura y luego descarta su resultado', () => {
+    // El tercer disfraz del mismo defecto: `await supabase.from(x).update(...)` como
+    // sentencia suelta. Espera al servidor… y no mira qué contestó.
+    const todo = import.meta.glob(['../../**/*.ts', '../../**/*.tsx', '!../../**/*.test.ts', '!../../**/*.test.tsx', '!../database.types.ts'],
+      { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    expect(Object.keys(todo).length).toBeGreaterThan(150)
+    const culpables: string[] = []
+    for (const [ruta, src] of Object.entries(todo)) {
+      src.split('\n').forEach((l, i) => {
+        const t = l.trim()
+        if (/^(if \([^)]*\)\s*)?await supabase\s*\.(from\(|rpc\()/.test(t) && /\.(insert|update|upsert|delete)\(|\.rpc\(/.test(t)) culpables.push(`${ruta}:${i + 1}`)
+      })
+    }
+    expect(culpables).toEqual([])
+  })
+
   it('las funciones críticas confirman ANTES de avisar o auditar', () => {
     const orders = fuentes['./ordersStore.ts']
     for (const fn of ['markShipped', 'markDelivered']) {
