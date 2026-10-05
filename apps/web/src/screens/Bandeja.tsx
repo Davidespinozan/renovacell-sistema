@@ -16,6 +16,7 @@ import { useStockReturns } from '../data/hooks/useStockReturns'
 import { useCompras } from '../data/hooks/useCompras'
 import { useCustodies } from '../data/hooks/useCustody'
 import { useRevisionFiscal } from '../data/hooks/useRevisionFiscal'
+import { useComunicaciones } from '../data/hooks/useComunicaciones'
 import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
@@ -118,8 +119,9 @@ export function Bandeja() {
   // Lo que la cola fiscal reporta hacia arriba, para que "Todo al día" no se muestre
   // junto a productos que siguen sin validar.
   const [fiscalPend, setFiscalPend] = useState(0)
-  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend
-  const vacio = tasks.length === 0 && fiscalPend === 0
+  const [mensajesPend, setMensajesPend] = useState(0)
+  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend
+  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -137,6 +139,7 @@ export function Bandeja() {
           {tasks.map((task) => <TaskRow key={task.id} task={task} onGo={() => setScreen(task.screen)} />)}
         </>
       )}
+      {role === 'admin' && <ColaMensajes onGo={() => setScreen('av_mensajes')} onCount={setMensajesPend} />}
       {role === 'admin' && <ColaFiscal onGo={() => setScreen('av_fiscal')} onCount={setFiscalPend} />}
     </div>
   )
@@ -154,6 +157,22 @@ function ColaFiscal({ onGo, onCount }: { onGo: () => void; onCount: (n: number) 
       id: 'fiscal', icon: 'shield', title: 'Productos sin validar fiscalmente',
       detail: 'Un producto sin validar se puede vender, pero no facturar.',
       count: pendientes, tone: 'neu', screen: 'av_fiscal',
+    }} />
+  )
+}
+
+// Mensajes al cliente que no salieron y esperan a una persona: rechazados, sin
+// confirmar o sin correo. También se deriva del servidor (el buzón de salida).
+function ColaMensajes({ onGo, onCount }: { onGo: () => void; onCount: (n: number) => void }) {
+  const { cuentas, loading } = useComunicaciones()
+  const n = loading ? 0 : cuentas.conProblema
+  useEffect(() => { onCount(n) }, [n, onCount])
+  if (n <= 0) return null
+  return (
+    <TaskRow onGo={onGo} task={{
+      id: 'mensajes', icon: 'chat', title: 'Mensajes al cliente sin entregar',
+      detail: 'No salieron, no se confirmaron o el cliente no tiene correo.',
+      count: n, tone: 'warn', screen: 'av_mensajes',
     }} />
   )
 }

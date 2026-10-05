@@ -63,6 +63,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
+      { key: 'av_mensajes', label: 'Mensajes al cliente', icon: 'chat', section: 'Operación' },
       { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
       { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt', section: 'Finanzas' },
       { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },

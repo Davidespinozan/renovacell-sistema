@@ -42,6 +42,7 @@ import { Equipo } from './admin/Equipo'
 import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
 import { Precios } from './admin/Precios'
 import { RevisionFiscal } from './admin/RevisionFiscal'
+import { Comunicaciones } from './admin/Comunicaciones'
 import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
 import { Mermas } from './admin/Mermas'
@@ -85,6 +86,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
   av_fiscal: () => <RevisionFiscal />,
+  av_mensajes: () => <Comunicaciones />,
   av_pagos: () => <PagosPorValidar />,
   av_finanzas: () => <Finanzas />,
   av_cierre: () => <CierreCaja />,

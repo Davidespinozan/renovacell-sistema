@@ -14,6 +14,7 @@ const srv = vi.hoisted(() => ({
   shipments: [] as unknown[], lots: [] as unknown[], doctors: [] as unknown[], prospects: [] as unknown[],
   devoluciones: [] as unknown[], compras: [] as unknown[], custodias: [] as unknown[],
   fiscal: { total: 0, validados: 0, pendientes: 0, incompletos: 0 },
+  mensajes: 0,
 }))
 
 vi.mock('../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, setScreen: vi.fn(), user: { email: 'x@y.mx' } }) }))
@@ -27,6 +28,7 @@ vi.mock('../data/hooks/useStockReturns', () => ({ useStockReturns: () => ({ data
 vi.mock('../data/hooks/useCompras', () => ({ useCompras: () => ({ data: srv.compras }) }))
 vi.mock('../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: srv.custodias }) }))
 vi.mock('../data/hooks/useRevisionFiscal', () => ({ useRevisionFiscal: () => ({ avance: srv.fiscal, loading: false }) }))
+vi.mock('../data/hooks/useComunicaciones', () => ({ useComunicaciones: () => ({ cuentas: { porEnviar: 0, enviados: 0, conProblema: srv.mensajes }, loading: false }) }))
 
 import { Bandeja } from './Bandeja'
 
@@ -36,7 +38,7 @@ beforeEach(() => {
   cleanup()
   Object.assign(srv, {
     role: 'admin', orders: [], byOrder: {}, claims: [], shipments: [], lots: [], doctors: [], prospects: [],
-    devoluciones: [], compras: [], custodias: [], fiscal: { total: 0, validados: 0, pendientes: 0, incompletos: 0 },
+    devoluciones: [], compras: [], custodias: [], fiscal: { total: 0, validados: 0, pendientes: 0, incompletos: 0 }, mensajes: 0,
   })
 })
 
@@ -119,6 +121,13 @@ describe('Dirección ve lo que espera SU decisión', () => {
     expect(screen.queryByText('Todo al día')).toBeNull()
   })
 
+  it('mensajes al cliente que no salieron son un pendiente de Dirección', () => {
+    srv.mensajes = 3
+    render(<Bandeja />)
+    expect(screen.getByText('Mensajes al cliente sin entregar')).toBeInTheDocument()
+    expect(screen.queryByText('Todo al día')).toBeNull()
+  })
+
   it('sin nada pendiente, entonces sí: todo al día', () => {
     render(<Bandeja />)
     expect(screen.getByText('Todo al día')).toBeInTheDocument()
@@ -147,6 +156,8 @@ describe('Almacén ve su trabajo, no el de Dirección', () => {
     expect(screen.queryByText('Crédito vencido')).toBeNull()
     expect(screen.queryByText('Compras por pagar')).toBeNull()
     expect(screen.queryByText('Productos sin validar fiscalmente')).toBeNull()
+    srv.mensajes = 4
+    expect(screen.queryByText('Mensajes al cliente sin entregar')).toBeNull()
   })
 
   it('una compra ya recibida completa no es un pendiente de Almacén', () => {

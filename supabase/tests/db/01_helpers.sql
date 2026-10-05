@@ -519,3 +519,29 @@ returns jsonb language sql immutable as $$
     'mapeo_metodo', case when p_product is null then null else p_metodo end,
     'mapeo_motivo', case when p_product is null then coalesce(p_motivo, 'sin coincidencia revisada') else null end))
 $$;
+
+-- ---------------------------------------- fixtures de W4 (comunicación al cliente)
+-- Ajusta campos internos del buzón (edad del primer intento, intentos) para probar la
+-- ventana de idempotencia sin esperar 20 horas.
+create or replace function tests.comm_ajustar(p_id uuid, p_edad interval default null, p_intentos int default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform set_config('app.trusted', 'on', true);
+  update public.comm_outbox set
+    first_attempt_at = case when p_edad is null then first_attempt_at else now() - p_edad end,
+    attempts = coalesce(p_intentos, attempts)
+   where id = p_id;
+  perform set_config('app.trusted', 'off', true);
+end $$;
+grant execute on function tests.comm_ajustar(uuid, interval, int) to authenticated, service_role;
+
+-- Fija (o borra) el correo de un perfil, como lo haría el alta real.
+create or replace function tests.set_email(p_uid uuid, p_email text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true);
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set email = p_email where id = p_uid;
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+end $$;
+grant execute on function tests.set_email(uuid, text) to authenticated, service_role;

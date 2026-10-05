@@ -19,6 +19,8 @@ const FORBIDDEN: { name: string; re: RegExp }[] = [
   { name: 'escritura directa a la evidencia fiscal', re: /from\(\s*['"]fiscal_price_evidence['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
   { name: 'escritura directa a la bitácora fiscal del producto', re: /from\(\s*['"]product_fiscal_events['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
   { name: 'escritura directa a los candidatos por familia', re: /from\(\s*['"]fiscal_family_defaults['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
+  // W4 · el buzón de mensajes al cliente solo cambia por sus comandos (nadie marca "enviado" a mano).
+  { name: 'escritura directa al buzón de mensajes', re: /['"]comm_outbox['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
 ]
 
 const CONTROLS = [
@@ -34,6 +36,7 @@ const CONTROLS = [
   "supabase.from('fiscal_price_evidence').insert({})",
   "supabase.from('product_fiscal_events').delete()",
   "supabase.from('fiscal_family_defaults').update({})",
+  "supabase.from('comm_outbox').update({ status: 'enviado' })",
 ]
 
 describe('W1: sin escrituras directas de inventario en el cliente', () => {
