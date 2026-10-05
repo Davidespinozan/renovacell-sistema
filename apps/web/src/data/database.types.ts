@@ -3921,6 +3921,7 @@ export type Database = {
       _comm_max_intentos: { Args: never; Returns: number }
       _comm_reclamo_caduco: { Args: never; Returns: string }
       _comm_ventana_idempotencia: { Args: never; Returns: string }
+      _cuenta_suspendida: { Args: never; Returns: string }
       _fiscal_audit: {
         Args: { p_action: string; p_fiscal: Json; p_resource: string }
         Returns: undefined
@@ -3946,6 +3947,26 @@ export type Database = {
         Returns: boolean
       }
       _pf_snapshot: { Args: { p_product: string }; Returns: Json }
+      _staff_objetivo: {
+        Args: { p_uid: string }
+        Returns: {
+          active: boolean
+          email: string | null
+          full_name: string | null
+          id: string
+          meta: Json | null
+          organization: string | null
+          price_list_id: string | null
+          role_id: string | null
+          verified: boolean | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _w1_op_begin: {
         Args: { p_kind: string; p_op: string; p_req: Json }
         Returns: Json
@@ -4498,6 +4519,7 @@ export type Database = {
             Args: { p_list: string; p_product: string; p_qty: number }
             Returns: number
           }
+      reactivar_staff: { Args: { p_uid: string }; Returns: Json }
       recibir_devolucion: {
         Args: {
           p_lines: Json
@@ -4594,7 +4616,6 @@ export type Database = {
         }
         Returns: Json
       }
-      reactivar_staff: { Args: { p_uid: string }; Returns: Json }
       reportar_pago: {
         Args: {
           p_amount: number
@@ -4605,10 +4626,6 @@ export type Database = {
           p_proof_path?: string
           p_reference?: string
         }
-        Returns: Json
-      }
-      suspender_staff: {
-        Args: { p_baja?: boolean; p_motivo: string; p_uid: string }
         Returns: Json
       }
       resolve_customer_identity: {
@@ -4659,6 +4676,10 @@ export type Database = {
       }
       surtir_pedido: {
         Args: { p_allocations: Json; p_op_id: string; p_order: string }
+        Returns: Json
+      }
+      suspender_staff: {
+        Args: { p_baja?: boolean; p_motivo: string; p_uid: string }
         Returns: Json
       }
       tramo_corte_caja: {
