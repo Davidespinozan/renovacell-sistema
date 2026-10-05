@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { money } from '../lib/format'
 import {
   isSale, isPosOrder, salesSummary, channelSplit, doctorActivity,
-  topDoctors, lineMix, monthlySales, billingSummary,
+  topDoctors, lineMix, monthlySales, cfdiSolicitados,
 } from './metrics'
 import { stockByProduct } from './ops/stock'
 import { allocateFEFO } from './ops/surtir'
@@ -58,14 +58,12 @@ describe('monthlySales — 12 meses', () => {
   it('devuelve 12 cubetas', () => { expect(monthlySales([], 12)).toHaveLength(12) })
 })
 
-describe('billingSummary — mezcla', () => {
-  it('cfdiRate 0.5 con la mitad facturada', () => {
-    const r = billingSummary([
+describe('cfdiSolicitados — mezcla', () => {
+  it('0.5 con la mitad facturada', () => {
+    expect(cfdiSolicitados([
       mkOrder({ id: '1', invoice_requested: true, payment_status: 'paid', total: 100 }),
       mkOrder({ id: '2', invoice_requested: false, payment_status: 'paid', total: 100 }),
-    ])
-    expect(r.cfdiRate).toBe(0.5)
-    expect(r.paid).toBe(200)
+    ])).toBe(0.5)
   })
 })
 

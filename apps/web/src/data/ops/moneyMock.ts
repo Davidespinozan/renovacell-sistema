@@ -65,3 +65,24 @@ export function claimsFromOrders(orders: OrdenMock[]): PaymentClaim[] {
   })
   return out.sort((a, b) => (a.declared_at < b.declared_at ? 1 : -1))
 }
+
+// Asientos de la demo: sin libro, lo único observable es que un pedido quedó pagado
+// (entra su total el día del pedido) y qué reembolsos se registraron (salen ese día).
+// Con backend NUNCA se usa: el cobrado sale de `payment_entries`.
+export function entriesFromOrders(
+  orders: (OrdenMock & { created_at: string })[],
+  refunds: { order_id: string; monto: number; created_at: string }[],
+  dia: (instante: string) => string,
+): { order_id: string; direction: 'in' | 'out'; amount: number; value_date: string }[] {
+  const out: { order_id: string; direction: 'in' | 'out'; amount: number; value_date: string }[] = []
+  const pagados = new Set<string>()
+  orders.forEach((o) => {
+    if (o.payment_status !== 'paid' || !(o.total && o.total > 0)) return
+    pagados.add(o.id)
+    out.push({ order_id: o.id, direction: 'in', amount: o.total, value_date: dia(o.created_at) })
+  })
+  refunds.forEach((r) => {
+    if (pagados.has(r.order_id) && r.monto > 0) out.push({ order_id: r.order_id, direction: 'out', amount: r.monto, value_date: dia(r.created_at) })
+  })
+  return out
+}

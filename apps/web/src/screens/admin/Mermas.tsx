@@ -9,11 +9,10 @@ import { ExportButton } from '../../app/ExportButton'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
+import { mesNegocio, etiquetaMes } from '../../data/periodo'
 
 const MERMA_REASONS = new Set(['merma', 'baja'])
 const reasonLabel = (r: string | null): string => (r === 'baja' ? 'Baja' : r === 'merma' ? 'Merma (caducidad/daño)' : r ?? '—')
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-const ym = (iso: string): string => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 
 export function Mermas() {
   const { data: movements } = useInventory()
@@ -21,15 +20,15 @@ export function Mermas() {
   const { data: products } = useProducts()
   const [scope, setScope] = useState<'mes' | 'todo'>('mes')
 
-  const now = new Date()
-  const curYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  // Mes DEL NEGOCIO (America/Mazatlan): el mismo corte que las mermas de Finanzas.
+  const curYm = mesNegocio(new Date())
   const lotById = useMemo(() => Object.fromEntries(lots.map((l) => [l.id, l])), [lots])
   const prodName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])), [products])
 
   const rows = useMemo(() => {
     return movements
       .filter((m) => MERMA_REASONS.has(m.reason ?? '') && m.change < 0)
-      .filter((m) => scope === 'todo' || ym(m.created_at) === curYm)
+      .filter((m) => scope === 'todo' || mesNegocio(m.created_at) === curYm)
       .map((m) => {
         const lot = lotById[m.lot_id]
         const unidades = -m.change
@@ -51,6 +50,8 @@ export function Mermas() {
 
   const totalValor = rows.reduce((s, r) => s + r.valor, 0)
   const totalUnid = rows.reduce((s, r) => s + r.unidades, 0)
+  // Una merma sin costo registrado NO vale cero: el total es un mínimo y se dice cuánto falta.
+  const unidSinCosto = rows.reduce((s, r) => s + (r.costoDesconocido ? r.unidades : 0), 0)
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -58,13 +59,13 @@ export function Mermas() {
         <TriangleAlert size={18} />
         <div className="eyebrow" style={{ margin: 0 }}>Dirección · Mermas valuadas</div>
         <div className="seg" style={{ marginLeft: 'auto' }}>
-          <button type="button" className={scope === 'mes' ? 'active' : undefined} onClick={() => setScope('mes')}>{MONTHS[now.getMonth()]}</button>
+          <button type="button" className={scope === 'mes' ? 'active' : undefined} onClick={() => setScope('mes')}>{etiquetaMes(curYm)}</button>
           <button type="button" className={scope === 'todo' ? 'active' : undefined} onClick={() => setScope('todo')}>Histórico</button>
         </div>
       </div>
 
       <div className="grid sigs">
-        <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{money(totalValor)}</div><div className="k">Pérdida por merma</div><div className="s">{scope === 'mes' ? 'este mes' : 'histórico'} · a costo</div></div>
+        <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{money(totalValor)}</div><div className="k">{unidSinCosto > 0 ? 'Pérdida por merma (mínimo)' : 'Pérdida por merma'}</div><div className="s">{scope === 'mes' ? etiquetaMes(curYm) : 'histórico'} · a costo{unidSinCosto > 0 ? ` · ${unidSinCosto} unidad(es) sin costo registrado` : ''}</div></div>
         <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{totalUnid}</div><div className="k">Unidades dadas de baja</div><div className="s">caducidad / daño</div></div>
         <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{rows.length}</div><div className="k">Eventos de merma</div><div className="s">movimientos registrados</div></div>
       </div>

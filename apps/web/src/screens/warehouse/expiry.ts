@@ -1,9 +1,14 @@
 // Helpers de caducidad para Almacén.
+import { diaNegocio, diasEntre, hoyNegocio } from '../../data/periodo'
 export type Sev = 'expired' | 'critical' | 'warn' | 'ok'
 
+// Días de CALENDARIO del negocio hasta la caducidad (0 = caduca hoy; negativo = caducó).
+// Mismo "hoy" que el servidor (`hoy_local()`): un lote está vigente hasta su día de
+// caducidad inclusive, visto desde donde se vea.
 export function daysUntil(iso: string | null): number | null {
   if (!iso) return null
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
+  const dia = diaNegocio(iso)
+  return dia ? diasEntre(hoyNegocio(), dia) : null
 }
 
 export function severity(days: number | null): Sev {

@@ -2,6 +2,7 @@
 // catálogo del doctor para mostrar estado tipo tienda: Agotado / Quedan pocas /
 // Disponible — y para no dejar pedir más de lo que hay.
 import type { Lot } from '../types'
+import { hoyNegocio } from '../periodo'
 
 export const LOW_STOCK = 10 // umbral "quedan pocas" (aviso al doctor en el catálogo)
 export const REORDER_THRESHOLD = 20 // umbral de REORDEN (alerta a Almacén / Reabastecimiento)
@@ -14,7 +15,7 @@ export interface StockInfo {
 }
 
 export function stockByProduct(lots: Lot[]): Record<string, StockInfo> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyNegocio()
   const tracked = new Set<string>()
   const qty: Record<string, number> = {}
   lots.forEach((l) => {

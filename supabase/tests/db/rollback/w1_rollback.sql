@@ -5,6 +5,9 @@ begin;
 -- Rollback EN CAPAS: cada ola se apoya en objetos de la anterior (W2-C usa
 -- v_order_money de W2; W2 usa stock_returns de W1), así que se baja en orden
 -- inverso al de aplicación. Ese es el orden real de una reversión.
+-- W5 agregó un índice sobre orders (tabla que este archivo compara contra producción
+-- previa a W1): es la capa más reciente, así que baja primero.
+\ir ../../../rollback/w5/99_down.sql
 \ir ../../../rollback/w2c/00_w2_snapshot.sql
 \ir ../../../rollback/w2c/99_down.sql
 \ir ../../../rollback/w2/99_down.sql

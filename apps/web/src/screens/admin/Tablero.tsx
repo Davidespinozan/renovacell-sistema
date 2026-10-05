@@ -12,9 +12,11 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
 import { useOrderMoney } from '../../data/hooks/useMoney'
-import { cobranza, cuentasPorCobrar } from '../../data/ops/finanzas'
-import { useRefunds } from '../../data/hooks/useFinanzas'
-import { salesSummary, doctorActivity, monthlySales, leadTime, valorEnRiesgo, doctoresEnRiesgo } from '../../data/metrics'
+import { useKpiVentas, useKpiPorCobrar } from '../../data/hooks/useKpis'
+import { avanceDeCobro } from '../../data/kpis'
+import { esteMes, mesPasado, todoElHistorico, hoyNegocio } from '../../data/periodo'
+import { cifra, AvisoKpi } from '../../app/Kpi'
+import { doctorActivity, leadTime, valorEnRiesgo, doctoresEnRiesgo, DIAS_RIESGO } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 
@@ -33,16 +35,17 @@ export function Tablero() {
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
   const { data: products } = useProducts()
-  const { data: refunds } = useRefunds()
 
-  // "Tu dinero" (mes): cobranza real neta de devoluciones + lo que te deben (CxC de pie).
-  const now = new Date()
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const cobMes = useMemo(
-    () => cobranza(orders.filter((o) => { const d = new Date(o.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === ym }), refunds, byOrder),
-    [orders, refunds, ym, byOrder],
-  )
-  const cxc = useMemo(() => cuentasPorCobrar(orders, byOrder), [orders, byOrder])
+  // CIFRAS DE CABECERA: las responde el servidor (kpi_ventas / kpi_por_cobrar), con el
+  // mes del NEGOCIO. Aquí no se suma dinero de pedidos.
+  const hoy = hoyNegocio()
+  const pMes = useMemo(() => esteMes(), [hoy])           // eslint-disable-line react-hooks/exhaustive-deps
+  const pAnterior = useMemo(() => mesPasado(), [hoy])    // eslint-disable-line react-hooks/exhaustive-deps
+  const pTodo = useMemo(() => todoElHistorico(), [])
+  const kMes = useKpiVentas(pMes)
+  const kAnterior = useKpiVentas(pAnterior)
+  const kTodo = useKpiVentas(pTodo)
+  const cxc = useKpiPorCobrar()
 
   const prodName = useMemo(() => {
     const m: Record<string, string> = {}
@@ -50,16 +53,13 @@ export function Tablero() {
     return m
   }, [products])
 
-  const sum = salesSummary(orders)
   // Servicio: cuánto tardamos de pedido a entrega. Riesgo: cuánto dinero está por caducar.
   const lt = useMemo(() => leadTime(orders, shipments), [orders, shipments])
   const act = doctorActivity(orders)
-  // Dato hero = ventas del MES en curso + variación vs el mes anterior.
-  const ms = useMemo(() => monthlySales(orders, 2), [orders])
-  const curM = ms[ms.length - 1]?.revenue ?? 0
-  const prevM = ms[ms.length - 2]?.revenue ?? 0
-  const mesLabel = ms[ms.length - 1]?.label ?? 'este mes'
-  const deltaPct = prevM > 0 ? ((curM - prevM) / prevM) * 100 : null
+  // Dato hero = ventas del MES en curso + variación vs el mes anterior (ambos del servidor).
+  const deltaPct = kMes.data && kAnterior.data && kAnterior.data.ventas > 0
+    ? ((kMes.data.ventas - kAnterior.data.ventas) / kAnterior.data.ventas) * 100 : null
+  const avance = kMes.data ? avanceDeCobro(kMes.data) : null
 
   const porEstatus = useMemo(() => {
     const acc: Record<Bucket, number> = { Pedido: 0, Empacado: 0, 'En camino': 0, Entregado: 0 }
@@ -92,6 +92,11 @@ export function Tablero() {
   )
 
   const recientes = orders.slice(0, 6)
+  const riesgo = useMemo(() => valorEnRiesgo(porCaducar.map(({ lot }) => lot)), [porCaducar])
+  // Un lote sin costo no vale cero: el valor se muestra como mínimo y se dice cuántos faltan.
+  const riesgoTexto = riesgo.completo
+    ? `${money(riesgo.valor)} en riesgo`
+    : `al menos ${money(riesgo.valor)} en riesgo · ${riesgo.lotesSinCosto} lote(s) sin costo`
 
   return (
     <div className="grid" style={{ gap: 18 }}>
@@ -101,14 +106,18 @@ export function Tablero() {
           name="tablero-indicadores"
           style={{ marginLeft: 'auto' }}
           rows={[
-            { indicador: 'Pedidos', valor: sum.orders },
-            { indicador: 'Ventas', valor: sum.revenue },
-            { indicador: 'Ticket promedio', valor: sum.avgTicket },
-            { indicador: 'Doctores activos', valor: act.active },
+            { indicador: `Ventas · ${pMes.etiqueta}`, valor: kMes.data?.ventas ?? 'No disponible' },
+            { indicador: `Cobrado · ${pMes.etiqueta}`, valor: kMes.data?.cobrado_neto ?? 'No disponible' },
+            { indicador: 'Por cobrar · a hoy', valor: cxc.data?.total ?? 'No disponible' },
+            { indicador: 'Pedidos · histórico', valor: kTodo.data?.pedidos ?? 'No disponible' },
+            { indicador: 'Ventas · histórico', valor: kTodo.data?.ventas ?? 'No disponible' },
+            { indicador: 'Ticket promedio · histórico', valor: kTodo.data?.ticket ?? 'No disponible' },
+            { indicador: 'Doctores con compra · histórico', valor: act.active },
             { indicador: 'Por surtir', valor: porSurtir.length },
             { indicador: 'Envíos atorados', valor: atorados.length },
             { indicador: 'Lotes por caducar', valor: porCaducar.length },
-            { indicador: 'Valor en riesgo por caducidad', valor: valorEnRiesgo(porCaducar.map(({ lot }) => lot)) },
+            { indicador: riesgo.completo ? 'Valor en riesgo por caducidad' : 'Valor en riesgo por caducidad (mínimo: hay lotes sin costo)', valor: riesgo.valor },
+            { indicador: 'Lotes por caducar sin costo registrado', valor: riesgo.lotesSinCosto },
             { indicador: 'Lead time pedido→entrega (días)', valor: lt.promedioDias ?? '' },
             { indicador: 'Entregas medidas', valor: lt.entregados },
           ]}
@@ -119,14 +128,16 @@ export function Tablero() {
         />
       </div>
 
+      <AvisoKpi estados={[kMes, kAnterior, kTodo, cxc]} />
+
       {/* Dato HERO (estilo app) */}
       <div className="grid two" style={{ gap: 16, alignItems: 'stretch' }}>
         <div className="feature">
-          <div className="fk">Ventas · {mesLabel}</div>
-          <div className="fv">{money(curM)}</div>
+          <div className="fk">Ventas · {pMes.etiqueta}</div>
+          <div className="fv">{cifra(kMes, (k) => money(k.ventas))}</div>
           <div className="fs">
             {deltaPct != null && <span className={'delta ' + (deltaPct >= 0 ? 'up' : 'down')}>{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span>}
-            <span>vs. mes anterior · {money(sum.revenue)} histórico</span>
+            <span>vs. {pAnterior.etiqueta.toLowerCase()} · {cifra(kTodo, (k) => money(k.ventas))} histórico</span>
           </div>
         </div>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -143,24 +154,24 @@ export function Tablero() {
 
       {/* TU DINERO (posición de cobranza del mes, en lenguaje llano — inspirado en CuboPolar) */}
       <div>
-        <div className="eyebrow" style={{ margin: '0 0 12px' }}>Tu dinero · {mesLabel}</div>
+        <div className="eyebrow" style={{ margin: '0 0 12px' }}>Tu dinero · {pMes.etiqueta}</div>
         <div className="grid sigs">
-          <Sig icon="chart" value={money(cobMes.vendido)} k="Vendiste" s="ventas del mes" />
-          <Sig icon="receipt" value={money(cobMes.cobrado)} k="Cobrado" s="entró a caja, neto de devoluciones" />
-          <Sig icon="check" value={`${Math.round(cobMes.tasaCobro)}%`} k="Tasa de cobro" s="cobrado ÷ vendido" tone={cobMes.vendido > 0 && cobMes.tasaCobro < 70 ? 'warn' : undefined} />
-          <Sig icon="clock" value={money(cxc.total)} k="Te deben" s={`${cxc.count} pedido(s) sin pagar · incluye contra-pedido`} tone={cxc.total > 0 ? 'warn' : undefined} />
+          <Sig icon="chart" value={cifra(kMes, (k) => money(k.ventas))} k="Vendiste" s="pedidos levantados en el mes" />
+          <Sig icon="receipt" value={cifra(kMes, (k) => money(k.cobrado_neto))} k="Cobrado en el mes" s="dinero que entró en el mes, menos lo que salió" />
+          <Sig icon="check" value={cifra(kMes, () => (avance == null ? '—' : `${Math.round(avance)}%`))} k="Avance de cobro" s="de lo vendido en el mes, ya cobrado" tone={avance != null && avance < 70 ? 'warn' : undefined} />
+          <Sig icon="clock" value={cifra(cxc, (c) => money(c.total))} k="Te deben" s={cxc.data ? `a hoy · ${cxc.data.pedidos} pedido(s) con saldo · incluye crédito` : 'saldo a hoy'} tone={cxc.data && cxc.data.total > 0 ? 'warn' : undefined} />
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid sigs">
-        <Sig icon="bag" value={String(sum.orders)} k="Pedidos" s="en el sistema" />
-        <Sig icon="chart" value={money(sum.revenue)} k="Ventas" s="compras acumuladas" />
-        <Sig icon="receipt" value={money(sum.avgTicket)} k="Ticket promedio" s="por pedido" />
-        <Sig icon="usercheck" value={String(act.active)} k="Doctores activos" s="con compra" />
+        <Sig icon="bag" value={cifra(kTodo, (k) => String(k.pedidos))} k="Pedidos" s="histórico · ventas confirmadas" />
+        <Sig icon="chart" value={cifra(kTodo, (k) => money(k.ventas))} k="Ventas" s="histórico" />
+        <Sig icon="receipt" value={cifra(kTodo, (k) => money(k.ticket))} k="Ticket promedio" s="histórico · por pedido" />
+        <Sig icon="usercheck" value={String(act.active)} k="Doctores con compra" s="histórico" />
         <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
         <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
-        <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? `${money(valorEnRiesgo(porCaducar.map(({ lot }) => lot)))} en riesgo` : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
+        <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? riesgoTexto : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
         <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} entregas · peor ${lt.peorDias} d` : 'sin entregas aún'} />
       </div>
 
@@ -224,7 +235,7 @@ export function Tablero() {
 function DoctoresRiesgo() {
   const { data: orders } = useAllOrders()
   const { data: doctors } = useDoctors()
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useState(DIAS_RIESGO)
   const enRiesgo = useMemo(() => doctoresEnRiesgo(orders, doctors, { days }), [orders, doctors, days])
   const OPCIONES = [30, 45, 60, 90]
 
@@ -251,7 +262,7 @@ function DoctoresRiesgo() {
         )}
       </div>
       <div style={{ padding: '10px 18px 6px', fontSize: 12.5, color: 'var(--ink-3)' }}>
-        Compraban antes y llevan <b>+{days} días</b> sin pedir. Contáctalos antes de perderlos.
+        Doctores verificados que ya compraron y llevan <b>{days} días o más</b> sin pedir. Contáctalos antes de perderlos.
       </div>
       <div style={{ padding: '0 14px 8px' }}>
         {enRiesgo.length === 0 ? (

@@ -16,6 +16,7 @@ import c6Src from '../../../../../supabase/migrations/20261015120000_w2c_c6_lega
 import surtirSrc from './surtir.ts?raw'
 import posSrc from './pos.ts?raw'
 import finanzasSrc from './finanzas.ts?raw'
+import kpisSrc from '../kpis.ts?raw'
 
 // El cuerpo de una función del fuente SQL, para aislar aserciones.
 const cuerpo = (src: string, cabecera: string, largo = 3000): string => {
@@ -208,11 +209,14 @@ describe('W2-C · tenedor estable y autoridad', () => {
 
 describe('W2-C · el COGS de custodia dejó de mentir', () => {
   it('ya no se reconoce costo de ventas al transferir', () => {
-    expect(finanzasSrc).toMatch(/const COGS_OUT = new Set\(\['surtido', 'venta'\]\)/)
+    // W5 movió el COGS a data/kpis.ts (espejo de kpi_resultado); la regla es la misma.
+    expect(kpisSrc).toMatch(/const SALIDA = new Set\(\['surtido', 'venta'\]\)/)
     // sobre CÓDIGO, no sobre los comentarios que explican por qué se quitaron
+    expect(codigo(kpisSrc)).not.toMatch(/'evento'|'consigna'|'evento-regreso'|'consigna-regreso'/)
     expect(codigo(finanzasSrc)).not.toMatch(/'evento'|'consigna'|'evento-regreso'|'consigna-regreso'/)
   })
   it('no quedan razones de movimiento imposibles bajo el vocabulario de W1', () => {
     expect(codigo(finanzasSrc)).not.toMatch(/'baja'/)
+    expect(codigo(kpisSrc)).not.toMatch(/'baja'/)
   })
 })

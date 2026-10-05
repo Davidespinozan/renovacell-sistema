@@ -1,3 +1,4 @@
+import { ZONA_NEGOCIO } from '../data/periodo'
 // Utilidades de formato compartidas.
 
 const MXN = new Intl.NumberFormat('es-MX', {
@@ -19,8 +20,10 @@ export function fmtDate(iso: string): string {
     // La parseamos como fecha LOCAL para mostrar el día correcto. Las que llevan hora
     // (contienen 'T', p. ej. created_at) siguen su curso normal.
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
-    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
-    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+    // Un INSTANTE se muestra en el día del NEGOCIO, no en el del dispositivo: así la fecha
+    // que se lee en un renglón es la misma con la que ese renglón se contó en los reportes.
+    return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: ZONA_NEGOCIO })
   } catch {
     return iso
   }

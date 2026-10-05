@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   salesSummary, channelSplit, doctorActivity, topDoctors, topProducts,
-  lineMix, monthlySales, doctorsAtRisk, billingSummary,
+  lineMix, monthlySales, doctoresEnRiesgo, cfdiSolicitados,
 } from './metrics'
 import { mkOrder, mkItem, mkProduct, mkProfile } from '../test/factories'
 
@@ -79,32 +79,32 @@ describe('lineMix — más casos', () => {
   })
 })
 
-describe('monthlySales — bucketing', () => {
+describe('monthlySales — bucketing por mes del negocio', () => {
   it('suma una venta del mes en curso a su cubeta', () => {
-    const now = new Date()
-    const iso = new Date(now.getFullYear(), now.getMonth(), 15).toISOString()
-    const r = monthlySales([mkOrder({ total: 1234, created_at: iso })], 6)
+    const r = monthlySales([mkOrder({ total: 1234, created_at: new Date().toISOString() })], 6)
     expect(r[r.length - 1].revenue).toBe(1234) // la última cubeta es el mes actual
   })
+  it('las 23:30 (Mazatlán) del último día del mes caen en ESE mes, no en el siguiente', () => {
+    const ahora = new Date('2026-11-10T18:00:00Z')
+    const r = monthlySales([mkOrder({ total: 500, created_at: '2026-11-01T06:30:00Z' })], 2, ahora)
+    expect(r.map((b) => [b.key, b.revenue])).toEqual([['2026-10', 500], ['2026-11', 0]])
+  })
 })
 
-describe('doctorsAtRisk — orden por total', () => {
-  it('ordena de mayor a menor gasto histórico', () => {
+describe('doctoresEnRiesgo — orden por urgencia', () => {
+  it('el que lleva más días sin pedir va primero', () => {
     const docs = [mkProfile({ id: 'A', verified: true }), mkProfile({ id: 'B', verified: true })]
-    // ambos sin pedidos recientes (nunca) → ambos en riesgo, total 0, orden estable
-    const r = doctorsAtRisk([], docs, 60)
-    expect(r).toHaveLength(2)
-    expect(r.every((x) => x.lastDays === null)).toBe(true)
+    const r = doctoresEnRiesgo([
+      mkOrder({ id: '1', doctor_id: 'A', created_at: '2026-01-01T10:00:00Z' }),
+      mkOrder({ id: '2', doctor_id: 'B', created_at: '2026-03-01T10:00:00Z' }),
+    ], docs, { days: 60, now: new Date('2026-09-01T10:00:00Z') })
+    expect(r.map((x) => x.id)).toEqual(['A', 'B'])
   })
 })
 
-describe('billingSummary — más casos', () => {
-  it('tasa de CFDI 0 sin ventas', () => {
-    expect(billingSummary([]).cfdiRate).toBe(0)
-  })
-  it('todo pagado: pendiente 0', () => {
-    const r = billingSummary([mkOrder({ payment_status: 'paid', total: 500, invoice_requested: true })])
-    expect(r.pending).toBe(0)
-    expect(r.cfdiRate).toBe(1)
+describe('cfdiSolicitados — más casos', () => {
+  it('0 sin ventas', () => { expect(cfdiSolicitados([])).toBe(0) })
+  it('1 cuando todo tiene CFDI solicitado', () => {
+    expect(cfdiSolicitados([mkOrder({ payment_status: 'paid', total: 500, invoice_requested: true })])).toBe(1)
   })
 })

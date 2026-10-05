@@ -21,6 +21,7 @@ import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
+import { hoyNegocio } from '../data/periodo'
 
 type Tone = 'warn' | 'dang' | 'neu'
 interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen: string }
@@ -97,7 +98,7 @@ export function Bandeja() {
       const porPagar = compras.filter((c) => c.kind === 'compra' && !c.paid)
       if (porPagar.length) t.push({ id: 'pagar', icon: 'receipt', title: 'Compras por pagar', detail: 'Pagos a proveedor pendientes de registrar.', count: porPagar.length, tone: 'neu', screen: 'av_finanzas' })
       // Custodia de un evento que ya pasó y nadie cerró: producto fuera del almacén sin liquidar.
-      const hoy = new Date().toISOString().slice(0, 10)
+      const hoy = hoyNegocio()
       const custodiasVencidas = custodias.filter((c) => c.status === 'abierta' && c.kind === 'evento' && !!c.event_date && c.event_date < hoy)
       if (custodiasVencidas.length) t.push({ id: 'custodia', icon: 'box', title: 'Custodias de evento por cerrar', detail: 'El evento ya pasó: liquida ventas, devoluciones y faltantes.', count: custodiasVencidas.length, tone: 'warn', screen: 'av_custodias' })
     }

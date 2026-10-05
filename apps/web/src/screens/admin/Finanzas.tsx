@@ -6,54 +6,46 @@ import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, Arr
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
 import { ExportButton } from '../../app/ExportButton'
-import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCompras } from '../../data/hooks/useCompras'
-import { useInventory } from '../../data/hooks/useInventory'
-import { useLots } from '../../data/hooks/useLots'
-import { useOrderMoney } from '../../data/hooks/useMoney'
-import { useGastos, useRefunds, type GastoCategoria } from '../../data/hooks/useFinanzas'
+import { useGastos, type GastoCategoria } from '../../data/hooks/useFinanzas'
 import { GASTO_CATEGORIAS } from '../../data/store/gastosStore'
-import { estadoResultados, cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria, cobranza } from '../../data/ops/finanzas'
+import { cuentasPorPagar, gastosPorCategoria } from '../../data/ops/finanzas'
+import { useKpiVentas, useKpiPorCobrar, useKpiResultado } from '../../data/hooks/useKpis'
+import { avanceDeCobro } from '../../data/kpis'
+import { esteMes, mesPasado, todoElHistorico, enPeriodo, hoyNegocio } from '../../data/periodo'
+import { cifra, AvisoKpi } from '../../app/Kpi'
 
 const pct = (n: number) => `${n.toFixed(1)}%`
 
 export function Finanzas() {
-  const { data: orders } = useAllOrders()
   const { data: compras, markPaid } = useCompras()
-  const { data: movements } = useInventory()
-  const { data: lots } = useLots()
   const { data: gastos, addGasto, removeGasto } = useGastos()
   const [open, setOpen] = useState(false)
 
-
+  // Periodo en DÍAS DEL NEGOCIO (America/Mazatlan): el mismo corte que aplica el servidor.
   const [period, setPeriod] = useState<'mes' | 'pasado' | 'todo'>('mes')
-  const range = useMemo(() => {
-    const now = new Date()
-    const y = now.getFullYear(); const m = now.getMonth()
-    if (period === 'todo') return { from: '0000-01-01', to: '9999-12-31', label: 'Todo el histórico' }
-    if (period === 'pasado') {
-      return { from: new Date(y, m - 1, 1).toISOString().slice(0, 10), to: new Date(y, m, 0).toISOString().slice(0, 10), label: 'Mes pasado' }
-    }
-    return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10), label: 'Este mes' }
-  }, [period])
-  const inRange = (iso: string) => { const d = iso.slice(0, 10); return d >= range.from && d <= range.to }
+  const hoy = hoyNegocio()
+  const range = useMemo(
+    () => (period === 'todo' ? todoElHistorico() : period === 'pasado' ? mesPasado() : esteMes()),
+    [period, hoy], // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
-  const fOrders = useMemo(() => orders.filter((o) => inRange(o.created_at)), [orders, range])
-  const fGastos = useMemo(() => gastos.filter((g) => inRange(g.fecha)), [gastos, range])
-  const fMov = useMemo(() => movements.filter((m) => inRange(m.created_at)), [movements, range])
+  // CIFRAS DE CABECERA: las responde el servidor. Utilidad y margen llegan en null
+  // cuando el costo de lo vendido no se conoce completo (er.costo_confiable = false).
+  const res = useKpiResultado(range)
+  const ven = useKpiVentas(range)
+  const cxc = useKpiPorCobrar()
+  const er = res.data
+  const cogsUnreliable = !!er && !er.costo_confiable
+  const netaUnreliable = !!er && !er.utilidad_neta_confiable
+  const avance = ven.data ? avanceDeCobro(ven.data) : null
 
-  // P&L por periodo; posición (por cobrar/pagar) es SIEMPRE al día de hoy.
-  const { data: refunds } = useRefunds()
-  const { byOrder } = useOrderMoney()
-  const er = useMemo(() => estadoResultados(fOrders, fGastos, fMov, lots, refunds), [fOrders, fGastos, fMov, lots, refunds])
-  const cogsUnreliable = !er.costoConfiable  // Fase 2: confianza del COGS = cobertura de snapshots congelados
-  // W2 · cobrado y por cobrar salen del LIBRO (v_order_money): pagos parciales cuentan
-  // como parciales y un crédito autorizado sigue siendo deuda, no ingreso.
-  const cob = useMemo(() => cobranza(fOrders, refunds, byOrder), [fOrders, refunds, byOrder])
-  const cxc = useMemo(() => cuentasPorCobrar(orders, byOrder), [orders, byOrder])
+  // `fecha` de un gasto ya es un día del negocio: se compara como fecha, sin zonas.
+  const fGastos = useMemo(() => gastos.filter((g) => enPeriodo(g.fecha, range)), [gastos, range])
   const cxp = useMemo(() => cuentasPorPagar(compras), [compras])
   const porPagar = useMemo(() => compras.filter((p) => p.kind === 'compra' && !p.paid), [compras])
   const porCat = useMemo(() => gastosPorCategoria(fGastos), [fGastos])
+  const dinero = (n: number | null | undefined) => (n == null ? 'No confiable' : money(n))
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -62,13 +54,25 @@ export function Finanzas() {
         <b> cuánto ganaste</b> — más lo que te deben y lo que debes. (Solo Dirección.)
       </PageHead>
 
-      {cogsUnreliable && (
+      <AvisoKpi estados={[res, ven, cxc]} />
+
+      {er && cogsUnreliable && (
         <div className="sysnote" style={{ background: 'var(--warn-bg, #FFF6E5)', borderColor: '#E9D8A6', color: '#8a6d1a', alignItems: 'flex-start' }}>
           <AlertTriangle size={16} />
           <span>
-            <b>Costo histórico incompleto: cobertura {er.costoConocidoPct}%.</b> {er.unidadesSinCosto} unidad(es) vendida(s) del periodo
-            no tienen costo congelado (ventas anteriores al registro de costo). Por eso <b>utilidad y margen se marcan como no confiables</b>;
-            las ventas futuras sí llevan su costo real. Cambiar el costo de referencia hoy no altera la historia ya registrada.
+            <b>Costo incompleto: se conoce el de {er.cobertura_pct}% de las {er.unidades_vendidas} unidades vendidas.</b>{' '}
+            {er.unidades_sin_surtir > 0 && <>{er.unidades_sin_surtir} unidad(es) vendida(s) aún no se surten: su costo se conoce al salir del almacén. </>}
+            {er.unidades_sin_costo > 0 && <>{er.unidades_sin_costo} unidad(es) salieron sin costo registrado. </>}
+            Por eso <b>utilidad y margen se muestran como no confiables</b>: un costo desconocido no se cuenta como cero.
+          </span>
+        </div>
+      )}
+      {er && !cogsUnreliable && netaUnreliable && (
+        <div className="sysnote" style={{ background: 'var(--warn-bg, #FFF6E5)', borderColor: '#E9D8A6', color: '#8a6d1a', alignItems: 'flex-start' }}>
+          <AlertTriangle size={16} />
+          <span>
+            <b>Mermas sin costo: {er.merma_unidades_sin_costo} unidad(es) dadas de baja no tienen costo registrado.</b>{' '}
+            La utilidad bruta es confiable; la <b>utilidad neta no</b>, porque esa merma no vale cero.
           </span>
         </div>
       )}
@@ -79,59 +83,66 @@ export function Finanzas() {
         <button type="button" className={period === 'todo' ? 'active' : undefined} onClick={() => setPeriod('todo')}>Todo</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '-4px 0 0' }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Estado de resultados · {range.label}</div>
-        <ExportButton
-          name={`estado-de-resultados-${range.label}`}
-          style={{ marginLeft: 'auto' }}
-          rows={[
-            ...(cogsUnreliable ? [{ concepto: 'AVISO: costos incompletos — utilidad y margen NO son confiables', monto: '' as number | string }] : []),
-            { concepto: 'Ventas', monto: er.ventas as number | string },
-            { concepto: 'Devoluciones', monto: -er.devoluciones },
-            { concepto: 'Ventas netas', monto: er.ventasNetas },
-            { concepto: 'Costo de ventas', monto: cogsUnreliable ? 'incompleto' : -er.costoVentas },
-            { concepto: 'Utilidad bruta', monto: cogsUnreliable ? 'no confiable' : er.utilidadBruta },
-            { concepto: 'Gastos', monto: -er.gastos },
-            { concepto: 'Mermas', monto: -er.mermas },
-            { concepto: 'Utilidad neta', monto: cogsUnreliable ? 'no confiable' : er.utilidadNeta },
-            { concepto: 'Margen bruto %', monto: cogsUnreliable ? 'no confiable' : Math.round(er.margenBruto * 10) / 10 },
-            { concepto: 'Margen neto %', monto: cogsUnreliable ? 'no confiable' : Math.round(er.margenNeto * 10) / 10 },
-          ]}
-          columns={[
-            { key: 'concepto', label: 'Concepto' },
-            { key: 'monto', label: 'Monto' },
-          ]}
-        />
+        <div className="eyebrow" style={{ margin: 0 }}>Estado de resultados · {range.etiqueta}</div>
+        {er && (
+          <ExportButton
+            name={`estado-de-resultados-${range.etiqueta}`}
+            style={{ marginLeft: 'auto' }}
+            rows={[
+              ...(cogsUnreliable ? [{ concepto: `AVISO: costo conocido solo para ${er.cobertura_pct}% de las unidades vendidas — utilidad y margen NO son confiables`, monto: '' as number | string }] : []),
+              { concepto: 'Ventas', monto: er.ventas as number | string },
+              { concepto: 'Devoluciones', monto: -er.devoluciones },
+              { concepto: 'Ventas netas', monto: er.ventas_netas },
+              { concepto: cogsUnreliable ? 'Costo de ventas conocido (incompleto)' : 'Costo de ventas', monto: -er.costo_ventas_conocido },
+              { concepto: 'Utilidad bruta', monto: er.utilidad_bruta ?? 'no confiable' },
+              { concepto: 'Gastos', monto: -er.gastos },
+              { concepto: er.merma_unidades_sin_costo > 0 ? 'Mermas con costo conocido (incompleto)' : 'Mermas', monto: -er.mermas_conocidas },
+              { concepto: 'Utilidad neta', monto: er.utilidad_neta ?? 'no confiable' },
+              { concepto: 'Margen bruto %', monto: er.margen_bruto_pct ?? 'no confiable' },
+              { concepto: 'Margen neto %', monto: er.margen_neto_pct ?? 'no confiable' },
+            ]}
+            columns={[
+              { key: 'concepto', label: 'Concepto' },
+              { key: 'monto', label: 'Monto' },
+            ]}
+          />
+        )}
       </div>
 
       {/* Estado de resultados */}
       <div className="grid sigs">
-        <Stat icon={<TrendingUp size={18} />} v={money(er.ventas)} k="Ventas" s="del periodo" />
-        {er.devoluciones > 0 && (
-          <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventasNetas)}`} accent="dang" />
+        <Stat icon={<TrendingUp size={18} />} v={cifra(res, (r) => money(r.ventas))} k="Ventas" s={`pedidos levantados · ${range.etiqueta.toLowerCase()}`} />
+        {er && er.devoluciones > 0 && (
+          <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventas_netas)}`} accent="dang" />
         )}
-        <Stat icon={<ArrowDownCircle size={18} />} v={cogsUnreliable ? '—' : money(er.costoVentas)} k="Costo de ventas" s={cogsUnreliable ? 'faltan costos' : `margen bruto ${pct(er.margenBruto)}`} accent={cogsUnreliable ? 'warn' : undefined} />
-        <Stat icon={<Wallet size={18} />} v={cogsUnreliable ? 'No confiable' : money(er.utilidadBruta)} k="Utilidad bruta" s={cogsUnreliable ? 'captura costos para verla' : 'ventas − costo'} accent={cogsUnreliable ? 'warn' : undefined} />
-        <Stat icon={<ArrowDownCircle size={18} />} v={money(er.gastos)} k="Gastos" s="operativos" />
-        <Stat icon={<ArrowDownCircle size={18} />} v={money(er.mermas)} k="Mermas" s="caducidad / daño" accent={er.mermas > 0 ? 'dang' : undefined} />
-        <Stat icon={er.utilidadNeta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} v={cogsUnreliable ? 'No confiable' : money(er.utilidadNeta)} k="Utilidad neta" s={cogsUnreliable ? 'captura costos para verla' : `margen neto ${pct(er.margenNeto)}`} accent={cogsUnreliable ? 'warn' : er.utilidadNeta >= 0 ? 'ok' : 'dang'} />
+        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => (r.costo_ventas == null ? '—' : money(r.costo_ventas)))} k="Costo de ventas" s={!er ? '' : cogsUnreliable ? `conocido: ${money(er.costo_ventas_conocido)} · faltan costos` : `margen bruto ${pct(er.margen_bruto_pct ?? 0)}`} accent={cogsUnreliable ? 'warn' : undefined} />
+        <Stat icon={<Wallet size={18} />} v={cifra(res, (r) => dinero(r.utilidad_bruta))} k="Utilidad bruta" s={cogsUnreliable ? 'falta costo de lo vendido' : 'ventas netas − costo'} accent={cogsUnreliable ? 'warn' : undefined} />
+        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => money(r.gastos))} k="Gastos" s="operativos" />
+        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => money(r.mermas_conocidas))} k="Mermas" s={er && er.merma_unidades_sin_costo > 0 ? `+ ${er.merma_unidades_sin_costo} unidad(es) sin costo` : 'caducidad / daño'} accent={er && (er.mermas_conocidas > 0 || er.merma_unidades_sin_costo > 0) ? 'dang' : undefined} />
+        <Stat icon={er && (er.utilidad_neta ?? 0) < 0 ? <TrendingDown size={18} /> : <TrendingUp size={18} />} v={cifra(res, (r) => dinero(r.utilidad_neta))} k="Utilidad neta" s={!er ? '' : er.utilidad_neta == null ? 'falta costo para calcularla' : `margen neto ${pct(er.margen_neto_pct ?? 0)}`} accent={!er ? undefined : er.utilidad_neta == null ? 'warn' : er.utilidad_neta >= 0 ? 'ok' : 'dang'} />
       </div>
 
-      {/* Cobranza real: vendido vs dinero que de verdad entró */}
+      {/* Cobranza: lo vendido en el periodo y el dinero que entró EN el periodo */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Cobranza · {range.label}</div>
-          <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>Tasa de cobro <b style={{ color: cob.tasaCobro >= 80 ? 'var(--green-deep)' : cob.tasaCobro >= 50 ? 'var(--warn)' : 'var(--danger)' }}>{pct(cob.tasaCobro)}</b></span>
+          <div className="eyebrow" style={{ margin: 0 }}>Cobranza · {range.etiqueta}</div>
+          {avance != null && (
+            <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>Avance de cobro de lo vendido <b style={{ color: avance >= 80 ? 'var(--green-deep)' : avance >= 50 ? 'var(--warn)' : 'var(--danger)' }}>{pct(avance)}</b></span>
+          )}
         </div>
         <div style={{ height: 10, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', marginBottom: 12 }}>
-          <div style={{ width: `${Math.min(100, Math.max(0, cob.tasaCobro))}%`, height: '100%', background: 'var(--grad-green, linear-gradient(90deg,#009A3E,#007311))' }} />
+          <div style={{ width: `${Math.min(100, Math.max(0, avance ?? 0))}%`, height: '100%', background: 'var(--grad-green, linear-gradient(90deg,#009A3E,#007311))' }} />
         </div>
         <div className="grid sigs">
-          <Stat icon={<Receipt size={18} />} v={money(cob.vendido)} k="Vendido" s="facturado del periodo" />
-          <Stat icon={<TrendingUp size={18} />} v={money(cob.cobrado)} k="Cobrado real" s="dinero que entró (neto)" accent="ok" />
-          {cob.devuelto > 0 && (
-            <Stat icon={<TrendingDown size={18} />} v={money(cob.devuelto)} k="Devuelto" s="reembolsado de pagadas" accent="dang" />
+          <Stat icon={<Receipt size={18} />} v={cifra(ven, (k) => money(k.ventas))} k="Vendido" s="pedidos levantados en el periodo" />
+          <Stat icon={<TrendingUp size={18} />} v={cifra(ven, (k) => money(k.cobrado_neto))} k="Cobrado en el periodo" s="por fecha de pago: lo que entró menos lo que salió" accent="ok" />
+          {ven.data && ven.data.cobrado_salidas > 0 && (
+            <Stat icon={<TrendingDown size={18} />} v={money(ven.data.cobrado_salidas)} k="Salidas" s={`reembolsos y reversas · entraron ${money(ven.data.cobrado_entradas)}`} accent="dang" />
           )}
-          <Stat icon={<ArrowDownCircle size={18} />} v={money(cob.porCobrar)} k="Por cobrar" s="ventas del periodo aún sin cobrar" />
+          <Stat icon={<ArrowDownCircle size={18} />} v={cifra(ven, (k) => money(k.saldo_ventas))} k="Falta cobrar de lo vendido" s="saldo a hoy de los pedidos del periodo" />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
+          «Cobrado en el periodo» cuenta el dinero por la fecha en que se pagó, sea de pedidos de este periodo o de anteriores.
         </div>
       </div>
 
@@ -142,11 +153,15 @@ export function Finanzas() {
             <div className="chip" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)', width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center' }}><ArrowDownCircle size={18} /></div>
             <div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 700 }}>Cuentas por cobrar · posición a hoy</div>
-              <div style={{ fontSize: 20, fontWeight: 600 }}>{money(cxc.total)}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>incluye contra-pedido pendiente</div>
+              <div style={{ fontSize: 20, fontWeight: 600 }}>{cifra(cxc, (c) => money(c.total))}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>saldo de pedidos sin liquidar · no depende del periodo</div>
             </div>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxc.count} pedido(s) contra pedido sin pagar.</div>
+          {cxc.data && (
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
+              {cxc.data.pedidos} pedido(s) con saldo · {money(cxc.data.a_credito)} a crédito{cxc.data.vencido > 0 ? ` · ${money(cxc.data.vencido)} vencido` : ''}.
+            </div>
+          )}
         </div>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -174,7 +189,7 @@ export function Finanzas() {
       {/* Gastos */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Gastos del periodo</div>
+          <div className="eyebrow" style={{ margin: 0 }}>Gastos · {range.etiqueta}</div>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {porCat.slice(0, 4).map((c) => (
               <span key={c.categoria} className="pill p-neu">{c.categoria}: {money(c.monto)}</span>
@@ -224,7 +239,7 @@ function Stat({ icon, v, k, s, accent }: { icon: React.ReactNode; v: string; k: 
 }
 
 function GastoModal({ onClose, onSave }: { onClose: () => void; onSave: (g: { fecha: string; categoria: GastoCategoria; concepto: string; monto: number }) => void }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyNegocio()
   const [fecha, setFecha] = useState(today)
   const [categoria, setCategoria] = useState<GastoCategoria>('Otros')
   const [concepto, setConcepto] = useState('')

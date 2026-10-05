@@ -22,6 +22,7 @@ import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
+import { enPeriodo } from '../../data/periodo'
 
 type ChannelFilter = 'todos' | 'portal' | 'pos'
 type PayFilter = 'todos' | 'pagado' | 'parcial' | 'contra' | 'pendiente'
@@ -74,9 +75,8 @@ export function VentasDetalle() {
     const query = q.trim().toLowerCase()
     return orders
       .filter((o) => {
-        const d = o.created_at.slice(0, 10)
-        if (from && d < from) return false
-        if (to && d > to) return false
+        // «Del … al …» son DÍAS DEL NEGOCIO, ambos inclusive (mismo corte que los indicadores).
+        if (!enPeriodo(o.created_at, { desde: from || null, hasta: to || null })) return false
         if (channel !== 'todos' && channelOf(o) !== channel) return false
         if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
         if (query) {

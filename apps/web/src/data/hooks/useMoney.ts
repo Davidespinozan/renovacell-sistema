@@ -12,7 +12,7 @@ import {
 import { subscribe as subOrders, getSnapshotAll as snapOrders } from '../store/ordersStore'
 import { subscribe as subRefunds, getSnapshot as snapRefunds, refundedByOrder } from '../store/refundsStore'
 import { claimsFromOrders, moneyFromOrder } from '../ops/moneyMock'
-import { localDay } from '../ops/finanzas'
+import { hoyNegocio } from '../periodo'
 import type { OrderMoney, PaymentClaim, PaymentEntry } from '../ops/money'
 
 export function useOrderMoney(): { data: OrderMoney[]; byOrder: Record<string, OrderMoney>; loading: boolean; reload: () => Promise<void> } {
@@ -24,7 +24,7 @@ export function useOrderMoney(): { data: OrderMoney[]; byOrder: Record<string, O
   const data = useMemo(() => {
     if (hasSupabase) return server
     const dev = refundedByOrder(refunds)
-    const hoy = localDay(new Date())
+    const hoy = hoyNegocio()
     return orders.map((o) => moneyFromOrder(o, dev[o.id] ?? 0, credits[o.id] ?? null, hoy))
   }, [server, orders, refunds, credits])
   const byOrder = useMemo(() => moneyIndex(data), [data])

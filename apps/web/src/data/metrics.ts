@@ -3,6 +3,7 @@
 // orders/order_items + products + doctores existentes.
 import type { OrderWithItems } from './hooks/useOrders'
 import type { ProductSafe, Profile } from './types'
+import { diaNegocio, diasEntre, duracionDias, etiquetaMes, hoyNegocio, mesNegocio, nombreMes, ultimosMeses } from './periodo'
 
 // "Venta" para KPIs: cuenta solo pedidos confirmados (al menos surtidos) o cobrados.
 // Excluye cancelados, borradores y pendientes de surtir → no infla ingresos con pipeline.
@@ -72,17 +73,20 @@ export function topDoctors(orders: OrderWithItems[], doctorsById: Record<string,
     .slice(0, limit)
 }
 
-// DOCTORES EN RIESGO (retención): doctores VERIFICADOS que ya compraban pero llevan
-// >= `days` sin pedir. Lista accionable para que Ventas los llame ANTES de perderlos.
-// Ordenada por urgencia (más días sin pedir primero). Pura y testeable: recibe `now`.
+// DOCTORES EN RIESGO (retención) — DEFINICIÓN ÚNICA.
+// Un doctor está en riesgo cuando: (1) está VERIFICADO, (2) ya compró alguna vez y
+// (3) su último pedido-venta fue hace `days` días de calendario del negocio o más.
+// Un doctor que nunca ha comprado no está "en riesgo": no es cliente todavía.
+// Lista accionable para que Ventas los llame ANTES de perderlos, ordenada por urgencia.
+export const DIAS_RIESGO = 30
 export interface DoctorRiesgo {
   id: string
   name: string
   phone?: string
   email?: string
   organization?: string
-  lastOrder: string       // ISO del último pedido
-  diasSinPedir: number
+  lastOrder: string       // instante del último pedido
+  diasSinPedir: number    // días de calendario del negocio desde ese pedido
   orders: number          // pedidos históricos (señal de qué tan valioso era)
   total: number           // gasto histórico
 }
@@ -91,9 +95,8 @@ export function doctoresEnRiesgo(
   doctors: Profile[],
   opts: { days?: number; now?: Date } = {},
 ): DoctorRiesgo[] {
-  const days = opts.days ?? 30
-  const now = opts.now ?? new Date()
-  const DAY = 86_400_000
+  const days = opts.days ?? DIAS_RIESGO
+  const hoy = hoyNegocio(opts.now ?? new Date())
   // Último pedido, conteo y total por doctor (solo ventas reales).
   const m = new Map<string, { last: number; orders: number; total: number }>()
   orders.filter(isSale).forEach((o) => {
@@ -111,7 +114,7 @@ export function doctoresEnRiesgo(
   m.forEach((v, id) => {
     const d = byId.get(id)
     if (!d || !d.verified) return // solo doctores verificados (clientes reales)
-    const diasSinPedir = Math.floor((now.getTime() - v.last) / DAY)
+    const diasSinPedir = diasEntre(diaNegocio(v.last), hoy)
     if (diasSinPedir < days) return // aún activo
     out.push({
       id,
@@ -168,78 +171,32 @@ export function lineMix(orders: OrderWithItems[], productsById: Record<string, P
   return acc
 }
 
-// Ventas por mes (últimos N meses), para gráfica de tendencia.
+// Ventas por MES DEL NEGOCIO (últimos N meses, del más antiguo al actual), para la
+// gráfica de tendencia. Cada pedido cae en el mes de su día del negocio: el mismo
+// corte que usan las cifras de cabecera del servidor.
 export interface MonthPoint {
   key: string
   label: string
+  titulo: string
   revenue: number
 }
-export function monthlySales(orders: OrderWithItems[], months = 6): MonthPoint[] {
-  const now = new Date()
-  const buckets: MonthPoint[] = []
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    buckets.push({ key, label: d.toLocaleString('es-MX', { month: 'short' }), revenue: 0 })
-  }
+export function monthlySales(orders: OrderWithItems[], months = 6, ahora: Date = new Date()): MonthPoint[] {
+  const buckets: MonthPoint[] = ultimosMeses(months, ahora).map((mes) => ({
+    key: mes, label: nombreMes(mes).slice(0, 3), titulo: etiquetaMes(mes), revenue: 0,
+  }))
   const idx = new Map(buckets.map((b, i) => [b.key, i]))
   orders.filter(isSale).forEach((o) => {
-    const d = new Date(o.created_at)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const i = idx.get(key)
+    const i = idx.get(mesNegocio(o.created_at))
     if (i != null) buckets[i].revenue += o.total ?? 0
   })
   return buckets
 }
 
-// Doctores en riesgo: verificados sin pedidos recientes (analogía "miembros en riesgo").
-export interface DoctorRisk {
-  id: string
-  name: string
-  lastDays: number | null // días desde su último pedido (null = nunca)
-  total: number
-}
-export function doctorsAtRisk(orders: OrderWithItems[], doctors: Profile[], days = 60): DoctorRisk[] {
-  const last = new Map<string, number>()
-  const total = new Map<string, number>()
-  orders.filter(isSale).forEach((o) => {
-    if (!o.doctor_id) return
-    const t = new Date(o.created_at).getTime()
-    last.set(o.doctor_id, Math.max(last.get(o.doctor_id) ?? 0, t))
-    total.set(o.doctor_id, (total.get(o.doctor_id) ?? 0) + (o.total ?? 0))
-  })
-  const now = Date.now()
-  return doctors
-    .filter((d) => d.verified)
-    .map((d) => {
-      const lt = last.get(d.id)
-      return { id: d.id, name: d.full_name ?? 'Doctor', lastDays: lt ? Math.floor((now - lt) / 86_400_000) : null, total: total.get(d.id) ?? 0 }
-    })
-    .filter((r) => r.lastDays == null || r.lastDays > days)
-    .sort((a, b) => b.total - a.total)
-}
-
-// CFDI solicitados (% de pedidos) y cobrado vs pendiente.
-export interface BillingSummary {
-  cfdiRate: number
-  paid: number
-  pending: number
-}
-// W2 · con libro de dinero, `paid` es lo que REALMENTE entró (neto de reembolsos) y
-// `pending` el SALDO: un pago parcial deja de contarse como si nada se hubiera cobrado.
-// Sin libro (demo) se conserva la derivación por pedido.
-export function billingSummary(orders: OrderWithItems[], money: Record<string, { cobrado_neto: number; saldo: number } | undefined> = {}): BillingSummary {
+// % de pedidos-venta en los que el cliente solicitó CFDI. (El dinero cobrado y por
+// cobrar NO se calcula aquí: sale de `kpi_ventas` / `kpi_por_cobrar`.)
+export function cfdiSolicitados(orders: OrderWithItems[]): number {
   const valid = orders.filter(isSale)
-  const cfdi = valid.filter((o) => o.invoice_requested).length
-  let paid = 0
-  let pending = 0
-  valid.forEach((o) => {
-    const m = money[o.id]
-    if (m) { paid += m.cobrado_neto; pending += Math.max(0, m.saldo); return }
-    if (o.payment_status === 'paid') paid += o.total ?? 0
-    else pending += o.total ?? 0
-  })
-  return { cfdiRate: valid.length ? cfdi / valid.length : 0, paid, pending }
+  return valid.length ? valid.filter((o) => o.invoice_requested).length / valid.length : 0
 }
 
 // ── LEAD TIME pedido → entrega ────────────────────────────────────────────────
@@ -258,7 +215,7 @@ export function leadTime(
   orders.forEach((o) => {
     const fin = entregaPorPedido.get(o.id)
     if (!fin || !o.created_at) return
-    const d = (new Date(fin).getTime() - new Date(o.created_at).getTime()) / 86_400_000
+    const d = duracionDias(o.created_at, fin)
     if (Number.isFinite(d) && d >= 0) dias.push(d)
   })
   if (dias.length === 0) return { entregados: 0, promedioDias: null, peorDias: null }
@@ -273,6 +230,20 @@ export function leadTime(
 // ── VALOR EN RIESGO por caducidad ─────────────────────────────────────────────
 // No basta con "7 lotes por vencer": Dirección necesita saber CUÁNTO DINERO está
 // en riesgo. Se valúa a COSTO (lo que se perdería), no a precio de venta.
-export function valorEnRiesgo(lots: { quantity: number; unit_cost?: number | null }[]): number {
-  return lots.reduce((s, l) => s + l.quantity * (l.unit_cost ?? 0), 0)
+// Un lote sin costo registrado NO vale cero: se cuenta aparte, y el valor que se
+// muestra es un MÍNIMO mientras haya alguno.
+export interface ValorEnRiesgo {
+  valor: number            // Σ cantidad × costo de los lotes con costo conocido
+  lotesSinCosto: number
+  unidadesSinCosto: number
+  completo: boolean        // false ⇒ `valor` es un mínimo, no el total
+}
+export function valorEnRiesgo(lots: { quantity: number; unit_cost?: number | null }[]): ValorEnRiesgo {
+  const r: ValorEnRiesgo = { valor: 0, lotesSinCosto: 0, unidadesSinCosto: 0, completo: true }
+  lots.forEach((l) => {
+    if (l.unit_cost == null) { r.lotesSinCosto += 1; r.unidadesSinCosto += l.quantity; return }
+    r.valor += l.quantity * l.unit_cost
+  })
+  r.completo = r.lotesSinCosto === 0
+  return r
 }

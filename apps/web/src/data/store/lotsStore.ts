@@ -15,6 +15,7 @@ import { blendedLotCost } from '../ops/inventoryCost'
 import { runW1Command, newOpId, type W1Result } from '../ops/w1Command'
 import { reloadCompras } from './comprasStore'
 import { leerTodo } from './lectura'
+import { diaNegocio, diasEntre, hoyNegocio } from '../periodo'
 
 const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
@@ -69,7 +70,7 @@ export const getSnapshotMovements = (): InventoryMovement[] => movsLive.getSnaps
 
 // Total DISPONIBLE (excluye caducados) de los productos indicados.
 function totalsFor(ids: Set<string>): Record<string, number> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyNegocio()
   const m: Record<string, number> = {}
   lotsLive.current().forEach((l) => {
     if (!ids.has(l.product_id)) return
@@ -100,7 +101,7 @@ function flagExpiring(lots: Lot[]): void {
   const names = Object.fromEntries(productsSnapshot().map((p) => [p.id, p.name]))
   lots.forEach((l) => {
     if (l.quantity <= 0 || !l.expiry_date) return
-    const days = Math.ceil((Date.parse(l.expiry_date) - Date.now()) / 86_400_000)
+    const days = diasEntre(hoyNegocio(), diaNegocio(l.expiry_date))
     if (Number.isNaN(days) || days > 60) return // solo crítico (≤60) o vencido (<0)
     if (notifiedExpiry.has(l.id)) return
     notifiedExpiry.add(l.id)

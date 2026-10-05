@@ -13,6 +13,7 @@ import type { CustodyStock } from './custody'
 import type { Lot } from '../types'
 import { hasSupabase } from '../../lib/supabase'
 import { runW1Command, newOpId } from './w1Command'
+import { hoyNegocio } from '../periodo'
 import type { Json } from '../database.types'
 
 export interface PosLine {
@@ -35,7 +36,7 @@ const isUuid = (v?: string | null): v is string =>
 // los lotes que se le entregaron y hasta lo que le queda. El servidor reimpone ambas
 // cosas (`CUSTODIA_SALDO_INSUFICIENTE`); esto es para no ofrecer lo que va a rechazar.
 function allocateDesdeCustodia(productId: string, qty: number, lots: Lot[], custodyId: string) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyNegocio()
   const saldo: { s: CustodyStock; lot: Lot }[] = getCustodyStockSnapshot()
     .filter((s) => s.custody_id === custodyId && s.product_id === productId && s.en_poder > 0)
     .map((s) => ({ s, lot: lots.find((l) => l.id === s.lot_id) }))

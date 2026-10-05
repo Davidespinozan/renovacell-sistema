@@ -15,7 +15,10 @@ import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
 import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { signedProofUrl } from '../../lib/uploads'
-import { billingSummary, isPosOrder } from '../../data/metrics'
+import { isPosOrder } from '../../data/metrics'
+import { useKpiVentas, useKpiPorCobrar } from '../../data/hooks/useKpis'
+import { todoElHistorico, diaNegocio, diasEntre, hoyNegocio } from '../../data/periodo'
+import { cifra } from '../../app/Kpi'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
 import { estadoFiscalPedido, mensajeEstadoFiscal, SIN_SOLICITUD, type EstadoFiscalPedido } from '../../data/ops/fiscalIntent'
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
@@ -81,7 +84,10 @@ export function Facturacion() {
   }
 
   const valid = useMemo(() => orders.filter(notCancelled), [orders])
-  const bill = billingSummary(valid, byOrder)
+  // Cobrado y por cobrar: las MISMAS cifras de cabecera que Tablero y Finanzas (servidor).
+  const pTodo = useMemo(() => todoElHistorico(), [])
+  const kTodo = useKpiVentas(pTodo)
+  const kCxc = useKpiPorCobrar()
   const solicitados = valid.filter((o) => o.invoice_requested).length
   const porEmitir = valid.filter((o) => o.invoice_requested && !isEmitida(o)).length
   const emitidos = valid.filter(isEmitida).length
@@ -143,8 +149,8 @@ export function Facturacion() {
         <Stat icon={<FileText size={18} />} v={String(solicitados)} k="CFDI solicitados" s="por el cliente" />
         <Stat icon={<Receipt size={18} />} v={String(porEmitir)} k="Por emitir" s="solicitados sin CFDI" />
         <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados" />
-        <Stat icon={<BadgeDollarSign size={18} />} v={money(bill.paid)} k="Cobrado" s="pagos confirmados" />
-        <Stat icon={<Clock size={18} />} v={money(bill.pending)} k="Por cobrar" s="ventas en curso sin pagar" />
+        <Stat icon={<BadgeDollarSign size={18} />} v={cifra(kTodo, (k) => money(k.cobrado_neto))} k="Cobrado" s="histórico · lo que entró menos lo que salió" />
+        <Stat icon={<Clock size={18} />} v={cifra(kCxc, (c) => money(c.total))} k="Por cobrar" s={kCxc.data ? `saldo a hoy · ${kCxc.data.pedidos} pedido(s)` : 'saldo a hoy'} />
       </div>
 
       {/* Filtros */}
@@ -234,7 +240,7 @@ export function Facturacion() {
             <thead><tr><th>Cliente</th><th>Pedidos</th><th>Adeudo</th><th>Antigüedad</th></tr></thead>
             <tbody>
               {debt.map((d) => {
-                const days = Math.max(0, Math.floor((Date.now() - new Date(d.oldest).getTime()) / 86_400_000))
+                const days = Math.max(0, diasEntre(diaNegocio(d.oldest), hoyNegocio()))
                 return (
                   <tr key={d.name}>
                     <td data-label="Cliente">{d.name}</td>

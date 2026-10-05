@@ -10,13 +10,16 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
 } from 'recharts'
 import { money, initials, avatarColor } from '../../lib/format'
-import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
+import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import {
-  salesSummary, channelSplit, doctorActivity, topDoctors, topProducts, lineMix,
-  billingSummary, monthlySales, doctorsAtRisk,
+  channelSplit, doctorActivity, topDoctors, topProducts, lineMix,
+  cfdiSolicitados, monthlySales, doctoresEnRiesgo, DIAS_RIESGO,
 } from '../../data/metrics'
+import { useKpiVentas } from '../../data/hooks/useKpis'
+import { esteMes, mesPasado, ultimosDias, todoElHistorico, periodoAnterior, enPeriodo, hoyNegocio, type Periodo as PeriodoNegocio } from '../../data/periodo'
+import { cifra, AvisoKpi } from '../../app/Kpi'
 import type { ProductSafe, Profile } from '../../data/types'
 import { VentasDetalle } from './VentasDetalle'
 
@@ -24,12 +27,17 @@ const GREEN = '#007311'
 const GREEN_SOFT = '#5FB873'
 const pct = (n: number) => `${Math.round(n * 100)}%`
 
-type Periodo = 'mes' | 'trimestre' | 'todo'
-const PERIODOS: { v: Periodo; label: string; days: number | null }[] = [
-  { v: 'mes', label: 'Últimos 30 días', days: 30 },
-  { v: 'trimestre', label: 'Últimos 90 días', days: 90 },
-  { v: 'todo', label: 'Todo', days: null },
+// Periodos de CALENDARIO del negocio. «Este mes» es el mes calendario, no "los últimos
+// 30 días": una ventana móvil con nombre de mes era la ambigüedad que se retiró.
+type Periodo = 'mes' | 'pasado' | 'dias90' | 'todo'
+const PERIODOS: { v: Periodo; label: string }[] = [
+  { v: 'mes', label: 'Este mes' },
+  { v: 'pasado', label: 'Mes pasado' },
+  { v: 'dias90', label: 'Últimos 90 días' },
+  { v: 'todo', label: 'Todo' },
 ]
+const periodoDe = (v: Periodo): PeriodoNegocio =>
+  v === 'mes' ? esteMes() : v === 'pasado' ? mesPasado() : v === 'dias90' ? ultimosDias(90) : todoElHistorico()
 
 export function Ventas() {
   const [tab, setTab] = useState<'detalle' | 'resumen'>('detalle')
@@ -52,53 +60,55 @@ function VentasResumen() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
-  const [periodo, setPeriodo] = useState<Periodo>('todo')
+  const [periodo, setPeriodo] = useState<Periodo>('mes')
 
-  const days = PERIODOS.find((p) => p.v === periodo)!.days
-  const inWindow = (o: OrderWithItems, lo: number, hi: number) => {
-    const age = (Date.now() - new Date(o.created_at).getTime()) / 86_400_000
-    return age >= lo && age < hi
-  }
-  const filtered = useMemo(() => (days == null ? orders : orders.filter((o) => inWindow(o, 0, days))), [orders, days])
-  const prevFiltered = useMemo(() => (days == null ? [] : orders.filter((o) => inWindow(o, days, days * 2))), [orders, days])
+  const hoy = hoyNegocio()
+  const p = useMemo(() => periodoDe(periodo), [periodo, hoy]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pPrev = useMemo(() => periodoAnterior(p), [p])
+  // Desgloses (canal, línea, top) sobre los pedidos cargados, cortados por DÍA DEL NEGOCIO.
+  const filtered = useMemo(() => orders.filter((o) => enPeriodo(o.created_at, p)), [orders, p])
 
-  const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
+  const productsById = useMemo(() => Object.fromEntries(products.map((x) => [x.id, x])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
 
-  const cur = salesSummary(filtered)
-  const prev = salesSummary(prevFiltered)
-  const revDelta = prev.revenue > 0 ? (cur.revenue - prev.revenue) / prev.revenue : null
-  const ordDelta = prev.orders > 0 ? (cur.orders - prev.orders) / prev.orders : null
+  // CIFRAS DE CABECERA: del servidor. El periodo anterior es del mismo tamaño
+  // (mes contra mes, 90 días contra los 90 anteriores).
+  const cur = useKpiVentas(p)
+  const prev = useKpiVentas(pPrev ?? p)
+  const revDelta = pPrev && cur.data && prev.data && prev.data.ventas > 0 ? (cur.data.ventas - prev.data.ventas) / prev.data.ventas : null
+  const ordDelta = pPrev && cur.data && prev.data && prev.data.pedidos > 0 ? (cur.data.pedidos - prev.data.pedidos) / prev.data.pedidos : null
 
   const act = doctorActivity(filtered)
   const channel = channelSplit(filtered)
   const mix = lineMix(filtered, productsById)
   const docs = topDoctors(filtered, doctorsById)
   const prods = topProducts(filtered, productsById)
-  const bill = billingSummary(filtered)
-  const trend = monthlySales(orders) // tendencia: siempre últimos 6 meses
-  const risk = doctorsAtRisk(orders, doctors)
+  const cfdi = cfdiSolicitados(filtered)
+  const trend = monthlySales(orders) // tendencia: siempre los últimos 6 meses del negocio
+  const risk = doctoresEnRiesgo(orders, doctors)
 
   return (
     <div className="grid" style={{ gap: 26 }}>
       {/* Selector de período */}
       <div className="fchips">
-        {PERIODOS.map((p) => (
-          <button key={p.v} type="button" className={'fchip' + (periodo === p.v ? ' on' : '')} onClick={() => setPeriodo(p.v)}>{p.label}</button>
+        {PERIODOS.map((x) => (
+          <button key={x.v} type="button" className={'fchip' + (periodo === x.v ? ' on' : '')} onClick={() => setPeriodo(x.v)}>{x.label}</button>
         ))}
       </div>
+      <div className="eyebrow" style={{ margin: '-14px 0 -10px' }}>{p.etiqueta}{p.desde && p.hasta ? ` · del ${p.desde} al ${p.hasta}` : ''}</div>
+      <AvisoKpi estados={[cur, prev]} />
 
       {/* KPIs */}
       <div className="grid sigs">
-        <Kpi icon={<TrendingUp size={18} />} label="Ventas" value={money(cur.revenue)} delta={revDelta} />
-        <Kpi icon={<ShoppingBag size={18} />} label="Pedidos" value={String(cur.orders)} delta={ordDelta} />
-        <Kpi icon={<Receipt size={18} />} label="Ticket promedio" value={money(cur.avgTicket)} nota="por pedido" />
+        <Kpi icon={<TrendingUp size={18} />} label="Ventas" value={cifra(cur, (k) => money(k.ventas))} delta={revDelta} />
+        <Kpi icon={<ShoppingBag size={18} />} label="Pedidos" value={cifra(cur, (k) => String(k.pedidos))} delta={ordDelta} />
+        <Kpi icon={<Receipt size={18} />} label="Ticket promedio" value={cifra(cur, (k) => money(k.ticket))} nota="por pedido" />
         <Kpi icon={<Users size={18} />} label="Doctores activos" value={String(act.active)} nota="con compra" />
         <Kpi icon={<Repeat size={18} />} label="Recompra" value={pct(act.repeatRate)} nota={`${act.repeat} repiten`} ayuda="% de doctores con más de un pedido en el periodo." />
       </div>
 
       {/* Tendencia */}
-      <ChartCard titulo="Ventas por mes (últimos 6)">
+      <ChartCard titulo="Ventas por mes · últimos 6 meses (no depende del periodo elegido)">
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={trend} margin={{ top: 6, right: 12, bottom: 4, left: 4 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
@@ -158,9 +168,9 @@ function VentasResumen() {
           <SplitRow label="Professional" amount={mix.prof.revenue} total={mix.cosm.revenue + mix.prof.revenue} sub={`${mix.prof.units} pzas`} />
         </Bloque>
         <Bloque titulo={<><Receipt size={14} style={ic} /> Cobro y CFDI</>}>
-          <Mini k="CFDI solicitados" v={pct(bill.cfdiRate)} />
-          <Mini k="Cobrado" v={money(bill.paid)} tone="ok" />
-          <Mini k="Pendiente (contra pedido)" v={money(bill.pending)} tone="warn" />
+          <Mini k="CFDI solicitados" v={pct(cfdi)} />
+          <Mini k="Cobrado en el periodo" v={cifra(cur, (k) => money(k.cobrado_neto))} tone="ok" />
+          <Mini k="Falta cobrar de lo vendido" v={cifra(cur, (k) => money(k.saldo_ventas))} tone="warn" />
         </Bloque>
       </div>
 
@@ -168,9 +178,9 @@ function VentasResumen() {
       <div style={{ borderTop: '1px solid var(--line)', paddingTop: 22 }}>
         <div className="eyebrow" style={{ color: 'var(--green-deep)' }}>Avanzado</div>
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Retención y recompra</h2>
-        <Bloque titulo={<><AlertTriangle size={14} style={ic} /> Doctores en riesgo (sin pedidos recientes)</>}>
+        <Bloque titulo={<><AlertTriangle size={14} style={ic} /> Doctores en riesgo · {DIAS_RIESGO} días o más sin pedir</>}>
           {risk.length === 0 ? (
-            <div style={{ fontSize: 13.5, color: 'var(--ink-3)' }}>Ningún doctor verificado en riesgo. 🎉</div>
+            <div style={{ fontSize: 13.5, color: 'var(--ink-3)' }}>Ningún doctor verificado con compras lleva {DIAS_RIESGO} días o más sin pedir. 🎉</div>
           ) : (
             <table className="tbl-cards">
               <thead><tr><th>Doctor</th><th>Último pedido</th><th>Histórico</th></tr></thead>
@@ -178,7 +188,7 @@ function VentasResumen() {
                 {risk.map((r) => (
                   <tr key={r.id}>
                     <td data-label="Doctor">{r.name}</td>
-                    <td data-label="Último pedido"><span className={'pill ' + (r.lastDays == null ? 'p-neu' : 'p-warn')}>{r.lastDays == null ? 'Nunca' : `hace ${r.lastDays} d`}</span></td>
+                    <td data-label="Último pedido"><span className="pill p-warn">hace {r.diasSinPedir} d</span></td>
                     <td data-label="Histórico" className="mono">{money(r.total)}</td>
                   </tr>
                 ))}

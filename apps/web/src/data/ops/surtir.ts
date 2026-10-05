@@ -8,6 +8,7 @@ import { getDisponibleSnapshot, reloadCustody } from '../store/custodyStore'
 import { markPacked, reloadOrders, type OrderWithItems } from '../store/ordersStore'
 import { hasSupabase } from '../../lib/supabase'
 import { runW1Command, newOpId } from './w1Command'
+import { hoyNegocio } from '../periodo'
 
 export interface Alloc {
   lot: Lot
@@ -47,7 +48,7 @@ export function mapaEnCustodia(): EnCustodia {
 // Núcleo FEFO reutilizable: asigna `qty` de un producto desde sus lotes, caducando
 // primero y SOLO contra lo disponible. Lo usan Surtido (Almacén) y Punto de Venta.
 export function allocateFEFO(productId: string, qty: number, lots: Lot[], enCustodia: EnCustodia = {}): { allocations: Alloc[]; shortfall: number } {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyNegocio()
   // No surtir/vender producto YA caducado (regulado) ni unidades que están en custodia.
   const avail = lots
     .filter((l) => l.product_id === productId && !(l.expiry_date != null && l.expiry_date < today))

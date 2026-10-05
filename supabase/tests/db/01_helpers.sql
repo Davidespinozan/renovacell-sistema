@@ -545,3 +545,84 @@ begin
   perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
 end $$;
 grant execute on function tests.set_email(uuid, text) to authenticated, service_role;
+
+-- ------------------------------------------------- fixtures de W5 (indicadores)
+-- Fecha en que se levantó un pedido (para armar periodos sin esperar meses).
+create or replace function tests.fechar(p_order uuid, p_ts timestamptz)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  perform set_config('app.trusted', 'on', true);
+  update public.orders set created_at = p_ts where id = p_order;
+  perform set_config('app.trusted', 'off', true);
+end $$;
+
+-- Stock por el comando real, con costo explícito (NULL = costo desconocido de verdad).
+create or replace function tests.stock_costo(p_product uuid, p_code text, p_qty int, p_cost numeric)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v_res jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  v_res := public.recibir_lote(gen_random_uuid(), p_product, p_code, current_date + 365, p_qty, null, 'sin_orden', p_cost, 'fixture', null);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return (v_res ->> 'lot_id')::uuid;
+end $$;
+
+-- Cobro por el comando real en una FECHA CONTABLE dada. Devuelve el id del asiento.
+create or replace function tests.cobrar_el(p_order uuid, p_amount numeric, p_fecha date, p_method text default 'transferencia')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v_op uuid := gen_random_uuid();
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  perform public.registrar_cobro(v_op, p_order, p_method, p_amount, p_fecha);
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_op;
+end $$;
+
+-- Surtido por el comando real (Almacén), con el plan FEFO de los fixtures.
+create or replace function tests.surtir(p_order uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_wh uuid; v_claims text := current_setting('request.jwt.claims', true);
+begin
+  select id into v_wh from public.profiles where role_id = 'warehouse' and email like 'fixture-wh%' limit 1;
+  if v_wh is null then v_wh := tests.user('warehouse', 'fixture-wh@test.local'); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_wh, 'role', 'authenticated')::text, true);
+  perform public.surtir_pedido(gen_random_uuid(), p_order, tests.alloc(p_order));
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+end $$;
+
+-- Un indicador pedido como Dirección (los kpi_* solo responden a admin).
+create or replace function tests.kpi(p_fn text, p_desde date default null, p_hasta date default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  if p_fn = 'por_cobrar' then v := public.kpi_por_cobrar();
+  elsif p_fn = 'ventas' then v := public.kpi_ventas(p_desde, p_hasta);
+  elsif p_fn = 'resultado' then v := public.kpi_resultado(p_desde, p_hasta);
+  else raise exception 'kpi desconocido: %', p_fn; end if;
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v;
+end $$;
+
+-- Cada llave de p_want debe valer lo mismo en p_got (números como números; null como null).
+create or replace function tests.jsonb_igual(p_got jsonb, p_want jsonb, p_name text)
+returns void language plpgsql as $$
+declare k text; w jsonb; g jsonb;
+begin
+  for k, w in select * from jsonb_each(p_want) loop
+    g := p_got -> k;
+    if g is null then raise exception 'FAIL: % — falta la llave "%"', p_name, k; end if;
+    if jsonb_typeof(w) = 'number' and jsonb_typeof(g) = 'number' then
+      if (w #>> '{}')::numeric <> (g #>> '{}')::numeric then
+        raise exception 'FAIL: % — % = % (esperado %)', p_name, k, g, w;
+      end if;
+    elsif g is distinct from w then
+      raise exception 'FAIL: % — % = % (esperado %)', p_name, k, g, w;
+    end if;
+  end loop;
+  raise notice 'PASS: %', p_name;
+end $$;
+
+grant execute on function tests.fechar(uuid, timestamptz), tests.stock_costo(uuid, text, int, numeric),
+  tests.cobrar_el(uuid, numeric, date, text), tests.surtir(uuid), tests.kpi(text, date, date),
+  tests.jsonb_igual(jsonb, jsonb, text) to authenticated, service_role;

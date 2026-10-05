@@ -1,6 +1,6 @@
 // Pruebas de finanzas (posición financiera + arqueo de caja). Función pura.
 import { describe, it, expect } from 'vitest'
-import { cuentasPorCobrar, cuentasPorPagar, gastosPorCategoria, efectivoEsperado } from './finanzas'
+import { cuentasPorPagar, gastosPorCategoria, efectivoEsperado } from './finanzas'
 import { mkOrder } from '../../test/factories'
 import type { Gasto } from '../store/gastosStore'
 import type { PurchaseOrder } from '../store/comprasStore'
@@ -12,19 +12,6 @@ const gasto = (g: Partial<Gasto> = {}): Gasto => ({
 const compra = (c: Partial<PurchaseOrder> = {}): PurchaseOrder => ({
   id: 'c1', product_id: 'p1', product_name: 'X', qty: 2, unit_cost: 300, kind: 'compra',
   supplier: 'Prov', status: 'pendiente', paid: false, created_at: '2026-06-01T10:00:00Z', ...c,
-})
-
-describe('cuentasPorCobrar', () => {
-  it('cuenta pedidos de portal no pagados (contra pedido)', () => {
-    const r = cuentasPorCobrar([
-      mkOrder({ id: '1', external_ref: 'S-1', payment_status: 'pending', total: 1000, status: 'paid' }),
-      mkOrder({ id: '2', external_ref: 'S-2', payment_status: 'paid', total: 500 }), // ya pagado
-      mkOrder({ id: '3', external_ref: 'POS-1', payment_status: 'pending', total: 999 }), // POS se cobra al momento
-      mkOrder({ id: '4', external_ref: 'S-3', payment_status: 'pending', total: 200, status: 'cancelled' }), // cancelado
-    ])
-    expect(r.count).toBe(1)
-    expect(r.total).toBe(1000)
-  })
 })
 
 describe('cuentasPorPagar', () => {

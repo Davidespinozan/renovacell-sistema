@@ -1,159 +1,17 @@
-// Lógica PURA de finanzas (sin estado, fácil de testear) — estilo CuboPolar.
-// Estado de resultados, posición financiera (CxC/CxP) y arqueo de caja.
-// SENSIBLE: usa costos → solo se muestra a Dirección.
+// Lógica PURA de finanzas que NO es un KPI de cabecera: cuentas por pagar, desglose
+// de gastos y la explicación del arqueo en la demo.
+//
+// Ventas, cobrado, por cobrar y utilidad ya NO se calculan aquí: su definición única
+// vive en el servidor (`kpi_ventas`, `kpi_por_cobrar`, `kpi_resultado`) y su espejo en
+// `data/kpis.ts`. Este módulo no debe volver a sumar dinero de pedidos.
 import type { OrderWithItems } from '../hooks/useOrders'
-import { isSale, isPosOrder } from '../metrics'
+import { isPosOrder } from '../metrics'
+import { diaNegocio } from '../periodo'
 import type { Gasto } from '../store/gastosStore'
 import type { PurchaseOrder } from '../store/comprasStore'
-import type { InventoryMovement, Lot } from '../types'
-import type { OrderMoney } from './money'
+import type { RefundLine } from '../kpis'
 
-// W2 · Cuando hay libro de dinero (`v_order_money`), el dinero cobrado/por cobrar sale
-// DE AHÍ, no de `payment_status`: reconoce pagos PARCIALES y no confunde un crédito
-// autorizado con dinero recibido. Sin libro (demo sin backend) se conserva la
-// derivación anterior por pedido, que es lo único disponible.
-export type MoneyIndex = Record<string, OrderMoney | undefined>
-
-// Movimientos que representan COSTO de ventas (salidas vendidas) y sus reversas.
-//
-// W2-C · El COGS nace en la VENTA, nunca al entregar producto en custodia: entregar no
-// mueve inventario, así que no hay movimiento que clasificar. Antes esta lista incluía
-// 'evento' y 'consigna' (y sus regresos), que reconocían costo de ventas en la
-// transferencia y lo revertían al devolver. Esas razones ya no existen: W1 cerró el
-// vocabulario del kardex a 9 (ck_invmov_reason) y 'baja' tampoco es una de ellas.
-const COGS_OUT = new Set(['surtido', 'venta'])
-const COGS_IN = new Set(['cancelacion', 'devolucion'])
-// Bajas de inventario que son PÉRDIDA (no costo de ventas): caducidad, daño, faltante.
-// Las pérdidas de producto en custodia entran aquí, como cualquier merma.
-const MERMA = new Set(['merma'])
-
-// Renglón mínimo de devolución que necesitan los reportes (evita acoplar a refundsStore).
-export interface RefundLine { order_id: string; monto: number; metodo?: string | null }
-
-export interface EstadoResultados {
-  ventas: number        // ventas BRUTAS del periodo
-  devoluciones: number  // devoluciones/correcciones de esos pedidos
-  ventasNetas: number   // ventas − devoluciones (la base real del margen)
-  costoVentas: number
-  utilidadBruta: number
-  gastos: number
-  mermas: number        // pérdida por caducidad/daño (a costo)
-  utilidadNeta: number
-  margenBruto: number   // %
-  margenNeto: number    // %
-  // Fase 2 · cobertura de costo (COGS a partir de snapshots congelados en el ledger).
-  costoConocidoPct: number   // % de unidades vendidas con costo histórico conocido
-  unidadesSinCosto: number   // unidades de COGS con costo desconocido (movimientos NULL, p.ej. legacy)
-  costoConfiable: boolean    // true si todas las unidades de COGS tienen costo (cobertura 100%)
-}
-
-// Estado de resultados del periodo: ventas netas − costo de ventas − gastos = utilidad.
-// El COSTO DE VENTAS sale del LEDGER valuado al costo REAL de cada lote que salió
-// (no un costo plano): trazabilidad de costo lote por lote. Las DEVOLUCIONES de los
-// pedidos del periodo se restan de las ventas (neto), no inflan el ingreso.
-export function estadoResultados(orders: OrderWithItems[], gastos: Gasto[], movements: InventoryMovement[], lots: Lot[], refunds: RefundLine[] = []): EstadoResultados {
-  const sales = orders.filter(isSale)
-  const ventas = sales.reduce((s, o) => s + (o.total ?? 0), 0)
-  const saleIds = new Set(sales.map((o) => o.id))
-  const devoluciones = refunds.filter((r) => saleIds.has(r.order_id)).reduce((s, r) => s + (r.monto ?? 0), 0)
-  const ventasNetas = ventas - devoluciones
-  // Fase 2: el COGS usa el COSTO CONGELADO en cada movimiento (m.unit_cost), no el costo
-  // actual de product_costs → cambiar product_costs mañana NO altera la historia. NULL =
-  // costo desconocido (p.ej. movimientos legacy pre-Fase 2): NO se cuenta como 0, se reporta
-  // como cobertura incompleta.
-  let cogsUnitsKnown = 0
-  let cogsUnitsUnknown = 0
-  const costoVentas = movements.reduce((s, m) => {
-    const out = COGS_OUT.has(m.reason ?? '') && m.change < 0
-    const inn = COGS_IN.has(m.reason ?? '') && m.change > 0
-    if (!out && !inn) return s
-    const units = Math.abs(m.change)
-    if (m.unit_cost == null) { cogsUnitsUnknown += units; return s } // desconocido → no fabrica costo
-    cogsUnitsKnown += units
-    return out ? s + units * m.unit_cost : s - units * m.unit_cost
-  }, 0)
-  const mermas = movements.reduce((s, m) => {
-    if (!(MERMA.has(m.reason ?? '') && m.change < 0)) return s
-    return m.unit_cost == null ? s : s + (-m.change) * m.unit_cost // NULL merma legacy → desconocida, no 0
-  }, 0)
-  const cogsUnitsTotal = cogsUnitsKnown + cogsUnitsUnknown
-  const costoConocidoPct = cogsUnitsTotal > 0 ? Math.round((cogsUnitsKnown / cogsUnitsTotal) * 100) : 100
-  const gastosTotal = gastos.reduce((s, g) => s + g.monto, 0)
-  const utilidadBruta = ventasNetas - costoVentas
-  const utilidadNeta = utilidadBruta - gastosTotal - mermas
-  return {
-    ventas,
-    devoluciones,
-    ventasNetas,
-    costoVentas,
-    utilidadBruta,
-    gastos: gastosTotal,
-    mermas,
-    utilidadNeta,
-    margenBruto: ventasNetas > 0 ? (utilidadBruta / ventasNetas) * 100 : 0,
-    margenNeto: ventasNetas > 0 ? (utilidadNeta / ventasNetas) * 100 : 0,
-    costoConocidoPct,
-    unidadesSinCosto: cogsUnitsUnknown,
-    costoConfiable: cogsUnitsUnknown === 0,
-  }
-}
-
-// COBRANZA REAL del periodo: separa lo VENDIDO (bookings, se haya cobrado o no) del
-// dinero que REALMENTE entró (pedidos pagados, neto de devoluciones). Evita el vanity
-// metric de "ventas" que incluye contra-pedido sin cobrar. `porCobrar` = lo vendido que
-// aún no se paga; la tasa de cobro es la señal de salud de cobranza.
-export interface Cobranza {
-  vendido: number     // ventas del periodo (bruto, incluye no pagadas)
-  cobrado: number     // de esas ventas, lo realmente pagado, neto de devoluciones
-  devuelto: number    // reembolsos sobre pedidos YA pagados (salieron del cajón)
-  porCobrar: number   // vendido − lo pagado (lo que falta cobrar del periodo)
-  tasaCobro: number   // % cobrado / vendido
-}
-// Reconcilia: Vendido = Cobrado + Devuelto + Por cobrar. Antes el "devuelto" (reembolso
-// de pedidos ya pagados) no aparecía en ningún renglón y Dirección no veía a dónde se fue.
-export function cobranza(orders: OrderWithItems[], refunds: RefundLine[] = [], money: MoneyIndex = {}): Cobranza {
-  const sales = orders.filter(isSale)
-  const vendido = sales.reduce((s, o) => s + (o.total ?? 0), 0)
-  let cobradoBruto = 0
-  let devuelto = 0
-  sales.forEach((o) => {
-    const m = money[o.id]
-    if (m) {
-      // Del LIBRO: lo que entró y lo que salió de verdad (incluye pagos parciales).
-      cobradoBruto += m.cobrado
-      devuelto += m.reembolsado
-      return
-    }
-    // Sin libro: lo único observable es si el pedido quedó pagado.
-    if (o.payment_status === 'paid') {
-      cobradoBruto += o.total ?? 0
-      devuelto += refunds.filter((r) => r.order_id === o.id).reduce((s, r) => s + (r.monto ?? 0), 0)
-    }
-  })
-  const cobrado = cobradoBruto - devuelto
-  const porCobrar = vendido - cobradoBruto
-  return { vendido, cobrado, devuelto, porCobrar, tasaCobro: vendido > 0 ? (cobrado / vendido) * 100 : 0 }
-}
-
-// Cuentas por COBRAR: pedidos del Portal confirmados (contra pedido) que el
-// cliente aún no paga — incluye los 'pending_payment' (contra pedido es un
-// cobrable real). Excluye cancelados, borradores y POS (POS se cobra al momento).
-export interface PorCobrar { total: number; count: number; aCredito: number; vencido: number }
-export function cuentasPorCobrar(orders: OrderWithItems[], money: MoneyIndex = {}): PorCobrar {
-  const cobrable = (o: OrderWithItems) => !isPosOrder(o) && o.status !== 'cancelled' && o.status !== 'draft'
-  let total = 0, count = 0, aCredito = 0, vencido = 0
-  orders.filter(cobrable).forEach((o) => {
-    const m = money[o.id]
-    // Con libro: la CxC es el SALDO real (un pago parcial ya no se cuenta completo).
-    const saldo = m ? m.saldo : (o.payment_status === 'paid' ? 0 : (o.total ?? 0))
-    if (saldo <= 0.0001) return
-    total += saldo
-    count += 1
-    // Un crédito autorizado sigue siendo deuda; se separa para poder verla envejecer.
-    if (m?.credito_autorizado) { aCredito += saldo; if (m.vencido) vencido += saldo }
-  })
-  return { total, count, aCredito, vencido }
-}
+export type { RefundLine }
 
 // Cuentas por PAGAR: compras a proveedor NO pagadas (pendientes o recibidas sin
 // pagar), valoradas a su costo real de compra.
@@ -173,13 +31,9 @@ export function gastosPorCategoria(gastos: Gasto[]): { categoria: string; monto:
 // W2 · El ESPERADO de un corte real lo calcula el SERVIDOR desde el libro
 // (`efectivo_esperado`, ops/money.ts). La función pura de abajo queda para la demo
 // sin backend y para explicar el número en pantalla; NUNCA se manda al comando.
-// Día LOCAL (del dispositivo, = zona del negocio) en formato AAAA-MM-DD. Antes se
-// usaba el día UTC (`toISOString`), cuya frontera cae ~18:00 en México: un corte de
-// la tarde/noche perdía casi todas las ventas del día y marcaba un faltante falso.
-export function localDay(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
+// El "día" del arqueo es el DÍA DEL NEGOCIO (`diaNegocio`, America/Mazatlan): ni el día
+// UTC —cuya frontera cae a las 17:00 locales y dejaba fuera las ventas de la tarde— ni
+// el del dispositivo.
 // Esperado = ventas POS en EFECTIVO dentro del alcance (día u evento), MENOS las
 // devoluciones en efectivo de esos pedidos (el dinero salió del cajón).
 export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string; eventId?: string; seller?: string; since?: string }, refunds: RefundLine[] = []): number {
@@ -194,7 +48,7 @@ export function efectivoEsperado(orders: OrderWithItems[], opts: { day?: string;
       // `seller` es un filtro ADICIONAL (corte por cajero): combina con día/evento.
       if (opts.seller && meta.seller !== opts.seller) return false
       if (opts.eventId) return meta.event_id === opts.eventId
-      if (opts.day) return localDay(new Date(o.created_at)) === opts.day
+      if (opts.day) return diaNegocio(o.created_at) === opts.day
       return true
     })
   const bruto = inScope.reduce((s, o) => s + (o.total ?? 0), 0)

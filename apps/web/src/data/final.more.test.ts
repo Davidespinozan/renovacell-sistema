@@ -1,7 +1,7 @@
 // Cierre de cobertura: casos distintos de finanzas, métricas, roles y formato.
 import { describe, it, expect } from 'vitest'
 import { gastosPorCategoria, cuentasPorPagar, efectivoEsperado } from './ops/finanzas'
-import { topProducts, monthlySales, doctorsAtRisk } from './metrics'
+import { topProducts, monthlySales, doctoresEnRiesgo } from './metrics'
 import { getRole, getNav } from '../app/roles'
 import { initials, timeAgo, money } from '../lib/format'
 import { mkOrder, mkItem, mkProfile } from '../test/factories'
@@ -57,10 +57,10 @@ describe('monthlySales — etiqueta de mes', () => {
   })
 })
 
-describe('doctorsAtRisk — excluye recientes', () => {
+describe('doctoresEnRiesgo — excluye recientes', () => {
   it('un doctor que compró ayer no está en riesgo', () => {
     const ayer = new Date(Date.now() - 86_400_000).toISOString()
-    const r = doctorsAtRisk([mkOrder({ doctor_id: 'A', created_at: ayer })], [mkProfile({ id: 'A', verified: true })], 60)
+    const r = doctoresEnRiesgo([mkOrder({ doctor_id: 'A', created_at: ayer })], [mkProfile({ id: 'A', verified: true })], { days: 60 })
     expect(r).toHaveLength(0)
   })
 })

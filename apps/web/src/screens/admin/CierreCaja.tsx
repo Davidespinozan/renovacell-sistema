@@ -17,7 +17,8 @@ import { ExportButton } from '../../app/ExportButton'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useCierres, useRefunds } from '../../data/hooks/useFinanzas'
 import { useRole } from '../../auth/RoleContext'
-import { efectivoEsperado, localDay } from '../../data/ops/finanzas'
+import { efectivoEsperado } from '../../data/ops/finanzas'
+import { hoyNegocio } from '../../data/periodo'
 import { tramoCorteCaja, type TramoCorte } from '../../data/ops/money'
 import { vigentes, anulados, type Cierre } from '../../data/store/cierresStore'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
@@ -81,7 +82,7 @@ export function CierreCaja() {
   const { user } = useRole()
   const { opId, renew } = useOpId()
 
-  const today = localDay(new Date()) // día LOCAL del negocio (no UTC), para que el corte no pierda ventas
+  const today = hoyNegocio() // día DEL NEGOCIO (ni UTC ni el reloj del dispositivo): el mismo que usa el servidor
   // Alcance del corte, tal como lo entiende el servidor: todo el día o solo un cajero.
   // Los eventos quedan fuera mientras el inventario en custodia siga deshabilitado.
   const [scope, setScope] = useState<'dia' | 'mia'>('dia')

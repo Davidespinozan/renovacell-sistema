@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isSale, isPosOrder, salesSummary, channelSplit, doctorActivity,
-  topDoctors, topProducts, lineMix, monthlySales, doctorsAtRisk, billingSummary,
+  topDoctors, topProducts, lineMix, monthlySales, doctoresEnRiesgo, cfdiSolicitados,
 } from './metrics'
 import { mkOrder, mkItem, mkProduct, mkProfile } from '../test/factories'
 
@@ -129,30 +129,24 @@ describe('monthlySales', () => {
   })
 })
 
-describe('doctorsAtRisk', () => {
-  it('lista verificados sin pedidos (nunca compraron)', () => {
+describe('doctoresEnRiesgo (definición única)', () => {
+  it('quien NUNCA compró no está "en riesgo": todavía no es cliente', () => {
     const docs = [mkProfile({ id: 'A', verified: true }), mkProfile({ id: 'B', verified: false })]
-    const r = doctorsAtRisk([], docs, 60)
-    expect(r.map((x) => x.id)).toEqual(['A']) // B no verificado no aplica
-    expect(r[0].lastDays).toBeNull()
+    expect(doctoresEnRiesgo([], docs, { days: 60 })).toHaveLength(0)
   })
   it('excluye a quien compró recientemente', () => {
     const recent = new Date(Date.now() - 5 * 86_400_000).toISOString()
     const docs = [mkProfile({ id: 'A', verified: true })]
-    const r = doctorsAtRisk([mkOrder({ doctor_id: 'A', created_at: recent })], docs, 60)
-    expect(r).toHaveLength(0)
+    expect(doctoresEnRiesgo([mkOrder({ doctor_id: 'A', created_at: recent })], docs, { days: 60 })).toHaveLength(0)
   })
 })
 
-describe('billingSummary', () => {
-  it('calcula tasa de CFDI, cobrado y pendiente', () => {
+describe('cfdiSolicitados', () => {
+  it('% de ventas con CFDI solicitado (el dinero ya no se calcula aquí)', () => {
     const orders = [
       mkOrder({ id: '1', invoice_requested: true, payment_status: 'paid', total: 1000 }),
       mkOrder({ id: '2', invoice_requested: false, payment_status: 'pending', total: 500 }),
     ]
-    const r = billingSummary(orders)
-    expect(r.cfdiRate).toBe(0.5)
-    expect(r.paid).toBe(1000)
-    expect(r.pending).toBe(500)
+    expect(cfdiSolicitados(orders)).toBe(0.5)
   })
 })

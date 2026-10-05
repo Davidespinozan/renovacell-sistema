@@ -83,6 +83,7 @@ export interface InventoryMovement {
   created_by: UUID | null
   created_at: ISODateTime
   unit_cost?: number | null // snapshot histórico del costo del lote en ese movimiento (Fase 2)
+  order_id?: UUID | null    // pedido al que pertenece la salida o el regreso (W1); la demo usa `reference`
 }
 
 export type OrderStatus =
