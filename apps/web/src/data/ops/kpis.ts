@@ -11,10 +11,8 @@ import type { Periodo } from '../periodo'
 export type LecturaKpi<T> = { ok: true; data: T } | { ok: false; error: string }
 type Rango = Pick<Periodo, 'desde' | 'hasta'>
 
-// Estas tres funciones entran a `database.types.ts` al regenerar los tipos después de
-// aplicar la migración W5. Hasta entonces, este es el ÚNICO lugar con tipado manual.
-type Rpc = { rpc: (f: string, a?: unknown) => PromiseLike<{ data: unknown; error: { message: string } | null }> }
-const rpc = (fn: string, args?: Record<string, unknown>) => (supabase as unknown as Rpc).rpc(fn, args)
+type FnKpi = 'kpi_ventas' | 'kpi_por_cobrar' | 'kpi_resultado'
+const rpc = (fn: FnKpi, args?: { p_desde?: string; p_hasta?: string }) => supabase.rpc(fn, args ?? {})
 
 const SOLO: Record<string, string> = {
   kpi_ventas: 'Las ventas y la cobranza solo las ven Dirección y Facturación.',
@@ -23,7 +21,7 @@ const SOLO: Record<string, string> = {
 }
 const NO_DISPONIBLE = 'No se pudieron cargar los indicadores. Vuelve a intentarlo.'
 
-async function pedir(fn: string, args?: Record<string, unknown>): Promise<LecturaKpi<Record<string, unknown>>> {
+async function pedir(fn: FnKpi, args?: { p_desde?: string; p_hasta?: string }): Promise<LecturaKpi<Record<string, unknown>>> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
   try {
     const { data, error } = await rpc(fn, args)

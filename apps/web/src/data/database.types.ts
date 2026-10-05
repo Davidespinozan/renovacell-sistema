@@ -3924,6 +3924,14 @@ export type Database = {
       }
       _fiscal_clean: { Args: { p: Json }; Returns: Json }
       _fiscal_error: { Args: { p: Json }; Returns: string }
+      _kpi_inicio: { Args: { p_dia: string }; Returns: string }
+      _kpi_ventas: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          order_id: string
+          total: number
+        }[]
+      }
       _norm_email: { Args: { p: string }; Returns: string }
       _norm_phone: { Args: { p: string }; Returns: string }
       _pf_autorizar: { Args: never; Returns: string }
@@ -4339,6 +4347,7 @@ export type Database = {
         }
         Returns: Json
       }
+      dia_negocio: { Args: { p_instante: string }; Returns: string }
       disponer_devolucion: {
         Args: { p_lines: Json; p_op_id: string }
         Returns: Json
@@ -4430,6 +4439,15 @@ export type Database = {
       }
       is_order_driver: { Args: { o_id: string }; Returns: boolean }
       is_verified: { Args: never; Returns: boolean }
+      kpi_por_cobrar: { Args: never; Returns: Json }
+      kpi_resultado: {
+        Args: { p_desde?: string; p_hasta?: string }
+        Returns: Json
+      }
+      kpi_ventas: {
+        Args: { p_desde?: string; p_hasta?: string }
+        Returns: Json
+      }
       log_audit: {
         Args: {
           p_action: string
