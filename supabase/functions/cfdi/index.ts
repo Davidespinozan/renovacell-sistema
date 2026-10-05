@@ -37,18 +37,17 @@
 // ./rules.ts, probadas, listas para que W3-B las aplique sobre la intención durable.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   // Se conserva el control de acceso: una sonda anónima no aprende nada del estado fiscal.
@@ -68,4 +67,4 @@ Deno.serve(async (req) => {
     message: 'El timbrado de CFDI está temporalmente bloqueado mientras se instala el nuevo camino fiscal. La solicitud de factura sí queda registrada y no se pierde. Dirección habilitará la emisión al completar W3-B.',
     fiscal_intent: 'solicitar_cfdi',
   })
-})
+}))

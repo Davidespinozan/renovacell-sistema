@@ -34,7 +34,10 @@ begin
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('lots','inventory_movements','replenishments','order_items','orders','shipping_attempts')
                        and grantee in ('anon','authenticated')),
-                   'b08d851485a764d4209f2004c3806d93', 'rollback restaura los GRANT de tabla igual a prod');
+                   -- CC-0B (autorizado): la higiene de privilegios (anon sin grants, sin TRUNCATE/REFERENCES/
+                   -- TRIGGER, escrituras solo con política) se conserva aunque se baje W1: el rollback de W1
+                   -- nunca volvió a conceder esos privilegios (eran defaults del esquema). Hash re-anclado.
+                   '8cd801e510fa42d0371727647540a92f', 'rollback restaura los GRANT de tabla igual a prod (post CC-0B)');
   -- Estado de constraints / índices / columnas de las tablas W1 = producción (hash leído de prod)
   perform tests.eq((select convalidated::text || '|' || pg_get_constraintdef(oid) from pg_constraint where conname = 'lots_quantity_nonneg'),
                    'false|CHECK ((quantity >= 0)) NOT VALID', 'rollback: lots_quantity_nonneg vuelve a NOT VALID como en prod');

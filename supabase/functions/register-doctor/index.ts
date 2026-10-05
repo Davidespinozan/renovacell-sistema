@@ -19,9 +19,10 @@
 // un veredicto). Activar Nubarium = meter los secrets, sin tocar código. La evidencia
 // (selfie + INE) se guarda en el bucket privado `proofs` con service_role.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
+import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -173,8 +174,7 @@ async function uploadEvidence(admin: any, uid: string, imgs: { selfie?: string; 
   return paths
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   let p: { name?: string; email?: string; cedula?: string; password?: string; organization?: string; phone?: string; website?: string; selfie?: string; ineFront?: string; ineBack?: string; address?: string; colonia?: string; cp?: string; city?: string; state?: string }
@@ -197,6 +197,12 @@ Deno.serve(async (req) => {
   if (password.length < 6) return json(400, { error: 'La contraseña debe tener al menos 6 caracteres.' })
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+
+  // CC-0B · Frontera de abuso ANTES de cualquier efecto caro (lectura de perfiles, Auth,
+  // Storage, proveedores externos): ráfaga por IP (hash) y techo global. Limitador caído → 503.
+  const sujeto = await sujetoPublico(req)
+  const veredicto = await limitarTodas(admin, [{ scope: 'register_doctor', sujeto }, { scope: 'register_doctor_global', sujeto: 'global' }])
+  if (!veredicto.permitido) return respuestaLimite(veredicto)
 
   // PRE-CHEQUEO DE DUPLICADO (fix landing): si ya existe una cuenta con ese correo, NO
   // intentamos createUser (GoTrue devuelve un 500 opaco "Database error checking email"
@@ -291,4 +297,4 @@ Deno.serve(async (req) => {
   }
   // NUNCA devuelve 'auto': el acceso comercial solo lo concede el admin en av_verif.
   return json(200, { decision: 'pending', reasons })
-})
+}))

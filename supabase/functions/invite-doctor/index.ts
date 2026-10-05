@@ -5,18 +5,17 @@
 // verified=false) para que no se pierda al recargar. El envío del enlace de acceso
 // (magic link) queda para cuando haya SMTP configurado (fase de correo).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const url = Deno.env.get('SUPABASE_URL')!
@@ -63,4 +62,4 @@ Deno.serve(async (req) => {
   if (pErr) return json(400, { error: pErr.message })
 
   return json(200, { id: userId, email, ok: true })
-})
+}))

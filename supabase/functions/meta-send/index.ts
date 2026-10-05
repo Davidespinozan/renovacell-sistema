@@ -12,10 +12,10 @@
 //
 // Requiere JWT (se despliega SIN --no-verify-jwt): solo staff autenticado responde.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
 import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -26,8 +26,7 @@ const GRAPH = 'https://graph.facebook.com/v21.0'
 
 interface Msg { dir: 'in' | 'out'; text: string; at: string; channel?: string; pending?: boolean }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const waToken = Deno.env.get('WHATSAPP_TOKEN')
@@ -105,4 +104,4 @@ Deno.serve(async (req) => {
     await admin.from('prospects').update({ meta: { ...meta, messages: updated } }).eq('id', prospectId)
   }
   return json(200, { delivered: true })
-})
+}))

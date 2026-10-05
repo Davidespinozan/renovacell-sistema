@@ -9,10 +9,11 @@
 // SEAM: sin ANTHROPIC_API_KEY responde 501 → el cliente usa su motor local (mock).
 // Activar = `supabase secrets set ANTHROPIC_API_KEY=...` (opcional ANTHROPIC_MODEL).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
+import { limitar, limitarTodas, respuestaLimite, sujetoPublico, sujetoUid, tokensEstimados } from '../_shared/limite.ts'
 import { resolverQuien } from '../_shared/quien.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -89,8 +90,7 @@ function systemPrompt(mode: string, products: unknown[]): string {
   ].join('\n')
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const key = Deno.env.get('ANTHROPIC_API_KEY')
@@ -108,10 +108,23 @@ Deno.serve(async (req) => {
 
   // El concierge del doctor exige sesión (no debe alcanzarse con la sola clave anon, ni
   // usarse como proxy gratis a la API de Anthropic). La landing SÍ es pública por diseño.
+  let uid: string | null = null
   if (mode === 'doctor') {
     const q = await resolverQuien(caller, createClient(sbUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
     if (!q.ok) return json(q.status, q.body)
+    uid = q.quien.uid
   }
+
+  // CC-0B · Frontera de abuso: ráfaga por sujeto (uid o IP) y techo global por hora. La
+  // autoridad es la base (rate_limit_hit, solo service_role); este cliente NO se usa para
+  // nada más. Si el limitador no responde, se cierra (503): nunca se llama al modelo a ciegas.
+  const limitador = createClient(sbUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+  const sujeto = uid ? sujetoUid(uid) : await sujetoPublico(req)
+  const rafaga = mode === 'landing'
+    ? [{ scope: 'assistant_landing_burst', sujeto }, { scope: 'assistant_landing_hora', sujeto }, { scope: 'assistant_landing_global', sujeto: 'global' }]
+    : [{ scope: 'assistant_doctor_burst', sujeto }]
+  const veredicto = await limitarTodas(limitador, rafaga)
+  if (!veredicto.permitido) return respuestaLimite(veredicto)
 
   // CC-0A · El catálogo que el modelo considera verdadero lo carga el SERVIDOR desde la
   // fuente autorizada para cada modo: `catalog_public` (anon, sin precio) en la landing y
@@ -136,6 +149,17 @@ Deno.serve(async (req) => {
     : [{ role: 'user', content: String(p.text ?? '').slice(0, 2000) }]
   if (!messages.length || !messages.some((m) => m.role === 'user')) return json(400, { error: 'Falta el mensaje.' })
 
+  // CC-0B · Techo de COSTO diario (tokens): se pre-carga la estimación ANTES de llamar al
+  // modelo (global y, si hay sesión, por uid); al volver se ajusta con el consumo real.
+  // Excedido → 429 sin llamar a Anthropic.
+  const maxTokens = mode === 'doctor' ? 900 : 500
+  const estimado = tokensEstimados(messages.map((m) => m.content), maxTokens)
+  const costo = await limitarTodas(limitador, [
+    { scope: 'assistant_tokens_dia', sujeto: 'global', costo: estimado },
+    ...(uid ? [{ scope: 'assistant_tokens_dia_uid', sujeto, costo: estimado }] : []),
+  ])
+  if (!costo.permitido) return respuestaLimite(costo)
+
   // En la landing, el agente CAPTA el prospecto: cuando el visitante da su nombre + un
   // contacto, el modelo llama a esta herramienta y el cliente crea el lead (→ ventas).
   const tools = mode === 'landing' ? [{
@@ -157,7 +181,6 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     // El doctor pide recomendaciones/comparaciones: dale margen para responder con
     // sustancia. La landing es captación breve, con menos.
-    const maxTokens = mode === 'doctor' ? 900 : 500
     const body: any = { model, max_tokens: maxTokens, system: systemPrompt(mode, products), messages }
     if (tools) body.tools = tools
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -166,6 +189,12 @@ Deno.serve(async (req) => {
       body: JSON.stringify(body),
     })
     const data = await r.json().catch(() => ({}))
+    // CC-0B · consumo real: se corrige la pre-carga (puede ser negativo). Nunca bloquea.
+    const usados = Number(data?.usage?.input_tokens ?? 0) + Number(data?.usage?.output_tokens ?? 0)
+    if (usados > 0 && usados !== estimado) {
+      await limitar(limitador, 'assistant_tokens_dia', 'global', { costo: usados - estimado })
+      if (uid) await limitar(limitador, 'assistant_tokens_dia_uid', sujeto, { costo: usados - estimado })
+    }
     if (!r.ok) return json(502, { error: 'anthropic', message: data?.error?.message ?? 'Error del modelo.' })
     // deno-lint-ignore no-explicit-any
     const blocks: any[] = data?.content ?? []
@@ -181,4 +210,4 @@ Deno.serve(async (req) => {
     // No filtrar el detalle interno al cliente.
     return json(502, { error: 'No se pudo contactar al asistente. Intenta de nuevo.' })
   }
-})
+}))

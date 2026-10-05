@@ -9,20 +9,19 @@
 // Nunca revela si el lead ya existía (evita enumeración). El envío/branding de correo
 // de confirmación queda para la fase SMTP.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { conCors } from '../_shared/cors.ts'
+import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const digits = (s: string): string => s.replace(/\D/g, '')
 const OPEN_EXCLUDED = ['convertido', 'descartado']
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const url = Deno.env.get('SUPABASE_URL')!
@@ -52,11 +51,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(url, service, { auth: { persistSession: false } })
 
-  // 2) Dedup por teléfono (≥7 dígitos) o correo.
-  const ph = digits(phone)
-  const { data: existing } = await admin.from('prospects').select('id, name, email, phone, meta')
-  const dup = (existing ?? []).find((p) =>
-    (ph.length >= 7 && digits(p.phone ?? '') === ph) || (email !== '' && (p.email ?? '').toLowerCase() === email))
+  // CC-0B · Frontera de abuso ANTES de tocar la base: ráfaga por IP (hash) y techo global.
+  // Si el limitador no responde, 503 (no se registra nada a ciegas).
+  const sujeto = await sujetoPublico(req)
+  const veredicto = await limitarTodas(admin, [{ scope: 'capture_lead', sujeto }, { scope: 'capture_lead_global', sujeto: 'global' }])
+  if (!veredicto.permitido) return respuestaLimite(veredicto)
+
+  // 2) Dedup por teléfono (≥7 dígitos) o correo — CC-0B: indexado en la base (misma regla),
+  //    ya no se lee toda la tabla por cada lead.
+  const { data: dupId } = await admin.rpc('buscar_prospecto_duplicado', { p_email: email || null, p_phone: phone || null })
+  const { data: dup } = dupId ? await admin.from('prospects').select('id, meta').eq('id', String(dupId)).maybeSingle() : { data: null }
   if (dup) {
     const meta = (dup.meta ?? {}) as Record<string, unknown>
     const notes = Array.isArray(meta.notes) ? meta.notes : []
@@ -109,4 +113,4 @@ Deno.serve(async (req) => {
   }
 
   return json(200, { ok: true })
-})
+}))

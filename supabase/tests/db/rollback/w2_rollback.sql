@@ -26,7 +26,8 @@ begin
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('cash_closings','orders','refunds') and grantee in ('anon','authenticated')),
-                   'ecc7b1333a9eda42157f520f29709d0c', 'rollback W2: grants iguales a W1');
+                   -- CC-0B (autorizado): misma razón que en w1_rollback — la higiene de privilegios persiste.
+                   '91bade8e1a52e7cd398eec886eba795a', 'rollback W2: grants iguales a W1 (post CC-0B)');
   perform tests.eq((select md5(string_agg(table_name||'|'||column_name||'|'||data_type, E'\n' order by table_name, column_name))
                       from information_schema.columns where table_schema = 'public' and table_name in ('orders','refunds','cash_closings')),
                    '21277584fe14cf4d1d058f51f184105c', 'rollback W2: columnas iguales a W1');
