@@ -7,6 +7,8 @@ import { useCompany } from '../../data/hooks/useCompany'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { clabeValida, type BankAccount } from '../../data/store/companyBankStore'
 import { REGIMENES_OPTIONS, esRegimenValido } from '../../data/sat/regimenesFiscales'
+import { HorarioAtencion } from './HorarioAtencion'   // CC-7
+import { hasSupabase } from '../../lib/supabase'
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 16 }
@@ -143,6 +145,7 @@ export function Configuracion() {
       </div>
 
       <BankAccountsEditor />
+      {hasSupabase && <HorarioAtencion />}   {/* CC-7 · horario de atención comercial (autoridad del servidor) */}
     </div>
   )
 }

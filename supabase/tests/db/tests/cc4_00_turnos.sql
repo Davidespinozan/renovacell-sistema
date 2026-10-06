@@ -94,8 +94,9 @@ begin
   t1 := (r ->> 'turn_id')::uuid;
   perform tests.eq(r ->> 'estado', 'reclamado', 'G · reclamado antes del takeover');
   perform public.cc_solicitar_asesor(cA, 'visitor', hA, null);
-  perform public.cc_asignar_asesor(cA, v_pos, v_pos);
-  perform tests.eq((select modo from public.cc_conversations where id = cA), 'human_assigned', 'G · humano asignado mientras "el proveedor responde"');
+  perform public.cc_asignar_asesor(cA, v_admin, v_pos);   -- CC-7 · asigna Dirección
+  perform public.cc_iniciar_asesoria(cA, v_pos);            -- CC-7 · el takeover es la sesión humana iniciada (la IA sigue en human_assigned)
+  perform tests.eq((select modo from public.cc_conversations where id = cA), 'human_active', 'G · humano activo mientras "el proveedor responde"');
   n := (select count(*) from public.cc_messages where conversation_id = cA and actor_type = 'ai');
   r := public.cc_ia_turno_responder(t1, 'Respuesta tardía de la IA', 'HUMAN_REQUEST', '{}', 0, 1, 1);
   perform tests.eq((r ->> 'persistido')::boolean, false, 'G · la respuesta tardía NO se inserta');

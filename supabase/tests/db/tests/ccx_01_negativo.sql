@@ -47,7 +47,7 @@ begin
   -- 14 · takeover humano → sin IA tardía
   m := public.cc_enviar_mensaje(conv2, 'visitor', hB, null, 'c:1', 'hola');
   t1 := (public.cc_ia_turno_reclamar(conv2, (m ->> 'seq')::bigint, 'falso', 'f') ->> 'turn_id')::uuid;
-  perform public.cc_solicitar_asesor(conv2, 'visitor', hB, null); perform public.cc_asignar_asesor(conv2, v_pos, v_pos);
+  perform public.cc_solicitar_asesor(conv2, 'visitor', hB, null); perform public.cc_asignar_asesor(conv2, v_admin, v_pos); perform public.cc_iniciar_asesoria(conv2, v_pos);   -- CC-7 · asigna Dirección; takeover = sesión iniciada
   r := public.cc_ia_turno_responder(t1, 'tarde');
   perform tests.eq(r ->> 'motivo', 'takeover_humano', '14 · la respuesta tardía de la IA se descarta');
   -- 15/16/17 · vendedor: lee, no muta, no confirma; suspendido pierde acceso

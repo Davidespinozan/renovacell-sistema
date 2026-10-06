@@ -21,6 +21,8 @@ vi.mock('../data/hooks/useStockReturns', () => ({ useStockReturns: () => ({ data
 vi.mock('../data/hooks/useCompras', () => ({ useCompras: () => ({ data: [] }) }))
 vi.mock('../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: [] }) }))
 vi.mock('../data/hooks/useRevisionFiscal', () => ({ useRevisionFiscal: () => ({ avance: { total: 0, validados: 0 }, loading: false }) }))
+// CC-7 · la tarjeta de atención comercial tiene su propia prueba; aquí se aísla A3.2 (sin RPC de ruteo).
+vi.mock('../data/ops/atencion', () => ({ atencion: { resumen: async () => ({ ok: false, error: 'aislado' }) } }))
 vi.mock('../data/hooks/useComunicaciones', () => ({ useComunicaciones: () => ({ cuentas: { porEnviar: 0, enviados: 0, conProblema: 0 }, loading: false }) }))
 // El "servidor": la RPC canónica. El hook y el cliente son los reales.
 vi.mock('../lib/supabase', () => ({

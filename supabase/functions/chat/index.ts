@@ -34,7 +34,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola'])
+const ACCIONES = new Set(['abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(conCors(async (req) => {
@@ -134,9 +134,17 @@ Deno.serve(conCors(async (req) => {
     if (error) return falla(error)
     return json(200, data)
   }
+  // CC-7 · el dueño rechaza al asesor para la compra actual (la IA sigue; la cartera no cambia).
+  if (action === 'rechazar_asesor') {
+    const v = await limitarTodas(admin, [{ scope: 'chat_solicitar', sujeto }])
+    if (!v.permitido) return respuestaLimite(v)
+    const { data, error } = await admin.rpc('cc_handoff_rechazar', base)
+    if (error) return falla(error)
+    return json(200, data)
+  }
   if (action === 'asignar') {
     if (!quien) return json(401, { error: 'sin_identidad' })
-    const seller = p.seller === null ? null : (typeof p.seller === 'string' && UUID.test(p.seller) ? p.seller : quien.uid) // un vendedor solo se asigna a sí mismo; Dirección puede nombrar a otro o liberar
+    const seller = p.seller === null ? null : (typeof p.seller === 'string' && UUID.test(p.seller) ? p.seller : quien.uid) // CC-7 · solo Dirección asigna/libera (la base lo exige); el vendedor solo confirma lo suyo
     const { data, error } = await admin.rpc('cc_asignar_asesor', { p_conv: conv, p_actor_profile: quien.uid, p_seller: seller })
     if (error) return falla(error)
     return json(200, data)

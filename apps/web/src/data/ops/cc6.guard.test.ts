@@ -63,7 +63,8 @@ describe('Edge cart + IA + frontend', () => {
   it('AM · revisar/confirmar exigen JWT y corren como el llamante; el cliente manda solo review_id/operation_id/expected_cart_rev; límites CC-0B', () => {
     const s = codigo(cartSrc)
     expect(s).toMatch(/if \(!quien\) return json\(401, \{ error: 'sin_identidad', message: 'Para confirmar tu pedido/)
-    expect(s).toMatch(/await caller\.rpc\('cc_checkout_confirmar', \{ p_review: review, p_operation: opc, p_expected_rev: rev \}\)/)
+    expect(s).toMatch(/await caller\.rpc\('cc_checkout_confirmar', \{ p_review: review, p_operation: opc, p_expected_rev: rev, p_factura: factura \}\)/)   // CC-7 · + intención de factura
+    expect(s).toMatch(/const factura = p\.factura === true/)
     expect(s).not.toMatch(/admin\.rpc\('cc_checkout/)
     expect(s).not.toMatch(/p\.total|p\.price|p\.precio|p\.discount|p\.price_list|p\.doctor|p\.customer|p\.seller/)
     for (const sc of ['checkout_revisar_uid', 'checkout_confirmar_uid', 'checkout_global']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }
@@ -80,9 +81,12 @@ describe('Edge cart + IA + frontend', () => {
     expect(p).toMatch(/await cliente\.confirmarCheckout\(revision\.review_id, revision\.cart_rev, opConfirmar\)/)
     expect(p).toMatch(/onClick=\{\(\) => void startStripeCheckout\(pedido\.order_id!\)\}/)
     expect(p).not.toMatch(/crear_pedido|createOrder|supabase\./)
-    expect(codigo(opsSrc)).toMatch(/confirmarCheckout\(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion\(\)\)/)
+    expect(codigo(opsSrc)).toMatch(/confirmarCheckout\(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion\(\), factura = false\)/)
   })
-  it('AC · el catálogo legacy del doctor sigue intacto (deferido: factura/perfil fiscal y modo cliente no están en el checkout canónico)', () => {
-    expect(catalogoLegacy).toMatch(/const \[cart, setCart\] = useState<Cart>\(\{\}\)/); expect(catalogoLegacy).not.toMatch(/data\/ops\/carrito|cc_checkout/)
+  it('AC · CC-7 · el Catálogo confirma por el checkout CANÓNICO (revisión → confirmación) con factura y snapshot de dirección; congela el perfil fiscal después', () => {
+    expect(catalogoLegacy).toMatch(/await clienteCarrito\.revisarCheckout\(c\.cart_id, choice\?\.locationId \?\? null, choice\?\.locationId \? null : choice\?\.address \?\? null\)/)
+    expect(catalogoLegacy).toMatch(/await clienteCarrito\.confirmarCheckout\(rv\.data\.review_id, rv\.data\.cart_rev, nuevaOperacion\(\), invoice\)/)
+    expect(catalogoLegacy).toMatch(/await setOrderFiscalSnapshot\(cf\.data\.order_id, receiver\)/)
+    expect(catalogoLegacy).not.toMatch(/cc_checkout_|supabase\.rpc/)
   })
 })

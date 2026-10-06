@@ -125,9 +125,9 @@ begin
   rv2 := (public.cc_checkout_revisar(c2) ->> 'review_id')::uuid;
   r := public.cc_checkout_confirmar(rv2, 'op-1');
   perform tests.ok((r ->> 'confirmado')::boolean and not (r ->> 'idempotente')::boolean, 'U · el libro de operaciones es por carrito: op-1 en otro carrito es una operación nueva');
-  -- Q · vendedor derivado del servidor: dueño de cartera (profiles.meta.seller_profile_id) → metadata compatible con comisiones
+  -- Q · vendedor derivado del servidor: CC-7 · cartera canónica (cc_cartera, la asigna Dirección) → metadata compatible con comisiones
   perform tests.act_as_service();
-  update public.profiles set meta = coalesce(meta, '{}'::jsonb) || jsonb_build_object('seller_profile_id', v_pos) where id = v_doc;
+  insert into public.cc_cartera (profile_id, seller_profile_id) values (v_doc, v_pos);   -- CC-7 · la cartera es la autoridad (meta ya no cuenta)
   perform tests.act_as(v_doc);
   perform tests.ok((select shipping_meta ->> 'seller_profile_id' is null from public.orders where id = (r ->> 'order_id')::uuid), 'Q · (el pedido anterior se creó antes de asignar cartera)');
   perform tests.ok(r ->> 'folio' ~ '^S[0-9]{6,}$' and r ->> 'folio' <> (select external_ref from public.orders where id = ord), 'P · folio único por pedido');
@@ -191,7 +191,7 @@ begin
   perform tests.ok((r ->> 'confirmado')::boolean and (r ->> 'total')::numeric = 2700, 'K · con revisión fresca y rev correcta confirma al precio actual');
   ord := (r ->> 'order_id')::uuid;
   perform tests.act_as_service();   -- (la RLS de profiles ocultaría el email del vendedor al doctor)
-  perform tests.ok((select shipping_meta ->> 'seller_profile_id' = v_pos::text and shipping_meta ->> 'seller_origen' = 'dueno_cartera' and shipping_meta ->> 'seller' = (select email from public.profiles where id = v_pos) from public.orders where id = ord), 'Q · vendedor = dueño de cartera, con email para el estimador de comisiones');
+  perform tests.ok((select shipping_meta ->> 'seller_profile_id' = v_pos::text and shipping_meta ->> 'seller_origen' = 'cartera' and shipping_meta ->> 'seller' = (select email from public.profiles where id = v_pos) from public.orders where id = ord), 'Q · vendedor = dueño de cartera, con email para el estimador de comisiones');
   perform tests.act_as(v_doc);
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op-c7'')', rv2), 'IDEMPOTENCIA_CONFLICTO', 'U · mismo operation_id COMPLETADO con otra revisión del mismo carrito → conflicto');
   r := public.cc_checkout_confirmar(rv2, 'op-c8');

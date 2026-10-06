@@ -4,7 +4,7 @@
 #   A. 10 aperturas simultáneas del mismo visitante → 1 conversación abierta.
 #   B. mismo client_message_id a la vez → 1 mensaje.
 #   C. adoptar mientras se envía → el mensaje queda en la MISMA conversación.
-#   D. dos asesores se asignan a la vez → exactamente uno.
+#   D. CC-7 · dos asignaciones de Dirección a la vez → un solo asesor vigente; el vendedor no se autoasigna.
 #   F. takeover humano vs IA simultánea → la IA no entra después del takeover.
 #   G. cerrar/reabrir concurrente → estado válido y eventos coherentes.
 # ============================================================================
@@ -17,7 +17,7 @@ SVC="select tests.act_as_service();"
 HA=$(printf 'a%.0s' $(seq 1 64)); HB=$(printf 'b%.0s' $(seq 1 64)); HC=$(printf 'c%.0s' $(seq 1 64)); HD=$(printf 'd%.0s' $(seq 1 64))
 
 "${P[@]}" -c "do \$\$ declare d uuid := tests.user('doctor'); p1 uuid := tests.user('pos'); p2 uuid := tests.user('pos'); begin
-  insert into tests.ctx values ('cc2_doc', d), ('cc2_p1', p1), ('cc2_p2', p2);
+  insert into tests.ctx values ('cc2_doc', d), ('cc2_p1', p1), ('cc2_p2', p2), ('cc2_adm', tests.fixture_admin());
   perform tests.act_as_service();
   update public.profiles set meta = coalesce(meta,'{}') || '{\"capabilities\":[\"conversaciones\"]}' where id in (p1, p2);
   perform public.cc_visitante_abrir(null, '$HA', '{}'::jsonb, null);
@@ -49,15 +49,18 @@ check "C · la conversación conserva su id y ahora es del doctor" "select profi
 check "C · el mensaje (si entró antes de rotar el token) está en la MISMA conversación; si no, el token ya no servía (sin mensaje huérfano)" "select (select count(*) from public.cc_messages where client_message_id = 'c:race') = (select count(*) from public.cc_messages where client_message_id = 'c:race' and conversation_id = '$CB')"
 grep -qE '^[0-9]+$|SESION_INVALIDA|NO_AUTORIZADO' "$T/c2.out" && echo "PASS: C · el envío concurrente terminó en seq válido o fue rechazado tras la adopción (nunca en otra conversación, nunca deadlock)" || { echo "FAIL: C · $(cat "$T/c2.out" | tr '\n' ' ' | cut -c1-120)"; FAILED=1; }
 
-# ── D) dos asesores se asignan a la vez → exactamente uno
+# ── D) CC-7 · dos asignaciones de Dirección a la vez → un solo asesor vigente (sin fantasmas)
 CC=$("${P[@]}" -c "$SVC select public.cc_abrir_conversacion('$HC', null) ->> 'conversation_id'" | tail -n1)
 "${P[@]}" -c "$SVC select public.cc_solicitar_asesor('$CC', 'visitor', '$HC', null)" >/dev/null
-("${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc2_p1'), tests.id('cc2_p1')) ->> 'seller'" > "$T/d1.out" 2>&1) &
-("${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc2_p2'), tests.id('cc2_p2')) ->> 'seller'" > "$T/d2.out" 2>&1) &
+"${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc2_p1'), tests.id('cc2_p1'))" > "$T/d0.out" 2>&1
+grep -q 'NO_AUTORIZADO' "$T/d0.out" && echo "PASS: D · el vendedor no se autoasigna desde la cola" || { echo "FAIL: D · autoasignación: $(tr '\n' ' ' < "$T/d0.out" | cut -c1-120)"; FAILED=1; }
+("${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc2_adm'), tests.id('cc2_p1')) ->> 'seller'" > "$T/d1.out" 2>&1) &
+("${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc2_adm'), tests.id('cc2_p2')) ->> 'seller'" > "$T/d2.out" 2>&1) &
 wait
-GANA=$(cat "$T"/d1.out "$T"/d2.out | grep -cE '^[0-9a-f-]{36}$' || true); PIERDE=$(cat "$T"/d1.out "$T"/d2.out | grep -c 'YA_ASIGNADA' || true)
-[ "$GANA" = "1" ] && [ "$PIERDE" = "1" ] && echo "PASS: D · exactamente un asesor se la quedó; el otro recibió YA_ASIGNADA" || { echo "FAIL: D · gana=$GANA pierde=$PIERDE: $(cat "$T"/d1.out "$T"/d2.out | tr '\n' ' ' | cut -c1-160)"; FAILED=1; }
-check "D · un solo evento human_assigned" "select count(*) = 1 from public.cc_conversation_events where conversation_id = '$CC' and tipo = 'human_assigned'"
+GANA=$(cat "$T"/d1.out "$T"/d2.out | grep -cE '^[0-9a-f-]{36}$' || true)
+[ "$GANA" = "2" ] && echo "PASS: D · ambas asignaciones de Dirección se serializan (la última manda)" || { echo "FAIL: D · $(cat "$T"/d1.out "$T"/d2.out | tr '\n' ' ' | cut -c1-160)"; FAILED=1; }
+check "D · un solo asesor vigente y coincide con la conversación" "select count(*) = 1 and bool_and(p.profile_id = c.seller_profile_id) from public.cc_participants p join public.cc_conversations c on c.id = p.conversation_id where p.conversation_id = '$CC' and p.rol = 'asesor' and p.left_at is null"
+check "D · modo human_assigned" "select modo = 'human_assigned' from public.cc_conversations where id = '$CC'"
 
 # ── F) takeover humano vs IA simultánea
 SELLER=$("${P[@]}" -c "select seller_profile_id from public.cc_conversations where id = '$CC'")

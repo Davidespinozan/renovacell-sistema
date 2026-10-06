@@ -127,6 +127,21 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         </div>
       </header>
 
+      {!asesor && conv && !cerrada && conv.handoff?.origen && (modo === 'human_requested' || modo === 'human_assigned') && (
+        // CC-7 · aviso veraz de atención humana (lo decide el servidor: horario y ruteo); la IA sigue hasta que el asesor entra.
+        <div style={estilos.aviso} role="status" data-testid="aviso-handoff">
+          <span style={{ flex: 1 }}>
+            {conv.handoff.asignado && !conv.handoff.fuera_horario ? 'Tu asesor personal se unirá a esta conversación.'
+              : conv.handoff.fuera_horario ? 'Tu solicitud de asesor quedó registrada; te avisaremos aquí cuando se una.'
+              : 'Te conectaremos con un asesor personal.'}
+            {' '}Mientras tanto, el asistente sigue contigo.
+          </span>
+          {conv.handoff.puede_rechazar && (
+            <button type="button" className="btn" onClick={() => accion(() => cliente.rechazarAsesor(convId!))} data-testid="btn-rechazar-asesor">Prefiero seguir con el asistente</button>
+          )}
+        </div>
+      )}
+
       {conCarrito && convId && conv && (
         // Dueño: su carrito activo ligado a esta conversación. Asesor/Dirección: el carrito del dueño, solo lectura (el servidor lo decide).
         <CarritoPanel conversationId={asesor ? null : convId} cartId={asesor ? conv.cart_id ?? null : null} soloLectura={asesor} cliente={clienteCarrito} />
@@ -159,8 +174,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         />
         <button type="submit" className="btn btn-primary" disabled={!puedoEscribir || enviando || !texto.trim()} data-testid="btn-enviar">{enviando ? 'Enviando…' : 'Enviar'}</button>
       </form>
-      {!asesor && conv && !cerrada && IA_PUEDE(modo) && modo === 'human_requested' && (
-        <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', padding: '4px 12px' }}>Un asesor te atenderá en breve; el asistente sigue disponible mientras tanto.</div>
+      {!asesor && conv && !cerrada && IA_PUEDE(modo) && (modo === 'human_requested' || modo === 'human_assigned') && !conv.handoff?.origen && (
+        <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', padding: '4px 12px' }}>Tu solicitud de asesor quedó registrada; el asistente sigue disponible mientras tanto.</div>
       )}
     </div>
   )
@@ -177,4 +192,5 @@ const estilos: Record<string, React.CSSProperties> = {
   pie: { display: 'flex', gap: 8, padding: 12, borderTop: '1px solid var(--line, #e5e7eb)' },
   input: { flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line, #d1d5db)', fontSize: 14 },
   error: { margin: '0 12px', padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13 },
+  aviso: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 12px 0', padding: '8px 12px', borderRadius: 10, background: 'var(--ok-bg, #ecfdf5)', color: 'var(--ink, #111)', fontSize: 13 },
 }

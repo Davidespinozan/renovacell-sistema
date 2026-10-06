@@ -50,9 +50,9 @@ describe('errores', () => {
 })
 
 describe('IA', () => {
-  it('IA_PUEDE: solo ai_active / human_offered / human_requested', () => {
-    expect(['ai_active', 'human_offered', 'human_requested'].every(IA_PUEDE)).toBe(true)
-    expect(['human_assigned', 'human_active', 'human_ended', 'otro'].some(IA_PUEDE)).toBe(false)
+  it('IA_PUEDE (CC-7): la IA sigue hasta que el asesor INICIA la sesión — ai_active / human_offered / human_requested / human_assigned', () => {
+    expect(['ai_active', 'human_offered', 'human_requested', 'human_assigned'].every(IA_PUEDE)).toBe(true)
+    expect(['human_active', 'human_ended', 'otro'].some(IA_PUEDE)).toBe(false)
   })
   it('historialParaIA: solo texto y rol; sin sistema; alterna fundiendo turnos; empieza en user; recorta a N', () => {
     const h = historialParaIA([

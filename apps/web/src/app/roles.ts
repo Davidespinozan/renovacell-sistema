@@ -13,7 +13,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes'
 
 export interface ScreenDef {
   key: string
@@ -61,6 +61,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
       { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
       { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Operación' },   // CC-2 (Comercial tiene su orden probado)
+      { key: 'av_atencion', label: 'Atención comercial', icon: 'chat', section: 'Operación' },   // CC-7 · cartera, ruteo y pendientes
       { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
@@ -155,6 +156,8 @@ export const CAPABILITIES: CapabilityDef[] = [
     key: 'conversaciones', label: 'Atender conversaciones',
     modules: [{ key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Mi cartera' }],
   },
+  // CC-7 · Sin módulos: permite que Dirección le asigne clientes NUEVOS (sin él conserva su cartera actual).
+  { key: 'nuevos_clientes', label: 'Recibir clientes nuevos', modules: [] },
   {
     key: 'contenido', label: 'Catálogo y sitio web',
     modules: [

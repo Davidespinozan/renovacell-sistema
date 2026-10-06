@@ -11,7 +11,9 @@
 export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 'comparar_productos' | 'buscar_conocimiento' | 'candidatos_comerciales' | 'obtener_precio' | 'obtener_disponibilidad' | 'obtener_estado_pedido' | 'solicitar_asesor'
   | 'ver_carrito' | 'agregar_al_carrito' | 'actualizar_carrito' | 'quitar_del_carrito' | 'vaciar_carrito' | 'declinar_asesor'   // CC-5
   | 'preparar_checkout'   // CC-6 (lectura; confirmar es SOLO por el botón del usuario)
-export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'SELLER_OFFER_ELIGIBLE' | 'CHECKOUT_REVIEW_EVIDENCE'
+export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE'
+  // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
+  | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
 export interface DefinicionHerramienta { name: NombreHerramienta; description: string; input_schema: Record<string, unknown>; autoridad: 'cualquiera' | 'cuenta'; mutante: boolean }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -49,7 +51,7 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
     input_schema: { type: 'object', properties: { product_id: texto('product_id del carrito', 36) }, required: ['product_id'], additionalProperties: false } },
   { name: 'vaciar_carrito', autoridad: 'cualquiera', mutante: true, description: 'Vacía el carrito. Solo a petición explícita e inequívoca.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'declinar_asesor', autoridad: 'cualquiera', mutante: true, description: 'Registra que el usuario NO quiere un asesor por ahora (solo cuando lo diga de forma inequívoca tras ofrecérselo).',
+  { name: 'declinar_asesor', autoridad: 'cualquiera', mutante: true, description: 'Registra que el usuario NO quiere que un asesor humano lo atienda en esta compra (solo cuando lo diga de forma inequívoca). Tú sigues atendiéndolo.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   // CC-6 · preparar checkout = LECTURA: total actual, disponibilidad y lo que falta. NO existe herramienta para confirmar:
   // el pedido se crea solo cuando el usuario pulsa "Confirmar pedido" en su carrito (prueba explícita que el modelo no puede fabricar).
@@ -175,7 +177,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
     case 'obtener_precio': return o.autorizado === true ? ['PRICE_EVIDENCE'] : []
     case 'obtener_disponibilidad': return o.autorizado === true ? ['STOCK_EVIDENCE'] : []
     case 'obtener_estado_pedido': return o.autorizado === true ? ['ORDER_EVIDENCE'] : []
-    case 'solicitar_asesor': return o.modo ? ['HUMAN_REQUESTED'] : []
+    case 'solicitar_asesor': return o.modo ? (['HUMAN_REQUESTED', 'HANDOFF_EN_CURSO', ...(o.asesor === true ? ['ASESOR_ASIGNADO'] : ['ASESOR_SIN_ASIGNAR'])] as Evidencia[]) : []
     case 'ver_carrito': {
       // La proyección trae precio/disponibilidad calculados por la MISMA autoridad de CC-4 (solo si el lector puede verlos).
       const items = Array.isArray(o.items) ? (o.items as Array<Record<string, unknown>>) : []
@@ -184,8 +186,8 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       return o.cart_id ? (['CART_READ_EVIDENCE', ...(conPrecio ? ['PRICE_EVIDENCE'] : []), ...(conStock ? ['STOCK_EVIDENCE'] : [])] as Evidencia[]) : []
     }
     case 'agregar_al_carrito': case 'actualizar_carrito': case 'quitar_del_carrito': case 'vaciar_carrito':
-      return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...(o.oferta_elegible === true ? ['SELLER_OFFER_ELIGIBLE'] : [])] as Evidencia[]) : []
-    case 'declinar_asesor': return []
+      return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
+    case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'
@@ -193,6 +195,26 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
     }
     default: return noVacia ? ['KNOWLEDGE_EVIDENCE'] : []
   }
+}
+
+/** CC-7 · evidencia del handoff que disparó una mutación de carrito (lo decide el servidor, no el modelo). */
+function evidenciaDeHandoffMutacion(h: unknown): Evidencia[] {
+  const x = (h && typeof h === 'object' ? h : {}) as Record<string, unknown>
+  if (x.estado !== 'solicitado') return []
+  const out: Evidencia[] = ['HANDOFF_SOLICITADO', 'HANDOFF_EN_CURSO']
+  if (x.horario_configurado === false) out.push('HORARIO_DESCONOCIDO'); else out.push(x.fuera_horario === true ? 'FUERA_DE_HORARIO' : 'EN_HORARIO')
+  if (x.asignado === true) out.push('ASESOR_ASIGNADO'); else if (x.ya_en_curso !== true) out.push('ASESOR_SIN_ASIGNAR')
+  return out
+}
+
+/** CC-7 · evidencia del estado de atención humana al iniciar el turno (cc_ia_estado_handoff, servidor). */
+export function evidenciaHandoff(estado: unknown): Evidencia[] {
+  const x = (estado && typeof estado === 'object' ? estado : {}) as Record<string, unknown>
+  const out: Evidencia[] = []
+  if (x.horario_configurado !== true) out.push('HORARIO_DESCONOCIDO'); else out.push(x.en_horario === true ? 'EN_HORARIO' : 'FUERA_DE_HORARIO')
+  if (x.modo === 'human_requested' || x.modo === 'human_assigned') out.push('HANDOFF_EN_CURSO', x.asignado === true ? 'ASESOR_ASIGNADO' : 'ASESOR_SIN_ASIGNAR')
+  if (x.rechazado_carrito === true) out.push('HANDOFF_RECHAZADO')
+  return out
 }
 
 /** Mensaje DATA que recibe el modelo cuando una llamada se rechaza (nunca detalles internos). */

@@ -13,8 +13,14 @@ export interface Conversacion {
   conversation_id: string; estado: 'abierta' | 'cerrada'; modo: ModoConversacion; rol?: 'dueno' | 'asesor' | 'supervisor'
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
+  handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
 }
-export interface ColaItem { conversation_id: string; modo: ModoConversacion; seller_profile_id: string | null; asesoria_solicitada_at: string | null; last_message_at: string | null; es_mia: boolean; sin_leer: number; dueno: string }
+export interface EstadoHandoff { origen: 'carrito' | 'manual' | null; cart_id: string | null; fuera_horario: boolean | null; asignado: boolean; puede_rechazar: boolean }
+export interface ColaItem {
+  conversation_id: string; modo: ModoConversacion; seller_profile_id: string | null; asesoria_solicitada_at: string | null; last_message_at: string | null; es_mia: boolean; sin_leer: number; dueno: string
+  // CC-7 · contexto comercial (servidor)
+  handoff_origen?: 'carrito' | 'manual' | null; fuera_horario?: boolean | null; ruteo_motivo?: string | null; cart_id?: string | null; n_items?: number | null; edad_min?: number | null; iniciada?: boolean
+}
 export type ErrorChat = { codigo: string; mensaje: string }
 
 type Invocar = (fn: string, opts: { body: Record<string, unknown> }) => Promise<{ data: unknown; error: unknown }>
@@ -24,7 +30,8 @@ export const ETIQUETA_MODO: Record<ModoConversacion, string> = {
   ai_active: 'Asistente', human_offered: 'Asistente', human_requested: 'Esperando asesor', human_assigned: 'Asesor asignado',
   human_active: 'Con asesor', human_ended: 'Asesoría terminada',
 }
-export const IA_PUEDE = (modo: ModoConversacion): boolean => modo === 'ai_active' || modo === 'human_offered' || modo === 'human_requested'
+// CC-7 · la IA sigue hasta que el asesor inicia la sesión (asignado ≠ activo); espejo de _cc_ia_puede.
+export const IA_PUEDE = (modo: ModoConversacion): boolean => modo === 'ai_active' || modo === 'human_offered' || modo === 'human_requested' || modo === 'human_assigned'
 
 export function nuevoClientId(): string {
   try { return 'c:' + crypto.randomUUID() } catch { return 'c:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }
@@ -55,7 +62,9 @@ export class ClienteChat {
   }
   leido(conversation_id: string, seq: number) { return this.llamar<{ ok: true }>({ action: 'leido', conversation_id, seq }) }
   solicitarAsesor(conversation_id: string) { return this.llamar<{ modo: ModoConversacion; asesor: boolean }>({ action: 'solicitar_asesor', conversation_id }) }
-  asignarme(conversation_id: string) { return this.llamar<{ modo: ModoConversacion; seller: string | null }>({ action: 'asignar', conversation_id }) }
+  rechazarAsesor(conversation_id: string) { return this.llamar<{ rechazado: boolean; modo: ModoConversacion; motivo?: string }>({ action: 'rechazar_asesor', conversation_id }) }   // CC-7
+  // CC-7 · solo Dirección asigna (la base rechaza a cualquier otro); para doctores la asignación persistente es la cartera.
+  asignar(conversation_id: string, seller: string) { return this.llamar<{ modo: ModoConversacion; seller: string | null }>({ action: 'asignar', conversation_id, seller }) }
   liberar(conversation_id: string) { return this.llamar<{ modo: ModoConversacion; seller: string | null }>({ action: 'asignar', conversation_id, seller: null }) }
   iniciar(conversation_id: string) { return this.llamar<{ modo: ModoConversacion }>({ action: 'iniciar', conversation_id }) }
   terminar(conversation_id: string) { return this.llamar<{ modo: ModoConversacion }>({ action: 'terminar', conversation_id }) }

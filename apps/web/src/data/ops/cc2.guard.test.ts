@@ -114,7 +114,8 @@ describe('frontend', () => {
     const r = codigo(rolesSrc)
     expect(r).toMatch(/'conversaciones'/); expect(r).toMatch(/key: 'conversaciones', label: 'Atender conversaciones'/)
     expect(r).toMatch(/\{ key: 'chat_cc', label: 'Chat', icon: 'chat' \}/)
-    expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido \/>,\n\s+asesorias: \(\) => <Asesorias \/>/)
+    expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido \/>,\n\s+asesorias: \(\) => <AsesoriasPantalla \/>/)   // CC-7 · Dirección vs vendedor
+    expect(r).toMatch(/key: 'nuevos_clientes', label: 'Recibir clientes nuevos'/); expect(codigo(registrySrc)).toMatch(/av_atencion: \(\) => <AtencionComercialPantalla \/>/)
   })
   it('landing canónica: CTA a /chat (misma origen → el token de visitante persiste)', () => {
     expect(landingSrc).toMatch(/cta\.href='\/chat'/)

@@ -77,7 +77,12 @@ describe('herramientas', () => {
     expect(evidenciaDe('obtener_precio', salida)).toEqual(['PRICE_EVIDENCE']); expect(evidenciaDe('obtener_precio', { autorizado: false })).toEqual([])
     expect(evidenciaDe('obtener_disponibilidad', { autorizado: true, estado: 'disponible' })).toEqual(['STOCK_EVIDENCE'])
     expect(evidenciaDe('buscar_productos', [])).toEqual([]); expect(evidenciaDe('buscar_productos', [{ product_id: A }])).toEqual(['KNOWLEDGE_EVIDENCE'])
-    expect(evidenciaDe('solicitar_asesor', { modo: 'human_requested' })).toEqual(['HUMAN_REQUESTED'])
+    expect(evidenciaDe('solicitar_asesor', { modo: 'human_requested' })).toEqual(['HUMAN_REQUESTED', 'HANDOFF_EN_CURSO', 'ASESOR_SIN_ASIGNAR'])   // CC-7
+    expect(evidenciaDe('solicitar_asesor', { modo: 'human_assigned', asesor: true })).toEqual(['HUMAN_REQUESTED', 'HANDOFF_EN_CURSO', 'ASESOR_ASIGNADO'])
+    expect(evidenciaDe('agregar_al_carrito', { cart_id: 'c', handoff: { estado: 'solicitado', fuera_horario: true, horario_configurado: true, asignado: true } })).toEqual(['CART_MUTATION_EVIDENCE', 'HANDOFF_SOLICITADO', 'HANDOFF_EN_CURSO', 'FUERA_DE_HORARIO', 'ASESOR_ASIGNADO'])
+    expect(evidenciaDe('agregar_al_carrito', { cart_id: 'c', handoff: { estado: 'solicitado', horario_configurado: false } })).toEqual(['CART_MUTATION_EVIDENCE', 'HANDOFF_SOLICITADO', 'HANDOFF_EN_CURSO', 'HORARIO_DESCONOCIDO', 'ASESOR_SIN_ASIGNAR'])
+    expect(evidenciaDe('agregar_al_carrito', { cart_id: 'c', handoff: null })).toEqual(['CART_MUTATION_EVIDENCE'])
+    expect(evidenciaDe('declinar_asesor', { rechazado: true })).toEqual(['HANDOFF_RECHAZADO'])
     const grande = acotarSalida({ t: 'x'.repeat(10_000) }); expect(grande.length).toBeLessThanOrEqual(6000); expect(grande).toContain('"truncado":true')
   })
 })

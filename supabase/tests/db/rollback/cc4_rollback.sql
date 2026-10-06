@@ -1,5 +1,6 @@
 -- CC-4 · El rollback retira libro de turnos, traza y herramientas de IA sin tocar CC-2/CC-3.
 begin;
+\ir ../../../rollback/cc7/99_down.sql   -- CC-7 se baja primero (depende de CC-2/5/6)
 \ir ../../../rollback/cc4/99_down.sql
 do $t$
 begin

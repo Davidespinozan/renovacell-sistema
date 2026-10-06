@@ -2,7 +2,7 @@
 // Dirección: solo lectura). Precio y total solo cuando el servidor los autoriza; el visitante ve
 // "al verificar tu cuenta". Sin checkout todavía: "Revisar para pedir" solo valida (lectura).
 import React, { useCallback, useEffect, useState } from 'react'
-import { carrito as clientePorDefecto, ETIQUETA_DISPONIBILIDAD, formatoMXN, nuevaOperacion, type Carrito, type ClienteCarrito, type Preparacion, type RevisionCheckout, type ResultadoCheckout } from '../../data/ops/carrito'
+import { carrito as clientePorDefecto, ETIQUETA_DISPONIBILIDAD, ETIQUETA_PROBLEMA, ETIQUETA_MOTIVO, formatoMXN, nuevaOperacion, type Carrito, type ClienteCarrito, type Preparacion, type RevisionCheckout, type ResultadoCheckout } from '../../data/ops/carrito'
 import { startStripeCheckout } from '../../lib/stripe'
 
 interface Props { conversationId?: string | null; cartId?: string | null; soloLectura?: boolean; cliente?: ClienteCarrito; intervaloMs?: number; compacto?: boolean }
@@ -154,8 +154,6 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
     </section>
   )
 }
-const ETIQUETA_PROBLEMA: Record<string, string> = { REQUIERE_CUENTA: 'crea tu cuenta', REQUIERE_VERIFICACION: 'verifica tu cédula', CARRITO_VACIO: 'el carrito está vacío', CARRITO_CERRADO: 'carrito cerrado', NO_VENDIBLE: 'ya no está disponible', SIN_PRECIO: 'precio por confirmar', SIN_DISPONIBILIDAD: 'sin existencia ahora', REQUIERE_DIRECCION: 'registra una dirección de entrega en tu perfil', YA_CONVERTIDO: 'este carrito ya es un pedido', CANTIDAD_INVALIDA: 'cantidad no válida' }
-const ETIQUETA_MOTIVO: Record<string, string> = { CARRITO_CAMBIO: 'Tu carrito cambió después de revisarlo.', PRECIO_CAMBIO: 'El precio cambió después de revisarlo.', REVISION_EXPIRADA: 'La revisión venció.', REVISION_CONSUMIDA: 'Esa revisión ya se usó.', NO_LISTO: 'Algo cambió en la disponibilidad o en los productos.' }
 const estilos: Record<string, React.CSSProperties> = {
   panel: { borderBottom: '1px solid var(--line, #e5e7eb)', background: 'var(--bg-2, #fafafa)' },
   cabecera: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: 'inherit', textAlign: 'left' },

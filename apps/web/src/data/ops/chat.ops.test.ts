@@ -17,11 +17,12 @@ describe('ClienteChat', () => {
     const f = fake({ data: { conversation_id: 'c1', estado: 'abierta', modo: 'ai_active', nuevo: true } })
     const c = new ClienteChat(f.invocar, () => 'T'.repeat(43))
     const a = await c.abrir(); expect(a.ok).toBe(true)
-    await c.leer('c1', 5); await c.enviar('c1', 'hola', 'c:fijo'); await c.solicitarAsesor('c1'); await c.asignarme('c1'); await c.liberar('c1'); await c.leido('c1', 7)
+    await c.leer('c1', 5); await c.enviar('c1', 'hola', 'c:fijo'); await c.solicitarAsesor('c1'); await c.rechazarAsesor('c1'); await c.liberar('c1'); await c.leido('c1', 7)
     expect(f.llamadas.map((l) => l.fn)).toEqual(['chat', 'chat', 'chat', 'chat', 'chat', 'chat', 'chat'])
     expect(f.llamadas[0].body).toEqual({ action: 'abrir', token: 'T'.repeat(43) })
     expect(f.llamadas[1].body).toEqual({ action: 'leer', conversation_id: 'c1', desde_seq: 5, token: 'T'.repeat(43) })
     expect(f.llamadas[2].body).toEqual({ action: 'enviar', conversation_id: 'c1', content: 'hola', client_message_id: 'c:fijo', token: 'T'.repeat(43) })
+    expect(f.llamadas[4].body).toEqual({ action: 'rechazar_asesor', conversation_id: 'c1', token: 'T'.repeat(43) })   // CC-7 · solo la conversación
     expect(f.llamadas[5].body).toMatchObject({ action: 'asignar', seller: null })
     for (const l of f.llamadas) expect(JSON.stringify(l.body)).not.toMatch(/actor|profile_id|seller_profile_id|visitor_id/)
     expect(f.llamadas[4].body).not.toHaveProperty('seller')   // asignarme: el servidor usa el uid del JWT
@@ -43,6 +44,6 @@ describe('ClienteChat', () => {
   })
   it('etiquetas de modo completas; IA_PUEDE coincide con la regla del servidor', () => {
     expect(Object.keys(ETIQUETA_MODO).sort()).toEqual(['ai_active', 'human_active', 'human_assigned', 'human_ended', 'human_offered', 'human_requested'])
-    expect(IA_PUEDE('human_requested')).toBe(true); expect(IA_PUEDE('human_active')).toBe(false)
+    expect(IA_PUEDE('human_requested')).toBe(true); expect(IA_PUEDE('human_assigned')).toBe(true); expect(IA_PUEDE('human_active')).toBe(false)   // CC-7
   })
 })

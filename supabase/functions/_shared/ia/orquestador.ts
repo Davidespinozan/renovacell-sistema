@@ -32,6 +32,7 @@ export interface DepsOrquestador {
     validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string> }) => Validada
     acotarSalida: (v: unknown) => string; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
+    evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
   }
   validacion: {
     validarRespuesta: (t: unknown, c: { evidencia: readonly string[]; nombresAutorizados: readonly string[]; nombresCatalogo: readonly string[]; limiteClinico: boolean }) => { ok: true; texto: string } | { ok: false; motivo: string; detalle?: string }
@@ -90,6 +91,11 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
+  // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
+  if (d.herramientas.evidenciaHandoff) {
+    const hs = await rpc('cc_ia_estado_handoff', { p_conv: e.conv })
+    if (!hs.error) addEv(d.herramientas.evidenciaHandoff(hs.data)); else addEv(['HORARIO_DESCONOCIDO'])   // sin dato: nunca prometer
+  }
   const fallar = async (clase: string, ambiguo: boolean, rondas: number): Promise<ResultadoTurno> => {
     await rpc('cc_ia_turno_fallar', { p_turn: turnId, p_error_class: clase, p_desconocido: ambiguo, p_intent: intencion, p_tool_rounds: rondas, p_input_tokens: usage.input, p_output_tokens: usage.output })
     await rpc('cc_ia_aviso_no_disponible', { p_conv: e.conv })   // una vez por conversación (client_id fijo)
@@ -100,10 +106,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     const pr = await rpc('cc_ia_turno_responder', { p_turn: turnId, p_content: texto, p_intent: intencion, p_evidencia: evidencia, p_tool_rounds: rondas, p_input_tokens: usage.input, p_output_tokens: usage.output })
     const p = (pr.data ?? {}) as { persistido?: boolean; motivo?: string }
     if (pr.error) { obs('persistir', 'internal_error', { code: 'rpc' }); return { estado: 'fallo', clase: 'persistence_error', turnId, intencion, evidencia, rondas, usage, motivoValidacion } }
-    // CC-5 · la elegibilidad la decidió el servidor (mutación); se registra la oferta solo si la respuesta se persistió.
-    if (p.persistido && evidencia.includes('SELLER_OFFER_ELIGIBLE') && carrito.id && !motivoValidacion) {
-      await rpc('cc_carrito_oferta', { p_cart: carrito.id, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: e.actor === 'doctor' ? e.profile : null, p_accion: 'ofrecer' })
-    }
+    // CC-7 · ya no hay "oferta" opcional: el handoff lo dispara el servidor al activarse el carrito.
     return { estado: p.persistido ? 'respondio' : 'descartada', turnId, intencion, evidencia, rondas, usage, clase: p.persistido ? undefined : p.motivo, motivoValidacion }
   }
 
@@ -165,7 +168,7 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
   // del mismo turno (tras timeout) que vuelva a pedir la misma mutación cae en el mismo id → la base
   // devuelve el resultado cacheado (nunca X×4). Dos llamadas idénticas en la misma ronda también.
   const op = `${t.turnId}:r${t.ronda}:${v.nombre}:${huella(JSON.stringify(a))}`
-  if (['ver_carrito', 'agregar_al_carrito', 'actualizar_carrito', 'quitar_del_carrito', 'vaciar_carrito', 'declinar_asesor', 'preparar_checkout'].includes(v.nombre)) {
+  if (['ver_carrito', 'agregar_al_carrito', 'actualizar_carrito', 'quitar_del_carrito', 'vaciar_carrito', 'preparar_checkout'].includes(v.nombre)) {
     const cart = await abrirCarrito(); if (!cart) return { data: null, error: 'carrito' }
     switch (v.nombre) {
       case 'ver_carrito': return rpc('cc_carrito_ver', { p_cart: cart, ...dueno })
@@ -173,7 +176,6 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
       case 'actualizar_carrito': return rpc('cc_carrito_actualizar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_product: a.product_id, p_qty: a.cantidad, p_op: op })
       case 'quitar_del_carrito': return rpc('cc_carrito_quitar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_product: a.product_id, p_op: op })
       case 'vaciar_carrito': return rpc('cc_carrito_vaciar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_op: op })
-      case 'declinar_asesor': return rpc('cc_carrito_oferta', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_accion: 'rechazar' })
       case 'preparar_checkout': return rpc('cc_carrito_preparar_checkout', { p_cart: cart, ...dueno })   // CC-6 · lectura; confirmar NO es una herramienta
     }
   }
@@ -186,12 +188,9 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'obtener_precio': return rpc('cc_ia_precio', { p_profile: e.profile, p_product: a.product_id, p_qty: a.cantidad })
     case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: e.profile, p_product: a.product_id })
     case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: e.profile, p_folio: a.folio })
-    case 'solicitar_asesor': {
-      const r = await rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
-      // CC-5 · aceptación de la oferta de asesor (si había una): el handoff sigue siendo el de CC-2.
-      if (!r.error) { const cart = t.carrito.id ?? (await abrirCarrito()); if (cart) await rpc('cc_carrito_oferta', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_accion: 'aceptar' }) }
-      return r
-    }
+    case 'solicitar_asesor': return rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
+    // CC-7 · rechazo del asesor para ESTA compra (no toca la cartera ni impone enfriamiento global).
+    case 'declinar_asesor': return rpc('cc_handoff_rechazar', { p_conv: e.conv, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
     default: return { data: null, error: 'desconocida' }
   }
 }

@@ -18,6 +18,7 @@ import { useCustodies } from '../data/hooks/useCustody'
 import { useRevisionFiscal } from '../data/hooks/useRevisionFiscal'
 import { useComunicaciones } from '../data/hooks/useComunicaciones'
 import { useSaludSistema } from '../data/hooks/useSaludSistema'
+import { atencion, type ResumenRuteo } from '../data/ops/atencion'   // CC-7
 import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
@@ -124,8 +125,9 @@ export function Bandeja() {
   const [mensajesPend, setMensajesPend] = useState(0)
   // W6-A3.2 · salud del sistema: una fuente = a lo sumo UNA incidencia visible (0 o 1).
   const [saludPend, setSaludPend] = useState(0)
-  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend + saludPend
-  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0 && saludPend === 0
+  const [ruteoPend, setRuteoPend] = useState(0)   // CC-7
+  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend + saludPend + ruteoPend
+  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0 && saludPend === 0 && ruteoPend === 0
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -146,6 +148,7 @@ export function Bandeja() {
       {role === 'admin' && <ColaMensajes onGo={() => setScreen('av_mensajes')} onCount={setMensajesPend} />}
       {role === 'admin' && <ColaFiscal onGo={() => setScreen('av_fiscal')} onCount={setFiscalPend} />}
       {role === 'admin' && <ColaSalud onCount={setSaludPend} />}
+      {role === 'admin' && hasSupabase && <ColaRuteo onGo={() => setScreen('av_atencion')} onCount={setRuteoPend} />}
     </div>
   )
 }
@@ -178,6 +181,31 @@ function ColaMensajes({ onGo, onCount }: { onGo: () => void; onCount: (n: number
       id: 'mensajes', icon: 'chat', title: 'Mensajes al cliente sin entregar',
       detail: 'No salieron, no se confirmaron o el cliente no tiene correo.',
       count: n, tone: 'warn', screen: 'av_mensajes',
+    }} />
+  )
+}
+
+// CC-7 · Atención comercial: excepciones de ruteo que necesitan a Dirección (conteos del SERVIDOR):
+// conversaciones con carrito/solicitud sin vendedor, clientes cuyo vendedor ya no puede atender,
+// handoffs que no se pudieron rutear y horario sin configurar. Lectura al montar (sin sondeo).
+function ColaRuteo({ onGo, onCount }: { onGo: () => void; onCount: (n: number) => void }) {
+  const [r, setR] = useState<ResumenRuteo | null>(null)
+  useEffect(() => { let vivo = true; void atencion.resumen().then((x) => { if (vivo && x.ok) setR(x.data) }); return () => { vivo = false } }, [])
+  const n = r ? r.handoffs_sin_asignar + r.reasignacion + r.handoffs_pendientes : 0
+  const sinHorario = !!r && !r.horario.configurado
+  useEffect(() => { onCount(n + (sinHorario ? 1 : 0)) }, [n, sinHorario, onCount])
+  if (!r || (n <= 0 && !sinHorario)) return null
+  const partes = [
+    r.handoffs_sin_asignar ? `${r.handoffs_sin_asignar} conversación(es) sin vendedor` : '',
+    r.reasignacion ? `${r.reasignacion} cliente(s) por reasignar` : '',
+    r.handoffs_pendientes ? `${r.handoffs_pendientes} carrito(s) sin rutear` : '',
+    sinHorario ? 'horario de atención sin configurar' : '',
+  ].filter(Boolean)
+  return (
+    <TaskRow onGo={onGo} task={{
+      id: 'ruteo', icon: 'chat', title: 'Atención comercial pendiente',
+      detail: partes.join(' · ') + '.',
+      count: n || 1, tone: r.handoffs_pendientes ? 'dang' : 'warn', screen: 'av_atencion',
     }} />
   )
 }

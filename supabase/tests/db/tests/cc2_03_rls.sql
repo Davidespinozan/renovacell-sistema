@@ -15,7 +15,7 @@ begin
   cD := (public.cc_abrir_conversacion(null, v_doc) ->> 'conversation_id')::uuid;
   perform public.cc_enviar_mensaje(cD, 'doctor', null, v_doc, 'd:1', 'doctor');
   perform public.cc_solicitar_asesor(cD, 'doctor', null, v_doc);
-  perform public.cc_asignar_asesor(cD, v_pos, v_pos);
+  perform public.cc_asignar_asesor(cD, v_admin, v_pos);   -- CC-7 · asigna Dirección
 
   perform tests.act_as(v_doc);
   perform tests.eq((select count(*)::int from public.cc_conversations), 1, '25 · el doctor ve solo su conversación');

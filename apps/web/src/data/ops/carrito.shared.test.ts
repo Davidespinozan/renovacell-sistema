@@ -28,12 +28,20 @@ describe('ClienteCarrito', () => {
   it('manda action + token + operation_id; nunca precio/descuento/lista/profile/seller/visitor_id', async () => {
     const cuerpos: Record<string, unknown>[] = []
     const c = new ClienteCarrito(async (_fn, opts) => { cuerpos.push(opts.body); return { data: { cart_id: 'c' }, error: null } }, () => 'tok')
-    await c.abrir('conv-1'); await c.agregar('c', 'p', 2); await c.actualizar('c', 'p', 3); await c.quitar('c', 'p'); await c.vaciar('c'); await c.prepararCheckout('c'); await c.responderOferta('c', 'rechazar'); await c.revisarCheckout('c', 'loc'); await c.confirmarCheckout('rev', 4, 'k:op')
-    expect(cuerpos.map((b) => b.action)).toEqual(['abrir', 'agregar', 'actualizar', 'quitar', 'vaciar', 'preparar_checkout', 'oferta', 'revisar_checkout', 'confirmar_checkout'])
-    expect(cuerpos[8]).toEqual({ action: 'confirmar_checkout', review_id: 'rev', operation_id: 'k:op', expected_cart_rev: 4, token: 'tok' })   // CHK8–13: nada más viaja
+    await c.abrir('conv-1'); await c.agregar('c', 'p', 2); await c.actualizar('c', 'p', 3); await c.quitar('c', 'p'); await c.vaciar('c'); await c.prepararCheckout('c'); await c.revisarCheckout('c', 'loc'); await c.confirmarCheckout('rev', 4, 'k:op')
+    expect(cuerpos.map((b) => b.action)).toEqual(['abrir', 'agregar', 'actualizar', 'quitar', 'vaciar', 'preparar_checkout', 'revisar_checkout', 'confirmar_checkout'])   // CC-7 · sin "oferta"
+    expect(cuerpos[7]).toEqual({ action: 'confirmar_checkout', review_id: 'rev', operation_id: 'k:op', expected_cart_rev: 4, factura: false, token: 'tok' })   // CHK8–13: nada más viaja (CC-7: + intención de factura)
+    expect(cuerpos[6]).toEqual({ action: 'revisar_checkout', cart_id: 'c', location_id: 'loc', direccion: null, token: 'tok' })   // con location no viaja snapshot
     for (const b of cuerpos) { expect(b.token).toBe('tok'); expect(JSON.stringify(b)).not.toMatch(/price|precio|total|discount|descuento|price_list|profile_id|doctor|customer|seller|visitor_id/) }
     expect(cuerpos[1]).toMatchObject({ cart_id: 'c', product_id: 'p', cantidad: 2 }); expect(String(cuerpos[1].operation_id)).toMatch(/^k:/)
-    expect(cuerpos[6]).toMatchObject({ respuesta: 'rechazar' })
+  })
+  it('CC-7 · revisar sin location manda el snapshot de dirección del Catálogo; confirmar manda la intención de factura (nunca datos fiscales)', async () => {
+    const cuerpos: Record<string, unknown>[] = []
+    const c = new ClienteCarrito(async (_fn, opts) => { cuerpos.push(opts.body); return { data: {}, error: null } }, () => null)
+    await c.revisarCheckout('c', null, { line1: 'Calle 5 #20', cp: '82010', city: 'Mazatlán' }); await c.confirmarCheckout('rev', 2, 'k:x', true)
+    expect(cuerpos[0]).toMatchObject({ action: 'revisar_checkout', location_id: null, direccion: { line1: 'Calle 5 #20', cp: '82010', city: 'Mazatlán' } })
+    expect(cuerpos[1]).toMatchObject({ action: 'confirmar_checkout', factura: true })
+    expect(JSON.stringify(cuerpos)).not.toMatch(/rfc|regimen|precio|total|seller|profile_id/)
   })
   it('errores de la Edge → código y mensaje; formato MXN', async () => {
     const c = new ClienteCarrito(async () => ({ data: null, error: { context: new Response(JSON.stringify({ error: 'carrito_cerrado', message: 'Cerrado.' })) } }), () => null)

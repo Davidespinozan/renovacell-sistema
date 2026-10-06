@@ -82,7 +82,7 @@ export function tarea(intencion: string, limiteClinico: boolean): string {
     case 'PRICE': return 'TAREA: el usuario pregunta precio. Identifica el producto (buscar_productos si hace falta) y usa obtener_precio. Si no está autorizado, explica que el precio se habilita al verificar la cuenta.'
     case 'AVAILABILITY': return 'TAREA: el usuario pregunta disponibilidad. Identifica el producto y usa obtener_disponibilidad. Sin resultado, no afirmes existencias.'
     case 'ORDER_STATUS': return 'TAREA: el usuario pregunta por su pedido. Usa obtener_estado_pedido (solo ve sus propios pedidos). Si no tiene sesión, indícale que entre al portal.'
-    case 'HUMAN_REQUEST': return 'TAREA: el usuario quiere hablar con una persona. Usa solicitar_asesor y confirma en una frase que un asesor lo atenderá; no finjas que ya hay un humano respondiendo.'
+    case 'HUMAN_REQUEST': return 'TAREA: el usuario quiere hablar con una persona. Usa solicitar_asesor (el sistema le avisa con la disponibilidad real del equipo). Confirma en una frase que quedó registrado, sin prometer tiempos ni que ya hay un humano respondiendo, y sigue ayudando.'
     case 'CHECKOUT': return 'TAREA: el usuario quiere comprar/confirmar. Usa preparar_checkout; informa el total actual (solo si viene autorizado) y los problemas (cuenta, verificación, dirección, disponibilidad), y pídele que confirme con el botón "Confirmar pedido" de su carrito. No digas que el pedido ya existe.'
     case 'CART_VIEW': return 'TAREA: el usuario quiere ver su carrito. Usa ver_carrito y resume productos, cantidades, disponibilidad y precio/total solo si vienen autorizados.'
     case 'CART_ADD': return 'TAREA: el usuario pide agregar algo. Resuelve el producto con buscar_productos; si es unívoco, usa agregar_al_carrito con la cantidad pedida (default 1); si hay varias coincidencias, pregunta cuál antes de agregar.'
@@ -101,10 +101,27 @@ export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteC
 export function construirSistema(e: EntradaSistema): string {
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '', tarea(e.intencion, e.limiteClinico)]
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
-  if (e.evidencia.includes('SELLER_OFFER_ELIGIBLE')) partes.push('OFERTA DE ASESOR (decidida por el servidor): al final de tu respuesta, en una sola frase natural y sin presionar, ofrece que un asesor de Renovacell revise con el usuario las opciones. Si dice que no, usa declinar_asesor; si acepta, usa solicitar_asesor.')
   else partes.push('', 'EVIDENCIA DISPONIBLE EN ESTE TURNO: ninguna todavía. Usa herramientas antes de afirmar.')
+  const atencion = atencionHumana(e.evidencia)
+  if (atencion) partes.push('', atencion)
   partes.push('', 'Cuando ya tengas lo necesario, responde al usuario sin más herramientas.')
   return partes.join('\n')
+}
+
+// CC-7 · Qué puede decir la IA sobre la atención humana: SOLO lo que el servidor sostiene (horario, ruteo, rechazo).
+// Nunca "ya viene"/"en un momento" salvo en horario y con asesor asignado; fuera de horario o sin horario, cero promesas.
+export function atencionHumana(ev: readonly string[]): string | null {
+  const partes: string[] = []
+  if (ev.includes('HANDOFF_SOLICITADO') || ev.includes('HANDOFF_EN_CURSO')) {
+    partes.push('ATENCIÓN HUMANA (decidida por el servidor): ya se pidió un asesor personal para esta conversación y el sistema ya se lo avisó al usuario. Tú sigues atendiendo normalmente hasta que el asesor se una; no repitas el aviso salvo que pregunten.')
+    if (ev.includes('FUERA_DE_HORARIO')) partes.push('El equipo de asesores NO está disponible ahora: no digas que un asesor viene, se conecta o responde pronto; si preguntan, di que su conversación queda lista para continuar cuando el equipo vuelva.')
+    else if (ev.includes('HORARIO_DESCONOCIDO')) partes.push('No sabes si hay asesores disponibles en este momento: no prometas atención inmediata ni tiempos.')
+    else if (ev.includes('ASESOR_ASIGNADO')) partes.push('Hay un asesor personal asignado: puedes decir que se unirá a esta conversación, sin decir que ya está escribiendo ni dar tiempos exactos.')
+    else partes.push('Aún no hay un asesor asignado: puedes decir que lo conectaremos con un asesor personal, sin nombres ni tiempos.')
+    partes.push('Si el usuario dice de forma inequívoca que NO quiere un asesor para esta compra, usa declinar_asesor y sigue ayudándolo.')
+  }
+  if (ev.includes('HANDOFF_RECHAZADO')) partes.push('El usuario rechazó al asesor para esta compra: no se lo vuelvas a ofrecer; si lo pide de nuevo, usa solicitar_asesor.')
+  return partes.length ? partes.join(' ') : null
 }
 
 // ── Historial acotado para el modelo: solo texto y rol, últimos N, alternancia garantizada. Sin ids.

@@ -149,7 +149,7 @@ begin
 
   -- ══ vendedor asignado: lectura, no mutación ═════════════════════════════════
   perform public.cc_solicitar_asesor(cv, 'visitor', hA, null);
-  perform public.cc_asignar_asesor(cv, v_pos, v_pos);
+  perform public.cc_asignar_asesor(cv, v_admin, v_pos);   -- CC-7 · asigna Dirección
   r := public.cc_carrito_ver(cA, 'seller', null, v_pos);
   perform tests.eq(r ->> 'rol', 'asesor', 'H · asesor asignado lee el resumen');
   perform tests.eq(r -> 'items' -> 0 -> 'precio' ->> 'estado', 'autorizado', 'H · ve precio porque SU rol lo tiene (pos)');

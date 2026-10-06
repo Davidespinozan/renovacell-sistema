@@ -35,24 +35,28 @@ begin
   r := public.cc_enviar_mensaje(cA, 'ai', null, null, 'ai:2', 'Mientras llega un asesor, te sigo ayudando.');
   perform tests.ok((r ->> 'seq')::int > 0, 'L · IA puede responder en human_requested');
 
-  -- ══ cola y autoasignación (solo quien puede atender, solo desde la cola) ═
+  -- ══ cola (CC-7: el vendedor ve SOLO lo suyo; lo no asignado lo asigna Dirección) ═
   perform tests.act_as(v_pos);
-  perform tests.eq((select count(*)::int from public.cc_cola_asesorias() q where q.conversation_id = cA and q.modo = 'human_requested'), 1, 'R · el vendedor con capability ve la cola');
+  perform tests.eq((select count(*)::int from public.cc_cola_asesorias() q where q.conversation_id = cA), 0, 'R · CC-7 · el vendedor no ve conversaciones sin asignar');
+  perform tests.act_as(v_admin);
+  perform tests.eq((select count(*)::int from public.cc_cola_asesorias() q where q.conversation_id = cA and q.modo = 'human_requested' and q.ruteo_motivo = 'visitante'), 1, 'R · Dirección ve la cola sin asignar con su motivo');
   perform tests.act_as(v_pos_sin);
   perform tests.eq((select count(*)::int from public.cc_cola_asesorias()), 0, 'Q · vendedor SIN capability no ve la cola');
   perform tests.act_as(v_doc);
   perform tests.eq((select count(*)::int from public.cc_cola_asesorias()), 0, 'un doctor no ve la cola');
   perform tests.act_as_service();
   perform tests.throws_any(format('select public.cc_asignar_asesor(%L, %L, %L)', cA, v_pos_sin, v_pos_sin), array['NO_AUTORIZADO', 'ASESOR_INVALIDO'], 'Q · sin capability no se autoasigna');
+  perform tests.throws(format('select public.cc_asignar_asesor(%L, %L, %L)', cA, v_pos, v_pos), 'NO_AUTORIZADO', 'CC-7 · el vendedor ya no se toma clientes de la cola');
   perform tests.throws(format('select public.cc_asignar_asesor(%L, %L, %L)', cA, v_pos, v_pos2), 'NO_AUTORIZADO', '13 · un vendedor no asigna a otro');
   perform tests.throws(format('select public.cc_asignar_asesor(%L, %L, %L)', cA, v_admin, v_wh), 'ASESOR_INVALIDO', 'Dirección no puede asignar a quien no atiende');
+  r := public.cc_asignar_asesor(cA, v_admin, v_pos);
+  perform tests.eq(r ->> 'modo', 'human_assigned', 'Dirección asigna → human_assigned');
   r := public.cc_asignar_asesor(cA, v_pos, v_pos);
-  perform tests.eq(r ->> 'modo', 'human_assigned', 'autoasignación desde la cola → human_assigned');
-  r := public.cc_asignar_asesor(cA, v_pos, v_pos);
-  perform tests.eq((r ->> 'idempotente')::boolean, true, '29 · reintento de asignación idempotente');
+  perform tests.eq((r ->> 'idempotente')::boolean, true, '29 · el asignado reintenta: idempotente');
   perform tests.throws(format('select public.cc_asignar_asesor(%L, %L, %L)', cA, v_pos2, v_pos2), 'YA_ASIGNADA', '13 · otro vendedor no se la queda');
-  -- IA silenciada desde human_assigned; asesor no escribe hasta iniciar
-  perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''ai'', null, null, ''ai:3'', ''x'')', cA), 'IA_SILENCIADA', '15 · IA callada en human_assigned');
+  -- CC-7 · la IA sigue en human_assigned (calla solo con la asesoría iniciada); el asesor no escribe hasta iniciar
+  r := public.cc_enviar_mensaje(cA, 'ai', null, null, 'ai:3', 'Tu asesor ya fue asignado; mientras se une, sigo contigo.');
+  perform tests.ok((r ->> 'seq')::int > 0, '15 · CC-7 · la IA sigue en human_assigned');
   perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''seller'', null, %L, null, ''x'')', cA, v_pos), 'ASESORIA_NO_INICIADA', 'el asesor escribe solo con la asesoría iniciada');
   perform tests.throws(format('select public.cc_iniciar_asesoria(%L, %L)', cA, v_pos2), 'NO_AUTORIZADO', 'otro vendedor no inicia');
   r := public.cc_iniciar_asesoria(cA, v_pos);
@@ -89,9 +93,11 @@ begin
   perform tests.throws(format('select public.cc_terminar_asesoria(%L, %L)', cA, v_pos2), 'NO_AUTORIZADO', 'otro vendedor no termina');
   r := public.cc_terminar_asesoria(cA, v_pos);
   perform tests.eq(r ->> 'modo', 'human_ended', 'human_ended');
-  perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''ai'', null, null, ''ai:5'', ''x'')', cA), 'IA_SILENCIADA', 'IA callada en human_ended hasta reanudar');
+  perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''ai'', null, null, ''ai:5'', ''x'')', cA), 'IA_SILENCIADA', 'IA callada en human_ended mientras el dueño no escriba');
+  r := public.cc_enviar_mensaje(cA, 'visitor', hA, null, 'c:3', 'Una pregunta más');
+  perform tests.eq(r ->> 'modo', 'ai_active', '34 · CC-7 · tras human_ended, el siguiente mensaje del dueño reanuda la IA');
   r := public.cc_reanudar_ia(cA, 'visitor', hA, null);
-  perform tests.eq(r ->> 'modo', 'ai_active', 'ai_resumed → ai_active');
+  perform tests.eq((r ->> 'idempotente')::boolean, true, 'reanudar una IA ya reanudada: idempotente');
   r := public.cc_enviar_mensaje(cA, 'ai', null, null, 'ai:6', 'De vuelta contigo.');
   perform tests.ok((r ->> 'seq')::int > 0, 'IA habla de nuevo');
   perform tests.act_as_owner();
@@ -99,7 +105,7 @@ begin
   perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = cA and tipo in ('human_assigned','seller_unassigned','human_started','human_ended')), 8, '20 · eventos de handoff durables (3 asignaciones + 2 desasignaciones + 2 inicios + 1 fin = 8)');
   perform tests.act_as_service();
 
-  -- ══ referido → preferido → autoasignación al solicitar ══════════════════
+  -- ══ referido → preferido (ATRIBUCIÓN) ≠ ruteo (CC-7: el referido no decide quién atiende) ═
   perform tests.act_as(v_admin);
   code := public.cc_codigo_referido_crear(v_pos2);
   perform tests.act_as_service();
@@ -109,9 +115,9 @@ begin
   perform tests.eq((select seller_preferido_id from public.cc_conversations where id = cR), v_pos2, 'P · preferido = vendedor del referido (resuelto en servidor)');
   perform tests.act_as_service();
   r := public.cc_solicitar_asesor(cR, 'visitor', hR, null);
-  perform tests.eq(r ->> 'modo', 'human_assigned', 'P · solicitar con preferido atendible → asignado directo');
+  perform tests.eq(r ->> 'modo', 'human_requested', 'P · CC-7 · visitante con referido: a la cola de Dirección, sin asignación automática');
   perform tests.act_as_owner();
-  perform tests.eq((select seller_profile_id from public.cc_conversations where id = cR), v_pos2, '11 · seller_profile_id lo puso el servidor');
+  perform tests.ok((select seller_profile_id is null and seller_preferido_id = v_pos2 and ruteo_motivo = 'visitante' from public.cc_conversations where id = cR), '32 · la atribución del referido se conserva aparte del ruteo');
   perform tests.act_as_service();
 
   -- ══ doctor: unverified no gana nada por chatear ════════════════════════

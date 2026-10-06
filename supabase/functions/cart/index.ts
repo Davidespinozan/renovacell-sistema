@@ -20,7 +20,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['abrir', 'ver', 'agregar', 'actualizar', 'quitar', 'vaciar', 'preparar_checkout', 'oferta', 'revisar_checkout', 'confirmar_checkout'])   // + CC-6
+const ACCIONES = new Set(['abrir', 'ver', 'agregar', 'actualizar', 'quitar', 'vaciar', 'preparar_checkout', 'revisar_checkout', 'confirmar_checkout'])   // + CC-6 (CC-7: sin "oferta"; el handoff lo dispara el servidor)
 const MUTANTES = new Set(['agregar', 'actualizar', 'quitar', 'vaciar'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -69,7 +69,9 @@ Deno.serve(conCors(async (req) => {
       const cartR = typeof p.cart_id === 'string' && UUID.test(p.cart_id) ? p.cart_id : null
       if (!cartR) return json(400, { error: 'falta_carrito', message: 'Falta cart_id.' })
       const loc = typeof p.location_id === 'string' && UUID.test(p.location_id) ? p.location_id : null
-      const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc })
+      // CC-7 · el Catálogo puede mandar el snapshot de dirección elegido (forma acotada; la base lo valida de nuevo).
+      const dir = !loc ? direccionSnapshot(p.direccion) : null
+      const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc, p_direccion: dir })
       if (error) return falla(error)
       return json(200, data)
     }
@@ -79,7 +81,8 @@ Deno.serve(conCors(async (req) => {
     if (!opc) return json(400, { error: 'operacion_invalida', message: 'Falta operation_id válido.' })
     const rev = Number.isInteger(Number(p.expected_cart_rev)) && Number(p.expected_cart_rev) >= 0 ? Number(p.expected_cart_rev) : null
     // Solo review_id + operation_id + rev esperada: NUNCA total, precio, descuento, lista, doctor ni seller.
-    const { data, error } = await caller.rpc('cc_checkout_confirmar', { p_review: review, p_operation: opc, p_expected_rev: rev })
+    const factura = p.factura === true   // solo la intención de factura; los datos fiscales se congelan aparte (set_order_fiscal_snapshot)
+    const { data, error } = await caller.rpc('cc_checkout_confirmar', { p_review: review, p_operation: opc, p_expected_rev: rev, p_factura: factura })
     if (error) return falla(error)
     return json(200, data)
   }
@@ -99,13 +102,6 @@ Deno.serve(conCors(async (req) => {
   }
   if (action === 'preparar_checkout') {
     const { data, error } = await admin.rpc('cc_carrito_preparar_checkout', { p_cart: cart, ...base })
-    if (error) return falla(error)
-    return json(200, data)
-  }
-  if (action === 'oferta') {
-    const acc = p.respuesta === 'aceptar' || p.respuesta === 'rechazar' ? p.respuesta : null   // "ofrecer" lo decide el servidor/orquestador, nunca el cliente
-    if (!acc) return json(400, { error: 'respuesta_invalida', message: 'Respuesta no válida.' })
-    const { data, error } = await admin.rpc('cc_carrito_oferta', { p_cart: cart, ...base, p_accion: acc })
     if (error) return falla(error)
     return json(200, data)
   }
@@ -130,3 +126,12 @@ Deno.serve(conCors(async (req) => {
   if (error) return falla(error)
   return json(200, data)
 }))
+
+// CC-7 · snapshot de dirección del selector del Catálogo: solo campos de texto conocidos y acotados (nunca precio, doctor ni seller).
+const CAMPOS_DIRECCION = ['line1', 'colonia', 'cp', 'city', 'state', 'refs', 'phone', 'country', 'contacto'] as const
+function direccionSnapshot(v: unknown): Record<string, string> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const o = v as Record<string, unknown>; const out: Record<string, string> = {}
+  for (const k of CAMPOS_DIRECCION) if (typeof o[k] === 'string' && (o[k] as string).trim()) out[k] = (o[k] as string).trim().slice(0, 200)
+  return out.line1 ? out : null
+}

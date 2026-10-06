@@ -18,7 +18,7 @@ begin
   insert into public.prospects (name, email, source, status) values ('Ana', 'ana@x.mx', 'Landing', 'nuevo') returning id into pA;
   perform public.cc_visitante_prospecto(hA, pA);
   perform public.cc_solicitar_asesor(cA, 'visitor', hA, null);
-  perform public.cc_asignar_asesor(cA, v_pos, v_pos);
+  perform public.cc_asignar_asesor(cA, tests.fixture_admin(), v_pos);   -- CC-7 · asigna Dirección
 
   -- ══ 16 · adoptar conserva conversation_id y todo lo demás ═══════════════
   r := public.cc_visitante_adoptar(hA, v_doc);

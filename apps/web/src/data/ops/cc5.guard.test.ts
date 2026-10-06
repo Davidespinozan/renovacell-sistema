@@ -76,11 +76,12 @@ describe('migración CC-5', () => {
 
 describe('Edge cart + módulo compartido', () => {
   const s = codigo(cartSrc)
-  it('identidad derivada (JWT o token); el cliente no manda dueño, precio, lista ni seller; operation_id obligatorio en mutaciones; "ofrecer" nunca desde el cliente', () => {
+  it('identidad derivada (JWT o token); el cliente no manda dueño, precio, lista ni seller; operation_id obligatorio en mutaciones; CC-7 · sin acción "oferta" (el handoff lo dispara el servidor)', () => {
     expect(s).toMatch(/const actor = derivarActor\(quien, hash\)/)
     expect(s).not.toMatch(/p\.profile_id|p\.visitor_id|p\.seller|p\.price|p\.precio|p\.discount|p\.price_list/)
     expect(s).toMatch(/const op = validarOperacion\(p\.operation_id\)\n\s+if \(!op\) return json\(400/)
-    expect(s).toMatch(/p\.respuesta === 'aceptar' \|\| p\.respuesta === 'rechazar' \? p\.respuesta : null/)
+    expect(s).not.toMatch(/action === 'oferta'|cc_carrito_oferta/)
+    expect(s).toMatch(/const CAMPOS_DIRECCION = \['line1', 'colonia', 'cp', 'city', 'state', 'refs', 'phone', 'country', 'contacto'\] as const/)   // CC-7 · snapshot acotado
     expect(s).toMatch(/Deno\.serve\(conCors\(/); expect(s).not.toMatch(/console\.(log|error|warn)|_shared\/observa/)
     for (const sc of ['cart_leer', 'cart_mutar', 'cart_mutar_uid', 'cart_global']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }
     expect(codigo(carritoShared)).not.toMatch(/^import /m)
@@ -88,25 +89,28 @@ describe('Edge cart + módulo compartido', () => {
 })
 
 describe('extensión CC-4 (IA)', () => {
-  it('Q/T · herramientas de carrito cerradas; evidencias CART_READ/CART_MUTATION/SELLER_OFFER; grounding de "ya agregué" y "tu carrito tiene"', () => {
+  it('Q/T · herramientas de carrito cerradas; evidencias CART_READ/CART_MUTATION (+ CC-7 handoff del servidor); grounding de "ya agregué" y "tu carrito tiene"', () => {
     const h = codigo(herSrc)
     for (const n of ['ver_carrito', 'agregar_al_carrito', 'actualizar_carrito', 'quitar_del_carrito', 'vaciar_carrito', 'declinar_asesor']) expect(h).toContain(`name: '${n}'`)
-    expect(h).toMatch(/'CART_READ_EVIDENCE' \| 'CART_MUTATION_EVIDENCE' \| 'SELLER_OFFER_ELIGIBLE'/)
+    expect(h).toMatch(/'CART_READ_EVIDENCE' \| 'CART_MUTATION_EVIDENCE' \| 'CHECKOUT_REVIEW_EVIDENCE'/); expect(h).not.toMatch(/SELLER_OFFER/)
+    expect(h).toMatch(/'HANDOFF_SOLICITADO' \| 'HANDOFF_EN_CURSO' \| 'ASESOR_ASIGNADO' \| 'ASESOR_SIN_ASIGNAR' \| 'EN_HORARIO' \| 'FUERA_DE_HORARIO' \| 'HORARIO_DESCONOCIDO' \| 'HANDOFF_RECHAZADO'/)
     const v = codigo(valSrc)
     expect(v).toMatch(/if \(!ctx\.evidencia\.includes\('CART_MUTATION_EVIDENCE'\) && RE_CART_MUT\.test\(t\)\) return \{ ok: false, motivo: 'carrito_mutacion_sin_evidencia' \}/)
     expect(v).toMatch(/carrito_lectura_sin_evidencia/)
   })
-  it('R/S · política: solo mutar ante petición explícita; "me interesa" no es orden; oferta de asesor la decide el servidor y el LLM solo la redacta', () => {
+  it('R/S · política: solo mutar ante petición explícita; "me interesa" no es orden; CC-7 · la atención humana la decide el servidor (horario/ruteo) y el LLM no promete más de lo que hay', () => {
     const p = codigo(polSrc)
     expect(p).toMatch(/SOLO ante una petición explícita e inequívoca/); expect(p).toMatch(/"Me interesa" o "quizá" NO es una orden/)
-    expect(p).toMatch(/OFERTA DE ASESOR \(decidida por el servidor\)/)
+    expect(p).toMatch(/ATENCIÓN HUMANA \(decidida por el servidor\)/); expect(p).not.toMatch(/OFERTA DE ASESOR/)
+    expect(p).toMatch(/El equipo de asesores NO está disponible ahora: no digas que un asesor viene/)
   })
-  it('CART23/43 · la IA usa los MISMOS comandos (cc_carrito_*) con actor ai en nombre del dueño y operation_id estable turno+ronda+herramienta+args; la oferta se registra solo tras persistir', () => {
+  it('CART23/43 · la IA usa los MISMOS comandos (cc_carrito_*) con actor ai en nombre del dueño y operation_id estable turno+ronda+herramienta+args; CC-7 · sin oferta; declinar = rechazo canónico del handoff', () => {
     const o = codigo(orqSrc)
     expect(o).toMatch(/const op = `\$\{t\.turnId\}:r\$\{t\.ronda\}:\$\{v\.nombre\}:\$\{huella\(JSON\.stringify\(a\)\)\}`/)
     expect(o).toMatch(/case 'agregar_al_carrito': return rpc\('cc_carrito_agregar', \{ p_cart: cart, p_actor_type: 'ai'/)
-    expect(o).toMatch(/if \(p\.persistido && evidencia\.includes\('SELLER_OFFER_ELIGIBLE'\) && carrito\.id && !motivoValidacion\)/)
-    expect(o).toMatch(/const r = await rpc\('cc_solicitar_asesor'/); expect(o).toMatch(/p_accion: 'aceptar'/); expect(o).toMatch(/p_accion: 'rechazar'/)
+    expect(o).not.toMatch(/SELLER_OFFER|cc_carrito_oferta|p_accion/)
+    expect(o).toMatch(/case 'solicitar_asesor': return rpc\('cc_solicitar_asesor'/); expect(o).toMatch(/case 'declinar_asesor': return rpc\('cc_handoff_rechazar', \{ p_conv: e\.conv, p_actor_type: 'ai'/)
+    expect(o).toMatch(/const hs = await rpc\('cc_ia_estado_handoff', \{ p_conv: e\.conv \}\)/)
     expect(o).not.toMatch(/^import /m)
   })
 })
@@ -120,7 +124,10 @@ describe('frontend', () => {
     expect(p).toMatch(/Precio al verificar tu cuenta/)
     expect(codigo(opsSrc)).not.toMatch(/\.from\(|price_list|discount|seller/)
   })
-  it('AF · el catálogo legacy del doctor (carrito en memoria + checkout W1) sigue intacto: CC-5 no crea dos carritos de servidor ni lo rompe', () => {
-    expect(catalogoLegacy).toMatch(/const \[cart, setCart\] = useState<Cart>\(\{\}\)/); expect(catalogoLegacy).not.toMatch(/data\/ops\/carrito|cc_carrito/)
+  it('AF · CC-7 · el Catálogo del doctor converge al carrito CANÓNICO (una sola verdad comercial); el carrito local queda solo para modo demo', () => {
+    expect(catalogoLegacy).toMatch(/const canon = useCarritoCanonico\(hasSupabase\)/)
+    expect(catalogoLegacy).toMatch(/const cart: Cart = hasSupabase \? canon\.qty : cartLocal/)
+    expect(catalogoLegacy).toMatch(/hasSupabase\s*\? confirmarCanonico\(invoice, choice, receiver\)/)
+    expect(catalogoLegacy).not.toMatch(/cc_carrito_|supabase\.rpc/)   // todo por el cliente de la Edge cart
   })
 })

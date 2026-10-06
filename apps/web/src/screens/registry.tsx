@@ -46,6 +46,7 @@ import { Comunicaciones } from './admin/Comunicaciones'
 import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
 import { Conocimiento } from './admin/Conocimiento' // CC-3
+import { AtencionComercialPantalla } from './admin/AtencionComercial' // CC-7
 import { Mermas } from './admin/Mermas'
 import { Importar } from './admin/Importar'
 import { Eventos } from './pos/Eventos'
@@ -58,7 +59,7 @@ import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
 import { ChatCanonico } from './chat/ChatCanonico'
-import { Asesorias } from './chat/Asesorias'
+import { AsesoriasPantalla } from './chat/Asesorias'
 
 // Pantallas reales ya construidas (por key de pantalla).
 const SCREENS: Record<string, () => React.ReactNode> = {
@@ -101,6 +102,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_precios: () => <Precios />,
   av_comisiones: () => <Comisiones />,
   av_conocimiento: () => <Conocimiento />,
+  av_atencion: () => <AtencionComercialPantalla />,   // CC-7
   av_config: () => <Configuracion />,
   av_mermas: () => <Mermas />,
   av_control_inv: () => <ControlInventario />,
@@ -114,7 +116,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_custodias: () => <Custodias />,
   // CC-2 · conversación canónica
   chat_cc: () => <ChatCanonico embebido />,
-  asesorias: () => <Asesorias />,
+  asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

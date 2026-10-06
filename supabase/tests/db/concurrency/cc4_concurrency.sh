@@ -17,7 +17,7 @@ SVC="select tests.act_as_service();"
 HA=$(printf '4%.0s' $(seq 1 64)); HB=$(printf '5%.0s' $(seq 1 64)); HC=$(printf '6%.0s' $(seq 1 64)); HD=$(printf '7%.0s' $(seq 1 64))   # hashes propios: cc1/cc2 concurrency usan a-d y dejan estado
 
 "${P[@]}" -c "do \$\$ declare p1 uuid := tests.user('pos'); begin
-  delete from tests.ctx where key like 'cc4_%'; insert into tests.ctx values ('cc4_p1', p1);
+  delete from tests.ctx where key like 'cc4_%'; insert into tests.ctx values ('cc4_p1', p1), ('cc4_adm', tests.fixture_admin());
   perform tests.act_as_service();
   update public.profiles set meta = coalesce(meta,'{}') || '{\"capabilities\":[\"conversaciones\"]}' where id = p1;
   perform public.cc_visitante_abrir(null, '$HA', '{}'::jsonb, null); perform public.cc_visitante_abrir(null, '$HB', '{}'::jsonb, null);
@@ -60,14 +60,16 @@ check "B · el viejo terminó completed (antes) o discarded:superado; nunca runn
 CC=$(conv "$HC"); S1=$(msg "$CC" "$HC" c:1)
 TC=$("${P[@]}" -c "$SVC select public.cc_ia_turno_reclamar('$CC', $S1, 'falso', 'f', 60) ->> 'turn_id'" | tail -n1)
 "${P[@]}" -c "$SVC select public.cc_solicitar_asesor('$CC', 'visitor', '$HC', null)" >/dev/null
-("${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc4_p1'), tests.id('cc4_p1'))" > "$T/c1.out" 2>&1) &
+# CC-7 · la IA sigue con asesor asignado; el takeover que compite con ella es INICIAR la sesión humana.
+"${P[@]}" -c "$SVC select public.cc_asignar_asesor('$CC', tests.id('cc4_adm'), tests.id('cc4_p1'))" >/dev/null
+("${P[@]}" -c "$SVC select public.cc_iniciar_asesoria('$CC', tests.id('cc4_p1'))" > "$T/c1.out" 2>&1) &
 ("${P[@]}" -c "$SVC select public.cc_ia_turno_responder('$TC', 'respuesta tardía') ->> 'persistido'" > "$T/c2.out" 2>&1) &
 wait
 # (now() es el inicio de la transacción: los timestamps no sirven para ordenar dos tx que compitieron por el lock;
 #  la garantía es por construcción —responder re-verifica el modo bajo el MISMO lock que el takeover— y se
 #  comprueba como estado final consistente: completed ⇔ hay mensaje ai; discarded ⇔ no lo hay.)
 check "C · estado final determinista: completed con mensaje, o discarded sin mensaje (nunca running ni mezcla)" "select (status = 'completed') = exists (select 1 from public.cc_messages m where m.conversation_id = '$CC' and m.actor_type = 'ai') and status in ('completed','discarded') from public.cc_ai_turns where id = '$TC'"
-check "C · la conversación quedó con asesor asignado" "select modo = 'human_assigned' and seller_profile_id = tests.id('cc4_p1') from public.cc_conversations where id = '$CC'"
+check "C · la conversación quedó con la sesión humana iniciada por su asesor" "select modo = 'human_active' and seller_profile_id = tests.id('cc4_p1') from public.cc_conversations where id = '$CC'"
 
 # ── D) cierre mientras corre
 CD=$(conv "$HD"); S1=$(msg "$CD" "$HD" c:1)

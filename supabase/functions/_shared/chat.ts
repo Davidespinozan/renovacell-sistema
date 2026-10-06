@@ -55,7 +55,8 @@ export function mapearErrorChat(mensaje: string | undefined): { status: number; 
 }
 
 // ¿El modo permite que la IA escriba? (espejo de la regla de la base; la base manda).
-export const IA_PUEDE = (modo: string): boolean => modo === 'ai_active' || modo === 'human_offered' || modo === 'human_requested'
+// CC-7 · la IA sigue hasta que el asesor INICIA la sesión (human_active); asignado ≠ activo.
+export const IA_PUEDE = (modo: string): boolean => modo === 'ai_active' || modo === 'human_offered' || modo === 'human_requested' || modo === 'human_assigned'
 
 // Contexto reciente para el adaptador de IA: solo texto y rol, últimos N turnos, sin ids ni hashes.
 export function historialParaIA(mensajes: Array<{ actor: string; content: string }>, maximo = 12): Array<{ role: 'user' | 'assistant'; content: string }> {

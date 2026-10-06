@@ -1,5 +1,9 @@
 // Catálogo del Portal del Doctor + flujo "armar pedido".
 // Catálogo (products_safe) -> agregar al pedido -> revisar -> crear (contra pedido).
+// CC-7 · Con backend, el carrito de esta pantalla ES el carrito canónico del servidor (el mismo del
+// Chat): cada +/− es un comando idempotente, el primer artículo dispara el handoff comercial en el
+// servidor y la compra se confirma con revisión + confirmación canónicas (CC-6). Sin backend (demo)
+// se conserva el carrito local.
 // Sin costo/margen (forma products_safe). Todos los productos tienen precio.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
@@ -25,6 +29,13 @@ import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { PedidoCreado } from '../../data/store/ordersStore'
+import { setOrderFiscalSnapshot, reloadOrders } from '../../data/store/ordersStore'
+import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
+import { carrito as clienteCarrito, nuevaOperacion, ETIQUETA_MOTIVO, textoProblemas } from '../../data/ops/carrito'
+
+// Lo que el modal necesita del pedido creado (legado u origen canónico).
+type PedidoMin = Pick<OrderWithItems, 'id' | 'external_ref' | 'total'>
+type ResultadoPedido = { ok: true; order: PedidoMin; aviso?: string } | { ok: false; error: string }
 
 type LineFilter = 'all' | 'cosm' | 'prof'
 type Cart = Record<string, number>
@@ -46,7 +57,13 @@ export function Catalogo() {
   const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty)
 
   const [filter, setFilter] = useState<LineFilter>('all')
-  const [cart, setCart] = useState<Cart>({})
+  const canon = useCarritoCanonico(hasSupabase)            // CC-7 · carrito canónico (servidor)
+  const [cartLocal, setCartLocal] = useState<Cart>({})      // solo modo demo (sin backend)
+  const cart: Cart = hasSupabase ? canon.qty : cartLocal
+  const setQty = (id: string, n: number) => {
+    if (hasSupabase) { void canon.fijar(id, n); return }
+    setCartLocal((c) => { if (n <= 0) { const { [id]: _d, ...rest } = c; return rest } return { ...c, [id]: n } })
+  }
   const [checkout, setCheckout] = useState(false)
   const [reorderNote, setReorderNote] = useState<string | null>(null)
 
@@ -58,7 +75,7 @@ export function Catalogo() {
   const seedRef = useRef(takeReorderSeed())
   useEffect(() => {
     const seed = seedRef.current
-    if (!seed || products.length === 0) return
+    if (!seed || products.length === 0 || (hasSupabase && !canon.listo)) return
     seedRef.current = null
     const next: Cart = {}
     let dropped = 0
@@ -73,7 +90,11 @@ export function Catalogo() {
       if (q < qty) capped += 1
       next[product_id] = q
     })
-    if (Object.keys(next).length > 0) setCart(next)
+    if (Object.keys(next).length > 0) {
+      // Rearmar = reemplazar el carrito (canónico: vaciar y fijar cada renglón, serializado).
+      if (hasSupabase) void (async () => { await canon.vaciar(); for (const [pid, q] of Object.entries(next)) await canon.fijar(pid, q) })()
+      else setCartLocal(next)
+    }
     if (dropped > 0 || capped > 0) {
       const parts: string[] = []
       if (dropped > 0) parts.push(`${dropped} producto(s) ya no están disponibles`)
@@ -82,7 +103,7 @@ export function Catalogo() {
     } else if (Object.keys(next).length > 0) {
       setReorderNote('Rearmamos tu pedido anterior. Revísalo y confírmalo.')
     }
-  }, [products, stockMap])
+  }, [products, stockMap, canon.listo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Agrupa producto→variantes: una tarjeta por familia (padre con hijas) + productos standalone.
   // Las variantes NUNCA se listan sueltas; se eligen dentro del modal de la familia.
@@ -110,24 +131,17 @@ export function Catalogo() {
 
   // No se puede pedir más de lo disponible en inventario. Ni un producto sin
   // precio publicado (price null = "a consultar"): evita un pedido con renglón a $0.
-  const add = (id: string) => setCart((c) => {
+  const add = (id: string) => {
     const prod = products.find((p) => p.id === id)
-    if (!prod || priceOf(prod) == null) return c
+    if (!prod || priceOf(prod) == null) return
     const info = stockInfoFor(stockMap, id)
     const max = info.tracked ? info.qty : 0
-    const next = (c[id] ?? 0) + 1
-    return next > max ? c : { ...c, [id]: next }
-  })
-  const dec = (id: string) =>
-    setCart((c) => {
-      const q = (c[id] ?? 0) - 1
-      if (q <= 0) {
-        const { [id]: _drop, ...rest } = c
-        return rest
-      }
-      return { ...c, [id]: q }
-    })
-  const clear = () => setCart({})
+    const next = (cart[id] ?? 0) + 1
+    if (next > max) return
+    setQty(id, next)
+  }
+  const dec = (id: string) => setQty(id, (cart[id] ?? 0) - 1)
+  const clear = () => { if (hasSupabase) void canon.vaciar(); else setCartLocal({}) }
 
   // Domicilio base del doctor (si lo tiene registrado). Si no, el checkout pide la
   // dirección de entrega — el pedido siempre viaja con una dirección.
@@ -137,15 +151,42 @@ export function Catalogo() {
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) =>
-    createOrder({
+  // CC-7 · confirmación CANÓNICA: revisión (precio/stock/dirección del servidor) → confirmación del
+  // doctor → pedido W1 en la misma transacción que convierte el carrito. Luego, si pidió factura, se
+  // congela su perfil fiscal en el pedido (igual que el flujo anterior).
+  const confirmarCanonico = async (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null): Promise<ResultadoPedido> => {
+    await canon.esperar()
+    const c = canon.cart
+    if (!c) return { ok: false, error: 'Tu carrito no está disponible. Recarga la página.' }
+    const rv = await clienteCarrito.revisarCheckout(c.cart_id, choice?.locationId ?? null, choice?.locationId ? null : choice?.address ?? null)
+    if (!rv.ok) return { ok: false, error: rv.error.mensaje }
+    if (!rv.data.listo || !rv.data.review_id || rv.data.cart_rev == null) {
+      if (rv.data.order_id) { void canon.recargar(); reloadOrders(); return { ok: true, order: { id: rv.data.order_id, external_ref: null, total: null } } }   // ya se había convertido (reintento)
+      const nombre = (id: string) => products.find((p) => p.id === id)?.name ?? 'producto'
+      return { ok: false, error: `Antes de pedir: ${textoProblemas(rv.data.problemas, nombre)}.` }
+    }
+    const cf = await clienteCarrito.confirmarCheckout(rv.data.review_id, rv.data.cart_rev, nuevaOperacion(), invoice)
+    if (!cf.ok) return { ok: false, error: cf.error.mensaje }
+    if (!cf.data.confirmado || !cf.data.order_id) return { ok: false, error: ETIQUETA_MOTIVO[cf.data.motivo ?? ''] ?? 'No se pudo confirmar. Vuelve a revisar tu pedido.' }
+    let aviso: string | undefined
+    if (invoice && receiver) {
+      const f = await setOrderFiscalSnapshot(cf.data.order_id, receiver)
+      if (!f.ok) aviso = 'Tu pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.'
+    }
+    void canon.recargar(); reloadOrders()
+    return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null }, aviso }
+  }
+
+  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null): Promise<ResultadoPedido> => hasSupabase
+    ? confirmarCanonico(invoice, choice, receiver)
+    : createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) })),
       total,
       invoice_requested: invoice,
       shipping: choice?.address ?? null,
       location_id: choice?.locationId ?? null,
       receiver: invoice ? receiver : null,
-    })
+    }).then((r: PedidoCreado): ResultadoPedido => (r.ok ? { ok: true, order: r.order } : { ok: false, error: r.error }))
 
   if (loading) return <div className="card">Cargando catálogo…</div>
 
@@ -192,6 +233,7 @@ export function Catalogo() {
       )}
 
       {/* DERECHA: pedido en curso */}
+      {hasSupabase && canon.error && <div role="alert" className="sysnote" style={{ gridColumn: '1 / -1' }}>{canon.error}</div>}
       <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
 
       {checkout && (
@@ -202,7 +244,7 @@ export function Catalogo() {
           base={baseAddr}
           onConfirm={onConfirm}
           onPay={(orderId, r) => payOrder(orderId, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
-          onDone={clear}
+          onDone={hasSupabase ? () => { void canon.recargar() } : clear}   // canónico: el carrito ya quedó convertido en el servidor
           onClose={() => setCheckout(false)}
         />
       )}
@@ -445,14 +487,15 @@ function CheckoutModal({
   total: number
   priceOf: (p: ProductSafe) => number | null
   base: ShippingAddress | null
-  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => Promise<PedidoCreado>
+  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => Promise<ResultadoPedido>
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
 }) {
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)
-  const [order, setOrder] = useState<OrderWithItems | null>(null)
+  const [order, setOrder] = useState<PedidoMin | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
   const [payNow, setPayNow] = useState(false)
   // Perfil fiscal para "Solicitar factura": AUTORIDAD = customers.meta.fiscal (master).
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
@@ -506,7 +549,7 @@ function CheckoutModal({
     // Si el servidor NO creó el pedido, el carrito se conserva: vaciarlo aquí
     // haría que el doctor pierda su selección por un pedido que no existe.
     if (!r.ok) { setErrorPedido(r.error); return }
-    setOrder(r.order)
+    setOrder(r.order); setAviso(r.aviso ?? null)
     onDone() // limpia el carrito — solo con el pedido confirmado
   }
 
@@ -532,9 +575,10 @@ function CheckoutModal({
               <div className="ck"><Icon name="check" /></div>
               <h3>Pedido creado</h3>
               <p>
-                Tu pedido <b>{order.external_ref}</b> quedó registrado. Págalo ahora para que
+                Tu pedido <b>{order.external_ref ?? 'nuevo'}</b> quedó registrado. Págalo ahora para que
                 entre a preparación, o más tarde desde <b>Mis pedidos</b>.
               </p>
+              {aviso && <p role="alert" style={{ color: 'var(--warn)', fontSize: 13 }}>{aviso}</p>}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Pagar después</button>
                 <button className="btn" type="button" onClick={() => setPayNow(true)}>

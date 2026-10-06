@@ -19,6 +19,9 @@ import { statusView } from './orderStatus'
 import type { AssistantReply } from '../../data/assistant/engine'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
+import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'   // CC-7
+import { seedReorder } from '../../data/store/reorderStore'
+import { useRole } from '../../auth/RoleContext'
 
 interface ChatMsg {
   id: string
@@ -71,7 +74,11 @@ export function Asistente() {
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     { id: 'm-0', role: 'assistant', text: GREETING },
   ])
-  const [draft, setDraft] = useState<DraftLine[]>([])
+  const [draft, setDraft] = useState<DraftLine[]>([])   // solo modo demo (sin backend)
+  // CC-7 · Con backend, "pedido en armado" ES el carrito canónico (el mismo del Catálogo y del Chat):
+  // agregar aquí pasa por la mutación del servidor (handoff incluido) y la compra se confirma en el Catálogo.
+  const canon = useCarritoCanonico(hasSupabase)
+  const { setScreen } = useRole()
   const [input, setInput] = useState('')
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -96,9 +103,14 @@ export function Asistente() {
     // No agregar más de lo disponible en inventario.
     const info = stockInfoFor(stockMap, product.id)
     const max = info.tracked ? info.qty : 0
-    const cur = draft.find((d) => d.product.id === product.id)?.qty ?? 0
+    const cur = (hasSupabase ? canon.qty[product.id] : draft.find((d) => d.product.id === product.id)?.qty) ?? 0
     if (max <= 0) { push({ role: 'assistant', text: `${product.name} está agotado ahora mismo.` }); return }
     if (cur >= max) { push({ role: 'assistant', text: `Solo hay ${max} u de ${product.name} disponibles.` }); return }
+    if (hasSupabase) {
+      void canon.fijar(product.id, cur + 1)
+      push({ role: 'assistant', text: `Agregué ${product.name} a tu carrito (es el mismo del Catálogo y del Chat).` })
+      return
+    }
     setDraft((prev) => {
       const found = prev.find((d) => d.product.id === product.id)
       if (found) return prev.map((d) => (d.product.id === product.id ? { ...d, qty: d.qty + 1 } : d))
@@ -109,7 +121,15 @@ export function Asistente() {
 
   const draftTotal = draft.reduce((s, d) => s + (priceOf(d.product) ?? 0) * d.qty, 0)
 
+  const nArmado = hasSupabase ? Object.keys(canon.qty).length : draft.length
+  const totalArmado = hasSupabase ? (canon.cart?.total.estado === 'completo' ? canon.cart.total.monto ?? 0 : null) : draftTotal
+  const irAlCatalogo = () => {
+    push({ role: 'assistant', text: 'Revisa tu carrito y confirma el pedido en el Catálogo: ahí eliges la dirección de entrega y si quieres factura.' })
+    setScreen('catalogo')
+  }
+
   const crearPedido = async () => {
+    if (hasSupabase) { irAlCatalogo(); return }   // CC-7 · la compra canónica se confirma en el Catálogo (revisión + confirmación)
     if (draft.length === 0) return
     const d = resolveDelivery()
     if (!d.ok) { push({ role: 'assistant', text: d.reason }); return }
@@ -135,6 +155,12 @@ export function Asistente() {
   }
 
   const reorder = async (o: OrderWithItems) => {
+    if (hasSupabase) {   // CC-7 · "Volver a pedir" rearma el carrito canónico en el Catálogo (capado al stock allí)
+      seedReorder(o.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty })))
+      push({ role: 'assistant', text: `Rearmé ${o.external_ref ?? 'tu pedido'} en tu carrito; revísalo y confírmalo en el Catálogo.` })
+      setScreen('catalogo')
+      return
+    }
     // Topa cada renglón al inventario disponible; descarta lo agotado.
     const lines = o.items
       .map((it) => {
@@ -224,17 +250,17 @@ export function Asistente() {
         </div>
 
         {/* Pedido en armado */}
-        {draft.length > 0 && (
+        {nArmado > 0 && (
           <div className="asst-draft">
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink-3)', fontWeight: 700 }}>Pedido en armado</div>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink-3)', fontWeight: 700 }}>{hasSupabase ? 'Tu carrito' : 'Pedido en armado'}</div>
               <div style={{ fontSize: 13 }}>
-                {draft.length} artículo(s) · <b className="mono">{money(draftTotal)}</b>
+                {nArmado} artículo(s){totalArmado != null && <> · <b className="mono">{money(totalArmado)}</b></>}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-              <button className="btn ghost sm" type="button" onClick={() => setDraft([])}>Vaciar</button>
-              <button className="btn sm" type="button" onClick={crearPedido}><Plus size={14} /> Crear pedido</button>
+              <button className="btn ghost sm" type="button" onClick={() => (hasSupabase ? void canon.vaciar() : setDraft([]))}>Vaciar</button>
+              <button className="btn sm" type="button" onClick={crearPedido}><Plus size={14} /> {hasSupabase ? 'Revisar y pedir' : 'Crear pedido'}</button>
             </div>
           </div>
         )}

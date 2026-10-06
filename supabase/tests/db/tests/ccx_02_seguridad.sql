@@ -21,7 +21,7 @@ begin
   perform tests.eq(n, 0, 'anon solo ejecuta lecturas públicas de conocimiento (' || coalesce(lst, '') || ')');
   select count(*), string_agg(p.proname, ',') into n, lst from pg_proc p join pg_namespace s on s.oid = p.pronamespace where s.nspname = 'public' and p.proname ~ '^cc_(visitante|abrir_conversacion|enviar_mensaje|ia_|carrito_|codigo)' and has_function_privilege('authenticated', p.oid, 'EXECUTE') and p.proname not in ('cc_codigo_referido_crear', 'cc_codigo_referido_revocar');
   perform tests.eq(n, 0, 'comandos de servidor (visitante/conversación/IA/carrito) no ejecutables por authenticated (' || coalesce(lst, '') || ')');
-  perform tests.ok(has_function_privilege('authenticated', 'public.cc_checkout_confirmar(uuid,text,int)', 'EXECUTE') and not has_function_privilege('anon', 'public.cc_checkout_confirmar(uuid,text,int)', 'EXECUTE'), 'checkout: authenticated sí (deriva auth.uid), anon no');
+  perform tests.ok(has_function_privilege('authenticated', 'public.cc_checkout_confirmar(uuid,text,int,boolean)', 'EXECUTE') and not has_function_privilege('anon', 'public.cc_checkout_confirmar(uuid,text,int,boolean)', 'EXECUTE'), 'checkout: authenticated sí (deriva auth.uid), anon no');
   perform tests.ok(not exists (select 1 from pg_default_acl d join pg_roles r on r.oid = d.defaclrole join pg_namespace s on s.oid = d.defaclnamespace where r.rolname = 'postgres' and s.nspname = 'public' and array_to_string(d.defaclacl, ',') like '%anon=%'), 'D-CC0B: sin default privileges para anon en public');
   perform tests.ok(not has_table_privilege('authenticated', 'public.cc_product_knowledge', 'SELECT') and not has_table_privilege('anon', 'public.cc_product_knowledge', 'SELECT'), 'borradores de conocimiento sin lectura directa');
 end $t$;
