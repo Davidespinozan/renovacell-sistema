@@ -9,12 +9,17 @@
 //   · público → 'ip:<hash>' derivado de la IP; y SIEMPRE además un cubo 'global' por
 //     scope, que es la garantía dura: aunque la IP se falsifique, el total por endpoint
 //     tiene techo.
-//   IP: NO se pudo probar desde el repo/documentación qué cabecera fija el gateway de
-//   Supabase. Estrategia conservadora (fail closed): se toma el ÚLTIMO valor de
-//   `x-forwarded-for` (el que añade el proxy más cercano, el más difícil de falsificar
-//   desde el cliente) o, si no existe, `cf-connecting-ip`; sin ninguna → 'ip:desconocida',
-//   un cubo compartido y por tanto más estricto. Nunca se guarda la IP cruda: se guarda
-//   un hash (HMAC con RATE_LIMIT_SALT si existe; SHA-256 si no).
+//   IP: la ÚNICA cabecera de confianza es `cf-connecting-ip`. Probado en producción
+//   (06-oct-2026, sonda temporal detrás del gateway de Supabase): la fija Cloudflare con la
+//   IP real del cliente, es estable entre peticiones del mismo cliente (observado v4) y una
+//   petición que trae su propia `cf-connecting-ip` recibe 403 (error 1000) ANTES de llegar
+//   a la Edge. En cambio `x-forwarded-for` llega reescrita como "cliente, cliente, proxy"
+//   con un ÚLTIMO salto que cambia en cada petición (el primer diseño lo usaba y fragmentó
+//   el cubo por IP), y `x-real-ip`/`true-client-ip` pasan tal cual las escribe el cliente.
+//   Por eso NO hay fallback a otras cabeceras: sin `cf-connecting-ip` válida (ausente,
+//   malformada, con comas, demasiado larga) el sujeto es 'ip:desconocida', un cubo
+//   compartido y por tanto MÁS estricto; el límite nunca se apaga. Nunca se guarda la IP
+//   cruda: se guarda un hash (HMAC con RATE_LIMIT_SALT si existe; SHA-256 si no).
 //
 // Fallos: si la base no responde o devuelve algo inesperado, `limitar` devuelve
 // `permitido: false, estado: 'sin_limiter'` → el endpoint responde 503. Para endpoints con
@@ -116,16 +121,45 @@ export function regla(scope: string, env: (k: string) => string | undefined = en
 // ---------------------------------------------------------------------------
 // SUJETO
 // ---------------------------------------------------------------------------
-export function ipDe(req: Request): string | null {
-  const xff = req.headers.get('x-forwarded-for')
-  if (xff) {
-    const partes = xff.split(',').map((s) => s.trim()).filter(Boolean)
-    const ultimo = partes[partes.length - 1]
-    if (ultimo && /^[0-9a-fA-F.:]{3,45}$/.test(ultimo)) return ultimo
+/** Cabecera que fija el gateway (Cloudflare) y que un cliente NO puede suministrar. */
+export const CABECERA_IP_CONFIABLE = 'cf-connecting-ip'
+const IP_MAX_LEN = 45
+const RE_V4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/
+
+function esIpv6(t: string): boolean {
+  if (!/^[0-9a-f:.]+$/.test(t) || !t.includes(':')) return false
+  const dobles = t.split('::').length - 1
+  if (dobles > 1) return false
+  let cuerpo = t
+  if (/\.\d{1,3}$/.test(t)) {                      // IPv4 embebida (::ffff:203.0.113.9)
+    const i = t.lastIndexOf(':')
+    if (!RE_V4.test(t.slice(i + 1))) return false
+    cuerpo = t.slice(0, i + 1) + '0:0'
   }
-  const cf = req.headers.get('cf-connecting-ip')
-  if (cf && /^[0-9a-fA-F.:]{3,45}$/.test(cf.trim())) return cf.trim()
-  return null
+  const grupos = cuerpo.split(':')
+  const llenos = grupos.filter(Boolean)
+  if (grupos.length > 9) return false
+  if (dobles === 0 && (grupos.length !== 8 || llenos.length !== 8)) return false
+  if (dobles === 1 && llenos.length > 7) return false
+  return llenos.every((g) => /^[0-9a-f]{1,4}$/.test(g))
+}
+
+/**
+ * Normaliza UNA dirección IP (v4 o v6) o devuelve null. Rechaza listas (comas), espacios,
+ * zonas (%), valores largos y cualquier cosa que no sea una IP bien formada: una cadena
+ * arbitraria nunca puede fabricar un sujeto nuevo.
+ */
+export function normalizarIp(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const t = v.trim().toLowerCase()
+  if (!t || t.length > IP_MAX_LEN || /[\s,%\[\]]/.test(t)) return null
+  if (RE_V4.test(t)) return t
+  return esIpv6(t) ? t : null
+}
+
+/** IP del cliente según la única cabecera confiable; null si falta o es inválida. */
+export function ipDe(req: Request): string | null {
+  return normalizarIp(req.headers.get(CABECERA_IP_CONFIABLE))
 }
 
 async function hash(texto: string, llave: string | undefined): Promise<string> {

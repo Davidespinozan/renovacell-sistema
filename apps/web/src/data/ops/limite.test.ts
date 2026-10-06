@@ -3,7 +3,7 @@
 // filtrar detalles, 429 controlado, seam de CAPTCHA dormido sin secreto.
 import { describe, it, expect } from 'vitest'
 import {
-  LIMITES, FACTOR_DESAFIO, regla, ipDe, sujetoPublico, sujetoUid, limitar, limitarTodas, respuestaLimite, desafioResuelto, tokensEstimados,
+  LIMITES, FACTOR_DESAFIO, regla, ipDe, normalizarIp, CABECERA_IP_CONFIABLE, sujetoPublico, sujetoUid, limitar, limitarTodas, respuestaLimite, desafioResuelto, tokensEstimados,
   type ClienteRpc, type Veredicto,
 } from '../../../../../supabase/functions/_shared/limite'
 
@@ -40,28 +40,60 @@ describe('reglas centralizadas', () => {
 
 describe('sujeto', () => {
   it('E · authenticated: uid', () => { expect(sujetoUid('abc')).toBe('uid:abc') })
-  it('F · IP: último salto de x-forwarded-for (el del proxy), no el primero que escribe el cliente', () => {
-    expect(ipDe(req({ 'x-forwarded-for': '1.1.1.1, 203.0.113.9' }))).toBe('203.0.113.9')
-    expect(ipDe(req({ 'x-forwarded-for': 'evil, also evil, 203.0.113.9' }))).toBe('203.0.113.9')
+  it('la autoridad de IP es cf-connecting-ip (la fija el gateway; el cliente no puede suministrarla)', () => {
+    expect(CABECERA_IP_CONFIABLE).toBe('cf-connecting-ip')
     expect(ipDe(req({ 'cf-connecting-ip': '198.51.100.7' }))).toBe('198.51.100.7')
-    expect(ipDe(req({ 'x-forwarded-for': 'not an ip at all!!' }))).toBeNull()
+    expect(ipDe(req({ 'cf-connecting-ip': ' 198.51.100.7 ' }))).toBe('198.51.100.7')
+  })
+  it('A · misma cf-connecting-ip repetida → mismo sujeto; B · distinta → distinto', async () => {
+    const a1 = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9' }), sinEnv)
+    const a2 = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9' }), sinEnv)
+    const b = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.10' }), sinEnv)
+    expect(a1).toMatch(/^ip:[0-9a-f]{32}$/); expect(a1).toBe(a2); expect(b).not.toBe(a1)
+  })
+  it('C/D · x-forwarded-for con último salto cambiante o falsificada NO altera el sujeto cuando hay primaria', async () => {
+    const base = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9' }), sinEnv)
+    for (const xff of ['203.0.113.9, 203.0.113.9, 172.16.0.1', '203.0.113.9, 203.0.113.9, 172.16.0.2', '9.9.9.9', 'evil, also evil, 8.8.8.8']) {
+      expect(await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': xff }), sinEnv)).toBe(base)
+    }
+    // x-real-ip / true-client-ip pasan tal cual los escribe el cliente: se ignoran
+    expect(await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9', 'x-real-ip': '8.8.8.8', 'true-client-ip': '8.8.8.8' }), sinEnv)).toBe(base)
+  })
+  it('E/F · sin primaria o malformada → cubo compartido determinista, nunca un sujeto nuevo ni límite apagado', async () => {
     expect(ipDe(req())).toBeNull()
-  })
-  it('F · el sujeto público es un hash (nunca la IP cruda); sin IP → cubo compartido "desconocida"', async () => {
-    const s = await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.9' }), sinEnv)
-    expect(s).toMatch(/^ip:[0-9a-f]{32}$/)
-    expect(s).not.toContain('203.0.113.9')
-    expect(await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.9' }), sinEnv)).toBe(s)
-    expect(await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.10' }), sinEnv)).not.toBe(s)
     expect(await sujetoPublico(req(), sinEnv)).toBe('ip:desconocida')
-    // con sal, el hash cambia (y sigue sin ser la IP)
-    const conSal = await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.9' }), env({ RATE_LIMIT_SALT: 'secreto' }))
-    expect(conSal).toMatch(/^ip:[0-9a-f]{32}$/); expect(conSal).not.toBe(s)
+    // sin cf-connecting-ip, x-forwarded-for / x-real-ip NO sirven de fallback (no son confiables)
+    expect(await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.9' }), sinEnv)).toBe('ip:desconocida')
+    expect(await sujetoPublico(req({ 'x-real-ip': '203.0.113.9' }), sinEnv)).toBe('ip:desconocida')
+    for (const mala of ['not an ip at all!!', '999.1.1.1', '1.2.3', '1.2.3.4.5', 'fe80::1%eth0', '[::1]', '', '   ']) {
+      expect(await sujetoPublico(req({ 'cf-connecting-ip': mala }), sinEnv)).toBe('ip:desconocida')
+    }
   })
-  it('F · un cliente no puede fabricar un sujeto "limpio" anteponiendo IPs: el último salto manda', async () => {
-    const real = await sujetoPublico(req({ 'x-forwarded-for': '203.0.113.9' }), sinEnv)
-    const falso = await sujetoPublico(req({ 'x-forwarded-for': '10.0.0.1, 8.8.8.8, 203.0.113.9' }), sinEnv)
-    expect(falso).toBe(real)
+  it('G/H · IPv4 e IPv6 válidas se normalizan (minúsculas, sin espacios)', () => {
+    expect(normalizarIp('203.0.113.9')).toBe('203.0.113.9')
+    expect(normalizarIp('0.0.0.0')).toBe('0.0.0.0')
+    expect(normalizarIp('2001:DB8::1')).toBe('2001:db8::1')
+    expect(normalizarIp('::1')).toBe('::1')
+    expect(normalizarIp('2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toBe('2001:0db8:85a3:0000:0000:8a2e:0370:7334')
+    expect(normalizarIp('::ffff:203.0.113.9')).toBe('::ffff:203.0.113.9')
+    expect(normalizarIp('1:2:3:4:5:6:7:8:9')).toBeNull()
+    expect(normalizarIp('1::2::3')).toBeNull()
+    expect(normalizarIp('12345::1')).toBeNull()
+    expect(normalizarIp('::ffff:999.0.113.9')).toBeNull()
+  })
+  it('I/J · primaria con comas o muy larga → inválida (no se toma "la primera")', async () => {
+    expect(normalizarIp('1.2.3.4, 5.6.7.8')).toBeNull()
+    expect(normalizarIp('1.2.3.4,5.6.7.8')).toBeNull()
+    expect(normalizarIp('a'.repeat(300))).toBeNull()
+    expect(normalizarIp('2001:db8::' + '1'.repeat(40))).toBeNull()
+    expect(await sujetoPublico(req({ 'cf-connecting-ip': '1.2.3.4, 5.6.7.8' }), sinEnv)).toBe('ip:desconocida')
+    expect(await sujetoPublico(req({ 'cf-connecting-ip': 'x'.repeat(300) }), sinEnv)).toBe('ip:desconocida')
+  })
+  it('el sujeto público es un hash (nunca la IP cruda); con sal cambia y sigue sin ser la IP', async () => {
+    const s = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9' }), sinEnv)
+    expect(s).not.toContain('203.0.113.9')
+    const conSal = await sujetoPublico(req({ 'cf-connecting-ip': '203.0.113.9' }), env({ RATE_LIMIT_SALT: 'secreto' }))
+    expect(conSal).toMatch(/^ip:[0-9a-f]{32}$/); expect(conSal).not.toBe(s); expect(conSal).not.toContain('203.0.113.9')
   })
 })
 
