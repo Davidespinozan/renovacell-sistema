@@ -17,6 +17,7 @@ import { useCompras } from '../data/hooks/useCompras'
 import { useCustodies } from '../data/hooks/useCustody'
 import { useRevisionFiscal } from '../data/hooks/useRevisionFiscal'
 import { useComunicaciones } from '../data/hooks/useComunicaciones'
+import { useSaludSistema } from '../data/hooks/useSaludSistema'
 import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
@@ -121,8 +122,10 @@ export function Bandeja() {
   // junto a productos que siguen sin validar.
   const [fiscalPend, setFiscalPend] = useState(0)
   const [mensajesPend, setMensajesPend] = useState(0)
-  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend
-  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0
+  // W6-A3.2 · salud del sistema: una fuente = a lo sumo UNA incidencia visible (0 o 1).
+  const [saludPend, setSaludPend] = useState(0)
+  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend + saludPend
+  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0 && saludPend === 0
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -142,6 +145,7 @@ export function Bandeja() {
       )}
       {role === 'admin' && <ColaMensajes onGo={() => setScreen('av_mensajes')} onCount={setMensajesPend} />}
       {role === 'admin' && <ColaFiscal onGo={() => setScreen('av_fiscal')} onCount={setFiscalPend} />}
+      {role === 'admin' && <ColaSalud onCount={setSaludPend} />}
     </div>
   )
 }
@@ -175,6 +179,33 @@ function ColaMensajes({ onGo, onCount }: { onGo: () => void; onCount: (n: number
       detail: 'No salieron, no se confirmaron o el cliente no tiene correo.',
       count: n, tone: 'warn', screen: 'av_mensajes',
     }} />
+  )
+}
+
+// W6-A3.2 · Salud del sistema (procesos automáticos). Solo Dirección la consulta y solo
+// aparece cuando el SERVIDOR ya clasificó un problema (FAILED / STALE) o cuando no se
+// pudo consultar: un error de lectura no es "todo al día". Sin botón: no hay nada que
+// reparar desde aquí; el mensaje viene redactado del servidor, sin detalles internos.
+function ColaSalud({ onCount }: { onCount: (n: number) => void }) {
+  const salud = useSaludSistema()
+  const visible = salud.estado === 'unhealthy' || salud.estado === 'read_error'
+  useEffect(() => { onCount(visible ? 1 : 0) }, [visible, onCount])
+  if (!visible) return null
+  const problema = salud.estado === 'unhealthy'
+  const tone: Tone = problema && salud.salud.estado === 'FAILED' ? 'dang' : 'warn'
+  return (
+    <div className="card" role="status" style={{ display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--line)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 11, background: toneBg[tone], color: toneFg[tone], display: 'grid', placeItems: 'center', flex: 'none' }}>
+        <Icon name="clock" />
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{problema ? 'Alertas automáticas con problema' : 'Salud del sistema'}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>
+          {problema ? salud.salud.mensaje : salud.error}
+        </div>
+      </div>
+      <span className={'pill ' + tonePill[tone]}>1</span>
+    </div>
   )
 }
 
