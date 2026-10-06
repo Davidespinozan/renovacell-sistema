@@ -64,6 +64,30 @@ export const LIMITES: Record<string, Regla> = {
   visitor_abrir:             { limite: 60,  ventanaSegs: 3600 },
   visitor_abrir_global:      { limite: 3000, ventanaSegs: 3600 },
   visitor_adoptar:           { limite: 10,  ventanaSegs: 3600 },
+  // chat (CC-2): abrir es barato; enviar cuesta (y puede llamar a la IA); solicitar asesor es raro.
+  chat_abrir:                { limite: 30,  ventanaSegs: 3600 },
+  chat_abrir_uid:            { limite: 60,  ventanaSegs: 3600 },
+  chat_abrir_global:         { limite: 2000, ventanaSegs: 3600 },
+  chat_enviar:               { limite: 30,  ventanaSegs: 60 },
+  chat_enviar_uid:           { limite: 60,  ventanaSegs: 60 },
+  chat_enviar_global:        { limite: 5000, ventanaSegs: 3600 },
+  chat_solicitar:            { limite: 10,  ventanaSegs: 3600 },
+  // ia (CC-4): un turno de IA por mensaje del usuario; ráfaga por sujeto, techo global y costo diario en tokens.
+  ia_turno:                  { limite: 20,  ventanaSegs: 60 },
+  ia_turno_uid:              { limite: 40,  ventanaSegs: 60 },
+  ia_turno_hora:             { limite: 120, ventanaSegs: 3600 },
+  ia_turno_global:           { limite: 1500, ventanaSegs: 3600 },
+  ia_tokens_dia:             { limite: 400_000, ventanaSegs: 86400 },
+  ia_tokens_dia_uid:         { limite: 60_000,  ventanaSegs: 86400 },
+  // cart (CC-5): lectura holgada; mutación acotada por sujeto (los controles +/- normales caben) y techo global.
+  cart_leer:                 { limite: 120, ventanaSegs: 60 },
+  cart_mutar:                { limite: 60,  ventanaSegs: 60 },
+  cart_mutar_uid:            { limite: 120, ventanaSegs: 60 },
+  cart_global:               { limite: 20000, ventanaSegs: 3600 },
+  // checkout (CC-6): revisar es lectura; confirmar es la mutación material (los reintentos idempotentes caben).
+  checkout_revisar_uid:      { limite: 30,  ventanaSegs: 60 },
+  checkout_confirmar_uid:    { limite: 10,  ventanaSegs: 60 },
+  checkout_global:           { limite: 2000, ventanaSegs: 3600 },
 }
 // Por encima de este múltiplo del límite se marca `desafio` (seam para CAPTCHA).
 export const FACTOR_DESAFIO = 2

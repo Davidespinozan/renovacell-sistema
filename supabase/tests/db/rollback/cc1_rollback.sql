@@ -1,5 +1,12 @@
 -- CC-1 · El rollback retira el dominio de visitante y devuelve el dedupe a CC-0B.
 begin;
+-- Rollback EN CAPAS (como W1/W2): CC-3 reutiliza _cc_append_only y CC-2 se apoya en cc_visitors
+-- (FK restrict), así que bajan primero, en orden inverso.
+\ir ../../../rollback/cc6/99_down.sql
+\ir ../../../rollback/cc5/99_down.sql
+\ir ../../../rollback/cc4/99_down.sql
+\ir ../../../rollback/cc3/99_down.sql
+\ir ../../../rollback/cc2/99_down.sql
 \ir ../../../rollback/cc1/99_down.sql
 do $t$
 begin

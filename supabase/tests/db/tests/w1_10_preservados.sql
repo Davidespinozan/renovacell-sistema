@@ -10,7 +10,7 @@ begin
     -- cuenta suspendida. Sus hashes se re-anclan aquí; el resto sigue intacto.
     ('auth_role()',                                           '663618f6d4eedf568db532bca55cddc5'),
     ('confirmar_entrega(uuid,text,text)',                     '312b5ba18dac4f4a9419e1aaff4e80cb'),
-    ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', '99d610b10ea8f5629e38e27b11ff0be8'),
+    ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', '408d0b2d90ae8431a3f4583988d11a32'),   -- re-anclado 20261031130000 (folio del servidor: texto W1 íntegro + folio único/servidor; payload +folio)
     ('finalize_shipment(uuid,jsonb)',                         'a1cf5c01877e87f41ee0e9635b478e34'),
     ('freeze_movement_cost()',                                'f1eb88ca3b5969cbd4d15a67754542ce'),
     ('handle_new_user()',                                     'd31936c0f165c984cd4cf28362d91a52'),

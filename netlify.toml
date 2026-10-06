@@ -60,6 +60,17 @@
   to = "/index.html"
   status = 200
 
+# 2b) CC-2 · /chat: la conversación canónica vive en la app (sin sesión o con sesión).
+[[redirects]]
+  from = "/chat"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/chat/*"
+  to = "/index.html"
+  status = 200
+
 # 3) /landing sigue sirviéndose como archivo (lo usa la vista previa del editor
 #    en Administración), pero ya no es la dirección pública.
 [[redirects]]

@@ -49,7 +49,8 @@ begin
                       from pg_index x join pg_class i on i.oid = x.indexrelid join pg_class c on c.oid = x.indrelid
                      where c.relnamespace = 'public'::regnamespace
                        and c.relname in ('lots','inventory_movements','replenishments','orders','order_items','shipping_attempts')),
-                   '90a49e6fa77b66eeb491ea6c932b720a', 'rollback: índices igual a prod');
+                   -- re-anclado: + uq_orders_external_ref (20261031130000 folio del servidor), ajeno a W1 y no se retira con W1
+                   'b08662eb9cb422aaab3599e13b0afa62', 'rollback: índices igual a prod');
   perform tests.eq((select md5(string_agg(table_name||'|'||column_name||'|'||data_type||'|'||is_nullable||'|'||coalesce(column_default,''), E'\n' order by table_name, column_name))
                       from information_schema.columns where table_schema = 'public'
                        and table_name in ('lots','inventory_movements','replenishments','orders','order_items','shipping_attempts')),

@@ -13,7 +13,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones'
 
 export interface ScreenDef {
   key: string
@@ -60,6 +60,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
       { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
+      { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Operación' },   // CC-2 (Comercial tiene su orden probado)
       { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
@@ -70,6 +71,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_fiscal', label: 'Revisión fiscal', icon: 'shield', section: 'Finanzas' },
       { key: 'av_cierre', label: 'Cierre de caja', icon: 'store', section: 'Finanzas' },
       { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Finanzas' },
+      { key: 'av_conocimiento', label: 'Conocimiento de producto', icon: 'grid', section: 'Sistema' },   // CC-3
       { key: 'av_config', label: 'Configuración', icon: 'store', section: 'Sistema' },
     ],
   },
@@ -81,6 +83,7 @@ export const ROLES: RoleDef[] = [
       { key: 'pedidosdr', label: 'Mis pedidos', icon: 'bag' },
       { key: 'hist', label: 'Historial', icon: 'clock' },
       { key: 'asist', label: 'Asistente IA', icon: 'chat' },
+      { key: 'chat_cc', label: 'Chat', icon: 'chat' },
     ],
   },
   {
@@ -146,6 +149,12 @@ export const CAPABILITIES: CapabilityDef[] = [
   },
   // Sin módulos propios: es un permiso (publicar/gestionar anuncios en Vista Común).
   { key: 'anuncios', label: 'Anuncios', modules: [] },
+  {
+    // CC-2 · Atender la conversación canónica con doctores/visitantes (solo vendedores a los que
+    // Dirección se lo asigne; Dirección siempre puede). El servidor exige esta capability.
+    key: 'conversaciones', label: 'Atender conversaciones',
+    modules: [{ key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Mi cartera' }],
+  },
   {
     key: 'contenido', label: 'Catálogo y sitio web',
     modules: [
