@@ -586,6 +586,209 @@ export type Database = {
           },
         ]
       }
+      cc_cartera: {
+        Row: {
+          asignado_at: string
+          asignado_por: string | null
+          motivo: string | null
+          profile_id: string
+          seller_profile_id: string
+        }
+        Insert: {
+          asignado_at?: string
+          asignado_por?: string | null
+          motivo?: string | null
+          profile_id: string
+          seller_profile_id: string
+        }
+        Update: {
+          asignado_at?: string
+          asignado_por?: string | null
+          motivo?: string | null
+          profile_id?: string
+          seller_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_cartera_asignado_por_fkey"
+            columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_asignado_por_fkey"
+            columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_asignado_por_fkey"
+            columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_cartera_historial: {
+        Row: {
+          actor_profile_id: string | null
+          created_at: string
+          id: number
+          motivo: string | null
+          profile_id: string
+          seller_anterior: string | null
+          seller_nuevo: string | null
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          created_at?: string
+          id?: never
+          motivo?: string | null
+          profile_id: string
+          seller_anterior?: string | null
+          seller_nuevo?: string | null
+        }
+        Update: {
+          actor_profile_id?: string | null
+          created_at?: string
+          id?: never
+          motivo?: string | null
+          profile_id?: string
+          seller_anterior?: string | null
+          seller_nuevo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_cartera_historial_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_anterior_fkey"
+            columns: ["seller_anterior"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_anterior_fkey"
+            columns: ["seller_anterior"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_anterior_fkey"
+            columns: ["seller_anterior"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_nuevo_fkey"
+            columns: ["seller_nuevo"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_nuevo_fkey"
+            columns: ["seller_nuevo"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cartera_historial_seller_nuevo_fkey"
+            columns: ["seller_nuevo"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cc_carts: {
         Row: {
           closed_at: string | null
@@ -593,6 +796,10 @@ export type Database = {
           converted_order_id: string | null
           created_at: string
           estado: string
+          handoff_at: string | null
+          handoff_conversation_id: string | null
+          handoff_error: string | null
+          handoff_estado: string | null
           id: string
           last_activity_at: string
           merged_into_cart_id: string | null
@@ -611,6 +818,10 @@ export type Database = {
           converted_order_id?: string | null
           created_at?: string
           estado?: string
+          handoff_at?: string | null
+          handoff_conversation_id?: string | null
+          handoff_error?: string | null
+          handoff_estado?: string | null
           id?: string
           last_activity_at?: string
           merged_into_cart_id?: string | null
@@ -629,6 +840,10 @@ export type Database = {
           converted_order_id?: string | null
           created_at?: string
           estado?: string
+          handoff_at?: string | null
+          handoff_conversation_id?: string | null
+          handoff_error?: string | null
+          handoff_estado?: string | null
           id?: string
           last_activity_at?: string
           merged_into_cart_id?: string | null
@@ -662,6 +877,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_order_money"
             referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "cc_carts_handoff_conversation_id_fkey"
+            columns: ["handoff_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cc_carts_merged_into_cart_id_fkey"
@@ -1048,10 +1270,14 @@ export type Database = {
           closed_at: string | null
           created_at: string
           estado: string
+          handoff_cart_id: string | null
+          handoff_fuera_horario: boolean | null
+          handoff_origen: string | null
           id: string
           last_message_at: string | null
           modo: string
           profile_id: string | null
+          ruteo_motivo: string | null
           seller_preferido_id: string | null
           seller_profile_id: string | null
           ultimo_seq: number
@@ -1066,10 +1292,14 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           estado?: string
+          handoff_cart_id?: string | null
+          handoff_fuera_horario?: boolean | null
+          handoff_origen?: string | null
           id?: string
           last_message_at?: string | null
           modo?: string
           profile_id?: string | null
+          ruteo_motivo?: string | null
           seller_preferido_id?: string | null
           seller_profile_id?: string | null
           ultimo_seq?: number
@@ -1084,10 +1314,14 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           estado?: string
+          handoff_cart_id?: string | null
+          handoff_fuera_horario?: boolean | null
+          handoff_origen?: string | null
           id?: string
           last_message_at?: string | null
           modo?: string
           profile_id?: string | null
+          ruteo_motivo?: string | null
           seller_preferido_id?: string | null
           seller_profile_id?: string | null
           ultimo_seq?: number
@@ -1095,6 +1329,13 @@ export type Database = {
           visitor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cc_conversations_handoff_cart_id_fkey"
+            columns: ["handoff_cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cc_conversations_profile_id_fkey"
             columns: ["profile_id"]
@@ -1166,6 +1407,171 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cc_horario_config: {
+        Row: {
+          configurado: boolean
+          id: number
+          updated_at: string
+          updated_by: string | null
+          zona: string
+        }
+        Insert: {
+          configurado?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+          zona?: string
+        }
+        Update: {
+          configurado?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+          zona?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_horario_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_horario_eventos: {
+        Row: {
+          accion: string
+          actor_profile_id: string | null
+          created_at: string
+          detalle: Json | null
+          id: number
+        }
+        Insert: {
+          accion: string
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+        }
+        Update: {
+          accion?: string
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_horario_eventos_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_eventos_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_eventos_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_horario_excepciones: {
+        Row: {
+          abre: string | null
+          cierra: string | null
+          created_at: string
+          created_by: string | null
+          fecha: string
+          motivo: string | null
+          tipo: string
+        }
+        Insert: {
+          abre?: string | null
+          cierra?: string | null
+          created_at?: string
+          created_by?: string | null
+          fecha: string
+          motivo?: string | null
+          tipo: string
+        }
+        Update: {
+          abre?: string | null
+          cierra?: string | null
+          created_at?: string
+          created_by?: string | null
+          fecha?: string
+          motivo?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_horario_excepciones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_excepciones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_horario_excepciones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_horario_semanal: {
+        Row: {
+          abierto: boolean
+          abre: string | null
+          cierra: string | null
+          dia: number
+        }
+        Insert: {
+          abierto?: boolean
+          abre?: string | null
+          cierra?: string | null
+          dia: number
+        }
+        Update: {
+          abierto?: boolean
+          abre?: string | null
+          cierra?: string | null
+          dia?: number
+        }
+        Relationships: []
       }
       cc_knowledge_config: {
         Row: {
@@ -5604,6 +6010,7 @@ export type Database = {
         Args: { p_location: string; p_profile: string }
         Returns: Json
       }
+      _cc_chk_direccion_snapshot: { Args: { p: Json }; Returns: Json }
       _cc_chk_evento: {
         Args: {
           p_cart: string
@@ -5623,6 +6030,10 @@ export type Database = {
         Returns: Json
       }
       _cc_chk_seller: { Args: { p_profile: string }; Returns: Json }
+      _cc_conversacion_de: {
+        Args: { p_profile: string; p_visitor: string }
+        Returns: Json
+      }
       _cc_es_admin: { Args: never; Returns: boolean }
       _cc_es_service: { Args: never; Returns: boolean }
       _cc_evento: {
@@ -5647,6 +6058,13 @@ export type Database = {
         Returns: undefined
       }
       _cc_exige_admin: { Args: never; Returns: undefined }
+      _cc_handoff_carrito: { Args: { p_cart: string }; Returns: Json }
+      _cc_handoff_seguro: { Args: { p_cart: string }; Returns: Json }
+      _cc_handoff_tras_adopcion: {
+        Args: { p_profile: string }
+        Returns: undefined
+      }
+      _cc_horario_estado: { Args: { p_ts?: string }; Returns: Json }
       _cc_ia_producto_vendible: {
         Args: { p_aud: string; p_product: string }
         Returns: Record<string, unknown>
@@ -5671,6 +6089,7 @@ export type Database = {
         Returns: boolean
       }
       _cc_puede_atender: { Args: { p_profile: string }; Returns: boolean }
+      _cc_rutear: { Args: { p_conv: string }; Returns: Json }
       _cc_secciones_visibles: {
         Args: { p_aud: string; p_product: string }
         Returns: Json
@@ -5680,11 +6099,21 @@ export type Database = {
         Returns: undefined
       }
       _cc_solo_servicio: { Args: never; Returns: undefined }
+      _cc_texto_handoff: {
+        Args: { p_configurado: boolean; p_en_horario: boolean }
+        Returns: string
+      }
       _cc_transicion_valida: {
         Args: { p_a: string; p_de: string }
         Returns: boolean
       }
+      _cc_vendedor_de: { Args: { p_profile: string }; Returns: string }
+      _cc_vendedor_elegible: {
+        Args: { p_nuevos?: boolean; p_profile: string }
+        Returns: boolean
+      }
       _cc_visitor_por_hash: { Args: { p_hash: string }; Returns: string }
+      _cc7_direccion: { Args: never; Returns: undefined }
       _comm_autorizar: { Args: never; Returns: string }
       _comm_encolar: {
         Args: {
@@ -6166,6 +6595,11 @@ export type Database = {
         }
         Returns: Json
       }
+      cc_cartera_asignar: {
+        Args: { p_cliente: string; p_motivo?: string; p_vendedor: string }
+        Returns: Json
+      }
+      cc_cartera_listar: { Args: { p_filtro?: string }; Returns: Json }
       cc_catalogo_para_ia: {
         Args: { p_audiencia?: string; p_limite?: number }
         Returns: Json
@@ -6180,11 +6614,16 @@ export type Database = {
         Returns: Json
       }
       cc_checkout_confirmar: {
-        Args: { p_expected_rev?: number; p_operation: string; p_review: string }
+        Args: {
+          p_expected_rev?: number
+          p_factura?: boolean
+          p_operation: string
+          p_review: string
+        }
         Returns: Json
       }
       cc_checkout_revisar: {
-        Args: { p_cart: string; p_location_id?: string }
+        Args: { p_cart: string; p_direccion?: Json; p_location_id?: string }
         Returns: Json
       }
       cc_cobertura: {
@@ -6207,11 +6646,18 @@ export type Database = {
         Args: never
         Returns: {
           asesoria_solicitada_at: string
+          cart_id: string
           conversation_id: string
           dueno: string
+          edad_min: number
           es_mia: boolean
+          fuera_horario: boolean
+          handoff_origen: string
+          iniciada: boolean
           last_message_at: string
           modo: string
+          n_items: number
+          ruteo_motivo: string
           seller_profile_id: string
           sin_leer: number
         }[]
@@ -6335,12 +6781,38 @@ export type Database = {
           version: string
         }[]
       }
+      cc_handoff_rechazar: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_horario_excepcion_borrar: { Args: { p_fecha: string }; Returns: Json }
+      cc_horario_excepcion_guardar: {
+        Args: {
+          p_abre?: string
+          p_cierra?: string
+          p_fecha: string
+          p_motivo?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      cc_horario_guardar: {
+        Args: { p_semana: Json; p_zona: string }
+        Returns: Json
+      }
+      cc_horario_ver: { Args: never; Returns: Json }
       cc_ia_aviso_no_disponible: { Args: { p_conv: string }; Returns: Json }
       cc_ia_contexto_actor: { Args: { p_profile: string }; Returns: Json }
       cc_ia_disponibilidad: {
         Args: { p_product: string; p_profile: string }
         Returns: Json
       }
+      cc_ia_estado_handoff: { Args: { p_conv: string }; Returns: Json }
       cc_ia_estado_pedido: {
         Args: { p_folio?: string; p_profile: string }
         Returns: Json
@@ -6451,6 +6923,8 @@ export type Database = {
       }
       cc_relacion_retirar: { Args: { p_id: string }; Returns: boolean }
       cc_revisar_claims: { Args: { p_texto: string }; Returns: Json }
+      cc_ruteo_pendientes: { Args: never; Returns: Json }
+      cc_ruteo_resumen: { Args: never; Returns: Json }
       cc_solicitar_asesor: {
         Args: {
           p_actor_type: string
@@ -6464,6 +6938,7 @@ export type Database = {
         Args: { p_conv: string; p_profile: string }
         Returns: Json
       }
+      cc_vendedores: { Args: never; Returns: Json }
       cc_visitante_abrir: {
         Args: {
           p_attr?: Json
