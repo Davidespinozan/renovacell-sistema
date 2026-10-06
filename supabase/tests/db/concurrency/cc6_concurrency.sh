@@ -19,7 +19,7 @@ DOC="select tests.act_as(tests.id('cc6_doc'));"
 
 "${P[@]}" -c "do \$\$ declare d uuid := tests.user('doctor'); px uuid; c uuid; begin
   px := tests.producto_fam('Rellenos', 'CC6', 1000);
-  delete from tests.ctx where key like 'cc6_%'; insert into tests.ctx values ('cc6_doc', d), ('cc6_px', px);
+  delete from tests.ctx where key like 'cc6_%'; insert into tests.ctx values ('cc6_doc', d), ('cc6_px', px); perform tests.cliente(d);
   perform tests.stock(px, 'L6', 50);
   perform tests.act_as_service();
   insert into public.doctor_locations (doctor_id, name, line1, postal_code, city, state, is_default) values (d, 'Base', 'Calle 1', '82000', 'Mazatlán', 'Sinaloa', true);

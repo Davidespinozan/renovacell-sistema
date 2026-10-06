@@ -1,6 +1,7 @@
 -- CC-2 · El rollback retira el dominio de conversación y devuelve adopción/purga al texto CC-1.
 begin;
 -- CC-4 (cc_ai_turns → cc_conversations) baja primero.
+\ir ../../../rollback/c360_0/99_down.sql   -- C360-0 (120) se baja primero
 \ir ../../../rollback/cc7/99_down.sql   -- CC-7 se baja primero (depende de CC-2/5/6)
 \ir ../../../rollback/cc6/99_down.sql
 \ir ../../../rollback/cc5/99_down.sql

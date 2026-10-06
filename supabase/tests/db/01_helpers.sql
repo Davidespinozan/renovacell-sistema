@@ -648,3 +648,17 @@ begin
   return v;
 end $$;
 grant execute on function tests.suspender(uuid, text, boolean), tests.reactivar(uuid) to authenticated, service_role;
+
+-- C360-0 · Expediente de cliente (customers) ligado al perfil del doctor: la identidad comercial
+-- canónica que el checkout canónico exige para crear el pedido (uq_customers_profile).
+create or replace function tests.cliente(p_profile uuid, p_activo boolean default true) returns uuid
+  language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  insert into public.customers (full_name, email, phone, profile_id, active)
+  select coalesce(p.full_name, 'Cliente ' || left(p_profile::text, 8)), p.email, '6690000000', p_profile, p_activo
+    from public.profiles p where p.id = p_profile
+  returning id into v_id;
+  return v_id;
+end $$;
+grant execute on function tests.cliente(uuid, boolean) to authenticated, service_role;

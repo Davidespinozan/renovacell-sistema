@@ -32,7 +32,7 @@ begin
   r := public.cc_carrito_ver(cart, 'visitor', hA, null);
   perform tests.eq(r -> 'total' ->> 'estado', 'requiere_verificacion', '3 · visitante: sin precio ni total');
   -- 4) registro: el visitante se vuelve doctor VERIFICADO (fixture) y adopta por posesión del token
-  v_doc := tests.user('doctor');
+  v_doc := tests.user('doctor'); perform tests.cliente(v_doc);   -- C360-0
   r := public.cc_visitante_adoptar(hA, v_doc);
   perform tests.ok(r ->> 'estado' = 'adoptado' and (r ->> 'conversaciones')::int = 1 and (r ->> 'carritos')::int = 1, '4 · adopción: 1 conversación y 1 carrito pasan al doctor en la misma transacción');
   perform tests.eq((select profile_id from public.cc_conversations where id = conv), v_doc, '4 · MISMA conversación (mismo id) ahora del doctor');

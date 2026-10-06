@@ -7,6 +7,7 @@ declare
 begin
   perform tests.act_as_service();
   update public.profiles set verified = false where id = v_nov;
+  perform tests.cliente(v_doc); perform tests.cliente(v_doc2); perform tests.cliente(v_nov);   -- C360-0
   update public.profiles set meta = coalesce(meta,'{}') || '{"capabilities":["conversaciones"]}' where id in (v_pos, v_pos2);
   pA := tests.producto_fam('Rellenos', 'NEG', 1000); perform tests.stock(pA, 'LNEG', 5);
   perform public.cc_visitante_abrir(null, hA, '{}'::jsonb, null); perform public.cc_visitante_abrir(null, hB, '{}'::jsonb, null);

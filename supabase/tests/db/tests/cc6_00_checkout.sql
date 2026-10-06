@@ -11,6 +11,7 @@ declare
 begin
   perform tests.act_as_service();
   update public.profiles set verified = false where id = v_nov;
+  perform tests.cliente(v_doc); perform tests.cliente(v_doc2); perform tests.cliente(v_nov);   -- C360-0 · expediente de cliente canónico
   pA := tests.producto_fam('Rellenos', 'Hyalux', 1000); pB := tests.producto_fam('Rellenos', 'Hyalux', 500); pSin := tests.producto_cat('Rellenos', 800);
   update public.products set name = 'Hyalux Deep' where id = pA; update public.products set name = 'Hyalux Lips' where id = pB; update public.products set name = 'Sin stock' where id = pSin;
   perform tests.stock(pA, 'L-A', 10); lotB := tests.stock(pB, 'L-B', 5);

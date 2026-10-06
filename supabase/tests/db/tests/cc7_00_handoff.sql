@@ -13,6 +13,7 @@ begin
   perform tests.act_as_service();
   update public.profiles set meta = coalesce(meta, '{}') || '{"capabilities":["conversaciones","nuevos_clientes"]}' where id in (s1, s2);
   update public.profiles set meta = coalesce(meta, '{}') || '{"capabilities":["conversaciones"]}' where id = s3;      -- atiende, pero no recibe clientes nuevos
+  perform tests.cliente(d1); perform tests.cliente(d2); perform tests.cliente(d3); perform tests.cliente(d4); perform tests.cliente(d5);   -- C360-0
   pA := tests.producto_cat('Rellenos', 1000); pB := tests.producto_cat('Rellenos', 500);
   perform tests.stock(pA, 'L7-A', 50); perform tests.stock(pB, 'L7-B', 50);
   hoy := (now() at time zone 'America/Mazatlan')::date;

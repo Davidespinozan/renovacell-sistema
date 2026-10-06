@@ -1,5 +1,6 @@
 -- CC-6 · El rollback retira revisiones/operaciones/eventos/comandos sin tocar CC-5 ni W1.
 begin;
+\ir ../../../rollback/c360_0/99_down.sql   -- C360-0 (120) se baja primero
 \ir ../../../rollback/cc7/99_down.sql   -- CC-7 se baja primero (depende de CC-2/5/6)
 \ir ../../../rollback/cc6/99_down.sql
 do $t$
