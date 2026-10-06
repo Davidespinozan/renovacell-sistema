@@ -5,7 +5,8 @@ import type { Database } from '../database.types'
 import { isAddressUsable, type ShippingAddress } from './shippingAddress'
 
 // C360-F3 · tipo/municipio (migración 121); opcionales hasta regenerar los tipos contra producción.
-export type DoctorLocation = Database['public']['Tables']['doctor_locations']['Row'] & { tipo?: string | null; municipio?: string | null }
+// tipo/municipio (C360-F3) se declaran aquí igual con o sin tipos regenerados (en la BD son columnas de 121).
+export type DoctorLocation = Omit<Database['public']['Tables']['doctor_locations']['Row'], 'tipo' | 'municipio'> & { tipo?: string | null; municipio?: string | null }
 export const TIPOS_DOMICILIO: Array<{ key: string; label: string }> = [
   { key: 'CONSULTORIO', label: 'Consultorio' }, { key: 'CLINICA_HOSPITAL', label: 'Clínica / Hospital' }, { key: 'CASA', label: 'Casa' },
   { key: 'OFICINA', label: 'Oficina' }, { key: 'ALMACEN', label: 'Almacén' }, { key: 'OTRO', label: 'Otro' },
