@@ -102,7 +102,7 @@ export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 export function mensajeError360(m: string | undefined): string {
   const t = m ?? ''
   if (/TELEFONO_DUPLICADO/.test(t)) return 'Ese número ya está registrado para este cliente.'
-  if (/TELEFONO_INVALIDO/.test(t)) return 'El teléfono debe tener de 10 a 15 dígitos.'
+  if (/TELEFONO_INVALIDO/.test(t)) return 'El teléfono debe tener de 10 a 15 dígitos y solo números, espacios, +, -, paréntesis o punto (un número por registro).'
   if (/FISCAL_INVALIDO: (.+)/.test(t)) return 'Datos fiscales: ' + (t.match(/FISCAL_INVALIDO: ([^\n]+)/)?.[1] ?? 'revisa los campos') + '.'
   if (/DOMICILIO_INVALIDO: (.+)/.test(t)) return 'Domicilio: ' + (t.match(/DOMICILIO_INVALIDO: ([^\n]+)/)?.[1] ?? 'revisa los campos') + '.'
   if (/CAMPO_NO_PERMITIDO/.test(t)) return 'No puedes cambiar ese dato.'

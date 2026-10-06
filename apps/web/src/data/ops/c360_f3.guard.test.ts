@@ -35,6 +35,15 @@ describe('migración 121 (C360-F3)', () => {
     expect(c).not.toMatch(/grant execute on function public\._c360_/)
     expect(c).not.toMatch(/grant execute on function [^;]*cliente_[^;]* to [^;]*anon/)
   })
+  it('teléfonos: UNA regla de validez (valor completo, 10–15 dígitos) en migración, trigger y comando', () => {
+    expect(c).toMatch(/create or replace function public\._c360_tel_valido\(p text\)/)
+    expect(c).toMatch(/if not public\._c360_tel_valido\(new\.phone\) then return new/)
+    expect(c).toMatch(/if not public\._c360_tel_valido\(p_numero\) then raise exception 'TELEFONO_INVALIDO/)
+    expect(c).toMatch(/where public\._c360_tel_valido\(c\.phone\)/)
+    expect(c).not.toMatch(/_c360_tel_norm\([^)]*\) ~ /)   // nunca truncar para declarar validez
+    expect(c).not.toMatch(/\{7,15\}/)
+    expect(codigo(down)).toMatch(/public\._c360_tel_valido\(text\)/)
+  })
   it('vendedor: nunca fiscal ni seller_name; facturación no edita contacto', () => {
     expect(c).toMatch(/if k = 'seller_name' and a not in \('direccion', 'servicio'\) then continue/)
   })

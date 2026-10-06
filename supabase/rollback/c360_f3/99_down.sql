@@ -214,7 +214,7 @@ revoke all on function public.cc_checkout_confirmar(uuid, text, integer, boolean
 grant execute on function public.cc_checkout_confirmar(uuid, text, integer, boolean) to authenticated, service_role;
 drop table if exists public.customer_events, public.customer_notes, public.customer_fiscal_profiles, public.customer_phones;
 drop function if exists public._c360_fiscal_predeterminar(uuid, uuid), public._c360_espejo_fiscal(uuid), public._c360_ubic_validar(jsonb), public._c360_ubic_predeterminar(uuid, uuid),
-  public._c360_cliente_de_ubicacion(uuid), public._c360_tel_desde_customer(), public._c360_espejo_tel(uuid), public._c360_tel_norm(text), public._c360_evento(uuid, text, jsonb, text),
+  public._c360_cliente_de_ubicacion(uuid), public._c360_tel_desde_customer(), public._c360_espejo_tel(uuid), public._c360_tel_norm(text), public._c360_tel_valido(text), public._c360_evento(uuid, text, jsonb, text),
   public._c360_exige(uuid, text[]), public._c360_cliente(uuid), public._c360_actor(uuid);
 alter table public.doctor_locations drop column if exists tipo, drop column if exists municipio;
 grant insert, update, delete on public.doctor_locations to authenticated;

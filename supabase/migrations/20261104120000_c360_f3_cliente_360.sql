@@ -21,12 +21,21 @@ begin
   if to_regclass('public.cc_cartera') is null then raise exception 'C360-F3: falta CC-7 (119)'; end if;
 end $pre$;
 
+-- ── 0) Regla ÚNICA de validez de teléfono (migración, trigger heredado y comando) ──
+-- Válido SOLO si el valor COMPLETO tiene únicamente caracteres de teléfono (dígitos, espacio, + - ( ) .) y
+-- la cadena COMPLETA de dígitos mide 10–15. Nunca se trunca para declarar validez: correos con dígitos, dos
+-- números en una cadena, número + nota o locales de 7–8 dígitos quedan como legado en customers.phone.
+create or replace function public._c360_tel_valido(p text) returns boolean
+  language sql immutable as
+$$ select coalesce(btrim(p), '') ~ '^[0-9 +().-]+$' and length(btrim(p)) <= 30   -- tope de longitud = columna numero
+       and length(regexp_replace(coalesce(p, ''), '[^0-9]', '', 'g')) between 10 and 15 $$;
+
 -- ── 1) Tablas canónicas ──────────────────────────────────────────────────────
 create table public.customer_phones (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.customers(id) on delete cascade,
-  numero text not null constraint ck_cph_numero check (length(btrim(numero)) between 7 and 30),
-  numero_norm text not null constraint ck_cph_norm check (numero_norm ~ '^[0-9]{7,15}$'),
+  numero text not null constraint ck_cph_numero check (public._c360_tel_valido(numero)),
+  numero_norm text not null constraint ck_cph_norm check (numero_norm ~ '^[0-9]{10}$'),
   etiqueta text not null default 'otro' constraint ck_cph_etiqueta check (etiqueta in ('celular', 'whatsapp', 'consultorio', 'recepcion', 'otro')),
   es_principal boolean not null default false,
   activo boolean not null default true,
@@ -133,6 +142,7 @@ $$ insert into public.customer_events (customer_id, tipo, detalle, actor_profile
 
 -- ── 4) Teléfonos ─────────────────────────────────────────────────────────────
 -- Normalización de identidad del número (igual que F1 · _norm_phone): últimos 10 dígitos. "+52 669…" = "669…".
+-- SOLO para comparar duplicados DESPUÉS de _c360_tel_valido; nunca decide validez.
 create or replace function public._c360_tel_norm(p text) returns text
   language sql immutable as $$ select right(regexp_replace(coalesce(p, ''), '[^0-9]', '', 'g'), 10) $$;
 
@@ -153,7 +163,7 @@ $$
 declare n text := public._c360_tel_norm(new.phone); ex record;
 begin
   if coalesce(current_setting('app.c360_espejo', true), '') = 'on' then return new; end if;   -- lo escribió un comando C360
-  if nullif(btrim(coalesce(new.phone, '')), '') is null or n !~ '^[0-9]{7,15}$' then return new; end if;
+  if not public._c360_tel_valido(new.phone) then return new; end if;   -- inválido/ambiguo: queda solo como legado
   if tg_op = 'UPDATE' and public._c360_tel_norm(old.phone) = n then return new; end if;
   select * into ex from public.customer_phones where customer_id = new.id and numero_norm = n and activo;
   if found then
@@ -177,7 +187,7 @@ declare v_c uuid := public._c360_cliente(p_customer); a text; n text := public._
 begin
   if v_c is null then raise exception 'CLIENTE_INEXISTENTE'; end if;
   a := public._c360_exige(v_c, array['direccion', 'vendedor', 'dueno']);
-  if regexp_replace(coalesce(p_numero, ''), '[^0-9]', '', 'g') !~ '^[0-9]{10,15}$' then raise exception 'TELEFONO_INVALIDO: escribe de 10 a 15 dígitos' using errcode = 'check_violation'; end if;
+  if not public._c360_tel_valido(p_numero) then raise exception 'TELEFONO_INVALIDO: escribe de 10 a 15 dígitos (solo números, espacios, +, -, paréntesis o punto)' using errcode = 'check_violation'; end if;
   if coalesce(p_etiqueta, '') not in ('celular', 'whatsapp', 'consultorio', 'recepcion', 'otro') then raise exception 'ETIQUETA_INVALIDA' using errcode = 'check_violation'; end if;
   perform 1 from public.customers where id = v_c for update;   -- serializa los cambios de contacto del cliente
   if exists (select 1 from public.customer_phones where customer_id = v_c and numero_norm = n and activo and id is distinct from p_telefono) then
@@ -854,13 +864,13 @@ $function$;
 
 
 -- ── 10) Migración de datos (determinista, idempotente) ───────────────────────
--- Teléfonos: cada customers.phone con 7–15 dígitos → teléfono principal (origen 'migracion'). Los que
--- no cumplen formato se quedan solo en customers.phone (visibles como legado) y se reportan.
+-- Teléfonos: cada customers.phone que pasa _c360_tel_valido (valor completo) → teléfono principal (origen
+-- 'migracion'). Los inválidos/ambiguos NO se interpretan ni reparan: quedan intactos solo en customers.phone
+-- (identificables: customers.phone no vacío y sin customer_phones activo).
 insert into public.customer_phones (customer_id, numero, numero_norm, etiqueta, es_principal, origen)
 select c.id, btrim(c.phone), public._c360_tel_norm(c.phone), 'otro', true, 'migracion'
   from public.customers c
- where nullif(btrim(coalesce(c.phone, '')), '') is not null and public._c360_tel_norm(c.phone) ~ '^[0-9]{7,15}$'
-   and length(btrim(c.phone)) between 7 and 30
+ where public._c360_tel_valido(c.phone)
    and not exists (select 1 from public.customer_phones t where t.customer_id = c.id);
 -- Fiscal: customers.meta.fiscal válido → perfil predeterminado (origen 'migracion').
 insert into public.customer_fiscal_profiles (customer_id, alias, rfc, razon_social, regimen, cp, uso_cfdi, email_facturacion, es_predeterminado, origen)
@@ -870,7 +880,7 @@ select c.id, left(public._fiscal_clean(c.meta -> 'fiscal') ->> 'razon_social', 8
    and not exists (select 1 from public.customer_fiscal_profiles f where f.customer_id = c.id);
 
 -- ── 11) Privilegios ──────────────────────────────────────────────────────────
-revoke all on function public._c360_actor(uuid), public._c360_cliente(uuid), public._c360_exige(uuid, text[]), public._c360_evento(uuid, text, jsonb, text), public._c360_tel_norm(text),
+revoke all on function public._c360_actor(uuid), public._c360_cliente(uuid), public._c360_exige(uuid, text[]), public._c360_evento(uuid, text, jsonb, text), public._c360_tel_norm(text), public._c360_tel_valido(text),
   public._c360_espejo_tel(uuid), public._c360_tel_desde_customer(), public._c360_cliente_de_ubicacion(uuid), public._c360_ubic_predeterminar(uuid, uuid), public._c360_ubic_validar(jsonb),
   public._c360_espejo_fiscal(uuid), public._c360_fiscal_predeterminar(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.cliente_telefono_guardar(uuid, uuid, text, text, boolean), public.cliente_telefono_principal(uuid), public.cliente_telefono_archivar(uuid),
