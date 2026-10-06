@@ -17,11 +17,11 @@ import { observador } from '../_shared/observa.ts'
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('shipping')
 import {
-import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
   dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
