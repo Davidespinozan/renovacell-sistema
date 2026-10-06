@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       announcement_comments: {
@@ -337,6 +312,1559 @@ export type Database = {
             columns: ["voids_closing_id"]
             isOneToOne: false
             referencedRelation: "cash_closings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_ai_tool_calls: {
+        Row: {
+          detalle: Json | null
+          finished_at: string
+          id: string
+          product_ids: string[]
+          round: number
+          started_at: string
+          status: string
+          tool_name: string
+          turn_id: string
+        }
+        Insert: {
+          detalle?: Json | null
+          finished_at?: string
+          id?: string
+          product_ids?: string[]
+          round: number
+          started_at?: string
+          status: string
+          tool_name: string
+          turn_id: string
+        }
+        Update: {
+          detalle?: Json | null
+          finished_at?: string
+          id?: string
+          product_ids?: string[]
+          round?: number
+          started_at?: string
+          status?: string
+          tool_name?: string
+          turn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_ai_tool_calls_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "cc_ai_turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_ai_turns: {
+        Row: {
+          attempts: number
+          conversation_id: string
+          created_at: string
+          error_class: string | null
+          evidencia: string[]
+          finished_at: string | null
+          id: string
+          input_tokens: number | null
+          intent: string | null
+          lease_until: string | null
+          model: string
+          operation_id: string
+          output_tokens: number | null
+          provider: string
+          result_message_id: string | null
+          started_at: string
+          status: string
+          tool_rounds: number
+          trigger_message_id: string | null
+          trigger_seq: number
+        }
+        Insert: {
+          attempts?: number
+          conversation_id: string
+          created_at?: string
+          error_class?: string | null
+          evidencia?: string[]
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          lease_until?: string | null
+          model: string
+          operation_id: string
+          output_tokens?: number | null
+          provider: string
+          result_message_id?: string | null
+          started_at?: string
+          status?: string
+          tool_rounds?: number
+          trigger_message_id?: string | null
+          trigger_seq: number
+        }
+        Update: {
+          attempts?: number
+          conversation_id?: string
+          created_at?: string
+          error_class?: string | null
+          evidencia?: string[]
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          lease_until?: string | null
+          model?: string
+          operation_id?: string
+          output_tokens?: number | null
+          provider?: string
+          result_message_id?: string | null
+          started_at?: string
+          status?: string
+          tool_rounds?: number
+          trigger_message_id?: string | null
+          trigger_seq?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_ai_turns_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_ai_turns_result_message_id_fkey"
+            columns: ["result_message_id"]
+            isOneToOne: false
+            referencedRelation: "cc_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_ai_turns_trigger_message_id_fkey"
+            columns: ["trigger_message_id"]
+            isOneToOne: false
+            referencedRelation: "cc_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_cart_events: {
+        Row: {
+          actor_profile_id: string | null
+          actor_type: string
+          actor_visitor_id: string | null
+          cart_id: string
+          created_at: string
+          detalle: Json | null
+          id: number
+          product_id: string | null
+          qty_antes: number | null
+          qty_despues: number | null
+          tipo: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          actor_type: string
+          actor_visitor_id?: string | null
+          cart_id: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          product_id?: string | null
+          qty_antes?: number | null
+          qty_despues?: number | null
+          tipo: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          actor_type?: string
+          actor_visitor_id?: string | null
+          cart_id?: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          product_id?: string | null
+          qty_antes?: number | null
+          qty_despues?: number | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_cart_events_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_cart_items: {
+        Row: {
+          cart_id: string
+          created_at: string
+          product_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          product_id: string
+          quantity: number
+          updated_at?: string
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_cart_items_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_cart_operations: {
+        Row: {
+          cart_id: string
+          created_at: string
+          operation_id: string
+          payload_hash: string
+          resultado: Json
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          operation_id: string
+          payload_hash: string
+          resultado: Json
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          operation_id?: string
+          payload_hash?: string
+          resultado?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_cart_operations_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_carts: {
+        Row: {
+          closed_at: string | null
+          conversation_id: string | null
+          converted_order_id: string | null
+          created_at: string
+          estado: string
+          id: string
+          last_activity_at: string
+          merged_into_cart_id: string | null
+          oferta_at: string | null
+          oferta_estado: string | null
+          oferta_respondida_at: string | null
+          oferta_siguiente_at: string | null
+          profile_id: string | null
+          rev: number
+          updated_at: string
+          visitor_id: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          conversation_id?: string | null
+          converted_order_id?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          last_activity_at?: string
+          merged_into_cart_id?: string | null
+          oferta_at?: string | null
+          oferta_estado?: string | null
+          oferta_respondida_at?: string | null
+          oferta_siguiente_at?: string | null
+          profile_id?: string | null
+          rev?: number
+          updated_at?: string
+          visitor_id?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          conversation_id?: string | null
+          converted_order_id?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          last_activity_at?: string
+          merged_into_cart_id?: string | null
+          oferta_at?: string | null
+          oferta_estado?: string | null
+          oferta_respondida_at?: string | null
+          oferta_siguiente_at?: string | null
+          profile_id?: string | null
+          rev?: number
+          updated_at?: string
+          visitor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_carts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_converted_order_id_fkey"
+            columns: ["converted_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_converted_order_id_fkey"
+            columns: ["converted_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "cc_carts_merged_into_cart_id_fkey"
+            columns: ["merged_into_cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_carts_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_checkout_events: {
+        Row: {
+          cart_id: string
+          created_at: string
+          detalle: Json | null
+          id: number
+          profile_id: string | null
+          review_id: string | null
+          tipo: string
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          profile_id?: string | null
+          review_id?: string | null
+          tipo: string
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          profile_id?: string | null
+          review_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_checkout_events_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_checkout_operations: {
+        Row: {
+          cart_id: string
+          created_at: string
+          operation_id: string
+          order_id: string | null
+          profile_id: string
+          resultado: Json
+          review_id: string
+          status: string
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          operation_id: string
+          order_id?: string | null
+          profile_id: string
+          resultado: Json
+          review_id: string
+          status?: string
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          operation_id?: string
+          order_id?: string | null
+          profile_id?: string
+          resultado?: Json
+          review_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_checkout_operations_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_operations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_operations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
+      cc_checkout_reviews: {
+        Row: {
+          cart_id: string
+          cart_rev: number
+          consumed_at: string | null
+          created_at: string
+          currency: string
+          direccion: Json | null
+          expires_at: string
+          fingerprint: string
+          id: string
+          location_id: string | null
+          n_items: number
+          order_id: string | null
+          profile_id: string
+          total: number
+        }
+        Insert: {
+          cart_id: string
+          cart_rev: number
+          consumed_at?: string | null
+          created_at?: string
+          currency?: string
+          direccion?: Json | null
+          expires_at: string
+          fingerprint: string
+          id?: string
+          location_id?: string | null
+          n_items: number
+          order_id?: string | null
+          profile_id: string
+          total: number
+        }
+        Update: {
+          cart_id?: string
+          cart_rev?: number
+          consumed_at?: string | null
+          created_at?: string
+          currency?: string
+          direccion?: Json | null
+          expires_at?: string
+          fingerprint?: string
+          id?: string
+          location_id?: string | null
+          n_items?: number
+          order_id?: string | null
+          profile_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_checkout_reviews_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "cc_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_checkout_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_claim_rules: {
+        Row: {
+          activo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          motivo: string
+          patron: string
+          tipo: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo: string
+          patron: string
+          tipo: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo?: string
+          patron?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      cc_company_knowledge: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          audiencia: string
+          contenido: string
+          created_at: string
+          created_by: string | null
+          estado: string
+          id: string
+          importado_de: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+          rev: number
+          source_id: string | null
+          tema: string
+          titulo: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audiencia?: string
+          contenido: string
+          created_at?: string
+          created_by?: string | null
+          estado?: string
+          id?: string
+          importado_de?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          rev?: number
+          source_id?: string | null
+          tema: string
+          titulo: string
+          updated_at?: string
+          updated_by?: string | null
+          version: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audiencia?: string
+          contenido?: string
+          created_at?: string
+          created_by?: string | null
+          estado?: string
+          id?: string
+          importado_de?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          rev?: number
+          source_id?: string | null
+          tema?: string
+          titulo?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_company_knowledge_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "cc_knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_conversation_events: {
+        Row: {
+          actor_profile_id: string | null
+          actor_type: string | null
+          actor_visitor_id: string | null
+          conversation_id: string
+          created_at: string
+          detalle: Json | null
+          id: number
+          tipo: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          actor_type?: string | null
+          actor_visitor_id?: string | null
+          conversation_id: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          tipo: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          actor_type?: string | null
+          actor_visitor_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_conversation_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_conversations: {
+        Row: {
+          asesoria_asignada_at: string | null
+          asesoria_iniciada_at: string | null
+          asesoria_solicitada_at: string | null
+          asesoria_terminada_at: string | null
+          closed_at: string | null
+          created_at: string
+          estado: string
+          id: string
+          last_message_at: string | null
+          modo: string
+          profile_id: string | null
+          seller_preferido_id: string | null
+          seller_profile_id: string | null
+          ultimo_seq: number
+          updated_at: string
+          visitor_id: string | null
+        }
+        Insert: {
+          asesoria_asignada_at?: string | null
+          asesoria_iniciada_at?: string | null
+          asesoria_solicitada_at?: string | null
+          asesoria_terminada_at?: string | null
+          closed_at?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          last_message_at?: string | null
+          modo?: string
+          profile_id?: string | null
+          seller_preferido_id?: string | null
+          seller_profile_id?: string | null
+          ultimo_seq?: number
+          updated_at?: string
+          visitor_id?: string | null
+        }
+        Update: {
+          asesoria_asignada_at?: string | null
+          asesoria_iniciada_at?: string | null
+          asesoria_solicitada_at?: string | null
+          asesoria_terminada_at?: string | null
+          closed_at?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          last_message_at?: string | null
+          modo?: string
+          profile_id?: string | null
+          seller_preferido_id?: string | null
+          seller_profile_id?: string | null
+          ultimo_seq?: number
+          updated_at?: string
+          visitor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_conversations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_preferido_id_fkey"
+            columns: ["seller_preferido_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_preferido_id_fkey"
+            columns: ["seller_preferido_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_preferido_id_fkey"
+            columns: ["seller_preferido_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_conversations_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_knowledge_config: {
+        Row: {
+          id: string
+          t2_habilitado: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          t2_habilitado?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          t2_habilitado?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      cc_knowledge_events: {
+        Row: {
+          accion: string
+          actor_profile_id: string | null
+          created_at: string
+          detalle: Json | null
+          entidad: string
+          entidad_id: string
+          id: number
+          version: number | null
+        }
+        Insert: {
+          accion: string
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          entidad: string
+          entidad_id: string
+          id?: never
+          version?: number | null
+        }
+        Update: {
+          accion?: string
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          entidad?: string
+          entidad_id?: string
+          id?: never
+          version?: number | null
+        }
+        Relationships: []
+      }
+      cc_knowledge_sources: {
+        Row: {
+          captured_at: string
+          created_at: string
+          created_by: string | null
+          documento_url: string | null
+          id: string
+          notas: string | null
+          referencia: string
+          tipo: string
+          version: string | null
+        }
+        Insert: {
+          captured_at?: string
+          created_at?: string
+          created_by?: string | null
+          documento_url?: string | null
+          id?: string
+          notas?: string | null
+          referencia: string
+          tipo: string
+          version?: string | null
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          created_by?: string | null
+          documento_url?: string | null
+          id?: string
+          notas?: string | null
+          referencia?: string
+          tipo?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
+      cc_messages: {
+        Row: {
+          actor_profile_id: string | null
+          actor_type: string
+          actor_visitor_id: string | null
+          client_message_id: string | null
+          content: string
+          content_hash: string
+          content_type: string
+          conversation_id: string
+          created_at: string
+          id: string
+          seq: number
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          actor_type: string
+          actor_visitor_id?: string | null
+          client_message_id?: string | null
+          content: string
+          content_hash: string
+          content_type?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          seq: number
+        }
+        Update: {
+          actor_profile_id?: string | null
+          actor_type?: string
+          actor_visitor_id?: string | null
+          client_message_id?: string | null
+          content?: string
+          content_hash?: string
+          content_type?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          seq?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_messages_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_messages_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_messages_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_messages_actor_visitor_id_fkey"
+            columns: ["actor_visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_participants: {
+        Row: {
+          actor_type: string
+          conversation_id: string
+          id: string
+          joined_at: string
+          last_read_at: string | null
+          last_read_seq: number
+          left_at: string | null
+          profile_id: string | null
+          rol: string
+          visitor_id: string | null
+        }
+        Insert: {
+          actor_type: string
+          conversation_id: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          last_read_seq?: number
+          left_at?: string | null
+          profile_id?: string | null
+          rol: string
+          visitor_id?: string | null
+        }
+        Update: {
+          actor_type?: string
+          conversation_id?: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          last_read_seq?: number
+          left_at?: string | null
+          profile_id?: string | null
+          rol?: string
+          visitor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_participants_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_product_aliases: {
+        Row: {
+          activo: boolean
+          alias: string
+          alias_norm: string
+          created_at: string
+          created_by: string | null
+          id: string
+          product_id: string
+          tipo: string
+        }
+        Insert: {
+          activo?: boolean
+          alias: string
+          alias_norm: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id: string
+          tipo?: string
+        }
+        Update: {
+          activo?: boolean
+          alias?: string
+          alias_norm?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_product_aliases_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_aliases_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_aliases_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_product_knowledge: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          audiencia: string
+          contenido: string
+          created_at: string
+          created_by: string | null
+          datos: Json | null
+          estado: string
+          id: string
+          importado_de: string | null
+          nivel: string
+          product_id: string
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+          rev: number
+          seccion: string
+          source_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audiencia: string
+          contenido: string
+          created_at?: string
+          created_by?: string | null
+          datos?: Json | null
+          estado?: string
+          id?: string
+          importado_de?: string | null
+          nivel: string
+          product_id: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          rev?: number
+          seccion: string
+          source_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audiencia?: string
+          contenido?: string
+          created_at?: string
+          created_by?: string | null
+          datos?: Json | null
+          estado?: string
+          id?: string
+          importado_de?: string | null
+          nivel?: string
+          product_id?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          rev?: number
+          seccion?: string
+          source_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_product_knowledge_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_knowledge_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_knowledge_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_knowledge_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "cc_knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_product_relations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          estado: string
+          id: string
+          nota: string | null
+          product_id: string
+          related_id: string
+          retired_at: string | null
+          retired_by: string | null
+          source_id: string | null
+          tipo: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estado?: string
+          id?: string
+          nota?: string | null
+          product_id: string
+          related_id: string
+          retired_at?: string | null
+          retired_by?: string | null
+          source_id?: string | null
+          tipo: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          estado?: string
+          id?: string
+          nota?: string | null
+          product_id?: string
+          related_id?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          source_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_product_relations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_related_id_fkey"
+            columns: ["related_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_related_id_fkey"
+            columns: ["related_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_related_id_fkey"
+            columns: ["related_id"]
+            isOneToOne: false
+            referencedRelation: "products_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_product_relations_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "cc_knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_referral_codes: {
+        Row: {
+          activo: boolean
+          code: string
+          created_at: string
+          created_by: string | null
+          revoked_at: string | null
+          seller_profile_id: string
+        }
+        Insert: {
+          activo?: boolean
+          code: string
+          created_at?: string
+          created_by?: string | null
+          revoked_at?: string | null
+          seller_profile_id: string
+        }
+        Update: {
+          activo?: boolean
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          revoked_at?: string | null
+          seller_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_referral_codes_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_referral_codes_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_referral_codes_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_visitor_events: {
+        Row: {
+          actor_profile_id: string | null
+          created_at: string
+          detalle: Json | null
+          id: number
+          tipo: string
+          visitor_id: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          tipo: string
+          visitor_id: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          created_at?: string
+          detalle?: Json | null
+          id?: never
+          tipo?: string
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_visitor_events_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_visitors: {
+        Row: {
+          adopted_at: string | null
+          adopted_profile_id: string | null
+          created_at: string
+          estado: string
+          first_touch: Json | null
+          first_touch_at: string | null
+          id: string
+          last_seen_at: string
+          last_touch: Json | null
+          last_touch_at: string | null
+          pending_at: string | null
+          pending_profile_id: string | null
+          referral_code: string | null
+          seller_profile_id: string | null
+          token_hash: string
+          visitas: number
+        }
+        Insert: {
+          adopted_at?: string | null
+          adopted_profile_id?: string | null
+          created_at?: string
+          estado?: string
+          first_touch?: Json | null
+          first_touch_at?: string | null
+          id?: string
+          last_seen_at?: string
+          last_touch?: Json | null
+          last_touch_at?: string | null
+          pending_at?: string | null
+          pending_profile_id?: string | null
+          referral_code?: string | null
+          seller_profile_id?: string | null
+          token_hash: string
+          visitas?: number
+        }
+        Update: {
+          adopted_at?: string | null
+          adopted_profile_id?: string | null
+          created_at?: string
+          estado?: string
+          first_touch?: Json | null
+          first_touch_at?: string | null
+          id?: string
+          last_seen_at?: string
+          last_touch?: Json | null
+          last_touch_at?: string | null
+          pending_at?: string | null
+          pending_profile_id?: string | null
+          referral_code?: string | null
+          seller_profile_id?: string | null
+          token_hash?: string
+          visitas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_visitors_adopted_profile_id_fkey"
+            columns: ["adopted_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_adopted_profile_id_fkey"
+            columns: ["adopted_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_adopted_profile_id_fkey"
+            columns: ["adopted_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_pending_profile_id_fkey"
+            columns: ["pending_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_pending_profile_id_fkey"
+            columns: ["pending_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_pending_profile_id_fkey"
+            columns: ["pending_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_visitors_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
             referencedColumns: ["id"]
           },
         ]
@@ -2818,6 +4346,7 @@ export type Database = {
           phone: string | null
           source: string | null
           status: string | null
+          visitor_id: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -2831,6 +4360,7 @@ export type Database = {
           phone?: string | null
           source?: string | null
           status?: string | null
+          visitor_id?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -2844,6 +4374,7 @@ export type Database = {
           phone?: string | null
           source?: string | null
           status?: string | null
+          visitor_id?: string | null
         }
         Relationships: [
           {
@@ -2872,6 +4403,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospects_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: false
+            referencedRelation: "cc_visitors"
             referencedColumns: ["id"]
           },
         ]
@@ -2963,6 +4501,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rate_limit_buckets: {
+        Row: {
+          count: number
+          scope: string
+          subject: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          scope: string
+          subject: string
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          scope?: string
+          subject?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
       }
       refunds: {
         Row: {
@@ -3391,6 +4953,36 @@ export type Database = {
             referencedColumns: ["order_id"]
           },
         ]
+      }
+      sistema_latidos: {
+        Row: {
+          actualizado: string
+          detalle: string | null
+          duracion_ms: number | null
+          fuente: string
+          procesados: number | null
+          ultimo_error: string | null
+          ultimo_ok: string | null
+        }
+        Insert: {
+          actualizado?: string
+          detalle?: string | null
+          duracion_ms?: number | null
+          fuente: string
+          procesados?: number | null
+          ultimo_error?: string | null
+          ultimo_ok?: string | null
+        }
+        Update: {
+          actualizado?: string
+          detalle?: string | null
+          duracion_ms?: number | null
+          fuente?: string
+          procesados?: number | null
+          ultimo_error?: string | null
+          ultimo_ok?: string | null
+        }
+        Relationships: []
       }
       stock_return_lines: {
         Row: {
@@ -3908,6 +5500,191 @@ export type Database = {
       }
     }
     Functions: {
+      _cc_adoptar_carritos: {
+        Args: { p_profile: string; p_visitor: string }
+        Returns: number
+      }
+      _cc_adoptar_conversaciones: {
+        Args: { p_profile: string; p_visitor: string }
+        Returns: number
+      }
+      _cc_atribuible: { Args: { p: Json }; Returns: boolean }
+      _cc_attr_limpia: { Args: { p: Json }; Returns: Json }
+      _cc_audiencia: { Args: { p_solicitada?: string }; Returns: string }
+      _cc_audiencia_minima: { Args: { p_nivel: string }; Returns: string }
+      _cc_audiencia_rango: { Args: { p_aud: string }; Returns: number }
+      _cc_autoridad: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor: string
+        }
+        Returns: string
+      }
+      _cc_cambiar_modo: {
+        Args: {
+          p_a: string
+          p_actor_type: string
+          p_conv: string
+          p_detalle?: Json
+          p_profile: string
+          p_tipo_evento: string
+          p_visitor: string
+        }
+        Returns: undefined
+      }
+      _cc_cart_activo: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor: string
+        }
+        Returns: string
+      }
+      _cc_cart_actor: {
+        Args: {
+          p_actor_type: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Record<string, unknown>
+      }
+      _cc_cart_autoridad: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_profile: string
+          p_visitor: string
+        }
+        Returns: string
+      }
+      _cc_cart_evento: {
+        Args: {
+          p_actor_type: string
+          p_antes?: number
+          p_cart: string
+          p_despues?: number
+          p_detalle?: Json
+          p_product?: string
+          p_profile: string
+          p_tipo: string
+          p_visitor: string
+        }
+        Returns: undefined
+      }
+      _cc_cart_mutar: {
+        Args: {
+          p_accion: string
+          p_actor_type: string
+          p_cart: string
+          p_op: string
+          p_product: string
+          p_profile: string
+          p_qty: number
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      _cc_cart_operacion: {
+        Args: { p_cart: string; p_op: string; p_payload: Json }
+        Returns: Json
+      }
+      _cc_cart_registrar_op: {
+        Args: {
+          p_cart: string
+          p_op: string
+          p_payload: Json
+          p_resultado: Json
+        }
+        Returns: undefined
+      }
+      _cc_chk_direccion: {
+        Args: { p_location: string; p_profile: string }
+        Returns: Json
+      }
+      _cc_chk_evento: {
+        Args: {
+          p_cart: string
+          p_detalle?: Json
+          p_profile: string
+          p_review: string
+          p_tipo: string
+        }
+        Returns: undefined
+      }
+      _cc_chk_lineas: {
+        Args: { p_cart: string; p_profile: string }
+        Returns: Json
+      }
+      _cc_chk_resultado: {
+        Args: { p_cart: string; p_idem: boolean; p_order: string }
+        Returns: Json
+      }
+      _cc_chk_seller: { Args: { p_profile: string }; Returns: Json }
+      _cc_es_admin: { Args: never; Returns: boolean }
+      _cc_es_service: { Args: never; Returns: boolean }
+      _cc_evento: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_detalle?: Json
+          p_profile: string
+          p_tipo: string
+          p_visitor: string
+        }
+        Returns: undefined
+      }
+      _cc_evento_k: {
+        Args: {
+          p_accion: string
+          p_detalle?: Json
+          p_entidad: string
+          p_id: string
+          p_version: number
+        }
+        Returns: undefined
+      }
+      _cc_exige_admin: { Args: never; Returns: undefined }
+      _cc_ia_producto_vendible: {
+        Args: { p_aud: string; p_product: string }
+        Returns: Record<string, unknown>
+      }
+      _cc_ia_puede: { Args: { p_modo: string }; Returns: boolean }
+      _cc_identidad: { Args: { p_product: string }; Returns: Json }
+      _cc_nivel_seccion: { Args: { p_seccion: string }; Returns: string }
+      _cc_norm: { Args: { p: string }; Returns: string }
+      _cc_participante: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_rol: string
+          p_visitor: string
+        }
+        Returns: undefined
+      }
+      _cc_perfil_activo: { Args: { p_profile: string }; Returns: string }
+      _cc_producto_visible: {
+        Args: { p_aud: string; p_product: string }
+        Returns: boolean
+      }
+      _cc_puede_atender: { Args: { p_profile: string }; Returns: boolean }
+      _cc_secciones_visibles: {
+        Args: { p_aud: string; p_product: string }
+        Returns: Json
+      }
+      _cc_sistema: {
+        Args: { p_client_id: string; p_conv: string; p_texto: string }
+        Returns: undefined
+      }
+      _cc_solo_servicio: { Args: never; Returns: undefined }
+      _cc_transicion_valida: {
+        Args: { p_a: string; p_de: string }
+        Returns: boolean
+      }
+      _cc_visitor_por_hash: { Args: { p_hash: string }; Returns: string }
       _comm_autorizar: { Args: never; Returns: string }
       _comm_encolar: {
         Args: {
@@ -3947,6 +5724,8 @@ export type Database = {
         Returns: boolean
       }
       _pf_snapshot: { Args: { p_product: string }; Returns: Json }
+      _salud_umbral_running: { Args: never; Returns: string }
+      _salud_umbral_stale: { Args: never; Returns: string }
       _staff_objetivo: {
         Args: { p_uid: string }
         Returns: {
@@ -4233,13 +6012,480 @@ export type Database = {
         }
         Returns: Json
       }
-      avisar_cuentas_por_cobrar: { Args: never; Returns: number }
       avisar_lotes_por_caducar: { Args: never; Returns: number }
+      buscar_prospecto_duplicado: {
+        Args: { p_email: string; p_phone: string }
+        Returns: string
+      }
       can_access_conversation: { Args: { cid: string }; Returns: boolean }
       cancelar_pedido: {
         Args: { p_op_id: string; p_order: string; p_reason?: string }
         Returns: Json
       }
+      cc_abrir_conversacion: {
+        Args: { p_profile: string; p_visitor_hash: string }
+        Returns: Json
+      }
+      cc_alias_guardar: {
+        Args: { p_alias: string; p_product: string; p_tipo?: string }
+        Returns: string
+      }
+      cc_alias_retirar: { Args: { p_id: string }; Returns: boolean }
+      cc_asignar_asesor: {
+        Args: { p_actor_profile: string; p_conv: string; p_seller: string }
+        Returns: Json
+      }
+      cc_audiencia_actual: { Args: never; Returns: string }
+      cc_buscar_conocimiento: {
+        Args: { p_audiencia?: string; p_limite?: number; p_q: string }
+        Returns: {
+          entidad: string
+          fragmento: string
+          fuente: string
+          nivel: string
+          nombre: string
+          product_id: string
+          relevancia: number
+          seccion: string
+        }[]
+      }
+      cc_buscar_productos: {
+        Args: { p_audiencia?: string; p_limite?: number; p_q: string }
+        Returns: {
+          categoria: string
+          coincidencia: string
+          es_familia: boolean
+          familia: string
+          linea: string
+          nombre: string
+          presentacion: string
+          product_id: string
+          puntaje: number
+        }[]
+      }
+      cc_candidatos_recomendacion: {
+        Args: {
+          p_audiencia?: string
+          p_categoria?: string
+          p_familia?: string
+          p_limite?: number
+          p_terminos?: string[]
+        }
+        Returns: {
+          categoria: string
+          familia: string
+          motivo: string
+          nombre: string
+          presentacion: string
+          product_id: string
+        }[]
+      }
+      cc_carrito_abrir: {
+        Args: {
+          p_actor_type: string
+          p_conv?: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_actualizar: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_op?: string
+          p_product: string
+          p_profile: string
+          p_qty: number
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_agregar: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_op?: string
+          p_product: string
+          p_profile: string
+          p_qty: number
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_oferta: {
+        Args: {
+          p_accion: string
+          p_actor_type: string
+          p_cart: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_preparar_checkout: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_proyeccion: {
+        Args: { p_cart: string; p_lector: string }
+        Returns: Json
+      }
+      cc_carrito_quitar: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_op?: string
+          p_product: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_vaciar: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_op?: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_carrito_ver: {
+        Args: {
+          p_actor_type: string
+          p_cart: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_catalogo_para_ia: {
+        Args: { p_audiencia?: string; p_limite?: number }
+        Returns: Json
+      }
+      cc_cerrar_conversacion: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_checkout_confirmar: {
+        Args: { p_expected_rev?: number; p_operation: string; p_review: string }
+        Returns: Json
+      }
+      cc_checkout_revisar: {
+        Args: { p_cart: string; p_location_id?: string }
+        Returns: Json
+      }
+      cc_cobertura: {
+        Args: never
+        Returns: {
+          aprobadas: string[]
+          borradores: string[]
+          categoria: string
+          es_padre: boolean
+          faltantes_t0: string[]
+          faltantes_t1: string[]
+          familia: string
+          nombre: string
+          product_id: string
+        }[]
+      }
+      cc_codigo_referido_crear: { Args: { p_seller: string }; Returns: string }
+      cc_codigo_referido_revocar: { Args: { p_code: string }; Returns: boolean }
+      cc_cola_asesorias: {
+        Args: never
+        Returns: {
+          asesoria_solicitada_at: string
+          conversation_id: string
+          dueno: string
+          es_mia: boolean
+          last_message_at: string
+          modo: string
+          seller_profile_id: string
+          sin_leer: number
+        }[]
+      }
+      cc_comparar_productos: {
+        Args: { p_audiencia?: string; p_ids: string[] }
+        Returns: Json
+      }
+      cc_config_t2: { Args: { p_habilitado: boolean }; Returns: boolean }
+      cc_conocimiento_aprobar: {
+        Args: { p_confirmar_clinico?: boolean; p_id: string }
+        Returns: Json
+      }
+      cc_conocimiento_guardar: {
+        Args: {
+          p_audiencia?: string
+          p_contenido: string
+          p_datos?: Json
+          p_id?: string
+          p_product: string
+          p_rev?: number
+          p_seccion: string
+          p_source?: string
+        }
+        Returns: Json
+      }
+      cc_conocimiento_listar: {
+        Args: { p_product: string }
+        Returns: {
+          approved_at: string
+          audiencia: string
+          contenido: string
+          created_at: string
+          datos: Json
+          estado: string
+          fuente: string
+          id: string
+          importado_de: string
+          nivel: string
+          retired_at: string
+          retired_reason: string
+          rev: number
+          seccion: string
+          source_id: string
+          version: number
+        }[]
+      }
+      cc_conocimiento_restaurar: { Args: { p_id: string }; Returns: Json }
+      cc_conocimiento_retirar: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: Json
+      }
+      cc_empresa_aprobar: { Args: { p_id: string }; Returns: Json }
+      cc_empresa_guardar: {
+        Args: {
+          p_audiencia?: string
+          p_contenido: string
+          p_id?: string
+          p_rev?: number
+          p_source?: string
+          p_tema: string
+          p_titulo: string
+        }
+        Returns: Json
+      }
+      cc_empresa_listar: {
+        Args: never
+        Returns: {
+          approved_at: string
+          audiencia: string
+          contenido: string
+          created_at: string
+          estado: string
+          id: string
+          importado_de: string
+          rev: number
+          source_id: string
+          tema: string
+          titulo: string
+          version: number
+        }[]
+      }
+      cc_empresa_retirar: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: Json
+      }
+      cc_enviar_mensaje: {
+        Args: {
+          p_actor_type: string
+          p_client_id: string
+          p_content: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_ficha_producto: {
+        Args: { p_audiencia?: string; p_product: string }
+        Returns: Json
+      }
+      cc_fuente_registrar: {
+        Args: {
+          p_documento_url?: string
+          p_notas?: string
+          p_referencia: string
+          p_tipo: string
+          p_version?: string
+        }
+        Returns: string
+      }
+      cc_fuentes_listar: {
+        Args: never
+        Returns: {
+          captured_at: string
+          documento_url: string
+          id: string
+          notas: string
+          referencia: string
+          tipo: string
+          version: string
+        }[]
+      }
+      cc_ia_aviso_no_disponible: { Args: { p_conv: string }; Returns: Json }
+      cc_ia_contexto_actor: { Args: { p_profile: string }; Returns: Json }
+      cc_ia_disponibilidad: {
+        Args: { p_product: string; p_profile: string }
+        Returns: Json
+      }
+      cc_ia_estado_pedido: {
+        Args: { p_folio?: string; p_profile: string }
+        Returns: Json
+      }
+      cc_ia_herramienta_registrar: {
+        Args: {
+          p_detalle?: Json
+          p_product_ids?: string[]
+          p_round: number
+          p_status: string
+          p_tool: string
+          p_turn: string
+        }
+        Returns: string
+      }
+      cc_ia_precio: {
+        Args: { p_product: string; p_profile: string; p_qty?: number }
+        Returns: Json
+      }
+      cc_ia_turno_fallar: {
+        Args: {
+          p_desconocido?: boolean
+          p_error_class: string
+          p_input_tokens?: number
+          p_intent?: string
+          p_output_tokens?: number
+          p_tool_rounds?: number
+          p_turn: string
+        }
+        Returns: Json
+      }
+      cc_ia_turno_reclamar: {
+        Args: {
+          p_conv: string
+          p_lease_segs?: number
+          p_model: string
+          p_provider: string
+          p_trigger_seq: number
+        }
+        Returns: Json
+      }
+      cc_ia_turno_responder: {
+        Args: {
+          p_content: string
+          p_evidencia?: string[]
+          p_input_tokens?: number
+          p_intent?: string
+          p_output_tokens?: number
+          p_tool_rounds?: number
+          p_turn: string
+        }
+        Returns: Json
+      }
+      cc_importar_conocimiento_existente: { Args: never; Returns: Json }
+      cc_iniciar_asesoria: {
+        Args: { p_conv: string; p_profile: string }
+        Returns: Json
+      }
+      cc_leer_conversacion: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_desde_seq?: number
+          p_limite?: number
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_marcar_leido: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_seq: number
+          p_visitor_hash: string
+        }
+        Returns: undefined
+      }
+      cc_reabrir_conversacion: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_reanudar_ia: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_relacion_guardar: {
+        Args: {
+          p_aprobar?: boolean
+          p_nota?: string
+          p_product: string
+          p_related: string
+          p_source?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      cc_relacion_retirar: { Args: { p_id: string }; Returns: boolean }
+      cc_revisar_claims: { Args: { p_texto: string }; Returns: Json }
+      cc_solicitar_asesor: {
+        Args: {
+          p_actor_type: string
+          p_conv: string
+          p_profile: string
+          p_visitor_hash: string
+        }
+        Returns: Json
+      }
+      cc_terminar_asesoria: {
+        Args: { p_conv: string; p_profile: string }
+        Returns: Json
+      }
+      cc_visitante_abrir: {
+        Args: {
+          p_attr?: Json
+          p_hash: string
+          p_hash_nuevo: string
+          p_ref?: string
+        }
+        Returns: Json
+      }
+      cc_visitante_adoptar: {
+        Args: { p_hash: string; p_profile: string }
+        Returns: Json
+      }
+      cc_visitante_prospecto: {
+        Args: { p_hash: string; p_prospect: string }
+        Returns: boolean
+      }
+      cc_visitante_vincular_registro: {
+        Args: { p_hash: string; p_profile: string }
+        Returns: boolean
+      }
+      cc_visitantes_purgar: { Args: { p_dias?: number }; Returns: number }
       cerrar_custodia: {
         Args: { p_custody: string; p_motivo: string; p_op_id: string }
         Returns: Json
@@ -4333,6 +6579,7 @@ export type Database = {
         Args: { p_lines: Json; p_op_id: string; p_return_id: string }
         Returns: Json
       }
+      correr_alertas_diarias: { Args: never; Returns: Json }
       crear_pedido: {
         Args: {
           p_customer_id?: string
@@ -4483,6 +6730,7 @@ export type Database = {
       }
       lote_caducado: { Args: { p_expiry: string }; Returns: boolean }
       lote_code_norm: { Args: { p_code: string }; Returns: string }
+      norm_telefono_mx: { Args: { p: string }; Returns: string }
       order_owner: { Args: { o_id: string }; Returns: string }
       order_vendor_email: { Args: { o_id: string }; Returns: string }
       pagar_reembolso: {
@@ -4513,12 +6761,24 @@ export type Database = {
         Args: { p_order: string }
         Returns: boolean
       }
+      pedido_visible: { Args: { p_order: string }; Returns: boolean }
       precio_de:
         | { Args: { p_list: string; p_product: string }; Returns: number }
         | {
             Args: { p_list: string; p_product: string; p_qty: number }
             Returns: number
           }
+      puede_ver_precio: { Args: never; Returns: boolean }
+      rate_limit_hit: {
+        Args: {
+          p_cost?: number
+          p_limit: number
+          p_scope: string
+          p_subject: string
+          p_window_secs: number
+        }
+        Returns: Json
+      }
       reactivar_staff: { Args: { p_uid: string }; Returns: Json }
       recibir_devolucion: {
         Args: {
@@ -4662,6 +6922,7 @@ export type Database = {
         Args: { p_motivo: string; p_op_id: string; p_order: string }
         Returns: Json
       }
+      salud_sistema: { Args: never; Returns: Json }
       set_doctor_default_location: {
         Args: { p_location_id: string }
         Returns: undefined
@@ -4670,6 +6931,7 @@ export type Database = {
         Args: { p_order_id: string; p_receiver: Json }
         Returns: Json
       }
+      siguiente_folio: { Args: never; Returns: string }
       solicitar_cfdi: {
         Args: { p_op_id: string; p_order_id: string; p_receiver?: Json }
         Returns: Json
@@ -4849,9 +7111,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
