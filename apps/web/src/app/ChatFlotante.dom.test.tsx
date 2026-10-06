@@ -8,8 +8,9 @@ import { RoleProvider, useRole } from '../auth/RoleContext'
 import type { RoleKey } from './roles'
 import { ChatFlotante } from './ChatFlotante'
 import { ClienteChat } from '../data/ops/chat'
+import { chatUi } from '../data/store/chatUiStore'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); chatUi.reset(); sessionStorage.clear(); document.body.classList.remove('chat-open') })
 
 function Como({ rol, pantalla, children }: { rol: RoleKey; pantalla: string; children: React.ReactNode }) {
   const { setRole, setScreen, role, screen } = useRole()
@@ -19,14 +20,14 @@ function Como({ rol, pantalla, children }: { rol: RoleKey; pantalla: string; chi
   return role === rol && screen === pantalla ? <>{children}</> : null
 }
 
-function clienteFalso(leidoHasta: number, mensajes: Array<{ seq: number; actor: string; propio: boolean }>) {
+function clienteFalso(leidoHasta: number, mensajes: Array<{ seq: number; actor: string; propio: boolean }>, extra: Record<string, unknown> = {}) {
   const llamadas: string[] = []
   const c = new ClienteChat(async (_fn, { body }) => {
     const a = body.action as string; llamadas.push(a)
     if (a === 'abrir') return { data: { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', nuevo: false }, error: null }
     if (a === 'leer') {
       const desde = Number(body.desde_seq ?? 0)
-      return { data: { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', rol: 'dueno', ultimo_seq: 4, leido_hasta: leidoHasta, handoff: { origen: null, cart_id: null, fuera_horario: null, asignado: false, puede_rechazar: false },
+      return { data: { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', rol: 'dueno', ultimo_seq: 4, leido_hasta: leidoHasta, handoff: { origen: null, cart_id: null, fuera_horario: null, asignado: false, puede_rechazar: false }, ...extra,
         mensajes: mensajes.filter((m) => m.seq > desde).map((m) => ({ id: 'm' + m.seq, seq: m.seq, actor: m.actor, content: 'x', created_at: 'T', propio: m.propio })) }, error: null }
     }
     if (a === 'leido') return { data: { ok: true }, error: null }
@@ -81,5 +82,49 @@ describe('ChatFlotante', () => {
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(screen.queryByTestId('chat-drawer')).toBeNull()
     vi.restoreAllMocks()
+  })
+
+  it('V2-A 1 · un handoff confirmado por el servidor abre el cajón cerrado y muestra la tarjeta', async () => {
+    const { c } = clienteFalso(0, [{ seq: 1, actor: 'system', propio: false }], { modo: 'human_assigned', asesor_nombre: 'Lucía', handoff: { origen: 'carrito', cart_id: 'K1', fuera_horario: null, asignado: true, puede_rechazar: true } })
+    render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /></Como></RoleProvider>)
+    await screen.findByTestId('chat-fab')
+    expect(screen.queryByTestId('chat-drawer')).toBeNull()
+    await act(async () => { chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1' }) })
+    expect(await screen.findByTestId('chat-drawer')).toBeTruthy()
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Lucía se unirá a esta conversación.')
+    expect(screen.getAllByTestId('chat-canonico').length).toBe(1)
+    expect(document.body.classList.contains('chat-open')).toBe(true)
+    expect(chatUi.getSnapshot()).toBeNull()
+  })
+  it('V2-A 5 · si ya está abierto, una nueva solicitud no duplica ni reabre; una segunda del mismo carrito se ignora', async () => {
+    const { c } = clienteFalso(0, [])
+    render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /></Como></RoleProvider>)
+    fireEvent.click(await screen.findByTestId('chat-fab'))
+    await screen.findByTestId('chat-drawer')
+    await act(async () => { chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K9' }) })
+    expect(screen.getAllByTestId('chat-drawer').length).toBe(1); expect(screen.getAllByTestId('chat-canonico').length).toBe(1)
+    expect(chatUi.getSnapshot()).toBeNull()
+  })
+  it('V2-A 6 · en la pantalla de chat la solicitud se descarta: no hay cajón ni segundo ChatCanonico', async () => {
+    const { c } = clienteFalso(0, [])
+    render(<RoleProvider><Como rol="doctor" pantalla="chat_cc"><ChatFlotante cliente={c} /><span data-testid="listo" /></Como></RoleProvider>)
+    await screen.findByTestId('listo')
+    await act(async () => { chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K2' }) })
+    expect(screen.queryByTestId('chat-drawer')).toBeNull(); expect(screen.queryByTestId('chat-canonico')).toBeNull()
+    expect(chatUi.getSnapshot()).toBeNull()
+  })
+  it('V2-A 7/8 · mensaje del asesor con el chat cerrado ⇒ badge + pulso, sin abrir; el aviso del handoff vivo cuenta', async () => {
+    const { c } = clienteFalso(0, [{ seq: 1, actor: 'seller', propio: false }, { seq: 2, actor: 'system', propio: false }], { modo: 'human_assigned', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: true } })
+    render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /></Como></RoleProvider>)
+    expect((await screen.findByTestId('chat-fab-badge')).textContent).toBe('2')
+    await waitFor(() => expect(screen.getByTestId('chat-fab').className).toContain('chat-fab--pulso'))
+    expect(screen.queryByTestId('chat-drawer')).toBeNull()
+  })
+  it('V2-A 9 · avisos internos del sistema sin handoff vivo no inflan el badge', async () => {
+    const { c } = clienteFalso(0, [{ seq: 1, actor: 'system', propio: false }, { seq: 2, actor: 'system', propio: false }])
+    render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /><span data-testid="listo" /></Como></RoleProvider>)
+    await screen.findByTestId('listo'); await screen.findByTestId('chat-fab')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(screen.queryByTestId('chat-fab-badge')).toBeNull()
   })
 })

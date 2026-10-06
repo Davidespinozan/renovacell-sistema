@@ -59,7 +59,7 @@ describe('UX-1 · lanzador flotante', () => {
   it('11 · móvil: hoja casi completa con dvh, lanzador sobre la barra inferior y barra oculta con el cajón abierto', () => {
     expect(cssSrc).toMatch(/\.chat-drawer\{[^}]*height:100dvh/)
     expect(cssSrc).toMatch(/@media \(max-width:900px\)\{\n\s+\.chat-fab\{bottom:calc\(96px/)
-    expect(cssSrc).toMatch(/\.chat-drawer\{width:100%;height:calc\(100dvh - 24px\)/)
+    expect(cssSrc).toMatch(/\.chat-drawer\{width:100%;height:calc\(100dvh - var\(--rc-kb,0px\)\)/)   // V2-B · pantalla completa; sigue al teclado
     expect(cssSrc).toMatch(/body:has\(\.chat-drawer-wrap\) \.bnav\{display:none\}/)
   })
 })

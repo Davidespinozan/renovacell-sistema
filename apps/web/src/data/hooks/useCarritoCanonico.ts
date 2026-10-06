@@ -4,9 +4,10 @@
 // el handoff comercial al primer artículo. Las mutaciones se SERIALIZAN (doble clic, ráfagas) y la
 // vista es optimista solo mientras el servidor confirma; la verdad final es la proyección del servidor.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { carrito as clientePorDefecto, type Carrito, type ClienteCarrito } from '../ops/carrito'
+import { carrito as clientePorDefecto, type Carrito, type ClienteCarrito, type Mutacion } from '../ops/carrito'
+import { chatUi, handoffNuevoDe } from '../store/chatUiStore'
 
-type Paso = { ok: boolean; error?: { mensaje: string } }
+type Paso = { ok: boolean; error?: { mensaje: string }; data?: Mutacion }
 
 export function useCarritoCanonico(activo: boolean, cliente: ClienteCarrito = clientePorDefecto) {
   const [cart, setCart] = useState<Carrito | null>(null)
@@ -38,6 +39,9 @@ export function useCarritoCanonico(activo: boolean, cliente: ClienteCarrito = cl
       const actual = Object.fromEntries(c.items.map((i) => [i.product_id, i.cantidad])) as Record<string, number>
       const r = await fn(c.cart_id, actual)
       if (!r.ok && r.error) setError(r.error.mensaje)
+      // UX V2-A · El servidor dice si ESTA mutación acaba de generar un handoff (primer artículo, no replay):
+      // se pide abrir el chat para que el doctor vea el aviso. Nada se infiere del lado del cliente.
+      if (r.ok) { const h = handoffNuevoDe(r.data); if (h) chatUi.solicitarApertura({ motivo: 'first_item_handoff', ...h }) }
       await recargar()
       despues?.()
     }).catch(() => { setError('No hay conexión con el servidor. Intenta de nuevo.') })

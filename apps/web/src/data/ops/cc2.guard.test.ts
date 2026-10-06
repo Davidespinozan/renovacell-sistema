@@ -106,7 +106,7 @@ describe('frontend', () => {
   it('/chat enrutado en Netlify y en App (sin router); el componente sirve a visitante, doctor y asesor; la cola NO está en Bandeja', () => {
     expect(codigo(netlify)).toMatch(/from = "\/chat"\n\s+to = "\/index\.html"\n\s+status = 200/)
     expect(codigo(appSrc)).toMatch(/esRutaChat\) view = <ChatCanonico \/>/)
-    expect(pantallaSrc).toMatch(/asesor \? 'Asesoría' : 'Chat Renovacell'/)
+    expect(pantallaSrc).toMatch(/asesor \? 'Asesoría' : 'Renovacell'/)   // UX V2-B · encabezado de producto, no de panel
     expect(asesoriasSrc).toMatch(/cliente\.cola\(\)/)
     expect(codigo(asesoriasSrc)).not.toMatch(/Bandeja/)
   })

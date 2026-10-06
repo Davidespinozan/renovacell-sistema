@@ -17,7 +17,7 @@ export interface Carrito {
   oferta_asesor?: { estado: 'ofrecida' | 'aceptada' | 'rechazada' | null; siguiente_at: string | null }; rol?: 'dueno' | 'asesor' | 'supervisor'
   handoff?: { estado: 'solicitado' | 'pendiente' | 'rechazado' | null; at: string | null }   // CC-7
 }
-export interface Mutacion { cart_id: string; accion: string; qty_antes: number; qty_despues: number; n_items: number; rev: number; idempotente: boolean; handoff?: { estado: string; fuera_horario?: boolean; asignado?: boolean } | null }
+export interface Mutacion { cart_id: string; accion: string; qty_antes: number; qty_despues: number; n_items: number; rev: number; idempotente: boolean; handoff?: { estado: string; fuera_horario?: boolean; asignado?: boolean; conversation_id?: string | null; modo?: string; ya_en_curso?: boolean } | null }
 export interface Preparacion { cart_id: string; listo: boolean; problemas: Array<string | { product_id: string; problema: string }>; proyeccion: Carrito; lineas_crear_pedido: Array<{ product_id: string; qty: number }> }
 export interface RevisionCheckout {
   listo: boolean; cart_id: string; cart_rev?: number; review_id?: string; expires_at?: string; total?: number; moneda?: string

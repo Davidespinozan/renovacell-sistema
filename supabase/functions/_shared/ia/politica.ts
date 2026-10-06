@@ -129,7 +129,11 @@ export function historialParaModelo(mensajes: Array<{ actor: string; content: st
   const out: Array<{ role: 'user' | 'assistant'; content: string }> = []
   for (const m of mensajes) {
     if (m.actor === 'system') continue
-    const role: 'user' | 'assistant' = m.actor === 'ai' ? 'assistant' : 'user'
+    // UX V2-A · Solo el dueño (visitante/doctor) es "user" y solo la IA es "assistant". Las líneas del asesor o de
+    // Dirección NO se le presentan al modelo como si las hubiera escrito el doctor: se excluyen del historial
+    // (la IA ya está en silencio mientras el asesor habla; V2-C acotará además el historial por sesión).
+    const role: 'user' | 'assistant' | null = m.actor === 'ai' ? 'assistant' : m.actor === 'visitor' || m.actor === 'doctor' ? 'user' : null
+    if (!role) continue
     const content = String(m.content ?? '').slice(0, maxChars)
     if (!content) continue
     if (out.length && out[out.length - 1].role === role) out[out.length - 1].content += '\n' + content
