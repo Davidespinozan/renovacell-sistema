@@ -464,3 +464,24 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
   .pg-lbl{display:none}
   .pg-mobile{display:inline}
 }
+
+/* ── UX-1 · Lanzador flotante "Habla con Renovacell" (solo doctor) ─────────────────────── */
+.chat-fab{position:fixed;right:18px;bottom:18px;z-index:57;width:56px;height:56px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;color:#fff;background:var(--green-deep,#1f6b3a);box-shadow:0 10px 28px rgba(0,0,0,.28);transition:transform .18s,box-shadow .18s}
+.chat-fab:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(0,0,0,.32)}
+.chat-fab:focus-visible{outline:3px solid var(--green-soft,#5fb873);outline-offset:3px}
+.chat-fab svg{width:26px;height:26px}
+.chat-fab-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--danger,#b42318);color:#fff;font-size:11.5px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
+.chat-drawer-wrap{position:fixed;inset:0;z-index:70;background:rgba(18,22,15,.35);backdrop-filter:blur(2px);display:flex;justify-content:flex-end;animation:fade .2s}
+.chat-drawer{width:min(440px,100vw);height:100vh;height:100dvh;background:#fff;box-shadow:-18px 0 50px rgba(0,0,0,.3);display:flex;flex-direction:column;min-height:0;animation:slidein .24s cubic-bezier(.2,.7,.3,1)}
+.chat-drawer > *{flex:1;min-height:0}
+@keyframes slidein{from{transform:translateX(100%)}to{transform:none}}
+/* Con un modal/hoja abierto, el lanzador no estorba los botones de confirmar/cancelar. */
+body:has(.overlay) .chat-fab, body:has(.sheet-wrap) .chat-fab, body:has(.chat-drawer-wrap) .chat-fab{display:none}
+@media (max-width:900px){
+  .chat-fab{bottom:calc(96px + env(safe-area-inset-bottom,0px));right:14px}
+  /* Móvil: hoja casi completa desde abajo (mismo patrón que .sheet), sin desbordar el viewport. */
+  .chat-drawer-wrap{align-items:flex-end;justify-content:center}
+  .chat-drawer{width:100%;height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);border-radius:22px 22px 0 0;animation:chatsheetup .28s cubic-bezier(.2,.7,.3,1);padding-bottom:env(safe-area-inset-bottom,0px)}
+  @keyframes chatsheetup{from{transform:translateY(100%)}to{transform:none}}
+  body:has(.chat-drawer-wrap) .bnav{display:none}
+}

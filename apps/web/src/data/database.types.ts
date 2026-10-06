@@ -7475,6 +7475,18 @@ export type Database = {
         Returns: Json
       }
       correr_alertas_diarias: { Args: never; Returns: Json }
+      crear_orden_compra: {
+        Args: {
+          p_kind?: string
+          p_op_id: string
+          p_product: string
+          p_product_name?: string
+          p_qty: number
+          p_supplier?: string
+          p_unit_cost: number
+        }
+        Returns: Json
+      }
       crear_pedido: {
         Args: {
           p_customer_id?: string

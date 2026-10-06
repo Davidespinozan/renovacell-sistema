@@ -34,13 +34,17 @@ describe('<Surtido>', () => {
 })
 
 describe('<Entradas>', () => {
-  it('muestra el formulario de registro de entradas', () => {
+  it('UX-2 · "Recibir mercancía": compras pendientes primero; la entrada excepcional va aparte y cerrada', () => {
     renderWithRole(<Entradas />)
-    expect(screen.getByText('Registrar entradas')).toBeInTheDocument()
+    expect(screen.getByText('Recibir mercancía')).toBeInTheDocument()
+    expect(screen.getByText(/Compras pendientes de recibir/)).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Ej. MGP-90-C')).toBeNull()
+    fireEvent.click(screen.getByTestId('btn-excepcional'))
     expect(screen.getByPlaceholderText('Ej. MGP-90-C')).toBeInTheDocument()
   })
-  it('permite escribir un lote nuevo', () => {
+  it('permite escribir un lote nuevo en la entrada excepcional', () => {
     renderWithRole(<Entradas />)
+    fireEvent.click(screen.getByTestId('btn-excepcional'))
     const input = screen.getByPlaceholderText('Ej. MGP-90-C') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'LOTE-TEST-01' } })
     expect(input.value).toBe('LOTE-TEST-01')

@@ -55,7 +55,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Comercial' },
       { key: 'av_precios', label: 'Precios', icon: 'receipt', section: 'Comercial' },
       { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Comercial' },
-      { key: 'av_inv', label: 'Inventario', icon: 'box', section: 'Operación' },
+      { key: 'av_inv', label: 'Compras a proveedores', icon: 'cart', section: 'Operación' },   // UX-2 · mismo nombre que en Almacén
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
       { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
@@ -83,8 +83,9 @@ export const ROLES: RoleDef[] = [
       { key: 'catalogo', label: 'Catálogo', icon: 'grid' },
       { key: 'pedidosdr', label: 'Mis pedidos', icon: 'bag' },
       { key: 'hist', label: 'Historial', icon: 'clock' },
-      { key: 'asist', label: 'Asistente IA', icon: 'chat' },
-      { key: 'chat_cc', label: 'Chat', icon: 'chat' },
+      // UX-1 · UNA sola conversación con Renovacell (IA + asesor humano en el mismo hilo). El antiguo
+      // 'asist' (Asistente IA) ya no es módulo: su clave sigue resolviendo a esta pantalla (alias).
+      { key: 'chat_cc', label: 'Habla con Renovacell', icon: 'chat' },
     ],
   },
   {
@@ -96,8 +97,8 @@ export const ROLES: RoleDef[] = [
       { key: 'stock', label: 'Lo que hay en almacén', icon: 'box', section: 'Almacén' },
       { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Almacén' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Almacén' },
-      { key: 'entradas', label: 'Registrar entradas', icon: 'download', section: 'Almacén' },
-      { key: 'compras', label: 'Compras', icon: 'cart', section: 'Almacén' },
+      { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Almacén' },   // UX-2 · recepción física de compras
+      { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Almacén' },
       { key: 'devoluciones', label: 'Devoluciones y reingresos', icon: 'box', section: 'Almacén' },
       { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Almacén' },
       { key: 'cola', label: 'Por empacar', icon: 'pkg', section: 'Empaque' },

@@ -13,7 +13,7 @@ import valSrc from '../../../../../supabase/functions/_shared/ia/validacion.ts?r
 import atencionSrc from './atencion.ts?raw'
 import hookSrc from '../hooks/useCarritoCanonico.ts?raw'
 import catalogoSrc from '../../screens/doctor/Catalogo.tsx?raw'
-import asistenteSrc from '../../screens/doctor/Asistente.tsx?raw'
+import lanzadorSrc from '../../app/ChatFlotante.tsx?raw'
 import bandejaSrc from '../../screens/Bandeja.tsx?raw'
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
@@ -78,12 +78,10 @@ describe('Edges e IA', () => {
 
 describe('frontend', () => {
   it('ningún disparador de handoff en el cliente (solo la mutación del servidor)', () => {
-    for (const src of [hookSrc, catalogoSrc, asistenteSrc]) expect(codigo(src)).not.toMatch(/cc_handoff|_cc_handoff|solicitarAsesor\(/)
+    for (const src of [hookSrc, catalogoSrc, lanzadorSrc]) expect(codigo(src)).not.toMatch(/cc_handoff|_cc_handoff|solicitarAsesor\(/)
   })
-  it('25/26 · Catálogo y Asistente usan el carrito canónico con backend (el local solo en demo)', () => {
-    expect(codigo(asistenteSrc)).toMatch(/const canon = useCarritoCanonico\(hasSupabase\)/)
-    expect(codigo(asistenteSrc)).toMatch(/if \(hasSupabase\) \{\n\s+void canon\.fijar\(product\.id, cur \+ 1\)/)
-    expect(codigo(asistenteSrc)).toMatch(/if \(hasSupabase\) \{ irAlCatalogo\(\); return \}/)
+  it('25/26 · el Catálogo usa el carrito canónico con backend (el local solo en demo); el Asistente legado ya no existe (UX-1)', () => {
+    expect(codigo(catalogoSrc)).toMatch(/const canon = useCarritoCanonico\(hasSupabase\)/)
     expect(codigo(hookSrc)).toMatch(/cola\.current = cola\.current\.then\(/)   // serializado
   })
   it('administración: solo RPC (la base valida Dirección); Bandeja cuenta desde el servidor', () => {

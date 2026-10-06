@@ -14,6 +14,7 @@ export interface Conversacion {
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
   handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
+  leido_hasta?: number                   // UX-1 · cursor de lectura del actor (cc_participants.last_read_seq): el badge del portal no inventa estado
 }
 export interface EstadoHandoff { origen: 'carrito' | 'manual' | null; cart_id: string | null; fuera_horario: boolean | null; asignado: boolean; puede_rechazar: boolean }
 export interface ColaItem {

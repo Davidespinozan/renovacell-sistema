@@ -59,7 +59,7 @@ export function Existencias() {
       ))}
       {groups.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Todavía no hay producto en almacén. Regístralo en “Registrar entradas”.
+          Todavía no hay producto en almacén. Entra al recibir la mercancía de una compra (“Recibir mercancía”).
         </div>
       )}
 

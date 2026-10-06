@@ -5,7 +5,6 @@ import { screen, cleanup } from '@testing-library/react'
 import { renderWithRole } from '../test/utils'
 import { Tablero } from './admin/Tablero'
 import { Ventas } from './admin/Ventas'
-import { Asistente } from './doctor/Asistente'
 import { CommonView } from './CommonView'
 import { MisEntregas } from './driver/MisEntregas'
 
@@ -22,13 +21,6 @@ describe('<Ventas>', () => {
   it('renderiza el panel de ventas', () => {
     renderWithRole(<Ventas />)
     expect(screen.getByText('Administración · Ventas')).toBeInTheDocument()
-  })
-})
-
-describe('<Asistente>', () => {
-  it('renderiza el asistente del doctor', () => {
-    renderWithRole(<Asistente />)
-    expect(screen.getByText('Portal del Doctor · Asistente')).toBeInTheDocument()
   })
 })
 

@@ -1,7 +1,8 @@
 // Registro de pantallas: mapea pantalla -> componente.
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useRole } from '../auth/RoleContext'
 import { Placeholder } from './Placeholder'
 import { Bandeja } from './Bandeja'
 import { Solicitudes } from './Solicitudes'
@@ -12,7 +13,6 @@ import { Chat } from './hub/Chat'
 import { Catalogo } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
-import { Asistente } from './doctor/Asistente'
 import { Existencias } from './warehouse/Existencias'
 import { Surtido } from './warehouse/Surtido'
 import { Caducidades } from './warehouse/Caducidades'
@@ -70,7 +70,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   catalogo: () => <Catalogo />,
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,
-  asist: () => <Asistente />,
+  asist: () => <RedirigirChat />,   // UX-1 · alias heredado ('Asistente IA') → la conversación canónica
   stock: () => <Existencias />,
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
@@ -117,6 +117,13 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   // CC-2 · conversación canónica
   chat_cc: () => <ChatCanonico embebido />,
   asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
+}
+
+// UX-1 · Enlaces/recuerdos a la pantalla retirada 'asist' caen en la conversación canónica (sin segunda implementación).
+function RedirigirChat() {
+  const { setScreen } = useRole()
+  useEffect(() => { setScreen('chat_cc') }, [setScreen])
+  return null
 }
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {

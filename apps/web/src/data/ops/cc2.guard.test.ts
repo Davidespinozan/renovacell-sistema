@@ -113,7 +113,7 @@ describe('frontend', () => {
   it('capability `conversaciones` y pantallas chat_cc/asesorias registradas; doctor y pos las ven por rol/capability', () => {
     const r = codigo(rolesSrc)
     expect(r).toMatch(/'conversaciones'/); expect(r).toMatch(/key: 'conversaciones', label: 'Atender conversaciones'/)
-    expect(r).toMatch(/\{ key: 'chat_cc', label: 'Chat', icon: 'chat' \}/)
+    expect(r).toMatch(/\{ key: 'chat_cc', label: 'Habla con Renovacell', icon: 'chat' \}/)   // UX-1 · un solo módulo conversacional
     expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido \/>,\n\s+asesorias: \(\) => <AsesoriasPantalla \/>/)   // CC-7 · Dirección vs vendedor
     expect(r).toMatch(/key: 'nuevos_clientes', label: 'Recibir clientes nuevos'/); expect(codigo(registrySrc)).toMatch(/av_atencion: \(\) => <AtencionComercialPantalla \/>/)
   })

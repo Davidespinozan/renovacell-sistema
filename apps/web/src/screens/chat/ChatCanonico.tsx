@@ -17,11 +17,14 @@ interface Props {
   onSalir?: () => void
   conCarrito?: boolean               // CC-5 · panel de carrito (default: sí)
   clienteCarrito?: ClienteCarrito
+  panel?: boolean                   // UX-1 · dentro del cajón flotante: ocupa el alto del contenedor, sin alto propio de página
+  onLeido?: (seq: number) => void    // UX-1 · avisa el cursor que se marcó leído (el lanzador apaga su badge)
+  etiquetaSalir?: string
 }
 
 const NOMBRE_ACTOR: Record<Mensaje['actor'], string> = { visitor: 'Tú', doctor: 'Tú', seller: 'Asesor', admin: 'Renovacell', ai: 'Asistente', system: '' }
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Volver' }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -41,8 +44,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       return { ...r.data, mensajes: [...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))] }
     })
     const max = r.data.mensajes.reduce((s, m) => Math.max(s, m.seq), desde)
-    if (max > ultimoSeq.current) { ultimoSeq.current = max; void cliente.leido(id, max) }
-  }, [cliente])
+    if (max > ultimoSeq.current) { ultimoSeq.current = max; void cliente.leido(id, max); onLeido?.(max) }
+  }, [cliente, onLeido])
 
   // Abrir/reanudar (dueño) o cargar la asignada (asesor).
   useEffect(() => {
@@ -99,7 +102,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const mensajes = useMemo(() => conv?.mensajes ?? [], [conv])
 
   return (
-    <div className={embebido ? 'card' : undefined} style={embebido ? { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', minHeight: 420 } : estilos.pagina} data-testid="chat-canonico">
+    <div className={embebido && !panel ? 'card' : undefined} style={panel ? estilos.panel : embebido ? { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', minHeight: 420 } : estilos.pagina} data-testid="chat-canonico">
       <header style={estilos.cabecera}>
         <div>
           <div style={{ fontWeight: 700 }}>{asesor ? 'Asesoría' : 'Chat Renovacell'}</div>
@@ -123,7 +126,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           {conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
           )}
-          {onSalir && <button type="button" className="btn" onClick={onSalir}>Volver</button>}
+          {onSalir && <button type="button" className="btn" onClick={onSalir} data-testid="btn-salir">{etiquetaSalir}</button>}
         </div>
       </header>
 
@@ -183,6 +186,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
 const estilos: Record<string, React.CSSProperties> = {
   pagina: { display: 'flex', flexDirection: 'column', height: '100vh', maxWidth: 760, margin: '0 auto', background: 'var(--bg, #fff)', color: 'var(--ink, #111)', fontFamily: 'system-ui, sans-serif' },
+  panel: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--bg, #fff)', color: 'var(--ink, #111)' },
   cabecera: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--line, #e5e7eb)' },
   hilo: { flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 },
   burbuja: { alignSelf: 'flex-start', maxWidth: '85%', background: 'var(--bg-2, #f3f4f6)', borderRadius: 12, padding: '8px 12px', fontSize: 14 },

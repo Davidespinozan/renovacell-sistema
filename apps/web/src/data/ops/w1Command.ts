@@ -19,7 +19,7 @@ import { atenderSuspension } from '../../auth/suspension'
 type Fns = Database['public']['Functions']
 // Comandos W1 que pasan por este cliente (firmas tipadas desde database.types.ts).
 export type W1Rpc =
-  | 'recibir_lote' | 'importar_lote' | 'cerrar_orden_compra' | 'ajustar_lote' | 'surtir_pedido' | 'vender_pos'
+  | 'recibir_lote' | 'importar_lote' | 'crear_orden_compra' | 'cerrar_orden_compra' | 'ajustar_lote' | 'surtir_pedido' | 'vender_pos'
   | 'cancelar_pedido' | 'confirmar_reingreso' | 'recibir_devolucion' | 'disponer_devolucion' | 'anular_guia_manual'
 export type W1Args<F extends W1Rpc> = Fns[F]['Args']
 
@@ -53,6 +53,8 @@ const MENSAJES: Record<string, string> = {
   OP_ID_REUTILIZADO: 'Esta operación ya se registró con otros datos. Recarga la pantalla para ver el estado real antes de volver a intentar.',
   OP_ID_REQUERIDO: 'Falta el identificador de la operación. Recarga la pantalla.',
   MOTIVO_REQUERIDO: 'Escribe el motivo — es obligatorio.',
+  PROVEEDOR_REQUERIDO: 'Indica el proveedor de la compra.',
+  COSTO_INVALIDO: 'Indica el costo unitario (mayor a cero).',
   CADUCIDAD_REQUERIDA: 'Indica la fecha de caducidad del lote.',
   CADUCIDAD_INVALIDA: 'La fecha de caducidad no es válida.',
   CADUCADO_NO_RECIBIBLE: 'Ese producto ya está caducado: no puede entrar como stock.',

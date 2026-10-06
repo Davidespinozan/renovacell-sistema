@@ -11,8 +11,10 @@ const FORBIDDEN: { name: string; re: RegExp }[] = [
   { name: 'inserción directa al kardex', re: /from\(\s*['"]inventory_movements['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
   { name: 'escritura directa a order_items', re: /from\(\s*['"]order_items['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
   { name: 'estado/acumulado de compra directo', re: /from\(\s*['"]replenishments['"]\s*\)\s*\.\s*update\(\s*\{\s*(status|received_qty)/ },
+  // UX-2 / P2-1 · la orden de compra nace SOLO por crear_orden_compra (idempotente); nunca por insert directo.
+  { name: 'alta de compra directa', re: /from\(\s*['"]replenishments['"]\s*\)\s*\.\s*insert\b/ },
   { name: "orders → 'cancelled'/'packed' directo", re: /from\(\s*['"]orders['"]\s*\)\s*\.\s*update\(\s*\{\s*status:\s*['"](cancelled|packed)['"]/ },
-  { name: 'RPC W1 sin el cliente de comandos', re: /\.rpc\(\s*['"](recibir_lote|surtir_pedido|importar_lote|cancelar_pedido|ajustar_lote|confirmar_reingreso|recibir_devolucion|disponer_devolucion|anular_guia_manual)['"]/ },
+  { name: 'RPC W1 sin el cliente de comandos', re: /\.rpc\(\s*['"](recibir_lote|surtir_pedido|importar_lote|crear_orden_compra|cerrar_orden_compra|cancelar_pedido|ajustar_lote|confirmar_reingreso|recibir_devolucion|disponer_devolucion|anular_guia_manual)['"]/ },
   // W3-C · la configuración fiscal del catálogo solo cambia por comando de C1.
   { name: 'escritura directa a product_fiscal', re: /from\(\s*['"]product_fiscal['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
   { name: 'escritura directa a fiscal_category_defaults', re: /from\(\s*['"]fiscal_category_defaults['"]\s*\)\s*\.\s*(insert|update|upsert|delete)\b/ },
@@ -29,6 +31,7 @@ const CONTROLS = [
   "supabase.from('inventory_movements').insert({})",
   "supabase.from('order_items').update({ lot_id: x })",
   "supabase.from('replenishments').update({ status: 'recibida' })",
+  "supabase.from('replenishments').insert({ qty: 1 })",
   "supabase.from('orders').update({ status: 'cancelled' })",
   "supabase.rpc('surtir_pedido', {})",
   "supabase.from('product_fiscal').update({ validado: true })",

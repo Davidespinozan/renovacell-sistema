@@ -6,7 +6,7 @@ import mig from '../../../../../supabase/migrations/20261025120000_cc0a_frontera
 import down from '../../../../../supabase/rollback/cc0a/99_down.sql?raw'
 import assistantSrc from '../../../../../supabase/functions/assistant/index.ts?raw'
 import checkoutSrc from '../../../../../supabase/functions/stripe-checkout/index.ts?raw'
-import llmSrc from '../assistant/llm.ts?raw'
+import landingSrc from '../../../public/landing/index.html?raw'
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
@@ -111,10 +111,10 @@ describe('stripe-checkout · UNVERIFIED CANNOT CHECKOUT', () => {
   })
 })
 
-describe('frontend · llm.ts', () => {
-  it('ya no envía productos al assistant', () => {
-    const l = codigo(llmSrc)
-    expect(l).toMatch(/invoke\('assistant', \{ body: \{ mode, text \} \}\)/)
-    expect(l).not.toMatch(/products:/)
+describe('frontend · assistant', () => {
+  it('UX-1 · el portal del doctor ya no tiene cliente propio del assistant; la landing pública sigue usándolo (mode landing) y el servidor ignora products', () => {
+    expect(landingSrc).toMatch(/\/functions\/v1\/assistant/)
+    expect(landingSrc).toMatch(/mode:\s*'landing'/)
+    expect(codigo(assistantSrc)).toMatch(/mode === 'landing'/)
   })
 })

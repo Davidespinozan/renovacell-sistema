@@ -6,6 +6,7 @@ import { BottomNav } from './BottomNav'
 import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
+import { ChatFlotante } from './ChatFlotante'
 
 export function AppShell() {
   const { role, screen } = useRole()
@@ -33,6 +34,8 @@ export function AppShell() {
           </div>
         </main>
       </div>
+      {/* UX-1 · un solo lanzador de conversación para el doctor; fuera de #content para que sobreviva al cambio de pantalla. */}
+      <ChatFlotante />
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
       <BottomNav onMenu={() => setDrawer(true)} />
     </div>
