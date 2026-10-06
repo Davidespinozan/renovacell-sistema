@@ -2812,6 +2812,323 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_events: {
+        Row: {
+          actor_profile_id: string | null
+          actor_rol: string | null
+          created_at: string
+          customer_id: string
+          detalle: Json | null
+          id: number
+          tipo: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          actor_rol?: string | null
+          created_at?: string
+          customer_id: string
+          detalle?: Json | null
+          id?: never
+          tipo: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          actor_rol?: string | null
+          created_at?: string
+          customer_id?: string
+          detalle?: Json | null
+          id?: never
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_events_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_events_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_events_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_fiscal_profiles: {
+        Row: {
+          activo: boolean
+          alias: string
+          cp: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          email_facturacion: string
+          es_predeterminado: boolean
+          id: string
+          origen: string
+          razon_social: string
+          regimen: string
+          rfc: string
+          updated_at: string
+          updated_by: string | null
+          uso_cfdi: string
+        }
+        Insert: {
+          activo?: boolean
+          alias: string
+          cp: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          email_facturacion: string
+          es_predeterminado?: boolean
+          id?: string
+          origen?: string
+          razon_social: string
+          regimen: string
+          rfc: string
+          updated_at?: string
+          updated_by?: string | null
+          uso_cfdi: string
+        }
+        Update: {
+          activo?: boolean
+          alias?: string
+          cp?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          email_facturacion?: string
+          es_predeterminado?: boolean
+          id?: string
+          origen?: string
+          razon_social?: string
+          regimen?: string
+          rfc?: string
+          updated_at?: string
+          updated_by?: string | null
+          uso_cfdi?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_fiscal_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_fiscal_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_notes: {
+        Row: {
+          autor_profile_id: string | null
+          autor_rol: string | null
+          created_at: string
+          customer_id: string
+          id: number
+          texto: string
+        }
+        Insert: {
+          autor_profile_id?: string | null
+          autor_rol?: string | null
+          created_at?: string
+          customer_id: string
+          id?: never
+          texto: string
+        }
+        Update: {
+          autor_profile_id?: string | null
+          autor_rol?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: never
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notes_autor_profile_id_fkey"
+            columns: ["autor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_autor_profile_id_fkey"
+            columns: ["autor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_autor_profile_id_fkey"
+            columns: ["autor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_phones: {
+        Row: {
+          activo: boolean
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          es_principal: boolean
+          etiqueta: string
+          id: string
+          numero: string
+          numero_norm: string
+          origen: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          es_principal?: boolean
+          etiqueta?: string
+          id?: string
+          numero: string
+          numero_norm: string
+          origen?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          es_principal?: boolean
+          etiqueta?: string
+          id?: string
+          numero?: string
+          numero_norm?: string
+          origen?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_phones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_phones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           active: boolean
@@ -2936,11 +3253,13 @@ export type Database = {
           interior_number: string | null
           is_default: boolean
           line1: string
+          municipio: string | null
           name: string
           neighborhood: string | null
           postal_code: string
           reference_notes: string | null
           state: string
+          tipo: string | null
           updated_at: string
         }
         Insert: {
@@ -2957,11 +3276,13 @@ export type Database = {
           interior_number?: string | null
           is_default?: boolean
           line1: string
+          municipio?: string | null
           name: string
           neighborhood?: string | null
           postal_code: string
           reference_notes?: string | null
           state: string
+          tipo?: string | null
           updated_at?: string
         }
         Update: {
@@ -2978,11 +3299,13 @@ export type Database = {
           interior_number?: string | null
           is_default?: boolean
           line1?: string
+          municipio?: string | null
           name?: string
           neighborhood?: string | null
           postal_code?: string
           reference_notes?: string | null
           state?: string
+          tipo?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5906,6 +6229,38 @@ export type Database = {
       }
     }
     Functions: {
+      _c360_actor: { Args: { p_customer: string }; Returns: string }
+      _c360_cliente: { Args: { p_customer: string }; Returns: string }
+      _c360_cliente_de_ubicacion: {
+        Args: { p_ubicacion: string }
+        Returns: string
+      }
+      _c360_espejo_fiscal: { Args: { p_customer: string }; Returns: undefined }
+      _c360_espejo_tel: { Args: { p_customer: string }; Returns: undefined }
+      _c360_evento: {
+        Args: {
+          p_actor: string
+          p_customer: string
+          p_detalle: Json
+          p_tipo: string
+        }
+        Returns: undefined
+      }
+      _c360_exige: {
+        Args: { p_customer: string; p_permitidos: string[] }
+        Returns: string
+      }
+      _c360_fiscal_predeterminar: {
+        Args: { p_customer: string; p_perfil: string }
+        Returns: undefined
+      }
+      _c360_tel_norm: { Args: { p: string }; Returns: string }
+      _c360_tel_valido: { Args: { p: string }; Returns: boolean }
+      _c360_ubic_predeterminar: {
+        Args: { p_customer: string; p_ubicacion: string }
+        Returns: undefined
+      }
+      _c360_ubic_validar: { Args: { d: Json }; Returns: Json }
       _cc_adoptar_carritos: {
         Args: { p_profile: string; p_visitor: string }
         Returns: number
@@ -6619,6 +6974,7 @@ export type Database = {
           p_expected_rev?: number
           p_factura?: boolean
           p_operation: string
+          p_perfil_fiscal?: string
           p_review: string
         }
         Returns: Json
@@ -6968,6 +7324,69 @@ export type Database = {
       }
       cerrar_orden_compra: {
         Args: { p_op_id: string; p_reason: string; p_replenishment: string }
+        Returns: Json
+      }
+      cliente_360: { Args: { p_customer?: string }; Returns: Json }
+      cliente_contacto_guardar: {
+        Args: { p_customer: string; p_patch: Json }
+        Returns: Json
+      }
+      cliente_fiscal_archivar: { Args: { p_perfil: string }; Returns: Json }
+      cliente_fiscal_guardar: {
+        Args: {
+          p_customer: string
+          p_datos: Json
+          p_perfil: string
+          p_predeterminado?: boolean
+        }
+        Returns: Json
+      }
+      cliente_fiscal_predeterminar: {
+        Args: { p_perfil: string }
+        Returns: Json
+      }
+      cliente_nota_agregar: {
+        Args: { p_customer: string; p_texto: string }
+        Returns: Json
+      }
+      cliente_perfiles_fiscales: {
+        Args: { p_customer?: string }
+        Returns: Json
+      }
+      cliente_telefono_archivar: { Args: { p_telefono: string }; Returns: Json }
+      cliente_telefono_guardar: {
+        Args: {
+          p_customer: string
+          p_etiqueta: string
+          p_numero: string
+          p_principal?: boolean
+          p_telefono: string
+        }
+        Returns: Json
+      }
+      cliente_telefono_principal: {
+        Args: { p_telefono: string }
+        Returns: Json
+      }
+      cliente_ubicacion_adoptar_alta: {
+        Args: { p_customer: string }
+        Returns: Json
+      }
+      cliente_ubicacion_archivar: {
+        Args: { p_ubicacion: string }
+        Returns: Json
+      }
+      cliente_ubicacion_guardar: {
+        Args: {
+          p_customer: string
+          p_datos: Json
+          p_predeterminada?: boolean
+          p_ubicacion: string
+        }
+        Returns: Json
+      }
+      cliente_ubicacion_predeterminar: {
+        Args: { p_ubicacion: string }
         Returns: Json
       }
       comm_reclamar: {
