@@ -1,6 +1,7 @@
 -- CC-5 · El rollback retira el carrito y devuelve adopción/purga a CC-2 sin tocar CC-1..CC-4.
 begin;
 -- CC-6 (revisiones/operaciones → cc_carts) baja primero.
+\ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero
 \ir ../../../rollback/c360_0/99_down.sql   -- C360-0 (120) se baja primero
 \ir ../../../rollback/cc7/99_down.sql   -- CC-7 se baja primero (depende de CC-2/5/6)
 \ir ../../../rollback/cc6/99_down.sql

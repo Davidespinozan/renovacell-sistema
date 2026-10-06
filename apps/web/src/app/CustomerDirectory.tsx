@@ -2,12 +2,13 @@
 // "Clientes". customers = identidad comercial del doctor/comprador (con o sin portal). profiles solo
 // = acceso al portal (badge). scope 'all' (admin) o 'cartera' (ventas por seller_name). Solo lectura.
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, MapPin, Phone, Mail, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from './ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
-import { portalStatus, filterByCartera, paginate, pageWindow, type Customer } from '../data/ops/customer'
+import { filterByCartera, paginate, pageWindow, type Customer } from '../data/ops/customer'
 import { useRole } from '../auth/RoleContext'
+import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
 
 const PAGE_SIZE = 100
@@ -17,7 +18,7 @@ const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '�
 // carteraToggle = muestra el filtro "Todos | Mi cartera" (Ventas); default = scope.
 export function CustomerDirectory({ title, scope, carteraToggle = false }: { title: string; scope: 'all' | 'cartera'; carteraToggle?: boolean }) {
   const { data: all, loading, error } = useCustomers()
-  const { role, user } = useRole()
+  const { role, user, setScreen } = useRole()
   const isAdmin = role === 'admin'
   const canOrder = role === 'admin' || role === 'pos'
   const placedBy = isAdmin ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
@@ -40,6 +41,23 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
 
   const pg = paginate(shown, page, PAGE_SIZE) // clamp interno a rango válido
   const visible = pg.items
+
+  // C360-F3 · abrir un cliente entra a la ficha Customer 360 de página completa (no el modal).
+  if (detail) {
+    return (
+      <>
+        <Customer360Page
+          customerId={detail.id}
+          inicial={{ nombre: detail.full_name, email: detail.email, portal: !!detail.profile_id }}
+          onBack={() => setDetail(null)}
+          canOrder={canOrder}
+          onOrder={() => setPedidoFor(detail)}
+          onAsesorias={() => setScreen('asesorias')}
+        />
+        {pedidoFor && <NuevoPedido customer={{ id: pedidoFor.id, name: pedidoFor.full_name, phone: pedidoFor.phone }} placedBy={placedBy} onClose={() => setPedidoFor(null)} />}
+      </>
+    )
+  }
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -105,9 +123,6 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
         </>
       )}
 
-      {detail && (
-        <CustomerDetail c={detail} canOrder={canOrder} onOrder={() => { setPedidoFor(detail); setDetail(null) }} onClose={() => setDetail(null)} />
-      )}
       {pedidoFor && (
         <NuevoPedido customer={{ id: pedidoFor.id, name: pedidoFor.full_name, phone: pedidoFor.phone }} placedBy={placedBy} onClose={() => setPedidoFor(null)} />
       )}
@@ -152,38 +167,3 @@ function Pager({ pg, onPage }: { pg: import('../data/ops/customer').Page<Custome
   )
 }
 
-function CustomerDetail({ c, canOrder, onOrder, onClose }: { c: Customer; canOrder: boolean; onOrder: () => void; onClose: () => void }) {
-  const row = (icon: React.ReactNode, label: string, value: string | null | undefined) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--line)' }}>
-      <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}>{icon}</span>
-      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink-3)', width: 84 }}>{label}</span>
-      <span style={{ fontSize: 13.5, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>{dash(value)}</span>
-    </div>
-  )
-  return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="mhead">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar" style={{ background: avatarColor(c.full_name || '?') }}>{initials(c.full_name || '?')}</div>
-            <div><h3 style={{ margin: 0 }}>{c.full_name}</h3><div className="ms">{portalStatus(c)}</div></div>
-          </div>
-          <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
-        </div>
-        <div className="mbody">
-          {row(<Mail size={15} />, 'Correo', c.email)}
-          {row(<Phone size={15} />, 'Teléfono', c.phone)}
-          {row(<MapPin size={15} />, 'Ciudad', c.city)}
-          {row(<MapPin size={15} />, 'País', c.country)}
-          {row(<UserCheck size={15} />, 'Vendedor', c.seller_name)}
-          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 6 }}>
-              {c.profile_id ? <UserCheck size={13} /> : <UserX size={13} />} {portalStatus(c)}
-            </span>
-            {canOrder && <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={onOrder}>Levantar pedido</button>}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}

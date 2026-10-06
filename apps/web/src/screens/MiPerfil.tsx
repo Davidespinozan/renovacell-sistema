@@ -9,9 +9,8 @@ import { useRole } from '../auth/RoleContext'
 import { uploadImage } from '../lib/uploads'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { DeliveryLocationsManager } from '../app/DeliveryLocationsManager'
-import { FiscalFields } from '../app/FiscalFields'
-import { emptyFiscalProfile, normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../data/ops/fiscal'
-import { customerFiscal, upsertCustomerFiscal, upsertCustomerContact } from '../data/store/customersStore'
+import { AutoservicioCliente } from '../app/AutoservicioCliente'   // C360-F3
+import { upsertCustomerContact } from '../data/store/customersStore'
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
   const { user, role, updateProfile } = useRole()
@@ -23,27 +22,14 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  // Datos fiscales del doctor (para su CFDI). AUTORIDAD = customers.meta.fiscal (master omnicanal).
-  // profiles.meta.fiscal solo se lee como fallback legacy de transición.
+  // C360-F3 · Teléfonos y perfiles fiscales (0..N) del doctor se editan con comandos del servidor en
+  // AutoservicioCliente (efecto inmediato, independiente de "Guardar"). Aquí solo queda el nombre.
   const isDoctor = role === 'doctor'
-  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
   const [customerId, setCustomerId] = useState<string | null>(null)
-  const [showFiscalErr, setShowFiscalErr] = useState(false)
-
   useEffect(() => {
     if (!isDoctor || !hasSupabase) return
     const uid = currentUserId(); if (!uid) return
-    ;(async () => {
-      // Master: el customer ligado a este perfil.
-      const { data: cust } = await supabase.from('customers').select('id, meta').eq('profile_id', uid).maybeSingle()
-      if (cust?.id) setCustomerId(cust.id)
-      const master = customerFiscal(cust as { meta: unknown } | null)
-      if (master.rfc || master.razon_social) { setFiscal(master); return }
-      // Fallback legacy: profiles.meta.fiscal (para migración controlada del doctor al confirmar).
-      const { data: prof } = await supabase.from('profiles').select('meta').eq('id', uid).single()
-      const legacy = (prof?.meta as { fiscal?: unknown } | null)?.fiscal
-      if (legacy) setFiscal(normalizeFiscalProfile(legacy))
-    })()
+    void supabase.from('customers').select('id').eq('profile_id', uid).maybeSingle().then(({ data }) => { if (data?.id) setCustomerId(data.id) })
   }, [isDoctor])
 
   const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
@@ -74,21 +60,6 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     if (isDoctor && customerId && name.trim()) {
       await upsertCustomerContact(customerId, { full_name: name.trim() })
     }
-    // Datos fiscales (opcionales): si el doctor capturó algo, se persiste en el MASTER
-    // (customers.meta.fiscal) vía RPC. Si está incompleto, se bloquea y se marca el error.
-    if (isDoctor) {
-      const touched = Object.values(fiscal).some((v) => (v ?? '').toString().trim() !== '')
-      if (touched) {
-        if (!validateFiscalProfile(fiscal).ok) { setShowFiscalErr(true); setError('Revisa tus datos fiscales.'); setBusy(false); return }
-        if (customerId) {
-          const res = await upsertCustomerFiscal(customerId, fiscal)
-          if (!res.ok) { setError(res.error ?? 'No se pudieron guardar los datos fiscales.'); setBusy(false); return }
-        } else {
-          // Sin customer ligado (caso legacy/transición): conserva en profiles.meta.fiscal.
-          updateProfile({ fiscal: normalizeFiscalProfile(fiscal) as unknown as Record<string, string> })
-        }
-      }
-    }
     setBusy(false)
     setToast(pw ? 'Perfil y contraseña actualizados.' : 'Perfil actualizado.')
     window.setTimeout(() => { setToast(null); onClose() }, 1100)
@@ -116,13 +87,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
           <label style={label}>Nombre visible</label>
           <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
 
-          {isDoctor && (
-            <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Datos fiscales (para tu factura CFDI)</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>Los usamos solo al emitir tu factura. Opcional si no la necesitas.</div>
-              <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
-            </div>
-          )}
+          {isDoctor && hasSupabase && <AutoservicioCliente />}
 
           {isDoctor && <DeliveryLocationsManager />}
 

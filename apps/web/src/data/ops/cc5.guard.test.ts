@@ -127,7 +127,7 @@ describe('frontend', () => {
   it('AF · CC-7 · el Catálogo del doctor converge al carrito CANÓNICO (una sola verdad comercial); el carrito local queda solo para modo demo', () => {
     expect(catalogoLegacy).toMatch(/const canon = useCarritoCanonico\(hasSupabase\)/)
     expect(catalogoLegacy).toMatch(/const cart: Cart = hasSupabase \? canon\.qty : cartLocal/)
-    expect(catalogoLegacy).toMatch(/hasSupabase\s*\? confirmarCanonico\(invoice, choice, receiver\)/)
+    expect(catalogoLegacy).toMatch(/hasSupabase\s*\? confirmarCanonico\(invoice, choice, perfilFiscalId\)/)
     expect(catalogoLegacy).not.toMatch(/cc_carrito_|supabase\.rpc/)   // todo por el cliente de la Edge cart
   })
 })

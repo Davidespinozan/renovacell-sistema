@@ -1,5 +1,6 @@
 -- C360-0 · El rollback devuelve EXACTAMENTE revisar/confirmar de 119 (confirmar vuelve a pasar null) y retira el helper.
 begin;
+\ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero
 \ir ../../../rollback/c360_0/99_down.sql
 do $t$
 begin

@@ -29,7 +29,9 @@ import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { PedidoCreado } from '../../data/store/ordersStore'
-import { setOrderFiscalSnapshot, reloadOrders } from '../../data/store/ordersStore'
+import { reloadOrders } from '../../data/store/ordersStore'
+import { cliente360, type PerfilFiscal } from '../../data/ops/customer360'   // C360-F3 · perfiles fiscales
+import { PerfilesFiscalesEditor } from '../../app/Cliente360Editores'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
 import { carrito as clienteCarrito, nuevaOperacion, ETIQUETA_MOTIVO, textoProblemas } from '../../data/ops/carrito'
 
@@ -154,7 +156,9 @@ export function Catalogo() {
   // CC-7 · confirmación CANÓNICA: revisión (precio/stock/dirección del servidor) → confirmación del
   // doctor → pedido W1 en la misma transacción que convierte el carrito. Luego, si pidió factura, se
   // congela su perfil fiscal en el pedido (igual que el flujo anterior).
-  const confirmarCanonico = async (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null): Promise<ResultadoPedido> => {
+  // C360-F3 · con factura, el receptor es el PERFIL FISCAL elegido (solo su id viaja); el servidor valida que sea
+  // del cliente y lo congela en el pedido dentro de la misma transacción.
+  const confirmarCanonico = async (invoice: boolean, choice: DeliveryChoice | null, perfilFiscalId: string | null): Promise<ResultadoPedido> => {
     await canon.esperar()
     const c = canon.cart
     if (!c) return { ok: false, error: 'Tu carrito no está disponible. Recarga la página.' }
@@ -165,20 +169,15 @@ export function Catalogo() {
       const nombre = (id: string) => products.find((p) => p.id === id)?.name ?? 'producto'
       return { ok: false, error: `Antes de pedir: ${textoProblemas(rv.data.problemas, nombre)}.` }
     }
-    const cf = await clienteCarrito.confirmarCheckout(rv.data.review_id, rv.data.cart_rev, nuevaOperacion(), invoice)
+    const cf = await clienteCarrito.confirmarCheckout(rv.data.review_id, rv.data.cart_rev, nuevaOperacion(), invoice, invoice ? perfilFiscalId : null)
     if (!cf.ok) return { ok: false, error: cf.error.mensaje }
     if (!cf.data.confirmado || !cf.data.order_id) return { ok: false, error: ETIQUETA_MOTIVO[cf.data.motivo ?? ''] ?? 'No se pudo confirmar. Vuelve a revisar tu pedido.' }
-    let aviso: string | undefined
-    if (invoice && receiver) {
-      const f = await setOrderFiscalSnapshot(cf.data.order_id, receiver)
-      if (!f.ok) aviso = 'Tu pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.'
-    }
     void canon.recargar(); reloadOrders()
-    return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null }, aviso }
+    return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null } }
   }
 
-  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null): Promise<ResultadoPedido> => hasSupabase
-    ? confirmarCanonico(invoice, choice, receiver)
+  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null, perfilFiscalId: string | null = null): Promise<ResultadoPedido> => hasSupabase
+    ? confirmarCanonico(invoice, choice, perfilFiscalId)
     : createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) })),
       total,
@@ -487,7 +486,7 @@ function CheckoutModal({
   total: number
   priceOf: (p: ProductSafe) => number | null
   base: ShippingAddress | null
-  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null) => Promise<ResultadoPedido>
+  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null, perfilFiscalId?: string | null) => Promise<ResultadoPedido>
   onPay: (orderId: string, r: { method: string; id: string }) => void
   onDone: () => void
   onClose: () => void
@@ -506,11 +505,22 @@ function CheckoutModal({
   const [savingFiscal, setSavingFiscal] = useState(false)
   const [creando, setCreando] = useState(false)
   const [errorPedido, setErrorPedido] = useState<string | null>(null)
-  const fiscalOk = isFiscalProfileComplete(fiscal)
+  const fiscalOkLegado = isFiscalProfileComplete(fiscal)
+  // C360-F3 · con servidor: perfiles fiscales canónicos (0..N); se elige uno (el predeterminado preseleccionado).
+  const [perfiles, setPerfiles] = useState<PerfilFiscal[] | null>(null)
+  const [perfilSel, setPerfilSel] = useState<string | null>(null)
+  const cargarPerfiles = async () => {
+    const r = await cliente360.perfilesFiscales(null)
+    const ps = r.ok ? r.data.perfiles : []
+    setPerfiles(ps)
+    setPerfilSel((sel) => (sel && ps.some((p) => p.id === sel) ? sel : ps.find((p) => p.es_predeterminado)?.id ?? ps[0]?.id ?? null))
+  }
+  useEffect(() => { if (hasSupabase && invoice && perfiles === null) void cargarPerfiles() }, [invoice])   // eslint-disable-line react-hooks/exhaustive-deps
+  const fiscalOk = hasSupabase ? !!perfilSel : fiscalOkLegado
 
   // Al activar "Solicitar factura", carga el master del cliente (o legacy) una sola vez.
   useEffect(() => {
-    if (!invoice || fiscalLoaded) return
+    if (!invoice || fiscalLoaded || hasSupabase) return   // con servidor se usan los perfiles canónicos
     ;(async () => {
       if (hasSupabase) {
         const uid = currentUserId() ?? ''
@@ -536,7 +546,7 @@ function CheckoutModal({
   const confirm = async () => {
     if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
-    if (invoice && customerId && editingFiscal) {
+    if (!hasSupabase && invoice && customerId && editingFiscal) {
       // Guarda/actualiza el master antes de crear (así POS/Admin lo verán después).
       setSavingFiscal(true)
       const res = await upsertCustomerFiscal(customerId, fiscal)
@@ -544,7 +554,7 @@ function CheckoutModal({
       if (!res.ok) { setShowFiscalErr(true); window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
     }
     setCreando(true); setErrorPedido(null)
-    const r = await onConfirm(invoice, choice, invoice ? fiscal : null)
+    const r = await onConfirm(invoice, choice, invoice && !hasSupabase ? fiscal : null, invoice ? perfilSel : null)
     setCreando(false)
     // Si el servidor NO creó el pedido, el carrito se conserva: vaciarlo aquí
     // haría que el doctor pierda su selección por un pedido que no existe.
@@ -619,16 +629,22 @@ function CheckoutModal({
                 <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface-2, #fafafa)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales para tu CFDI</div>
-                    {fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
+                    {!hasSupabase && fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
                   </div>
-                  {!fiscalLoaded ? (
+                  {hasSupabase ? (
+                    perfiles === null ? <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando tus datos…</div> : (
+                      <div style={{ marginTop: 8 }} data-testid="checkout-perfiles-fiscales">
+                        <PerfilesFiscalesEditor customerId={null} perfiles={perfiles} editable cliente={cliente360} onCambio={cargarPerfiles} seleccion={{ valor: perfilSel, onElegir: setPerfilSel }} />
+                      </div>
+                    )
+                  ) : !fiscalLoaded ? (
                     <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando tus datos…</div>
                   ) : editingFiscal ? (
                     <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
                   ) : (
                     <FiscalSummary value={fiscal} />
                   )}
-                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>Completa tus datos fiscales para poder solicitar la factura.</div>}
+                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>{hasSupabase ? 'Elige o agrega el perfil fiscal para tu factura.' : 'Completa tus datos fiscales para poder solicitar la factura.'}</div>}
                 </div>
               )}
 

@@ -81,8 +81,10 @@ Deno.serve(conCors(async (req) => {
     if (!opc) return json(400, { error: 'operacion_invalida', message: 'Falta operation_id válido.' })
     const rev = Number.isInteger(Number(p.expected_cart_rev)) && Number(p.expected_cart_rev) >= 0 ? Number(p.expected_cart_rev) : null
     // Solo review_id + operation_id + rev esperada: NUNCA total, precio, descuento, lista, doctor ni seller.
-    const factura = p.factura === true   // solo la intención de factura; los datos fiscales se congelan aparte (set_order_fiscal_snapshot)
-    const { data, error } = await caller.rpc('cc_checkout_confirmar', { p_review: review, p_operation: opc, p_expected_rev: rev, p_factura: factura })
+    const factura = p.factura === true
+    // C360-F3 · perfil fiscal ELEGIDO (solo su id; la base exige que sea del cliente y esté activo y lo congela)
+    const perfil = factura && typeof p.perfil_fiscal_id === 'string' && UUID.test(p.perfil_fiscal_id) ? p.perfil_fiscal_id : null
+    const { data, error } = await caller.rpc('cc_checkout_confirmar', { p_review: review, p_operation: opc, p_expected_rev: rev, p_factura: factura, p_perfil_fiscal: perfil })
     if (error) return falla(error)
     return json(200, data)
   }

@@ -14,6 +14,8 @@ import { usePricing } from '../../data/hooks/usePricing'
 import { findCustomerCandidates, type CustomerCandidate } from '../../data/ops/customerMatch'
 import { findVerifiedOrphans } from '../../data/ops/orphans'
 import { deriveVerificationStatus, VERIF_LABEL, VERIF_PILL } from '../../data/ops/verification'
+import { profileContact } from '../../data/ops/profileContact'
+import { formatAddress } from '../../data/ops/shippingAddress'
 import type { CustomerFields } from '../../data/store/customersStore'
 import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
@@ -368,6 +370,9 @@ function DoctorDetail({
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Contacto del perfil por su RUTA REAL (meta.shipping → prospecto → legacy). Lo usan la ficha
+  // y la creación del customer, para que ambos vean exactamente lo que el doctor capturó.
+  const contacto = profileContact(doctor)
 
   // Preserva TODO el contexto comercial disponible (incl. el que viajó desde el prospecto en
   // doctor.meta.commercial): teléfono, ciudad, source, organización, notas y vendedor. NULL/'' no
@@ -383,8 +388,10 @@ function DoctorDetail({
     return {
       full_name: doctor.full_name ?? 'Doctor',
       email: doctor.email ?? null,
-      phone: (doctor.meta?.phone as string) ?? (c.phone as string) ?? null,
-      city: (doctor.meta?.city as string) ?? (c.city as string) ?? null,
+      // F2A: el alta guarda el contacto en meta.shipping.{phone,city}; leerlo por la ruta
+      // canónica (con fallback prospecto/legacy) evita crear customers sin teléfono ni ciudad.
+      phone: contacto.phone.value,
+      city: contacto.city.value,
       source: (c.source as string) ?? 'portal',
       seller_name: (c.seller_name as string) ?? null,
       profile_id: doctor.id,
@@ -433,8 +440,10 @@ function DoctorDetail({
           <div className="form-grid-2" style={{ marginBottom: 14 }}>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Correo</div>{doctor.email}</div>
             <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Cédula</div>{(doctor.meta?.cedula as string) ?? '—'}</div>
-            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Teléfono</div>{(doctor.meta?.phone as string) ?? '—'}</div>
-            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Dirección</div>{(doctor.meta?.address as string) ? `${doctor.meta?.address as string}, ${(doctor.meta?.city as string) ?? ''}` : '—'}</div>
+            {/* F2A: el alta escribe meta.shipping.{phone,line1,city}; se lee por la ruta real
+                (con fallback legacy) — antes mostraba "—" aunque el doctor sí los capturó. */}
+            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Teléfono</div>{contacto.phone.value ?? '—'}</div>
+            <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Dirección</div>{contacto.address.value ? formatAddress(contacto.address.value) : '—'}</div>
             <div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Estatus</div>
               <span className={'pill ' + VERIF_PILL[status]}>{VERIF_LABEL[status]}</span>

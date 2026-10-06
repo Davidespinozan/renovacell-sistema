@@ -27,7 +27,9 @@ begin
     ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),
     ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
     ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
-    ('upsert_customer_fiscal(uuid,jsonb)',                    '8fd937b882e85743582730ac7f132088')
+    -- C360-F3 (autorizado): upsert_customer_fiscal queda como COMPATIBILIDAD sobre el perfil fiscal canónico
+    -- predeterminado y pierde la autoridad de pos (solo Dirección, facturación y el doctor dueño). Hash re-anclado.
+    ('upsert_customer_fiscal(uuid,jsonb)',                    'b6041b322c1b9657139591b28dcad316')
   ) as t(sig, h) loop
     perform tests.eq(md5(pg_get_functiondef(('public.' || r.sig)::regprocedure)), r.h, 'sin cambios: ' || r.sig);
   end loop;

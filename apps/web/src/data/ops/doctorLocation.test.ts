@@ -140,10 +140,11 @@ describe('garantías DB (migración) y no-contaminación (store)', () => {
     expect(migSrc).toMatch(/doctor_locations_update/)
     expect(migSrc).toMatch(/enable row level security/)
   })
-  it('el store SOLO toca la tabla doctor_locations (ningún .from a orders/otros)', () => {
+  it('el store LEE doctor_locations (y resuelve el cliente de un doctor); nunca escribe tablas directo (C360-F3: comandos)', () => {
     const froms = [...storeSrc.matchAll(/\.from\('([^']+)'\)/g)].map((m) => m[1])
-    expect(froms.length).toBeGreaterThan(0)
-    expect([...new Set(froms)]).toEqual(['doctor_locations'])
+    expect([...new Set(froms)].sort()).toEqual(['customers', 'doctor_locations'])
+    expect(storeSrc).not.toMatch(/\.(insert|update|delete|upsert)\(/)
+    for (const c of ['cliente_ubicacion_guardar', 'cliente_ubicacion_archivar', 'cliente_ubicacion_predeterminar']) expect(storeSrc).toContain(`'${c}'`)
   })
   it('list scopea por el doctor seleccionado (staff no usa sus propias ubicaciones)', () => {
     expect(storeSrc).toMatch(/if \(doctorId\) q = q\.eq\('doctor_id', doctorId\)/)
@@ -193,15 +194,15 @@ describe('set default ATÓMICO — RPC set_doctor_default_location', () => {
   it('el self-test de la migración verifica que la RPC existe', () => {
     expect(migSrc).toMatch(/proname = 'set_doctor_default_location'/)
   })
-  it('el store llama la RPC y YA NO hace el flujo de dos UPDATE', () => {
-    expect(storeSrc).toMatch(/supabase\.rpc\('set_doctor_default_location', \{ p_location_id: locationId \}\)/)
+  it('el store llama el comando atómico y YA NO hace el flujo de dos UPDATE (C360-F3: cliente_ubicacion_predeterminar)', () => {
+    expect(storeSrc).toMatch(/rpc\('cliente_ubicacion_predeterminar', \{ p_ubicacion: locationId \}\)/)
     expect(storeSrc).not.toMatch(/\.update\(\{ is_default: true/)   // paso 2 del flujo viejo
     expect(storeSrc).not.toMatch(/\.eq\('is_default', true\)/)      // paso 1 del flujo viejo
     // setDefault recibe SOLO locationId (el doctor lo deriva la RPC).
     expect(storeSrc).toMatch(/setDefaultDoctorLocation\(locationId: string\)/)
   })
-  it('deactivate deja 0 default y NO auto-elige otra (active=false + is_default=false)', () => {
+  it('C360-F3 · archivar = comando del servidor (no borra; si era el predeterminado promueve el activo más antiguo, determinista)', () => {
     expect(storeSrc).toMatch(/deactivateDoctorLocation/)
-    expect(storeSrc).toMatch(/\{ active: false, is_default: false, updated_at:/)
+    expect(storeSrc).toMatch(/rpc\('cliente_ubicacion_archivar', \{ p_ubicacion: id \}\)/)
   })
 })

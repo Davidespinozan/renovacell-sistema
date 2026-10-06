@@ -32,6 +32,7 @@ export function mapearErrorCarrito(mensaje: string | undefined): { status: numbe
   if (/NO_VERIFICADO|is_verified/.test(m)) return r(403, 'NO_VERIFICADO', 'Tu cuenta aún no está verificada por Renovacell.')
   if (/No autorizado/.test(m)) return r(403, 'no_autorizado', 'No puedes confirmar este pedido.')
   // C360-0 · sin expediente de cliente vinculado no hay pedido (falla cerrado, el carrito queda intacto)
+  if (/PERFIL_FISCAL_INVALIDO/.test(m)) return r(409, 'perfil_fiscal_invalido', 'Ese perfil fiscal ya no está disponible. Elige otro o agrégalo de nuevo.')   // C360-F3
   if (/CLIENTE_NO_VINCULADO/.test(m)) return r(409, 'cliente_no_vinculado', 'Tu cuenta aún no está ligada a tu expediente de cliente. Renovacell lo completa; tu carrito sigue guardado.')
   if (/FALLO_INYECTADO|W1_INCONSISTENTE/.test(m)) return r(503, 'no_disponible', 'No se pudo crear el pedido. Tu carrito sigue intacto; intenta de nuevo.')
   return null   // lo demás (NO_AUTORIZADO, SESION_INVALIDA, CUENTA_SUSPENDIDA…) lo traduce el mapa de CC-2
