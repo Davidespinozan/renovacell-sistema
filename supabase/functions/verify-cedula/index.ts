@@ -9,12 +9,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import { observador } from '../_shared/observa.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('verify-cedula')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -157,7 +157,7 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
   return { found: false, unavailable: true, provider: 'sin-proveedor', checkedAt: new Date().toISOString() }
 }
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const url = Deno.env.get('SUPABASE_URL')!
@@ -218,4 +218,4 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
   }
   // Para staff, el cliente aplica la decisión bajo su RLS de admin (evidencia, no acceso).
   return json(200, result)
-})
+}))

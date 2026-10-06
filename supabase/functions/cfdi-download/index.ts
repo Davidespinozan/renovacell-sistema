@@ -13,16 +13,16 @@ import { observador } from '../_shared/observa.ts'
 const obs = observador('cfdi-download')
 import { formatoValido, mimeDe, nombreArchivo, puedeDescargar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const user = Deno.env.get('FACTURAMA_USER')
@@ -79,4 +79,4 @@ const json = (status: number, body: unknown) =>
     contentType: mimeDe(format),
     base64: content,
   })
-})
+}))

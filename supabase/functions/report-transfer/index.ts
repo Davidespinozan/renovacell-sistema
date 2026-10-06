@@ -16,12 +16,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import { observador } from '../_shared/observa.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('report-transfer')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -57,7 +57,7 @@ const traducir = (msg: string): string => {
   return (code && MENSAJES[code]) || msg.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo registrar tu reporte.'
 }
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const url = Deno.env.get('SUPABASE_URL')!
@@ -129,4 +129,4 @@ const traducir = (msg: string): string => {
   }
 
   return json(200, { ok: true, status: estado ?? 'applied', claim_id: (res as { claim_id?: string } | null)?.claim_id, op_id: opId })
-})
+}))

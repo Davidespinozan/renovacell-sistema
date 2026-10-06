@@ -13,16 +13,16 @@ import { observador } from '../_shared/observa.ts'
 const obs = observador('cfdi-send')
 import { auditarSeguro, emailValido, envioExitoso, normalizaEmail, puedeEnviar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const user = Deno.env.get('FACTURAMA_USER')
@@ -108,4 +108,4 @@ const json = (status: number, body: unknown) =>
   // usuario no reintenta y no se duplica el CFDI. Sin XML/PDF/base64/credenciales/email en logs.
   await auditarSeguro(() => caller.rpc('log_audit', { p_action: 'CFDI enviado', p_resource: resource, p_detail: JSON.stringify({ to: email, at, result: 'ok' }), p_actor_name: 'Administración' }))
   return json(200, { ok: true, email })
-})
+}))

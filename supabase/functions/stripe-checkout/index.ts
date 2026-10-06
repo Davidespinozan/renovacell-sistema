@@ -7,9 +7,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import Stripe from 'npm:stripe@17'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -17,7 +17,7 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
 
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
   if (!stripeKey) return json(501, { error: 'not_configured', message: 'Stripe no está habilitado. Agrega STRIPE_SECRET_KEY.' })
@@ -67,4 +67,4 @@ Deno.serve(async (req) => {
   })
 
   return json(200, { url: session.url, id: session.id })
-})
+}))

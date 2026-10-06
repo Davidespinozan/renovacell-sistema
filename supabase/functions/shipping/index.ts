@@ -17,13 +17,13 @@ import { observador } from '../_shared/observa.ts'
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('shipping')
 import {
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
   dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -91,7 +91,7 @@ async function labelPayload(admin: any, sh: any) {
   return { provider: 'dhl', carrier: sh.carrier ?? 'DHL', service: 'DHL Express', serviceCode: sh.service_code, tracking: sh.tracking_number, labelUrl, amount: Number(sh.provider_cost ?? 0), currency: sh.currency ?? 'MXN', estimatedDeliveryAt: sh.estimated_delivery_at ?? '' }
 }
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   // AUTH: usuario + rol de logística (igual que hoy).
@@ -294,4 +294,4 @@ async function labelPayload(admin: any, sh: any) {
     obs('agregador', 'provider_error', { code: 'exception', error: e })
     return json(502, { error: `Error con el agregador: ${(e as Error).message}` })
   }
-})
+}))

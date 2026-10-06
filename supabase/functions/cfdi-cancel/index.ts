@@ -10,15 +10,15 @@ import { observador } from '../_shared/observa.ts'
 const obs = observador('cfdi-cancel')
 import { accionAuditoria, auditarSeguro, construyeCancelMeta, construyeClaimMeta, mapeaStatusCancelacion, motivoCancelValido, puedeCancelar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   const user = Deno.env.get('FACTURAMA_USER'), pass = Deno.env.get('FACTURAMA_PASSWORD')
@@ -125,4 +125,4 @@ const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status
   }
 
   return json(200, { ok: true, cancel: { status, motive, requested_at, acuse_available: !!x?.AcuseXmlBase64, expiration_at: x?.ExpirationDate ?? null } })
-})
+}))

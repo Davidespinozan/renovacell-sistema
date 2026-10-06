@@ -11,12 +11,12 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { enviarCorreo, leerConfig } from '../_shared/correo.ts'
 import { renderizar } from '../_shared/plantillas.ts'
 import { observador } from '../_shared/observa.ts'
+import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('comm-dispatch')
 
 const cors = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -28,7 +28,7 @@ interface Reclamado {
   to_address: string; to_name: string | null; payload: Record<string, unknown>
 }
 
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
   // Antes que nada: ¿hay proveedor? Si no, no se toca ni un mensaje.
@@ -86,4 +86,4 @@ interface Reclamado {
     if (!eRes) cuenta[resultado] += 1
   }
   return json(200, { procesados: (lote ?? []).length, ...cuenta })
-})
+}))
