@@ -4,6 +4,10 @@
 // PRESERVANDO el resto. NO toca order/pago/inventario/comisión/invoice_requested. NO motivo 01/04.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('cfdi-cancel')
 import { accionAuditoria, auditarSeguro, construyeCancelMeta, construyeClaimMeta, mapeaStatusCancelacion, motivoCancelValido, puedeCancelar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
 
@@ -14,7 +18,6 @@ const cors = {
 }
 const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
     .eq('id', payload.order_id)
     .or('invoice_meta->cancel->>status.is.null,invoice_meta->cancel->>status.eq.rechazada')
     .select('id')
-  if (claimErr) return json(500, { error: 'claim_failed', message: 'No se pudo iniciar la cancelación.' })
+  if (claimErr) { obs('cancelar', 'internal_error', { code: 'claim_failed', error: claimErr }); return json(500, { error: 'claim_failed', message: 'No se pudo iniciar la cancelación.' }) }
   if (!claimed || claimed.length === 0) return json(409, { error: 'already_requested', message: 'La cancelación ya está en curso o el CFDI ya está cancelado.' })
 
   // Ya tenemos el claim. DELETE a Facturama — EXACTAMENTE UNO. facturama_id SIEMPRE de BD.
@@ -72,6 +75,7 @@ Deno.serve(async (req) => {
   try {
     r = await fetch(`${facBase}/cfdi/${gate.facturamaId}?${qs.toString()}`, { method: 'DELETE', headers: { Authorization: auth, Accept: 'application/json' } })
   } catch (_e) {
+    obs('cancelar', 'unknown', { code: 'fiscal_incierto', error: _e })
     // AMBIGÜEDAD (network/timeout): NO sabemos si Facturama/SAT procesó la cancelación. Conservar
     // 'solicitada' (NO liberar), NO reintentar DELETE. Requiere reconciliación posterior.
     await auditarSeguro(() => caller.rpc('log_audit', { p_action: 'CFDI cancelación fallida', p_resource: resource, p_detail: JSON.stringify({ motive, at: requested_at, status: 'incierto' }), p_actor_name: 'Administración' }))
@@ -90,6 +94,7 @@ Deno.serve(async (req) => {
       .eq('invoice_meta->cancel->>status', 'solicitada')
       .eq('invoice_meta->cancel->>claim_id', claimId)
     await auditarSeguro(() => caller.rpc('log_audit', { p_action: 'CFDI cancelación fallida', p_resource: resource, p_detail: JSON.stringify({ motive, at: requested_at, status: 'error' }), p_actor_name: 'Administración' }))
+    obs('cancelar', 'provider_error', { code: r.status, mensaje: 'Facturama respondió error al cancelar' })
     return json(502, { error: 'facturama', message: x?.Message ?? x?.message ?? 'No se pudo cancelar el CFDI.' })
   }
 
@@ -115,6 +120,7 @@ Deno.serve(async (req) => {
     // La cancelación fiscal YA ocurrió; falló persistir el estado final. NO reintentar DELETE, NO
     // revertir el claim (el estado remoto cambió). Requiere reconciliación.
     console.warn('[cfdi-cancel] persist_after_cancel', upErr?.message)
+    obs('cancelar', 'internal_error', { code: 'persist_after_cancel', error: upErr ?? undefined, mensaje: upErr ? undefined : 'el claim ya no era nuestro al persistir' })
     return json(500, { error: 'persist_after_cancel', message: 'La cancelación se realizó en el SAT/Facturama pero no se pudo guardar el estado final. Requiere reconciliación. No reintentar cancelar.', fiscal_status: status })
   }
 

@@ -94,7 +94,7 @@ export function construyeClaimMeta(existing: unknown, motive: MotivoCancel, requ
 
 // Auditoría BEST-EFFORT: tolera {error} y excepción, nunca lanza (un fallo de auditoría no debe
 // ocultar/alterar el resultado fiscal). No registra contenido fiscal/credenciales.
-export async function auditarSeguro(rpc: () => Promise<{ error?: unknown } | null | undefined>): Promise<boolean> {
+export async function auditarSeguro(rpc: () => PromiseLike<{ error?: unknown } | null | undefined>): Promise<boolean> {
   try {
     const res = await rpc()
     if (res && (res as { error?: unknown }).error) { console.warn('[cfdi-cancel] auditoría no registrada (rpc error)'); return false }

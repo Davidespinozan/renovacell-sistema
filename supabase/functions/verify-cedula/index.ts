@@ -8,6 +8,10 @@
 // para que la fuente de verdad y el criterio no dependan del navegador.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('verify-cedula')
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -120,11 +124,12 @@ async function lookupSepHttp(cedula: string, enteredName: string): Promise<SepRe
     const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }), signal: ctrl.signal })
     clearTimeout(t)
     // Un error del proveedor NO es "cédula inexistente": es indisponibilidad.
-    if (!r.ok) return { found: false, unavailable: true, provider: url, checkedAt }
+    if (!r.ok) { obs('sep', 'provider_error', { code: r.status }); return { found: false, unavailable: true, provider: url, checkedAt } }
     const raw = await r.json().catch(() => ({}))
     const mapped = mapSepResponse(raw)
     return { ...mapped, provider: url, checkedAt, folio: pick(raw, ['folio', 'idconsulta', 'transaction', 'referencia']) }
-  } catch {
+  } catch (e) {
+    obs('sep', 'provider_error', { code: 'exception', error: e })
     return { found: false, unavailable: true, provider: url, checkedAt }
   }
 }
@@ -152,7 +157,6 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
   return { found: false, unavailable: true, provider: 'sin-proveedor', checkedAt: new Date().toISOString() }
 }
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 

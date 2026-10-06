@@ -13,6 +13,10 @@
 // histórica (quién recibió, cobró, surtió, entregó) se conserva.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('staff-admin')
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +26,6 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -113,6 +116,7 @@ Deno.serve(async (req) => {
     const { data, error } = await caller.rpc('suspender_staff', { p_uid: body.id, p_motivo: motivo, p_baja: baja })
     if (error) return json(400, { error: error.message })
     const sesionesRevocadas = await revocar(body.id)
+    if (!sesionesRevocadas) obs(action, 'internal_error', { code: 'auth_revocation_failed', mensaje: 'Auth no aceptó la revocación de sesiones' })
     return json(200, { ok: true, ...(data as Record<string, unknown>), sesiones_revocadas: sesionesRevocadas })
   }
 
@@ -121,6 +125,7 @@ Deno.serve(async (req) => {
     const { data, error } = await caller.rpc('reactivar_staff', { p_uid: body.id })
     if (error) return json(400, { error: error.message })
     const readmitido = await readmitir(body.id)
+    if (!readmitido) obs(action, 'internal_error', { code: 'auth_readmission_failed', mensaje: 'Auth no aceptó la readmisión' })
     return json(200, { ok: true, ...(data as Record<string, unknown>), readmitido })
   }
 

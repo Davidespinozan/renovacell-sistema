@@ -15,6 +15,10 @@
 // Requiere JWT (cliente autenticado). Desplegar SIN --no-verify-jwt.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('report-transfer')
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -53,7 +57,6 @@ const traducir = (msg: string): string => {
   return (code && MENSAJES[code]) || msg.replace(/^[A-Z_]+:\s*/, '') || 'No se pudo registrar tu reporte.'
 }
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -96,6 +99,7 @@ Deno.serve(async (req) => {
     const path = `transfers/${order.id}/${Date.now()}.jpg`
     const up = await admin.storage.from('proofs').upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })
     if (!up.error) proofPath = path
+    else obs('comprobante', 'internal_error', { code: 'proof_upload_failed', error: up.error })
   }
 
   // El op_id lo manda el cliente para que un reintento del MISMO reporte no cree dos

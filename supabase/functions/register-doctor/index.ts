@@ -21,6 +21,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('register-doctor')
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -68,7 +72,7 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
       const t = setTimeout(() => ctrl.abort(), 10_000)
       const r = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify({ cedula, nombre: enteredName }), signal: ctrl.signal })
       clearTimeout(t)
-      if (!r.ok) return { found: false, unavailable: true, provider: apiUrl, checkedAt }
+      if (!r.ok) { obs('sep', 'provider_error', { code: r.status }); return { found: false, unavailable: true, provider: apiUrl, checkedAt } }
       // deno-lint-ignore no-explicit-any
       const d: any = await r.json().catch(() => ({}))
       const o = d?.data ?? d?.result ?? d?.persona ?? d
@@ -76,7 +80,7 @@ async function lookupSep(cedula: string, enteredName: string): Promise<SepRecord
       const profession = o?.profesion ?? o?.profession ?? o?.carrera
       const folio = o?.folio ?? o?.idConsulta ?? o?.referencia ?? d?.folio
       return { found: !!name, name, profession, provider: apiUrl, checkedAt, folio: folio ? String(folio) : undefined }
-    } catch { return { found: false, unavailable: true, provider: apiUrl, checkedAt } }
+    } catch (e) { obs('sep', 'provider_error', { code: 'exception', error: e }); return { found: false, unavailable: true, provider: apiUrl, checkedAt } }
   }
   // SIMULADOR (solo con flag explícito, para demos). Sin proveedor y sin flag → revisión manual.
   if (Deno.env.get('CEDULA_SIMULATE') !== 'true') {
@@ -181,6 +185,7 @@ Deno.serve(conCors(async (req) => {
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   if ((p.website ?? '').trim() !== '') return json(200, { decision: 'review' }) // honeypot
 
+  // vínculo del registro; nunca es identidad ni autoridad.
   // Domicilio BASE de entrega (opcional al registrarse; si falta, se pide al pedir).
   const line1 = (p.address ?? '').trim().slice(0, 160)
   const shipping = line1
@@ -201,7 +206,7 @@ Deno.serve(conCors(async (req) => {
   // CC-0B · Frontera de abuso ANTES de cualquier efecto caro (lectura de perfiles, Auth,
   // Storage, proveedores externos): ráfaga por IP (hash) y techo global. Limitador caído → 503.
   const sujeto = await sujetoPublico(req)
-  const veredicto = await limitarTodas(admin, [{ scope: 'register_doctor', sujeto }, { scope: 'register_doctor_global', sujeto: 'global' }])
+  const veredicto = await limitarTodas(admin, [{ scope: 'register_doctor', sujeto }, { scope: 'register_doctor_global', sujeto: 'global' }], { reportar: obs })
   if (!veredicto.permitido) return respuestaLimite(veredicto)
 
   // PRE-CHEQUEO DE DUPLICADO (fix landing): si ya existe una cuenta con ese correo, NO
@@ -224,10 +229,10 @@ Deno.serve(conCors(async (req) => {
   if (cel.decision === 'reject' || idHardFail(id)) {
     const reasons = [...cel.reasons]
     if (idHardFail(id)) reasons.push(id.live === false ? 'La prueba de vida no fue superada (no se detectó una persona real).' : 'La selfie no coincide con la foto del INE.')
-    await admin.from('prospects').insert({
+    const { data: pr } = await admin.from('prospects').insert({
       name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
       meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, identity: id, capturedVia: 'auto-registro' },
-    }).then(() => {}, () => {})
+    }).select('id').maybeSingle()
     return json(200, { decision: 'reject', reasons })
   }
 
@@ -239,10 +244,10 @@ Deno.serve(conCors(async (req) => {
   // Compat: si el registro NO adjuntó identidad y la cédula NO es 'auto', se mantiene el
   // comportamiento anterior (prospecto sin cuenta) para no crear cuentas de cédulas dudosas.
   if (!id.attempted && cel.decision !== 'auto') {
-    await admin.from('prospects').insert({
+    const { data: pr } = await admin.from('prospects').insert({
       name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
       meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro' },
-    }).then(() => {}, () => {})
+    }).select('id').maybeSingle()
     return json(200, { decision: cel.decision, reasons: cel.reasons })
   }
 
@@ -255,6 +260,7 @@ Deno.serve(conCors(async (req) => {
 
   // Guarda la evidencia (selfie + INE) en el bucket privado, si vino.
   const evidence = id.attempted ? await uploadEvidence(admin, uid, imgs) : {}
+    obs('crear_cuenta', 'internal_error', { code: 'create_user', error: cErr ?? undefined })
   const autoOk = green && cel.decision === 'auto' // solo EVIDENCIA para el admin, NO da acceso
   const identityStatus = autoOk ? 'approved' : 'pending' // dictamen KYC (evidencia)
 
@@ -285,6 +291,7 @@ Deno.serve(conCors(async (req) => {
     body: autoOk
       ? `Doctor nuevo (validación automática OK) PENDIENTE de aprobación: ${name}`
       : `Doctor EN REVISIÓN de identidad: ${name} — revisa cédula/selfie/INE`,
+  // ya autenticada, confirme la adopción). Posesión probada aquí, confirmación después.
     roles: ['admin'], screen: 'av_verif',
   }).then(() => {}, () => {})
 

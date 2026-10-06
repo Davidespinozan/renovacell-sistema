@@ -14,6 +14,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import Stripe from 'npm:stripe@17'
 import { evaluarPago } from './rules.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('stripe-webhook')
 
 // op_id ESTABLE a partir del id de la sesión: un reintento de Stripe reusa el mismo y el
 // registro de operaciones de dinero devuelve `already_applied` en lugar de cobrar dos veces.
@@ -54,7 +58,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
     const { data: order, error: readErr } = await admin.from('orders').select('total, payment_status').eq('id', orderId).maybeSingle()
-    if (readErr) return new Response('db_read_error', { status: 500 }) // 500 → Stripe reintenta
+    if (readErr) { obs('checkout', 'internal_error', { code: 'db_read_error', error: readErr }); return new Response('db_read_error', { status: 500 }) } // 500 → Stripe reintenta
 
     // Valida estado e IMPORTE contra el pedido antes de marcar pagado.
     const decision = evaluarPago(
@@ -85,6 +89,7 @@ Deno.serve(async (req) => {
         return ok({ received: true, ignored: 'already_recorded' })
       }
       console.error('[stripe-webhook] registrar_cobro', cobroErr.message, { orderId })
+      obs('checkout', 'internal_error', { code: 'rpc_error', error: cobroErr })
       return new Response('rpc_error', { status: 500 }) // 500 → Stripe reintenta
     }
 
@@ -92,7 +97,7 @@ Deno.serve(async (req) => {
     // deja el pedido en 'parcial' y no libera nada). `status` es flujo, no dinero.
     if ((res as { payment_status?: string } | null)?.payment_status === 'paid') {
       const { error: stErr } = await admin.from('orders').update({ status: 'paid' }).eq('id', orderId).eq('status', 'pending_payment')
-      if (stErr) return new Response('db_update_error', { status: 500 })
+      if (stErr) { obs('checkout', 'internal_error', { code: 'db_update_error', error: stErr }); return new Response('db_update_error', { status: 500 }) }
     }
   }
 

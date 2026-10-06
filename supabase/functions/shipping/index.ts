@@ -12,6 +12,10 @@
 //   (legado) SHIPPING_API_KEY, SHIPPING_API_URL, SHIPPING_RATE_PATH, SHIPPING_LABEL_PATH
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('shipping')
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
   dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
@@ -87,7 +91,6 @@ async function labelPayload(admin: any, sh: any) {
   return { provider: 'dhl', carrier: sh.carrier ?? 'DHL', service: 'DHL Express', serviceCode: sh.service_code, tracking: sh.tracking_number, labelUrl, amount: Number(sh.provider_cost ?? 0), currency: sh.currency ?? 'MXN', estimatedDeliveryAt: sh.estimated_delivery_at ?? '' }
 }
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -127,6 +130,7 @@ Deno.serve(async (req) => {
           // Guía válida sin eventos todavía (404 / "No data found") → éxito de dominio,
           // no error. Auth (401/403), request inválido (400) y otros 5xx SIGUEN siendo error.
           if (isTrackingNoData(r.status, data)) return json(200, emptyTrackingResult(tn))
+          obs('track', 'provider_error', { code: r.status, mensaje: 'DHL respondió error en rastreo' })
           return json(502, { error: dhlErrorMessage(r.status, data) })
         }
         return json(200, { tracking: tn, ...parseTracking(data) })
@@ -144,9 +148,9 @@ Deno.serve(async (req) => {
       if (action === 'rate') {
         const r = await fetch(`${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) })
         const data = await r.json().catch(() => ({}))
-        if (!r.ok) return json(502, { error: dhlErrorMessage(r.status, data) })
+        if (!r.ok) { obs('rate', 'provider_error', { code: r.status, mensaje: 'DHL respondió error en cotización' }); return json(502, { error: dhlErrorMessage(r.status, data) }) }
         const rates = parseRates(data)
-        if (!rates.length) return json(502, { error: 'DHL no devolvió tarifas para estos datos.' })
+        if (!rates.length) { obs('rate', 'provider_error', { code: 'sin_tarifas', mensaje: 'DHL no devolvió tarifas' }); return json(502, { error: 'DHL no devolvió tarifas para estos datos.' }) }
         return json(200, { rates })
       }
 
@@ -187,9 +191,10 @@ Deno.serve(async (req) => {
       try {
         const rq = await fetch(`${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) })
         const rd = await rq.json().catch(() => ({}))
-        if (!rq.ok) { await failAttempt(admin, attemptId, dhlErrorMessage(rq.status, rd)); return json(502, { error: dhlErrorMessage(rq.status, rd) }) }
+        if (!rq.ok) { obs('create_shipment', 'provider_error', { code: rq.status, mensaje: 'DHL respondió error en cotización previa a la guía' }); await failAttempt(admin, attemptId, dhlErrorMessage(rq.status, rd)); return json(502, { error: dhlErrorMessage(rq.status, rd) }) }
         serverRate = parseRates(rd).find((x) => String(x.serviceCode) === productCode)
       } catch (e) {
+        obs('create_shipment', 'provider_error', { code: 'rate_exception', error: e })
         await failAttempt(admin, attemptId, `rate: ${(e as Error).message}`)
         return json(502, { error: `Error con DHL (cotización): ${(e as Error).message}` })
       }
@@ -201,13 +206,14 @@ Deno.serve(async (req) => {
       try {
         shipResp = await fetch(`${base}/shipments`, { method: 'POST', headers: { ...H, 'Message-Reference': msgRef }, body: JSON.stringify(buildShipmentRequest(shipper, receiver, pkg, account, productCode, orderRef)) })
       } catch (e) {
+        obs('create_shipment', 'unknown', { code: 'create_timeout', error: e })
         await markUnknown(admin, attemptId, `create timeout/network: ${(e as Error).message}`)
         return json(409, { error: 'unknown_requires_reconciliation', message: 'No se pudo confirmar el resultado con DHL; la guía pudo crearse. Requiere reconciliación (no se reintenta automáticamente).' })
       }
       const shipData = await shipResp.json().catch(() => ({}))
-      if (!shipResp.ok) { await failAttempt(admin, attemptId, dhlErrorMessage(shipResp.status, shipData)); return json(502, { error: dhlErrorMessage(shipResp.status, shipData) }) }
+      if (!shipResp.ok) { obs('create_shipment', 'provider_error', { code: shipResp.status, mensaje: 'DHL rechazó la creación de la guía' }); await failAttempt(admin, attemptId, dhlErrorMessage(shipResp.status, shipData)); return json(502, { error: dhlErrorMessage(shipResp.status, shipData) }) }
       const { tracking, labelBase64, labelFormat } = parseShipment(shipData)
-      if (!tracking) { await markUnknown(admin, attemptId, 'DHL 2xx sin tracking'); return json(409, { error: 'unknown_requires_reconciliation', message: 'DHL respondió sin número de guía; requiere reconciliación.' }) }
+      if (!tracking) { obs('create_shipment', 'unknown', { code: 'sin_tracking', mensaje: 'DHL 2xx sin tracking' }); await markUnknown(admin, attemptId, 'DHL 2xx sin tracking'); return json(409, { error: 'unknown_requires_reconciliation', message: 'DHL respondió sin número de guía; requiere reconciliación.' }) }
 
       // 5) Evidencia inmediata (tracking + costo del SERVIDOR) en el intento, antes de finalizar.
       const etaDays = Number(serverRate.etaDays ?? 2)
@@ -236,12 +242,13 @@ Deno.serve(async (req) => {
         currency: serverRate.currency, quote_ref: quoteRef,
       }
       const { error: finErr } = await admin.rpc('finalize_shipment', { p_attempt_id: attemptId, p_shipment: shipmentRow as unknown as never })
-      if (finErr) { await markUnknown(admin, attemptId, `finalize: ${finErr.message}`); return json(409, { error: 'unknown_requires_reconciliation', message: 'La guía se creó en DHL pero falló el guardado local; requiere reconciliación (no se reintenta automáticamente).' }) }
+      if (finErr) { obs('create_shipment', 'unknown', { code: 'finalize_failed', error: finErr }); await markUnknown(admin, attemptId, `finalize: ${finErr.message}`); return json(409, { error: 'unknown_requires_reconciliation', message: 'La guía se creó en DHL pero falló el guardado local; requiere reconciliación (no se reintenta automáticamente).' }) }
 
       let labelUrl = ''
       if (labelPath) { const { data: sg } = await admin.storage.from(LABELS_BUCKET).createSignedUrl(labelPath, SIGNED_TTL); labelUrl = sg?.signedUrl ?? '' }
       return json(200, { label: { provider: 'dhl', carrier: 'DHL', service: serverRate.service ?? 'DHL Express', serviceCode: productCode, tracking, labelUrl, amount: serverRate.amount, currency: serverRate.currency, etaDays, estimatedDeliveryAt } })
     } catch (e) {
+      obs('dhl', 'provider_error', { code: 'exception', error: e })
       return json(502, { error: `Error con DHL: ${(e as Error).message}` })
     }
   }
@@ -284,6 +291,7 @@ Deno.serve(async (req) => {
     }
     return json(400, { error: 'action inválida (usa rate | create_shipment | track | quote | label).' })
   } catch (e) {
+    obs('agregador', 'provider_error', { code: 'exception', error: e })
     return json(502, { error: `Error con el agregador: ${(e as Error).message}` })
   }
 })

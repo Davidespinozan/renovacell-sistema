@@ -49,7 +49,7 @@ export function accionActualizacion(anterior: string | undefined, nuevo: CancelS
   return null // pendiente → pendiente (sin cambio)
 }
 
-export async function auditarSeguro(rpc: () => Promise<{ error?: unknown } | null | undefined>): Promise<boolean> {
+export async function auditarSeguro(rpc: () => PromiseLike<{ error?: unknown } | null | undefined>): Promise<boolean> {
   try {
     const res = await rpc()
     if (res && (res as { error?: unknown }).error) { console.warn('[cfdi-cancel-status] auditoría no registrada (rpc error)'); return false }

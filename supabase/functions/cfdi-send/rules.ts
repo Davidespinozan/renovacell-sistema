@@ -51,7 +51,7 @@ export function envioExitoso(httpStatus: number, body: unknown): boolean {
 // fallo de auditoría no debe convertir un envío ya realizado en un error para el frontend (evita
 // reintentos que dupliquen el CFDI). No registra email/payload fiscal/credenciales, solo un aviso.
 export async function auditarSeguro(
-  rpc: () => Promise<{ error?: unknown } | null | undefined>,
+  rpc: () => PromiseLike<{ error?: unknown } | null | undefined>,
 ): Promise<boolean> {
   try {
     const res = await rpc()

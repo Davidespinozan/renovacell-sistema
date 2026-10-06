@@ -4,6 +4,10 @@
 // NO usa /cfdi/status en esta versión (usa GET /cfdi/{id}?type=issued).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('cfdi-cancel-status')
 import { accionActualizacion, actualizaCancelStatus, auditarSeguro, mapeaStatusDetalle, puedeConsultar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
 
@@ -14,7 +18,6 @@ const cors = {
 }
 const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -49,7 +52,7 @@ Deno.serve(async (req) => {
   const data = await r.json().catch(() => ({}))
   // deno-lint-ignore no-explicit-any
   const x = data as any
-  if (!r.ok) return json(502, { error: 'facturama', message: x?.Message ?? x?.message ?? 'No se pudo consultar el estatus.' })
+  if (!r.ok) { obs('consultar', 'provider_error', { code: r.status, mensaje: 'Facturama respondió error al consultar estatus' }); return json(502, { error: 'facturama', message: x?.Message ?? x?.message ?? 'No se pudo consultar el estatus.' }) }
 
   const nuevo = mapeaStatusDetalle(x?.Status)
   const resource = order.external_ref ?? payload.order_id
@@ -64,6 +67,7 @@ Deno.serve(async (req) => {
   const { error: upErr } = await admin.from('orders').update({ invoice_meta: meta }).eq('id', payload.order_id)
   if (upErr) {
     console.warn('[cfdi-cancel-status] persist', upErr.message)
+    obs('consultar', 'internal_error', { code: 'persist', error: upErr })
     return json(500, { error: 'persist', message: 'No se pudo guardar el estatus actualizado.', remote_status: nuevo })
   }
   return json(200, { ok: true, cancel: { status: nuevo, confirmed_at: nuevo === 'cancelada' ? now : undefined }, changed: true })

@@ -7,6 +7,10 @@
 // NO toca el timbrado (función `cfdi`): es solo lectura de un CFDI ya timbrado.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('cfdi-download')
 import { formatoValido, mimeDe, nombreArchivo, puedeDescargar } from './rules.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
 
@@ -18,7 +22,6 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -67,6 +70,7 @@ Deno.serve(async (req) => {
   if (!r.ok || !content) {
     // deno-lint-ignore no-explicit-any
     const d = data as any
+    obs('descargar', 'provider_error', { code: r.ok ? 'sin_contenido' : r.status, mensaje: 'Facturama no entregó el documento' })
     return json(502, { error: 'facturama', message: d?.Message ?? d?.message ?? 'No se pudo obtener el documento.' })
   }
 

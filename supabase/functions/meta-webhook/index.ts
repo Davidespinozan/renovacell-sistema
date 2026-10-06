@@ -16,6 +16,10 @@
 //
 // IMPORTANTE al desplegar: --no-verify-jwt (Meta no manda JWT de Supabase).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('meta-webhook')
 
 const OPEN_EXCLUDED = ['convertido', 'descartado']
 const digits = (s: string): string => (s ?? '').replace(/\D/g, '')
@@ -103,6 +107,7 @@ Deno.serve(async (req) => {
   // Meta EXIGE 200 aunque no haya nada que procesar (si no, reintenta y duplica).
   if (incomings.length === 0) return new Response(JSON.stringify({ received: true }), { status: 200 })
 
+  try {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
 
   // Cargamos prospectos y vendedores UNA vez; el batch puede traer varios mensajes.
@@ -166,4 +171,10 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ received: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  } catch (e) {
+    // Firma válida y fallo interno al procesar: se reporta y se relanza (el runtime
+    // responde 500 y Meta reintenta, exactamente como antes).
+    obs('procesar', 'internal_error', { code: 'exception', error: e })
+    throw e
+  }
 })

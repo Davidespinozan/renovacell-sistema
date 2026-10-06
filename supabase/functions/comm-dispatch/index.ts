@@ -10,6 +10,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { enviarCorreo, leerConfig } from '../_shared/correo.ts'
 import { renderizar } from '../_shared/plantillas.ts'
+import { observador } from '../_shared/observa.ts'
+
+// W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
+const obs = observador('comm-dispatch')
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +28,6 @@ interface Reclamado {
   to_address: string; to_name: string | null; payload: Record<string, unknown>
 }
 
-Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
 
@@ -48,6 +51,7 @@ Deno.serve(async (req) => {
     // llamante; aquí no hace falta llave de servicio para saberlo.
     if (/CUENTA_SUSPENDIDA/.test(eRec.message)) return json(403, { error: 'CUENTA_SUSPENDIDA', message: 'Tu acceso fue suspendido por Dirección.' })
     const negado = /NO_AUTORIZADO/.test(eRec.message)
+    if (!negado) obs('reclamar', 'internal_error', { error: eRec })
     return json(negado ? 403 : 500, { error: negado ? 'Solo Dirección envía mensajes al cliente.' : 'No se pudo leer la cola de mensajes.' })
   }
 
@@ -77,6 +81,8 @@ Deno.serve(async (req) => {
     })
     // Si no se pudo asentar el resultado, el mensaje queda `enviando`: la base lo
     // tratará como incierto y lo reintentará con la MISMA llave de idempotencia.
+    if (eRes) obs('resolver', 'internal_error', { error: eRes })
+    else if (resultado === 'incierto') obs('enviar', 'unknown', { code: 'incierto', mensaje: 'el proveedor de correo no confirmó el envío' })
     if (!eRes) cuenta[resultado] += 1
   }
   return json(200, { procesados: (lote ?? []).length, ...cuenta })
