@@ -6006,6 +6006,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      _cc_chk_customer: { Args: { p_profile: string }; Returns: string }
       _cc_chk_direccion: {
         Args: { p_location: string; p_profile: string }
         Returns: Json
