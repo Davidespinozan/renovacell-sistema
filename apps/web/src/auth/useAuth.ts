@@ -8,6 +8,7 @@ import { MOCK_ACCOUNTS } from '../data/mock/accounts'
 import { userByEmail } from '../data/store/teamStore'
 import { verifiedByEmail } from '../data/store/doctorsStore'
 import { decideVerification, simulateSep } from '../data/verification/decide'
+import { leerTokenVisitante } from '../data/ops/visitante'
 
 export interface LoginResult {
   ok: boolean
@@ -69,7 +70,8 @@ export function useAuth() {
     if (password.length < 6) return { decision: 'reject', error: 'La contraseña debe tener al menos 6 caracteres.' }
 
     if (hasSupabase) {
-      const { data, error } = await supabase.functions.invoke('register-doctor', { body: { name, email, cedula, password } })
+      // CC-1: el token de visitante (si lo hay) deja el vínculo del registro; no es identidad.
+      const { data, error } = await supabase.functions.invoke('register-doctor', { body: { name, email, cedula, password, visitor_token: leerTokenVisitante() } })
       if (error) {
         let msg = ''
         try { const b = await (error as { context?: { json?: () => Promise<{ message?: string }> } }).context?.json?.(); msg = b?.message ?? '' } catch { /* noop */ }

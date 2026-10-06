@@ -1,0 +1,14 @@
+-- CC-1 · El rollback retira el dominio de visitante y devuelve el dedupe a CC-0B.
+begin;
+\ir ../../../rollback/cc1/99_down.sql
+do $t$
+begin
+  perform tests.ok(to_regclass('public.cc_visitors') is null and to_regclass('public.cc_visitor_events') is null and to_regclass('public.cc_referral_codes') is null, 'tablas cc_* retiradas');
+  perform tests.ok(to_regprocedure('public.cc_visitante_adoptar(text,uuid)') is null and to_regprocedure('public.cc_visitante_abrir(text,text,jsonb,text)') is null
+               and to_regprocedure('public.norm_telefono_mx(text)') is null, 'funciones CC-1 retiradas');
+  perform tests.ok(not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'prospects' and column_name = 'visitor_id'), 'prospects.visitor_id retirada');
+  perform tests.ok(exists (select 1 from pg_indexes where indexname = 'idx_prospects_phone_digits') and not exists (select 1 from pg_indexes where indexname = 'idx_prospects_phone_norm'), 'índice de dedupe CC-0B restaurado');
+  perform tests.ok(pg_get_functiondef('public.buscar_prospecto_duplicado(text,text)'::regprocedure) like '%>= 7%' and pg_get_functiondef('public.buscar_prospecto_duplicado(text,text)'::regprocedure) not like '%norm_telefono_mx%', 'dedupe vuelve a la regla CC-0B');
+  perform tests.ok(has_function_privilege('service_role', 'public.buscar_prospecto_duplicado(text,text)', 'EXECUTE') and not has_function_privilege('authenticated', 'public.buscar_prospecto_duplicado(text,text)', 'EXECUTE'), 'privilegios del dedupe iguales a CC-0B');
+end $t$;
+rollback;

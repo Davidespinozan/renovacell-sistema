@@ -3045,7 +3045,7 @@ document.addEventListener('keydown', e => {
     var t=add('…','bot');
     fetch(U+'/functions/v1/assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({mode:'landing',messages:window.__rncHist.slice(-12),products:window.__rncCatalog||[]})})
       .then(function(r){return r.ok?r.json():Promise.reject();})
-      .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;window.__rncHist.push({role:'assistant',content:txt});if(d.lead&&d.lead.name){var L=d.lead;fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({name:L.name,phone:L.phone||'',email:L.email||'',channel:'Landing · Asistente',interest:L.interest||''})}).catch(function(){});}var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
+      .then(function(d){var txt=(d&&d.text)?String(d.text).replace(/</g,'&lt;'):'';if(!txt){t.remove();mockAnswer(q);return;}t.innerHTML=txt;window.__rncHist.push({role:'assistant',content:txt});if(d.lead&&d.lead.name){var L=d.lead;fetch(U+'/functions/v1/capture-lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},body:JSON.stringify({name:L.name,phone:L.phone||'',email:L.email||'',channel:'Landing · Asistente',interest:L.interest||'',visitor_token:window.__rncVisitorToken||null})}).catch(function(){});}var b=document.createElement('button');b.className='rnc-ai-chip';b.style.marginTop='6px';b.style.display='block';b.textContent='→ Solicitar acceso médico';b.onclick=goAcceso;t.appendChild(b);body.scrollTop=body.scrollHeight;defaultChips();})
       .catch(function(){t.remove();mockAnswer(q);});
   }
   function defaultChips(){chips(['¿Qué es S²RM®?','¿Cómo obtengo acceso?','¿Tienen certificaciones?']);}
@@ -3352,7 +3352,7 @@ document.addEventListener('keydown', e => {
     fetch(U+'/functions/v1/register-doctor',{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+K},
-      body:JSON.stringify(d)
+      body:JSON.stringify(Object.assign({},d,{visitor_token:window.__rncVisitorToken||null}))
     })
     .then(function(r){ return r.json(); })
     .then(function(r){
@@ -4469,5 +4469,9 @@ body.rnc-drawer-abierto{overflow:hidden}
   .hero-split .hero-glow-2{opacity:.4!important;width:460px!important;height:460px!important;bottom:auto!important;top:8%!important;right:-200px!important}
 }
 </style>
+<script>
+/* CC-1 · identidad de visitante (anónima, sin PII; solo atribución comercial). Silenciosa: si falla, la landing sigue igual. */
+(function(){try{var U='https://amurlvlvfohwucvxfdot.supabase.co';var KEY='rc_visitor';var q=new URLSearchParams(location.search);function g(k,m){var v=q.get(k);return v?String(v).trim().slice(0,m||120):null}var at={};[['utm_source'],['utm_medium'],['utm_campaign'],['utm_content'],['utm_term'],['gclid',160],['fbclid',160]].forEach(function(e){var v=g(e[0],e[1]);if(v)at[e[0]]=v});var r=(document.referrer||'').split('?')[0].slice(0,300);if(r)at.referrer=r;at.landing_path=(location.pathname||'/').split('?')[0].slice(0,200);var ref=g('ref',8);var tok=null;try{tok=localStorage.getItem(KEY)}catch(e){}window.__rncVisitorToken=tok;fetch(U+'/functions/v1/visitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'abrir',token:tok,atribucion:at,ref:ref})}).then(function(x){return x.ok?x.json():null}).then(function(d){if(d&&d.nuevo&&d.token){try{localStorage.setItem(KEY,d.token)}catch(e){}window.__rncVisitorToken=d.token}}).catch(function(){});try{var cta=document.createElement('a');cta.href='/chat';cta.id='rc-chat-cta';cta.textContent='Chatea con Renovacell';cta.setAttribute('aria-label','Abrir el chat de Renovacell');cta.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9998;background:#0f766e;color:#fff;padding:10px 14px;border-radius:999px;font:600 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.18)';document.body.appendChild(cta)}catch(e){}}catch(e){}})();
+</script>
 </body>
 </html>

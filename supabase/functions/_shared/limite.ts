@@ -60,6 +60,10 @@ export const LIMITES: Record<string, Regla> = {
   // register-doctor (público; crea cuentas, sube evidencia, consulta proveedores).
   register_doctor:           { limite: 3,   ventanaSegs: 3600 },
   register_doctor_global:    { limite: 30,  ventanaSegs: 3600 },
+  // visitor (CC-1): abrir/reanudar es barato pero crea filas; techo por IP y global.
+  visitor_abrir:             { limite: 60,  ventanaSegs: 3600 },
+  visitor_abrir_global:      { limite: 3000, ventanaSegs: 3600 },
+  visitor_adoptar:           { limite: 10,  ventanaSegs: 3600 },
 }
 // Por encima de este múltiplo del límite se marca `desafio` (seam para CAPTCHA).
 export const FACTOR_DESAFIO = 2

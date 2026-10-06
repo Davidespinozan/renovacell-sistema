@@ -12,7 +12,8 @@ begin
   perform tests.eq(public.buscar_prospecto_duplicado('ana.perez@clinica.mx', null), v_a, 'correo en minúsculas → encuentra a Ana');
   perform tests.eq(public.buscar_prospecto_duplicado('  ANA.PEREZ@CLINICA.MX ', null), v_a, 'correo con espacios/mayúsculas → Ana');
   perform tests.eq(public.buscar_prospecto_duplicado(null, '52-669-123-4567'), v_a, 'teléfono con los mismos dígitos (formato distinto) → Ana');
-  perform tests.eq(public.buscar_prospecto_duplicado(null, '6691234567'), null::uuid, 'sin lada país = dígitos distintos → no es el mismo (regla ACTUAL de capture-lead, no se amplía en CC-0B)');
+  -- CC-1 (autorizado): el teléfono se normaliza con norm_telefono_mx → +52 669… y 669… son el mismo contacto.
+  perform tests.eq(public.buscar_prospecto_duplicado(null, '6691234567'), v_a, 'sin lada país → mismo contacto (norm_telefono_mx, CC-1)');
   perform tests.eq(public.buscar_prospecto_duplicado(null, '123456'), null::uuid, '< 7 dígitos → nunca deduplica por teléfono');
   perform tests.eq(public.buscar_prospecto_duplicado(null, '555-1234'), v_b, '7 dígitos exactos → Beto');
   perform tests.eq(public.buscar_prospecto_duplicado('nadie@x.mx', '0000000'), null::uuid, 'sin coincidencia → null');
@@ -20,8 +21,9 @@ begin
   perform tests.eq(public.buscar_prospecto_duplicado(null, null), null::uuid, 'nulos → null');
 
   -- índices de expresión presentes (el plan se mide aparte, en el reporte)
+  -- CC-1 reemplaza el índice de dígitos por el de teléfono normalizado: se acepta cualquiera de los dos.
   perform tests.ok(exists (select 1 from pg_indexes where tablename = 'prospects' and indexname = 'idx_prospects_email_lower')
-               and exists (select 1 from pg_indexes where tablename = 'prospects' and indexname = 'idx_prospects_phone_digits'),
+               and exists (select 1 from pg_indexes where tablename = 'prospects' and indexname in ('idx_prospects_phone_digits', 'idx_prospects_phone_norm')),
     'índices de expresión creados');
 
   -- privilegios

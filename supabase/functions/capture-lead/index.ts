@@ -11,6 +11,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
+import { hashToken } from '../_shared/visitante.ts'
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -30,6 +31,7 @@ Deno.serve(conCors(async (req) => {
   let payload: {
     name?: string; email?: string; phone?: string; cedula?: string
     organization?: string; interest?: string; channel?: string; website?: string // website = honeypot
+    visitor_token?: string // CC-1: identidad de visitante (posesión), solo para ligar el prospecto NUEVO
   }
   try { payload = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
 
@@ -93,11 +95,16 @@ Deno.serve(conCors(async (req) => {
     else if (res?.status === 'AMBIGUOUS') meta.identity_review = true
   } catch { /* el lead no debe fallar por el resolver */ }
 
-  const { error: insErr } = await admin.from('prospects').insert({
+  const { data: creado, error: insErr } = await admin.from('prospects').insert({
     name, email: email || null, phone: phone || null, cedula, source: channel,
     status: 'nuevo', assigned_to: assigned, customer_id: customerId, meta,
-  })
-  if (insErr) return json(500, { error: 'No se pudo registrar. Intenta de nuevo.' })
+  }).select('id').single()
+  if (insErr || !creado) return json(500, { error: 'No se pudo registrar. Intenta de nuevo.' })
+
+  // CC-1 · Si el lead trae su token de visitante, el prospecto NUEVO queda ligado a ese
+  // visitante (atribución). DEDUPE ≠ ADOPCIÓN: un prospecto existente nunca se re-liga.
+  const visitorHash = await hashToken(payload.visitor_token)
+  if (visitorHash) await admin.rpc('cc_visitante_prospecto', { p_hash: visitorHash, p_prospect: creado.id }).then(() => {}, () => {})
 
   // 4) Aviso a Dirección (best-effort; no bloquea la respuesta al lead).
   await admin.from('notifications').insert({

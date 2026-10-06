@@ -21,6 +21,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
+import { hashToken } from '../_shared/visitante.ts'
 import { observador } from '../_shared/observa.ts'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
@@ -184,8 +185,11 @@ Deno.serve(conCors(async (req) => {
   let p: { name?: string; email?: string; cedula?: string; password?: string; organization?: string; phone?: string; website?: string; selfie?: string; ineFront?: string; ineBack?: string; address?: string; colonia?: string; cp?: string; city?: string; state?: string }
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   if ((p.website ?? '').trim() !== '') return json(200, { decision: 'review' }) // honeypot
-
+  // CC-1 · token de visitante (posesión): solo sirve para ligar el prospecto o dejar el
   // vínculo del registro; nunca es identidad ni autoridad.
+  const visitorHash = await hashToken((p as { visitor_token?: unknown }).visitor_token)
+  const ligarProspecto = async (id: string | null | undefined) => { if (visitorHash && id) await admin.rpc('cc_visitante_prospecto', { p_hash: visitorHash, p_prospect: id }).then(() => {}, () => {}) }
+
   // Domicilio BASE de entrega (opcional al registrarse; si falta, se pide al pedir).
   const line1 = (p.address ?? '').trim().slice(0, 160)
   const shipping = line1
@@ -233,6 +237,7 @@ Deno.serve(conCors(async (req) => {
       name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
       meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, identity: id, capturedVia: 'auto-registro' },
     }).select('id').maybeSingle()
+    await ligarProspecto(pr?.id)
     return json(200, { decision: 'reject', reasons })
   }
 
@@ -248,19 +253,20 @@ Deno.serve(conCors(async (req) => {
       name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
       meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro' },
     }).select('id').maybeSingle()
+    await ligarProspecto(pr?.id)
     return json(200, { decision: cel.decision, reasons: cel.reasons })
   }
 
   const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name } })
   if (cErr || !created?.user) {
     if ((cErr?.message ?? '').toLowerCase().includes('already')) return json(200, { decision: 'exists', message: 'Ese correo ya tiene cuenta. Inicia sesión o recupera tu contraseña.' })
+    obs('crear_cuenta', 'internal_error', { code: 'create_user', error: cErr ?? undefined })
     return json(500, { error: cErr?.message ?? 'No se pudo crear la cuenta.' })
   }
   const uid = created.user.id
 
   // Guarda la evidencia (selfie + INE) en el bucket privado, si vino.
   const evidence = id.attempted ? await uploadEvidence(admin, uid, imgs) : {}
-    obs('crear_cuenta', 'internal_error', { code: 'create_user', error: cErr ?? undefined })
   const autoOk = green && cel.decision === 'auto' // solo EVIDENCIA para el admin, NO da acceso
   const identityStatus = autoOk ? 'approved' : 'pending' // dictamen KYC (evidencia)
 
@@ -285,13 +291,15 @@ Deno.serve(conCors(async (req) => {
       ...(commercial ? { commercial } : {}),
     },
   })
+  // CC-1 · El visitante que creó esta cuenta queda vinculado (pendiente de que la cuenta,
+  // ya autenticada, confirme la adopción). Posesión probada aquí, confirmación después.
+  if (visitorHash) await admin.rpc('cc_visitante_vincular_registro', { p_hash: visitorHash, p_profile: uid }).then(() => {}, () => {})
 
   // Aviso al admin (cola de revisión av_verif). Distingue si las validaciones salieron verdes.
   await admin.from('notifications').insert({
     body: autoOk
       ? `Doctor nuevo (validación automática OK) PENDIENTE de aprobación: ${name}`
       : `Doctor EN REVISIÓN de identidad: ${name} — revisa cédula/selfie/INE`,
-  // ya autenticada, confirme la adopción). Posesión probada aquí, confirmación después.
     roles: ['admin'], screen: 'av_verif',
   }).then(() => {}, () => {})
 

@@ -125,7 +125,8 @@ describe('CORS · inventario y webhooks', () => {
       if (/Deno\.serve\(conCors\(/.test(src)) conHelper.push(nombre(p))
       if (/'Access-Control-Allow-Origin': '\*'/.test(src)) conAsterisco.push(nombre(p))
     }
-    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'comm-dispatch', 'invite-doctor', 'meta-send', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verify-cedula'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
+    // CC-1 añade `visitor` (nace ya con la lista blanca).
+    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'comm-dispatch', 'invite-doctor', 'meta-send', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verify-cedula', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
     for (const f of conHelper) expect(conAsterisco, f).not.toContain(f)
     expect(conAsterisco).toEqual([])   // CC-0B.2 cerrado: ninguna Edge conserva '*'
   })

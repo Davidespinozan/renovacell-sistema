@@ -8,6 +8,7 @@ import { FEATURES } from '../app/config'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
 import { confirmar } from '../data/store/escritura'
+import { abrirVisitante, adoptarVisitante } from '../data/ops/visitante'
 
 export type AppMode = 'app' | 'landing' | 'login' | 'reset'
 
@@ -102,10 +103,14 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     } else {
       currentSession().then((s) => {
         if (active && s) login(s.role, s.verified, { name: s.name, email: s.email, avatarUrl: s.avatarUrl }, s.capabilities)
+        // CC-1 · identidad de visitante (silenciosa): sin sesión se abre/reanuda; con sesión
+        // la cuenta adopta lo que hizo antes de existir (token poseído o vínculo del registro).
+        if (active) void (s ? adoptarVisitante() : abrirVisitante())
       })
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setMode('reset')
+      else if (event === 'SIGNED_IN') void adoptarVisitante()
       else if (event === 'SIGNED_OUT') {
         setUser(null)
         setCapabilities([])
