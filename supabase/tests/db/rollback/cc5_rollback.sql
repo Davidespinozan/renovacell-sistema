@@ -1,6 +1,8 @@
 -- CC-5 · El rollback retira el carrito y devuelve adopción/purga a CC-2 sin tocar CC-1..CC-4.
 begin;
 -- CC-6 (revisiones/operaciones → cc_carts) baja primero.
+set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/chatv2c1/99_down.sql   -- Chat V2-C1 (125) se baja primero
 \ir ../../../rollback/chv2a_cron/99_down.sql   -- CHV2-A cron fix (124) se baja primero
 \ir ../../../rollback/chv2a/99_down.sql   -- CHV2-A (123) se baja primero
 \ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero

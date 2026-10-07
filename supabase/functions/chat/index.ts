@@ -34,7 +34,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola'])
+const ACCIONES = new Set(['abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion'])   // + Chat V2-C1
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(conCors(async (req) => {
@@ -85,8 +85,25 @@ Deno.serve(conCors(async (req) => {
     return json(200, data)
   }
 
+  // ── Chat V2-C1 · leer UNA sesión (histórica o actual), solo lectura; la base decide la autoridad ──
+  if (action === 'leer_sesion') {
+    const sesion = typeof p.session_id === 'string' && UUID.test(p.session_id) ? p.session_id : null
+    if (!sesion) return json(400, { error: 'falta_sesion', message: 'Falta session_id.' })
+    const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
+    const { data, error } = await admin.rpc('cc_sesion_leer', { p_session: sesion, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile, p_desde_seq: desde, p_limite: 100 })
+    if (error) return falla(error)
+    return json(200, data)
+  }
+
   if (!conv) return json(400, { error: 'falta_conversacion', message: 'Falta conversation_id.' })
   const base = { p_conv: conv, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile }
+
+  // ── Chat V2-C1 · sesiones autorizadas de la conversación (sin fragmentos de mensajes) ──
+  if (action === 'sesiones') {
+    const { data, error } = await admin.rpc('cc_sesiones_listar', base)
+    if (error) return falla(error)
+    return json(200, data)
+  }
 
   if (action === 'leer') {
     const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
@@ -221,8 +238,10 @@ async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 
 }
 
 // Lectura interna con service_role (el orquestador corre en el servidor, no es un cliente).
+// Chat V2-C1 · la base acota el contexto a la SESIÓN del disparador (nunca el transcript eterno).
 // deno-lint-ignore no-explicit-any
 async function leerInterno(admin: any, conv: string, hastaSeq: number, limite: number): Promise<Array<{ actor: string; content: string }>> {
-  const { data } = await admin.from('cc_messages').select('actor_type, content, seq').eq('conversation_id', conv).lte('seq', hastaSeq).order('seq', { ascending: false }).limit(limite)
-  return ((data ?? []) as Array<{ actor_type: string; content: string }>).reverse().map((m) => ({ actor: m.actor_type, content: m.content }))
+  const { data, error } = await admin.rpc('cc_ia_contexto', { p_conv: conv, p_hasta_seq: hastaSeq, p_limite: limite })
+  if (error) throw new Error('contexto_ia')
+  return ((data ?? []) as Array<{ actor: string; content: string }>).map((m) => ({ actor: m.actor, content: m.content }))
 }

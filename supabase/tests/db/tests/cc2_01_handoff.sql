@@ -92,16 +92,19 @@ begin
   r := public.cc_iniciar_asesoria(cA, v_pos);
   perform tests.throws(format('select public.cc_terminar_asesoria(%L, %L)', cA, v_pos2), 'NO_AUTORIZADO', 'otro vendedor no termina');
   r := public.cc_terminar_asesoria(cA, v_pos);
-  perform tests.eq(r ->> 'modo', 'human_ended', 'human_ended');
-  perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''ai'', null, null, ''ai:5'', ''x'')', cA), 'IA_SILENCIADA', 'IA callada en human_ended mientras el dueño no escriba');
+  -- Chat V2-C1 · terminar = CERRAR la sesión: modo vuelve a ai_active (antes quedaba en human_ended).
+  perform tests.eq(r ->> 'modo', 'ai_active', 'terminar cierra la sesión y libera el estado (V2-C1)');
+  perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''ai'', null, null, ''ai:5'', ''x'')', cA), 'IA_SILENCIADA', 'IA callada tras terminar mientras el dueño no escriba (sin sesión abierta)');
   r := public.cc_enviar_mensaje(cA, 'visitor', hA, null, 'c:3', 'Una pregunta más');
-  perform tests.eq(r ->> 'modo', 'ai_active', '34 · CC-7 · tras human_ended, el siguiente mensaje del dueño reanuda la IA');
+  perform tests.eq(r ->> 'modo', 'ai_active', '34 · CC-7 · tras terminar, el siguiente mensaje del dueño abre sesión nueva con IA');
   r := public.cc_reanudar_ia(cA, 'visitor', hA, null);
   perform tests.eq((r ->> 'idempotente')::boolean, true, 'reanudar una IA ya reanudada: idempotente');
   r := public.cc_enviar_mensaje(cA, 'ai', null, null, 'ai:6', 'De vuelta contigo.');
   perform tests.ok((r ->> 'seq')::int > 0, 'IA habla de nuevo');
   perform tests.act_as_owner();
-  perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = cA and tipo = 'ai_resumed'), 1, '20 · evento ai_resumed durable');
+  -- V2-C1 · el cierre de sesión sustituye a "ai_resumed" (no se duplica semántica): 1 session_closed, 0 ai_resumed.
+  perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = cA and tipo = 'session_closed'), 1, '20 · evento session_closed durable');
+  perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = cA and tipo = 'ai_resumed'), 0, '20 · sin ai_resumed duplicado tras el cierre de sesión');
   perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = cA and tipo in ('human_assigned','seller_unassigned','human_started','human_ended')), 8, '20 · eventos de handoff durables (3 asignaciones + 2 desasignaciones + 2 inicios + 1 fin = 8)');
   perform tests.act_as_service();
 

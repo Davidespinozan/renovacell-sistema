@@ -231,7 +231,9 @@ do $k$
 declare v_hay boolean;
 begin
   alter table public.cc_conversation_events drop constraint ck_ccce_tipo;
-  select exists (select 1 from public.cc_conversation_events where tipo = 'notificacion_fallida') into v_hay;
+  -- Append-only: cualquier fila fuera de la lista de la 122 (notificacion_fallida de CHV2-A o session_* de Chat V2-C1)
+  -- obliga a restaurar el CHECK como NOT VALID (no se borra historia).
+  select exists (select 1 from public.cc_conversation_events where tipo not in ('conversation_opened', 'visitor_adopted', 'human_offered', 'human_requested', 'human_assigned', 'seller_unassigned', 'human_started', 'human_ended', 'ai_resumed', 'conversation_closed', 'conversation_reopened', 'human_handoff_requested', 'human_handoff_queued', 'human_handoff_rejected')) into v_hay;
   if v_hay then
     alter table public.cc_conversation_events add constraint ck_ccce_tipo check (tipo in ('conversation_opened', 'visitor_adopted', 'human_offered', 'human_requested', 'human_assigned', 'seller_unassigned', 'human_started', 'human_ended', 'ai_resumed', 'conversation_closed', 'conversation_reopened', 'human_handoff_requested', 'human_handoff_queued', 'human_handoff_rejected')) not valid;
   else

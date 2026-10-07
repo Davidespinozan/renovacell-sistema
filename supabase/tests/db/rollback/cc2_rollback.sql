@@ -1,6 +1,8 @@
 -- CC-2 · El rollback retira el dominio de conversación y devuelve adopción/purga al texto CC-1.
 begin;
 -- CC-4 (cc_ai_turns → cc_conversations) baja primero.
+set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/chatv2c1/99_down.sql   -- Chat V2-C1 (125) se baja primero
 \ir ../../../rollback/chv2a_cron/99_down.sql   -- CHV2-A cron fix (124) se baja primero
 \ir ../../../rollback/chv2a/99_down.sql   -- CHV2-A (123) se baja primero
 \ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero

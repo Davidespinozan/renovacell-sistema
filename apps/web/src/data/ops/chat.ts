@@ -16,7 +16,14 @@ export interface Conversacion {
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
   handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
   leido_hasta?: number                   // UX-1 · cursor de lectura del actor (cc_participants.last_read_seq): el badge del portal no inventa estado
+  sesion?: SesionResumen | null          // Chat V2-C1 · la lectura activa es la sesión actual (o la última cerrada si no hay abierta)
 }
+// Chat V2-C1 · sesión = interacción temporal dentro de la conversación permanente (rango de mensajes).
+export interface SesionResumen {
+  id: string; ordinal: number; estado: 'abierta' | 'cerrada'; origen: string; first_seq?: number; last_seq?: number | null
+  opened_at: string; closed_at: string | null; close_reason: string | null
+}
+export interface SesionListada extends SesionResumen { actual: boolean; last_activity_at: string; n_mensajes: number; asesor_nombre: string | null }
 export interface EstadoHandoff { origen: 'carrito' | 'manual' | null; cart_id: string | null; fuera_horario: boolean | null; asignado: boolean; puede_rechazar: boolean }
 export interface ColaItem {
   conversation_id: string; modo: ModoConversacion; seller_profile_id: string | null; asesoria_solicitada_at: string | null; last_message_at: string | null; es_mia: boolean; sin_leer: number; dueno: string
@@ -74,6 +81,9 @@ export class ClienteChat {
   reanudarIA(conversation_id: string) { return this.llamar<{ modo: ModoConversacion }>({ action: 'reanudar_ia', conversation_id }) }
   cerrar(conversation_id: string) { return this.llamar<{ estado: string }>({ action: 'cerrar', conversation_id }) }
   cola() { return this.llamar<{ cola: ColaItem[] }>({ action: 'cola' }) }
+  // Chat V2-C1 · autoridad de historial lista para C3 (sin UI todavía): la base decide quién ve qué.
+  sesiones(conversation_id: string) { return this.llamar<{ conversation_id: string; sesiones: SesionListada[] }>({ action: 'sesiones', conversation_id }) }
+  leerSesion(session_id: string, desde_seq = 0) { return this.llamar<{ sesion: SesionResumen & { asesor_nombre: string | null }; rol: string; solo_lectura: boolean; mensajes: Mensaje[] }>({ action: 'leer_sesion', session_id, desde_seq }) }
 }
 
 export const chat = new ClienteChat()

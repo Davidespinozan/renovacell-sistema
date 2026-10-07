@@ -88,6 +88,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     setError(null)
     setConv((prev) => {
       if (!prev || desde === 0 || prev.conversation_id !== id) return r.data
+      // Chat V2-C1 · el servidor muestra SOLO la sesión actual: si cambió de sesión, el hilo empieza de nuevo.
+      if (r.data.sesion?.id && prev.sesion?.id && r.data.sesion.id !== prev.sesion.id) return r.data
       const vistos = new Set(prev.mensajes.map((m) => m.seq))
       return { ...r.data, mensajes: [...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))] }
     })

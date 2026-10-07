@@ -17,6 +17,8 @@ begin
 end $t$;
 reset role;
 select set_config('request.jwt.claims', '', true);
+set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/chatv2c1/99_down.sql   -- Chat V2-C1 (125) se baja primero
 \ir ../../../rollback/chv2a_cron/99_down.sql   -- CHV2-A cron fix (124) se baja primero
 \ir ../../../rollback/chv2a/99_down.sql
 do $t$

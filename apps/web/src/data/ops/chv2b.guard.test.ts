@@ -67,7 +67,8 @@ describe('autoridad del servidor', () => {
 describe('alcance', () => {
   it('sin migración 125 ni cambios de Edge/Web Push en CHV2-B', () => {
     const migs = readdirSync(new URL('../../../../../supabase/migrations', import.meta.url)) as string[]
-    expect(migs.filter((m) => m > '20261107120000_chv2a_cron_fix.sql')).toEqual([])
+    // CHV2-B no agregó migraciones; la única posterior a la 124 es la de Chat V2-C1 (125), de otro paquete.
+    expect(migs.filter((m) => m > '20261107120000_chv2a_cron_fix.sql' && m !== '20261108120000_chatv2c1_sesiones.sql')).toEqual([])
     const sw = (() => { try { return readFileSync(new URL('../../../public/sw.js', import.meta.url), 'utf8') as string } catch { return '' } })()
     expect(sw).not.toMatch(/push/i)
   })
