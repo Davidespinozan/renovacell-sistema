@@ -2,6 +2,7 @@
 begin;
 -- Rollback EN CAPAS (como W1/W2): CC-3 reutiliza _cc_append_only y CC-2 se apoya en cc_visitors
 -- (FK restrict), así que bajan primero, en orden inverso.
+\ir ../../../rollback/chv2a/99_down.sql   -- CHV2-A (123) se baja primero
 \ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero
 \ir ../../../rollback/c360_0/99_down.sql   -- C360-0 (120) se baja primero
 \ir ../../../rollback/cc7/99_down.sql   -- CC-7 se baja primero (depende de CC-2/5/6)
