@@ -30,6 +30,7 @@ begin
 end $t$;
 create temp table _c1rb_antes as select conversation_id, string_agg(id::text || ':' || seq || ':' || content_hash, ',' order by seq) h, count(*) n from public.cc_messages group by conversation_id;
 set app.chatv2c1_rollback_forzado = 'on';   -- override explícito (decisión del dueño) para probar la restauración estructural
+\ir ../../../rollback/ci1/99_down.sql   -- Commercial Intent CI-1 (128) se baja primero
 \ir ../../../rollback/chatv2c2/99_down.sql   -- Chat V2-C2 (127) se baja primero
 \ir ../../../rollback/chatv2c1/99_down.sql
 do $t$

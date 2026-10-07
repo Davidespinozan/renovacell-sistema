@@ -41,7 +41,7 @@ for i in 1 2 3 4 5 6; do
 done; wait
 noerr "$T"/a*.out && echo "PASS: A · 6 mutaciones concurrentes sin error (el ruteo nunca rompe el carrito)"
 check "A · un solo HANDOFF_REQUESTED en el carrito" "select count(*) = 1 from public.cc_cart_events where cart_id = '$KA' and tipo = 'handoff_requested'"
-check "A · un solo aviso al doctor" "select count(*) = 1 from public.cc_messages m join public.cc_carts k on k.handoff_conversation_id = m.conversation_id where k.id = '$KA' and m.client_message_id = 'sys:handoff:$KA'"
+check "A · un solo aviso al doctor" "select count(*) = 1 from public.cc_messages m join public.cc_carts k on k.handoff_conversation_id = m.conversation_id where k.id = '$KA' and m.client_message_id like 'sys:handoff:$KA:%'"
 check "A · una sola solicitud en la conversación y asignada a su cartera" "select (select count(*) from public.cc_conversation_events e where e.conversation_id = c.id and e.tipo = 'human_handoff_requested') = 1 and c.modo = 'human_assigned' and c.seller_profile_id = tests.id('cc7_s1') from public.cc_conversations c join public.cc_carts k on k.handoff_conversation_id = c.id where k.id = '$KA'"
 check "A · todas las adiciones aplicadas (sin lost update)" "select sum(quantity) = 6 from public.cc_cart_items where cart_id = '$KA'"
 

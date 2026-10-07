@@ -142,18 +142,20 @@ begin
   r := public.cc_leer_conversacion(c1, 'doctor', null, d1, 0, 100);
   perform tests.ok(jsonb_array_length(r -> 'mensajes') = 2 and (r -> 'sesion' ->> 'ordinal')::int = 2 and r -> 'sesion' ->> 'estado' = 'abierta', 'leer (activa) = solo la sesión 2, con su metadata');
 
-  -- ══ 17 · mismo carrito ya con handoff: cerrar/abrir sesiones NO produce un segundo handoff ══
+  -- ══ 17 · (CI-1, 128) mismo carrito con un handoff de la sesión 1 YA CERRADA: una señal fuerte en la sesión 2
+  --        abre un EPISODIO nuevo dentro de la sesión 2 (rearme por episodio; antes "un ciclo por carrito") ══
   perform tests.act_as_owner(); select count(*) into n from public.cc_conversation_events where conversation_id = c1 and tipo = 'human_handoff_requested'; perform tests.act_as_service();
   perform public.cc_carrito_quitar(k1, 'doctor', null, d1, pA, 'k1-2');
   r := public.cc_carrito_agregar(k1, 'doctor', null, d1, pB, 1, 'k1-3');
-  perform tests.ok((r -> 'handoff') is null or jsonb_typeof(r -> 'handoff') = 'null', '17 · mismo carrito: sin handoff automático nuevo');
+  perform tests.ok(r -> 'handoff' ->> 'estado' = 'solicitado', '17 · CI-1: handoff de una sesión cerrada → la señal fuerte abre un episodio nuevo');
   perform tests.act_as_owner();
-  perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = c1 and tipo = 'human_handoff_requested'), n, '17 · cero eventos de handoff nuevos');
-  perform tests.ok((select modo = 'ai_active' from public.cc_conversations where id = c1), '17 · la sesión 2 sigue con IA');
-  -- la solicitud MANUAL en la sesión nueva sigue siendo posible (reglas CC-7)
+  perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = c1 and tipo = 'human_handoff_requested'), n + 1, '17 · un evento de handoff nuevo');
+  perform tests.ok((select modo = 'human_assigned' from public.cc_conversations where id = c1)
+                   and (select count(*) = 2 from public.cc_conversation_events e join public.cc_conversation_sessions s on s.id = e.session_id where e.conversation_id = c1 and s.ordinal = 2 and e.tipo in ('human_handoff_requested', 'human_assigned')), '17 · episodio en la sesión 2 (asignado por cartera, eventos con su sesión)');
+  -- la solicitud MANUAL con el episodio vigente es idempotente (reglas CC-7)
   perform tests.act_as_service();
   r := public.cc_solicitar_asesor(c1, 'doctor', null, d1);
-  perform tests.eq(r ->> 'modo', 'human_assigned', '17 · solicitud manual de asesor en la sesión 2 → asignada por cartera');
+  perform tests.ok(r ->> 'modo' = 'human_assigned' and (r ->> 'idempotente')::boolean, '17 · solicitud manual con episodio vigente → idempotente, asignada por cartera');
   perform tests.act_as_owner();
   perform tests.eq((select count(*)::int from public.cc_conversation_sessions where conversation_id = c1), 2, '17 · la solicitud manual no abre otra sesión');
 

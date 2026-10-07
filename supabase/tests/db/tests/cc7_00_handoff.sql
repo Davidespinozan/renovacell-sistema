@@ -64,7 +64,7 @@ begin
   perform tests.eq((r -> 'handoff' ->> 'asignado')::boolean, true, '16 · ruteado a su vendedor de cartera');
   c1 := (r -> 'handoff' ->> 'conversation_id')::uuid;
   perform tests.ok((select modo = 'human_assigned' and seller_profile_id = s1 and handoff_origen = 'carrito' and handoff_cart_id = k1 and not handoff_fuera_horario from public.cc_conversations where id = c1), '16 · conversación human_assigned con s1');
-  perform tests.ok(exists (select 1 from public.cc_messages where conversation_id = c1 and actor_type = 'system' and client_message_id = 'sys:handoff:' || k1 and content like 'Te conectaremos con un asesor personal%'), '1 · aviso durable en horario');
+  perform tests.ok(exists (select 1 from public.cc_messages where conversation_id = c1 and actor_type = 'system' and client_message_id like 'sys:handoff:' || k1 || ':%' and content like 'Te conectaremos con un asesor personal%'), '1 · aviso durable en horario');
   perform tests.eq((select count(*)::int from public.cc_conversation_events where conversation_id = c1 and tipo in ('human_handoff_requested', 'human_assigned')), 2, '18 · eventos observables (solicitado + asignado)');
   perform tests.eq((select count(*)::int from public.cc_cart_events where cart_id = k1 and tipo in ('first_item_added', 'handoff_requested')), 2, '18 · CART_ACTIVATED + HANDOFF_REQUESTED en el carrito');
   -- 4/5 · reintento con la misma operación y "doble clic" (otra operación): sin duplicados
@@ -197,7 +197,7 @@ begin
   r := public.cc_carrito_agregar(k4, 'doctor', null, d4, pB, 1, 'k4b-1');
   perform tests.eq((r -> 'handoff' ->> 'fuera_horario')::boolean, true, '2 · fuera de horario detectado por el servidor');
   perform tests.ok((select seller_profile_id = s3 and handoff_fuera_horario from public.cc_conversations where id = c4), '2 · destino de cartera preservado');
-  perform tests.ok(exists (select 1 from public.cc_messages where conversation_id = c4 and client_message_id = 'sys:handoff:' || k4 and content like 'Nuestro equipo de asesores no está disponible%'), '2 · aviso veraz fuera de horario');
+  perform tests.ok(exists (select 1 from public.cc_messages where conversation_id = c4 and client_message_id like 'sys:handoff:' || k4 || ':%' and content like 'Nuestro equipo de asesores no está disponible%'), '2 · aviso veraz fuera de horario');
   perform tests.ok(exists (select 1 from public.cc_conversation_events where conversation_id = c4 and tipo = 'human_handoff_requested' and (detalle ->> 'fuera_horario')::boolean), '18 · OUTSIDE_BUSINESS_HOURS observable');
   perform tests.eq((public.cc_ia_estado_handoff(c4) ->> 'en_horario')::boolean, false, 'el orquestador sabe que está fuera de horario');
 
