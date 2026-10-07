@@ -9,6 +9,7 @@
 //   · Horario y alertas: horario semanal/excepciones (CC-7) y umbrales de aviso/escalamiento (CHV2-A).
 // La autoridad es la base: valida Dirección, elegibilidad y motivo; nada se asigna al azar.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { capitalizarNombre } from '../../lib/nombres'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
@@ -152,7 +153,7 @@ function PestanaPendientes({ pend, vendedores, cliente, chat, onCambio, foco, on
               className={destacada === p.conversation_id ? 'rc-llegada' : undefined}
               style={{ border: '1px solid var(--line)', borderLeft: `4px solid var(--${tono === 'dang' ? 'danger' : tono === 'warn' ? 'warn' : tono === 'ok' ? 'green' : 'line'})`, borderRadius: 12, padding: '12px 14px', display: 'grid', gap: 8, outline: 'none' }} data-testid="pendiente">
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <b style={{ fontSize: 15 }}>{p.nombre}{p.dueno === 'visitante' ? ' (visitante)' : ''}</b>
+                <b style={{ fontSize: 15 }}>{capitalizarNombre(p.nombre)}{p.dueno === 'visitante' ? ' (visitante)' : ''}</b>
                 {e ? <span className={'pill ' + PILL[tono]} data-testid="estado-atencion">{ETIQUETA_ATENCION[e]}</span> : <span className="pill p-neu">{p.iniciada ? 'Asesoría iniciada' : ETIQUETA_MODO[p.modo as ModoConversacion] ?? p.modo}</span>}
                 {p.origen === 'carrito' && <span className="pill p-neu">Carrito{p.n_items ? ` · ${p.n_items}` : ''}</span>}
                 {p.fuera_horario && <span className="pill p-warn">Llegó fuera de horario</span>}
@@ -244,7 +245,7 @@ function ModalReasignarSolicitud({ p, vendedores, carteraNombre, cliente, onCerr
     onHecho(`Ahora ${quien} atiende esta solicitud. ${p.profile_id ? `La cartera no cambió${cart ? `: sigue con ${cart}` : ' (el cliente sigue sin vendedor de cartera)'}.` : 'Es un visitante: no tiene cartera.'}`)
   }
   return (
-    <MarcoModal testid="modal-reasignar-solicitud" titulo={p.seller_id ? 'Reasignar esta solicitud' : 'Asignar solo esta solicitud'} sub={p.nombre} onCerrar={onCerrar}>
+    <MarcoModal testid="modal-reasignar-solicitud" titulo={p.seller_id ? 'Reasignar esta solicitud' : 'Asignar solo esta solicitud'} sub={capitalizarNombre(p.nombre)} onCerrar={onCerrar}>
       <div className="rh-note rh-note--neu" data-testid="explica-solicitud">
         <span>Solo cambia <b>quién atiende esta solicitud</b>. <b>La cartera del cliente no cambia</b>{p.profile_id ? (carteraNombre ? ` (sigue con ${carteraNombre})` : ' (sigue sin vendedor de cartera)') : ''}. Para un cambio permanente usa “Cambiar vendedor de cartera”.</span>
       </div>
@@ -282,7 +283,7 @@ function ModalCambiarCartera({ p, vendedores, carteraNombre, cliente, onCerrar, 
     onHecho(`Cartera actualizada: ${vendedores.find((x) => x.id === v)?.nombre ?? 'el vendedor elegido'} atenderá las compras futuras de ${p.nombre}.`)
   }
   return (
-    <MarcoModal testid="modal-cambiar-cartera" titulo="Cambiar vendedor de cartera" sub={p.nombre} onCerrar={onCerrar}>
+    <MarcoModal testid="modal-cambiar-cartera" titulo="Cambiar vendedor de cartera" sub={capitalizarNombre(p.nombre)} onCerrar={onCerrar}>
       <div className="rh-note rh-note--warn" data-testid="explica-cartera-permanente">
         <span><b>Cambio permanente.</b> El nuevo vendedor atenderá las compras futuras de este cliente{carteraNombre ? ` (hoy: ${carteraNombre})` : ''}. Una solicitud que aún espera se le pasa también; una asesoría en curso no se interrumpe.</span>
       </div>

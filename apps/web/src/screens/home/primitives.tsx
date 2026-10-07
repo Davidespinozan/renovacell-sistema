@@ -7,19 +7,21 @@
 import React from 'react'
 import { Icon, type IconName } from '../../app/icons'
 import { initials } from '../../lib/format'
+import { nombrePersona, primerNombre } from '../../lib/nombres'
 
 export type Tono = 'dang' | 'warn' | 'neu' | 'ok'
 const PILL: Record<Tono, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
+/** Saludo compartido por todos los roles: compacto (no compite con el contenido operativo). */
 export function Bienvenida({ nombre, avatarUrl, titulo, detalle, etiqueta }: { nombre: string; avatarUrl?: string; titulo: string; detalle: string; etiqueta?: string }) {
+  const persona = nombrePersona(nombre)
   return (
     <header className="rh-hello" data-testid="rh-bienvenida">
-      {avatarUrl ? <img className="rh-av" src={avatarUrl} alt="" /> : <span className="rh-av" aria-hidden>{initials(nombre.split('·')[0].trim() || 'R')}</span>}
+      {avatarUrl ? <img className="rh-av" src={avatarUrl} alt="" /> : <span className="rh-av" aria-hidden>{persona ? initials(persona) : 'R'}</span>}
       <div className="rh-hello-t">
-        <h2 className="rh-hello-h">{titulo}</h2>
+        <h2 className="rh-hello-h">{titulo}{etiqueta && <span className="rh-role">{etiqueta}</span>}</h2>
         <p className="rh-hello-p">{detalle}</p>
       </div>
-      {etiqueta && <span className="rh-role">{etiqueta}</span>}
     </header>
   )
 }
@@ -87,14 +89,19 @@ export function ErrorLectura({ texto, onReintentar }: { texto: string; onReinten
 }
 
 export interface Acceso { key: string; label: string; icon: IconName; onClick: () => void; detalle?: string }
-export function Accesos({ items }: { items: Acceso[] }) {
-  if (items.length === 0) return null
+/**
+ * CHV2-B.1 · Atajos SOLO en móvil (en escritorio el sidebar ya es la navegación: Inicio no es un segundo
+ * menú). Máximo 3, para el trabajo principal del rol que en móvil queda detrás de "Menú".
+ */
+export function AtajosMovil({ items }: { items: Acceso[] }) {
+  const vista = items.slice(0, 3)
+  if (vista.length === 0) return null
   return (
-    <nav className="rh-quick" aria-label="Accesos rápidos">
-      {items.map((a) => (
-        <button key={a.key} type="button" className="rh-tile" onClick={a.onClick} data-testid={`acceso-${a.key}`}>
+    <nav className="rh-quick rh-quick--movil" aria-label="Atajos" data-testid="atajos-movil">
+      {vista.map((a) => (
+        <button key={a.key} type="button" className="rh-tile" onClick={a.onClick} data-testid={`atajo-${a.key}`}>
           <span className="rh-tile-ic" aria-hidden><Icon name={a.icon} /></span>
-          <span className="rh-tile-t">{a.label}{a.detalle && <small>{a.detalle}</small>}</span>
+          <span className="rh-tile-t">{a.label}</span>
         </button>
       ))}
     </nav>
@@ -105,8 +112,5 @@ export function Nota({ children, tono = 'neu' }: { children: React.ReactNode; to
   return <div className={`rh-note rh-note--${tono}`} role="note">{children}</div>
 }
 
-/** "Dra. Ana Ruiz · Ventas" → "Ana". */
-export function nombreCorto(nombre: string | undefined | null): string {
-  const limpio = (nombre ?? '').split('·')[0].trim().replace(/^(dra?\.?|doctora?|lic\.?|ing\.?)\s+/i, '')
-  return limpio.split(/\s+/)[0] || ''
-}
+/** "Dra. Ana Ruiz · Ventas" → "Ana"; cuenta técnica ("almacen") → "". */
+export function nombreCorto(nombre: string | undefined | null): string { return primerNombre(nombre) ?? '' }

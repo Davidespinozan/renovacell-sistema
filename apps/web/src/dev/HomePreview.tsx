@@ -11,6 +11,8 @@ import { ClienteAtencion, type Pendientes, type PendienteRuteo } from '../data/o
 import type { Atencion, EstadoAtencion } from '../data/ops/atencionComercial'
 import { configurarClientesAtencion } from '../data/store/atencionStore'
 import { configurarClientesInicioDoctor } from '../screens/home/HomeDoctor'
+import { _configurarClienteLanzador } from '../app/ChatFlotante'
+import { chatUi } from '../data/store/chatUiStore'
 import { _simularLlegada } from '../data/store/notificationsStore'
 import { pedirIntento } from '../data/store/navIntentStore'
 import { Asesorias } from '../screens/chat/Asesorias'
@@ -92,14 +94,25 @@ export function HomePreview() {
     const p = PENDIENTES[estado] ?? PENDIENTES.normal
     const cola = COLAS[estado] ?? COLAS.esperando
     configurarClientesAtencion({ chat: chatFalso(cola), atencion: atencionFalsa(p) })
-    const doctorConv: Conversacion | undefined = estado === 'asesoria' ? { conversation_id: 'C1', estado: 'abierta', modo: 'human_active', ultimo_seq: 8, asesor_nombre: 'Lucía', mensajes: [], handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: false }, cart_id: 'K' }
+    const doctorConv: Conversacion | undefined = estado === 'asesoria' || estado === 'asesoria_sin_carrito' ? { conversation_id: 'C1', estado: 'abierta', modo: 'human_active', ultimo_seq: 8, asesor_nombre: 'Lucía', mensajes: [], handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: false }, cart_id: 'K' }
       : estado === 'carrito' ? { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', ultimo_seq: 2, mensajes: [], cart_id: 'K' }
         : { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', ultimo_seq: 0, mensajes: [], cart_id: null }
-    configurarClientesInicioDoctor({ chat: chatFalso([], doctorConv), carrito: new ClienteCarrito(async () => ok(cartDoctor(estado === 'asesoria' ? 1 : estado === 'carrito' ? 2 : 0)), () => null) })
+    const chatDoctor = chatFalso([], vista === 'autoapertura' || vista === 'cerrado' ? { conversation_id: 'C1', estado: 'abierta', modo: 'human_requested', ultimo_seq: 2, leido_hasta: 0, mensajes: MENSAJES.slice(0, 2).map((m) => (m.actor === 'doctor' ? { ...m, propio: true } : m)), handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: false, puede_rechazar: true }, cart_id: 'K' } : doctorConv)
+    configurarClientesInicioDoctor({ chat: chatDoctor, carrito: new ClienteCarrito(async () => ok(cartDoctor(estado === 'asesoria' ? 1 : estado === 'carrito' ? 2 : 0)), () => null) })
+    _configurarClienteLanzador(chatDoctor)
     login(perfil.role, true, { name: perfil.name, email: perfil.email }, perfil.caps)
     setListo(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Doctor: simula la respuesta del servidor a la mutación del primer artículo (handoff nuevo) → presentación.
+  useEffect(() => {
+    if (!listo || (vista !== 'autoapertura' && vista !== 'cerrado')) return
+    try { sessionStorage.clear() } catch { /* sin storage */ }
+    const t1 = setTimeout(() => chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K-' + Date.now() }), 700)
+    const t2 = vista === 'cerrado' ? setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })), 1300) : undefined
+    return () => { clearTimeout(t1); if (t2) clearTimeout(t2) }
+  }, [listo, vista])
 
   // Alerta: simula la llegada en vivo de un aviso ya emitido por el servidor (misma ruta que Realtime).
   useEffect(() => {

@@ -7,6 +7,7 @@
 // canónico de inicio (Edge chat → cc_iniciar_asesoria, idempotente): nunca crea otra conversación, otro
 // handoff ni cambia la cartera.
 import React, { useCallback, useEffect, useState } from 'react'
+import { capitalizarNombre } from '../../lib/nombres'
 import { chat as clientePorDefecto, ETIQUETA_MODO, type ClienteChat, type ColaItem } from '../../data/ops/chat'
 import { MOTIVO_RUTEO } from '../../data/ops/atencion'
 import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, textoEspera, textoIA, tonoAtencion } from '../../data/ops/atencionComercial'
@@ -115,7 +116,7 @@ function Seccion({ titulo, items, accion, llegada }: { titulo: string; items: Co
           return (
             <li key={c.conversation_id} className={llegada === c.conversation_id ? 'rc-llegada' : undefined} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10 }} data-testid="cola-item">
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{c.dueno}{c.sin_leer > 0 ? ` · ${c.sin_leer} sin leer` : ''}</div>
+                <div style={{ fontWeight: 600 }}>{capitalizarNombre(c.dueno)}{c.sin_leer > 0 ? ` · ${c.sin_leer} sin leer` : ''}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
                   {e ? <span className={'pill ' + PILL[tonoAtencion(e)]} data-testid="estado-atencion">{ETIQUETA_ATENCION[e]}</span> : <span>{c.iniciada ? 'Asesoría iniciada' : ETIQUETA_MODO[c.modo]}</span>}
                   {c.handoff_origen === 'carrito' && <span className="pill p-neu" data-testid="marca-carrito">Carrito activo{c.n_items ? ` · ${c.n_items} producto${c.n_items === 1 ? '' : 's'}` : ''}</span>}

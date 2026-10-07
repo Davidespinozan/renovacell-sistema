@@ -33,7 +33,11 @@ export function cuentaComoActividad(m: Conversacion['mensajes'][number], handoff
 }
 export const handoffVivoDe = (c: Pick<Conversacion, 'modo' | 'handoff'>): boolean => !!c.handoff?.origen && (c.modo === 'human_requested' || c.modo === 'human_assigned')
 
-export function ChatFlotante({ cliente = clientePorDefecto, intervaloMs = 30000 }: { cliente?: ClienteChat; intervaloMs?: number }) {
+// Solo vista previa local / pruebas: cliente inyectable para el lanzador montado por el shell.
+let clienteShell: ClienteChat = clientePorDefecto
+export function _configurarClienteLanzador(c: ClienteChat) { clienteShell = c }
+
+export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { cliente?: ClienteChat; intervaloMs?: number }) {
   const { role, screen } = useRole()
   const [abierto, setAbierto] = useState(false)
   const [convId, setConvId] = useState<string | null>(null)

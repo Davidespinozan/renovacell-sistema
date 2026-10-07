@@ -10,7 +10,8 @@ import { ClienteCarrito, type Carrito } from '../../data/ops/carrito'
 
 afterEach(cleanup)
 
-const msg = (seq: number, actor: Mensaje['actor'], content: string, propio = false, at = '2026-10-06T22:00:00Z'): Mensaje => ({ id: 'm' + seq, seq, actor, content, created_at: at, propio })
+// Instante relativo (hace 1 min): el separador "Hoy" no debe depender de la fecha en que corre la prueba.
+const msg = (seq: number, actor: Mensaje['actor'], content: string, propio = false, at = new Date(Date.now() - 60_000).toISOString()): Mensaje => ({ id: 'm' + seq, seq, actor, content, created_at: at, propio })
 const conv = (x: Partial<Conversacion> = {}): Conversacion => ({ conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', rol: 'dueno', ultimo_seq: 0, mensajes: [], leido_hasta: 0, handoff: { origen: null, cart_id: null, fuera_horario: null, asignado: false, puede_rechazar: false }, ...x })
 
 function chatFalso(c: Conversacion, fallarEnvio = 0) {

@@ -6,6 +6,7 @@
 // Atención comercial. Entre pestañas solo una presenta la misma señal (dedupe de presentación; la
 // idempotencia real es event_key único en la base). Sin sonido ni notificaciones del navegador.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { capitalizarNombre } from '../lib/nombres'
 import { Icon } from './icons'
 import { useRole } from '../auth/RoleContext'
 import type { RoleKey } from './roles'
@@ -86,7 +87,7 @@ export function AlertaComercial() {
 
 function Tarjeta({ a, onAccion, onDescartar }: { a: AlertaAccionable; onAccion: (reasignar: boolean) => void; onDescartar: () => void }) {
   const escalada = a.item.atencion?.estado === 'escalado'
-  const nombre = a.tipo === 'vendedor' ? a.item.dueno : a.item.nombre
+  const nombre = capitalizarNombre(a.tipo === 'vendedor' ? a.item.dueno : a.item.nombre)
   const titulo = a.tipo === 'vendedor'
     ? `${nombre} solicita atención`
     : escalada ? `${nombre} sigue esperando asesor` : `${nombre} solicita asesor sin vendedor`

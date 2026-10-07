@@ -2,13 +2,13 @@
    Bienvenida → requiere atención → continuar → accesos. Solo tokens existentes (packages/ui/tokens.css).
    Tres niveles visuales: atención (acento por tono), continuar (tarjeta neutra), información (accesos). */
 
-.rh{display:grid;gap:22px;max-width:1080px;width:100%;min-width:0}
-.rh-hello{display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:var(--r-lg);background:var(--area-light),var(--card);border:1px solid var(--line);box-shadow:var(--sh-card);min-width:0}
-.rh-av{width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;object-fit:cover;background:var(--grad-green);color:#fff;font-weight:800;font-size:17px;box-shadow:var(--sh-sm)}
+.rh{display:grid;gap:18px;align-content:start;max-width:1080px;width:100%;min-width:0}
+.rh-hello{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--r);background:var(--area-light),var(--card);border:1px solid var(--line);box-shadow:var(--sh-sm);min-width:0}
+.rh-av{width:38px;height:38px;border-radius:50%;flex:none;display:grid;place-items:center;object-fit:cover;background:var(--grad-green);color:#fff;font-weight:800;font-size:14px}
 .rh-hello-t{min-width:0;flex:1}
-.rh-hello-h{margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere}
-.rh-hello-p{margin:3px 0 0;font-size:14px;color:var(--ink-3);line-height:1.4}
-.rh-role{flex:none;font-size:12px;font-weight:600;color:var(--green-deep);background:var(--ok-bg);border-radius:var(--pill);padding:5px 11px}
+.rh-hello-h{margin:0;font-size:18px;line-height:1.25;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
+.rh-hello-p{margin:2px 0 0;font-size:13.5px;color:var(--ink-3);line-height:1.4}
+.rh-role{font-size:11.5px;font-weight:600;letter-spacing:0;color:var(--green-deep);background:var(--ok-bg);border-radius:var(--pill);padding:3px 9px}
 
 .rh-sec{display:grid;gap:10px;min-width:0}
 .rh-sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
@@ -50,6 +50,7 @@
 .rh-note--warn{background:var(--warn-bg);color:var(--warn)}
 .rh-note--ok{background:var(--ok-bg);color:var(--green-deep)}
 
+.rh-quick.rh-quick--movil{display:none}
 .rh-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:10px}
 .rh-tile{display:flex;align-items:center;gap:12px;min-height:64px;padding:12px 14px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;text-align:left;cursor:pointer;box-shadow:var(--sh-sm);transition:border-color var(--dur-fast),box-shadow var(--dur-fast),transform var(--dur-fast)}
 .rh-tile:hover{border-color:var(--green-soft);box-shadow:var(--sh-card-h);transform:translateY(-1px)}
@@ -90,14 +91,16 @@
   .rc-al-ctas,.rc-al-nota{padding-left:0}
   .rc-al-ctas .btn{flex:1}
 }
+@media (max-width:900px){
+  .rh-quick.rh-quick--movil{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rh-quick--movil .rh-tile{flex-direction:column;align-items:flex-start;gap:8px;min-height:84px;padding:12px 10px;min-width:0}
+  .rh-quick--movil .rh-tile-t{font-size:12.5px;overflow-wrap:anywhere;hyphens:auto}
+}
 @media (max-width:640px){
-  .rh{gap:18px}
-  .rh-hello{padding:14px 16px;flex-wrap:wrap}
-  .rh-hello-h{font-size:19px}
-  .rh-hello-t{flex:1 1 calc(100% - 64px)}
-  .rh-role{order:3;margin-left:62px}
+  .rh{gap:16px}
+  .rh-hello{padding:12px 14px}
+  .rh-hello-h{font-size:17px}
   .rh-ctas .rh-btn{flex:1}
-  .rh-quick{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion:reduce){
   .rh-skel,.rh-card--destacada,.rc-llegada,.rc-al{animation:none}
@@ -106,3 +109,10 @@
 
 /* Campana: conteo numérico de no leídos (sigue siendo historial, no la cola de trabajo). */
 .icobtn .bdg.bdg-n{top:-4px;right:-5px;width:auto;height:auto;min-width:18px;padding:1px 5px;border-radius:var(--pill);font-size:10.5px;font-weight:700;line-height:14px;color:#fff;text-align:center;border:2px solid #fff}
+
+/* CHV2-B.1 · Rezago administrativo: visible y contado, pero sin el peso de lo urgente. */
+.rh-sec--rezago .rh-sec-h h3{color:var(--mid)}
+.rh-rezago-nota{font-size:12.5px;color:var(--mid);margin:-4px 0 0}
+.rh-context{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--r-sm);background:var(--ok-bg);color:var(--green-deep);font-size:13.5px;line-height:1.4}
+.rh-context b{font-weight:700}
+.rh-context--neu{background:var(--hueso);color:var(--ink-2)}

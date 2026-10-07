@@ -281,6 +281,47 @@ describe('Roles sin datos comerciales', () => {
   })
 })
 
+describe('CHV2-B.1 · Inicio no es un segundo menú', () => {
+  it('doctor: sin bloque de accesos ni botón de chat duplicado; la atención es una línea informativa', async () => {
+    srv.role = 'doctor'; srv.capabilities = []; srv.user = { name: 'david espinoza', email: 'd@x.mx' }
+    const doc = new ClienteChat(async (_fn, { body }) => {
+      const a = body.action as string
+      if (a === 'abrir') return { data: { conversation_id: 'CD', estado: 'abierta', modo: 'human_active', nuevo: false }, error: null }
+      if (a === 'leer') return { data: { conversation_id: 'CD', estado: 'abierta', modo: 'human_active', ultimo_seq: 8, asesor_nombre: 'Lucía', mensajes: [], cart_id: null }, error: null }
+      return { data: { ok: true }, error: null }
+    }, () => null)
+    configurarClientesInicioDoctor({ chat: doc })
+    render(<RoleHome />); await flush()
+    expect(screen.getByText('Hola, David')).toBeTruthy()
+    expect(await screen.findByTestId('doctor-atencion')).toHaveTextContent('Lucía · Asesora · En conversación')
+    expect(screen.queryByText('Abrir conversación')).toBeNull()
+    expect(screen.queryByText('Accesos')).toBeNull()
+    for (const k of ['catalogo', 'chat_cc', 'pedidosdr', 'hist']) expect(screen.queryByTestId(`acceso-${k}`)).toBeNull()
+    expect(screen.queryByTestId('atajos-movil')).toBeNull()
+    srv.user = { name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx' }
+  })
+  it('staff: sin "Accesos" de escritorio; a lo sumo 3 atajos (solo móvil por CSS)', async () => {
+    render(<RoleHome />); await flush()
+    expect(screen.queryByText('Accesos')).toBeNull()
+    const atajos = screen.getByTestId('atajos-movil')
+    expect(atajos.className).toContain('rh-quick--movil')
+    expect(atajos.querySelectorAll('button').length).toBeLessThanOrEqual(3)
+  })
+  it('cuenta de servicio "almacen": saludo neutral, no "Hola, almacen"', async () => {
+    srv.role = 'warehouse'; srv.capabilities = []; srv.user = { name: 'almacen', email: 'almacen@renovacell.mx' }
+    render(<RoleHome />); await flush()
+    expect(screen.getByTestId('rh-bienvenida').querySelector('h2')!.firstChild!.textContent).toBe('Hola')
+    expect(screen.queryByText(/Hola, almacen/i)).toBeNull()
+    srv.user = { name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx' }
+  })
+  it('vendedor: el nombre del cliente se presenta con mayúsculas ("david espinoza" → "David Espinoza")', async () => {
+    colaVendedor = [item({ conversation_id: 'CA', dueno: 'david espinoza', modo: 'human_active', iniciada: true, atencion: at('activo') })]
+    render(<RoleHome />); await flush()
+    const a = await screen.findByTestId('asesoria-activa')
+    expect(a).toHaveTextContent('David Espinoza'); expect(a).toHaveTextContent('Sin mensajes nuevos')
+  })
+})
+
 describe('textoEspera (servidor, nunca reloj del navegador)', () => {
   it('configurado: minutos hábiles del servidor; cerrado: pausa; sin horario: pendiente', () => {
     expect(textoEspera(at('aviso', { horario_configurado: true, en_horario: true, reloj_sla_min: 4 }))).toBe('4 min hábiles esperando')
