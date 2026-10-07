@@ -7,6 +7,7 @@ import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
+import { AlertaComercial } from './AlertaComercial'
 
 export function AppShell() {
   const { role, screen } = useRole()
@@ -36,6 +37,8 @@ export function AppShell() {
       </div>
       {/* UX-1 · un solo lanzador de conversación para el doctor; fuera de #content para que sobreviva al cambio de pantalla. */}
       <ChatFlotante />
+      {/* CHV2-B · alerta comercial en vivo del staff (vendedor con conversaciones / Dirección); fuera de #content. */}
+      <AlertaComercial />
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
       <BottomNav onMenu={() => setDrawer(true)} />
     </div>

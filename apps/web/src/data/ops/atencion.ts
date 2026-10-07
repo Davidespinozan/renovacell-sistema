@@ -3,6 +3,7 @@
 // audita cada cambio y decide el ruteo. El cliente nunca escribe tablas ni elige por el servidor.
 // Los nombres aún no están en database.types.ts (se regeneran al aplicar la migración 119).
 import { hasSupabase, supabase } from '../../lib/supabase'
+import type { Atencion } from './atencionComercial'
 
 export interface DiaHorario { dia: number; abierto: boolean; abre: string | null; cierra: string | null }
 export interface Excepcion { fecha: string; tipo: 'cerrado' | 'horario'; abre: string | null; cierra: string | null; motivo: string | null }
@@ -18,7 +19,11 @@ export interface PendienteRuteo {
   conversation_id: string; dueno: 'doctor' | 'visitante'; profile_id: string | null; nombre: string; modo: string; seller_id: string | null; seller_nombre: string | null
   ruteo_motivo: 'sin_vendedor' | 'vendedor_no_elegible' | 'visitante' | null; origen: 'carrito' | 'manual' | null; fuera_horario: boolean | null
   solicitado_at: string | null; edad_min: number | null; iniciada: boolean; cart_id: string | null; n_items: number
+  atencion?: Atencion | null   // CHV2-A · estado derivado del servidor
 }
+// CHV2-A · umbrales del SLA comercial (minutos hábiles) — Dirección.
+export interface ConfigAtencion { aviso_min: number; escalamiento_min: number; pausar_fuera_horario: boolean; updated_at: string | null; horario: EstadoHorario }
+export interface ResultadoReasignacion { cartera_vendedor: string | null; [k: string]: unknown }
 export interface Pendientes { resumen: ResumenRuteo; conversaciones: PendienteRuteo[]; carritos_pendientes: Array<{ cart_id: string; profile_id: string | null; visitante: boolean; desde: string | null; error: string | null; n_items: number }> }
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -35,9 +40,16 @@ export function mensajeError(m: string | undefined): string {
   if (/SEMANA_INVALIDA/.test(t)) return 'Revisa los siete días del horario.'
   if (/HORARIO_INVALIDO/.test(t)) return 'La hora de apertura debe ser antes de la de cierre.'
   if (/EXCEPCION_INVALIDA/.test(t)) return 'Revisa la fecha y el tipo de la excepción.'
+  if (/VENDEDOR_NO_ELEGIBLE: activo, de ventas y con/.test(t)) return 'Ese vendedor no puede atender conversaciones: debe estar activo, ser de Ventas y tener "Atender conversaciones" en Equipo.'   // CHV2-A · solicitud
   if (/VENDEDOR_NO_ELEGIBLE/.test(t)) return 'Ese vendedor no puede recibir clientes nuevos: debe estar activo, ser de Ventas y tener "Atender conversaciones" y "Recibir clientes nuevos" en Equipo.'
   if (/MOTIVO_REQUERIDO/.test(t)) return 'Para reasignar o quitar un vendedor escribe el motivo.'
   if (/CLIENTE_INVALIDO/.test(t)) return 'Solo los doctores tienen cartera.'
+  // CHV2-A · reasignar SOLO esta solicitud (handler) y umbrales de alerta.
+  if (/VENDEDOR_REQUERIDO/.test(t)) return 'Elige a quién pasa la solicitud.'
+  if (/SOLICITUD_NO_REASIGNABLE/.test(t)) return 'La asesoría ya está en curso: termínala antes de pasarla a otra persona.'
+  if (/SOLICITUD_INEXISTENTE/.test(t)) return 'Esa solicitud ya no existe.'
+  if (/CONVERSACION_CERRADA/.test(t)) return 'La conversación ya está cerrada.'
+  if (/CONFIG_INVALIDA/.test(t)) return 'Revisa los minutos: el escalamiento debe ser mayor que el aviso (0 a 1440).'
   return 'No se pudo completar. Intenta de nuevo.'
 }
 
@@ -62,6 +74,14 @@ export class ClienteAtencion {
   asignar(cliente: string, vendedor: string | null, motivo?: string | null) { return this.llamar<{ idempotente: boolean }>('cc_cartera_asignar', { p_cliente: cliente, p_vendedor: vendedor, p_motivo: motivo ?? null }) }
   resumen() { return this.llamar<ResumenRuteo>('cc_ruteo_resumen') }
   pendientes() { return this.llamar<Pendientes>('cc_ruteo_pendientes') }
+  // CHV2-A · pasa SOLO esta solicitud a otro vendedor (handler). La cartera NO cambia; motivo obligatorio.
+  reasignarSolicitud(conversation_id: string, vendedor: string, motivo: string) {
+    return this.llamar<ResultadoReasignacion>('cc_solicitud_reasignar', { p_conv: conversation_id, p_vendedor: vendedor, p_motivo: motivo })
+  }
+  configAtencion() { return this.llamar<ConfigAtencion>('cc_atencion_config_ver') }
+  guardarConfigAtencion(aviso: number, escalamiento: number, pausar: boolean) {
+    return this.llamar<ConfigAtencion>('cc_atencion_config_guardar', { p_aviso: aviso, p_escalamiento: escalamiento, p_pausar: pausar })
+  }
 }
 export const atencion = new ClienteAtencion()
 

@@ -2,7 +2,9 @@
 // agregados de los MISMOS stores que el resto del sistema (no inventa nada). Cada
 // tarjeta enruta al módulo donde se resuelve (apoya la Regla 2: el sistema indica
 // el siguiente pendiente). Es la funcionalidad "Muy Alta" pedida por todos.
-import React, { useEffect, useMemo, useState } from 'react'
+// CHV2-B · El constructor de tareas (`useBandeja`) es ÚNICO: Mi bandeja muestra la cola completa e
+// Inicio muestra su subconjunto superior con el MISMO resultado — no pueden contradecirse.
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon, type IconName } from '../app/icons'
 import { useRole } from '../auth/RoleContext'
 import { getRole, type RoleKey } from '../app/roles'
@@ -18,21 +20,27 @@ import { useCustodies } from '../data/hooks/useCustody'
 import { useRevisionFiscal } from '../data/hooks/useRevisionFiscal'
 import { useComunicaciones } from '../data/hooks/useComunicaciones'
 import { useSaludSistema } from '../data/hooks/useSaludSistema'
-import { atencion, type ResumenRuteo } from '../data/ops/atencion'   // CC-7
+import { useAtencionComercial, fuenteComercial, type EstadoAtencionComercial } from '../data/store/atencionStore'   // CHV2-B
+import { solicitudesVendedor, activasVendedor, intervencionDireccion, TEXTO_HORARIO_PENDIENTE } from '../data/ops/atencionComercial'
 import { tieneCfdi } from '../data/ops/cfdi'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
 import { hoyNegocio } from '../data/periodo'
 
-type Tone = 'warn' | 'dang' | 'neu'
-interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen: string }
+export type Tone = 'warn' | 'dang' | 'neu'
+// `screen` ausente = aviso informativo sin destino (p. ej. salud del sistema: no hay nada que reparar aquí).
+export interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen?: string }
 
 const isEmitida = (o: OrderWithItems) => tieneCfdi(o) // reconoce 'emitida' Y 'timbrada' (fuente única)
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
+const PESO: Record<Tone, number> = { dang: 0, warn: 1, neu: 2 }
+/** Orden de urgencia estable (Inicio): primero lo crítico, luego advertencias, luego informativo. */
+export const porUrgencia = (a: Task, b: Task) => PESO[a.tone] - PESO[b.tone]
 
-export function Bandeja() {
-  const { role, setScreen, user } = useRole()
+/** Tareas de los stores compartidos (pedidos, dinero, inventario…) para el rol actual. */
+function useTareasBase(): Task[] {
+  const { role, user } = useRole()
   const { data: orders } = useAllOrders()
   const { byOrder } = useOrderMoney()
   const { data: claims } = usePaymentClaims()
@@ -47,7 +55,7 @@ export function Bandeja() {
   // W4-03 · Toda cola de esta bandeja se DERIVA del estado del servidor. Ninguna
   // depende de un aviso ni de memoria del navegador: al recargar o abrir la app en
   // otro equipo, lo que requiere acción humana sigue ahí.
-  const tasks = useMemo<Task[]>(() => {
+  return useMemo<Task[]>(() => {
     const t: Task[] = []
     const lotesCriticos = lots.filter((l) => l.quantity > 0 && ['expired', 'critical'].includes(severity(daysUntil(l.expiry_date))))
     const porSurtir = orders.filter((o) => isSurtible(o, byOrder[o.id]))
@@ -118,22 +126,76 @@ export function Bandeja() {
     // después de los pedidos, la bandeja no se recalculaba y "Pagos por validar" o
     // "Por surtir" quedaban invisibles hasta que cambiara otra cosa.
   }, [role, user, orders, byOrder, claims, shipments, lots, doctors, prospects, devoluciones, compras, custodias])
+}
 
-  // Lo que la cola fiscal reporta hacia arriba, para que "Todo al día" no se muestre
-  // junto a productos que siguen sin validar.
-  const [fiscalPend, setFiscalPend] = useState(0)
-  const [mensajesPend, setMensajesPend] = useState(0)
-  // W6-A3.2 · salud del sistema: una fuente = a lo sumo UNA incidencia visible (0 o 1).
-  const [saludPend, setSaludPend] = useState(0)
-  const [ruteoPend, setRuteoPend] = useState(0)   // CC-7
-  const total = tasks.reduce((s, x) => s + x.count, 0) + fiscalPend + mensajesPend + saludPend + ruteoPend
-  const vacio = tasks.length === 0 && fiscalPend === 0 && mensajesPend === 0 && saludPend === 0 && ruteoPend === 0
+// CHV2-B · Atención comercial desde el store compartido (la misma lectura que Inicio y la alerta).
+// Vendedor: SUS solicitudes sin iniciar y sus asesorías con mensajes sin leer. Dirección: lo que
+// requiere su intervención (sin vendedor, escaladas, cartera por reasignar, carritos sin rutear) y el
+// horario sin configurar. Ya no es una lectura única al montar: se refresca con la señal en vivo.
+export function tareasComerciales(est: EstadoAtencionComercial): Task[] {
+  const t: Task[] = []
+  if (est.fuente === 'vendedor') {
+    const sol = solicitudesVendedor(est.cola)
+    if (sol.length) {
+      const urgentes = sol.some((c) => c.atencion?.estado === 'escalado' || c.atencion?.estado === 'aviso')
+      t.push({ id: 'comercial', icon: 'chat', title: 'Clientes esperando asesor', detail: 'Te los asignaron y el asistente los atiende mientras tanto. Inicia la asesoría.', count: sol.length, tone: urgentes ? 'dang' : 'warn', screen: 'asesorias' })
+    }
+    const conMensajes = activasVendedor(est.cola).filter((c) => c.sin_leer > 0)
+    if (conMensajes.length) t.push({ id: 'asesorias_activas', icon: 'chat', title: 'Asesorías con mensajes sin leer', detail: 'Tus clientes te escribieron en una asesoría en curso.', count: conMensajes.length, tone: 'warn', screen: 'asesorias' })
+  }
+  if (est.fuente === 'direccion' && est.pendientes) {
+    const r = est.pendientes.resumen
+    const interv = intervencionDireccion(est.pendientes.conversaciones)
+    const escaladas = interv.filter((c) => c.atencion?.estado === 'escalado' && c.seller_id).length
+    const n = r.handoffs_sin_asignar + escaladas + r.reasignacion + r.handoffs_pendientes
+    const sinHorario = !r.horario.configurado
+    if (n > 0 || sinHorario) {
+      const partes = [
+        r.handoffs_sin_asignar ? `${r.handoffs_sin_asignar} conversación(es) sin vendedor` : '',
+        escaladas ? `${escaladas} solicitud(es) escalada(s) por espera` : '',
+        r.reasignacion ? `${r.reasignacion} cliente(s) por reasignar` : '',
+        r.handoffs_pendientes ? `${r.handoffs_pendientes} carrito(s) sin rutear` : '',
+        sinHorario ? TEXTO_HORARIO_PENDIENTE.toLowerCase() : '',
+      ].filter(Boolean)
+      t.push({ id: 'comercial', icon: 'chat', title: 'Atención comercial pendiente', detail: partes.join(' · ') + '.', count: n || 1, tone: r.handoffs_pendientes || escaladas || r.handoffs_sin_asignar ? 'dang' : 'warn', screen: 'av_atencion' })
+    }
+  }
+  return t
+}
+
+/**
+ * EL constructor de la bandeja. Devuelve las tareas (en el orden canónico) y `fuentes`: componentes
+ * invisibles de las colas que solo Dirección puede leer (fiscal, mensajes, salud). Quien use el hook
+ * debe montar `fuentes`.
+ */
+export function useBandeja(): { tareas: Task[]; fuentes: React.ReactNode; comercialListo: boolean } {
+  const { role, capabilities } = useRole()
+  const base = useTareasBase()
+  const est = useAtencionComercial(fuenteComercial(role as RoleKey, capabilities))
+  const comerciales = useMemo(() => tareasComerciales(est), [est])
+  const [extra, setExtra] = useState<Record<string, Task | null>>({})
+  const reportar = useCallback((id: string, t: Task | null) => setExtra((m) => (m[id] === t || (m[id] && t && m[id]!.count === t.count && m[id]!.detail === t.detail) ? m : { ...m, [id]: t })), [])
+  const tareas = useMemo(() => [...comerciales, ...base, ...(['mensajes', 'fiscal', 'salud'] as const).map((k) => extra[k]).filter((x): x is Task => !!x)], [comerciales, base, extra])
+  const fuentes = role === 'admin' ? <><FuenteMensajes onTarea={reportar} /><FuenteFiscal onTarea={reportar} /><FuenteSalud onTarea={reportar} /></> : null
+  return { tareas, fuentes, comercialListo: !est.fuente || est.listo }
+}
+
+/** Lista de tareas. `limite` = vista resumida (Inicio): las más urgentes primero. */
+export function ListaTareas({ tareas, limite, onGo }: { tareas: Task[]; limite?: number; onGo: (screen: string) => void }) {
+  const vista = limite != null ? [...tareas].sort(porUrgencia).slice(0, limite) : tareas
+  return <>{vista.map((task) => (task.screen ? <TaskRow key={task.id} task={task} onGo={() => onGo(task.screen!)} /> : <AvisoRow key={task.id} task={task} />))}</>
+}
+
+export function Bandeja() {
+  const { role, setScreen } = useRole()
+  const { tareas, fuentes } = useBandeja()
+  const total = tareas.reduce((s, x) => s + x.count, 0)
 
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">{getRole(role as RoleKey).label} · Mi bandeja</div>
-
-      {vacio ? (
+      {fuentes}
+      {tareas.length === 0 ? (
         <div className="card" style={{ textAlign: 'center' }}>
           <div className="gi" style={{ width: 46, height: 46, borderRadius: 13, background: 'var(--grad-green)', color: '#fff', display: 'grid', placeItems: 'center', margin: '0 auto 12px' }}><Icon name="check" /></div>
           <div style={{ fontWeight: 600 }}>Todo al día</div>
@@ -142,99 +204,51 @@ export function Bandeja() {
       ) : (
         <>
           <div style={{ fontSize: 13, color: 'var(--ink-2)' }}><b>{total}</b> pendiente(s) · toca uno para resolverlo.</div>
-          {tasks.map((task) => <TaskRow key={task.id} task={task} onGo={() => setScreen(task.screen)} />)}
+          <ListaTareas tareas={tareas} onGo={setScreen} />
         </>
       )}
-      {role === 'admin' && <ColaMensajes onGo={() => setScreen('av_mensajes')} onCount={setMensajesPend} />}
-      {role === 'admin' && <ColaFiscal onGo={() => setScreen('av_fiscal')} onCount={setFiscalPend} />}
-      {role === 'admin' && <ColaSalud onCount={setSaludPend} />}
-      {role === 'admin' && hasSupabase && <ColaRuteo onGo={() => setScreen('av_atencion')} onCount={setRuteoPend} />}
     </div>
   )
 }
 
+type Reportar = (id: string, t: Task | null) => void
+
 // La cola fiscal vive en su propio componente porque su fuente (la hoja de trabajo
 // fiscal) solo la puede leer Dirección: así no se consulta para los demás roles.
-function ColaFiscal({ onGo, onCount }: { onGo: () => void; onCount: (n: number) => void }) {
+function FuenteFiscal({ onTarea }: { onTarea: Reportar }) {
   const { avance, loading } = useRevisionFiscal()
   const pendientes = loading ? 0 : Math.max(0, avance.total - avance.validados)
-  useEffect(() => { onCount(pendientes) }, [pendientes, onCount])
-  if (pendientes <= 0) return null
-  return (
-    <TaskRow onGo={onGo} task={{
-      id: 'fiscal', icon: 'shield', title: 'Productos sin validar fiscalmente',
-      detail: 'Un producto sin validar se puede vender, pero no facturar.',
-      count: pendientes, tone: 'neu', screen: 'av_fiscal',
-    }} />
-  )
+  useEffect(() => {
+    onTarea('fiscal', pendientes > 0 ? { id: 'fiscal', icon: 'shield', title: 'Productos sin validar fiscalmente', detail: 'Un producto sin validar se puede vender, pero no facturar.', count: pendientes, tone: 'neu', screen: 'av_fiscal' } : null)
+  }, [pendientes, onTarea])
+  return null
 }
 
 // Mensajes al cliente que no salieron y esperan a una persona: rechazados, sin
 // confirmar o sin correo. También se deriva del servidor (el buzón de salida).
-function ColaMensajes({ onGo, onCount }: { onGo: () => void; onCount: (n: number) => void }) {
+function FuenteMensajes({ onTarea }: { onTarea: Reportar }) {
   const { cuentas, loading } = useComunicaciones()
   const n = loading ? 0 : cuentas.conProblema
-  useEffect(() => { onCount(n) }, [n, onCount])
-  if (n <= 0) return null
-  return (
-    <TaskRow onGo={onGo} task={{
-      id: 'mensajes', icon: 'chat', title: 'Mensajes al cliente sin entregar',
-      detail: 'No salieron, no se confirmaron o el cliente no tiene correo.',
-      count: n, tone: 'warn', screen: 'av_mensajes',
-    }} />
-  )
-}
-
-// CC-7 · Atención comercial: excepciones de ruteo que necesitan a Dirección (conteos del SERVIDOR):
-// conversaciones con carrito/solicitud sin vendedor, clientes cuyo vendedor ya no puede atender,
-// handoffs que no se pudieron rutear y horario sin configurar. Lectura al montar (sin sondeo).
-function ColaRuteo({ onGo, onCount }: { onGo: () => void; onCount: (n: number) => void }) {
-  const [r, setR] = useState<ResumenRuteo | null>(null)
-  useEffect(() => { let vivo = true; void atencion.resumen().then((x) => { if (vivo && x.ok) setR(x.data) }); return () => { vivo = false } }, [])
-  const n = r ? r.handoffs_sin_asignar + r.reasignacion + r.handoffs_pendientes : 0
-  const sinHorario = !!r && !r.horario.configurado
-  useEffect(() => { onCount(n + (sinHorario ? 1 : 0)) }, [n, sinHorario, onCount])
-  if (!r || (n <= 0 && !sinHorario)) return null
-  const partes = [
-    r.handoffs_sin_asignar ? `${r.handoffs_sin_asignar} conversación(es) sin vendedor` : '',
-    r.reasignacion ? `${r.reasignacion} cliente(s) por reasignar` : '',
-    r.handoffs_pendientes ? `${r.handoffs_pendientes} carrito(s) sin rutear` : '',
-    sinHorario ? 'horario de atención sin configurar' : '',
-  ].filter(Boolean)
-  return (
-    <TaskRow onGo={onGo} task={{
-      id: 'ruteo', icon: 'chat', title: 'Atención comercial pendiente',
-      detail: partes.join(' · ') + '.',
-      count: n || 1, tone: r.handoffs_pendientes ? 'dang' : 'warn', screen: 'av_atencion',
-    }} />
-  )
+  useEffect(() => {
+    onTarea('mensajes', n > 0 ? { id: 'mensajes', icon: 'chat', title: 'Mensajes al cliente sin entregar', detail: 'No salieron, no se confirmaron o el cliente no tiene correo.', count: n, tone: 'warn', screen: 'av_mensajes' } : null)
+  }, [n, onTarea])
+  return null
 }
 
 // W6-A3.2 · Salud del sistema (procesos automáticos). Solo Dirección la consulta y solo
 // aparece cuando el SERVIDOR ya clasificó un problema (FAILED / STALE) o cuando no se
-// pudo consultar: un error de lectura no es "todo al día". Sin botón: no hay nada que
+// pudo consultar: un error de lectura no es "todo al día". Sin destino: no hay nada que
 // reparar desde aquí; el mensaje viene redactado del servidor, sin detalles internos.
-function ColaSalud({ onCount }: { onCount: (n: number) => void }) {
+function FuenteSalud({ onTarea }: { onTarea: Reportar }) {
   const salud = useSaludSistema()
   const visible = salud.estado === 'unhealthy' || salud.estado === 'read_error'
-  useEffect(() => { onCount(visible ? 1 : 0) }, [visible, onCount])
-  if (!visible) return null
   const problema = salud.estado === 'unhealthy'
   const tone: Tone = problema && salud.salud.estado === 'FAILED' ? 'dang' : 'warn'
-  return (
-    <div className="card" role="status" style={{ display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--line)' }}>
-      <div style={{ width: 40, height: 40, borderRadius: 11, background: toneBg[tone], color: toneFg[tone], display: 'grid', placeItems: 'center', flex: 'none' }}>
-        <Icon name="clock" />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{problema ? 'Alertas automáticas con problema' : 'Salud del sistema'}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>
-          {problema ? salud.salud.mensaje : salud.error}
-        </div>
-      </div>
-      <span className={'pill ' + tonePill[tone]}>1</span>
-    </div>
-  )
+  const detalle = problema ? salud.salud.mensaje ?? '' : salud.estado === 'read_error' ? salud.error : ''
+  useEffect(() => {
+    onTarea('salud', visible ? { id: 'salud', icon: 'clock', title: problema ? 'Alertas automáticas con problema' : 'Salud del sistema', detail: detalle, count: 1, tone } : null)
+  }, [visible, problema, detalle, tone, onTarea])
+  return null
 }
 
 const toneBg: Record<Tone, string> = { warn: 'var(--warn-bg)', dang: 'var(--danger-bg)', neu: 'var(--ok-bg)' }
@@ -254,9 +268,25 @@ function TaskRow({ task, onGo }: { task: Task; onGo: () => void }) {
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{task.title}</div>
+        {task.detail && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>{task.detail}</div>}
       </div>
       <span className={'pill ' + tonePill[task.tone]}>{task.count}</span>
       <span aria-hidden style={{ color: 'var(--ink-3)', fontSize: 20, lineHeight: 1, flex: 'none' }}>›</span>
     </button>
+  )
+}
+
+function AvisoRow({ task }: { task: Task }) {
+  return (
+    <div className="card" role="status" style={{ display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--line)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 11, background: toneBg[task.tone], color: toneFg[task.tone], display: 'grid', placeItems: 'center', flex: 'none' }}>
+        <Icon name={task.icon} />
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{task.title}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>{task.detail}</div>
+      </div>
+      <span className={'pill ' + tonePill[task.tone]}>{task.count}</span>
+    </div>
   )
 }

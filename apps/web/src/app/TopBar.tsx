@@ -5,9 +5,11 @@ import { Icon } from './icons'
 import { getRole, getScreenDef, getNav, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
-import { useNotifications } from '../data/hooks/useNotifications'
+import { useNotifications, type Notif } from '../data/hooks/useNotifications'
 import { timeAgo } from '../lib/format'
 import { currentUserId } from '../lib/supabase'
+import { KINDS_COMERCIALES } from '../data/ops/atencionComercial'
+import { irAConversacion, irASolicitud } from '../data/store/navIntentStore'
 
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen, capabilities } = useRole()
@@ -127,23 +129,34 @@ function NotifBell() {
   )
   const unread = visible.filter((n) => !n.read).length
 
-  const onPick = (id: string, toScreen?: string) => {
-    markRead(id)
-    if (toScreen && navKeys.has(toScreen)) setScreen(toScreen)
+  // CHV2-B · La campana es HISTORIAL de eventos (no la cola de trabajo). Un aviso comercial abre la
+  // conversación/solicitud exacta solo si el destino está en la navegación del rol; la pantalla destino
+  // vuelve a validar contra el servidor (un id ajeno o resuelto no revela nada).
+  const onPick = (n: Notif) => {
+    markRead(n.id)
+    if (n.kind && KINDS_COMERCIALES.has(n.kind) && n.conversationId && n.screen && navKeys.has(n.screen)) {
+      if (n.screen === 'asesorias') irAConversacion(setScreen, n.conversationId, { origen: 'campana' })
+      else if (n.screen === 'av_atencion') irASolicitud(setScreen, n.conversationId, { origen: 'campana' })
+      else setScreen(n.screen)
+    } else if (n.screen && navKeys.has(n.screen)) setScreen(n.screen)
     setOpen(false)
   }
+  const etiqueta = unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
 
   return (
     <div style={{ position: 'relative' }}>
       <button
         className="icobtn"
         type="button"
-        aria-label="Notificaciones"
+        aria-label={etiqueta}
+        aria-expanded={open}
+        title="Notificaciones"
         onClick={() => setOpen((o) => !o)}
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        data-testid="campana"
       >
         <Icon name="bell" />
-        {unread > 0 && <span className="bdg" />}
+        {unread > 0 && <span className="bdg bdg-n" data-testid="campana-n" aria-hidden>{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
         <div className="searchpop">
@@ -163,7 +176,7 @@ function NotifBell() {
                 key={n.id}
                 type="button"
                 className={'notif-row' + (n.read ? '' : ' unread')}
-                onMouseDown={() => onPick(n.id, n.screen)}
+                onMouseDown={() => onPick(n)}
               >
                 <span className="notif-dot" data-on={!n.read} />
                 <span className="notif-text">{n.text}</span>

@@ -5,6 +5,7 @@
 // duplica. Transporte = polling acotado (realtime queda documentado para después).
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { leerTokenVisitante } from './visitante'
+import type { Atencion } from './atencionComercial'
 
 export type ModoConversacion = 'ai_active' | 'human_offered' | 'human_requested' | 'human_assigned' | 'human_active' | 'human_ended'
 export type ActorMensaje = 'visitor' | 'doctor' | 'seller' | 'admin' | 'ai' | 'system'
@@ -21,6 +22,7 @@ export interface ColaItem {
   conversation_id: string; modo: ModoConversacion; seller_profile_id: string | null; asesoria_solicitada_at: string | null; last_message_at: string | null; es_mia: boolean; sin_leer: number; dueno: string
   // CC-7 · contexto comercial (servidor)
   handoff_origen?: 'carrito' | 'manual' | null; fuera_horario?: boolean | null; ruteo_motivo?: string | null; cart_id?: string | null; n_items?: number | null; edad_min?: number | null; iniciada?: boolean
+  atencion?: Atencion | null             // CHV2-A · estado derivado del servidor (_cc_atencion); la UI no recalcula esperas
 }
 export type ErrorChat = { codigo: string; mensaje: string }
 

@@ -80,8 +80,9 @@ export function CommonView() {
         <div className="welcome">
           <Avatar name={user?.name ?? 'Equipo'} url={user?.avatarUrl} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="wk">Bienvenido a Renovacell</div>
-            <div className="wh">Hola, {hi}</div>
+            {/* CHV2-B · Esta vista ya no es "Inicio": es el muro del equipo. La bienvenida vive en Inicio. */}
+            <div className="wk">Avisos del equipo</div>
+            <div className="wh">Lo que comparte el equipo, {hi}</div>
           </div>
           <span className="role-badge"><Icon name={r.icon} /> {r.label}</span>
         </div>

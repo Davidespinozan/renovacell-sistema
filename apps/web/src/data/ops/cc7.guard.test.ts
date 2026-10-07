@@ -86,7 +86,9 @@ describe('frontend', () => {
   })
   it('administración: solo RPC (la base valida Dirección); Bandeja cuenta desde el servidor', () => {
     expect(codigo(atencionSrc)).not.toMatch(/\.from\(/)
-    expect(codigo(bandejaSrc)).toMatch(/atencion\.resumen\(\)/)
-    expect(codigo(bandejaSrc)).toMatch(/const n = r \? r\.handoffs_sin_asignar \+ r\.reasignacion \+ r\.handoffs_pendientes : 0/)
+    // CHV2-B · la bandeja ya no lee una sola vez al montar: cuenta desde el store compartido (cc_ruteo_pendientes,
+    // la misma lectura que Inicio y la alerta) y suma lo escalado por espera.
+    expect(codigo(bandejaSrc)).toMatch(/useAtencionComercial\(fuenteComercial\(/)
+    expect(codigo(bandejaSrc)).toMatch(/const n = r\.handoffs_sin_asignar \+ escaladas \+ r\.reasignacion \+ r\.handoffs_pendientes/)
   })
 })

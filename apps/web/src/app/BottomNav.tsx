@@ -1,29 +1,28 @@
-// Bottom nav móvil (<900px, vía CSS). Abajo van los accesos COMUNES (Inicio/Chat
-// del hub); el resto de módulos del rol se abren con "Menú" (cajón con el rol
-// visible). Sin hub (p. ej. doctor) muestra sus propios módulos.
+// Bottom nav móvil (<900px, vía CSS). Staff: Inicio + Avisos/Chat del equipo (hub); el resto de
+// módulos se abren con "Menú". Doctor: Inicio + sus primeros módulos. El Menú siempre está.
 import React from 'react'
 import { Icon } from './icons'
-import { getRole, getNav, HUB_SCREENS, COMMON_SCREEN } from './roles'
+import { getRole, getNav, HUB_KEYS, INICIO_SCREEN, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 
-const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
-
 function short(label: string, key: string): string {
-  if (key === COMMON_SCREEN.key) return 'Inicio'
+  if (key === INICIO_SCREEN.key) return 'Inicio'
+  if (key === COMMON_SCREEN.key) return 'Avisos'
+  if (key === CHAT_SCREEN.key) return 'Chat'
   return label.replace(/^Mis\s+/i, '').replace(/^Por\s+/i, '').split(' (')[0]
 }
 
 export function BottomNav({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen, capabilities } = useRole()
-  const nav = getNav(getRole(role), undefined, capabilities)
+  const r = getRole(role)
+  const nav = getNav(r, undefined, capabilities)
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
-  const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 
   // El cajón (Sidebar) tiene perfil, ajustes y CERRAR SESIÓN → debe estar SIEMPRE accesible en
   // móvil (antes el doctor, con hub vacío y 4 módulos exactos, se quedaba sin "Menú" y no podía
   // salir). Con el Menú siempre visible, dejamos 3 accesos directos + Menú (4 pestañas máx).
   const showMenu = true
-  const primary = hub.length > 0 ? hub : modules.slice(0, 3)
+  const primary = r.isStaff && hub.length > 1 ? hub.slice(0, 3) : nav.slice(0, 3)
 
   // R-36/R-24: enlaces sin href → foco por teclado (role=button, tabIndex) + Enter/Espacio.
   const onKey = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }

@@ -60,9 +60,11 @@ import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
 import { ChatCanonico } from './chat/ChatCanonico'
 import { AsesoriasPantalla } from './chat/Asesorias'
+import { RoleHome } from './home/RoleHome'   // CHV2-B · Inicio por rol
 
 // Pantallas reales ya construidas (por key de pantalla).
 const SCREENS: Record<string, () => React.ReactNode> = {
+  inicio: () => <RoleHome />,   // CHV2-B · entrada de todos los roles
   bandeja: () => <Bandeja />,
   dis_solicitudes: () => <Solicitudes />,
   dis_calendario: () => <Calendario />,

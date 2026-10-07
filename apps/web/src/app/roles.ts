@@ -2,10 +2,11 @@
 //
 // - El hub base es NEUTRO; el marco (sidebar/topbar) permanece y el contenido
 //   cambia al módulo según el rol.
-// - La VISTA COMÚN (anuncios/avisos/biblioteca) NO es el contenedor: es el add-on
-//   "Comunicación interna", que se activa con un flag (ver config.ts). Cuando está
-//   activo, es la home del staff; cuando no, el staff entra a su primer módulo.
-// - DOCTOR entra directo a su Portal y nunca ve la vista común (contenido del equipo).
+// - CHV2-B · INICIO es la entrada de TODOS los roles (staff y doctor): "qué requiere mi atención
+//   ahora". Es parte del hub base (no depende de add-ons) y se arma con RoleHome.
+// - La VISTA COMÚN (anuncios/avisos/biblioteca) es el add-on "Comunicación interna" (flag en
+//   config.ts) y ahora se llama "Avisos del equipo": ya no es dueña de "Inicio".
+// - DOCTOR nunca ve la vista común (contenido del equipo).
 import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
@@ -33,19 +34,24 @@ export interface RoleDef {
   requiresFeature?: keyof Features       // el rol existe solo si el add-on está activo
 }
 
-// La VISTA COMÚN y el CHAT pertenecen al add-on "Comunicación interna" (hub).
-export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Inicio', icon: 'home' }
-export const CHAT_SCREEN: ScreenDef = { key: 'chat', label: 'Chat', icon: 'chat' }
+// CHV2-B · INICIO (RoleHome) es de todos los roles. La VISTA COMÚN ("Avisos del equipo") y el CHAT
+// interno ("Chat del equipo") pertenecen al add-on "Comunicación interna" (hub). Las keys no cambian
+// (avisos existentes apuntan a 'comun'/'chat').
+export const INICIO_SCREEN: ScreenDef = { key: 'inicio', label: 'Inicio', icon: 'home' }
+export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Avisos del equipo', icon: 'megaphone' }
+export const CHAT_SCREEN: ScreenDef = { key: 'chat', label: 'Chat del equipo', icon: 'chat' }
 export const HUB_SCREENS: ScreenDef[] = [COMMON_SCREEN, CHAT_SCREEN]
+// Claves que el marco agrupa arriba ("Hub Renovacell" en el sidebar; pestañas del bottom-nav del staff).
+export const HUB_KEYS: ReadonlySet<string> = new Set([INICIO_SCREEN.key, ...HUB_SCREENS.map((s) => s.key)])
 
 export const ROLES: RoleDef[] = [
   {
     key: 'admin', label: 'Administración', group: 'Administración · Dirección',
     icon: 'dashboard', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
-      { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Inicio' },
-      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Inicio' },
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
+      { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
+      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Mi trabajo' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
       // Flujo natural: Prospecto → Por verificar → Doctor. Comisiones no interrumpe.
@@ -60,7 +66,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
       { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
-      { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Operación' },   // CC-2 (Comercial tiene su orden probado)
+      { key: 'asesorias', label: 'Conversaciones', icon: 'chat', section: 'Operación' },   // CC-2 · CHV2-B: etiqueta visible "Conversaciones" (la key sigue siendo 'asesorias')
       { key: 'av_atencion', label: 'Atención comercial', icon: 'chat', section: 'Operación' },   // CC-7 · cartera, ruteo y pendientes
       { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
@@ -93,7 +99,7 @@ export const ROLES: RoleDef[] = [
     key: 'warehouse', label: 'Almacén / Empaque', group: 'Almacén y Empaque · Alberto',
     icon: 'box', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
       { key: 'stock', label: 'Lo que hay en almacén', icon: 'box', section: 'Almacén' },
       { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Almacén' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Almacén' },
@@ -113,7 +119,7 @@ export const ROLES: RoleDef[] = [
     key: 'pos', label: 'Ventas', group: 'Ventas · Campo',
     icon: 'bag', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Inicio' },
+      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Mi cartera' },
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
@@ -155,7 +161,7 @@ export const CAPABILITIES: CapabilityDef[] = [
     // CC-2 · Atender la conversación canónica con doctores/visitantes (solo vendedores a los que
     // Dirección se lo asigne; Dirección siempre puede). El servidor exige esta capability.
     key: 'conversaciones', label: 'Atender conversaciones',
-    modules: [{ key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Mi cartera' }],
+    modules: [{ key: 'asesorias', label: 'Conversaciones', icon: 'chat', section: 'Mi cartera' }],   // CHV2-B · etiqueta visible
   },
   // CC-7 · Sin módulos: permite que Dirección le asigne clientes NUEVOS (sin él conserva su cartera actual).
   { key: 'nuevos_clientes', label: 'Recibir clientes nuevos', modules: [] },
@@ -178,11 +184,10 @@ export const getRole = (key: RoleKey): RoleDef =>
 export const availableRoles = (features: Features = FEATURES): RoleDef[] =>
   ROLES.filter((r) => !r.requiresFeature || features[r.requiresFeature])
 
-// Navegación visible: staff = [vista común (si add-on), ...módulos del rol,
-// ...módulos de sus capabilities]; doctor = módulos. Las capabilities las asigna
-// Administración por usuario.
+// Navegación visible: [Inicio, avisos/chat del equipo (staff con add-on), ...módulos del rol,
+// ...módulos de sus capabilities]. Las capabilities las asigna Administración por usuario.
 export const getNav = (role: RoleDef, features: Features = FEATURES, capabilities: string[] = []): ScreenDef[] => {
-  const nav: ScreenDef[] = []
+  const nav: ScreenDef[] = [INICIO_SCREEN]
   if (role.isStaff && features.comunicacionInterna) nav.push(...HUB_SCREENS)
   nav.push(...role.modules)
   const have = new Set(nav.map((s) => s.key))
@@ -190,14 +195,14 @@ export const getNav = (role: RoleDef, features: Features = FEATURES, capabilitie
   return nav
 }
 
-// Pantalla de entrada tras "login": la primera de su navegación.
+// Pantalla de entrada tras "login": la primera de su navegación (CHV2-B: Inicio para todos).
 export const getEntryScreen = (role: RoleDef, features: Features = FEATURES, capabilities: string[] = []): string =>
-  getNav(role, features, capabilities)[0]?.key ?? COMMON_SCREEN.key
+  getNav(role, features, capabilities)[0]?.key ?? INICIO_SCREEN.key
 
 // Resuelve un ScreenDef por key dentro del alcance del rol + capabilities.
 export const getScreenDef = (role: RoleDef, key: string, features: Features = FEATURES, capabilities: string[] = []): ScreenDef => {
   const nav = getNav(role, features, capabilities)
-  return nav.find((s) => s.key === key) ?? nav[0] ?? COMMON_SCREEN
+  return nav.find((s) => s.key === key) ?? nav[0] ?? INICIO_SCREEN
 }
 
 // Quién puede gestionar la vista común (crear/editar anuncios/avisos/assets):

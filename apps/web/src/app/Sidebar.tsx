@@ -4,14 +4,12 @@
 import React, { useState } from 'react'
 import { LogOut, Pencil, Settings } from 'lucide-react'
 import { Icon } from './icons'
-import { getRole, getNav, HUB_SCREENS, type ScreenDef } from './roles'
+import { getRole, getNav, HUB_KEYS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
 import { Ajustes } from '../screens/Ajustes'
 import { BrandLogo } from './BrandLogo'
-
-const HUB_KEYS = new Set(HUB_SCREENS.map((s) => s.key))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen, user, logout, capabilities } = useRole()
@@ -63,7 +61,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="side-role"><Icon name={r.icon} /> {r.label}</div>
 
       <nav className="nav">
-        {/* En móvil el hub (Inicio/Chat) ya vive en el bottom-nav → se oculta aquí. */}
+        {/* Inicio + Avisos/Chat del equipo. En móvil el hub del staff vive en el bottom-nav → se oculta aquí. */}
         {hub.length > 0 && (
           <div className="nav-hub">
             <div className="grp">Hub Renovacell</div>

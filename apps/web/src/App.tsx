@@ -13,12 +13,16 @@ const esRutaChat = typeof window !== 'undefined' && /^\/chat(\/|$)/.test(window.
 // Vista previa visual del chat, SOLO en desarrollo (no existe en producción).
 const esPreviewChat = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'chat'
 const ChatPreview = import.meta.env.DEV ? React.lazy(() => import('./dev/ChatPreview').then((m) => ({ default: m.ChatPreview }))) : null
+// CHV2-B · Vista previa visual de Inicio / alerta / Conversaciones / Atención comercial, SOLO en desarrollo.
+const esPreviewHome = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'home'
+const HomePreview = import.meta.env.DEV ? React.lazy(() => import('./dev/HomePreview').then((m) => ({ default: m.HomePreview }))) : null
 
 function Root() {
   const { mode, role, verified } = useRole()
 
   let view
   if (esPreviewChat && ChatPreview) view = <React.Suspense fallback={null}><ChatPreview /></React.Suspense>
+  else if (esPreviewHome && HomePreview) view = <React.Suspense fallback={null}><HomePreview /></React.Suspense>
   else if (esRutaChat) view = <ChatCanonico />
   else if (mode === 'landing') view = <LandingPreview />
   else if (mode === 'reset') view = <ResetPassword />

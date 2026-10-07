@@ -3,6 +3,7 @@
 @import './styles/shell.css';
 @import './styles/social.css';
 @import './styles/chat.css';
+@import './styles/home.css';
 @import '@renovacell/ui/responsive.css';
 
 @tailwind base;
