@@ -1,5 +1,6 @@
 -- CC-7 · El rollback retira horario/cartera/handoff y devuelve EXACTAMENTE el comportamiento CC-2/5/6 previo.
 begin;
+\ir ../../../rollback/chv2a_cron/99_down.sql   -- CHV2-A cron fix (124) se baja primero
 \ir ../../../rollback/chv2a/99_down.sql   -- CHV2-A (123) se baja primero
 \ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero
 \ir ../../../rollback/c360_0/99_down.sql   -- C360-0 (120) se baja primero

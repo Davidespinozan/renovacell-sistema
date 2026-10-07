@@ -5,13 +5,16 @@
 -- emitidas se conservan como notificaciones normales (pierden kind/referencia).
 -- Ejecutar en UNA transacción:  psql -1 -v ON_ERROR_STOP=1 -f 99_down.sql
 -- ============================================================================
+-- Job del evaluador, por FIRMA EXACTA (to_regproc es ambiguo con las sobrecargas de pg_cron; ver 124).
 do $$
 begin
-  if to_regproc('cron.unschedule') is not null and exists (select 1 from cron.job where jobname = 'renovacell-atencion-comercial') then
-    perform cron.unschedule('renovacell-atencion-comercial');
+  if to_regprocedure('cron.unschedule(text)') is null then
+    raise notice 'pg_cron no disponible: retirar renovacell-atencion-comercial aparte.';
+    return;
   end if;
-exception when others then
-  raise notice 'pg_cron no disponible al retirar el job (%).', sqlerrm;
+  if exists (select 1 from cron.job where jobname = 'renovacell-atencion-comercial') then
+    perform cron.unschedule('renovacell-atencion-comercial'::text);
+  end if;
 end $$;
 drop function if exists public.cc_atencion_evaluar(), public.cc_solicitud_reasignar(uuid, uuid, text), public.cc_atencion_config_guardar(integer, integer, boolean), public.cc_atencion_config_ver();
 drop function if exists public.cc_cola_asesorias();
