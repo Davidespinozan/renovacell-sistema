@@ -2,6 +2,7 @@
 // comercial en vivo, Conversaciones (apertura profunda) y Atención comercial con clientes FALSOS en estados
 // fijos, para revisión visual (escritorio y móvil) sin tocar el servidor. No existe en producción.
 //   ?preview=home&rol=vendedor|direccion|almacen|chofer|doctor&estado=…&vista=home|alerta|asesorias|atencion&modal=reasignar|cartera
+//   Chat V2-C4 · ?preview=home&rol=doctor&vista=c4&paso=abre|modal|cerrar|e2 (auto-apertura reactiva del lanzador)
 import React, { useEffect, useState } from 'react'
 import { useRole } from '../auth/RoleContext'
 import { AppShell } from '../app/AppShell'
@@ -73,6 +74,27 @@ function atencionFalsa(p: Pendientes) {
 }
 const cartDoctor = (n: number): Carrito => ({ cart_id: 'K', estado: 'active', rev: 5, dueno: 'profile', audiencia: 'verified', puede_precio: true, conversation_id: 'C1', n_items: n, cantidad_total: n, total: { estado: 'completo', monto: 350 * n }, items: n ? [{ product_id: 'P', nombre: 'Golden Placenta Mask', presentacion: null, imagen_url: null, cantidad: n, vendible: true, visible: true, disponibilidad: 'disponible', precio: { estado: 'autorizado', unitario: 350, subtotal: 350 * n } }] : [] })
 
+// Chat V2-C4 · conversación del doctor que "recibe" mensajes: contrato real de `leer` (seq, propio, sesión abierta).
+const C4 = (() => {
+  const mensajes: Mensaje[] = [
+    { id: 'c1', seq: 1, actor: 'doctor', content: '¿Tienen la Golden Placenta Mask en caja de 5?', created_at: new Date(Date.now() - 600_000).toISOString(), propio: true },
+    { id: 'c2', seq: 2, actor: 'ai', content: 'Sí, la manejamos en caja de 5 piezas. ¿Quieres que tu asesora te confirme el precio por volumen?', created_at: new Date(Date.now() - 590_000).toISOString(), propio: false },
+  ]
+  let leido = 2
+  const sesion = { id: 'S2', ordinal: 2, estado: 'abierta' as const, origen: 'cliente', first_seq: 1, last_seq: null, opened_at: new Date(Date.now() - 600_000).toISOString(), closed_at: null, close_reason: null }
+  const cliente = new ClienteChat(async (_fn, { body }) => {
+    const a = body.action as string
+    const ult = mensajes.length
+    if (a === 'abrir') return ok({ conversation_id: 'C1', estado: 'abierta', modo: 'human_active', nuevo: false })
+    if (a === 'leer') { const d = Number(body.desde_seq ?? 0); return ok({ conversation_id: 'C1', estado: 'abierta', modo: 'human_active', rol: 'dueno', ultimo_seq: ult, leido_hasta: leido, asesor_nombre: 'Lucía', sesion, cart_id: null, handoff: { origen: 'manual', cart_id: null, fuera_horario: false, asignado: true, puede_rechazar: false }, mensajes: mensajes.filter((m) => m.seq > d) }) }
+    if (a === 'leido') { leido = Math.max(leido, Number(body.seq)); return ok({ ok: true }) }
+    if (a === 'sesiones') return ok({ conversation_id: 'C1', sesiones: [] })
+    return ok({ ok: true })
+  }, () => null)
+  const llega = (actor: Mensaje['actor'], content: string) => { const seq = mensajes.length + 1; mensajes.push({ id: 'c' + seq, seq, actor, content, created_at: new Date().toISOString(), propio: false }) }
+  return { cliente, llega }
+})()
+
 const PERFILES: Record<string, { role: RoleKey; name: string; email: string; caps: string[] }> = {
   vendedor: { role: 'pos', name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx', caps: ['conversaciones'] },
   direccion: { role: 'admin', name: 'Alberto Gutiérrez · Dirección', email: 'admin@renovacell.mx', caps: [] },
@@ -99,7 +121,7 @@ export function HomePreview() {
         : { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', ultimo_seq: 0, mensajes: [], cart_id: null }
     const chatDoctor = chatFalso([], vista === 'autoapertura' || vista === 'cerrado' ? { conversation_id: 'C1', estado: 'abierta', modo: 'human_requested', ultimo_seq: 2, leido_hasta: 0, mensajes: MENSAJES.slice(0, 2).map((m) => (m.actor === 'doctor' ? { ...m, propio: true } : m)), handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: false, puede_rechazar: true }, cart_id: 'K' } : doctorConv)
     configurarClientesInicioDoctor({ chat: chatDoctor, carrito: new ClienteCarrito(async () => ok(cartDoctor(estado === 'asesoria' ? 1 : estado === 'carrito' ? 2 : 0)), () => null) })
-    _configurarClienteLanzador(chatDoctor)
+    _configurarClienteLanzador(vista === 'c4' ? C4.cliente : chatDoctor)
     login(perfil.role, true, { name: perfil.name, email: perfil.email }, perfil.caps)
     setListo(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,6 +134,23 @@ export function HomePreview() {
     const t1 = setTimeout(() => chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K-' + Date.now() }), 700)
     const t2 = vista === 'cerrado' ? setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })), 1300) : undefined
     return () => { clearTimeout(t1); if (t2) clearTimeout(t2) }
+  }, [listo, vista])
+
+  // Chat V2-C4 · llega actividad nueva (asesor) y se fuerza el tick de la burbuja (visibilitychange) para no esperar 30 s.
+  useEffect(() => {
+    if (!listo || vista !== 'c4') return
+    try { sessionStorage.clear() } catch { /* sin storage */ }
+    const paso = q.get('paso') ?? 'abre'
+    const tick = () => document.dispatchEvent(new Event('visibilitychange'))
+    const ts: number[] = []
+    const en = (ms: number, f: () => void) => { ts.push(window.setTimeout(f, ms)) }
+    if (paso === 'modal') en(600, () => { const o = document.createElement('div'); o.className = 'overlay'; o.id = 'c4-modal'; o.innerHTML = '<div class="modal" style="padding:24px;max-width:360px;background:#fff;border-radius:14px"><b>Reportar pago</b><p style="margin:8px 0 0;font-size:14px">Modal crítico abierto: la auto-apertura se difiere.</p></div>'; document.body.appendChild(o) })
+    en(1500, () => { C4.llega('seller', 'Doctor, ya le preparé el pedido con precio por volumen. ¿Lo confirmamos?'); tick() })
+    if (paso === 'cerrar' || paso === 'e2') en(2600, () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    if (paso === 'cerrar' || paso === 'e2') en(3400, tick)
+    if (paso === 'e2') en(4200, () => { C4.llega('seller', 'Le confirmo: sale hoy por paquetería.'); tick() })
+    return () => ts.forEach((t) => clearTimeout(t))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listo, vista])
 
   // Alerta: simula la llegada en vivo de un aviso ya emitido por el servidor (misma ruta que Realtime).

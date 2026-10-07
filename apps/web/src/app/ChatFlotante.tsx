@@ -8,8 +8,11 @@
 //    chatUiStore), una vez por carrito; nunca por cantidades, polling, re-render ni reintentos.
 //  · Sin leer = cursor del servidor (`leido_hasta`). Cuenta mensajes relevantes (asesor, Dirección, IA) y el
 //    aviso del sistema SOLO mientras hay un handoff vivo; el resto de avisos internos no hacen ruido.
-//  · Actividad significativa (mensaje del asesor, asesor asignado/activo) = badge + UN pulso discreto. Sin
-//    auto-abrir y sin notificaciones del navegador.
+//  · Actividad significativa (mensaje del asesor, asesor asignado/activo) = badge + UN pulso discreto.
+//  · Chat V2-C4 · ESTE componente es la ÚNICA autoridad de apertura automática (handoff del carrito y
+//    actividad nueva vista por el sondeo de la burbuja). Frontera por conversación (data/ops/autoapertura):
+//    lo no leído antiguo no abre; lo nuevo abre una vez; un cierre manual suprime lo existente; se difiere
+//    con un modal/hoja, la pestaña oculta o un campo enfocado. Sin notificaciones del navegador.
 //  · Aquí no hay disparadores de handoff ni mutaciones: solo abrir/leer de la conversación propia.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from './icons'
@@ -18,6 +21,7 @@ import { hasSupabase } from '../lib/supabase'
 import { chat as clientePorDefecto, type ClienteChat, type Conversacion, type ModoConversacion } from '../data/ops/chat'
 import { chatUi, marcarAbiertoPara, useSolicitudApertura } from '../data/store/chatUiStore'
 import { ChatCanonico } from '../screens/chat/ChatCanonico'
+import { debeDiferir, decidir, guardarFrontera, leerFrontera } from '../data/ops/autoapertura'
 
 // Pantallas donde la conversación YA está montada a página completa.
 export const PANTALLAS_CHAT: ReadonlySet<string> = new Set(['chat_cc', 'asist'])
@@ -40,6 +44,13 @@ export function _configurarClienteLanzador(c: ClienteChat) { clienteShell = c }
 export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { cliente?: ClienteChat; intervaloMs?: number }) {
   const { role, screen } = useRole()
   const [abierto, setAbierto] = useState(false)
+  const [apertura, setApertura] = useState<'manual' | 'auto'>('manual')   // C4 · la automática no enfoca el redactor
+  const abiertoRef = useRef(false)
+  abiertoRef.current = abierto
+  const frontera = useRef<{ conv: string; f: number | null } | null>(null)   // C4 · F de la conversación actual
+  const descartar = useRef(false)          // C4 · tras un cierre manual: la siguiente lectura absorbe lo existente
+  const handoffPendiente = useRef<string | null>(null)   // C4 · V2-A diferida por interacción crítica (cartId)
+  const dialogo = useRef<HTMLElement | null>(null)
   const [convId, setConvId] = useState<string | null>(null)
   const [sinLeer, setSinLeer] = useState(0)
   const [pulso, setPulso] = useState(false)
@@ -65,11 +76,33 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
 
   const pulsar = useCallback(() => { setPulso(true); window.setTimeout(() => setPulso(false), 2600) }, [])
 
+  // C4 · ÚNICA autoridad de apertura automática. Nunca reabre lo que ya está abierto.
+  const abrirAuto = useCallback((): boolean => {
+    if (abiertoRef.current || !visible) return false
+    abiertoRef.current = true
+    setApertura('auto'); setSinLeer(0); setAbierto(true)
+    return true
+  }, [visible])
+  // V2-A por la misma autoridad: si hay interacción crítica, se difiere (y se reintenta en el siguiente tick).
+  const atenderHandoff = useCallback((cartId: string) => {
+    if (abiertoRef.current) { handoffPendiente.current = null; return }
+    if (debeDiferir()) { handoffPendiente.current = cartId; return }
+    handoffPendiente.current = null
+    if (abrirAuto()) marcarAbiertoPara(cartId)
+  }, [abrirAuto])
+
   // Cuenta la actividad con la autoridad del servidor: mensajes relevantes posteriores a `leido_hasta`.
   const contar = useCallback(async () => {
     if (!convId) return
+    if (handoffPendiente.current) atenderHandoff(handoffPendiente.current)
     const r = await cliente.leer(convId, cursor.current)
     if (!r.ok) return
+    // C4 · frontera por conversación (sessionStorage) → ¿actividad genuinamente nueva?
+    if (frontera.current?.conv !== convId) frontera.current = { conv: convId, f: leerFrontera(convId) }
+    const d = decidir({ lectura: r.data, frontera: frontera.current.f, descartar: descartar.current, diferir: debeDiferir() })
+    descartar.current = false
+    if (d.frontera !== frontera.current.f) { frontera.current.f = d.frontera; guardarFrontera(convId, d.frontera) }
+    if (d.abrir) abrirAuto()
     const leido = Math.max(cursor.current, r.data.leido_hasta ?? 0)
     cursor.current = leido
     const vivo = handoffVivoDe(r.data)
@@ -82,7 +115,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
     asesorVisto.current = deAsesor
     modoVisto.current = r.data.modo
     setConAsesor(MODOS_CON_ASESOR.has(r.data.modo))
-  }, [cliente, convId, pulsar])
+  }, [cliente, convId, pulsar, abrirAuto, atenderHandoff])
 
   // Solo con el cajón CERRADO y la pestaña visible (abierto, ChatCanonico ya lee y marca).
   useEffect(() => {
@@ -98,9 +131,9 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
   useEffect(() => {
     if (!solicitud) return
     if (!visible) { chatUi.consumir(solicitud.id); return }   // en la pantalla de chat ya se ve: no hay cajón
-    if (!abierto) { marcarAbiertoPara(solicitud.cartId); setSinLeer(0); setAbierto(true) }
+    atenderHandoff(solicitud.cartId)
     chatUi.consumir(solicitud.id)
-  }, [solicitud, visible, abierto])
+  }, [solicitud, visible, atenderHandoff])
 
   // Cajón abierto: bloquea el scroll del fondo, sigue al teclado (visualViewport) y Escape cierra.
   useEffect(() => {
@@ -113,16 +146,25 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
       document.documentElement.style.setProperty('--rc-kb', `${kb}px`)
     }
     ajustar(); vv?.addEventListener('resize', ajustar); vv?.addEventListener('scroll', ajustar)
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrarManual() }
     document.addEventListener('keydown', onKey)
     return () => {
       document.body.classList.remove('chat-open'); document.documentElement.style.removeProperty('--rc-kb')
       vv?.removeEventListener('resize', ajustar); vv?.removeEventListener('scroll', ajustar)
       document.removeEventListener('keydown', onKey)
     }
-  }, [abierto])
+  }, [abierto])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cerrar = useCallback(() => { setAbierto(false); window.setTimeout(() => fab.current?.focus(), 0) }, [])
+  // C4 · apertura automática: el foco va al diálogo (lectores de pantalla), NUNCA al redactor (sin teclado en móvil).
+  useEffect(() => { if (abierto && apertura === 'auto') dialogo.current?.focus() }, [abierto, apertura])
+
+  // C4 · cierre MANUAL explícito (X, flecha, botón flotante, fondo, Escape): suprime lo existente. Navegar,
+  // cerrar sesión o desmontar NO pasan por aquí.
+  const cerrarManual = useCallback(() => {
+    descartar.current = true
+    abiertoRef.current = false
+    setAbierto(false); window.setTimeout(() => fab.current?.focus(), 0)
+  }, [])
   const onLeido = useCallback((seq: number) => { cursor.current = Math.max(cursor.current, seq); setSinLeer(0) }, [])
 
   if (!visible) return null
@@ -130,15 +172,16 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
   return (
     <>
       <button ref={fab} type="button" className={`chat-fab${pulso ? ' chat-fab--pulso' : ''}`} aria-label={etiqueta} title={ETIQUETA_LANZADOR} aria-expanded={abierto}
-        onClick={() => { if (abierto) cerrar(); else { setSinLeer(0); setAbierto(true) } }} data-testid="chat-fab">
+        onClick={() => { if (abierto) cerrarManual(); else { setApertura('manual'); setSinLeer(0); setAbierto(true) } }} data-testid="chat-fab">
         <Icon name="chat" />
         {conAsesor && sinLeer === 0 && <span className="chat-fab-asesor" aria-hidden data-testid="chat-fab-asesor" />}
         {sinLeer > 0 && <span className="chat-fab-badge" data-testid="chat-fab-badge">{sinLeer > 99 ? '99+' : sinLeer}</span>}
       </button>
       {abierto && (
-        <div className="chat-drawer-wrap" onClick={cerrar} data-testid="chat-drawer">
-          <aside className="chat-drawer" role="dialog" aria-modal="true" aria-label={ETIQUETA_LANZADOR} onClick={(e) => e.stopPropagation()}>
-            <ChatCanonico embebido panel autoFoco cliente={cliente} onSalir={cerrar} etiquetaSalir="Cerrar" onLeido={onLeido} />
+        <div className="chat-drawer-wrap" onClick={cerrarManual} data-testid="chat-drawer" data-apertura={apertura}>
+          <aside ref={dialogo} tabIndex={-1} style={{ outline: 'none' }} className="chat-drawer" role="dialog" aria-modal="true" aria-label={ETIQUETA_LANZADOR} onClick={(e) => e.stopPropagation()}>
+            {/* C4 · conversación conocida → solo `leer` (sin un `abrir` adicional que pueda recuperar un handoff) */}
+            <ChatCanonico embebido panel autoFoco={apertura === 'manual'} conversationId={convId ?? undefined} cliente={cliente} onSalir={cerrarManual} etiquetaSalir="Cerrar" onLeido={onLeido} />
           </aside>
         </div>
       )}

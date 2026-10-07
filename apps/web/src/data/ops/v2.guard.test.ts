@@ -30,7 +30,9 @@ describe('V2-A · apertura y actividad', () => {
   it('el lanzador abre una vez por carrito, nunca sobre la pantalla de chat ni si ya está abierto; sin notificaciones del navegador', () => {
     const l = codigo(lanzadorSrc)
     expect(l).toMatch(/if \(!visible\) \{ chatUi\.consumir\(solicitud\.id\); return \}/)
-    expect(l).toMatch(/if \(!abierto\) \{ marcarAbiertoPara\(solicitud\.cartId\)/)
+    // Chat V2-C4 · V2-A pasa por la autoridad única: si ya está abierto no reabre; marca el carrito solo si de verdad abrió.
+    expect(l).toMatch(/if \(abiertoRef\.current\) \{ handoffPendiente\.current = null; return \}/)
+    expect(l).toMatch(/if \(abrirAuto\(\)\) marcarAbiertoPara\(cartId\)/)
     expect(l).not.toMatch(/new Notification|Notification\.requestPermission/)
     expect((l.match(/<ChatCanonico /g) ?? []).length).toBe(1)
   })
