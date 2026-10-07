@@ -451,6 +451,82 @@ export type Database = {
           },
         ]
       }
+      cc_atencion_config: {
+        Row: {
+          aviso_min: number
+          escalamiento_min: number
+          id: number
+          pausar_fuera_horario: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          aviso_min?: number
+          escalamiento_min?: number
+          id?: number
+          pausar_fuera_horario?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          aviso_min?: number
+          escalamiento_min?: number
+          id?: number
+          pausar_fuera_horario?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_atencion_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_atencion_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_atencion_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_atencion_config_hist: {
+        Row: {
+          actor_profile_id: string | null
+          aviso_min: number
+          created_at: string
+          escalamiento_min: number
+          id: number
+          pausar_fuera_horario: boolean
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          aviso_min: number
+          created_at?: string
+          escalamiento_min: number
+          id?: number
+          pausar_fuera_horario: boolean
+        }
+        Update: {
+          actor_profile_id?: string | null
+          aviso_min?: number
+          created_at?: string
+          escalamiento_min?: number
+          id?: number
+          pausar_fuera_horario?: boolean
+        }
+        Relationships: []
+      }
       cc_cart_events: {
         Row: {
           actor_profile_id: string | null
@@ -4156,32 +4232,49 @@ export type Database = {
       notifications: {
         Row: {
           body: string
+          conversation_id: string | null
           created_at: string | null
           created_by: string | null
+          event_key: string | null
           id: string
+          kind: string | null
           roles: string[] | null
           screen: string | null
           user_ids: string[] | null
         }
         Insert: {
           body: string
+          conversation_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          event_key?: string | null
           id?: string
+          kind?: string | null
           roles?: string[] | null
           screen?: string | null
           user_ids?: string[] | null
         }
         Update: {
           body?: string
+          conversation_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          event_key?: string | null
           id?: string
+          kind?: string | null
           roles?: string[] | null
           screen?: string | null
           user_ids?: string[] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cc_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_cancellations: {
         Row: {
@@ -6269,6 +6362,7 @@ export type Database = {
         Args: { p_profile: string; p_visitor: string }
         Returns: number
       }
+      _cc_atencion: { Args: { p_conv: string }; Returns: Json }
       _cc_atribuible: { Args: { p: Json }; Returns: boolean }
       _cc_attr_limpia: { Args: { p: Json }; Returns: Json }
       _cc_audiencia: { Args: { p_solicitada?: string }; Returns: string }
@@ -6414,6 +6508,17 @@ export type Database = {
         Returns: undefined
       }
       _cc_exige_admin: { Args: never; Returns: undefined }
+      _cc_handler_asignar: {
+        Args: {
+          p_actor: string
+          p_actor_type: string
+          p_conv: string
+          p_motivo: string
+          p_origen: string
+          p_seller: string
+        }
+        Returns: Json
+      }
       _cc_handoff_carrito: { Args: { p_cart: string }; Returns: Json }
       _cc_handoff_seguro: { Args: { p_cart: string }; Returns: Json }
       _cc_handoff_tras_adopcion: {
@@ -6427,8 +6532,26 @@ export type Database = {
       }
       _cc_ia_puede: { Args: { p_modo: string }; Returns: boolean }
       _cc_identidad: { Args: { p_product: string }; Returns: Json }
+      _cc_minutos_habiles: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: number
+      }
       _cc_nivel_seccion: { Args: { p_seccion: string }; Returns: string }
+      _cc_nombre_dueno: { Args: { p_conv: string }; Returns: string }
+      _cc_nombre_perfil: { Args: { p_profile: string }; Returns: string }
       _cc_norm: { Args: { p: string }; Returns: string }
+      _cc_notificar: {
+        Args: {
+          p_body: string
+          p_conv: string
+          p_event_key: string
+          p_kind: string
+          p_roles: string[]
+          p_screen: string
+          p_user_ids: string[]
+        }
+        Returns: string
+      }
       _cc_participante: {
         Args: {
           p_actor_type: string
@@ -6820,6 +6943,12 @@ export type Database = {
         Args: { p_actor_profile: string; p_conv: string; p_seller: string }
         Returns: Json
       }
+      cc_atencion_config_guardar: {
+        Args: { p_aviso: number; p_escalamiento: number; p_pausar: boolean }
+        Returns: Json
+      }
+      cc_atencion_config_ver: { Args: never; Returns: Json }
+      cc_atencion_evaluar: { Args: never; Returns: Json }
       cc_audiencia_actual: { Args: never; Returns: string }
       cc_buscar_conocimiento: {
         Args: { p_audiencia?: string; p_limite?: number; p_q: string }
@@ -7003,6 +7132,7 @@ export type Database = {
         Args: never
         Returns: {
           asesoria_solicitada_at: string
+          atencion: Json
           cart_id: string
           conversation_id: string
           dueno: string
@@ -7289,6 +7419,10 @@ export type Database = {
           p_profile: string
           p_visitor_hash: string
         }
+        Returns: Json
+      }
+      cc_solicitud_reasignar: {
+        Args: { p_conv: string; p_motivo: string; p_vendedor: string }
         Returns: Json
       }
       cc_terminar_asesoria: {
