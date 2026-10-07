@@ -13,6 +13,8 @@
 //    actividad nueva vista por el sondeo de la burbuja). Frontera por conversación (data/ops/autoapertura):
 //    lo no leído antiguo no abre; lo nuevo abre una vez; un cierre manual suprime lo existente; se difiere
 //    con un modal/hoja, la pestaña oculta o un campo enfocado. Sin notificaciones del navegador.
+//  · CI-3 · Realtime (INSERT en cc_messages de esta conversación) solo DESPIERTA la misma lectura canónica; el
+//    sondeo de 30 s queda como respaldo. Una sola lectura en vuelo; una señal durante la lectura → otra después.
 //  · Aquí no hay disparadores de handoff ni mutaciones: solo abrir/leer de la conversación propia.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from './icons'
@@ -22,6 +24,7 @@ import { chat as clientePorDefecto, type ClienteChat, type Conversacion, type Mo
 import { chatUi, marcarAbiertoPara, useSolicitudApertura } from '../data/store/chatUiStore'
 import { ChatCanonico } from '../screens/chat/ChatCanonico'
 import { debeDiferir, decidir, guardarFrontera, leerFrontera } from '../data/ops/autoapertura'
+import { suscribirMensajes, type Suscriptor } from '../data/ops/chatRealtime'
 
 // Pantallas donde la conversación YA está montada a página completa.
 export const PANTALLAS_CHAT: ReadonlySet<string> = new Set(['chat_cc', 'asist'])
@@ -40,8 +43,10 @@ export const handoffVivoDe = (c: Pick<Conversacion, 'modo' | 'handoff'>): boolea
 // Solo vista previa local / pruebas: cliente inyectable para el lanzador montado por el shell.
 let clienteShell: ClienteChat = clientePorDefecto
 export function _configurarClienteLanzador(c: ClienteChat) { clienteShell = c }
+let suscriptorShell: Suscriptor = suscribirMensajes
+export function _configurarSuscriptorLanzador(s: Suscriptor) { suscriptorShell = s }
 
-export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { cliente?: ClienteChat; intervaloMs?: number }) {
+export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, suscribir = suscriptorShell }: { cliente?: ClienteChat; intervaloMs?: number; suscribir?: Suscriptor }) {
   const { role, screen } = useRole()
   const [abierto, setAbierto] = useState(false)
   const [apertura, setApertura] = useState<'manual' | 'auto'>('manual')   // C4 · la automática no enfoca el redactor
@@ -51,6 +56,11 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
   const descartar = useRef(false)          // C4 · tras un cierre manual: la siguiente lectura absorbe lo existente
   const handoffPendiente = useRef<string | null>(null)   // C4/CI-2 · V2-A diferida por interacción crítica (episodio)
   const vigilante = useRef<(() => void) | null>(null)     // CI-2 · vigilancia temporal del obstáculo (solo con un pendiente)
+  const c4Diferido = useRef(false)          // CI-3 · actividad elegible diferida por un obstáculo: reevaluar al quitarse
+  const leyendo = useRef(false)             // CI-3 · una sola lectura canónica en vuelo
+  const otraVez = useRef(false)             // CI-3 · llegó una señal durante la lectura → leer otra vez al terminar
+  const coalescer = useRef<number | undefined>(undefined)
+  const revisarRef = useRef<() => Promise<void>>(async () => {})
   const dialogo = useRef<HTMLElement | null>(null)
   const [convId, setConvId] = useState<string | null>(null)
   const [sinLeer, setSinLeer] = useState(0)
@@ -65,7 +75,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
   const solicitud = useSolicitudApertura()
 
   // Si el doctor navega a la pantalla de chat, el cajón se cierra: un solo montaje del hilo (ahí el episodio ya se ve).
-  useEffect(() => { if (!visible) { setAbierto(false); handoffPendiente.current = null; vigilante.current?.(); vigilante.current = null } }, [visible])
+  useEffect(() => { if (!visible) { setAbierto(false); handoffPendiente.current = null; c4Diferido.current = false; vigilante.current?.(); vigilante.current = null } }, [visible])
 
   // Abrir/reanudar la conversación propia (idempotente en el servidor) una sola vez.
   useEffect(() => {
@@ -94,8 +104,10 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
     const revisar = () => {
       marco = 0
       const p = handoffPendiente.current
-      if (!p) { dejarDeVigilar(); return }
-      if (!debeDiferir()) atenderRef.current(p)
+      if (!p && !c4Diferido.current) { dejarDeVigilar(); return }
+      if (debeDiferir()) return
+      if (p) atenderRef.current(p)
+      if (c4Diferido.current) { c4Diferido.current = false; dejarDeVigilar(); if (!abiertoRef.current) void revisarRef.current() }   // CI-3
     }
     const programar = () => { if (!marco) marco = window.requestAnimationFrame(revisar) }
     const obs = typeof MutationObserver !== 'undefined' ? new MutationObserver(programar) : null
@@ -129,6 +141,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
     descartar.current = false
     if (d.frontera !== frontera.current.f) { frontera.current.f = d.frontera; guardarFrontera(convId, d.frontera) }
     if (d.abrir) abrirAuto()
+    else if (d.motivo === 'diferir' && document.visibilityState === 'visible') { c4Diferido.current = true; vigilarDiferido() }   // CI-3 · abrir al quitarse el obstáculo
     const leido = Math.max(cursor.current, r.data.leido_hasta ?? 0)
     cursor.current = leido
     const vivo = handoffVivoDe(r.data)
@@ -141,17 +154,41 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
     asesorVisto.current = deAsesor
     modoVisto.current = r.data.modo
     setConAsesor(MODOS_CON_ASESOR.has(r.data.modo))
-  }, [cliente, convId, pulsar, abrirAuto, atenderHandoff])
+  }, [cliente, convId, pulsar, abrirAuto, atenderHandoff, vigilarDiferido])
+
+  // CI-3 · UNA lectura canónica en vuelo: sondeo, visibilidad y Realtime pasan por aquí; si llega otra señal
+  // mientras se lee, se vuelve a leer al terminar (ninguna actividad se pierde ni se lee en paralelo).
+  const revisarAhora = useCallback(async () => {
+    if (leyendo.current) { otraVez.current = true; return }
+    leyendo.current = true
+    try {
+      do { otraVez.current = false; await contar() } while (otraVez.current && !abiertoRef.current)
+    } finally { leyendo.current = false }
+  }, [contar])
+  revisarRef.current = revisarAhora
+
+  // CI-3 · Realtime: despertador de la lectura canónica (ráfagas se agrupan ~120 ms). Solo con el cajón cerrado y
+  // la pestaña visible; al (re)conectarse se lee una vez por si algo llegó mientras el canal estaba caído.
+  useEffect(() => {
+    if (!visible || !convId) return
+    const despertar = () => {
+      if (abiertoRef.current || (typeof document !== 'undefined' && document.visibilityState !== 'visible')) return
+      window.clearTimeout(coalescer.current)
+      coalescer.current = window.setTimeout(() => { void revisarRef.current() }, 120)
+    }
+    const retirar = suscribir(convId, despertar, (e) => { if (e === 'listo') despertar() })
+    return () => { retirar(); window.clearTimeout(coalescer.current) }
+  }, [visible, convId, suscribir])
 
   // Solo con el cajón CERRADO y la pestaña visible (abierto, ChatCanonico ya lee y marca).
   useEffect(() => {
     if (!visible || !convId || abierto) return
-    const tick = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void contar() }
+    const tick = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void revisarAhora() }
     tick()
     const t = setInterval(tick, intervaloMs)
     document.addEventListener('visibilitychange', tick)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
-  }, [visible, convId, abierto, contar, intervaloMs])
+  }, [visible, convId, abierto, revisarAhora, intervaloMs])
 
   // UX V2-A · Apertura automática pedida por la mutación del carrito (handoff confirmado por el servidor).
   useEffect(() => {
@@ -198,7 +235,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000 }: { 
   return (
     <>
       <button ref={fab} type="button" className={`chat-fab${pulso ? ' chat-fab--pulso' : ''}`} aria-label={etiqueta} title={ETIQUETA_LANZADOR} aria-expanded={abierto}
-        onClick={() => { if (abierto) cerrarManual(); else { handoffPendiente.current = null; dejarDeVigilar(); setApertura('manual'); setSinLeer(0); setAbierto(true) } }} data-testid="chat-fab">
+        onClick={() => { if (abierto) cerrarManual(); else { handoffPendiente.current = null; c4Diferido.current = false; dejarDeVigilar(); setApertura('manual'); setSinLeer(0); setAbierto(true) } }} data-testid="chat-fab">
         <Icon name="chat" />
         {conAsesor && sinLeer === 0 && <span className="chat-fab-asesor" aria-hidden data-testid="chat-fab-asesor" />}
         {sinLeer > 0 && <span className="chat-fab-badge" data-testid="chat-fab-badge">{sinLeer > 99 ? '99+' : sinLeer}</span>}

@@ -47,6 +47,7 @@ begin
   perform tests.act_as(v_pos);
   perform tests.throws('select count(*) from public.cc_conversations', 'CUENTA_SUSPENDIDA', '7 · suspendido: la RLS también lo niega');
   perform tests.act_as_owner();
-  perform tests.ok(not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename like 'cc\_%'), 'U · ninguna tabla cc_* publicada en realtime (transporte = Edge/polling)');
+  -- CI-3 (129) · Realtime aprobado SOLO como despertador: la única tabla cc_* publicada es cc_messages (RLS auditado).
+  perform tests.ok(not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename like 'cc\_%' and tablename <> 'cc_messages'), 'U · ninguna tabla cc_* publicada en realtime salvo cc_messages (despertador CI-3; el transporte sigue siendo Edge)');
 end $t$;
 rollback;
