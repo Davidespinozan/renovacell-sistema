@@ -113,7 +113,8 @@ describe('apertura automática del chat del doctor', () => {
     render(<><Catalogo carrito={s.carrito} /><ChatFlotante cliente={s.chat} intervaloMs={600_000} /></>); await esperar()
     expect(abierto()).toBe(0)
     // Y aunque llegara una réplica de la misma señal, el carrito ya se presentó en esta sesión.
-    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1' })).toBe(false)
+    expect(sessionStorage.getItem('rc_chat_handoff_abierto:K1:2')).toBe('1')   // CI-2 · episodio = carrito + rev del servidor
+    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1', episodio: 'K1:2' })).toBe(false)
   })
 
   it('J · una asesoría humana que ya existe no abre nada al cargar, y un carrito nuevo trae ya_en_curso (sin abrir)', async () => {

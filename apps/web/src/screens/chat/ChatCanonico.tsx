@@ -11,6 +11,7 @@ import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
 import { diaEtiqueta, etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
 import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
+import { primerNombre } from '../../lib/nombres'
 
 interface Props {
   embebido?: boolean                 // dentro del portal (tarjeta a página completa)
@@ -38,26 +39,26 @@ export function subtituloDe(conv: Conversacion | null, asesor: boolean): string 
   const modo = conv.modo
   if (asesor) return `${ETIQUETA_MODO[modo]}${conv.asesor_nombre && modo !== 'ai_active' ? ` · ${conv.asesor_nombre}` : ''}`
   const nombre = conv.asesor_nombre?.trim() || null
-  const fuera = conv.handoff?.fuera_horario
+  // CI-2 · sin prometer tiempos ni horarios (el horario puede no estar configurado): solo lo que el servidor confirmó.
   switch (modo) {
     case 'ai_active':
     case 'human_offered': return 'Asistente Renovacell'
-    case 'human_requested': return fuera === true ? 'Te atenderá un asesor en horario de atención · el asistente sigue contigo' : 'Buscando a tu asesor · el asistente sigue contigo'
-    case 'human_assigned': return fuera === true ? `${nombre ?? 'Tu asesor'} te responderá en horario de atención · el asistente sigue contigo` : `${nombre ?? 'Tu asesor'} se unirá pronto · el asistente sigue contigo`
+    case 'human_requested': return 'Avisamos a nuestro equipo comercial · el asistente sigue contigo'
+    case 'human_assigned': return `Avisamos a ${primerNombre(nombre) ?? 'tu asesor'} · el asistente sigue contigo`
     case 'human_active': return nombre ? `${nombre} · ${ETIQUETA_ASESOR}` : `Con tu ${ETIQUETA_ASESOR.toLowerCase()}`
     case 'human_ended': return 'Asesoría terminada · escribe para seguir con el asistente'
   }
 }
 
-/** Tarjeta conversacional del handoff (sustituye al banner operativo). Copia veraz según horario del servidor. */
-function textoHandoff(conv: Conversacion): { titulo: string; detalle: string } {
-  const nombre = conv.asesor_nombre?.trim() || null
-  const h = conv.handoff
-  const detalle = 'Mientras tanto puedes seguir hablando con el asistente.'
-  if (h?.asignado && h.fuera_horario !== true) return { titulo: `${nombre ?? 'Tu asesor personal'} se unirá a esta conversación.`, detalle }
-  if (h?.fuera_horario === true) return { titulo: `${nombre ?? 'Tu asesor'} te responderá en horario de atención.`, detalle }
-  if (h?.fuera_horario === false) return { titulo: 'Te conectaremos con un asesor personal.', detalle }
-  return { titulo: 'Registramos tu solicitud de asesor; te avisaremos aquí cuando se una.', detalle }
+/**
+ * CI-2 · Tarjeta de atención comercial (sustituye al aviso del sistema en el hilo actual). Fija e inmediata:
+ * confirma que se avisó al equipo y que la IA sigue disponible. Nombra a la asesora solo si el servidor la
+ * asignó; nunca promete tiempos ni horarios.
+ */
+export function textoHandoff(conv: Pick<Conversacion, 'asesor_nombre' | 'handoff'>): { titulo: string; detalle: string } {
+  const nombre = conv.handoff?.asignado ? primerNombre(conv.asesor_nombre) : null
+  if (nombre) return { titulo: `Ya avisé a ${nombre}, tu ${ETIQUETA_ASESOR.toLowerCase()}.`, detalle: 'Mientras se incorpora, puedo ayudarte con productos, disponibilidad y formas de pago.' }
+  return { titulo: 'Ya avisé a nuestro equipo comercial.', detalle: 'Mientras tu asesor se incorpora, puedo ayudarte con productos, disponibilidad y formas de pago.' }
 }
 
 // Separadores de día con el reloj del NEGOCIO (data/periodo.ts): "Hoy"/"Ayer" según el día de Mazatlán, no el del dispositivo.

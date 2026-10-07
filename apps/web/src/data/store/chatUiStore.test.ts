@@ -9,7 +9,7 @@ beforeEach(() => { sessionStorage.clear(); chatUi.reset() })
 
 describe('handoffNuevoDe', () => {
   it('1 · handoff solicitado confirmado por el servidor ⇒ abrir', () => {
-    expect(handoffNuevoDe({ ...base, handoff: { estado: 'solicitado', conversation_id: 'C1', asignado: true } })).toEqual({ conversationId: 'C1', cartId: 'K1' })
+    expect(handoffNuevoDe({ ...base, handoff: { estado: 'solicitado', conversation_id: 'C1', asignado: true } })).toEqual({ conversationId: 'C1', cartId: 'K1', episodio: 'K1:2' })
   })
   it('2 · reintento idempotente ⇒ no reabre aunque traiga el handoff original', () => {
     expect(handoffNuevoDe({ ...base, idempotente: true, handoff: { estado: 'solicitado', conversation_id: 'C1' } })).toBeNull()
@@ -28,15 +28,23 @@ describe('handoffNuevoDe', () => {
 })
 
 describe('store de presentación', () => {
-  it('5 · una solicitud por carrito por sesión del navegador; consumir la limpia', () => {
-    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1' })).toBe(true)
+  it('5 · una apertura por EPISODIO por pestaña; consumir la limpia', () => {
+    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1', episodio: 'K1:2' })).toBe(true)
     const s = chatUi.getSnapshot()!
     expect(s.cartId).toBe('K1')
     chatUi.consumir(s.id)
     expect(chatUi.getSnapshot()).toBeNull()
-    marcarAbiertoPara('K1')
-    expect(yaAbiertoPara('K1')).toBe(true)
-    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1' })).toBe(false)
+    marcarAbiertoPara('K1:2')
+    expect(yaAbiertoPara('K1:2')).toBe(true)
+    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1', episodio: 'K1:2' })).toBe(false)
     expect(chatUi.getSnapshot()).toBeNull()
+  })
+  it('CI-2 · un episodio NUEVO del mismo carrito (otro rev) sí abre: el carrito no queda bloqueado para siempre', () => {
+    marcarAbiertoPara('K1:2')
+    expect(chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1', episodio: 'K1:9' })).toBe(true)
+  })
+  it('CI-2 · el episodio sale del servidor (carrito + rev); sin rev no se inventa', () => {
+    expect(handoffNuevoDe({ ...base, rev: 9, handoff: { estado: 'solicitado', conversation_id: 'C1' } })?.episodio).toBe('K1:9')
+    expect(handoffNuevoDe({ ...base, rev: undefined as unknown as number, handoff: { estado: 'solicitado', conversation_id: 'C1' } })).toBeNull()
   })
 })

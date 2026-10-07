@@ -131,7 +131,7 @@ export function HomePreview() {
   useEffect(() => {
     if (!listo || (vista !== 'autoapertura' && vista !== 'cerrado')) return
     try { sessionStorage.clear() } catch { /* sin storage */ }
-    const t1 = setTimeout(() => chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K-' + Date.now() }), 700)
+    const t1 = setTimeout(() => chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K', episodio: 'K:' + Date.now() }), 700)
     const t2 = vista === 'cerrado' ? setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })), 1300) : undefined
     return () => { clearTimeout(t1); if (t2) clearTimeout(t2) }
   }, [listo, vista])

@@ -45,8 +45,8 @@ describe('encabezado', () => {
     expect(screen.getByTestId('btn-minimizar')).toBeTruthy()
   })
   it('12 · asesor asignado, IA sigue: copia natural con el nombre, sin "Ventas"', () => {
-    expect(subtituloDe(conv({ modo: 'human_assigned', asesor_nombre: 'Lucía', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: true } }), false)).toBe('Lucía se unirá pronto · el asistente sigue contigo')
-    expect(subtituloDe(conv({ modo: 'human_requested', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: true, asignado: false, puede_rechazar: true } }), false)).toMatch(/horario de atención · el asistente sigue contigo/)
+    expect(subtituloDe(conv({ modo: 'human_assigned', asesor_nombre: 'Lucía', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: true } }), false)).toBe('Avisamos a Lucía · el asistente sigue contigo')
+    expect(subtituloDe(conv({ modo: 'human_requested', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: true, asignado: false, puede_rechazar: true } }), false)).toBe('Avisamos a nuestro equipo comercial · el asistente sigue contigo')   // CI-2 · sin inventar horarios
   })
   it('13 · humano activo: "Lucía · Asesora"', () => {
     expect(subtituloDe(conv({ modo: 'human_active', asesor_nombre: 'Lucía' }), false)).toBe('Lucía · Asesora')
@@ -82,7 +82,7 @@ describe('hilo', () => {
     render(<ChatCanonico panel embebido cliente={f.cliente} conCarrito={false} intervaloMs={60_000} />)
     const card = await screen.findByTestId('aviso-handoff')
     expect(card.className).toContain('rc-card')
-    expect(card).toHaveTextContent('Lucía se unirá a esta conversación.')   // asignada; horario sin configurar ⇒ sin promesa de tiempo
+    expect(card).toHaveTextContent('Ya avisé a Lucía, tu asesora.')   // CI-2 · asignada ⇒ su nombre; sin promesa de tiempo
     expect(screen.getByTestId('btn-rechazar-asesor')).toHaveTextContent('Seguir solo con el asistente')
     expect(screen.queryByTestId('msg-system')).toBeNull()                       // sin duplicar: la tarjeta ocupa su lugar
     expect(screen.getByTestId('msg-doctor').className).toContain('rc-msg--own')

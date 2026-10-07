@@ -31,8 +31,9 @@ describe('V2-A · apertura y actividad', () => {
     const l = codigo(lanzadorSrc)
     expect(l).toMatch(/if \(!visible\) \{ chatUi\.consumir\(solicitud\.id\); return \}/)
     // Chat V2-C4 · V2-A pasa por la autoridad única: si ya está abierto no reabre; marca el carrito solo si de verdad abrió.
-    expect(l).toMatch(/if \(abiertoRef\.current\) \{ handoffPendiente\.current = null; return \}/)
-    expect(l).toMatch(/if \(abrirAuto\(\)\) marcarAbiertoPara\(cartId\)/)
+    // CI-2 · dedupe por EPISODIO (no por carrito): si ya está abierto no reabre; marca el episodio solo si de verdad abrió.
+    expect(l).toMatch(/if \(abiertoRef\.current\) \{ handoffPendiente\.current = null; dejarDeVigilar\(\); return \}/)
+    expect(l).toMatch(/if \(abrirAuto\(\)\) marcarAbiertoPara\(episodio\)/)
     expect(l).not.toMatch(/new Notification|Notification\.requestPermission/)
     expect((l.match(/<ChatCanonico /g) ?? []).length).toBe(1)
   })
