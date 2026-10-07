@@ -4,11 +4,13 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Send, X } from 'lucide-react'
+import { ChevronDown, History, Send, X } from 'lucide-react'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
+import { diaEtiqueta, etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
+import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
 
 interface Props {
   embebido?: boolean                 // dentro del portal (tarjeta a página completa)
@@ -23,11 +25,11 @@ interface Props {
   onLeido?: (seq: number) => void    // UX-1 · avisa el cursor que se marcó leído (el lanzador apaga su badge)
   etiquetaSalir?: string
   autoFoco?: boolean                 // UX V2-B · al abrir el cajón, el foco entra al redactor
+  nombreCliente?: string | null      // Chat V2-C3 · nombre del dueño que manda el servidor (vista del personal)
 }
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
 export const ETIQUETA_ASESOR = 'Asesora'
-const NOMBRE_ACTOR: Record<Mensaje['actor'], string> = { visitor: 'Tú', doctor: 'Tú', seller: 'Asesor', admin: 'Renovacell', ai: 'Asistente', system: '' }
 
 /** Subtítulo del encabezado: UN estado en lenguaje natural, decidido por lo que manda el servidor. */
 export function subtituloDe(conv: Conversacion | null, asesor: boolean): string {
@@ -69,8 +71,13 @@ const diaDe = (iso: string): string => {
 const horaDe = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: ZONA_NEGOCIO }) }
 
 type Pendiente = { clientId: string; texto: string; error: string | null }
+// Chat V2-C3 · ACTUAL = la conversación viva; HISTORIAL = lista/lector de solo lectura (mismo contenedor).
+type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false }: Props) {
+/** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
+export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
+
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -81,6 +88,15 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const fin = useRef<HTMLDivElement | null>(null)
   const area = useRef<HTMLTextAreaElement | null>(null)
   const ultimoSeq = useRef(0)
+  // Chat V2-C3 · historial: vista, caché por sesión (cerradas = inmutables), cursor de lectura diferido y aviso.
+  const [vista, setVista] = useState<Vista>({ tipo: 'actual' })
+  const enHistorial = useRef(false)
+  const porLeer = useRef(0)            // máximo seq de ACTUAL recibido mientras HISTORIAL estaba visible (sin `leido`)
+  const anunciado = useRef(0)          // máximo seq ajeno ya avisado (dedupe del aviso por seq)
+  const [nuevoActual, setNuevoActual] = useState(false)
+  const cache = useRef(new Map<string, CacheSesion>())
+  const botonHist = useRef<HTMLButtonElement | null>(null)
+  const visor: Visor = asesor ? 'personal' : 'cliente'
 
   const cargar = useCallback(async (id: string, desde = 0) => {
     const r = await cliente.leer(id, desde)
@@ -94,8 +110,28 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       return { ...r.data, mensajes: [...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))] }
     })
     const max = r.data.mensajes.reduce((s, m) => Math.max(s, m.seq), desde)
-    if (max > ultimoSeq.current) { ultimoSeq.current = max; void cliente.leido(id, max); onLeido?.(max) }
+    if (max <= ultimoSeq.current) return
+    ultimoSeq.current = max
+    if (enHistorial.current) {
+      // Chat V2-C3 · con HISTORIAL visible NO se marca leído; actividad ajena nueva → aviso (una vez por seq).
+      porLeer.current = max
+      const ajeno = r.data.mensajes.reduce((s, m) => (m.propio ? s : Math.max(s, m.seq)), 0)
+      if (ajeno > anunciado.current) { anunciado.current = ajeno; setNuevoActual(true) }
+      return
+    }
+    void cliente.leido(id, max); onLeido?.(max)
   }, [cliente, onLeido])
+
+  const abrirHistorial = (sesion: string | null) => {
+    enHistorial.current = true; anunciado.current = ultimoSeq.current; porLeer.current = 0
+    setNuevoActual(false); setVista({ tipo: 'historial', sesion })
+  }
+  const volverActual = () => {
+    enHistorial.current = false; setNuevoActual(false); setVista({ tipo: 'actual' })
+    // De vuelta en ACTUAL: lectura normal de lo que llegó mientras tanto.
+    if (convId && porLeer.current > 0) { const s = porLeer.current; porLeer.current = 0; void cliente.leido(convId, s); onLeido?.(s) }
+    window.setTimeout(() => botonHist.current?.focus(), 0)
+  }
 
   // Abrir/reanudar (dueño) o cargar la asignada (asesor).
   useEffect(() => {
@@ -131,7 +167,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     alFinal()
     const raf = requestAnimationFrame(alFinal); const t = window.setTimeout(alFinal, 180)
     return () => { cancelAnimationFrame(raf); window.clearTimeout(t) }
-  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal])
+  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal, vista])
   useEffect(() => { if (autoFoco && !cargando) area.current?.focus() }, [autoFoco, cargando])
 
   const modo: ModoConversacion = conv?.modo ?? 'ai_active'
@@ -139,6 +175,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const soyAsesor = asesor && (conv?.rol === 'asesor' || conv?.rol === 'supervisor')
   const puedoEscribir = !!conv && !cerrada && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
+  const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
 
   // Enviar con idempotencia: el MISMO client_message_id en cada reintento → nunca se duplica.
   const enviarTexto = async (t: string, clientId: string) => {
@@ -171,7 +208,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   }
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
 
-  const mensajes = useMemo(() => conv?.mensajes ?? [], [conv])
+  const mensajes = useMemo(() => mensajesActuales(conv), [conv])
   const handoffVivo = !asesor && !!conv && !cerrada && !!conv.handoff?.origen && (modo === 'human_requested' || modo === 'human_assigned')
   // La tarjeta de handoff ocupa el lugar del último aviso del sistema (el servidor lo publica junto con el
   // handoff): así no hay banner + aviso duplicados. Si no hubiera aviso, la tarjeta va al final del hilo.
@@ -208,7 +245,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     const clave = m.propio ? 'own' : m.actor
     const inicio = clave !== actorPrevio
     actorPrevio = clave
-    const etiqueta = m.propio ? null : m.actor === 'seller' ? `${nombreAsesor ?? NOMBRE_ACTOR.seller} · ${ETIQUETA_ASESOR}` : NOMBRE_ACTOR[m.actor]
+    const etiqueta = etiquetaActor(m, visor, { nombreCliente, nombreAsesor, etiquetaAsesor: ETIQUETA_ASESOR })
     hilo.push(
       <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}`} data-testid={`msg-${m.actor}`}>
         {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden>R</span>}
@@ -225,7 +262,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   if (!asesor && conv && !cerrada && modo === 'human_active') hilo.push(<div key="join" className="rc-join" data-testid="aviso-asesor-activo"><span>{nombreAsesor ?? 'Tu asesor'} está contigo</span></div>)
 
   return (
-    <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}`} data-testid="chat-canonico">
+    <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}`} data-testid="chat-canonico"
+      onKeyDown={(e) => { if (e.key === 'Escape' && vista.tipo === 'historial') { e.stopPropagation(); volverActual() } }}>
       <header className="rc-head">
         <div className="rc-mark" aria-hidden>R</div>
         <div className="rc-title">
@@ -233,13 +271,17 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           <div className="rc-state" data-testid="chat-modo">{subtituloDe(conv, asesor)}</div>
         </div>
         <div className="rc-actions">
-          {soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
+          {conv?.sesion && convId && (
+            <button type="button" ref={botonHist} className={`rc-ico rc-ico--hist${vista.tipo === 'historial' ? ' rc-ico--on' : ''}`} onClick={() => (vista.tipo === 'historial' ? volverActual() : abrirHistorial(null))}
+              aria-label="Conversaciones anteriores" aria-pressed={vista.tipo === 'historial'} title="Conversaciones anteriores" data-testid="btn-historial"><History size={18} /></button>
+          )}
+          {vista.tipo === 'actual' && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.iniciar(convId!))} data-testid="btn-iniciar">Iniciar asesoría</button>
           )}
-          {soyAsesor && conv && (modo === 'human_active' || modo === 'human_assigned') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
+          {vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_assigned') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.terminar(convId!))} data-testid="btn-terminar">Terminar asesoría</button>
           )}
-          {conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
+          {vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
           )}
           {onSalir && panel && <button type="button" className="rc-ico" onClick={onSalir} aria-label="Minimizar" title="Minimizar" data-testid="btn-minimizar"><ChevronDown size={18} /></button>}
@@ -247,6 +289,18 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         </div>
       </header>
 
+      {vista.tipo === 'historial' && convId ? (
+        <>
+          {nuevoActual && (
+            <div className="rc-hist-aviso" role="status" aria-live="polite" data-testid="aviso-nuevo-actual">
+              <span>Nuevo mensaje en la conversación actual</span>
+              <button type="button" className="rc-link" onClick={volverActual} data-testid="aviso-nuevo-ver">Ver</button>
+            </div>
+          )}
+          <HistorialConversacion key={`${convId}:${vista.sesion ?? ''}`} conversationId={convId} lector={cliente} visor={visor} nombreCliente={nombreCliente}
+            cache={cache.current} inicial={vista.sesion} onActual={volverActual} />
+        </>
+      ) : (<>
       {conCarrito && convId && conv && (
         // Dueño: su carrito activo ligado a esta conversación. Asesor/Dirección: el carrito del dueño, solo lectura (el servidor lo decide).
         <CarritoPanel conversationId={asesor ? null : convId} cartId={asesor ? conv.cart_id ?? null : null} soloLectura={asesor} cliente={clienteCarrito} />
@@ -254,6 +308,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
       <div className="rc-thread" aria-live="polite">
         {cargando && <div className="rc-sys">Cargando conversación…</div>}
+        {!cargando && anterior && (
+          <div className="rc-anterior" data-testid="tarjeta-anterior">
+            <span>{asesor ? 'Conversación anterior' : 'Tu conversación anterior'}{diaEtiqueta(anterior.closed_at ?? anterior.opened_at) ? ` · ${diaEtiqueta(anterior.closed_at ?? anterior.opened_at)}` : ''}</span>
+            <button type="button" className="rc-link" onClick={() => abrirHistorial(anterior.id)} data-testid="tarjeta-anterior-ver">Ver</button>
+          </div>
+        )}
         {!cargando && mensajes.length === 0 && !error && !pendiente && (
           <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="msg-bienvenida"><span className="rc-avatar" aria-hidden>R</span><div className="rc-bubble-wrap"><div className="rc-meta">Asistente</div><div className="rc-bubble">{asesor ? 'Sin mensajes todavía.' : 'Hola, soy el asistente de Renovacell. ¿En qué te ayudo?'}</div></div></div>
         )}
@@ -290,6 +350,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       {!asesor && conv && !cerrada && modo === 'human_ended' && (
         <div className="rc-foot"><button type="button" className="rc-link" onClick={() => accion(() => cliente.reanudarIA(convId!))} data-testid="btn-reanudar">Seguir con el asistente</button></div>
       )}
+      </>)}
     </div>
   )
 }

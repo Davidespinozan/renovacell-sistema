@@ -70,7 +70,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
-      <ChatCanonico embebido asesor conversationId={abierta} cliente={cliente} autoFoco={enfocar} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
+      <ChatCanonico embebido asesor conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )
 

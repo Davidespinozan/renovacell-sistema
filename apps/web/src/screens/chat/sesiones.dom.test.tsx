@@ -14,7 +14,7 @@ const base = (x: Partial<Conversacion>): Conversacion => ({ conversation_id: 'C1
 describe('sesión actual', () => {
   it('al cambiar de sesión el hilo se reemplaza (no se mezclan sesiones)', async () => {
     let fase = 1
-    const s1 = base({ ultimo_seq: 2, mensajes: [msg(1, 'Hola ayer'), msg(2, 'Respuesta de ayer')], sesion: { id: 'S1', ordinal: 1, estado: 'cerrada', origen: 'cliente', opened_at: 'x', closed_at: 'y', close_reason: 'asesor_finalizo' } })
+    const s1 = base({ ultimo_seq: 2, mensajes: [msg(1, 'Hola ayer'), msg(2, 'Respuesta de ayer')], sesion: { id: 'S1', ordinal: 1, estado: 'abierta', origen: 'cliente', opened_at: 'x', closed_at: null, close_reason: null } })
     const s2 = base({ ultimo_seq: 4, mensajes: [msg(3, 'Hola hoy'), msg(4, 'Respuesta de hoy')], sesion: { id: 'S2', ordinal: 2, estado: 'abierta', origen: 'cliente', opened_at: 'z', closed_at: null, close_reason: null } })
     const cliente = new ClienteChat(async (_fn, { body }) => {
       const a = body.action as string

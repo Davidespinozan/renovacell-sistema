@@ -11,7 +11,8 @@ import {
   estadoVerificacion, lineaDomicilio, type Cliente360, type ClienteC360, type Pestana,
 } from '../data/ops/customer360'
 import { atencion as atencionPorDefecto, type ClienteAtencion, type Vendedor } from '../data/ops/atencion'
-import { ETIQUETA_MODO, type ModoConversacion } from '../data/ops/chat'
+import { chat as chatPorDefecto, ETIQUETA_MODO, type ModoConversacion } from '../data/ops/chat'
+import { HistorialConversacion, type CacheSesion, type LectorSesiones } from '../screens/chat/HistorialSesiones'   // Chat V2-C3
 import { TelefonosEditor, DomiciliosEditor, PerfilesFiscalesEditor, ContactoEditor, NotasPanel } from './Cliente360Editores'
 
 function Section({ icon, title, aside, children }: { icon: React.ReactNode; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
@@ -39,8 +40,8 @@ function Field({ label, value, note }: { label: string; value: string | null | u
 const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 18px' }
 const ESTADO_PAGO: Record<string, string> = { pagado: 'Pagado', pendiente: 'Pendiente', parcial: 'Parcial', credito: 'A crédito', liberado: 'Liberado' }
 
-export function Customer360Page({ customerId, onBack, canOrder = false, onOrder, onAsesorias, cliente = clientePorDefecto, atencion = atencionPorDefecto, inicial }: {
-  customerId: string; inicial?: { nombre: string; email?: string | null; portal: boolean }; onBack: () => void; canOrder?: boolean; onOrder?: () => void; onAsesorias?: () => void; cliente?: ClienteC360; atencion?: ClienteAtencion
+export function Customer360Page({ customerId, onBack, canOrder = false, onOrder, onAsesorias, cliente = clientePorDefecto, atencion = atencionPorDefecto, inicial, lectorChat = chatPorDefecto }: {
+  customerId: string; inicial?: { nombre: string; email?: string | null; portal: boolean }; onBack: () => void; canOrder?: boolean; onOrder?: () => void; onAsesorias?: () => void; cliente?: ClienteC360; atencion?: ClienteAtencion; lectorChat?: LectorSesiones
 }) {
   const { data, loading, error, recargar } = useCustomer360(customerId, cliente)
   const [tab, setTab] = useState<Pestana>('resumen')
@@ -101,7 +102,7 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
             {tab === 'pedidos' && <Pedidos d={data} />}
             {tab === 'pagos' && <Pagos d={data} />}
             {tab === 'facturas' && <Facturas d={data} />}
-            {tab === 'conversacion' && <Conversacion d={data} onAsesorias={onAsesorias} />}
+            {tab === 'conversacion' && <Conversacion d={data} onAsesorias={onAsesorias} lector={lectorChat} />}
             {tab === 'actividad' && <Actividad d={data} />}
           </div>
         </>
@@ -253,8 +254,11 @@ const Facturas = ({ d }: { d: Cliente360 }) => (
     <Tabla cols={['Pedido', 'Tipo', 'Estado', 'Serie-folio', 'UUID', 'Total', 'Fecha']} vacio="Sin facturas." filas={d.facturas.map((f) => [f.pedido ?? '—', f.tipo, f.estado, [f.serie, f.folio].filter(Boolean).join('-') || '—', <span key="u" className="mono" style={{ fontSize: 11 }}>{f.uuid ?? '—'}</span>, f.total != null ? money(f.total) : '—', fmtDate(f.fecha)])} />
   </Section>
 )
-function Conversacion({ d, onAsesorias }: { d: Cliente360; onAsesorias?: () => void }) {
+function Conversacion({ d, onAsesorias, lector }: { d: Cliente360; onAsesorias?: () => void; lector: LectorSesiones }) {
   const c = d.comercial?.conversacion
+  // Chat V2-C3 · historial de sesiones de SOLO LECTURA (la autoridad —cartera/Dirección— la decide el servidor).
+  const [verHist, setVerHist] = useState(false)
+  const [cache] = useState(() => new Map<string, CacheSesion>())
   return (
     <Section icon={<MessageCircle size={15} />} title="Conversación (CC)">
       {!c ? <Empty>Este cliente aún no ha conversado con Renovacell.</Empty> : (
@@ -265,8 +269,19 @@ function Conversacion({ d, onAsesorias }: { d: Cliente360; onAsesorias?: () => v
           <Field label="Origen" value={c.origen === 'carrito' ? 'Activó un carrito' : c.origen === 'manual' ? 'Pidió asesor' : null} />
         </div>
       )}
-      {c && onAsesorias && <button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={onAsesorias} data-testid="c360-asesorias">Abrir en Asesorías</button>}
-      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>El historial de mensajes vive en la conversación canónica; aquí no se duplica.</div>
+      {c && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          {!verHist && <button type="button" className="btn sm" style={{ minHeight: 44 }} onClick={() => setVerHist(true)} data-testid="c360-historial">Ver historial</button>}
+          {onAsesorias && <button type="button" className="btn ghost sm" style={{ minHeight: 44 }} onClick={onAsesorias} data-testid="c360-asesorias">Abrir en Asesorías</button>}
+        </div>
+      )}
+      {c && verHist && (
+        <div className="rc-chat rc-hist-c360" data-testid="c360-historial-panel">
+          <HistorialConversacion conversationId={c.id} lector={lector} visor="personal" nombreCliente={d.resumen.nombre} cache={cache}
+            onActual={() => setVerHist(false)} etiquetaVolver="Cerrar historial" etiquetaFin="Cerrar historial" />
+        </div>
+      )}
+      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>El historial vive en la conversación canónica (solo lectura aquí); no se duplica.</div>
     </Section>
   )
 }
