@@ -106,7 +106,12 @@ begin
   insert into public.customers (id, full_name, active, meta)
   values (gen_random_uuid(), 'Cliente Fiscal', true,
           jsonb_build_object('fiscal', tests.fiscal('BBB010101BB1'))) returning id into v_c;
-  update public.orders set customer_id = v_c where id = v_o;
+  -- CX-0b (136): la cuenta de un pedido no se cambia después de creado (ni con service_role). El pedido cuyo cliente tiene
+  -- maestro fiscal NACE con esa cuenta (mismo pedido que tests.order: 1 × 100, pendiente); las aserciones no cambian.
+  v_o := gen_random_uuid();
+  insert into public.orders (id, external_ref, doctor_id, customer_id, total, status, payment_method, payment_status)
+  values (v_o, 'T' || left(v_o::text, 6), v_doctor, v_c, 100, 'pending_payment', 'transferencia', 'pending');
+  insert into public.order_items (order_id, product_id, qty, unit_price) values (v_o, v_p, 1, 100);
   perform tests.act_as(v_admin);
   v_d := (public.solicitar_cfdi(gen_random_uuid(), v_o, null)->>'doc_id')::uuid;
   perform tests.eq((select receiver->>'rfc' from public.fiscal_documents where id = v_d), 'BBB010101BB1',

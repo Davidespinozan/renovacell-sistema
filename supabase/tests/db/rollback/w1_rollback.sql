@@ -29,7 +29,8 @@ begin
   perform tests.eq((select md5(string_agg(tablename||'|'||policyname||'|'||cmd||'|'||roles::text||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by tablename, policyname))
                       from pg_policies where schemaname = 'public'
                        and tablename in ('lots','inventory_movements','replenishments','order_items','orders','shipping_attempts','refunds','shipments')),
-                   '8b0fd14798994ec1d0985e0dc3bd936e', 'rollback restaura las políticas RLS igual a prod');
+                   -- re-anclado CX-0b (136): sin política orders_insert_scoped ni INSERT de authenticated en orders (ajeno a W1/W2; no se restaura con su rollback)
+                   '3832889bf506f3aec4dba4db18ecc80f', 'rollback restaura las políticas RLS igual a prod');
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('lots','inventory_movements','replenishments','order_items','orders','shipping_attempts')

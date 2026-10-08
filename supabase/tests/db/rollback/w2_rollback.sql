@@ -22,12 +22,14 @@ begin
   end loop;
   perform tests.eq((select md5(string_agg(tablename||'|'||policyname||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by tablename, policyname))
                       from pg_policies where schemaname = 'public' and tablename in ('cash_closings','orders','refunds','payment_entries')),
-                   'f5c690093c880ee64a9a25bfdbfc16e6', 'rollback W2: políticas iguales a W1');
+                   -- re-anclado CX-0b (136): sin política orders_insert_scoped ni INSERT de authenticated en orders (ajeno a W1/W2; no se restaura con su rollback)
+                   'c382039ed0c5ad898b3fa9b680abe893', 'rollback W2: políticas iguales a W1');
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('cash_closings','orders','refunds') and grantee in ('anon','authenticated')),
                    -- CC-0B (autorizado): misma razón que en w1_rollback — la higiene de privilegios persiste.
-                   '91bade8e1a52e7cd398eec886eba795a', 'rollback W2: grants iguales a W1 (post CC-0B)');
+                   -- re-anclado CX-0b (136): sin política orders_insert_scoped ni INSERT de authenticated en orders (ajeno a W1/W2; no se restaura con su rollback)
+                   'a0c3140d1ec516ac70dc3f7906edcd81', 'rollback W2: grants iguales a W1 (post CC-0B)');
   perform tests.eq((select md5(string_agg(table_name||'|'||column_name||'|'||data_type, E'\n' order by table_name, column_name))
                       from information_schema.columns where table_schema = 'public' and table_name in ('orders','refunds','cash_closings')),
                    '21277584fe14cf4d1d058f51f184105c', 'rollback W2: columnas iguales a W1');
