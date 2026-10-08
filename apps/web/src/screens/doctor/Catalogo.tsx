@@ -23,6 +23,7 @@ import type { PedidoCreado } from '../../data/store/ordersStore'
 import { reloadOrders } from '../../data/store/ordersStore'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
 import { CheckoutCanonico, domicilioLegadoDelDoctor, type MotorLocal } from '../checkout/CheckoutCanonico'
+import { BarraCarrito } from './BarraCarrito'
 import type { ConfigServidor, ResultadoPedido } from '../checkout/checkoutMotor'
 
 
@@ -205,6 +206,14 @@ export function Catalogo() {
       {/* DERECHA: pedido en curso */}
       {hasSupabase && canon.error && <div role="alert" className="sysnote" style={{ gridColumn: '1 / -1' }}>{canon.error}</div>}
       <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
+      {/* MC-3 · barra contextual en móvil: mismo carrito, mismo checkout. Se oculta con checkout/modal abierto y con un
+          carrito que no es el activo del servidor (convertido o inaccesible). Total = el mismo estimado del panel. */}
+      <BarraCarrito
+        unidades={lines.reduce((n, l) => n + l.qty, 0)}
+        totalEstimado={lines.length ? total : null}
+        bloqueada={checkout || !!openFamily || (hasSupabase && (!canon.cart || canon.cart.estado !== 'active'))}
+        onRevisar={() => setCheckout(true)}
+      />
 
       {checkout && (
         <CheckoutCanonico

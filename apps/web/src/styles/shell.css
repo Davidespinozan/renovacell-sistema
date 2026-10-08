@@ -505,3 +505,26 @@ body.chat-open{overflow:hidden}
   @keyframes chatsheetup{from{transform:translateY(100%)}to{transform:none}}
   body:has(.chat-drawer-wrap) .bnav{display:none}
 }
+
+/* ── MC-3 · Barra contextual del carrito (Catálogo, móvil) ──────────────────────────────────────────────────
+   Sobre la navegación inferior (≈72px + safe-area), debajo de la burbuja/vista previa (que suben mientras la barra
+   está visible: body.rc-barra-carrito, gestionada por el componente). La visibilidad la decide el estado; estas
+   reglas son solo respaldo (escritorio, overlays, hojas y chat abierto). */
+.rc-cart-bar{display:none}
+@media (max-width:900px){
+  .rc-cart-bar{display:flex;align-items:center;gap:10px;position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:56;
+    min-height:56px;padding:8px 8px 8px 14px;border-radius:16px;background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:0 12px 30px rgba(0,0,0,.22);animation:rcbarra .22s ease-out}
+  .rc-cart-bar-ico{width:20px;height:20px;flex:none;color:var(--green-deep)}
+  .rc-cart-bar-txt{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.25}
+  .rc-cart-bar-n{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rc-cart-bar-total{font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rc-cart-bar-total b{color:var(--ink);font-weight:700}
+  .rc-cart-bar-btn{flex:none;min-height:44px;padding:0 14px;white-space:nowrap}
+  @media (max-width:360px){.rc-cart-bar{gap:8px;padding-left:10px}.rc-cart-bar-lbl{display:none}.rc-cart-bar-btn{padding:0 11px}}   /* 320px: el monto estimado completo antes que la palabra "Total" */
+  body.rc-barra-carrito .canvas{padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))!important}
+  body.rc-barra-carrito .chat-fab{bottom:calc(160px + env(safe-area-inset-bottom,0px))}
+  body.rc-barra-carrito .chat-vista-zona{bottom:calc(160px + env(safe-area-inset-bottom,0px))}
+  body:has(.overlay) .rc-cart-bar, body:has(.sheet-wrap) .rc-cart-bar, body:has(.chat-drawer-wrap) .rc-cart-bar, body.chat-open .rc-cart-bar, body.drawer-open .rc-cart-bar{display:none}
+}
+@keyframes rcbarra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rc-cart-bar{animation:none}}
