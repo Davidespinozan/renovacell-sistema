@@ -23,6 +23,8 @@ import { useSaludSistema } from '../data/hooks/useSaludSistema'
 import { useAtencionComercial, fuenteComercial, type EstadoAtencionComercial } from '../data/store/atencionStore'   // CHV2-B
 import { solicitudesVendedor, activasVendedor, intervencionDireccion, TEXTO_HORARIO_PENDIENTE } from '../data/ops/atencionComercial'
 import { tieneCfdi } from '../data/ops/cfdi'
+import { clasificarDeclaraciones } from '../data/ops/pagosPendientes'
+import { useRevisionEconomica } from '../data/hooks/useRevisionEconomica'
 import { hasSupabase, currentUserId } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
@@ -86,7 +88,8 @@ function useTareasBase(): Task[] {
       if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
       if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos y muévelos por el pipeline.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
       // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
-      const transferPend = claims.filter((c) => c.status === 'reportado')
+      // PAY-EXP-01A-3 · MISMO universo que la lista de "Pagos por validar" (los de pedidos cancelados → Revisión económica).
+      const transferPend = clasificarDeclaraciones(claims, orders).vigentes
       if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Pagos por validar', detail: 'El cliente informó un pago; verifica que cayó y regístralo.', count: transferPend.length, tone: 'warn', screen: 'av_pagos' })
       if (atorados.length) t.push({ id: 'atorados', icon: 'truck', title: 'Envíos atorados', detail: 'Requieren atención en seguimiento.', count: atorados.length, tone: 'dang', screen: 'seguimiento' })
       if (porEmitir.length) t.push({ id: 'cfdi', icon: 'receipt', title: 'CFDI por emitir', detail: 'Pedidos con factura solicitada.', count: porEmitir.length, tone: 'warn', screen: 'av_fin' })
@@ -175,8 +178,8 @@ export function useBandeja(): { tareas: Task[]; fuentes: React.ReactNode; comerc
   const comerciales = useMemo(() => tareasComerciales(est), [est])
   const [extra, setExtra] = useState<Record<string, Task | null>>({})
   const reportar = useCallback((id: string, t: Task | null) => setExtra((m) => (m[id] === t || (m[id] && t && m[id]!.count === t.count && m[id]!.detail === t.detail) ? m : { ...m, [id]: t })), [])
-  const tareas = useMemo(() => [...comerciales, ...base, ...(['mensajes', 'fiscal', 'salud'] as const).map((k) => extra[k]).filter((x): x is Task => !!x)], [comerciales, base, extra])
-  const fuentes = role === 'admin' ? <><FuenteMensajes onTarea={reportar} /><FuenteFiscal onTarea={reportar} /><FuenteSalud onTarea={reportar} /></> : null
+  const tareas = useMemo(() => [...comerciales, ...base, ...(['mensajes', 'fiscal', 'salud', 'revision'] as const).map((k) => extra[k]).filter((x): x is Task => !!x)], [comerciales, base, extra])
+  const fuentes = role === 'admin' ? <><FuenteMensajes onTarea={reportar} /><FuenteFiscal onTarea={reportar} /><FuenteSalud onTarea={reportar} /><FuenteRevision onTarea={reportar} /></> : null
   return { tareas, fuentes, comercialListo: !est.fuente || est.listo }
 }
 
@@ -248,6 +251,19 @@ function FuenteSalud({ onTarea }: { onTarea: Reportar }) {
   useEffect(() => {
     onTarea('salud', visible ? { id: 'salud', icon: 'clock', title: problema ? 'Alertas automáticas con problema' : 'Salud del sistema', detail: detalle, count: 1, tone } : null)
   }, [visible, problema, detalle, tone, onTarea])
+  return null
+}
+
+// PAY-EXP-01A-3 · Revisión económica (solo Dirección/Facturación; el servidor autoriza). Casos abiertos → tarea;
+// si no se pudo consultar, se avisa (un error de lectura NO es "sin casos").
+function FuenteRevision({ onTarea }: { onTarea: Reportar }) {
+  const rev = useRevisionEconomica(hasSupabase)
+  const n = rev.estado === 'listo' ? rev.data.resumen.abiertos : 0
+  const fallo = rev.estado === 'error'
+  useEffect(() => {
+    onTarea('revision', n > 0 ? { id: 'revision', icon: 'shield', title: 'Revisión económica', detail: 'Pedidos cuyo dinero requiere una decisión (cancelados con dinero o comprobante, reembolsos).', count: n, tone: 'dang', screen: 'av_revision' }
+      : fallo ? { id: 'revision', icon: 'shield', title: 'Revisión económica', detail: 'No se pudo consultar; ábrela para reintentar.', count: 1, tone: 'warn', screen: 'av_revision' } : null)
+  }, [n, fallo, onTarea])
   return null
 }
 

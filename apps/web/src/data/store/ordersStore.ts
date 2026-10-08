@@ -559,9 +559,13 @@ export async function reviewTransfer(
     const nuevo = r.status === 'applied'
     if (action === 'confirm') {
       if (nuevo) {
-        notify({ text: `Transferencia confirmada · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
+        // PAY-EXP-01A-3 · "listo para surtir" / "ya entró a preparación" SOLO si el libro dice pagado y el pedido
+        // (releído tras la operación) no está cancelado: un pago parcial o un pedido cancelado no se prepara.
+        const fresco = orders.find((x) => x.id === orderId) ?? o
+        const preparable = r.data.payment_status === 'paid' && fresco.status !== 'cancelled'
+        if (preparable) notify({ text: `Transferencia confirmada · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
         notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)}`, roles: ['admin'], screen: 'av_pagos' })
-        if (o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+        if (preparable && o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
         logAudit({ actor: 'Administración', action: 'Transferencia confirmada', resource: folioOf(orderId) })
       }
     } else if (nuevo) {
@@ -580,6 +584,22 @@ export async function reviewTransfer(
   if (!d.ok) return d
   if (d.effect !== 'noop') applyReviewLocally(orderId, action, reason, d.status)
   return { ok: true, status: d.status }
+}
+
+// PAY-EXP-01A-3 · Revisión de una declaración desde "Revisión económica" (p. ej. de un pedido CANCELADO): el MISMO
+// comando canónico (revisar_pago, por id de declaración). Sin avisos de "listo para surtir" ni "reintenta el pago":
+// un pedido cancelado no se prepara ni admite otro reporte. Verificar reconoce el dinero que sí llegó (F-9) y el caso
+// queda por reembolsar en la revisión; nunca se reembolsa aquí.
+export async function revisarDeclaracion(
+  claimId: string, accion: 'verificar' | 'rechazar', motivo?: string | null, opId: string = newOpId(),
+): Promise<{ ok: boolean; status?: string; error?: string; ambiguous?: boolean }> {
+  if (accion === 'rechazar' && !motivo?.trim()) return { ok: false, error: 'El rechazo necesita un motivo.' }
+  const r = await cmdRevisarPago(opId, { claimId, accion, motivo: motivo ?? null })
+  if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
+  await reloadMoney()
+  await hydrate()
+  if (r.status === 'applied') logAudit({ actor: 'Administración', action: accion === 'verificar' ? 'Declaración verificada (revisión económica)' : 'Declaración rechazada (revisión económica)', resource: claimId, detail: motivo ?? undefined })
+  return { ok: true, status: r.status }
 }
 
 // Espejo local del efecto (SOLO demo, sin backend).

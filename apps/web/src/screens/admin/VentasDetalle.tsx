@@ -2,7 +2,7 @@
 // Portal + ventas POS (mismo store), filtrable. NO es el Tablero ni Trazabilidad.
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -12,6 +12,7 @@ import { useRefunds } from '../../data/hooks/useFinanzas'
 import { useOrderMoney, usePaymentEntries } from '../../data/hooks/useMoney'
 import { useOpId } from '../../data/hooks/useOpId'
 import { autorizarCreditoDePedido, revocarCreditoDePedido } from '../../data/store/ordersStore'
+import { useIntentoVentas, consumirIntentoVentas } from '../../data/store/ventasIntentStore'   // PAY-EXP-01A-3
 import { METODOS, reembolsoPagado, type OrderMoney, type PaymentEntry, type PaymentMethod } from '../../data/ops/money'
 import { etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
@@ -70,6 +71,15 @@ export function VentasDetalle() {
   const [pay, setPay] = useState<PayFilter>('todos')
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
+  // pedido está en la lista de este usuario; se consume una sola vez.
+  const intento = useIntentoVentas()
+  useEffect(() => {
+    if (!intento) return
+    consumirIntentoVentas(intento.id)
+    if (intento.folio) setQ(intento.folio)
+    setSelected(intento.orderId)
+  }, [intento])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase()

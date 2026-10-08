@@ -33,6 +33,7 @@ import { Doctores } from './admin/Doctores' // cockpit de verificación (av_veri
 import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { PagosPorValidar } from './admin/PagosPorValidar'
+import { RevisionEconomica } from './admin/RevisionEconomica'   // PAY-EXP-01A-3
 import { Finanzas } from './admin/Finanzas'
 import { CierreCaja } from './admin/CierreCaja'
 import { Bitacora } from './admin/Bitacora'
@@ -94,6 +95,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_fiscal: () => <RevisionFiscal />,
   av_mensajes: () => <Comunicaciones />,
   av_pagos: () => <PagosPorValidar />,
+  av_revision: () => <RevisionEconomica />,
   av_finanzas: () => <Finanzas />,
   av_cierre: () => <CierreCaja />,
   av_audit: () => <Bitacora />,

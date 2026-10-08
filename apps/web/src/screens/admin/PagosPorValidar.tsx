@@ -13,6 +13,9 @@ import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
 import { reviewTransfer } from '../../data/store/ordersStore'
 import { signedProofUrl } from '../../lib/uploads'
 import { METODOS, type PaymentClaim } from '../../data/ops/money'
+import { clasificarDeclaraciones } from '../../data/ops/pagosPendientes'
+import { useRole } from '../../auth/RoleContext'
+import { reloadOrders } from '../../data/store/ordersStore'
 import type { Profile } from '../../data/types'
 
 const metodoLabel = (m: string): string => METODOS.find((x) => x.value === m)?.label ?? m
@@ -24,11 +27,12 @@ export function PagosPorValidar() {
   const { data: banks } = useBankAccounts()
   const { data: claims } = usePaymentClaims()
   const { byOrder } = useOrderMoney()
+  const { setScreen } = useRole()
   const [busy, setBusy] = useState<string | null>(null)
 
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
   const banksById = useMemo(() => Object.fromEntries(banks.map((b) => [b.id, b])), [banks])
-  const clientName = (o: OrderWithItems) => (o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
+  const clientName = (o: OrderWithItems | null) => (!o ? 'Pedido aún no cargado' : o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
   const bankLabel = (t: PaymentClaim): string => {
     const b = t.bank_account_id ? banksById[t.bank_account_id] : null
     if (!b) return 'Cuenta no indicada'
@@ -38,14 +42,10 @@ export function PagosPorValidar() {
 
   // La cola son los comprobantes ABIERTOS (status 'reportado'). No se filtra por
   // payment_status: un pedido con pago PARCIAL puede tener otro comprobante en revisión.
-  const rows = useMemo(() => {
-    const byId = Object.fromEntries(orders.map((o) => [o.id, o])) as Record<string, OrderWithItems | undefined>
-    return claims
-      .filter((c) => c.status === 'reportado')
-      .map((t) => ({ t, o: byId[t.order_id] }))
-      .filter((r): r is { t: PaymentClaim; o: OrderWithItems } => r.o != null && r.o.status !== 'cancelled')
-      .sort((a, b) => (a.t.declared_at < b.t.declared_at ? 1 : -1))
-  }, [claims, orders])
+  // PAY-EXP-01A-3 · MISMO universo que el contador de Bandeja (clasificarDeclaraciones): los de pedidos cancelados
+  // van a "Revisión económica" (aviso abajo) y los de pedidos aún no cargados se listan, no se esconden.
+  const pend = useMemo(() => clasificarDeclaraciones(claims, orders), [claims, orders])
+  const rows = useMemo(() => pend.vigentes.map(({ claim, order }) => ({ t: claim, o: order })), [pend])
 
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
@@ -74,8 +74,14 @@ export function PagosPorValidar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <BadgeDollarSign size={18} />
         <div className="eyebrow" style={{ margin: 0 }}>Finanzas · Pagos por validar</div>
-        <span className="pill p-warn" style={{ marginLeft: 'auto' }}>{rows.length} por revisar</span>
+        <span className="pill p-warn" style={{ marginLeft: 'auto' }} data-testid="pagos-contador">{rows.length} por revisar</span>
       </div>
+      {pend.enCancelados.length > 0 && (
+        <div className="sysnote" style={{ background: 'var(--warn-bg)' }} data-testid="pagos-en-cancelados">
+          <span style={{ flex: 1 }}><b>{pend.enCancelados.length}</b> comprobante(s) de pedidos <b>cancelados</b> esperan decisión: se revisan en <b>Revisión económica</b> (registrar el dinero que sí llegó o rechazarlo).</span>
+          <button type="button" className="btn ghost sm" onClick={() => setScreen('av_revision')}>Ir a Revisión económica</button>
+        </div>
+      )}
 
       <div className="sysnote">
         <Clock size={16} />
@@ -90,12 +96,12 @@ export function PagosPorValidar() {
             </thead>
             <tbody>
               {rows.map(({ t, o }) => (
-                <tr key={t.id}>
+                <tr key={t.id} data-testid="pagos-fila">
                   <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(t.declared_at)}</td>
                   <td data-label="Cliente">{clientName(o)}</td>
-                  <td data-label="Folio" className="mono">{o.external_ref}</td>
+                  <td data-label="Folio" className="mono">{o ? o.external_ref : '—'}</td>
                   <td data-label="Declarado" className="mono">{money(t.amount_declared)}<div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{metodoLabel(t.method)}</div></td>
-                  <td data-label="Saldo del pedido" className="mono">{money(byOrder[o.id]?.saldo ?? o.total ?? 0)}</td>
+                  <td data-label="Saldo del pedido" className="mono">{o ? money(byOrder[o.id]?.saldo ?? o.total ?? 0) : '—'}</td>
                   <td data-label="Referencia" className="mono">{t.reference || '—'}</td>
                   <td data-label="Cuenta destino"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Landmark size={14} /> {bankLabel(t)}</span></td>
                   <td data-label="Comprobante">
@@ -104,10 +110,14 @@ export function PagosPorValidar() {
                       : <span className="ms" style={{ color: 'var(--ink-3)' }}>Sin comprobante</span>}
                   </td>
                   <td data-label="Acciones">
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button type="button" className="btn sm" disabled={busy === o.id} onClick={() => confirmar(o)}><Check size={14} /> Confirmar</button>
-                      <button type="button" className="btn ghost sm" disabled={busy === o.id} onClick={() => rechazar(o)}><X size={14} /> Rechazar</button>
-                    </div>
+                    {o ? (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button type="button" className="btn sm" disabled={busy === o.id} onClick={() => confirmar(o)}><Check size={14} /> Confirmar</button>
+                        <button type="button" className="btn ghost sm" disabled={busy === o.id} onClick={() => rechazar(o)}><X size={14} /> Rechazar</button>
+                      </div>
+                    ) : (
+                      <div className="ms" data-testid="pagos-sin-pedido">El pedido aún no se cargó. <button type="button" className="btn ghost sm" onClick={() => reloadOrders()}>Recargar</button></div>
+                    )}
                   </td>
                 </tr>
               ))}
