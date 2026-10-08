@@ -498,7 +498,7 @@ body:has(.overlay) .chat-vista-zona, body:has(.sheet-wrap) .chat-vista-zona, bod
 body.chat-open{overflow:hidden}
 @media (max-width:900px){
   .chat-fab{bottom:calc(96px + env(safe-area-inset-bottom,0px));right:14px}
-  .chat-vista-zona{right:14px;bottom:calc(160px + env(safe-area-inset-bottom,0px));max-width:min(280px,calc(100vw - 28px))}
+  .chat-vista-zona{right:78px;bottom:calc(96px + env(safe-area-inset-bottom,0px));max-width:min(280px,calc(100vw - 92px))}   /* V2-D3 · en la fila de la burbuja: no tapa tarjetas */
   /* Móvil: hoja casi completa desde abajo (mismo patrón que .sheet), sin desbordar el viewport. */
   .chat-drawer-wrap{align-items:flex-end;justify-content:center}
   .chat-drawer{width:100%;height:calc(100dvh - var(--rc-kb,0px));max-height:calc(100dvh - var(--rc-kb,0px));border-radius:0;animation:chatsheetup .28s cubic-bezier(.2,.7,.3,1)}

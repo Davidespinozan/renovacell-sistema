@@ -30,7 +30,7 @@ describe('V2-A · apertura y actividad', () => {
   it('V2-D2 · el episodio comercial NO abre el chat: se marca por episodio y despierta la lectura; sin notificaciones del navegador', () => {
     const l = codigo(lanzadorSrc)
     expect(l).toMatch(/chatUi\.consumir\(solicitud\.id\)\n\s*if \(!visible\) return/)
-    expect(l).toMatch(/marcarAbiertoPara\(solicitud\.episodio\)\n\s*if \(!abiertoRef\.current\) void revisarRef\.current\(\)/)
+    expect(l).toMatch(/marcarAbiertoPara\(solicitud\.episodio\)\n\s*if \(!abiertoRef\.current\) void revisarRef\.current\('episodio'\)/)
     expect(l).not.toMatch(/abrirAuto/)                                            // no existe apertura automática
     expect((l.match(/setAbierto\(true\)/g) ?? []).length).toBe(1)               // solo abrirManual abre
     expect(l).not.toMatch(/new Notification|Notification\.requestPermission/)

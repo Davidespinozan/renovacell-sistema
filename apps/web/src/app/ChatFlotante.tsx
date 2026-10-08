@@ -15,6 +15,8 @@
 //    una vez; un cierre manual absorbe lo existente; con un modal/hoja, la pestaña oculta o un campo enfocado la
 //    vista previa se difiere y aparece en cuanto el obstáculo desaparece (vigilancia temporal, solo con pendiente).
 //  · CI-3 · Realtime solo DESPIERTA la lectura canónica; sondeo de 30 s de respaldo; una sola lectura en vuelo.
+//  · V2-D3 · Varias pestañas: al leer en una, las demás releen (ping BroadcastChannel; la autoridad sigue siendo el
+//    cursor del servidor) y retiran badge y vista previa ya leídos. Latencia medida en memoria (chatMetricas).
 //  · Aquí no hay disparadores de handoff ni mutaciones: solo abrir/leer de la conversación propia.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from './icons'
@@ -26,6 +28,7 @@ import { ChatCanonico } from '../screens/chat/ChatCanonico'
 import { debeDiferir, decidir, esElegible, guardarFrontera, leerFrontera } from '../data/ops/autoapertura'
 import { suscribirMensajes, type Suscriptor } from '../data/ops/chatRealtime'
 import { primerNombre } from '../lib/nombres'
+import { registrarAviso, type ViaLectura } from '../data/ops/chatMetricas'
 
 // Pantallas donde la conversación YA está montada a página completa.
 export const PANTALLAS_CHAT: ReadonlySet<string> = new Set(['chat_cc', 'asist'])
@@ -78,7 +81,10 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
   const leyendo = useRef(false)             // CI-3 · una sola lectura canónica en vuelo
   const otraVez = useRef(false)             // CI-3 · llegó una señal durante la lectura → leer otra vez al terminar
   const coalescer = useRef<number | undefined>(undefined)
-  const revisarRef = useRef<() => Promise<void>>(async () => {})
+  const revisarRef = useRef<(via: ViaLectura) => Promise<void>>(async () => {})
+  const viaSiguiente = useRef<ViaLectura>('realtime')    // V2-D3 · causa de la relectura pendiente
+  const ultimaSenal = useRef<number | null>(null)        // V2-D3 · Date.now() de la última señal Realtime
+  const canalPestanas = useRef<BroadcastChannel | null>(null)
   const temporizador = useRef<number | undefined>(undefined)
   const [convId, setConvId] = useState<string | null>(null)
   const [sinLeer, setSinLeer] = useState(0)
@@ -127,7 +133,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
       if (!diferido.current) { dejarDeVigilar(); return }
       if (debeDiferir()) return
       diferido.current = false; dejarDeVigilar()
-      if (!abiertoRef.current) void revisarRef.current()
+      if (!abiertoRef.current) void revisarRef.current('diferido')
     }
     const programar = () => { if (!marco) marco = window.requestAnimationFrame(revisar) }
     const obs = typeof MutationObserver !== 'undefined' ? new MutationObserver(programar) : null
@@ -142,10 +148,13 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
   useEffect(() => () => dejarDeVigilar(), [dejarDeVigilar])
 
   // Cuenta la actividad con la autoridad del servidor y decide si hay algo NUEVO que anunciar.
-  const contar = useCallback(async () => {
+  const contar = useCallback(async (via: ViaLectura) => {
     if (!convId) return
+    const senalMs = via === 'realtime' || via === 'reconexion' ? ultimaSenal.current : null
+    const lecturaInicioMs = Date.now()
     const r = await cliente.leer(convId, cursor.current)
     if (!r.ok) return
+    const lecturaFinMs = Date.now()
     // C4 · frontera por conversación (sessionStorage) → ¿actividad genuinamente nueva? (se anuncia, no se abre)
     if (frontera.current?.conv !== convId) frontera.current = { conv: convId, f: leerFrontera(convId) }
     const fAntes = frontera.current.f
@@ -156,10 +165,14 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
       const piso = Math.max(fAntes ?? 0, r.data.leido_hasta ?? 0)
       const nuevos = r.data.mensajes.filter((m) => m.seq > piso && esElegible(m, r.data))
       const ultimo = nuevos.find((m) => m.seq === d.frontera) ?? nuevos[nuevos.length - 1]
-      if (ultimo) notificar({ seq: ultimo.seq, remitente: remitenteDe(ultimo, r.data.asesor_nombre), texto: fragmentoSeguro(ultimo.content) ?? TEXTO_GENERICO, extra: Math.max(0, nuevos.length - 1) })
+      if (ultimo) {
+        notificar({ seq: ultimo.seq, remitente: remitenteDe(ultimo, r.data.asesor_nombre), texto: fragmentoSeguro(ultimo.content) ?? TEXTO_GENERICO, extra: Math.max(0, nuevos.length - 1) })
+        registrarAviso({ seq: ultimo.seq, via, creadoServidor: ultimo.created_at, senalMs, lecturaInicioMs, lecturaFinMs, avisoMs: Date.now() })
+      }
     } else if (d.motivo === 'diferir' && document.visibilityState === 'visible') { diferido.current = true; vigilarDiferido() }
     const leido = Math.max(cursor.current, r.data.leido_hasta ?? 0)
     cursor.current = leido
+    setVista((v) => (v && v.seq <= leido ? null : v))   // V2-D3 · ya leído (p. ej. en otra pestaña): la vista previa se retira
     setSinLeer(r.data.mensajes.filter((m) => m.seq > leido && cuentaComoActividad(m, r.data.modo)).length)
     // Un pulso discreto cuando la atención queda asignada/activa sin mensaje propio (transición vista por primera vez).
     const antes = modoVisto.current
@@ -170,11 +183,12 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
 
   // CI-3 · UNA lectura canónica en vuelo: sondeo, visibilidad, Realtime y episodios pasan por aquí; si llega otra
   // señal mientras se lee, se vuelve a leer al terminar (ninguna actividad se pierde ni se lee en paralelo).
-  const revisarAhora = useCallback(async () => {
-    if (leyendo.current) { otraVez.current = true; return }
+  const revisarAhora = useCallback(async (via: ViaLectura) => {
+    if (leyendo.current) { otraVez.current = true; viaSiguiente.current = via; return }
     leyendo.current = true
+    let causa = via
     try {
-      do { otraVez.current = false; await contar() } while (otraVez.current && !abiertoRef.current)
+      do { otraVez.current = false; await contar(causa); causa = viaSiguiente.current } while (otraVez.current && !abiertoRef.current)
     } finally { leyendo.current = false }
   }, [contar])
   revisarRef.current = revisarAhora
@@ -183,23 +197,25 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
   // la pestaña visible; al (re)conectarse se lee una vez por si algo llegó mientras el canal estaba caído.
   useEffect(() => {
     if (!visible || !convId) return
-    const despertar = () => {
+    const despertar = (via: ViaLectura) => {
       if (abiertoRef.current || (typeof document !== 'undefined' && document.visibilityState !== 'visible')) return
+      if (ultimaSenal.current === null || !coalescer.current) ultimaSenal.current = Date.now()
       window.clearTimeout(coalescer.current)
-      coalescer.current = window.setTimeout(() => { void revisarRef.current() }, 120)
+      coalescer.current = window.setTimeout(() => { coalescer.current = undefined; void revisarRef.current(via) }, 120)
     }
-    const retirar = suscribir(convId, despertar, (e) => { if (e === 'listo') despertar() })
+    const retirar = suscribir(convId, () => despertar('realtime'), (e) => { if (e === 'listo') despertar('reconexion') })
     return () => { retirar(); window.clearTimeout(coalescer.current) }
   }, [visible, convId, suscribir])
 
   // Solo con el cajón CERRADO y la pestaña visible (abierto, ChatCanonico ya lee y marca).
   useEffect(() => {
     if (!visible || !convId || abierto) return
-    const tick = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void revisarAhora() }
-    tick()
-    const t = setInterval(tick, intervaloMs)
-    document.addEventListener('visibilitychange', tick)
-    return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
+    const tick = (via: ViaLectura) => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void revisarAhora(via) }
+    tick('cierre')
+    const t = setInterval(() => tick('sondeo'), intervaloMs)
+    const alVolver = () => tick('visibilidad')
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [visible, convId, abierto, revisarAhora, intervaloMs])
 
   // CI-2 / V2-D2 · Episodio comercial confirmado por el servidor: se marca (una vez por episodio) y se despierta la
@@ -209,8 +225,17 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
     chatUi.consumir(solicitud.id)
     if (!visible) return                                   // en la pantalla de chat ya se ve todo
     marcarAbiertoPara(solicitud.episodio)
-    if (!abiertoRef.current) void revisarRef.current()
+    if (!abiertoRef.current) void revisarRef.current('episodio')
   }, [solicitud, visible])
+
+  // V2-D3 · Varias pestañas: un aviso "leí hasta N" hace que las demás relean al servidor (sin segunda fuente de verdad).
+  useEffect(() => {
+    if (!visible || !convId || typeof BroadcastChannel === 'undefined') return
+    const bc = new BroadcastChannel(`rc-chat-${convId}`)
+    bc.onmessage = (e: MessageEvent<{ tipo?: string }>) => { if (e.data?.tipo === 'leido' && !abiertoRef.current) void revisarRef.current('pestana') }
+    canalPestanas.current = bc
+    return () => { bc.close(); canalPestanas.current = null }
+  }, [visible, convId])
 
   // Cajón abierto: bloquea el scroll del fondo, sigue al teclado (visualViewport) y Escape cierra.
   useEffect(() => {
@@ -244,7 +269,10 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
     abiertoRef.current = false
     setAbierto(false); window.setTimeout(() => fab.current?.focus(), 0)
   }, [])
-  const onLeido = useCallback((seq: number) => { cursor.current = Math.max(cursor.current, seq); setSinLeer(0) }, [])
+  const onLeido = useCallback((seq: number) => {
+    cursor.current = Math.max(cursor.current, seq); setSinLeer(0)
+    try { canalPestanas.current?.postMessage({ tipo: 'leido', seq }) } catch { /* canal cerrado */ }   // V2-D3 · avisa a las otras pestañas
+  }, [])
 
   if (!visible) return null
   const etiqueta = sinLeer > 0 ? `${ETIQUETA_LANZADOR}, ${sinLeer} ${sinLeer === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}` : ETIQUETA_LANZADOR
