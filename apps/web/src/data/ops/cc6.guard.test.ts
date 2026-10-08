@@ -13,6 +13,7 @@ import polSrc from '../../../../../supabase/functions/_shared/ia/politica.ts?raw
 import opsSrc from './carrito.ts?raw'
 import panelSrc from '../../screens/chat/CarritoPanel.tsx?raw'
 import catalogoLegacy from '../../screens/doctor/Catalogo.tsx?raw'
+import motorSrc from '../../screens/checkout/checkoutMotor.ts?raw'
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
@@ -84,8 +85,13 @@ describe('Edge cart + IA + frontend', () => {
     expect(codigo(opsSrc)).toMatch(/confirmarCheckout\(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion\(\), factura = false, perfil_fiscal_id: string \| null = null\)/)
   })
   it('AC · CC-7/C360-F3 · el Catálogo confirma por el checkout CANÓNICO con snapshot de dirección y el PERFIL FISCAL elegido (lo congela el servidor)', () => {
-    expect(catalogoLegacy).toMatch(/await clienteCarrito\.revisarCheckout\(c\.cart_id, choice\?\.locationId \?\? null, choice\?\.locationId \? null : choice\?\.address \?\? null\)/)
-    expect(catalogoLegacy).toMatch(/await clienteCarrito\.confirmarCheckout\(rv\.data\.review_id, rv\.data\.cart_rev, nuevaOperacion\(\), invoice, invoice \? perfilFiscalId : null\)/)
+    // MC-1 · el Catálogo monta el checkout CANÓNICO compartido; la revisión manda id de ubicación o snapshot de
+    // dirección, y la confirmación lleva la clave del INTENTO (revisión + factura + perfil), no una nueva por clic.
+    expect(catalogoLegacy).toMatch(/<CheckoutCanonico[\s\S]*servidor=\{servidor\}/)
+    expect(motorSrc).toMatch(/return \[e\?\.locationId \?\? null, e\?\.locationId \? null : e\?\.address \?\? null\]/)
+    expect(motorSrc).toMatch(/await cliente\.revisarCheckout\(cartId, \.\.\.argsRevision\(e\)\)/)
+    expect(motorSrc).toMatch(/await cliente\.confirmarCheckout\(rv\.review_id, rv\.cart_rev, op, factura, factura \? perfilFiscalId : null\)/)
+    expect(codigo(motorSrc)).not.toMatch(/cc_checkout_|supabase\.|crear_pedido/)
     expect(catalogoLegacy).not.toMatch(/setOrderFiscalSnapshot/)   // ya no hay snapshot posterior desde el navegador
     expect(catalogoLegacy).not.toMatch(/cc_checkout_|supabase\.rpc/)
   })

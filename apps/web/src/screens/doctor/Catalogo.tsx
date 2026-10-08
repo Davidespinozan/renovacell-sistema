@@ -17,27 +17,17 @@ import { effectiveUnitPrice, volumePromoLabel, volumeSavings } from '../../data/
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
-import { PaymentModal } from './PaymentModal'
-import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
-import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
-import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
-import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
-import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
+import { hasSupabase, currentUserId } from '../../lib/supabase'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import type { ProductSafe } from '../../data/types'
-import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { PedidoCreado } from '../../data/store/ordersStore'
 import { reloadOrders } from '../../data/store/ordersStore'
-import { cliente360, type PerfilFiscal } from '../../data/ops/customer360'   // C360-F3 · perfiles fiscales
-import { PerfilesFiscalesEditor } from '../../app/Cliente360Editores'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
-import { carrito as clienteCarrito, nuevaOperacion, ETIQUETA_MOTIVO, textoProblemas } from '../../data/ops/carrito'
+import { CheckoutCanonico, type MotorLocal } from '../checkout/CheckoutCanonico'
+import type { ConfigServidor, ResultadoPedido } from '../checkout/checkoutMotor'
 
-// Lo que el modal necesita del pedido creado (legado u origen canónico).
-type PedidoMin = Pick<OrderWithItems, 'id' | 'external_ref' | 'total'>
-type ResultadoPedido = { ok: true; order: PedidoMin; aviso?: string } | { ok: false; error: string }
 
 type LineFilter = 'all' | 'cosm' | 'prof'
 type Cart = Record<string, number>
@@ -153,39 +143,27 @@ export function Catalogo() {
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  // CC-7 · confirmación CANÓNICA: revisión (precio/stock/dirección del servidor) → confirmación del
-  // doctor → pedido W1 en la misma transacción que convierte el carrito. Luego, si pidió factura, se
-  // congela su perfil fiscal en el pedido (igual que el flujo anterior).
-  // C360-F3 · con factura, el receptor es el PERFIL FISCAL elegido (solo su id viaja); el servidor valida que sea
-  // del cliente y lo congela en el pedido dentro de la misma transacción.
-  const confirmarCanonico = async (invoice: boolean, choice: DeliveryChoice | null, perfilFiscalId: string | null): Promise<ResultadoPedido> => {
-    await canon.esperar()
-    const c = canon.cart
-    if (!c) return { ok: false, error: 'Tu carrito no está disponible. Recarga la página.' }
-    const rv = await clienteCarrito.revisarCheckout(c.cart_id, choice?.locationId ?? null, choice?.locationId ? null : choice?.address ?? null)
-    if (!rv.ok) return { ok: false, error: rv.error.mensaje }
-    if (!rv.data.listo || !rv.data.review_id || rv.data.cart_rev == null) {
-      if (rv.data.order_id) { void canon.recargar(); reloadOrders(); return { ok: true, order: { id: rv.data.order_id, external_ref: null, total: null } } }   // ya se había convertido (reintento)
-      const nombre = (id: string) => products.find((p) => p.id === id)?.name ?? 'producto'
-      return { ok: false, error: `Antes de pedir: ${textoProblemas(rv.data.problemas, nombre)}.` }
-    }
-    const cf = await clienteCarrito.confirmarCheckout(rv.data.review_id, rv.data.cart_rev, nuevaOperacion(), invoice, invoice ? perfilFiscalId : null)
-    if (!cf.ok) return { ok: false, error: cf.error.mensaje }
-    if (!cf.data.confirmado || !cf.data.order_id) return { ok: false, error: ETIQUETA_MOTIVO[cf.data.motivo ?? ''] ?? 'No se pudo confirmar. Vuelve a revisar tu pedido.' }
-    void canon.recargar(); reloadOrders()
-    return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null } }
-  }
-
-  const onConfirm = (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null, perfilFiscalId: string | null = null): Promise<ResultadoPedido> => hasSupabase
-    ? confirmarCanonico(invoice, choice, perfilFiscalId)
-    : createOrder({
+  // MC-1 · el checkout es el CANÓNICO compartido (screens/checkout): revisión del servidor (importes, precio por
+  // volumen, disponibilidad, dirección) → confirmación idempotente → pedido W1 en la misma transacción que
+  // convierte el carrito. Con factura, el receptor es el PERFIL FISCAL elegido (lo valida y congela el servidor).
+  const servidor: ConfigServidor | null = hasSupabase ? {
+    obtenerCartId: async () => { await canon.esperar(); return canon.cart?.cart_id ?? null },
+    nombreDe: (id: string) => products.find((p) => p.id === id)?.name ?? 'producto',
+    onPedido: () => { void canon.recargar(); reloadOrders() },
+  } : null
+  // Solo modo demo (sin backend): pedido local con el precio efectivo previsto (volumen incluido).
+  const local: MotorLocal = {
+    lineas: lines.map((l) => { const u = effOf(l.product, l.qty); return { product_id: l.product.id, nombre: l.product.name, qty: l.qty, unitario: u, subtotal: u == null ? null : u * l.qty } }),
+    total,
+    confirmar: (invoice, choice, receiver) => createOrder({
       lines: lines.map((l) => ({ product_id: l.product.id, qty: l.qty, unit_price: effOf(l.product, l.qty) })),
       total,
       invoice_requested: invoice,
-      shipping: choice?.address ?? null,
-      location_id: choice?.locationId ?? null,
+      shipping: choice.address ?? null,
+      location_id: choice.locationId ?? null,
       receiver: invoice ? receiver : null,
-    }).then((r: PedidoCreado): ResultadoPedido => (r.ok ? { ok: true, order: r.order } : { ok: false, error: r.error }))
+    }).then((r: PedidoCreado): ResultadoPedido => (r.ok ? { ok: true, order: r.order } : { ok: false, error: r.error })),
+  }
 
   if (loading) return <div className="card">Cargando catálogo…</div>
 
@@ -236,14 +214,13 @@ export function Catalogo() {
       <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
 
       {checkout && (
-        <CheckoutModal
-          lines={lines}
-          total={total}
-          priceOf={priceOf}
+        <CheckoutCanonico
           base={baseAddr}
-          onConfirm={onConfirm}
+          servidor={servidor}
+          local={local}
+          previas={lines.map((l) => ({ product_id: l.product.id, nombre: l.product.name, qty: l.qty }))}
           onPay={(orderId, r) => payOrder(orderId, { method: r.method, ref: r.id, actor: 'Portal del Doctor' })}
-          onDone={hasSupabase ? () => { void canon.recargar() } : clear}   // canónico: el carrito ya quedó convertido en el servidor
+          onDone={hasSupabase ? undefined : clear}   // canónico: el servidor ya convirtió el carrito (onPedido recarga)
           onClose={() => setCheckout(false)}
         />
       )}
@@ -474,192 +451,6 @@ function LineRow({ l, price, onInc, onDec }: { l: CartLine; price: number | null
         <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
         <span className="mono">{l.qty}</span>
         <button className="btn ghost sm" type="button" onClick={onInc}><Icon name="plus" /></button>
-      </div>
-    </div>
-  )
-}
-
-function CheckoutModal({
-  lines, total, priceOf, base, onConfirm, onPay, onDone, onClose,
-}: {
-  lines: CartLine[]
-  total: number
-  priceOf: (p: ProductSafe) => number | null
-  base: ShippingAddress | null
-  onConfirm: (invoice: boolean, choice: DeliveryChoice | null, receiver: FiscalProfile | null, perfilFiscalId?: string | null) => Promise<ResultadoPedido>
-  onPay: (orderId: string, r: { method: string; id: string }) => void
-  onDone: () => void
-  onClose: () => void
-}) {
-  const [invoice, setInvoice] = useState(false)
-  const [choice, setChoice] = useState<DeliveryChoice | null>(null)
-  const [order, setOrder] = useState<PedidoMin | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
-  const [payNow, setPayNow] = useState(false)
-  // Perfil fiscal para "Solicitar factura": AUTORIDAD = customers.meta.fiscal (master).
-  const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
-  const [customerId, setCustomerId] = useState<string | null>(null)
-  const [fiscalLoaded, setFiscalLoaded] = useState(false)
-  const [editingFiscal, setEditingFiscal] = useState(false)
-  const [showFiscalErr, setShowFiscalErr] = useState(false)
-  const [savingFiscal, setSavingFiscal] = useState(false)
-  const [creando, setCreando] = useState(false)
-  const [errorPedido, setErrorPedido] = useState<string | null>(null)
-  const fiscalOkLegado = isFiscalProfileComplete(fiscal)
-  // C360-F3 · con servidor: perfiles fiscales canónicos (0..N); se elige uno (el predeterminado preseleccionado).
-  const [perfiles, setPerfiles] = useState<PerfilFiscal[] | null>(null)
-  const [perfilSel, setPerfilSel] = useState<string | null>(null)
-  const cargarPerfiles = async () => {
-    const r = await cliente360.perfilesFiscales(null)
-    const ps = r.ok ? r.data.perfiles : []
-    setPerfiles(ps)
-    setPerfilSel((sel) => (sel && ps.some((p) => p.id === sel) ? sel : ps.find((p) => p.es_predeterminado)?.id ?? ps[0]?.id ?? null))
-  }
-  useEffect(() => { if (hasSupabase && invoice && perfiles === null) void cargarPerfiles() }, [invoice])   // eslint-disable-line react-hooks/exhaustive-deps
-  const fiscalOk = hasSupabase ? !!perfilSel : fiscalOkLegado
-
-  // Al activar "Solicitar factura", carga el master del cliente (o legacy) una sola vez.
-  useEffect(() => {
-    if (!invoice || fiscalLoaded || hasSupabase) return   // con servidor se usan los perfiles canónicos
-    ;(async () => {
-      if (hasSupabase) {
-        const uid = currentUserId() ?? ''
-        const { data: cust } = await supabase.from('customers').select('id, meta, email').eq('profile_id', uid).maybeSingle()
-        if (cust?.id) setCustomerId(cust.id)
-        let master = customerFiscal(cust as { meta: unknown } | null)
-        if (!master.rfc) {
-          const { data: prof } = await supabase.from('profiles').select('meta, email').eq('id', uid ?? '').maybeSingle()
-          const legacy = (prof?.meta as { fiscal?: unknown } | null)?.fiscal
-          if (legacy) master = normalizeFiscalProfile(legacy)
-          // Prefill del correo de facturación desde el contacto si aún no hay uno.
-          if (!master.email_facturacion) master.email_facturacion = normalizeFiscalProfile({ email: (cust?.email ?? prof?.email ?? '') }).email_facturacion
-        }
-        setFiscal(master)
-        setEditingFiscal(!isFiscalProfileComplete(master))
-      } else {
-        setEditingFiscal(true)
-      }
-      setFiscalLoaded(true)
-    })()
-  }, [invoice, fiscalLoaded])
-
-  const confirm = async () => {
-    if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
-    if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
-    if (!hasSupabase && invoice && customerId && editingFiscal) {
-      // Guarda/actualiza el master antes de crear (así POS/Admin lo verán después).
-      setSavingFiscal(true)
-      const res = await upsertCustomerFiscal(customerId, fiscal)
-      setSavingFiscal(false)
-      if (!res.ok) { setShowFiscalErr(true); window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
-    }
-    setCreando(true); setErrorPedido(null)
-    const r = await onConfirm(invoice, choice, invoice && !hasSupabase ? fiscal : null, invoice ? perfilSel : null)
-    setCreando(false)
-    // Si el servidor NO creó el pedido, el carrito se conserva: vaciarlo aquí
-    // haría que el doctor pierda su selección por un pedido que no existe.
-    if (!r.ok) { setErrorPedido(r.error); return }
-    setOrder(r.order); setAviso(r.aviso ?? null)
-    onDone() // limpia el carrito — solo con el pedido confirmado
-  }
-
-  // Paso de pago en línea (al elegir "Pagar ahora").
-  if (order && payNow) {
-    return (
-      <PaymentModal
-        folio={order.external_ref ?? order.id}
-        amount={order.total ?? total}
-        orderId={order.id}
-        onPaid={(r) => onPay(order.id, { method: r.method, id: r.id })}
-        onClose={onClose}
-      />
-    )
-  }
-
-  return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        {order ? (
-          <div className="mbody">
-            <div className="success">
-              <div className="ck"><Icon name="check" /></div>
-              <h3>Pedido creado</h3>
-              <p>
-                Tu pedido <b>{order.external_ref ?? 'nuevo'}</b> quedó registrado. Págalo ahora para que
-                entre a preparación, o más tarde desde <b>Mis pedidos</b>.
-              </p>
-              {aviso && <p role="alert" style={{ color: 'var(--warn)', fontSize: 13 }}>{aviso}</p>}
-              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button className="btn ghost" type="button" onClick={onClose}>Pagar después</button>
-                <button className="btn" type="button" onClick={() => setPayNow(true)}>
-                  <Icon name="receipt" /> Pagar ahora
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mhead">
-              <div>
-                <h3>Revisar pedido</h3>
-              </div>
-              <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
-            </div>
-            <div className="mbody">
-              {lines.map((l) => (
-                <div key={l.product.id} className="coitem">
-                  <span>{l.product.name} <span style={{ color: 'var(--ink-3)' }}>×{l.qty}</span></span>
-                  <span className="mono">{money((priceOf(l.product) ?? 0) * l.qty)}</span>
-                </div>
-              ))}
-
-              <div className="cototal">
-                <span>Total</span>
-                <b>{money(total)}</b>
-              </div>
-
-              <div className="eyebrow" style={{ marginTop: 16 }}>Dirección de entrega</div>
-              <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
-                <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)
-              </label>
-
-              {invoice && (
-                <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface-2, #fafafa)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales para tu CFDI</div>
-                    {!hasSupabase && fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
-                  </div>
-                  {hasSupabase ? (
-                    perfiles === null ? <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando tus datos…</div> : (
-                      <div style={{ marginTop: 8 }} data-testid="checkout-perfiles-fiscales">
-                        <PerfilesFiscalesEditor customerId={null} perfiles={perfiles} editable cliente={cliente360} onCambio={cargarPerfiles} seleccion={{ valor: perfilSel, onElegir: setPerfilSel }} />
-                      </div>
-                    )
-                  ) : !fiscalLoaded ? (
-                    <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando tus datos…</div>
-                  ) : editingFiscal ? (
-                    <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
-                  ) : (
-                    <FiscalSummary value={fiscal} />
-                  )}
-                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>{hasSupabase ? 'Elige o agrega el perfil fiscal para tu factura.' : 'Completa tus datos fiscales para poder solicitar la factura.'}</div>}
-                </div>
-              )}
-
-              {errorPedido && (
-                <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13 }}>
-                  <b>Tu pedido no se creó.</b> {errorPedido} Tu selección sigue en el carrito.
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
-                <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" onClick={confirm} disabled={!choice?.address || savingFiscal || creando || (invoice && !fiscalOk)} style={(!choice?.address || savingFiscal || creando || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Icon name="check" /> {savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : 'Crear pedido'}</button>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </div>
   )
