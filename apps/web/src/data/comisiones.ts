@@ -15,7 +15,7 @@ import { isSale } from './metrics'
 import { enPeriodo, type Periodo } from './periodo'
 
 export type LineaProducto = 'cosm' | 'prof'
-export interface Vendedor { email: string; name: string }
+export interface Vendedor { id?: string; email: string; name: string }
 export interface AsientoComision { order_id: string; direction: 'in' | 'out'; amount: number; value_date: string }
 
 export interface EstimacionVendedor {
@@ -33,15 +33,20 @@ export interface EstimacionComisiones {
 }
 
 /**
- * Vendedor que el pedido trae registrado: el correo en `shipping_meta.seller` (POS, venta
- * directa, eventos) o, si lo levantó un vendedor, por coincidencia de nombre en `placed_by`.
- * Es la atribución ACTUAL del pedido; no existe (todavía) un registro histórico congelado.
+ * CX-0c · Vendedor comercial que el pedido trae CONGELADO (lo decide el servidor al crearlo: cartera; en POS sin
+ * asignación, el cajero; si no es resoluble, ninguno). Precedencia:
+ *   1. `shipping_meta.seller_profile_id` (identidad canónica) → el vendedor con ese id;
+ *   2. `shipping_meta.seller` (correo) — compatibilidad con pedidos anteriores a CX-0c o vendedor fuera de la lista;
+ *   3. sin vendedor.
+ * `placed_by` es el CAPTURISTA y nunca atribuye comisión (D2).
  */
 export function vendedorDe(o: OrderWithItems, vendedores: Vendedor[]): string | null {
-  const meta = (o.shipping_meta ?? {}) as { seller?: string | null; placed_by?: string | null }
-  if (meta.seller) return meta.seller
-  if (meta.placed_by) return vendedores.find((s) => meta.placed_by!.startsWith(s.name))?.email ?? null
-  return null
+  const meta = (o.shipping_meta ?? {}) as { seller?: string | null; seller_profile_id?: string | null }
+  if (meta.seller_profile_id) {
+    const v = vendedores.find((s) => s.id && s.id === meta.seller_profile_id)
+    if (v) return v.email
+  }
+  return meta.seller || null
 }
 
 export function estimarComisiones(d: {

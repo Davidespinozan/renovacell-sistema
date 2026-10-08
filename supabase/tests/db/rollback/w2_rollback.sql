@@ -22,8 +22,8 @@ begin
   end loop;
   perform tests.eq((select md5(string_agg(tablename||'|'||policyname||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by tablename, policyname))
                       from pg_policies where schemaname = 'public' and tablename in ('cash_closings','orders','refunds','payment_entries')),
-                   -- re-anclado CX-0b (136): sin política orders_insert_scoped ni INSERT de authenticated en orders (ajeno a W1/W2; no se restaura con su rollback)
-                   'c382039ed0c5ad898b3fa9b680abe893', 'rollback W2: políticas iguales a W1');
+                   -- re-anclado CX-0b (136) + CX-0c (137): sin INSERT directo en orders; rama pos de orders_select_scoped por seller_profile_id / _cx0c_venta_pos_propia (ajeno a W1/W2)
+                   'f137ad685d613eb8f68b0c2525273709', 'rollback W2: políticas iguales a W1');
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('cash_closings','orders','refunds') and grantee in ('anon','authenticated')),

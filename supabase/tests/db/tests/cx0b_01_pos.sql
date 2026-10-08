@@ -31,8 +31,9 @@ begin
   perform tests.ok((select external_ref = 'P-CX0B-1' and customer_id = c_h and doctor_id is null and status = 'delivered' and payment_status = 'paid' and total = 200
                     from public.orders where id = v_o), 'P1 · folio del cajero, cuenta, entregado/pagado y precio del SERVIDOR (2 × 100, no el del cliente)');
   perform tests.ok((select shipping_meta -> 'customer' ->> 'name' = 'Histórico sin portal' and shipping_meta -> 'customer' ->> 'id' = c_h::text
-                       and shipping_meta ->> 'seller' = 'cajero@x.mx' and shipping_meta ->> 'channel' = 'pos' from public.orders where id = v_o),
-    'P1 · snapshot del cliente del servidor (el falso se descarta); seller y canal intactos (CX-0c fuera)');
+                       and shipping_meta ->> 'seller' = (select email from public.profiles where id = v_pos) and shipping_meta ->> 'seller_origen' = 'pos_cajero'
+                       and shipping_meta ->> 'channel' = 'pos' from public.orders where id = v_o),
+    'P1 · snapshot del cliente del servidor (el falso se descarta); canal intacto; vendedor = cajero AUTENTICADO, no el que manda la caja (CX-0c)');
   perform tests.eq(tests.qty(v_lot), 38, 'P1 · inventario: el lote bajó 2');
   perform tests.ok(tests.kardex_ok(v_lot) and exists (select 1 from public.inventory_movements where order_id = v_o and change = -2 and reason = 'venta'), 'P1 · kardex: salida de venta registrada');
   perform tests.ok((select count(*) = 1 and sum(amount) = 200 and min(method) = 'efectivo' and min(direction) = 'in' from public.payment_entries where order_id = v_o),

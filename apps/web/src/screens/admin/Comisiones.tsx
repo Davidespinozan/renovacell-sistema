@@ -45,7 +45,7 @@ export function Comisiones() {
     orders,
     // Con backend, el cobrado sale del libro; en la demo se deriva de los pedidos pagados.
     entries: hasSupabase ? asientos : entriesFromOrders(orders, refunds, diaNegocio),
-    vendedores: sellers.map((s) => ({ email: s.email, name: s.name })),
+    vendedores: sellers.map((s) => ({ id: s.id, email: s.email, name: s.name })),   // CX-0c · id = identidad canónica
     lineaDe: (pid) => ((pid && lineOf[pid]) === 'prof' ? 'prof' : 'cosm'),
     tasaVigente: { cosm: rateCosm, prof: rateProf },
   }, periodo), [orders, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])

@@ -38,11 +38,12 @@ begin
   r := public.crear_pedido(o, null, v_a, lineas, null, false, c_a);
   perform tests.ok((r ->> 'idempotent')::boolean, 'A3 · idempotencia por order_id intacta');
 
-  -- falsificación del snapshot: el servidor lo reemplaza; el resto de shipping_meta se conserva (seller = CX-0c, sin tocar)
+  -- falsificación del snapshot: el servidor lo reemplaza; el resto de shipping_meta se conserva (la atribución la fija CX-0c)
   r := public.crear_pedido(gen_random_uuid(), null, v_a, lineas, '{"customer":{"id":"x","name":"FALSO","phone":"000"},"seller":"pos@x.mx","notas":"n1"}', false, null);
   select shipping_meta into r from public.orders where id = (r ->> 'order_id')::uuid;
   perform tests.ok(r -> 'customer' ->> 'name' = 'Cuenta A' and r -> 'customer' ->> 'id' = c_a::text and r -> 'customer' ->> 'phone' = '5550000001', 'A4 · snapshot falso descartado: el servidor escribe el de SU cuenta');
-  perform tests.ok(r ->> 'notas' = 'n1' and r ->> 'seller' = 'pos@x.mx', 'A4 · otras secciones de shipping_meta intactas (seller fuera de alcance, CX-0c)');
+  -- CX-0c (137): el seller del navegador ya no se conserva; la atribución la decide el servidor (A sin cartera → sin vendedor).
+  perform tests.ok(r ->> 'notas' = 'n1' and not (r ? 'seller') and r ->> 'seller_origen' = 'sin_vendedor', 'A4 · otras secciones de shipping_meta intactas; seller del navegador descartado (CX-0c)');
   perform tests.act_as(v_sin);
   r := public.crear_pedido(gen_random_uuid(), null, v_sin, lineas, '{"customer":{"name":"FALSO"}}', false, null);
   perform tests.ok((select customer_id is null and not (coalesce(shipping_meta, '{}') ? 'customer') from public.orders where id = (r ->> 'order_id')::uuid),
