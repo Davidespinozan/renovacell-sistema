@@ -94,7 +94,7 @@ export function HorarioAtencion({ cliente = clientePorDefecto, onCambio }: { cli
 }
 
 /** CHV2-A · Umbrales del SLA comercial (minutos HÁBILES): aviso al vendedor y escalamiento a Dirección. */
-export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio }: { cliente?: ClienteAtencion; onCambio?: () => void }) {
+export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio, version = 0 }: { cliente?: ClienteAtencion; onCambio?: () => void; version?: number }) {
   const [cfg, setCfg] = useState<ConfigAtencion | null>(null)
   const [aviso, setAviso] = useState('3')
   const [esc, setEsc] = useState('7')
@@ -102,7 +102,8 @@ export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio 
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const aplicar = (c: ConfigAtencion) => { setCfg(c); setAviso(String(c.aviso_min)); setEsc(String(c.escalamiento_min)); setPausar(c.pausar_fuera_horario) }
-  useEffect(() => { let vivo = true; void cliente.configAtencion().then((r) => { if (!vivo) return; if (r.ok) aplicar(r.data); else setMsg({ ok: false, texto: r.error }) }); return () => { vivo = false } }, [cliente])
+  // HORARIO-P1 · `version` cambia cuando el horario se guarda con éxito: se relee (el aviso "pendiente" y la pausa dependen de él).
+  useEffect(() => { let vivo = true; void cliente.configAtencion().then((r) => { if (!vivo) return; if (r.ok) aplicar(r.data); else setMsg({ ok: false, texto: r.error }) }); return () => { vivo = false } }, [cliente, version])
   const a = Number(aviso), e = Number(esc)
   const invalido = !Number.isInteger(a) || !Number.isInteger(e) || a < 0 || e < 1 || a > 1440 || e > 1440 || e <= a
   const guardar = async () => {
@@ -144,10 +145,11 @@ export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio 
 
 /** Horario (CC-7) + umbrales (CHV2-A) en un solo lugar. */
 export function HorarioYAlertas({ cliente = clientePorDefecto, onCambio }: { cliente?: ClienteAtencion; onCambio?: () => void }) {
+  const [version, setVersion] = useState(0)   // HORARIO-P1 · cada guardado exitoso del horario refresca la tarjeta de alertas
   return (
     <div className="grid" style={{ gap: 14 }} data-testid="horario-y-alertas">
-      <HorarioAtencion cliente={cliente} onCambio={onCambio} />
-      <ConfigAtencionComercial cliente={cliente} onCambio={onCambio} />
+      <HorarioAtencion cliente={cliente} onCambio={() => { setVersion((v) => v + 1); onCambio?.() }} />
+      <ConfigAtencionComercial cliente={cliente} onCambio={onCambio} version={version} />
     </div>
   )
 }

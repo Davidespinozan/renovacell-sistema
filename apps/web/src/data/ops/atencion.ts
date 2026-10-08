@@ -2,6 +2,8 @@
 // cartera cliente→vendedor y pendientes de ruteo. Todo es RPC: la base valida que sea Dirección,
 // audita cada cambio y decide el ruteo. El cliente nunca escribe tablas ni elige por el servidor.
 // Los nombres aún no están en database.types.ts (se regeneran al aplicar la migración 119).
+import { captureError } from '../../lib/sentry'
+import { sanitizarTexto } from '../../lib/sanitizar'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import type { Atencion } from './atencionComercial'
 
@@ -33,6 +35,16 @@ const rpcPorDefecto: Rpc = (fn, args) => (supabase.rpc as unknown as Rpc)(fn, ar
 export const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as const   // ISO 1..7
 export const MOTIVO_RUTEO: Record<string, string> = { sin_vendedor: 'Cliente sin vendedor', vendedor_no_elegible: 'Su vendedor ya no puede atender', visitante: 'Visitante (aún sin cuenta)' }
 
+// HORARIO-P1 · un error que no reconocemos NO se muestra crudo (puede traer detalles internos): el usuario ve el
+// genérico + una referencia corta, y el error real (sanitizado) se reporta a observabilidad con esa referencia.
+export const ERROR_GENERICO = 'No se pudo completar. Intenta de nuevo.'
+export function referenciaError(): string {
+  let r = ''
+  try { r = crypto.getRandomValues(new Uint32Array(1))[0].toString(36) } catch { r = Math.random().toString(36).slice(2) }
+  return 'ATN-' + r.slice(0, 6).toUpperCase().padStart(6, '0')
+}
+export type Reportar = (error: unknown, contexto: Record<string, unknown>) => void
+
 export function mensajeError(m: string | undefined): string {
   const t = m ?? ''
   if (/NO_AUTORIZADO|permission denied/.test(t)) return 'Solo Dirección administra la atención comercial.'
@@ -50,16 +62,22 @@ export function mensajeError(m: string | undefined): string {
   if (/SOLICITUD_INEXISTENTE/.test(t)) return 'Esa solicitud ya no existe.'
   if (/CONVERSACION_CERRADA/.test(t)) return 'La conversación ya está cerrada.'
   if (/CONFIG_INVALIDA/.test(t)) return 'Revisa los minutos: el escalamiento debe ser mayor que el aviso (0 a 1440).'
-  return 'No se pudo completar. Intenta de nuevo.'
+  return ERROR_GENERICO
 }
 
 export class ClienteAtencion {
-  constructor(private rpc: Rpc = rpcPorDefecto) {}
+  constructor(private rpc: Rpc = rpcPorDefecto, private reportar: Reportar = captureError) {}
   private async llamar<T>(fn: string, args?: Record<string, unknown>): Promise<Resultado<T>> {
     if (!hasSupabase && this.rpc === rpcPorDefecto) return { ok: false, error: 'La atención comercial requiere conexión con el servidor.' }
     try {
       const { data, error } = await this.rpc(fn, args)
-      if (error) return { ok: false, error: mensajeError(error.message) }
+      if (error) {
+        const texto = mensajeError(error.message)
+        if (texto !== ERROR_GENERICO) return { ok: false, error: texto }
+        const ref = referenciaError()
+        try { this.reportar(new Error(`atencion:${fn} · ${sanitizarTexto(error.message ?? '').texto}`), { pantalla: 'atencion', clasificacion: 'rpc_no_reconocido', code: ref }) } catch { /* la telemetría nunca rompe la app */ }
+        return { ok: false, error: `${ERROR_GENERICO} Si se repite, comparte la referencia ${ref} con soporte.` }
+      }
       return { ok: true, data: data as T }
     } catch { return { ok: false, error: 'No hay conexión con el servidor. Intenta de nuevo.' } }
   }
