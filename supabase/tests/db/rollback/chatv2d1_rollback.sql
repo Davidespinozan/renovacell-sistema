@@ -2,6 +2,7 @@
 -- ayudantes y el CHECK de procedencia; no borra mensajes.
 begin;
 create temp table _d1_antes as select (select count(*) from public.cc_messages) m;
+\ir ../../../rollback/cartera_p1/99_down.sql   -- CARTERA-P1 (131) se baja primero
 \ir ../../../rollback/chatv2d1/99_down.sql
 do $t$
 begin

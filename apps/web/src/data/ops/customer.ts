@@ -56,24 +56,17 @@ export function matchCustomer(c: Pick<Customer, 'full_name' | 'email' | 'phone' 
   return hay.includes(norm(query).trim()) || (qDigits.length >= 3 && digits(c.phone).includes(qDigits))
 }
 
-// Cartera del vendedor: filtra el directorio comercial por `seller_name` ~ nombre del usuario.
-// admin/scope 'all' → toda la población. Ventas → sus clientes asignados (best-effort por nombre,
-// tolerante a apellidos extra: coincide si comparten los 2 primeros tokens del nombre).
-const nrm = (s: string | null | undefined) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
-export function sellerMatchesUser(sellerName: string | null | undefined, userName: string | null | undefined): boolean {
-  const s = nrm(sellerName), u = nrm(userName)
-  if (!s || !u) return false
-  if (s === u || s.includes(u) || u.includes(s)) return true
-  const st = s.split(' '), ut = u.split(' ')
-  return st.length >= 2 && ut.length >= 2 && st[0] === ut[0] && st[1] === ut[1] // 2 primeros tokens
-}
-
+// CARTERA-P1 · "Mi cartera" = asignación VIGENTE (cc_cartera) y "Cartera histórica (Odoo)" = equivalencias explícitas.
+// Las dos llegan del servidor como conjuntos de ids (cc_mi_cartera / cc_mi_cartera_historica); aquí NUNCA se compara
+// por nombre (la coincidencia por texto de seller_name dejaba fuera a clientes asignados y podía incluir ajenos).
+export type VistaCartera = 'all' | 'cartera' | 'historica'
 export function filterByCartera(
   customers: Customer[],
-  opts: { scope: 'all' | 'cartera'; isAdmin: boolean; userName?: string | null },
+  opts: { scope: VistaCartera; isAdmin: boolean; clientes?: ReadonlySet<string>; perfiles?: ReadonlySet<string>; historicos?: ReadonlySet<string> },
 ): Customer[] {
   if (opts.scope === 'all' || opts.isAdmin) return customers
-  return customers.filter((c) => sellerMatchesUser(c.seller_name, opts.userName))
+  if (opts.scope === 'historica') return customers.filter((c) => !!opts.historicos?.has(c.id))
+  return customers.filter((c) => !!opts.clientes?.has(c.id) || (!!c.profile_id && !!opts.perfiles?.has(c.profile_id)))
 }
 
 // Paginación (aplica DESPUÉS de filtro+búsqueda). Nunca renderiza todo: devuelve solo la página.

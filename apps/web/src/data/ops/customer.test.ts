@@ -2,7 +2,7 @@
 // Las conductas de RLS/constraints son a nivel DB (no ejecutables en vitest): se aseguran contra
 // el texto de la migración y el self-test que corre al aplicarla (E2E autenticado aparte).
 import { describe, it, expect } from 'vitest'
-import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, filterByCartera, sellerMatchesUser, paginate, pageWindow, type Customer } from './customer'
+import { normalizeEmail, normalizePhone, computeImportHash, classifyImportRow, matchCustomer, portalStatus, filterByCartera, paginate, pageWindow, type Customer } from './customer'
 import { filterCustomers } from '../hooks/useCustomers'
 import { createOrder, createPosOrder } from '../store/ordersStore'
 import migSrc from '../../../../../supabase/migrations/20260922120000_customers_domain.sql?raw'
@@ -179,26 +179,24 @@ describe('Fase 3 — Doctores(admin) y Clientes(ventas) = MISMA población (cust
     mkCustomer({ id: 'c2', full_name: 'Beto', seller_name: 'Antonio Gallardo' }),
     mkCustomer({ id: 'c3', full_name: 'Cid', seller_name: 'Alejandra Cazarez Bojorquez' }),
   ]
-  it('sellerMatchesUser tolera apellidos extra / 2 primeros tokens', () => {
-    expect(sellerMatchesUser('Alejandra Cazarez Bojorquez', 'Alejandra Cazarez')).toBe(true)
-    expect(sellerMatchesUser('Antonio Gallardo', 'Antonio Gallardo')).toBe(true)
-    expect(sellerMatchesUser('Antonio Gallardo', 'Roberto Ibarra')).toBe(false)
-    expect(sellerMatchesUser(null, 'X')).toBe(false)
-  })
+  // CARTERA-P1 · las carteras llegan del servidor como ids; jamás se decide por el texto de seller_name.
   it('scope all / admin → población completa', () => {
     expect(filterByCartera(sample, { scope: 'all', isAdmin: false }).length).toBe(3)
     expect(filterByCartera(sample, { scope: 'cartera', isAdmin: true }).length).toBe(3)
   })
-  it('scope cartera + ventas → solo su cartera por seller_name', () => {
-    const mine = filterByCartera(sample, { scope: 'cartera', isAdmin: false, userName: 'Alejandra Cazarez' })
-    expect(mine.map((c) => c.id)).toEqual(['c1', 'c3'])
+  it('Mi cartera = ids de la asignación VIGENTE (por cliente o por perfil), aunque seller_name sea null o de otro', () => {
+    const conPerfil = [...sample, mkCustomer({ id: 'c4', full_name: 'David', seller_name: null, profile_id: 'P-DAVID' })]
+    const mine = filterByCartera(conPerfil, { scope: 'cartera', isAdmin: false, clientes: new Set(['c2']), perfiles: new Set(['P-DAVID']) })
+    expect(mine.map((c) => c.id)).toEqual(['c2', 'c4'])
   })
-  it('toggle Todos↔Mi cartera (vendedor): "Todos" ve la población completa; "Mi cartera" filtra', () => {
-    // El toggle de Ventas alterna effectiveScope entre 'all' y 'cartera' (mismo helper puro).
-    const todos = filterByCartera(sample, { scope: 'all', isAdmin: false, userName: 'Alejandra Cazarez' })
-    expect(todos.length).toBe(3)                                   // "Todos" NO filtra por cartera
-    const cartera = filterByCartera(sample, { scope: 'cartera', isAdmin: false, userName: 'Alejandra Cazarez' })
-    expect(cartera.map((c) => c.id)).toEqual(['c1', 'c3'])         // "Mi cartera" conserva el filtro
+  it('el texto de seller_name NO da pertenencia: sin ids, Mi cartera está vacía', () => {
+    expect(filterByCartera(sample, { scope: 'cartera', isAdmin: false })).toEqual([])
+  })
+  it('Cartera histórica = solo los ids de la equivalencia; no se mezcla con la vigente', () => {
+    const h = filterByCartera(sample, { scope: 'historica', isAdmin: false, clientes: new Set(['c2']), historicos: new Set(['c1', 'c3']) })
+    expect(h.map((c) => c.id)).toEqual(['c1', 'c3'])
+    const v = filterByCartera(sample, { scope: 'cartera', isAdmin: false, clientes: new Set(['c2']), historicos: new Set(['c1', 'c3']) })
+    expect(v.map((c) => c.id)).toEqual(['c2'])
   })
   it('Doctores(admin) y Clientes(ventas) montan el MISMO CustomerDirectory (customers)', () => {
     expect(doctoresSrc).toMatch(/CustomerDirectory/)

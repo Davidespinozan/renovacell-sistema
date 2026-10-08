@@ -2,6 +2,7 @@
 -- de actividad y el cierre de C1, sin tocar sesiones, mensajes ni eventos.
 begin;
 create temp table _c2_antes as select (select count(*) from public.cc_conversation_sessions) s, (select count(*) from public.cc_conversation_events) e, (select count(*) from public.cc_messages) m;
+\ir ../../../rollback/cartera_p1/99_down.sql   -- CARTERA-P1 (131) se baja primero
 \ir ../../../rollback/chatv2d1/99_down.sql   -- CHAT V2-D1 (130) se baja primero
 \ir ../../../rollback/ci1/99_down.sql   -- Commercial Intent CI-1 (128) se baja primero
 \ir ../../../rollback/chatv2c2/99_down.sql

@@ -1,12 +1,17 @@
 // DIRECTORIO COMERCIAL compartido — la MISMA población (customers) para Admin "Doctores" y Ventas
 // "Clientes". customers = identidad comercial del doctor/comprador (con o sin portal). profiles solo
-// = acceso al portal (badge). scope 'all' (admin) o 'cartera' (ventas por seller_name). Solo lectura.
+// = acceso al portal (badge). Solo lectura.
+// CARTERA-P1 · Ventas alterna tres vistas SEPARADAS: "Todos" (lo que permite la RLS), "Mi cartera" (asignación
+// VIGENTE de cc_cartera, la que asigna Dirección) y "Cartera histórica (Odoo)" (registros heredados por
+// equivalencia EXPLÍCITA; no son asignaciones). Ambas carteras vienen del servidor por id, nunca por nombre.
 import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from './ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
-import { filterByCartera, paginate, pageWindow, type Customer } from '../data/ops/customer'
+import { filterByCartera, paginate, pageWindow, type Customer, type VistaCartera } from '../data/ops/customer'
+import { useMiCartera } from '../data/hooks/useMiCartera'
+import type { ClienteCartera } from '../data/ops/cartera'
 import { useRole } from '../auth/RoleContext'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
@@ -16,7 +21,14 @@ const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '�
 
 // title = etiqueta de la sección ("Doctores" admin / "Clientes" ventas). scope = alcance por defecto.
 // carteraToggle = muestra el filtro "Todos | Mi cartera" (Ventas); default = scope.
-export function CustomerDirectory({ title, scope, carteraToggle = false }: { title: string; scope: 'all' | 'cartera'; carteraToggle?: boolean }) {
+const VISTAS: ReadonlyArray<readonly [VistaCartera, string]> = [['all', 'Todos'], ['cartera', 'Mi cartera'], ['historica', 'Cartera histórica (Odoo)']]
+const EXPLICACION: Record<VistaCartera, string> = {
+  all: '',
+  cartera: 'Clientes asignados a ti por Dirección (asignación vigente).',
+  historica: 'Registros heredados de Odoo según la equivalencia de vendedor que autorizó Dirección. Son de consulta: no son asignaciones vigentes.',
+}
+
+export function CustomerDirectory({ title, scope, carteraToggle = false, clienteCartera }: { title: string; scope: VistaCartera; carteraToggle?: boolean; clienteCartera?: ClienteCartera }) {
   const { data: all, loading, error } = useCustomers()
   const { role, user, setScreen } = useRole()
   const isAdmin = role === 'admin'
@@ -24,11 +36,15 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
   const placedBy = isAdmin ? 'Administración' : `${user?.name ?? 'Ventas'} (Ventas)`
 
   // Vista efectiva: con toggle el vendedor alterna Todos/Mi cartera (default = scope, "Todos").
-  const [view, setView] = useState<'all' | 'cartera'>(scope)
+  const [view, setView] = useState<VistaCartera>(scope)
   const effectiveScope = carteraToggle ? view : scope
+  const mi = useMiCartera(carteraToggle && !isAdmin, clienteCartera)
 
-  // MISMA fuente (customers); "Todos" muestra todo lo accesible por RLS, "Mi cartera" filtra por seller_name.
-  const customers = useMemo(() => filterByCartera(all, { scope: effectiveScope, isAdmin, userName: user?.name }), [all, effectiveScope, isAdmin, user])
+  // MISMA fuente (customers); "Todos" muestra lo accesible por RLS; las carteras filtran por los ids del servidor.
+  const customers = useMemo(() => filterByCartera(all, { scope: effectiveScope, isAdmin, clientes: mi.clientes, perfiles: mi.perfiles, historicos: mi.historicos }), [all, effectiveScope, isAdmin, mi])
+  const asignado = (c: Customer) => mi.clientes.has(c.id) || (!!c.profile_id && mi.perfiles.has(c.profile_id))
+  const historico = (c: Customer) => mi.historicos.has(c.id)
+  const enCartera = effectiveScope !== 'all' && !isAdmin
   const [q, setQ] = useState('')
   const shown = useCustomerSearch(customers, q) // filtro cartera + búsqueda, SOBRE TODOS (antes de paginar)
   const [page, setPage] = useState(1)
@@ -74,18 +90,20 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
           { key: 'phone', label: 'Teléfono' },
           { key: 'city', label: 'Ciudad' },
           { key: 'country', label: 'País' },
-          { key: 'seller_name', label: 'Vendedor' },
+          { key: 'seller_name', label: 'Vendedor histórico (Odoo)' },
+          ...(carteraToggle && !isAdmin ? [{ key: 'id' as const, label: 'Relación conmigo', format: (_: unknown, c: Customer) => (asignado(c) ? 'Asignación vigente' : historico(c) ? 'Histórico (Odoo)' : '') }] : []),
           { key: 'profile_id', label: 'Portal', format: (v) => (v ? 'Con acceso' : 'Sin acceso') },
         ]} />
       </div>
 
       {carteraToggle && (
         <div className="seg" style={{ alignSelf: 'flex-start' }}>
-          {([['all', 'Todos'], ['cartera', 'Mi cartera']] as const).map(([k, lbl]) => (
-            <button key={k} type="button" className={view === k ? 'active' : undefined} onClick={() => setView(k)}>{lbl}</button>
+          {VISTAS.map(([k, lbl]) => (
+            <button key={k} type="button" className={view === k ? 'active' : undefined} aria-pressed={view === k} onClick={() => setView(k)} data-testid={`vista-${k}`}>{lbl}</button>
           ))}
         </div>
       )}
+      {enCartera && EXPLICACION[effectiveScope] && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: -8 }} data-testid="cartera-explicacion">{EXPLICACION[effectiveScope]}</div>}
 
       <input
         value={q}
@@ -98,8 +116,14 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando directorio…</div>
       ) : error ? (
         <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>
+      ) : enCartera && mi.cargando ? (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tu cartera…</div>
+      ) : enCartera && mi.error ? (
+        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }} data-testid="cartera-error"><span>{mi.error}</span></div>
       ) : customers.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>{effectiveScope === 'cartera' ? 'No tienes clientes en tu cartera.' : 'No hay registros en el directorio.'}</div>
+        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }} data-testid="cartera-vacia">{effectiveScope === 'cartera' ? 'No tienes clientes asignados.'
+          : effectiveScope === 'historica' ? (mi.equivalencias.length ? 'No hay registros históricos de Odoo para tus equivalencias.' : 'Dirección aún no ha registrado una equivalencia entre tu usuario y un vendedor de Odoo.')
+          : 'No hay registros en el directorio.'}</div>
       ) : shown.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ninguno coincide con “{q}”.</div>
       ) : (
@@ -111,9 +135,11 @@ export function CustomerDirectory({ title, scope, carteraToggle = false }: { tit
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{c.full_name}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {[dash(c.city) !== '—' ? c.city : null, dash(c.seller_name) !== '—' ? c.seller_name : null].filter(Boolean).join(' · ') || '—'}
+                  {[dash(c.city) !== '—' ? c.city : null, dash(c.seller_name) !== '—' ? `Odoo: ${c.seller_name}` : null].filter(Boolean).join(' · ') || '—'}
                 </div>
               </div>
+              {carteraToggle && !isAdmin && asignado(c) && <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-asignado">Asignado</span>}
+              {carteraToggle && !isAdmin && !asignado(c) && historico(c) && <span className="pill p-neu" style={{ whiteSpace: 'nowrap' }} data-testid="marca-historico">Histórico (Odoo)</span>}
               <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5, whiteSpace: 'nowrap' }}>
                 {c.profile_id ? <UserCheck size={12} /> : <UserX size={12} />} {c.profile_id ? 'Portal' : 'Sin portal'}
               </span>
