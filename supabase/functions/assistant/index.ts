@@ -210,4 +210,4 @@ Deno.serve(conCors(async (req) => {
     // No filtrar el detalle interno al cliente.
     return json(502, { error: 'No se pudo contactar al asistente. Intenta de nuevo.' })
   }
-}))
+}, undefined, 'landing'))   // CX-0B · solo la landing la llama: sin la puerta del portal

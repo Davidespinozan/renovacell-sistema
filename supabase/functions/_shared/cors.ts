@@ -13,6 +13,11 @@
 //
 // Sin dependencias de Deno en el módulo: `Deno.env` se lee de forma perezosa para poder
 // probarlo con vitest.
+//
+// CX-0B · Alcance: `portal.renovacell.mx` es otra PUERTA de la misma SPA que `sistema.renovacell.mx`
+// (netlify.toml / host-router). Se permite solo en las funciones que llama la SPA (alcance 'app', el
+// predeterminado); las que solo usa la landing (assistant, capture-lead) se declaran 'landing' y no lo reciben.
+// CORS no autentica ni autoriza: cada función sigue validando JWT/rol.
 export const ORIGENES_BASE: readonly string[] = [
   'https://sistema-renovacell.netlify.app',
   'https://sistema.renovacell.mx',
@@ -22,6 +27,11 @@ export const ORIGENES_BASE: readonly string[] = [
   'http://localhost:4173',
   'http://127.0.0.1:5173',
 ]
+// Puertas de la SPA que no sirven la landing (solo alcance 'app').
+export const ORIGENES_APP: readonly string[] = [
+  'https://portal.renovacell.mx',
+]
+export type AlcanceCors = 'app' | 'landing'
 // Previsualizaciones de Netlify del MISMO sitio (solo Netlify puede crear ese subdominio).
 const PREVIEW_NETLIFY = /^https:\/\/[a-z0-9-]+--sistema-renovacell\.netlify\.app$/
 
@@ -40,17 +50,17 @@ function envPorDefecto(k: string): string | undefined {
   try { return (globalThis as { Deno?: { env?: { get?: (k: string) => string | undefined } } }).Deno?.env?.get?.(k) ?? undefined } catch { return undefined }
 }
 
-export function origenPermitido(origen: string | null | undefined, env: (k: string) => string | undefined = envPorDefecto): boolean {
+export function origenPermitido(origen: string | null | undefined, env: (k: string) => string | undefined = envPorDefecto, alcance: AlcanceCors = 'app'): boolean {
   if (!origen) return false
   const o = origen.trim()
   if (!o || o === 'null') return false
-  return ORIGENES_BASE.includes(o) || PREVIEW_NETLIFY.test(o) || origenesExtra(env).includes(o)
+  return ORIGENES_BASE.includes(o) || (alcance === 'app' && ORIGENES_APP.includes(o)) || PREVIEW_NETLIFY.test(o) || origenesExtra(env).includes(o)
 }
 
 /** Cabeceras CORS para esta petición, o null si no corresponde devolver ninguna. */
-export function cabecerasCors(req: Request, env: (k: string) => string | undefined = envPorDefecto): Record<string, string> | null {
+export function cabecerasCors(req: Request, env: (k: string) => string | undefined = envPorDefecto, alcance: AlcanceCors = 'app'): Record<string, string> | null {
   const origen = req.headers.get('origin')
-  if (!origenPermitido(origen, env)) return null
+  if (!origenPermitido(origen, env, alcance)) return null
   return { ...CABECERAS_BASE, 'Access-Control-Allow-Origin': origen!.trim(), 'Vary': 'Origin' }
 }
 
@@ -58,10 +68,10 @@ export function cabecerasCors(req: Request, env: (k: string) => string | undefin
  * Envuelve un handler: resuelve el preflight y añade las cabeceras CORS a cualquier
  * respuesta. El handler no necesita saber nada de CORS.
  */
-export function conCors(handler: (req: Request) => Promise<Response> | Response, env: (k: string) => string | undefined = envPorDefecto) {
+export function conCors(handler: (req: Request) => Promise<Response> | Response, env: (k: string) => string | undefined = envPorDefecto, alcance: AlcanceCors = 'app') {
   return async (req: Request): Promise<Response> => {
     const origen = req.headers.get('origin')
-    const h = cabecerasCors(req, env)
+    const h = cabecerasCors(req, env, alcance)
     if (req.method === 'OPTIONS') {
       if (origen && !h) return new Response('origen no permitido', { status: 403 })
       return new Response(null, { status: 204, headers: h ?? {} })

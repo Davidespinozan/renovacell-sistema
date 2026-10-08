@@ -2,7 +2,9 @@
 // sin Origin (servidor a servidor / webhooks) nada cambia; OPTIONS correcto; nunca se
 // refleja un Origin arbitrario.
 import { describe, it, expect } from 'vitest'
-import { ORIGENES_BASE, origenPermitido, cabecerasCors, conCors } from '../../../../../supabase/functions/_shared/cors'
+// @ts-expect-error tipos de node no incluidos en el tsconfig del front (vitest corre en Node)
+import { readFileSync } from 'node:fs'
+import { ORIGENES_BASE, ORIGENES_APP, origenPermitido, cabecerasCors, conCors } from '../../../../../supabase/functions/_shared/cors'
 
 const env = (vars: Record<string, string | undefined>) => (k: string) => vars[k]
 const sinEnv = env({})
@@ -76,5 +78,69 @@ describe('cabecerasCors / conCors', () => {
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBe('30')
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://renovacell.mx')
+  })
+})
+
+// CX-0B · portal.renovacell.mx = otra puerta de la MISMA SPA: permitido en las funciones de la app (alcance
+// 'app', el predeterminado) y NO en las de la landing (assistant, capture-lead). Sin comodines ni reflejo.
+describe('CX-0B · portal.renovacell.mx por alcance', () => {
+  const PORTAL = 'https://portal.renovacell.mx'
+  it('la lista del portal es exactamente esa puerta; la base no cambió; nunca "*"', () => {
+    expect([...ORIGENES_APP]).toEqual([PORTAL])
+    expect(ORIGENES_BASE).not.toContain(PORTAL)
+    expect([...ORIGENES_BASE, ...ORIGENES_APP].some((o) => o.includes('*'))).toBe(false)
+  })
+  it('alcance app (predeterminado): portal permitido con ACAO = portal y Vary: Origin', async () => {
+    expect(origenPermitido(PORTAL, sinEnv)).toBe(true)
+    expect(origenPermitido(PORTAL, sinEnv, 'app')).toBe(true)
+    const res = await conCors(handler, sinEnv)(req(PORTAL))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(PORTAL)
+    expect(res.headers.get('Vary')).toBe('Origin')
+  })
+  it('preflight del portal en la app: 204, métodos y cabeceras (authorization, apikey, content-type)', async () => {
+    const pre = await conCors(handler, sinEnv)(req(PORTAL, 'OPTIONS'))
+    expect(pre.status).toBe(204)
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(PORTAL)
+    expect(pre.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS')
+    for (const h of ['authorization', 'apikey', 'content-type', 'x-client-info']) expect(pre.headers.get('Access-Control-Allow-Headers')).toContain(h)
+    expect(pre.headers.get('Access-Control-Allow-Credentials')).toBeNull()
+  })
+  it('alcance landing: el portal NO recibe cabeceras y su preflight es 403; la landing sigue permitida', async () => {
+    expect(origenPermitido(PORTAL, sinEnv, 'landing')).toBe(false)
+    expect(cabecerasCors(req(PORTAL), sinEnv, 'landing')).toBeNull()
+    const pre = await conCors(handler, sinEnv, 'landing')(req(PORTAL, 'OPTIONS'))
+    expect(pre.status).toBe(403)
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    for (const o of ['https://renovacell.mx', 'https://www.renovacell.mx', 'https://sistema.renovacell.mx']) {
+      expect(origenPermitido(o, sinEnv, 'landing'), o).toBe(true)
+    }
+  })
+  it('imitaciones del portal: rechazadas en ambos alcances (sin reflejo)', async () => {
+    for (const o of ['https://portal.renovacell.mx.evil.com', 'http://portal.renovacell.mx', 'https://portal.renovacell.mx/', 'https://xportal.renovacell.mx',
+      'https://portal.renovacell.mx:8443', 'https://evil.com/portal.renovacell.mx', 'https://staging.portal.renovacell.mx']) {
+      expect(origenPermitido(o, sinEnv, 'app'), o).toBe(false)
+      expect(origenPermitido(o, sinEnv, 'landing'), o).toBe(false)
+      const pre = await conCors(handler, sinEnv)(req(o, 'OPTIONS'))
+      expect(pre.status, o).toBe(403)
+    }
+  })
+  it('sin Origin (servidor a servidor) nada cambia en ningún alcance', async () => {
+    for (const a of ['app', 'landing'] as const) {
+      const res = await conCors(handler, sinEnv, a)(req(undefined))
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    }
+  })
+  it('las funciones reales declaran su alcance: solo assistant y capture-lead son landing; las 17 de la SPA usan el predeterminado', () => {
+    const base = new URL('../../../../../supabase/functions/', import.meta.url)
+    const LANDING = ['assistant', 'capture-lead']
+    const APP = ['cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invite-doctor',
+      'meta-send', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verify-cedula', 'visitor']
+    for (const f of [...LANDING, ...APP]) {
+      const src = readFileSync(new URL(`${f}/index.ts`, base), 'utf8')
+      expect((src.match(/conCors\(/g) ?? []).length, f).toBe(1)
+      expect(/\}, undefined, 'landing'\)\)/.test(src), f).toBe(LANDING.includes(f))
+    }
   })
 })

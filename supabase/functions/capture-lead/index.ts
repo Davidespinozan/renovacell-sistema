@@ -120,4 +120,4 @@ Deno.serve(conCors(async (req) => {
   }
 
   return json(200, { ok: true })
-}))
+}, undefined, 'landing'))   // CX-0B · solo la landing la llama: sin la puerta del portal

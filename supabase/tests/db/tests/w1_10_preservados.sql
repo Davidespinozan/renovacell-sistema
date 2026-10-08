@@ -21,7 +21,9 @@ begin
     ('orders_estado_terminal()',                              '6c44978c08600b0ffd7777743757c359'),
     ('pay_order(uuid,text,text)',                             '3717294aa7b93a4322f5c378f6db9e38'),
     ('precio_de(uuid,uuid)',                                  'b256810a5e089355712bdeffcb423832'),
-    ('precio_de(uuid,uuid,integer)',                          '9efe19506f40e19c3dc5baeca66b9014'),
+    -- CX-0A (autorizado): precio_de/3 recibe la barrera de autorización (mismo alcance que la RLS de product_prices);
+    -- el cálculo no cambia. Hash re-anclado; el de producción previo (9efe1950…) lo restaura supabase/rollback/cx0.
+    ('precio_de(uuid,uuid,integer)',                          '349176d8415cc46db01f1eaf887c9255'),
     -- CC-0A (autorizado): profiles_guard protege además la evidencia de verificación y la
     -- autoridad comercial en meta (META_PROTEGIDA). Hash re-anclado; el resto sigue intacto.
     ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),
