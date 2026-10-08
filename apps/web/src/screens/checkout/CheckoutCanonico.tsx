@@ -2,7 +2,11 @@
 // entrega (guardada, nueva o de legado, sin pasar por Perfil) → factura opcional → crear pedido → pagar ahora
 // o después. Hoy lo abre Catálogo; MC-2 lo abrirá desde el Chat (el mismo componente, no un segundo checkout).
 // Sin servidor (modo demo) usa el motor local que le pase quien monta.
-import React, { useEffect, useState } from 'react'
+// MC-2 · Se monta en un portal sobre <body>: encima de cualquier superficie (también del cajón del chat, que sigue
+// montado debajo). Escape, el fondo y la X cierran SOLO el checkout; el foco queda atrapado en el diálogo y vuelve
+// a quien lo abrió; el scroll del fondo se bloquea y se restaura tal como estaba.
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { PaymentModal } from '../doctor/PaymentModal'
@@ -12,6 +16,9 @@ import { PerfilesFiscalesEditor } from '../../app/Cliente360Editores'
 import { cliente360 as clienteFiscalPorDefecto, type PerfilFiscal } from '../../data/ops/customer360'
 import { emptyFiscalProfile, isFiscalProfileComplete, type FiscalProfile } from '../../data/ops/fiscal'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
+import { clientOf } from '../../data/mock/profiles'
+import { DOCTOR_ID } from '../../data/mock/orders'
+import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
@@ -19,6 +26,49 @@ export interface MotorLocal {
   lineas: LineaVista[]
   total: number
   confirmar: (factura: boolean, entrega: EleccionEntrega, receptor: FiscalProfile | null) => Promise<ResultadoPedido>
+}
+
+/** Domicilio de LEGADO del doctor en sesión (si lo tiene registrado): el selector lo ofrece como opción. */
+export function domicilioLegadoDelDoctor(): ShippingAddress | null {
+  const ci = clientOf(hasSupabase ? currentUserId() : DOCTOR_ID)
+  return ci.address && ci.address !== '—' ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone } : null
+}
+
+const ENFOCABLES = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** MC-2 · Diálogo sobre <body>: Escape (fase de captura, no llega al cajón del chat), trampa de foco, foco de
+ *  vuelta a quien abrió y bloqueo del scroll del fondo restaurando el valor previo. */
+function Capa({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const caja = useRef<HTMLDivElement | null>(null)
+  const cerrar = useRef(onClose); cerrar.current = onClose
+  useEffect(() => {
+    const previo = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const primero = caja.current?.querySelector<HTMLElement>(ENFOCABLES)
+    ;(primero ?? caja.current)?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cerrar.current(); return }
+      if (e.key !== 'Tab' || !caja.current) return
+      const f = Array.prototype.slice.call(caja.current.querySelectorAll<HTMLElement>(ENFOCABLES)) as HTMLElement[]
+      if (!f.length) { e.preventDefault(); return }
+      const i = f.indexOf(document.activeElement as HTMLElement)
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus() }
+      else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus() }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      document.body.style.overflow = overflow
+      if (previo && previo.isConnected) previo.focus()
+    }
+  }, [])
+  return createPortal(
+    <div className="overlay" onClick={(e) => { e.stopPropagation(); onClose() }} data-testid="checkout-capa">
+      <div ref={caja} tabIndex={-1} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{children}</div>
+    </div>,
+    document.body,
+  )
 }
 
 export interface PropsCheckout {
@@ -66,6 +116,8 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     ? (lineasServidor.length ? lineasServidor : previas.map((p) => ({ ...p, unitario: null, subtotal: null })))
     : local?.lineas ?? []
   const total = conServidor ? totalServidor : local?.total ?? 0
+  // El carrito ya es un pedido (p. ej. confirmado en otra pestaña): se informa y NO se ofrece confirmar de nuevo.
+  const yaPedido = conServidor && !order && motor.revision?.order_id ? motor.revision.order_id : null
   // Avisos de la revisión que NO son la dirección (esa se elige aquí abajo): disponibilidad, precio, cuenta…
   const avisoRevision = conServidor && motor.revision && !motor.revision.listo && !motor.revision.order_id
     ? textoProblemasCheckout(motor.revision.problemas, servidor?.nombreDe, false) : ''
@@ -74,7 +126,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const confirm = async () => {
     if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
     if (invoice && !fiscalOk) { setShowFiscalErr(true); return } // HARD GATE
-    if (creando) return
+    if (creando || yaPedido) return
     setCreando(true); setErrorPedido(null)
     const r = conServidor
       ? await motor.confirmar(choice, invoice, invoice ? perfilSel : null)
@@ -101,9 +153,20 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   }
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Revisar pedido" data-testid="checkout-canonico">
-        {order ? (
+    <Capa onClose={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Revisar pedido" data-testid="checkout-canonico">
+        {yaPedido ? (
+          <div className="mbody">
+            <div className="success" data-testid="checkout-ya-pedido">
+              <div className="ck"><Icon name="check" /></div>
+              <h3>Este carrito ya es un pedido</h3>
+              <p>Tu pedido ya quedó registrado. Consulta su estado y págalo desde <b>Mis pedidos</b>.</p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'center' }}>
+                <button className="btn" type="button" onClick={onClose}>Entendido</button>
+              </div>
+            </div>
+          </div>
+        ) : order ? (
           <div className="mbody">
             <div className="success" data-testid="checkout-exito">
               <div className="ck"><Icon name="check" /></div>
@@ -178,6 +241,6 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
           </>
         )}
       </div>
-    </div>
+    </Capa>
   )
 }

@@ -14,6 +14,7 @@ import opsSrc from './carrito.ts?raw'
 import panelSrc from '../../screens/chat/CarritoPanel.tsx?raw'
 import catalogoLegacy from '../../screens/doctor/Catalogo.tsx?raw'
 import motorSrc from '../../screens/checkout/checkoutMotor.ts?raw'
+import checkoutSrc from '../../screens/checkout/CheckoutCanonico.tsx?raw'
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
@@ -76,12 +77,13 @@ describe('Edge cart + IA + frontend', () => {
     expect(codigo(valSrc)).toMatch(/if \(RE_PEDIDO_CREADO\.test\(t\)\) return \{ ok: false, motivo: 'pedido_sin_evidencia' \}/)
     expect(codigo(polSrc)).toMatch(/NUNCA afirmas que un pedido fue creado/)
   })
-  it('AD · UI: revisión → botón "Confirmar pedido" → pedido → pago DESPUÉS; mismo operation_id en reintentos; Stripe solo si el usuario elige', () => {
+  it('AD · UI (MC-2): el chat abre el checkout CANÓNICO compartido → pedido → pago DESPUÉS y solo si el usuario elige; misma clave en reintentos', () => {
     const p = codigo(panelSrc)
-    expect(p).toMatch(/data-testid="checkout-confirmar">Confirmar pedido<\/button>/)
-    expect(p).toMatch(/await cliente\.confirmarCheckout\(revision\.review_id, revision\.cart_rev, opConfirmar\)/)
-    expect(p).toMatch(/onClick=\{\(\) => void startStripeCheckout\(pedido\.order_id!\)\}/)
+    expect(p).toMatch(/<CheckoutCanonico[\s\S]*servidor=\{\{/)
+    expect(p).not.toMatch(/confirmarCheckout|revisarCheckout|startStripeCheckout/)   // sin un segundo motor en el panel
     expect(p).not.toMatch(/crear_pedido|createOrder|supabase\./)
+    expect(codigo(checkoutSrc)).toMatch(/if \(order && payNow\)/)   // el pago (tarjeta/transferencia) solo tras "Pagar ahora"
+    expect(codigo(motorSrc)).toMatch(/let op = claves\.current\.get\(intento\)/)
     expect(codigo(opsSrc)).toMatch(/confirmarCheckout\(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion\(\), factura = false, perfil_fiscal_id: string \| null = null\)/)
   })
   it('AC · CC-7/C360-F3 · el Catálogo confirma por el checkout CANÓNICO con snapshot de dirección y el PERFIL FISCAL elegido (lo congela el servidor)', () => {

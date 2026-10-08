@@ -40,19 +40,21 @@ export function argsRevision(e: EleccionEntrega | null): [string | null, Shippin
 }
 
 /** Líneas e importe a mostrar: SIEMPRE los de la revisión del servidor (nunca precios de lista locales). */
+const monto = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null)   // solo importes numéricos del servidor
+
 export function vistaDe(r: RevisionCheckout | null): { lineas: LineaVista[]; total: number | null } {
   if (!r) return { lineas: [], total: null }
-  if (r.lineas?.length) return { lineas: r.lineas.map((l) => ({ product_id: l.product_id, nombre: l.nombre, qty: l.qty, unitario: l.precio_unitario, subtotal: l.subtotal })), total: r.total ?? null }
+  if (r.lineas?.length) return { lineas: r.lineas.map((l) => ({ product_id: l.product_id, nombre: l.nombre, qty: l.qty, unitario: monto(l.precio_unitario), subtotal: monto(l.subtotal) })), total: monto(r.total) }
   const items = r.proyeccion?.items ?? []
   return {
-    lineas: items.map((i) => ({ product_id: i.product_id, nombre: i.nombre, qty: i.cantidad, unitario: i.precio.unitario ?? null, subtotal: i.precio.subtotal ?? null, por_volumen: i.precio.por_volumen })),
-    total: r.total ?? null,
+    lineas: items.map((i) => ({ product_id: i.product_id, nombre: i.nombre, qty: i.cantidad, unitario: monto(i.precio?.unitario), subtotal: monto(i.precio?.subtotal), por_volumen: i.precio?.por_volumen })),
+    total: monto(r.total),
   }
 }
 
 /** Problemas de la revisión en lenguaje del checkout. La dirección se resuelve AQUÍ (no en Perfil). */
 export function textoProblemasCheckout(problemas: RevisionCheckout['problemas'], nombre?: (id: string) => string, conDireccion = true): string {
-  return problemas
+  return (problemas ?? [])
     .filter((p) => conDireccion || p !== 'REQUIERE_DIRECCION')
     .map((p) => (p === 'REQUIERE_DIRECCION' ? 'revisa la dirección de entrega (calle y número, código postal de 5 dígitos)' : textoProblemas([p], nombre)))
     .join(' · ')

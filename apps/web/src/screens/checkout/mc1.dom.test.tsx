@@ -109,6 +109,7 @@ describe('MC-1 · importes del servidor', () => {
     expect(claveEntrega({ address: { line1: 'x' }, locationId: 'L1' })).toBe('loc:L1')
     expect(claveEntrega({ address: { line1: 'x' } })).not.toBe(claveEntrega({ address: { line1: 'y' } }))
     expect(claveEntrega(null)).toBe('ninguna')
+    expect(vistaDe({ listo: false, cart_id: 'K', problemas: [], total: { monto: 1 } as unknown as number }).total).toBeNull()   // nunca "$NaN"
   })
 })
 

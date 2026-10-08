@@ -17,15 +17,12 @@ import { effectiveUnitPrice, volumePromoLabel, volumeSavings } from '../../data/
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
-import { clientOf } from '../../data/mock/profiles'
-import { DOCTOR_ID } from '../../data/mock/orders'
-import { hasSupabase, currentUserId } from '../../lib/supabase'
-import type { ShippingAddress } from '../../data/ops/shippingAddress'
+import { hasSupabase } from '../../lib/supabase'
 import type { ProductSafe } from '../../data/types'
 import type { PedidoCreado } from '../../data/store/ordersStore'
 import { reloadOrders } from '../../data/store/ordersStore'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
-import { CheckoutCanonico, type MotorLocal } from '../checkout/CheckoutCanonico'
+import { CheckoutCanonico, domicilioLegadoDelDoctor, type MotorLocal } from '../checkout/CheckoutCanonico'
 import type { ConfigServidor, ResultadoPedido } from '../checkout/checkoutMotor'
 
 
@@ -137,11 +134,7 @@ export function Catalogo() {
 
   // Domicilio base del doctor (si lo tiene registrado). Si no, el checkout pide la
   // dirección de entrega — el pedido siempre viaja con una dirección.
-  const myId = hasSupabase ? currentUserId() : DOCTOR_ID
-  const ci = clientOf(myId)
-  const baseAddr: ShippingAddress | null = ci.address && ci.address !== '—'
-    ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
-    : null
+  const baseAddr = domicilioLegadoDelDoctor()
 
   // MC-1 · el checkout es el CANÓNICO compartido (screens/checkout): revisión del servidor (importes, precio por
   // volumen, disponibilidad, dirección) → confirmación idempotente → pedido W1 en la misma transacción que

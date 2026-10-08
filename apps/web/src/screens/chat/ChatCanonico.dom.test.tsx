@@ -70,7 +70,7 @@ describe('carrito', () => {
     expect(screen.queryByTestId('carrito-item')).toBeNull()
     fireEvent.click(chip)
     expect(await screen.findByTestId('carrito-item')).toHaveTextContent('Golden Placenta Mask')
-    expect(screen.getByTestId('carrito-revisar')).toHaveTextContent('Revisar y confirmar pedido')
+    expect(screen.getByTestId('carrito-revisar')).toHaveTextContent('Revisar pedido')
   })
 })
 

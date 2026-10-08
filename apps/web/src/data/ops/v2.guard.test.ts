@@ -54,11 +54,11 @@ describe('V2-B · redactor, móvil y CSS', () => {
     expect(c).not.toMatch(/className="btn" onClick=\{onSalir\}/)
     expect(c).not.toMatch(/estilos\.pagina|style=\{estilos/)        // sin estilos inline de panel de ERP
   })
-  it('chip de carrito: vacío sin franja; botón de confirmar y Stripe intactos (CC-6)', () => {
+  it('chip de carrito: vacío sin franja; "Revisar pedido" abre el checkout canónico compartido (MC-2)', () => {
     const p = codigo(panelSrc)
-    expect(p).toMatch(/if \(cart\.n_items === 0 && !pedido && !revision\) return null/)
+    expect(p).toMatch(/if \(cart\.n_items === 0\) return capa/)
     expect(p).toMatch(/className="rc-chip"/)
-    expect(p).toMatch(/data-testid="checkout-confirmar">Confirmar pedido<\/button>/)
+    expect(p).toMatch(/'Revisar pedido' : 'Revisar para pedir'/)
   })
   it('19/20/22 · móvil: dvh + teclado, bloqueo de scroll, reduced-motion; .btn-primary y variables definidas', () => {
     expect(shell).toMatch(/\.chat-drawer\{width:100%;height:calc\(100dvh - var\(--rc-kb,0px\)\)/)
