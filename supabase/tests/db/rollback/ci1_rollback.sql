@@ -2,6 +2,7 @@
 -- carrito"), retira _cc_episodio_vivo y cc_carts.handoff_session_id, sin tocar mensajes, sesiones ni eventos.
 begin;
 create temp table _ci1_antes as select (select count(*) from public.cc_conversation_sessions) s, (select count(*) from public.cc_conversation_events) e, (select count(*) from public.cc_messages) m, (select count(*) from public.cc_carts) k;
+\ir ../../../rollback/chatv2d1/99_down.sql   -- CHAT V2-D1 (130) se baja primero
 \ir ../../../rollback/ci1/99_down.sql
 do $t$
 begin

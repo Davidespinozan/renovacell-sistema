@@ -140,7 +140,10 @@ begin
   kI := (public.cc_carrito_abrir('doctor', null, dI) ->> 'cart_id')::uuid;
   r := public.cc_carrito_agregar(kI, 'doctor', null, dI, pA, 1, 'i-2');
   perform tests.ok((select count(*) = 1 and bool_and(ordinal = 1) from public.cc_conversation_sessions where conversation_id = cI), 'CI1-14/17 · con sesión abierta, el episodio NO crea otra sesión');
-  perform tests.eq((select last_activity_at from public.cc_conversation_sessions where conversation_id = cI and estado = 'abierta'), v_lact, 'CI1-21 · sys:handoff no renueva la actividad (C2 intacto)');
+  -- V2-D1 (130): el episodio también inserta el saludo del asistente, que SÍ es actividad (C2); el aviso solo no renueva.
+  perform tests.ok(not public._cc_mensaje_renueva('system', 'sys:handoff:x:1'), 'CI1-21 · el aviso sys:handoff por sí solo no renueva la actividad (C2 intacto)');
+  perform tests.eq((select last_activity_at from public.cc_conversation_sessions where conversation_id = cI and estado = 'abierta'),
+                   (select created_at from public.cc_messages where conversation_id = cI and client_message_id like 'tpl:saludo:%'), 'CI1-21 · la actividad la renueva el saludo (V2-D1)');
   perform tests.ok((select bool_and(e.session_id = s.id) from public.cc_conversation_events e join public.cc_conversation_sessions s on s.conversation_id = e.conversation_id and s.estado = 'abierta' where e.conversation_id = cI and e.tipo in ('human_handoff_requested', 'human_assigned')), 'CI1-19 · eventos en la sesión ya abierta');
 
   -- ══ CI1-22 / 23 / 24 · autoridad de la IA intacta ══
