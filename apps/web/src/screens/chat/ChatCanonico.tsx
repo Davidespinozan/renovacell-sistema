@@ -51,14 +51,14 @@ export function subtituloDe(conv: Conversacion | null, asesor: boolean): string 
 }
 
 /**
- * CI-2 · Tarjeta de atención comercial (sustituye al aviso del sistema en el hilo actual). Fija e inmediata:
- * confirma que se avisó al equipo y que la IA sigue disponible. Nombra a la asesora solo si el servidor la
- * asignó; nunca promete tiempos ni horarios.
+ * CI-2 → V2-D2 · Estado compacto de la atención comercial (sustituye al aviso del sistema en el hilo actual). La
+ * bienvenida la da el saludo persistido por D1 (mensaje del asistente): aquí solo el estado, sin repetirla.
+ * Nombra a la asesora solo si el servidor la asignó; nunca promete tiempos ni horarios.
  */
 export function textoHandoff(conv: Pick<Conversacion, 'asesor_nombre' | 'handoff'>): { titulo: string; detalle: string } {
   const nombre = conv.handoff?.asignado ? primerNombre(conv.asesor_nombre) : null
-  if (nombre) return { titulo: `Ya avisé a ${nombre}, tu ${ETIQUETA_ASESOR.toLowerCase()}.`, detalle: 'Mientras se incorpora, puedo ayudarte con productos, disponibilidad y formas de pago.' }
-  return { titulo: 'Ya avisé a nuestro equipo comercial.', detalle: 'Mientras tu asesor se incorpora, puedo ayudarte con productos, disponibilidad y formas de pago.' }
+  if (nombre) return { titulo: `${nombre}, tu ${ETIQUETA_ASESOR.toLowerCase()}, ya tiene tu solicitud.`, detalle: '' }
+  return { titulo: 'Nuestro equipo comercial ya tiene tu solicitud.', detalle: '' }
 }
 
 // Separadores de día con el reloj del NEGOCIO (data/periodo.ts): "Hoy"/"Ayer" según el día de Mazatlán, no el del dispositivo.
@@ -223,7 +223,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <div className="rc-card-mark" aria-hidden>{(nombreAsesor ?? 'R').slice(0, 1).toUpperCase()}</div>
         <div className="rc-card-body">
           <div className="rc-card-title">{t.titulo}</div>
-          <div className="rc-card-sub">{t.detalle}</div>
+          {t.detalle && <div className="rc-card-sub">{t.detalle}</div>}
           {conv.handoff?.puede_rechazar && (
             <button type="button" className="rc-link" onClick={() => accion(() => cliente.rechazarAsesor(convId!))} data-testid="btn-rechazar-asesor">Seguir solo con el asistente</button>
           )}

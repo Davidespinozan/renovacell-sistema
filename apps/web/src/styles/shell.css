@@ -158,7 +158,7 @@ svg{display:block}
 .canvas #content > .grid > *:nth-child(6){animation-delay:.23s}
 /* Lift sutil en tarjetas tipo "tile" e interactivas. */
 .card.sig:hover,.pcard:hover,.syscard:hover,.alert:hover,.card.clickable:hover{box-shadow:var(--sh-card-h);transform:translateY(-2px)}
-@media (prefers-reduced-motion:reduce){.card,.canvas #content > .grid > *,.chat-fab,.chat-fab--pulso,.chat-drawer,.chat-drawer-wrap,.sheet,.sheet-wrap,.overlay,.modal{animation:none}.chat-fab,.chat-drawer{transition:none}.card.sig:hover,.pcard:hover,.syscard:hover,.alert:hover,.card.clickable:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){.card,.canvas #content > .grid > *,.chat-fab,.chat-fab--pulso,.chat-vista,.chat-drawer,.chat-drawer-wrap,.sheet,.sheet-wrap,.overlay,.modal{animation:none}.chat-fab,.chat-drawer{transition:none}.card.sig:hover,.pcard:hover,.syscard:hover,.alert:hover,.card.clickable:hover{transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .eyebrow{display:flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mid);font-weight:600;margin-bottom:16px}
 .eyebrow::before{content:"";width:18px;height:2px;border-radius:2px;background:var(--green)}
@@ -472,7 +472,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
 .chat-fab:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(0,0,0,.32)}
 .chat-fab:focus-visible{outline:3px solid var(--green-soft,#5fb873);outline-offset:3px}
 .chat-fab svg{width:26px;height:26px}
-.chat-fab--pulso{animation:rcpulso 1.3s ease-out 2}
+.chat-fab--pulso{animation:rcpulso 1.2s ease-out 1}   /* V2-D2 · un solo pulso suave */
 @keyframes rcpulso{0%{box-shadow:0 10px 28px rgba(0,0,0,.28),0 0 0 0 rgba(51,174,100,.55)}70%{box-shadow:0 10px 28px rgba(0,0,0,.28),0 0 0 14px rgba(51,174,100,0)}100%{box-shadow:0 10px 28px rgba(0,0,0,.28),0 0 0 0 rgba(51,174,100,0)}}
 .chat-fab-asesor{position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:var(--green-soft);border:2px solid #fff}
 .chat-fab-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--danger,#b42318);color:#fff;font-size:11.5px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
@@ -482,9 +482,23 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--hueso)}tr:last-child td
 @keyframes slidein{from{transform:translateX(100%)}to{transform:none}}
 /* Con un modal/hoja abierto, el lanzador no estorba los botones de confirmar/cancelar. */
 body:has(.overlay) .chat-fab, body:has(.sheet-wrap) .chat-fab, body:has(.chat-drawer-wrap) .chat-fab{display:none}
+/* V2-D2 · Vista previa no intrusiva junto a la burbuja: sin overlay, sin foco, ~6 s, 2 líneas, cerrable */
+.chat-vista-zona{position:fixed;right:18px;bottom:84px;z-index:57;display:flex;justify-content:flex-end;max-width:min(280px,calc(100vw - 36px));pointer-events:none}
+.chat-vista{pointer-events:auto;display:flex;align-items:flex-start;gap:2px;background:#fff;color:var(--ink,#1c2118);border:1px solid var(--line,#e6e3dc);border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:9px 4px 9px 12px;animation:rcvista .22s ease-out}
+.chat-vista-cuerpo{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;min-height:40px;border-radius:10px}
+.chat-vista-de{font-size:12px;font-weight:700;color:var(--green-deep,#1f6b3a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-vista-mas{font-weight:600;color:var(--ink-3,#6b6f66)}
+.chat-vista-texto{font-size:13.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.chat-vista-cerrar{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:36px;height:36px;display:grid;place-items:center;border-radius:50%;color:var(--ink-3,#6b6f66);font-size:13px;position:relative}
+.chat-vista-cerrar::after{content:'';position:absolute;inset:-4px;border-radius:50%}
+.chat-vista-cerrar:hover{background:var(--hueso,#f4f2ec)}
+.chat-vista-cuerpo:focus-visible,.chat-vista-cerrar:focus-visible{outline:2px solid var(--green-soft,#33ae64);outline-offset:2px}
+@keyframes rcvista{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+body:has(.overlay) .chat-vista-zona, body:has(.sheet-wrap) .chat-vista-zona, body:has(.chat-drawer-wrap) .chat-vista-zona{display:none}
 body.chat-open{overflow:hidden}
 @media (max-width:900px){
   .chat-fab{bottom:calc(96px + env(safe-area-inset-bottom,0px));right:14px}
+  .chat-vista-zona{right:14px;bottom:calc(160px + env(safe-area-inset-bottom,0px));max-width:min(280px,calc(100vw - 28px))}
   /* Móvil: hoja casi completa desde abajo (mismo patrón que .sheet), sin desbordar el viewport. */
   .chat-drawer-wrap{align-items:flex-end;justify-content:center}
   .chat-drawer{width:100%;height:calc(100dvh - var(--rc-kb,0px));max-height:calc(100dvh - var(--rc-kb,0px));border-radius:0;animation:chatsheetup .28s cubic-bezier(.2,.7,.3,1)}

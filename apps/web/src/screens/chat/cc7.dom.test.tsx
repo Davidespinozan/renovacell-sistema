@@ -31,8 +31,8 @@ describe('ChatCanonico · aviso de atención humana (doctor)', () => {
   it('CI-2 · sin asignar: "ya avisé al equipo comercial"; la IA sigue; botón para rechazar al asesor', async () => {
     const f = chatFalso({ modo: 'human_requested', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: false, asignado: false, puede_rechazar: true } })
     render(<ChatCanonico cliente={f.c} conCarrito={false} intervaloMs={60_000} />)
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ya avisé a nuestro equipo comercial.')
-    expect(screen.getByTestId('aviso-handoff')).toHaveTextContent('Mientras tu asesor se incorpora, puedo ayudarte con productos, disponibilidad y formas de pago.')
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Nuestro equipo comercial ya tiene tu solicitud.')
+    expect(screen.getByTestId('aviso-handoff').textContent).not.toMatch(/puedo ayudarte/)   // V2-D2 · no repite el saludo de D1
     fireEvent.click(screen.getByTestId('btn-rechazar-asesor'))
     await waitFor(() => expect(f.llamadas.some((l) => l.fn === 'rechazarAsesor' && l.args[0] === 'C1')).toBe(true))
     expect(screen.queryByText(/en breve/)).toBeNull()   // nunca la promesa vieja
@@ -40,14 +40,14 @@ describe('ChatCanonico · aviso de atención humana (doctor)', () => {
   it('CI-2 · fuera de horario (o sin horario): sin inventar horarios ni prometer inmediatez; nombre solo si está asignada', async () => {
     const f = chatFalso({ modo: 'human_assigned', asesor_nombre: 'Ana', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: true, asignado: true, puede_rechazar: true } })
     render(<ChatCanonico cliente={f.c} conCarrito={false} intervaloMs={60_000} />)
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ya avisé a Ana, tu asesora.')
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ana, tu asesora, ya tiene tu solicitud.')
     expect(screen.getByTestId('chat-modo')).toHaveTextContent('Avisamos a Ana · el asistente sigue contigo')
     expect(screen.queryByText(/horario|pronto|en breve/)).toBeNull()
   })
   it('CI-2 · asignado sin nombre del servidor: copia genérica; con la sesión humana activa no hay aviso ni botón de rechazo', async () => {
     const f = chatFalso({ modo: 'human_assigned', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: false, asignado: true, puede_rechazar: true } })
     render(<ChatCanonico cliente={f.c} conCarrito={false} intervaloMs={60_000} />)
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ya avisé a nuestro equipo comercial.')
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Nuestro equipo comercial ya tiene tu solicitud.')
     expect(screen.getByTestId('chat-modo')).toHaveTextContent('Avisamos a tu asesor · el asistente sigue contigo')
     cleanup()
     const g = chatFalso({ modo: 'human_active', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: false, asignado: true, puede_rechazar: false } })

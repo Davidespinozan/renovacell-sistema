@@ -84,17 +84,19 @@ describe('ChatFlotante', () => {
     vi.restoreAllMocks()
   })
 
-  it('V2-A 1 · un handoff confirmado por el servidor abre el cajón cerrado y muestra la tarjeta', async () => {
+  it('V2-A 1 → V2-D2 · un handoff confirmado por el servidor NO abre el cajón; abrir a mano muestra el estado comercial', async () => {
     const { c } = clienteFalso(0, [{ seq: 1, actor: 'system', propio: false }], { modo: 'human_assigned', asesor_nombre: 'Lucía', handoff: { origen: 'carrito', cart_id: 'K1', fuera_horario: null, asignado: true, puede_rechazar: true } })
     render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /></Como></RoleProvider>)
     await screen.findByTestId('chat-fab')
     expect(screen.queryByTestId('chat-drawer')).toBeNull()
     await act(async () => { chatUi.solicitarApertura({ motivo: 'first_item_handoff', conversationId: 'C1', cartId: 'K1', episodio: 'K1:1' }) })
-    expect(await screen.findByTestId('chat-drawer')).toBeTruthy()
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ya avisé a Lucía, tu asesora.')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(screen.queryByTestId('chat-drawer')).toBeNull()                       // nunca se abre solo
+    expect(chatUi.getSnapshot()).toBeNull()
+    fireEvent.click(screen.getByTestId('chat-fab'))                              // apertura explícita
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Lucía, tu asesora, ya tiene tu solicitud.')
     expect(screen.getAllByTestId('chat-canonico').length).toBe(1)
     expect(document.body.classList.contains('chat-open')).toBe(true)
-    expect(chatUi.getSnapshot()).toBeNull()
   })
   it('V2-A 5 · si ya está abierto, una nueva solicitud no duplica ni reabre; una segunda del mismo carrito se ignora', async () => {
     const { c } = clienteFalso(0, [])
@@ -113,11 +115,13 @@ describe('ChatFlotante', () => {
     expect(screen.queryByTestId('chat-drawer')).toBeNull(); expect(screen.queryByTestId('chat-canonico')).toBeNull()
     expect(chatUi.getSnapshot()).toBeNull()
   })
-  it('V2-A 7/8 · mensaje del asesor con el chat cerrado ⇒ badge + pulso, sin abrir; el aviso del handoff vivo cuenta', async () => {
+  it('V2-A 7/8 → V2-D2 · lo no leído previo al montaje: badge (asesor sí; aviso del sistema en espera no), sin pulso, sin abrir', async () => {
     const { c } = clienteFalso(0, [{ seq: 1, actor: 'seller', propio: false }, { seq: 2, actor: 'system', propio: false }], { modo: 'human_assigned', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: true } })
     render(<RoleProvider><Como rol="doctor" pantalla="catalogo"><ChatFlotante cliente={c} /></Como></RoleProvider>)
-    expect((await screen.findByTestId('chat-fab-badge')).textContent).toBe('2')
-    await waitFor(() => expect(screen.getByTestId('chat-fab').className).toContain('chat-fab--pulso'))
+    expect((await screen.findByTestId('chat-fab-badge')).textContent).toBe('1')
+    await new Promise((r) => setTimeout(r, 30))
+    expect(screen.getByTestId('chat-fab').className).not.toContain('chat-fab--pulso')   // lo histórico no anima
+    expect(screen.queryByTestId('chat-vista')).toBeNull()
     expect(screen.queryByTestId('chat-drawer')).toBeNull()
   })
   it('V2-A 9 · avisos internos del sistema sin handoff vivo no inflan el badge', async () => {

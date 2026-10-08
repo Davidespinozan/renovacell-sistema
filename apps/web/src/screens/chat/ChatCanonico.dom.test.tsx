@@ -82,7 +82,7 @@ describe('hilo', () => {
     render(<ChatCanonico panel embebido cliente={f.cliente} conCarrito={false} intervaloMs={60_000} />)
     const card = await screen.findByTestId('aviso-handoff')
     expect(card.className).toContain('rc-card')
-    expect(card).toHaveTextContent('Ya avisé a Lucía, tu asesora.')   // CI-2 · asignada ⇒ su nombre; sin promesa de tiempo
+    expect(card).toHaveTextContent('Lucía, tu asesora, ya tiene tu solicitud.')   // V2-D2 · estado compacto; la bienvenida es el saludo de D1
     expect(screen.getByTestId('btn-rechazar-asesor')).toHaveTextContent('Seguir solo con el asistente')
     expect(screen.queryByTestId('msg-system')).toBeNull()                       // sin duplicar: la tarjeta ocupa su lugar
     expect(screen.getByTestId('msg-doctor').className).toContain('rc-msg--own')

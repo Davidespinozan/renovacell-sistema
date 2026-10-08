@@ -27,21 +27,20 @@ describe('V2-A · apertura y actividad', () => {
     expect(s).toMatch(/h\.estado !== 'solicitado' \|\| h\.ya_en_curso/)
     expect(s).not.toMatch(/qty_despues|n_items|content|seller/)
   })
-  it('el lanzador abre una vez por carrito, nunca sobre la pantalla de chat ni si ya está abierto; sin notificaciones del navegador', () => {
+  it('V2-D2 · el episodio comercial NO abre el chat: se marca por episodio y despierta la lectura; sin notificaciones del navegador', () => {
     const l = codigo(lanzadorSrc)
-    expect(l).toMatch(/if \(!visible\) \{ chatUi\.consumir\(solicitud\.id\); return \}/)
-    // Chat V2-C4 · V2-A pasa por la autoridad única: si ya está abierto no reabre; marca el carrito solo si de verdad abrió.
-    // CI-2 · dedupe por EPISODIO (no por carrito): si ya está abierto no reabre; marca el episodio solo si de verdad abrió.
-    expect(l).toMatch(/if \(abiertoRef\.current\) \{ handoffPendiente\.current = null; dejarDeVigilar\(\); return \}/)
-    expect(l).toMatch(/if \(abrirAuto\(\)\) marcarAbiertoPara\(episodio\)/)
+    expect(l).toMatch(/chatUi\.consumir\(solicitud\.id\)\n\s*if \(!visible\) return/)
+    expect(l).toMatch(/marcarAbiertoPara\(solicitud\.episodio\)\n\s*if \(!abiertoRef\.current\) void revisarRef\.current\(\)/)
+    expect(l).not.toMatch(/abrirAuto/)                                            // no existe apertura automática
+    expect((l.match(/setAbierto\(true\)/g) ?? []).length).toBe(1)               // solo abrirManual abre
     expect(l).not.toMatch(/new Notification|Notification\.requestPermission/)
     expect((l.match(/<ChatCanonico /g) ?? []).length).toBe(1)
   })
-  it('badge con categorías explícitas: asesor/Dirección/IA siempre; sistema solo con handoff vivo; nunca propios', () => {
+  it('badge con categorías explícitas: asesor/Dirección/IA siempre; sistema solo con atención humana activa; nunca propios', () => {
     const l = codigo(lanzadorSrc)
     expect(l).toMatch(/if \(m\.propio\) return false/)
     expect(l).toMatch(/if \(m\.actor === 'seller' \|\| m\.actor === 'admin' \|\| m\.actor === 'ai'\) return true/)
-    expect(l).toMatch(/if \(m\.actor === 'system'\) return handoffVivo/)
+    expect(l).toMatch(/if \(m\.actor === 'system'\) return modo === 'human_active'/)
     expect(l).toMatch(/chat-fab--pulso/)
   })
 })
@@ -66,7 +65,7 @@ describe('V2-B · redactor, móvil y CSS', () => {
     expect(shell).toMatch(/body\.chat-open\{overflow:hidden\}/)
     expect(codigo(lanzadorSrc)).toMatch(/document\.body\.classList\.add\('chat-open'\)/)
     expect(codigo(lanzadorSrc)).toMatch(/window\.visualViewport/)
-    expect(shell).toMatch(/@media \(prefers-reduced-motion:reduce\)\{[^}]*\.chat-fab,\.chat-fab--pulso,\.chat-drawer,\.chat-drawer-wrap,\.sheet,\.sheet-wrap,\.overlay,\.modal\{animation:none\}/)
+    expect(shell).toMatch(/@media \(prefers-reduced-motion:reduce\)\{[^}]*\.chat-fab,\.chat-fab--pulso,\.chat-vista,\.chat-drawer,\.chat-drawer-wrap,\.sheet,\.sheet-wrap,\.overlay,\.modal\{animation:none\}/)
     expect(chat).toMatch(/@media \(prefers-reduced-motion:reduce\)/)
     expect(shell).toMatch(/\n\.btn-primary\{/)
     for (const v of ['--bg:', '--bg-2:', '--brand-soft:', '--card:']) expect(tokens).toContain(v)
