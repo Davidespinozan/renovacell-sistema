@@ -224,10 +224,15 @@ begin
   -- ══ R1 · EXPLOIT F1: registrar un cobro NUNCA da visibilidad ═════════════════════════════════
   perform set_config('request.jwt.claims', json_build_object('sub', v_s3, 'role', 'authenticated', 'email', 'otro3@test.local')::text, true); perform set_config('role', 'authenticated', true);
   perform tests.ok((select count(*) from public.orders where id = oA) = 0, 'R1.1 · POS sin relación no ve el pedido de otro vendedor');
-  perform public.registrar_cobro(gen_random_uuid(), oA, 'efectivo', 0.01);
-  perform tests.ok((select count(*) from public.orders where id = oA) = 0, 'R1.2 · F1 BLOQUEADO: tras registrar un cobro de 0.01 sigue sin verlo');
-  perform public.registrar_cobro(gen_random_uuid(), oA, 'efectivo', 0.01); perform public.registrar_cobro(gen_random_uuid(), oA, 'transferencia', 5);
-  perform tests.ok((select count(*) from public.orders where id = oA) = 0, 'R1.3 · ni con varios cobros');
+  -- SEC-B (139): POS ya no registra cobros directos (D-SEC-1). La propiedad R1 se sigue probando con asientos HEREDADOS
+  -- (anteriores a SEC-B) registrados por este POS: la autoría nunca se deriva del libro de dinero.
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 0.01)', oA), 'NO_AUTORIZADO', 'R1.2a · SEC-B: POS ya no registra cobros sobre un pedido ajeno');
+  perform tests.act_as_owner(); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oA, 'in', 'efectivo', 0.01, v_s3, 'pos');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_s3, 'role', 'authenticated', 'email', 'otro3@test.local')::text, true); perform set_config('role', 'authenticated', true);
+  perform tests.ok((select count(*) from public.orders where id = oA) = 0, 'R1.2 · F1 BLOQUEADO: con un asiento de 0.01 registrado por él sigue sin verlo');
+  perform tests.act_as_owner(); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oA, 'in', 'efectivo', 0.01, v_s3, 'pos'); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oA, 'in', 'transferencia', 5, v_s3, 'pos');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_s3, 'role', 'authenticated', 'email', 'otro3@test.local')::text, true); perform set_config('role', 'authenticated', true);
+  perform tests.ok((select count(*) from public.orders where id = oA) = 0, 'R1.3 · ni con varios asientos suyos');
   perform tests.act_as(v_admin);
   perform public.reversar_asiento(gen_random_uuid(), (select id from public.payment_entries where order_id = oA and recorded_by = v_s3 and reversal_of is null and amount = 5), 'prueba R1');
   perform set_config('request.jwt.claims', json_build_object('sub', v_s3, 'role', 'authenticated', 'email', 'otro3@test.local')::text, true); perform set_config('role', 'authenticated', true);
@@ -240,10 +245,14 @@ begin
     'R1.7 · Dirección lo ve y el cobro ajeno no cambió la atribución');
   -- escenario 6: el capturista de Ventas cobra → sigue sin permisos por capturar/cobrar
   perform set_config('request.jwt.claims', json_build_object('sub', v_s2, 'role', 'authenticated', 'email', 'caja2@test.local')::text, true); perform set_config('role', 'authenticated', true);
-  perform public.registrar_cobro(gen_random_uuid(), oV, 'efectivo', 1);
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 1)', oV), 'NO_AUTORIZADO', 'R1.8a · SEC-B: el capturista tampoco cobra directo');
+  perform tests.act_as_owner(); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oV, 'in', 'efectivo', 1, v_s2, 'pos');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_s2, 'role', 'authenticated', 'email', 'caja2@test.local')::text, true); perform set_config('role', 'authenticated', true);
   perform tests.ok((select count(*) from public.orders where id = oV) = 0, 'R1.8 · capturista que además cobra NO obtiene visibilidad (ni comisión: vendedor sigue siendo cartera)');
   -- escenario 7: pedido histórico sin operación venta_pos + cobro → no se inventa autoría
-  perform public.registrar_cobro(gen_random_uuid(), oHist, 'efectivo', 1);
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 1)', oHist), 'NO_AUTORIZADO', 'R1.9a · SEC-B: ni sobre un histórico');
+  perform tests.act_as_owner(); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oHist, 'in', 'efectivo', 1, v_s2, 'pos');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_s2, 'role', 'authenticated', 'email', 'caja2@test.local')::text, true); perform set_config('role', 'authenticated', true);
   perform tests.ok((select count(*) from public.orders where id = oHist) = 0, 'R1.9 · histórico sin autoría POS: un cobro posterior no la crea');
   -- ══ R1 · AUTORÍA NO FALSIFICABLE ══════════════════════════════════════════════════════════════
   perform set_config('request.jwt.claims', json_build_object('sub', v_s3, 'role', 'authenticated', 'email', 'otro3@test.local')::text, true); perform set_config('role', 'authenticated', true);

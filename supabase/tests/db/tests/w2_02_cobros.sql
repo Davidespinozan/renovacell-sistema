@@ -17,9 +17,15 @@ begin
   perform tests.act_as(v_doc);
   perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 100)', v_o),
     'NO_AUTORIZADO', 'el doctor no registra cobros');
-
-  -- ANTICIPO / PARCIAL (D-W2-2)
+  -- SEC-B (139) · D-SEC-1: POS cobra SOLO dentro de vender_pos; no registra cobros sobre pedidos existentes.
   perform tests.act_as(v_pos);
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 120)', v_o),
+    'NO_AUTORIZADO', 'POS no registra cobros directos (ni anticipos)');
+  perform tests.act_as_owner();
+  perform tests.eq((select count(*)::int from public.payment_entries where order_id = v_o), 0, 'el rechazo del POS no dejó asiento');
+
+  -- ANTICIPO / PARCIAL (D-W2-2): lo registra Dirección (cobro administrativo con evidencia)
+  perform tests.act_as(v_admin);
   v_op := tests.op();
   perform tests.eq(public.registrar_cobro(v_op, v_o, 'efectivo', 120) ->> 'payment_status', 'parcial',
     'anticipo de 120 sobre 300 ⇒ parcial');

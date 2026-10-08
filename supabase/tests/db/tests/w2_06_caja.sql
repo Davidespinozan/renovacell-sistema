@@ -2,6 +2,8 @@
 -- D-W2-CASH-CUTOFF: un corte cerrado establece un LÍMITE ECONÓMICO — el corte siguiente
 -- del mismo alcance arquea SOLO el efectivo posterior, nunca el ya arqueado. Una anulación
 -- no establece límite: reabre el tramo. Nada de esto se resta en el cliente.
+-- SEC-B (139): el efectivo del POS entra SOLO por vender_pos (D-SEC-1) y el POS solo cierra SU corte de cajero (D-SECB-2);
+-- los cortes del DÍA los cierran Facturación/Dirección.
 begin;
 do $t$
 declare
@@ -26,9 +28,12 @@ begin
     '10: el esperado se obtiene de una función del servidor (security definer)');
 
   -- ── 1) PRIMER corte del día: arranca en el inicio del día local ───────────────
+  perform tests.venta_pos(v_pos, 200);                 -- venta de mostrador en efectivo
+  perform tests.venta_pos(v_pos, 100, 'tarjeta');      -- no es efectivo: fuera del arqueo
   perform tests.act_as(v_pos);
-  perform public.registrar_cobro(tests.op(), v_o, 'efectivo', 200);
-  perform public.registrar_cobro(tests.op(), v_o2, 'tarjeta', 100);   -- no es efectivo: fuera del arqueo
+  perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''dia'', 500, 700)', v_hoy),
+    'solo puedes cerrar tu propio corte', 'SEC-B: el POS no cierra el corte del día');
+  perform tests.act_as(v_bill);
   perform tests.eq(public.efectivo_esperado(v_hoy, 'dia', null), 200::numeric,
     '1: el esperado sale del libro y solo cuenta efectivo');
   v_r := public.tramo_corte_caja(v_hoy, 'dia', null);
@@ -55,9 +60,9 @@ begin
     '2/5: el tramo nuevo empieza exactamente donde terminó el anterior (sin hueco ni traslape)');
 
   -- ── 3) MOVIMIENTOS ENTRE CORTES: el segundo toma SOLO los nuevos ─────────────
+  perform tests.venta_pos(v_pos, 50);
+  perform tests.venta_pos(v_pos, 30);
   perform tests.act_as(v_pos);
-  perform public.registrar_cobro(tests.op(), v_o2, 'efectivo', 50);
-  perform public.registrar_cobro(tests.op(), v_o2, 'efectivo', 30);
   perform tests.eq(public.efectivo_esperado(v_hoy, 'dia', null), 80::numeric,
     '3: el esperado es SOLO el efectivo posterior al último corte (no vuelve a contar los 200)');
   perform tests.act_as(v_admin);
@@ -79,8 +84,8 @@ begin
     '8: ningún par de cortes vigentes traslapa su tramo');
 
   -- ── 7) REINTENTO con el MISMO op_id ⇒ idempotente, sin reclamar otro tramo ────
-  perform tests.act_as(v_pos);
-  perform public.registrar_cobro(tests.op(), v_o2, 'efectivo', 10);
+  perform tests.venta_pos(v_pos, 10);
+  perform tests.act_as(v_bill);
   v_op := tests.op();
   v_r := public.registrar_corte_caja(v_op, v_hoy, 'dia', 0, 10);
   perform tests.eq(v_r ->> 'status', 'applied', '7: el corte se registra');
@@ -110,14 +115,18 @@ begin
   -- ── 6) CAJEROS DISTINTOS: cada cajero tiene su PROPIA cadena ─────────────────
   -- Los alcances 'dia' y 'cajero' son cadenas separadas por diseño (la decisión acota el
   -- límite a "un mismo alcance/cajero"): cerrar el turno de un cajero no cierra el día.
+  perform tests.venta_pos(v_pos, 25);                  -- recibido por POS
   perform tests.act_as(v_pos);
-  perform public.registrar_cobro(tests.op(), v_o2, 'efectivo', 25);   -- recibido por POS
   perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_pos), 315::numeric,
     '6: el primer corte del cajero cubre TODO lo que él recibió en el día (200+50+30+10+25)');
   perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_bill), 0::numeric,
     '6: otro cajero no arquea efectivo ajeno');
   perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''cajero'', 0, 315, null, %L)', v_hoy, v_bill),
+    'solo puedes cerrar tu propio corte', 'SEC-B: el POS no cierra el corte de otro cajero');
+  perform tests.act_as(v_bill);
+  perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''cajero'', 0, 315, null, %L)', v_hoy, v_bill),
     'MOTIVO_REQUERIDO', '6: el corte de un cajero sin efectivo propio no puede cuadrar con dinero ajeno');
+  perform tests.act_as(v_pos);
   v_r := public.registrar_corte_caja(tests.op(), v_hoy, 'cajero', 0, 315, null, v_pos);
   v_cj := (v_r ->> 'closing_id')::uuid;
   perform tests.eq((v_r ->> 'esperado')::numeric, 315::numeric, '6: el cajero cierra su propio tramo');
@@ -170,8 +179,11 @@ begin
     'FECHA_FUTURA', 'no se cierra caja de un día futuro');
   perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''cajero'', 0, 0)', v_hoy),
     'CAJERO_REQUERIDO', 'el alcance por cajero exige indicar cajero');
+  perform tests.venta_pos(v_pos, 5);
   perform tests.act_as(v_pos);
-  perform public.registrar_cobro(tests.op(), v_o2, 'efectivo', 5);
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 5)', v_o2),
+    'NO_AUTORIZADO', 'SEC-B: el POS no registra cobros directos (cobra solo por vender_pos)');
+  perform tests.act_as(v_bill);
   perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''dia'', 0, 999)', v_hoy),
     'MOTIVO_REQUERIDO', 'una diferencia exige explicación');
   perform tests.act_as(tests.user('warehouse'));

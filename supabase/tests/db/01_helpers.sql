@@ -174,6 +174,22 @@ begin
   return v_op;
 end $$;
 
+-- SEC-B: el dinero del POS entra SOLO por vender_pos (D-SEC-1). Venta de mostrador por p_monto (producto con ese precio y
+-- su propio lote) hecha por el cajero indicado: el asiento queda a su nombre (arqueo por cajero). Devuelve el id del pedido.
+create or replace function tests.venta_pos(p_cajero uuid, p_monto numeric, p_metodo text default 'efectivo')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_claims text := current_setting('request.jwt.claims', true); v_o uuid := gen_random_uuid();
+        v_p uuid := tests.product(p_monto); v_lot uuid;
+begin
+  v_lot := tests.stock(v_p, 'POS-' || left(v_o::text, 8), 1);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_cajero, 'role', 'authenticated')::text, true);
+  perform public.vender_pos(v_o, 'POS-' || left(v_o::text, 8), 1, p_metodo, null, '{}',
+            jsonb_build_array(jsonb_build_object('product_id', v_p, 'qty', 1, 'unit_price', p_monto)),
+            jsonb_build_array(jsonb_build_object('line_index', 0, 'lot_id', v_lot, 'qty', 1)));
+  perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);
+  return v_o;
+end $$;
+
 -- W2: el doctor DECLARA un pago (queda en revisión, no mueve dinero).
 create or replace function tests.reportar(p_order uuid, p_amount numeric default null)
 returns uuid language plpgsql security definer set search_path = public as $$

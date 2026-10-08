@@ -52,8 +52,11 @@ begin
   perform tests.ok(public.order_vendor_email(ox) is null, 'N3 · POS ajeno: no obtiene el correo de otro vendedor');
   perform tests.ok(public.order_owner(gen_random_uuid()) is null and public.order_owner(o) is null, 'N6 · pedido inexistente y ajeno son indistinguibles (ambos NULL)');
   perform tests.ok((select count(*) from public.orders where id in (o, ox, oc)) = 0 and (select count(*) from public.shipments where order_id = o) = 0, 'N7 · sin exposición indirecta por RLS (orders/shipments)');
-  perform public.registrar_cobro(gen_random_uuid(), oc, 'efectivo', 0.01);
-  perform tests.ok((select count(*) from public.orders where id = oc) = 0, 'N9 · F1 sigue cerrado: un cobro no da visibilidad');
+  perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 0.01)', oc), 'NO_AUTORIZADO', 'N9a · SEC-B: POS ya no registra cobros directos');
+  -- asiento HEREDADO (anterior a SEC-B) registrado por este POS: sigue sin dar visibilidad (F1)
+  perform tests.act_as_owner(); insert into public.payment_entries (id, order_id, direction, method, amount, recorded_by, actor_role) values (gen_random_uuid(), oc, 'in', 'efectivo', 0.01, v_otro, 'pos');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_otro, 'role', 'authenticated', 'email', 'otro@t.local')::text, true); perform set_config('role', 'authenticated', true);
+  perform tests.ok((select count(*) from public.orders where id = oc) = 0, 'N9 · F1 sigue cerrado: un asiento suyo no da visibilidad');
   perform tests.act_as(dB);
   perform tests.ok(public.order_owner(o) is null and (select count(*) from public.shipments where order_id = o) = 0 and (select count(*) from public.orders where id in (o, oc)) = 0,
     'N4 · doctor ajeno: NULL, sin envíos ni pedidos ajenos (aislamiento del portal)');
