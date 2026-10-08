@@ -27,10 +27,14 @@ interface Props {
   etiquetaSalir?: string
   autoFoco?: boolean                 // UX V2-B · al abrir el cajón, el foco entra al redactor
   nombreCliente?: string | null      // Chat V2-C3 · nombre del dueño que manda el servidor (vista del personal)
+  onFin?: (motivo: 'terminada') => void   // D4-FIX · el asesor terminó la asesoría: quien monta vuelve a su lista
 }
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
 export const ETIQUETA_ASESOR = 'Asesora'
+// D4-FIX · textos neutrales del cierre y de la pérdida legítima de acceso del asesor (no son errores).
+export const TEXTO_ASESORIA_FINALIZADA = 'Asesoría finalizada. El historial permanece disponible en Cliente 360.'
+export const TEXTO_SIN_ASIGNACION = 'Esta conversación ya no está asignada a ti. Puedes consultar su historial en Cliente 360.'
 
 /** Subtítulo del encabezado: UN estado en lenguaje natural, decidido por lo que manda el servidor. */
 export function subtituloDe(conv: Conversacion | null, asesor: boolean): string {
@@ -78,7 +82,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -98,10 +102,23 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const cache = useRef(new Map<string, CacheSesion>())
   const botonHist = useRef<HTMLButtonElement | null>(null)
   const visor: Visor = asesor ? 'personal' : 'cliente'
+  // D4-FIX · fin de la atención en la vista del asesor: 'terminada' (cerró él) o 'sin_acceso' (lo cerró C2, Dirección
+  // lo reasignó o devolvió, u otra sesión lo terminó). Solo aplica a un asesor que YA estaba autorizado.
+  const [finAtencion, setFinAtencion] = useState<null | 'terminada' | 'sin_acceso'>(null)
+  const finRef = useRef(false)
+  const autorizado = useRef(false)
+  const [errorTerminar, setErrorTerminar] = useState<string | null>(null)   // el sondeo no lo borra (sí `error`)
 
   const cargar = useCallback(async (id: string, desde = 0) => {
+    if (finRef.current) return
     const r = await cliente.leer(id, desde)
-    if (!r.ok) { setError(r.error.mensaje); return }
+    if (finRef.current) return
+    if (!r.ok) {
+      // D4-FIX · un asesor que YA tenía la conversación y deja de estar asignado → estado neutral, sin más lecturas.
+      if (asesor && autorizado.current && r.error.codigo === 'no_autorizado') { finRef.current = true; setFinAtencion('sin_acceso'); return }
+      setError(r.error.mensaje); return
+    }
+    if (asesor && (r.data.rol === 'asesor' || r.data.rol === 'supervisor')) autorizado.current = true
     setError(null)
     setConv((prev) => {
       if (!prev || desde === 0 || prev.conversation_id !== id) return r.data
@@ -121,7 +138,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       return
     }
     void cliente.leido(id, max); onLeido?.(max)
-  }, [cliente, onLeido])
+  }, [cliente, onLeido, asesor])
 
   const abrirHistorial = (sesion: string | null) => {
     enHistorial.current = true; anunciado.current = ultimoSeq.current; porLeer.current = 0
@@ -155,12 +172,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
   // Polling acotado, solo con la pestaña visible.
   useEffect(() => {
-    if (!convId) return
+    if (!convId || finAtencion) return   // D4-FIX · terminada o sin acceso: sin sondeo
     const tick = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void cargar(convId, ultimoSeq.current) }
     const t = setInterval(tick, intervaloMs)
     document.addEventListener('visibilitychange', tick)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
-  }, [convId, cargar, intervaloMs])
+  }, [convId, cargar, intervaloMs, finAtencion])
 
   // Al final del hilo tras cada cambio (y de nuevo tras el layout/fuentes): el último elemento siempre visible.
   const alFinal = useCallback(() => { fin.current?.scrollIntoView?.({ block: 'end' }) }, [])
@@ -203,6 +220,16 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     const r = await fn()
     if (!r.ok && r.error) setError(r.error.mensaje)
     await cargar(convId, 0)
+  }
+  // D4-FIX · Terminar: si el servidor confirma, NO se relee (el asesor deja de tener acceso por diseño de C1); se
+  // detiene el sondeo y quien monta vuelve a su lista con la confirmación. Un fallo real conserva su manejo.
+  const terminarAsesoria = async () => {
+    if (!convId) return
+    setErrorTerminar(null)
+    const r = await cliente.terminar(convId)
+    if (!r.ok) { setErrorTerminar(r.error.mensaje); await cargar(convId, 0); return }
+    finRef.current = true; setFinAtencion('terminada')
+    onFin?.('terminada')
   }
   const alTeclear = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void enviar() }
@@ -276,13 +303,14 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
             <button type="button" ref={botonHist} className={`rc-ico rc-ico--hist${vista.tipo === 'historial' ? ' rc-ico--on' : ''}`} onClick={() => (vista.tipo === 'historial' ? volverActual() : abrirHistorial(null))}
               aria-label="Conversaciones anteriores" aria-pressed={vista.tipo === 'historial'} title="Conversaciones anteriores" data-testid="btn-historial"><History size={18} /></button>
           )}
-          {vista.tipo === 'actual' && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
+          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.iniciar(convId!))} data-testid="btn-iniciar">Iniciar asesoría</button>
           )}
-          {vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_assigned') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
-            <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.terminar(convId!))} data-testid="btn-terminar">Terminar asesoría</button>
+          {/* D4-FIX · solo en los estados que el backend acepta (human_active / human_ended); en human_assigned se pulsa "Iniciar" */}
+          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_ended') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
+            <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria()} data-testid="btn-terminar">Terminar asesoría</button>
           )}
-          {vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
+          {!finAtencion && vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
           )}
           {onSalir && panel && <button type="button" className="rc-ico" onClick={onSalir} aria-label="Minimizar" title="Minimizar" data-testid="btn-minimizar"><ChevronDown size={18} /></button>}
@@ -290,7 +318,16 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         </div>
       </header>
 
-      {vista.tipo === 'historial' && convId ? (
+      {finAtencion ? (
+        <div className="rc-thread" data-testid="asesoria-fin">
+          <div className="rc-card" role="status" data-testid={finAtencion === 'terminada' ? 'aviso-asesoria-finalizada' : 'aviso-sin-asignacion'}>
+            <div className="rc-card-body">
+              <div className="rc-card-title">{finAtencion === 'terminada' ? TEXTO_ASESORIA_FINALIZADA : TEXTO_SIN_ASIGNACION}</div>
+              {onSalir && <button type="button" className="rc-link" onClick={onSalir} data-testid="btn-volver-asesorias">Volver a Asesorías</button>}
+            </div>
+          </div>
+        </div>
+      ) : vista.tipo === 'historial' && convId ? (
         <>
           {nuevoActual && (
             <div className="rc-hist-aviso" role="status" aria-live="polite" data-testid="aviso-nuevo-actual">
@@ -333,7 +370,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <div ref={fin} />
       </div>
 
-      {error && <div role="alert" className="rc-error">{error}</div>}
+      {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
 
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
         <textarea
