@@ -30,7 +30,8 @@ begin
                       from pg_policies where schemaname = 'public'
                        and tablename in ('lots','inventory_movements','replenishments','order_items','orders','shipping_attempts','refunds','shipments')),
                    -- re-anclado CX-0b (136) + CX-0c (137): sin INSERT directo en orders; rama pos de orders_select_scoped por seller_profile_id / _cx0c_venta_pos_propia (ajeno a W1/W2)
-                   '83543a5a0b9d7d9f086a7d0d13b35f00', 'rollback restaura las políticas RLS igual a prod');
+                   -- re-anclado SEC-C1 (140): lecturas de POS acotadas al pedido visible (order_items, inventory_movements, refunds, payment_entries, cash_closings); ajeno a W1/W2 — con el down de SEC-C1 aplicado primero el valor vuelve a 83543a5a… (verificado)
+                   '2ffad07903ac4d2e04a8003c95ced1af', 'rollback restaura las políticas RLS igual a prod');
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('lots','inventory_movements','replenishments','order_items','orders','shipping_attempts')

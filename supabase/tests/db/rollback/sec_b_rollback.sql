@@ -18,7 +18,8 @@ begin
     '139 down · sin comentario, misma forma y mismo ACL que producción');
   perform tests.eq((select md5(string_agg(tablename || policyname || cmd || coalesce(qual, '') || coalesce(with_check, ''), '|' order by tablename, policyname)) from pg_policies
                     where schemaname = 'public' and tablename in ('payment_entries','payment_claims','refunds','cash_closings','orders','money_operations')),
-    '7e0dff2ac0fb0839b52f02acaf324afc', '139 down · políticas intactas');
+    -- re-anclado SEC-C1 (140): lecturas de POS acotadas en las tablas de dinero (ajeno a SEC-B, que solo cambia escrituras)
+    'c2923769d4cd847a6cd4ca87538e1617', '139 down · políticas intactas');
   perform tests.ok((select e = (select count(*) from public.payment_entries) and c = (select count(*) from public.payment_claims) and r = (select count(*) from public.refunds)
                            and k = (select count(*) from public.cash_closings) and o = (select count(*) from public.orders) from _secb), '139 down · sin cambios de datos');
   -- el down reabre F2 (documentado): pos vuelve a pasar la compuerta de registrar_cobro

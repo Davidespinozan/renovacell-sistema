@@ -23,7 +23,8 @@ begin
   perform tests.eq((select md5(string_agg(tablename||'|'||policyname||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by tablename, policyname))
                       from pg_policies where schemaname = 'public' and tablename in ('cash_closings','orders','refunds','payment_entries')),
                    -- re-anclado CX-0b (136) + CX-0c (137): sin INSERT directo en orders; rama pos de orders_select_scoped por seller_profile_id / _cx0c_venta_pos_propia (ajeno a W1/W2)
-                   'f137ad685d613eb8f68b0c2525273709', 'rollback W2: políticas iguales a W1');
+                   -- re-anclado SEC-C1 (140): lecturas de POS acotadas al pedido visible (order_items, inventory_movements, refunds, payment_entries, cash_closings); ajeno a W1/W2 — con el down de SEC-C1 aplicado primero el valor vuelve a f137ad68… (verificado)
+                   '8741ef54337be7ac9bc21385eb56f889', 'rollback W2: políticas iguales a W1');
   perform tests.eq((select md5(string_agg(table_name||'|'||grantee||'|'||privilege_type, E'\n' order by table_name, grantee, privilege_type))
                       from information_schema.role_table_grants where table_schema = 'public'
                        and table_name in ('cash_closings','orders','refunds') and grantee in ('anon','authenticated')),

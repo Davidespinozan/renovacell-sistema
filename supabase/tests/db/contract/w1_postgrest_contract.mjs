@@ -402,4 +402,59 @@ expect('conciliar_custodia por la API: 0 errores', !r.error && r.data.filter((x)
 r = await wh.rpc('conciliar_custodia')
 expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error)
 
+// 25) SEC-C1 · lecturas por rol con los SELECT EXACTOS de los stores (ordersStore, moneyStore, refundsStore, cierresStore,
+//     lotsStore): ninguna falla; para POS, lo visible de tablas hijas ⊆ pedidos visibles; sin reembolsos; solo su corte.
+{
+  const SEL = {
+    orders: 'id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)',
+    v_order_money: 'order_id, external_ref, order_status, payment_status, total, cobrado, reembolsado, cobrado_neto, saldo, estado_pago, sobrepago, reembolso_pendiente, credito_autorizado, due_date, vencido, liberado',
+    payment_claims: 'id, order_id, method, amount_declared, reference, bank_account_id, proof_path, status, declared_by, declared_at, resolved_at, reject_reason, entry_id',
+    payment_entries: 'id, order_id, claim_id, refund_id, direction, method, amount, value_date, external_ref, bank_account_id, reversal_of, notes, actor_role, created_at',
+    refunds: 'id, order_id, tipo, monto, motivo, metodo, usuario, created_at, items',
+    cash_closings: 'id, fecha, alcance, esperado, fondo, contado, diferencia, motivo, usuario, created_at, voids_closing_id, void_reason, cajero, corte_desde, corte_hasta, prev_closing_id',
+    inventory_movements: 'id, lot_id, change, reason, reference, created_by, created_at, unit_cost',
+  }
+  const roles = { admin, billing: as(ids.bill), warehouse: wh, packing: as(ids.pk), pos, pos2: otroPos, doctor: doc }
+  const leido = {}
+  for (const [rol, cli] of Object.entries(roles)) {
+    leido[rol] = {}
+    for (const [t, cols] of Object.entries(SEL)) {
+      const q = await cli.from(t).select(cols)
+      leido[rol][t] = q.data ?? []
+      if (q.error) bad(`SEC-C1 · ${rol} lee ${t} con el SELECT del store sin error`, q.error)
+    }
+  }
+  ok('SEC-C1 · los 7 SELECT de los stores responden sin error para Dirección, Facturación, Almacén, Empaque, POS y doctor')
+  for (const rol of ['pos', 'pos2']) {
+    const visibles = new Set(leido[rol].orders.map((o) => o.id))
+    const sub = (t) => leido[rol][t].every((x) => x.order_id && visibles.has(x.order_id))
+    expect(`SEC-C1 · ${rol}: partidas embebidas, asientos, declaraciones y v_order_money ⊆ pedidos visibles`,
+      sub('payment_entries') && sub('payment_claims') && sub('v_order_money') && leido[rol].orders.every((o) => (o.order_items ?? []).every((i) => i.order_id === o.id)),
+      { pedidos: visibles.size, asientos: leido[rol].payment_entries.length, declaraciones: leido[rol].payment_claims.length })
+    expect(`SEC-C1 · ${rol}: sin reembolsos y solo SUS cortes`, leido[rol].refunds.length === 0
+      && leido[rol].cash_closings.every((c) => c.cajero === ids[rol]), { reembolsos: leido[rol].refunds.length, cortes: leido[rol].cash_closings.map((c) => c.cajero) })
+  }
+  expect('SEC-C1 · el POS ve el efectivo de SU venta de mostrador (asiento de su pedido)', leido.pos.payment_entries.some((e) => e.order_id === saleId), leido.pos.payment_entries.map((e) => e.order_id))
+  expect('SEC-C1 · otro POS no ve la venta ni el efectivo del primero', !leido.pos2.orders.some((o) => o.id === saleId) && !leido.pos2.payment_entries.some((e) => e.order_id === saleId),
+    leido.pos2.payment_entries.map((e) => e.order_id))
+  expect('SEC-C1 · Dirección y Facturación ven todos los asientos, reembolsos y cortes', leido.admin.payment_entries.length > 0
+    && leido.billing.payment_entries.length === leido.admin.payment_entries.length && leido.billing.refunds.length === leido.admin.refunds.length
+    && leido.billing.cash_closings.length === leido.admin.cash_closings.length, { a: leido.admin.payment_entries.length, b: leido.billing.payment_entries.length })
+  expect('SEC-C1 · Almacén y Empaque conservan pedidos con partidas y movimientos (surtido)', leido.warehouse.orders.length === leido.admin.orders.length
+    && leido.packing.orders.length === leido.admin.orders.length && leido.warehouse.inventory_movements.length === leido.admin.inventory_movements.length,
+    { wh: leido.warehouse.orders.length, adm: leido.admin.orders.length })
+  r = await otroPos.rpc('estado_dinero_pedido', { p_order: saleId })
+  expect('SEC-C1 · otro POS: estado_dinero_pedido de la venta ajena → NO_AUTORIZADO', r.error?.message === 'NO_AUTORIZADO', r.error ?? r.data)
+  r = await pos.rpc('estado_dinero_pedido', { p_order: saleId })
+  expect('SEC-C1 · el POS: estado_dinero_pedido de SU venta', !r.error && r.data?.order_id === saleId, r.error ?? r.data)
+  r = await pos.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
+  expect('SEC-C1 · POS: arqueo del día → NO_AUTORIZADO', /solo puedes consultar tu propio corte/.test(r.error?.message ?? ''), r.error ?? r.data)
+  r = await pos.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'cajero', p_cajero: ids.pos })
+  expect('SEC-C1 · POS: arqueo de SU corte', !r.error && Number.isFinite(Number(r.data)), r.error ?? r.data)
+  r = await pos.rpc('tramo_corte_caja', { p_fecha: hoy, p_alcance: 'cajero', p_cajero: ids.pos2 })
+  expect('SEC-C1 · POS: tramo de otro cajero → NO_AUTORIZADO', /solo puedes consultar tu propio corte/.test(r.error?.message ?? ''), r.error ?? r.data)
+  r = await pos.rpc('_sec_c1_pos_ve_pedido', { o_id: saleId })
+  expect('SEC-C1 · el helper interno no se expone por la API', !!r.error && !r.data, r.error ?? r.data)
+}
+
 process.exit(failed)

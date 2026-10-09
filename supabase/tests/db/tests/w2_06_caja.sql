@@ -63,6 +63,9 @@ begin
   perform tests.venta_pos(v_pos, 50);
   perform tests.venta_pos(v_pos, 30);
   perform tests.act_as(v_pos);
+  perform tests.throws(format('select public.efectivo_esperado(%L, ''dia'', null)', v_hoy), 'solo puedes consultar tu propio corte',
+    'SEC-C1: el POS no consulta el arqueo del día');
+  perform tests.act_as(v_bill);
   perform tests.eq(public.efectivo_esperado(v_hoy, 'dia', null), 80::numeric,
     '3: el esperado es SOLO el efectivo posterior al último corte (no vuelve a contar los 200)');
   perform tests.act_as(v_admin);
@@ -119,11 +122,13 @@ begin
   perform tests.act_as(v_pos);
   perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_pos), 315::numeric,
     '6: el primer corte del cajero cubre TODO lo que él recibió en el día (200+50+30+10+25)');
-  perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_bill), 0::numeric,
-    '6: otro cajero no arquea efectivo ajeno');
+  perform tests.throws(format('select public.efectivo_esperado(%L, ''cajero'', %L)', v_hoy, v_bill), 'solo puedes consultar tu propio corte',
+    'SEC-C1: el POS no consulta el arqueo de otro cajero');
   perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''cajero'', 0, 315, null, %L)', v_hoy, v_bill),
     'solo puedes cerrar tu propio corte', 'SEC-B: el POS no cierra el corte de otro cajero');
   perform tests.act_as(v_bill);
+  perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_bill), 0::numeric,
+    '6: otro cajero no arquea efectivo ajeno');
   perform tests.throws(format('select public.registrar_corte_caja(gen_random_uuid(), %L, ''cajero'', 0, 315, null, %L)', v_hoy, v_bill),
     'MOTIVO_REQUERIDO', '6: el corte de un cajero sin efectivo propio no puede cuadrar con dinero ajeno');
   perform tests.act_as(v_pos);
@@ -132,6 +137,7 @@ begin
   perform tests.eq((v_r ->> 'esperado')::numeric, 315::numeric, '6: el cajero cierra su propio tramo');
   perform tests.eq(public.efectivo_esperado(v_hoy, 'cajero', v_pos), 0::numeric,
     '6: su tramo queda cerrado y no se vuelve a arquear');
+  perform tests.act_as(v_bill);
   perform tests.eq(public.efectivo_esperado(v_hoy, 'dia', null), 25::numeric,
     '6: la cadena del DÍA es independiente: ahí solo queda pendiente lo posterior a su último corte');
   perform tests.act_as_owner();

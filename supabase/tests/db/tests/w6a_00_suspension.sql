@@ -29,7 +29,8 @@ begin
   perform tests.ok(public.auth_role() = 'warehouse' and public.has_cap('diseno') and (select count(*) from public.lots) >= 1,
     'Almacén activo: rol, capacidad y lotes');
   perform tests.act_as(v_pos);
-  perform tests.ok(public.auth_role() = 'pos' and public.efectivo_esperado(public.hoy_local()) >= 0, 'POS activo: rol y efectivo esperado');
+  -- SEC-C1 (140): el POS arquea SU corte de cajero (el del día ya no)
+  perform tests.ok(public.auth_role() = 'pos' and public.efectivo_esperado(public.hoy_local(), 'cajero', v_pos) >= 0, 'POS activo: rol y efectivo esperado');
   perform tests.act_as(v_drv);
   perform tests.ok(public.auth_role() = 'driver' and public.is_verified(), 'Chofer activo: rol y verificado');
   perform tests.act_as(v_doc);
