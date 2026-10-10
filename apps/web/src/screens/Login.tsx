@@ -60,6 +60,7 @@ export function Login() {
   const linkBtn: React.CSSProperties = {
     background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
     color: 'var(--green-soft)', fontSize: 12.5, fontWeight: 600,
+    display: 'inline-flex', alignItems: 'center', minHeight: 44,
   }
 
   return (

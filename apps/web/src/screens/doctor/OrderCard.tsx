@@ -132,7 +132,7 @@ function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
       <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
         Paquetería: {m.carrier}
         {m.tracking && (url
-          ? <> · guía <a href={url} target="_blank" rel="noreferrer" className="mono" style={{ color: 'var(--green-deep)', fontWeight: 600 }}>{m.tracking}</a></>
+          ? <> · guía <a href={url} target="_blank" rel="noreferrer" className="mono tap-link" style={{ color: 'var(--green-deep)', fontWeight: 600 }}>{m.tracking}</a></>
           : <> · guía {m.tracking}</>)}
       </div>
     )

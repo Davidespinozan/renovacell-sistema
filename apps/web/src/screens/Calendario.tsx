@@ -60,11 +60,11 @@ export function Calendario() {
 
       <div className="card">
         {/* Cabecera del mes */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <button className="iconbtn-round" type="button" aria-label="Mes anterior" onClick={() => move(-1)}><ChevronLeft size={17} /></button>
-          <div style={{ fontWeight: 600, fontSize: 15, minWidth: 170, textAlign: 'center' }}>{MONTHS[cursor.m]} {cursor.y}</div>
+          <div style={{ fontWeight: 600, fontSize: 15, minWidth: 130, flex: '1 1 130px', textAlign: 'center' }}>{MONTHS[cursor.m]} {cursor.y}</div>
           <button className="iconbtn-round" type="button" aria-label="Mes siguiente" onClick={() => move(1)}><ChevronRight size={17} /></button>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', flex: '1 1 240px' }}>
             {(Object.keys(KIND) as CalKind[]).map((k) => (
               <span key={k} style={{ fontSize: 11.5, color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <span className={'pill ' + KIND[k].pill} style={{ padding: '1px 7px' }}>{KIND[k].icon}</span> {KIND[k].label}
@@ -113,9 +113,9 @@ export function Calendario() {
         <div className="eyebrow" style={{ marginBottom: 8 }}>Próximos compromisos</div>
         {upcoming.length === 0 && <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Sin compromisos agendados. Agrega uno con “Nuevo compromiso”.</div>}
         {upcoming.map((e) => (
-          <div key={e.id} className="lrow" style={{ alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span className={'pill ' + KIND[e.kind].pill} style={{ padding: '2px 8px' }}>{KIND[e.kind].icon} {KIND[e.kind].label}</span>
+          <div key={e.id} className="lrow" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 220px' }}>
+              <span className={'pill ' + KIND[e.kind].pill} style={{ padding: '2px 8px', flex: 'none' }}>{KIND[e.kind].icon} {KIND[e.kind].label}</span>
               <div style={{ minWidth: 0 }}>
                 <div className="nm" style={{ textDecoration: e.status === 'listo' ? 'line-through' : 'none', opacity: e.status === 'listo' ? 0.6 : 1 }}>{e.title}</div>
                 <div className="lt">{fmtLong(e.date)}{e.notes ? ` · ${e.notes}` : ''}</div>

@@ -281,9 +281,9 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { 
           </button>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
-            <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
+            <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}><Icon name="minus" /></button>
             <span className="mono" style={{ fontSize: 15 }}>{qty}</span>
-            <button className="btn sm" type="button" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
+            <button className="btn sm" type="button" aria-label="Agregar uno" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
           </div>
         )}
         {qty > 0 && atMax && <div style={{ fontSize: 10.5, color: 'var(--warn)', marginTop: 5 }}>Máximo disponible</div>}
@@ -373,9 +373,9 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
                     <button className="btn sm" type="button" disabled={stock.tracked && stock.qty <= 0} onClick={() => onAdd(v.id)}><Icon name="plus" /> Agregar</button>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button className="btn ghost sm" type="button" onClick={() => onDec(v.id)}><Icon name="minus" /></button>
+                      <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={() => onDec(v.id)}><Icon name="minus" /></button>
                       <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>
-                      <button className="btn sm" type="button" disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined} onClick={() => onAdd(v.id)}><Icon name="plus" /></button>
+                      <button className="btn sm" type="button" aria-label="Agregar uno" disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined} onClick={() => onAdd(v.id)}><Icon name="plus" /></button>
                     </div>
                   )}
                 </div>
@@ -450,9 +450,9 @@ function LineRow({ l, price, onInc, onDec }: { l: CartLine; price: number | null
         <div className="tl">{money(price)}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button className="btn ghost sm" type="button" onClick={onDec}><Icon name="minus" /></button>
+        <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}><Icon name="minus" /></button>
         <span className="mono">{l.qty}</span>
-        <button className="btn ghost sm" type="button" onClick={onInc}><Icon name="plus" /></button>
+        <button className="btn ghost sm" type="button" aria-label="Agregar uno" onClick={onInc}><Icon name="plus" /></button>
       </div>
     </div>
   )

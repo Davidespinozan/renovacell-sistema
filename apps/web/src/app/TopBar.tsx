@@ -143,8 +143,20 @@ function NotifBell() {
   }
   const etiqueta = unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'
 
+  // Cierre fiable en táctil: Safari iOS no enfoca un <button> al tocarlo, así que el onBlur nunca
+  // dispara y el panel se quedaba abierto (incluso encima de un modal). Se cierra al tocar fuera o con Escape.
+  const caja = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const fuera = (e: Event) => { if (caja.current && !caja.current.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', fuera)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', fuera); document.removeEventListener('keydown', esc) }
+  }, [open])
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={caja} style={{ position: 'relative' }}>
       <button
         className="icobtn"
         type="button"

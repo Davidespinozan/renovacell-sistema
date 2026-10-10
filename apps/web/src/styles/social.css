@@ -89,6 +89,9 @@
 /* Botón eliminar del asset (solo Diseño): esquina superior derecha de la tarjeta. */
 .libdel { position: absolute; top: 8px; right: 8px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line); background: rgba(255,255,255,.94); border-radius: var(--r-sm); cursor: pointer; box-shadow: var(--sh-sm); opacity: .55; transition: opacity .15s, transform .15s; }
 .libcard:hover .libdel { opacity: 1; }
+/* Táctil: no hay hover, así que el botón va siempre visible, y su área de toque crece a 44 px sin agrandar el ícono. */
+.libdel::after { content: ""; position: absolute; inset: -8px; }
+@media (hover: none) { .libdel { opacity: 1; width: 40px; height: 40px; top: 4px; right: 4px; } }
 .libdel:hover { transform: translateY(-1px); border-color: #E4B8B4; }
 
 /* Bottom-sheet (comentarios) */
@@ -159,3 +162,12 @@
 .cmt .who { font-size: 13px; font-weight: 600; }
 .cmt .when { font-size: 11px; color: var(--ink-3); margin-left: 6px; font-weight: 400; }
 .cmt .txt { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+
+/* Teléfono: la bienvenida del muro en rejilla (avatar | texto) y el rol en su propia fila bajo el texto.
+   Con flex el rol competía por el ancho y partía el título en cuatro líneas. */
+@media (max-width: 640px) {
+  .welcome { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 10px; padding: 16px; }
+  .welcome .avatar { width: 44px; height: 44px; font-size: 16px; }
+  .welcome .wh { font-size: 19px; }
+  .welcome .role-badge { grid-column: 2; justify-self: start; margin-left: 0; }
+}

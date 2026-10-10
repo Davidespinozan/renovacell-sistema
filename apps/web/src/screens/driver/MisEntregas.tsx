@@ -260,14 +260,14 @@ export function MisEntregas() {
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name} · {client.clinic}</div>
                 <div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Teléfono</div>
-                  <a href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
+                  <a className="tap-link" href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
                     {deliv.phone} · Llamar
                   </a>
                 </div>
                 <div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>
                   {deliv.addr}{' '}
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap' }}>· Ver en mapa</a>
+                  <a className="tap-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap', display: 'flex' }}>Ver en mapa</a>
                 </div>
                 <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
               </div>
@@ -373,7 +373,7 @@ export function MisEntregas() {
               )}
 
               <details style={{ marginTop: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-3)' }}>¿Problema con la entrega? Reportar incidencia</summary>
+                <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-3)', padding: '14px 0' }}>¿Problema con la entrega? Reportar incidencia</summary>
                 <div className="field-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                   <select
                     value={incType[s.id] ?? INCIDENT_TYPES[0]}

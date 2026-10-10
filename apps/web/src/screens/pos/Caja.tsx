@@ -2,6 +2,7 @@
 // cobra (efectivo/tarjeta) y completa. Al cobrar: crea orden POS pagada/entregada
 // y descuenta inventario por lote (FEFO de Almacén, reutilizada).
 import { Vacio } from '../../app/EmptyState'
+import { BarraVenta } from './BarraVenta'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -132,6 +133,8 @@ export function Caja() {
     [cart, sellable],
   )
   const total = lines.reduce((s, l) => s + effOf(l.product, l.qty) * l.qty, 0)
+  const unidades = lines.reduce((s, l) => s + l.qty, 0)
+  const ticketRef = useRef<HTMLDivElement>(null)
   const savings = lines.reduce((s, l) => s + volumeSavings(l.product.price, volRules, l.product.id, l.qty), 0)
   const recibidoN = Math.max(0, Number(recibido) || 0)
   const cambio = recibidoN - total
@@ -272,7 +275,8 @@ export function Caja() {
       </div>
 
       {/* Ticket */}
-      <div className="card ticket" style={{ position: 'sticky', top: 90 }}>
+      <BarraVenta unidades={unidades} total={total} ancla={ticketRef} />
+      <div ref={ticketRef} className="card ticket" style={{ position: 'sticky', top: 90, scrollMarginTop: 84 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
           <Icon name="store" style={{ width: 18, height: 18, color: 'var(--green-deep)' }} />
           <h3 style={{ fontSize: 16, fontWeight: 600 }}>Venta</h3>

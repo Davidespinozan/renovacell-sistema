@@ -33,7 +33,9 @@
 
 /* --- Touch targets ≥44px en teléfono (uso a pulgar) -------------------------- */
 @media (max-width: 640px) {
-  .btn, .btn.sm, .devchip, .lchip, .backbtn, .seg button, .mclose, .dbtn { min-height: 44px; }
+  .btn, .btn.sm, .devchip, .lchip, .backbtn, .seg button, .mclose, .dbtn, .fchip, .fbtn { min-height: 44px; }
+  .fchip { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; }
+  .fbtn { min-width: 44px; justify-content: center; }
   .btn.sm { padding-top: 10px; padding-bottom: 10px; }
   .seg button { display: inline-flex; align-items: center; justify-content: center; }
   select, input[type="date"], input[type="number"], input[type="text"] { min-height: 44px; }
