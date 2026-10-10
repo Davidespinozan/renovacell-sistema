@@ -36,6 +36,15 @@ describe('resolverQuien', () => {
     const r = await resolverQuien(caller({ id: 'u1' }), admin(null, { message: 'boom' }))
     expect(r).toMatchObject({ ok: false, status: 500 })
   })
+  it('verified: solo true si el perfil lo dice explícitamente; sin dato o sin perfil falla cerrado', async () => {
+    const v = async (row: Record<string, unknown> | null) => { const r = await resolverQuien(caller({ id: 'u1' }), admin(row)); return r.ok ? r.quien.verified : 'error' }
+    expect(await v({ role_id: 'doctor', active: true, verified: true })).toBe(true)
+    expect(await v({ role_id: 'doctor', active: true, verified: false })).toBe(false)
+    expect(await v({ role_id: 'doctor', active: true, verified: null })).toBe(false)
+    expect(await v({ role_id: 'doctor', active: true })).toBe(false)             // la columna no vino
+    expect(await v({ role_id: 'doctor', active: true, verified: 'true' })).toBe(false)   // un texto no es verificación
+    expect(await v(null)).toBe(false)                                           // sin perfil
+  })
 })
 
 describe('guarda de repositorio: las edges autenticadas pasan por resolverQuien', () => {

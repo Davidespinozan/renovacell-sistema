@@ -131,6 +131,18 @@ describe('frontend', () => {
     expect(landingSrc).toMatch(/\/functions\/v1\/visitor/)                   // atribución del visitante (CC-1)
     expect(landingSrc).toMatch(/localStorage\.setItem\(KEY,d\.token\)/)       // el token de visitante persiste
   })
+  // Decisión del dueño (10 oct 2026): la conversación existe solo dentro del sistema. La función de servidor
+  // no atiende a un anónimo ni a un doctor sin verificar, y lo decide ANTES de tocar la base o el limitador.
+  it('Edge chat: sin sesión → 401 y doctor sin verificar → 403, antes de cualquier comando; el token de visitante ya no abre la puerta', () => {
+    const c = codigo(chatSrc)
+    const iPuerta = c.indexOf("if (!quien) return json(401, { error: 'sin_identidad'")
+    const iAcceso = c.indexOf("if (quien.role === 'doctor' && !quien.verified) return json(403, { error: 'sin_acceso'")
+    const iPrimerComando = Math.min(...['admin.rpc(', 'caller.rpc(', 'limitarTodas(', 'limitar('].map((x) => c.indexOf(x)).filter((n) => n >= 0))
+    expect(iPuerta).toBeGreaterThan(0); expect(iAcceso).toBeGreaterThan(iPuerta); expect(iPrimerComando).toBeGreaterThan(iAcceso)
+    expect(c).toMatch(/verified: q\.quien\.verified/)                 // la verificación sale del perfil, no del cliente
+    expect(c).toMatch(/const hash: string \| null = null/)            // ningún comando recibe hash de visitante
+    expect(c).not.toMatch(/hashToken|sujetoPublico|p\.token/)         // el token de visitante ni se lee
+  })
   it('AG · el chat interno de staff (legacy) sigue intacto', () => {
     expect(legacyChatStore).toMatch(/from\('messages'\)/); expect(legacyChatStore).not.toMatch(/cc_messages/)
   })

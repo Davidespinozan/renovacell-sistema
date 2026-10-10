@@ -1,7 +1,10 @@
-// Edge Function PÚBLICA (desplegar con --no-verify-jwt): CONVERSACIÓN CANÓNICA (CC-2).
+// Edge Function (se despliega con --no-verify-jwt porque valida el JWT ella misma): CONVERSACIÓN CANÓNICA (CC-2).
 //
-// Una sola puerta para visitante (token de CC-1) y para cuentas (JWT). El actor lo deriva el
-// servidor: perfil+rol del JWT, o visitante por hash del token. Nunca se acepta actor_type,
+// SOLO CUENTAS CON ACCESO (decisión del dueño, 10 oct 2026): la conversación con Renovacell —y con un
+// asesor humano— existe dentro del sistema, una vez que el doctor envió su verificación y fue aprobado.
+// Sin sesión no hay conversación (el token de visitante de CC-1 YA NO abre esta puerta), y un doctor sin
+// verificar tampoco. En la landing atiende el agente de orientación (función `assistant`), no esta.
+// El actor lo deriva el servidor: perfil+rol del JWT. Nunca se acepta actor_type,
 // actor_id, profile_id ni seller_profile_id del cliente. La autoridad está en los comandos
 // cc_* (solo service_role); aquí se acota la entrada, se aplica el limitador (CC-0B) y se
 // traduce la respuesta. El contenido de los mensajes no se registra en ningún lado.
@@ -15,8 +18,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import { conCors } from '../_shared/cors.ts'
-import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
-import { hashToken } from '../_shared/visitante.ts'
+import { limitarTodas, respuestaLimite, sujetoUid } from '../_shared/limite.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
 import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
@@ -51,17 +53,22 @@ Deno.serve(conCors(async (req) => {
 
   // Identidad: JWT (si viene) manda; si no, visitante por token.
   const authHeader = req.headers.get('Authorization') ?? ''
-  let quien: { uid: string; role: string } | null = null
+  let quien: { uid: string; role: string; verified: boolean } | null = null
   if (authHeader.replace(/^Bearer\s+/i, '').trim() && authHeader.replace(/^Bearer\s+/i, '').trim() !== anon) {
     const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
     const q = await resolverQuien(caller, admin)
     if (!q.ok) return json(q.status, q.body)
-    quien = { uid: q.quien.uid, role: q.quien.role }
+    quien = { uid: q.quien.uid, role: q.quien.role, verified: q.quien.verified }
   }
-  const hash = quien ? null : await hashToken(p.token)
+  // Puerta de acceso: sin sesión no se conversa, y el doctor debe estar verificado. Se responde ANTES de
+  // tocar la base o el limitador: un anónimo no crea conversaciones, no consume IA y no pide asesor.
+  if (!quien) return json(401, { error: 'sin_identidad', message: 'Inicia sesión para conversar con Renovacell.' })
+  if (quien.role === 'doctor' && !quien.verified) return json(403, { error: 'sin_acceso', message: 'Tu acceso aún no está aprobado. Podrás conversar con Renovacell cuando Dirección verifique tu cédula.' })
+  // El hash de visitante queda SIEMPRE en null: los comandos cc_* reciben solo el perfil de la cuenta.
+  const hash: string | null = null
   const actor = derivarActor(quien, hash)
   if (!actor) return json(401, { error: 'sin_identidad', message: 'Inicia sesión o abre la conversación desde el sitio.' })
-  const sujeto = quien ? sujetoUid(quien.uid) : await sujetoPublico(req)
+  const sujeto = sujetoUid(quien.uid)
   const conv = typeof p.conversation_id === 'string' && UUID.test(p.conversation_id) ? p.conversation_id : null
   const falla = (e: { message?: string } | null) => { const m = mapearErrorChat(e?.message); return json(m.status, m.body) }
 

@@ -12,6 +12,7 @@ export interface Quien {
   email: string | null
   role: string            // '' si no hay perfil
   active: boolean
+  verified: boolean       // doctor con cédula aprobada; falla cerrado (sin perfil o sin dato = false)
   full_name: string | null
   meta: Record<string, unknown>
 }
@@ -30,7 +31,7 @@ interface ClienteAdmin {
 export async function resolverQuien(caller: ClienteAuth, admin: ClienteAdmin): Promise<Resuelto> {
   const { data: who } = await caller.auth.getUser()
   if (!who?.user) return { ok: false, status: 401, body: { error: 'No autenticado.' } }
-  const { data: p, error } = await admin.from('profiles').select('role_id, active, full_name, meta, email').eq('id', who.user.id).maybeSingle()
+  const { data: p, error } = await admin.from('profiles').select('role_id, active, verified, full_name, meta, email').eq('id', who.user.id).maybeSingle()
   // Falla cerrado: si el perfil no se pudo leer, no se asume ningún rol.
   if (error) return { ok: false, status: 500, body: { error: 'No se pudo verificar la cuenta.' } }
   const active = p ? p.active !== false : true
@@ -44,6 +45,7 @@ export async function resolverQuien(caller: ClienteAuth, admin: ClienteAdmin): P
       email: (p?.email as string | null | undefined) ?? who.user.email ?? null,
       role: (p?.role_id as string | null | undefined) ?? '',
       active,
+      verified: p?.verified === true,
       full_name: (p?.full_name as string | null | undefined) ?? null,
       meta: ((p?.meta ?? {}) as Record<string, unknown>),
     },
