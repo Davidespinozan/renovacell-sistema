@@ -511,7 +511,7 @@ function CaptacionPanel({ prospects, roster }: { prospects: Prospect[]; roster: 
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 1, background: 'var(--line)', margin: '10px 0' }}>
+      <div className="kpi-strip">
         {[
           { n: total, l: 'Leads totales' },
           { n: stats.byStage.nuevo ?? 0, l: 'Nuevos sin atender' },

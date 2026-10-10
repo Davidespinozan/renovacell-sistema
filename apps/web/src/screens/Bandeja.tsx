@@ -186,7 +186,8 @@ export function useBandeja(): { tareas: Task[]; fuentes: React.ReactNode; comerc
 /** Lista de tareas. `limite` = vista resumida (Inicio): las más urgentes primero. */
 export function ListaTareas({ tareas, limite, onGo }: { tareas: Task[]; limite?: number; onGo: (screen: string) => void }) {
   const vista = limite != null ? [...tareas].sort(porUrgencia).slice(0, limite) : tareas
-  return <>{vista.map((task) => (task.screen ? <TaskRow key={task.id} task={task} onGo={() => onGo(task.screen!)} /> : <AvisoRow key={task.id} task={task} />))}</>
+  if (vista.length === 0) return null
+  return <div className="tasklist">{vista.map((task) => (task.screen ? <TaskRow key={task.id} task={task} onGo={() => onGo(task.screen!)} /> : <AvisoRow key={task.id} task={task} />))}</div>
 }
 
 export function Bandeja() {
@@ -273,35 +274,26 @@ const tonePill: Record<Tone, string> = { warn: 'p-warn', dang: 'p-dang', neu: 'p
 
 function TaskRow({ task, onGo }: { task: Task; onGo: () => void }) {
   return (
-    <button
-      type="button"
-      className="card clickrow"
-      onClick={onGo}
-      style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', border: '1px solid var(--line)' }}
-    >
-      <div style={{ width: 40, height: 40, borderRadius: 11, background: toneBg[task.tone], color: toneFg[task.tone], display: 'grid', placeItems: 'center', flex: 'none' }}>
-        <Icon name={task.icon} />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{task.title}</div>
-        {task.detail && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>{task.detail}</div>}
-      </div>
+    <button type="button" className="taskrow clickrow" onClick={onGo}>
+      <span className="taskrow-ic" style={{ background: toneBg[task.tone], color: toneFg[task.tone] }} aria-hidden><Icon name={task.icon} /></span>
+      <span className="taskrow-tx">
+        <span className="taskrow-t">{task.title}</span>
+        {task.detail && <span className="taskrow-d">{task.detail}</span>}
+      </span>
       <span className={'pill ' + tonePill[task.tone]}>{task.count}</span>
-      <span aria-hidden style={{ color: 'var(--ink-3)', fontSize: 20, lineHeight: 1, flex: 'none' }}>›</span>
+      <span className="taskrow-ch" aria-hidden><Icon name="chevronRight" /></span>
     </button>
   )
 }
 
 function AvisoRow({ task }: { task: Task }) {
   return (
-    <div className="card" role="status" style={{ display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--line)' }}>
-      <div style={{ width: 40, height: 40, borderRadius: 11, background: toneBg[task.tone], color: toneFg[task.tone], display: 'grid', placeItems: 'center', flex: 'none' }}>
-        <Icon name={task.icon} />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{task.title}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2, overflowWrap: 'anywhere' }}>{task.detail}</div>
-      </div>
+    <div className="taskrow" role="status">
+      <span className="taskrow-ic" style={{ background: toneBg[task.tone], color: toneFg[task.tone] }} aria-hidden><Icon name={task.icon} /></span>
+      <span className="taskrow-tx">
+        <span className="taskrow-t">{task.title}</span>
+        <span className="taskrow-d">{task.detail}</span>
+      </span>
       <span className={'pill ' + tonePill[task.tone]}>{task.count}</span>
     </div>
   )

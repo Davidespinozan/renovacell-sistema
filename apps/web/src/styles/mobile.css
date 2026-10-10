@@ -1,0 +1,80 @@
+/* ============================================================================
+   Renovacell — capa de acabado "ligero" (se importa AL FINAL).
+   Mismo lenguaje que CuboPolar 2026, con los verdes de Renovacell:
+     · superficies planas: el primario y el filtro activo van en verde sólido, sin degradado ni halo
+     · listas dentro de UNA tarjeta con divisores, no una tarjeta por fila
+     · en teléfono: filtros en una fila deslizable, cifras compactas y barra inferior discreta
+   Las vistas no dibujan esto a mano.
+   ============================================================================ */
+
+/* iOS pinta en azul el texto de cualquier <button> sin color propio. */
+button { color: inherit; }
+
+/* ── Superficies planas (todas las anchuras) ───────────────────────────────── */
+.btn, .btn-primary, .pcard .addb, .fchip.on, .seg button.active, .lchip.on {
+  background: var(--green); box-shadow: 0 1px 2px rgba(11, 18, 32, .10);
+}
+.btn:hover, .btn-primary:hover { background: var(--green-deep); box-shadow: 0 1px 2px rgba(11, 18, 32, .10); filter: none; }
+.fchip, .lchip { box-shadow: none; }
+
+/* ── Lista de tareas: una tarjeta, filas con divisor ───────────────────────── */
+.tasklist { background: var(--cp-surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-card); overflow: hidden; min-width: 0; }
+.taskrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 14px; text-align: left; font-family: inherit; background: none; border: 0; border-top: 1px solid var(--line); color: var(--ink); }
+.taskrow:first-child { border-top: 0; }
+button.taskrow { cursor: pointer; }
+button.taskrow:hover { background: var(--cp-slate-50); }
+button.taskrow:active { background: var(--cp-slate-100); }
+button.taskrow:focus-visible { outline: 2px solid rgba(0, 115, 17, .6); outline-offset: -2px; }
+.taskrow-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.taskrow-ic svg { width: 20px; height: 20px; }
+.taskrow-tx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.taskrow-t { font-weight: 600; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.taskrow-d { font-size: 13px; line-height: 1.35; color: var(--ink-3); overflow-wrap: anywhere; }
+.taskrow-ch { color: var(--cp-text-3); flex: none; }
+.taskrow-ch svg { width: 18px; height: 18px; }
+
+/* ── Tira de cifras (Prospectos): 4 columnas; 2 en teléfono, sin celda de relleno ── */
+.kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); margin: 10px 0; }
+
+/* ── Teléfono y tableta chica ──────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Cabecera compacta */
+  .top { padding: 10px 14px; }
+  .screen-title { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .screen-sub { font-size: 12px; margin-top: 1px; }
+
+  /* Barra inferior: etiqueta normal de 11 px y píldora solo en el ícono activo */
+  .bnav { padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px)); gap: 0; }
+  .bnav a { gap: 2px; padding: 4px 2px; min-height: 52px; justify-content: center; border-radius: 0; background: none;
+    font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, .62); }
+  .bnav a svg { width: 20px; height: 20px; padding: 5px 14px; box-sizing: content-box; border-radius: 999px; }
+  .bnav a span { display: block; }
+  .bnav a span::first-letter { text-transform: uppercase; }
+  .bnav a.on { background: none; color: #fff; font-weight: 600; }
+  .bnav a.on svg { background: rgba(255, 255, 255, .14); color: var(--green-soft); }
+}
+
+@media (max-width: 640px) {
+  .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Tarjetas más livianas y con menos aire muerto */
+  .card { padding: 14px; box-shadow: 0 1px 2px rgba(11, 18, 32, .04), 0 8px 20px -16px rgba(11, 18, 32, .16); }
+  .canvas #content > .grid { gap: 12px !important; }
+
+  /* Filtros: una sola fila que se desliza con el dedo (no dos filas de píldoras) */
+  .fchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-left: -12px; margin-right: -12px; padding: 2px 12px; }
+  .fchips::-webkit-scrollbar { display: none; }
+  .fchip { flex: none; min-height: 40px; padding: 0 14px; font-size: 13.5px; white-space: nowrap; }
+  .card .fchips { margin-left: -2px; margin-right: -2px; padding-left: 2px; padding-right: 2px; }
+
+  /* Cifras: etiqueta arriba, ícono chico a la derecha, cifra y pista debajo */
+  .card.sig { grid-template-columns: 1fr auto; column-gap: 8px; row-gap: 2px; padding: 14px; align-items: center; align-content: start; }
+  .sig .k { grid-row: 1; grid-column: 1; }
+  .sig .chip { grid-row: 1; grid-column: 2; width: 30px; height: 30px; border-radius: 10px; }
+  .sig .chip svg { width: 16px; height: 16px; }
+  .sig .v { grid-row: 2; grid-column: 1 / -1; font-size: 24px; margin-top: 4px; }
+  .sig .s { grid-row: 3; grid-column: 1 / -1; font-size: 12px; color: var(--ink-3); }
+
+  /* Botones: mismo alto táctil, texto de 14 */
+  .btn { font-size: 14px; }
+}

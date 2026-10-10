@@ -5,6 +5,7 @@
 @import './styles/chat.css';
 @import './styles/home.css';
 @import '@renovacell/ui/responsive.css';
+@import './styles/mobile.css';
 
 @tailwind base;
 @tailwind components;

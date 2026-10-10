@@ -46,7 +46,6 @@ export function CommonView() {
     if (!rr.assetUrl) return
     assets.create({ key: rr.title, url: rr.assetUrl, tags: ['solicitud'] })
   }
-  const hi = user?.name?.split('·')[0].trim() || 'Equipo'
   const ann = useAnnouncements()
   const assets = useAssets()
   const resources = useResources()
@@ -77,16 +76,6 @@ export function CommonView() {
   return (
     <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
       <div className="feed">
-        <div className="welcome">
-          <Avatar name={user?.name ?? 'Equipo'} url={user?.avatarUrl} />
-          <div style={{ minWidth: 0, flex: 1 }}>
-            {/* CHV2-B · Esta vista ya no es "Inicio": es el muro del equipo. La bienvenida vive en Inicio. */}
-            <div className="wk">Avisos del equipo</div>
-            <div className="wh">Lo que comparte el equipo, {hi}</div>
-          </div>
-          <span className="role-badge"><Icon name={r.icon} /> {r.label}</span>
-        </div>
-
         {/* Composer (solo admin/comm) */}
         {canManage && <Composer onPublish={ann.create} meUrl={user?.avatarUrl} meName={user?.name} />}
 

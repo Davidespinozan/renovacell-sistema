@@ -12,14 +12,15 @@ import { nombrePersona, primerNombre } from '../../lib/nombres'
 export type Tono = 'dang' | 'warn' | 'neu' | 'ok'
 const PILL: Record<Tono, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
-/** Saludo compartido por todos los roles: compacto (no compite con el contenido operativo). */
+/** Recepción compartida por todos los roles: el saludo según la hora del negocio abre SIEMPRE el Inicio. */
 export function Bienvenida({ nombre, avatarUrl, titulo, detalle, etiqueta }: { nombre: string; avatarUrl?: string; titulo: string; detalle: string; etiqueta?: string }) {
   const persona = nombrePersona(nombre)
   return (
     <header className="rh-hello" data-testid="rh-bienvenida">
       {avatarUrl ? <img className="rh-av" src={avatarUrl} alt="" /> : <span className="rh-av" aria-hidden>{persona ? initials(persona) : 'R'}</span>}
       <div className="rh-hello-t">
-        <h2 className="rh-hello-h">{titulo}{etiqueta && <span className="rh-role">{etiqueta}</span>}</h2>
+        {etiqueta && <span className="rh-role">{etiqueta}</span>}
+        <h2 className="rh-hello-h">{titulo}</h2>
         <p className="rh-hello-p">{detalle}</p>
       </div>
     </header>

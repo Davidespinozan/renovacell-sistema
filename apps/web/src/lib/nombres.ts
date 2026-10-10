@@ -45,5 +45,16 @@ export function primerNombre(raw: string | null | undefined): string | null {
   return partes[0] ?? null
 }
 
-/** Saludo natural: "Hola, Ana" o, sin nombre de persona, "Hola". */
-export const saludo = (raw: string | null | undefined): string => { const p = primerNombre(raw); return p ? `Hola, ${p}` : 'Hola' }
+/** Hora (0–23) en la zona del negocio, sin depender de la del dispositivo. */
+export function horaNegocio(instante: Date = new Date()): number {
+  const h = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Mazatlan', hour: 'numeric', hour12: false }).format(instante)
+  return Number(h) % 24
+}
+/** "Buenos días" (5–11) · "Buenas tardes" (12–18) · "Buenas noches" (19–4). */
+export const saludoPorHora = (hora: number): string => (hora >= 5 && hora < 12 ? 'Buenos días' : hora >= 12 && hora < 19 ? 'Buenas tardes' : 'Buenas noches')
+
+/** Bienvenida de la recepción: "Buenos días, Ana" o, sin nombre de persona, "Buenos días". */
+export const saludo = (raw: string | null | undefined, instante: Date = new Date()): string => {
+  const p = primerNombre(raw); const s = saludoPorHora(horaNegocio(instante))
+  return p ? `${s}, ${p}` : s
+}

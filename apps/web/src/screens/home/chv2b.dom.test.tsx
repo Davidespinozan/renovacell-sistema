@@ -292,7 +292,7 @@ describe('CHV2-B.1 · Inicio no es un segundo menú', () => {
     }, () => null)
     configurarClientesInicioDoctor({ chat: doc })
     render(<RoleHome />); await flush()
-    expect(screen.getByText('Hola, David')).toBeTruthy()
+    expect(screen.getByText(/^(Buenos días|Buenas tardes|Buenas noches), David$/)).toBeTruthy()   // recepción: saludo según la hora del negocio
     expect(await screen.findByTestId('doctor-atencion')).toHaveTextContent('Lucía · Asesora · En conversación')
     expect(screen.queryByText('Abrir conversación')).toBeNull()
     expect(screen.queryByText('Accesos')).toBeNull()
@@ -307,11 +307,11 @@ describe('CHV2-B.1 · Inicio no es un segundo menú', () => {
     expect(atajos.className).toContain('rh-quick--movil')
     expect(atajos.querySelectorAll('button').length).toBeLessThanOrEqual(3)
   })
-  it('cuenta de servicio "almacen": saludo neutral, no "Hola, almacen"', async () => {
+  it('cuenta de servicio "almacen": saludo neutral, sin nombrar a la cuenta como si fuera persona', async () => {
     srv.role = 'warehouse'; srv.capabilities = []; srv.user = { name: 'almacen', email: 'almacen@renovacell.mx' }
     render(<RoleHome />); await flush()
-    expect(screen.getByTestId('rh-bienvenida').querySelector('h2')!.firstChild!.textContent).toBe('Hola')
-    expect(screen.queryByText(/Hola, almacen/i)).toBeNull()
+    expect(screen.getByTestId('rh-bienvenida').querySelector('h2')!.textContent).toMatch(/^(Buenos días|Buenas tardes|Buenas noches)$/)
+    expect(screen.queryByText(/, almacen/i)).toBeNull()
     srv.user = { name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx' }
   })
   it('vendedor: el nombre del cliente se presenta con mayúsculas ("david espinoza" → "David Espinoza")', async () => {
