@@ -27,10 +27,11 @@ ATT=$(one "insert into public.shipping_attempts (order_id, idempotency_key, stat
 DOC=$(one "select tests.user('doctor')")
 POS2=$(one "select tests.user('pos', 'contrato-pos2@test.local')")
 BILL=$(one "select tests.user('billing')"); PK=$(one "select tests.user('packing')")   # SEC-C1: contratos de lectura por rol
+SUSP=$(one "select tests.user('pos', 'contrato-susp@test.local')"); one "select tests.suspender('$SUSP')" >/dev/null   # SEC-C2: cuenta suspendida
 OM=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 2)))")
 OC=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$P2'::uuid, 'qty', 1)))")
 one "select tests.stock('$P2', 'CT-C', 10)" >/dev/null
-CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK")
+CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s","susp":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK" "$SUSP")
 SOCK=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${PGHOST}")
 cat > /tmp/w1_pgrst.conf.$$ <<CONF
 db-uri = "postgres://authenticator@/${DB}?host=${SOCK}&port=${PGPORT}"

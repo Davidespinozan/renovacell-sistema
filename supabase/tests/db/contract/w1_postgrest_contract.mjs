@@ -457,4 +457,42 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C1 · el helper interno no se expone por la API', !!r.error && !r.data, r.error ?? r.data)
 }
 
+// 26) SEC-C2 · vistas de custodia con security_invoker: SELECT EXACTOS de custodyStore (v_custody_stock) y liquidacionDe
+//     (v_custody_liquidacion, .eq('custody_id').maybeSingle()). Ve la custodia quien la ve en las tablas; nadie más.
+{
+  const STOCK = 'custody_id, product_id, lot_id, entregado, vendido, devuelto, perdido, en_poder'
+  const LIQ = 'custody_id, kind, status, unidades_entregadas, unidades_vendidas, unidades_devueltas, unidades_perdidas, unidades_en_poder, importe_vendido, cobrado, saldo'
+  const cols = (o) => Object.keys(o ?? {}).sort().join(',')
+  const stockDe = async (cli) => await cli.from('v_custody_stock').select(STOCK).order('custody_id').order('lot_id')
+  const liqDe = async (cli) => await cli.from('v_custody_liquidacion').select(LIQ).eq('custody_id', cusId).maybeSingle()
+  const refS = await stockDe(admin), refL = await liqDe(admin)
+  expect('SEC-C2 · Dirección: existencias de la custodia con las columnas del store', !refS.error && refS.data.some((x) => x.custody_id === cusId)
+    && cols(refS.data[0]) === STOCK.split(', ').sort().join(','), refS.error ?? refS.data?.[0])
+  expect('SEC-C2 · Dirección: liquidación con las columnas del store y cifras numéricas', !refL.error && refL.data?.custody_id === cusId
+    && cols(refL.data) === LIQ.split(', ').sort().join(',') && Number.isFinite(Number(refL.data.importe_vendido)) && Number.isFinite(Number(refL.data.saldo)), refL.error ?? refL.data)
+  r = await admin.rpc('estado_custodia', { p_custody: cusId })
+  expect('SEC-C2 · la liquidación de Dirección coincide con estado_custodia (cálculo sin cambios)', !r.error
+    && Number(r.data?.importe_vendido) === Number(refL.data?.importe_vendido) && Number(r.data?.cobrado) === Number(refL.data?.cobrado)
+    && Number(r.data?.unidades_en_poder) === Number(refL.data?.unidades_en_poder), { rpc: r.data?.importe_vendido, vista: refL.data?.importe_vendido })
+  for (const [rol, cli] of Object.entries({ Facturación: as(ids.bill), Almacén: wh, Empaque: as(ids.pk) })) {
+    const s2 = await stockDe(cli), l2 = await liqDe(cli)
+    expect(`SEC-C2 · ${rol}: mismas existencias y liquidación que Dirección`, !s2.error && !l2.error && s2.data.length === refS.data.length
+      && Number(l2.data?.importe_vendido) === Number(refL.data?.importe_vendido), s2.error ?? l2.error ?? s2.data?.length)
+  }
+  let s1 = await stockDe(pos), l1 = await liqDe(pos)
+  expect('SEC-C2 · POS titular: SOLO las existencias de su custodia', !s1.error && s1.data.length > 0 && s1.data.every((x) => x.custody_id === cusId), s1.error ?? s1.data)
+  expect('SEC-C2 · POS titular: su liquidación (mismo importe vendido que Dirección)', !l1.error && l1.data?.custody_id === cusId
+    && Number(l1.data.importe_vendido) === Number(refL.data.importe_vendido), l1.error ?? l1.data)
+  for (const [rol, cli] of Object.entries({ 'otro POS': otroPos, doctor: doc, 'sin perfil': as(uuid()) })) {
+    s1 = await stockDe(cli); l1 = await liqDe(cli)
+    expect(`SEC-C2 · ${rol}: sin existencias de custodia (sin error: la pantalla no se rompe)`, !s1.error && s1.data.length === 0, s1.error ?? s1.data)
+    expect(`SEC-C2 · ${rol}: liquidación ajena = null (sin error)`, !l1.error && l1.data === null, l1.error ?? l1.data)
+  }
+  s1 = await stockDe(as(ids.susp)); l1 = await liqDe(as(ids.susp))
+  expect('SEC-C2 · cuenta suspendida: existencias rechazadas', /CUENTA_SUSPENDIDA/.test(s1.error?.message ?? '') && !s1.data, s1.error ?? s1.data)
+  expect('SEC-C2 · cuenta suspendida: liquidación rechazada', /CUENTA_SUSPENDIDA/.test(l1.error?.message ?? '') && !l1.data, l1.error ?? l1.data)
+  s1 = await stockDe(anon); l1 = await liqDe(anon)
+  expect('SEC-C2 · anon: vistas de custodia denegadas', !!s1.error && !!l1.error && !s1.data && !l1.data, s1.data ?? l1.data)
+}
+
 process.exit(failed)
