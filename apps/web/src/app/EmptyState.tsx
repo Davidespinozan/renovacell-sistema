@@ -26,6 +26,23 @@ export function Vacio({ icono = 'layers', titulo, pista, accion, plano, ...rest 
   )
 }
 
+/** Esqueleto de una fila de KPIs (misma rejilla .sigs que las tarjetas reales). */
+export function CargandoKpis({ n = 4, etiqueta = 'Cargando indicadores…' }: { n?: number; etiqueta?: string }) {
+  return (
+    <div className="grid sigs" role="status" aria-busy="true" aria-label={etiqueta}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="card skel-kpi">
+          <span className="skel skel-dot" />
+          <span className="skel-lines">
+            <span className="skel" style={{ width: '46%', height: 22 }} />
+            <span className="skel" style={{ width: '64%' }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function Cargando({ filas = 3, etiqueta = 'Cargando…', plano }: { filas?: number; etiqueta?: string; plano?: boolean }) {
   return (
     <div className={plano ? 'skel-list' : 'card skel-list'} role="status" aria-busy="true" aria-label={etiqueta}>

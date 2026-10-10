@@ -1,6 +1,7 @@
 // TABLERO de Administración: centro de mando. Solo lectura; AGREGA de los stores
 // compartidos (orders, shipments, lots) y reutiliza los detectores existentes
 // (atorados de Seguimiento, caducidad de Almacén). No inventa datos nuevos.
+import { Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon, type IconName } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
@@ -30,7 +31,7 @@ function bucketOf(status: string | null): Bucket | null {
 }
 
 export function Tablero() {
-  const { data: orders } = useAllOrders()
+  const { data: orders, loading: cargandoPedidos } = useAllOrders()
   const { byOrder } = useOrderMoney()
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
@@ -127,6 +128,7 @@ export function Tablero() {
           ]}
         />
       </div>
+      {cargandoPedidos && orders.length === 0 ? (<><CargandoKpis n={4} /><Cargando filas={4} /></>) : (<>
 
       <AvisoKpi estados={[kMes, kAnterior, kTodo, cxc]} />
 
@@ -226,6 +228,7 @@ export function Tablero() {
       </div>
 
       <DoctoresRiesgo />
+      </>)}
     </div>
   )
 }

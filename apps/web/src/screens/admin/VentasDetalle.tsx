@@ -2,7 +2,7 @@
 // Portal + ventas POS (mismo store), filtrable. NO es el Tablero ni Trazabilidad.
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -51,7 +51,7 @@ const sel: React.CSSProperties = {
 }
 
 export function VentasDetalle() {
-  const { data: orders } = useAllOrders()
+  const { data: orders, loading: cargandoPedidos } = useAllOrders()
   const { byOrder } = useOrderMoney()
   const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
@@ -105,6 +105,9 @@ export function VentasDetalle() {
   const prods = topProducts(rows, productsById, 3)
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
 
+  if (cargandoPedidos && orders.length === 0) {
+    return (<div className="grid" style={{ gap: 16 }}><CargandoKpis n={5} /><Cargando filas={6} /></div>)
+  }
   if (orders.length === 0) {
     return (
       <Vacio icono="chart" titulo="Aún no hay ventas." pista="Crea un pedido en el Portal del Doctor o cobra en Punto de Venta." />

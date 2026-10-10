@@ -194,6 +194,7 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .skel-dot{width:40px;height:40px;border-radius:var(--r-sm);flex:none}
 .skel-lines{flex:1;display:grid;gap:8px}
 .skel-lines .skel{height:12px;border-radius:6px}
+.skel-kpi{display:flex;align-items:center;gap:13px;min-height:96px}
 /* Estado vacío: ícono en caja, frase corta, pista y una acción. */
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:32px 20px}
 .empty-ic{width:44px;height:44px;border-radius:var(--r-sm);background:var(--cp-slate-100);color:var(--cp-text-2);display:grid;place-items:center;margin-bottom:8px}
