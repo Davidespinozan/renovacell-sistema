@@ -39,7 +39,7 @@ export function GuiaManualVoid({ orderId }: { orderId: string }) {
   }
 
   const box: React.CSSProperties = { marginTop: 14, padding: 14, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }
-  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 5 }
+  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 5 }
   if (a.status === 'unknown_requires_reconciliation') {
     return <div className="sysnote" style={box}><Icon name="truck" /><span>La guía de este pedido quedó en <b>estado desconocido</b> con la paquetería. Requiere reconciliación antes de poder cancelar el pedido.</span></div>
   }

@@ -333,7 +333,7 @@ function PestanaCartera({ vendedores, cliente, onCambio }: { vendedores: Vendedo
       {visibles.length === 0 && <div style={{ color: 'var(--ink-3)' }}>Sin clientes en este filtro.</div>}
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
         {visibles.map((f) => (
-          <li key={f.profile_id} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }} data-testid="cartera-fila">
+          <li key={f.profile_id} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }} data-testid="cartera-fila">
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontWeight: 600 }}>{f.nombre}{!f.verificado ? ' · sin verificar' : ''}</div>
               <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
@@ -362,7 +362,7 @@ function PestanaVendedores({ vendedores, onEquipo }: { vendedores: Vendedor[]; o
       {vendedores.length === 0 && <div style={{ color: 'var(--ink-3)' }}>No hay usuarios de Ventas.</div>}
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
         {vendedores.map((v) => (
-          <li key={v.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10 }} data-testid="vendedor">
+          <li key={v.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12 }} data-testid="vendedor">
             <b style={{ flex: 1 }}>{v.nombre}</b>
             <span className={'pill ' + (v.activo ? 'p-neu' : 'p-dang')}>{v.activo ? 'Activo' : 'Inactivo'}</span>
             <span className={'pill ' + (v.conversaciones ? 'p-neu' : 'p-warn')}>{v.conversaciones ? 'Atiende conversaciones' : 'No atiende conversaciones'}</span>

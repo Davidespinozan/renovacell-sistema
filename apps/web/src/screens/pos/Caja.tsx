@@ -234,7 +234,7 @@ export function Caja() {
           value={buscar}
           onChange={(e) => setBuscar(e.target.value)}
           placeholder="Buscar producto por nombre, categoría o SKU…"
-          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)' }}
+          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
         />
         {filtered.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ningún producto coincide con “{buscar}”.</div>
@@ -283,7 +283,7 @@ export function Caja() {
             <Icon name="store" style={{ width: 15, height: 15, color: custodyId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
             <span style={{ whiteSpace: 'nowrap' }}>Vendiendo en</span>
             <select value={custodyId ?? ''} onChange={(e) => { setCustodyId(e.target.value || null); setCart({}) }}
-              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: 'var(--cp-surface)', outline: 'none', fontWeight: custodyId ? 600 : 400 }}>
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)', outline: 'none', fontWeight: custodyId ? 600 : 400 }}>
               <option value="">Mostrador · del almacén</option>
               {misCustodias.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -296,7 +296,7 @@ export function Caja() {
 
         {/* Cliente OPCIONAL: por defecto mostrador; no obliga a entrar por un cliente */}
         <button type="button" onClick={() => setPickOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>
           <Icon name="usercheck" style={{ width: 15, height: 15, color: client ? 'var(--green-deep)' : 'var(--ink-3)' }} />
           <span style={{ minWidth: 0, flex: 1 }}>
             <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700 }}>Cliente</span>
@@ -339,7 +339,7 @@ export function Caja() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 56 }}>Recibí</span>
                   <input type="number" min={0} value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="¿con cuánto paga? (opcional)"
-                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, outline: 'none', background: 'var(--cp-surface)' }} />
+                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 15, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
                 </div>
                 {recibido !== '' && (
                   <div className="tket-total" style={{ marginTop: 8, color: cambio < 0 ? 'var(--danger)' : 'var(--green-deep)' }}>
@@ -456,15 +456,15 @@ function ClientPicker({ customers, onPick, onClose }: {
         </div>
         <div className="mbody">
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente por nombre, teléfono o ciudad…"
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
           <button type="button" onClick={() => onPick(null)}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '11px 12px', border: '1px solid var(--line)', borderRadius: 11, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 6, fontWeight: 600 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '11px 12px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 6, fontWeight: 600 }}>
             <Icon name="store" style={{ width: 15, height: 15, color: 'var(--ink-3)' }} /> Mostrador · público general
           </button>
           <div style={{ display: 'grid', gap: 4, maxHeight: '44vh', overflow: 'auto' }}>
             {list.map((c) => (
               <button key={c.id} type="button" onClick={() => onPick({ id: c.id, name: c.full_name, phone: c.phone })}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface, #fff)', cursor: 'pointer', fontFamily: 'inherit' }}>
                 <Icon name="usercheck" style={{ width: 15, height: 15, color: c.profile_id ? 'var(--green-deep)' : 'var(--ink-3)' }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 13.5 }}>{c.full_name}</span>

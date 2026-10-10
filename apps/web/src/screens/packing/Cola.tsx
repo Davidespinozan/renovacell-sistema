@@ -29,7 +29,7 @@ function receiverOf(order: OrderWithItems): Receiver {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1px solid var(--line)',
-  borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)',
+  borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)',
 }
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em',

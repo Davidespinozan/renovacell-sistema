@@ -246,7 +246,7 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { 
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
         {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'var(--cp-surface)', padding: 10, opacity: sellable ? 1 : 0.55 }} />
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: 'var(--cp-surface)', padding: 10, opacity: sellable ? 1 : 0.55 }} />
           : <Icon name="leaf" />}
       </div>
       <div className="pb">
@@ -268,11 +268,11 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { 
         {price == null ? (
           // Precio "a consultar": antes mostraba un "Agregar" habilitado que no hacía
           // nada (add() sale temprano). Ahora es un estado claro y no engañoso.
-          <button className="addb" type="button" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} title="Este producto se cotiza aparte">
+          <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Este producto se cotiza aparte">
             Precio a consultar
           </button>
         ) : !sellable ? (
-          <button className="addb" type="button" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+          <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }}>
             {stock.tracked ? 'Agotado' : 'No disponible'}
           </button>
         ) : qty === 0 ? (
@@ -303,7 +303,7 @@ function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; 
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
         {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'var(--cp-surface)', padding: 10 }} />
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: 'var(--cp-surface)', padding: 10 }} />
           : <Icon name="leaf" />}
       </div>
       <div className="pb">
@@ -344,7 +344,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', background: 'var(--cp-surface)', border: '1px solid var(--line)' }} />}
+            {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', backgroundColor: 'var(--cp-surface)', border: '1px solid var(--line)' }} />}
             <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} variante(s) · elige presentación</div></div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
@@ -352,7 +352,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
         <div className="mbody">
           {variants.length > 8 && (
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar variante…"
-              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', marginBottom: 10 }} />
           )}
           <div style={{ display: 'grid', gap: 8, maxHeight: '52vh', overflow: 'auto' }}>
             {shown.map((v) => {
@@ -362,7 +362,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
               const qty = cart[v.id] ?? 0
               const atMax = stock.tracked && qty >= stock.qty
               return (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, opacity: disponible ? 1 : 0.6 }}>
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, opacity: disponible ? 1 : 0.6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>{variantLabel(v)}</div>
                     <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{disponible ? money(price) : 'No disponible'}</div>

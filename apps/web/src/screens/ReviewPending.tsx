@@ -74,7 +74,7 @@ export function ReviewPending() {
               onKeyDown={(e) => e.key === 'Enter' && submit()}
               placeholder="Número de cédula profesional"
               inputMode="numeric"
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 15, outline: 'none', marginTop: 16 }}
+              style={{ width: '100%', padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 15, outline: 'none', marginTop: 16 }}
             />
             {res?.decision === 'reject' && (
               <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'transparent', color: 'var(--danger)', marginTop: 12, textAlign: 'left' }}>

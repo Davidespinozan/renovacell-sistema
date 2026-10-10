@@ -191,7 +191,7 @@ function CerrarCustodia({ custody, enPoder, saldo, prodName, onDone }: {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo del cierre"
-        style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, minWidth: 160 }} />
+        style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13, minWidth: 160 }} />
       <button className="btn sm" type="button" disabled={busy || motivo.trim().length < 3} onClick={() => void cerrar()}>{busy ? 'Cerrando…' : 'Cerrar'}</button>
       <button className="btn ghost sm" type="button" onClick={() => { setAbierto(false); setErr('') }}>Cancelar</button>
       {err && <div style={{ fontSize: 12, color: 'var(--danger)', width: '100%', textAlign: 'right' }}>{err}</div>}

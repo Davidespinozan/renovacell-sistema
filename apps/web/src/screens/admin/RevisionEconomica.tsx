@@ -129,7 +129,7 @@ function Caso({ caso: c, revisar, recargar, abrirEnVentas }: { caso: CasoRevisio
       {modo === 'rechazar' && declAbierta && (
         <div className="sysnote" style={{ marginTop: 10, display: 'grid', gap: 8 }} data-testid="revision-panel-rechazo">
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Motivo del rechazo (obligatorio)
-            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={400} style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit' }} data-testid="revision-motivo" />
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={400} style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit' }} data-testid="revision-motivo" />
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn sm" disabled={busy} onClick={() => void ejecutar('rechazar')} data-testid="revision-confirmar-rechazo">Rechazar declaración</button>

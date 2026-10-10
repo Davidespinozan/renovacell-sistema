@@ -8,7 +8,7 @@ import { BrandLogo } from '../app/BrandLogo'
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px 11px 38px', border: '1px solid var(--line)',
-  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)',
+  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)',
 }
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }

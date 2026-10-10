@@ -26,8 +26,8 @@ import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 
 const fld: React.CSSProperties = {
-  padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10,
-  fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)',
+  padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12,
+  fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)',
 }
 const lbl: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em',

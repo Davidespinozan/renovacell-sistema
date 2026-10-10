@@ -90,7 +90,7 @@ export function Calendario() {
                 onClick={() => setPick(date)}
                 className="cal-cell"
                 style={{
-                  textAlign: 'left', minHeight: 82, border: '1px solid var(--line)', borderRadius: 10,
+                  textAlign: 'left', minHeight: 82, border: '1px solid var(--line)', borderRadius: 12,
                   padding: 6, background: isToday ? 'var(--ok-bg)' : '#fff', cursor: 'pointer',
                   display: 'flex', flexDirection: 'column', gap: 3, fontFamily: 'inherit',
                 }}
@@ -141,7 +141,7 @@ function fmtLong(dateIso: string): string {
   return `${d} de ${MONTHS[m - 1]} ${y}`
 }
 
-const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
 function NuevoCompromiso({ date, onClose, onCreate }: { date: string; onClose: () => void; onCreate: (title: string, kind: CalKind, notes: string) => void }) {

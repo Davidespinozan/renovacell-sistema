@@ -169,7 +169,7 @@ export function Doctores() {
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
               Precios:
               <select value={d.price_list_id ?? ''} onChange={(e) => setPriceList(d.id, e.target.value || null)}
-                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none', background: 'var(--cp-surface)' }}>
+                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 12, outline: 'none', backgroundColor: 'var(--cp-surface)' }}>
                 <option value="">General (base)</option>
                 {lists.filter((l) => !l.is_default).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
@@ -250,7 +250,7 @@ export function Doctores() {
 function EditDoctorModal({ initial, onClose, onSave }: { initial: { name: string; org: string }; onClose: () => void; onSave: (name: string, org: string) => void }) {
   const [name, setName] = useState(initial.name)
   const [org, setOrg] = useState(initial.org)
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   return (
     <div className="overlay" onClick={onClose}>
@@ -329,7 +329,7 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
         {['selfie', 'ine-front', 'ine-back'].filter((k) => evidence[k]).map((k) => (
           <a key={k} href={urls[k] ?? undefined} target="_blank" rel="noopener" title={`Abrir ${EVID_LABELS[k]}`}
-            style={{ display: 'block', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', background: '#000', aspectRatio: '3/4', position: 'relative' }}>
+            style={{ display: 'block', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', background: '#000', aspectRatio: '3/4', position: 'relative' }}>
             {urls[k]
               ? <img src={urls[k]} alt={EVID_LABELS[k]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 11 }}>Cargando…</div>}
@@ -473,7 +473,7 @@ function DoctorDetail({
                 value={ced}
                 onChange={(e) => setCed(e.target.value)}
                 placeholder="Cédula profesional"
-                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
               />
               <button className="btn sm" type="button" disabled={!ced.trim() || ced.trim() === cedulaOf(doctor)} style={(!ced.trim() || ced.trim() === cedulaOf(doctor)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => onSetCedula(ced.trim())}>{cedulaOf(doctor) ? 'Actualizar cédula' : 'Registrar cédula'}</button>
             </div>
@@ -489,7 +489,7 @@ function DoctorDetail({
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 6 }}>No se encontraron clientes coincidentes.</div>
               )}
               {candidates.map((c) => (
-                <label key={c.customer.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, marginBottom: 6, opacity: c.linkedToOther ? 0.55 : 1 }}>
+                <label key={c.customer.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12, marginBottom: 6, opacity: c.linkedToOther ? 0.55 : 1 }}>
                   <input type="radio" name="cust-choice" disabled={c.linkedToOther} checked={choice === c.customer.id} onChange={() => setChoice(c.customer.id)} style={{ marginTop: 3 }} />
                   <span style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 600 }}>{c.customer.full_name}</span>{c.strong && <span className="pill p-ok" style={{ marginLeft: 6, fontSize: 10.5 }}>coincidencia fuerte</span>}
@@ -543,7 +543,7 @@ function DoctorDetail({
           {rejectMode && !doctor.verified && (
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo del rechazo"
-                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }} />
+                style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }} />
             </div>
           )}
 

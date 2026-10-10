@@ -32,7 +32,7 @@ export function ConfirmModal({ title, message, confirmLabel = 'Confirmar', requi
                 autoFocus value={typed} onChange={(e) => setTyped(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && ok) { onConfirm(); onClose() } }}
                 placeholder={requireType}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 6 }}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginTop: 6 }}
               />
             </div>
           )}

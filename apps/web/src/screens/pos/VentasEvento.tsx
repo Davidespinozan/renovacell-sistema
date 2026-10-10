@@ -38,7 +38,7 @@ export function VentasEvento() {
       <div className="card">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={sel} onChange={(e) => setSel(e.target.value)}
-            style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13, background: 'var(--cp-surface)' }}>
+            style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)' }}>
             <option value="">Todas las custodias</option>
             {custodias.map((c) => <option key={c.id} value={c.id}>{etiqueta(c)}</option>)}
           </select>

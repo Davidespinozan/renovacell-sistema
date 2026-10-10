@@ -85,7 +85,7 @@
   --sh-card: var(--cp-shadow-card);
   --sh-card-h: 0 2px 4px rgba(11,18,32,.05), 0 16px 34px -14px rgba(11,18,32,.20);
   --scrim: rgba(11,18,32,.4);                              /* telón de modal y hoja */
-  --glow: 0 10px 26px -6px rgba(0,115,17,.5);
+  --glow: 0 1px 2px rgba(11,18,32,.06), 0 8px 18px -10px rgba(0,115,17,.5); /* primario: sombra contenida, no halo */
 
   /* Profundidad / movimiento (playbook) */
   --ease-soft: cubic-bezier(.32,.72,0,1);

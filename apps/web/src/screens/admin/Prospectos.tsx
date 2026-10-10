@@ -186,7 +186,7 @@ export function Prospectos() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, organización, correo, teléfono u origen…"
-            style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)' }}
+            style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
           />
           <div className="fchips">
             <button type="button" className={'fchip' + (fStatus === 'todos' ? ' on' : '')} onClick={() => setFStatus('todos')}>Todos</button>
@@ -329,7 +329,7 @@ function DetailModal({
                 <select
                   value={p.assigned_to ?? ''}
                   onChange={(e) => onReassign(e.target.value || null)}
-                  style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }}
+                  style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
                 >
                   <option value="">Sin asignar</option>
                   {roster.map((s) => <option key={s} value={s}>{sellerLabel(s)}</option>)}
@@ -405,7 +405,7 @@ function DetailModal({
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendReply()}
                   placeholder={`Responder por ${p.source ?? 'el canal'}…`}
-                  style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+                  style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
                 />
                 <button className="btn sm" type="button" onClick={sendReply} disabled={!reply.trim()} style={!reply.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}><Send size={14} /> Responder</button>
               </div>
@@ -440,7 +440,7 @@ function DetailModal({
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
               placeholder="Agregar nota de seguimiento…"
-              style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+              style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
             />
             <button className="btn ghost sm" type="button" onClick={send}><Send size={14} /> Agregar</button>
           </div>
@@ -518,7 +518,7 @@ function CaptacionPanel({ prospects, roster }: { prospects: Prospect[]; roster: 
           { n: conv, l: 'Convertidos' },
           { n: `${rate}%`, l: 'Tasa de conversión' },
         ].map((k) => (
-          <div key={k.l} style={{ background: 'var(--cp-surface)', padding: '12px 16px' }}>
+          <div key={k.l} style={{ backgroundColor: 'var(--cp-surface)', padding: '12px 16px' }}>
             <div className="mono" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-.02em' }}>{k.n}</div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{k.l}</div>
           </div>
@@ -597,7 +597,7 @@ function CaptureModal({ onClose, onCapture }: {
   const [interest, setInterest] = useState('')
   const [message, setMessage] = useState('')
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   const save = () => {
@@ -699,7 +699,7 @@ function NewModal({ onClose, onSave }: {
   const [source, setSource] = useState('Puerta a puerta')
   const [interest, setInterest] = useState('')
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   const save = () => {
@@ -785,7 +785,7 @@ function EditProspectModal({ initial, onClose, onSave }: {
   const [email, setEmail] = useState(initial.email)
   const [phone, setPhone] = useState(initial.phone)
   const [org, setOrg] = useState(initial.org)
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   return (
     <div className="overlay" onClick={onClose}>

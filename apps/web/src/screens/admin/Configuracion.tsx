@@ -10,7 +10,7 @@ import { REGIMENES_OPTIONS, esRegimenValido } from '../../data/sat/regimenesFisc
 import { HorarioYAlertas } from './HorarioAtencion'   // CC-7 + CHV2-B (umbrales de alerta)
 import { hasSupabase } from '../../lib/supabase'
 
-const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 16 }
 
 export function Configuracion() {

@@ -174,8 +174,8 @@ export function CierreCaja() {
     requestAnimationFrame(() => requestAnimationFrame(() => imprimirCorte()))
   }
 
-  const sel: React.CSSProperties = { padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: 'var(--cp-surface)' }
-  const fld: React.CSSProperties = { width: '100%', padding: '11px 13px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 16, outline: 'none', marginTop: 6 }
+  const sel: React.CSSProperties = { padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13.5, backgroundColor: 'var(--cp-surface)' }
+  const fld: React.CSSProperties = { width: '100%', padding: '11px 13px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 16, outline: 'none', marginTop: 6 }
   const lbl: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   return (

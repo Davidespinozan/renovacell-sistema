@@ -19,7 +19,7 @@ import {
   type StockReturn, type Returnable,
 } from '../../data/store/stockReturnsStore'
 
-const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)' }
+const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 const errBox: React.CSSProperties = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }
 
 function useNames() {

@@ -59,7 +59,7 @@ function GeneralTab({ skus }: { skus: ProductSafe[] }) {
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="eyebrow" style={{ margin: 0 }}><DollarSign size={13} /> Precio general (base) · {list.length}</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto"
-          style={{ marginLeft: 'auto', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+          style={{ marginLeft: 'auto', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
       </div>
       <div className="tbl-scroll">
         <table className="tbl-cards">
@@ -92,7 +92,7 @@ function GeneralRow({ p }: { p: ProductSafe }) {
       <td data-label="Precio general">
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && dirty && save()} inputMode="decimal"
-            style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+            style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
           <button className="btn ghost sm" type="button" title="Guardar" disabled={!dirty || guardando} onClick={save}><Check size={13} /></button>
           {msg && <span style={{ fontSize: 11.5, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
         </span>
@@ -135,7 +135,7 @@ function MayoreoTab({ skus }: { skus: ProductSafe[] }) {
           ))}
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addList()} placeholder="Nueva lista (ej. Mayoreo)"
-              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
             <button className="btn sm" type="button" onClick={addList} disabled={!newName.trim()}><Plus size={14} /> Crear</button>
           </span>
         </div>
@@ -188,7 +188,7 @@ function MayoreoRow({ name, base, current, onSet }: { name: string; base: number
       <td data-label="Mayoreo">
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} inputMode="decimal" placeholder={base != null ? String(base) : '—'}
-            style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+            style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
           <button className="btn ghost sm" type="button" title="Guardar" onClick={save}><Check size={13} /></button>
           {hasOverride && <span className="pill p-ok" style={{ fontSize: 10.5 }}>override</span>}
           {msg && <span style={{ fontSize: 12, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
@@ -218,7 +218,7 @@ function VolumenTab({ skus }: { skus: ProductSafe[] }) {
       <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="eyebrow" style={{ margin: 0 }}><Layers size={13} /> Descuentos por cantidad (por SKU)</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto para agregar reglas"
-          style={{ marginLeft: 'auto', width: 280, maxWidth: '100%', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+          style={{ marginLeft: 'auto', width: 280, maxWidth: '100%', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
       </div>
       {list.length === 0 && (
         <div className="card" style={{ color: 'var(--ink-3)' }}>
@@ -321,4 +321,4 @@ function TierRow({ tier, base, onUpdate, onToggle, onDelete }: {
   )
 }
 
-const inp = (w: number): React.CSSProperties => ({ width: w, padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' })
+const inp = (w: number): React.CSSProperties => ({ width: w, padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' })

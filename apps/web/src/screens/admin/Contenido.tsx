@@ -166,7 +166,7 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
     return () => { vivo = false }
   }, [product])
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   const priceNum = price.trim() === '' ? null : Number(price)
   const valid = name.trim() !== '' && (priceNum === null || priceNum >= 0)
@@ -292,7 +292,7 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
 }
 
 // ---- Editor de la landing (todas las secciones, data-driven) ----------------
-const fInput: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 5 }
+const fInput: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 5 }
 const fLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 12 }
 
 function Fld({ label, value, onChange, hint, mono, type }: { label: string; value: string; onChange: (v: string) => void; hint?: string; mono?: boolean; type?: string }) {
@@ -341,7 +341,7 @@ function LandingTab() {
     upSec('pie', { categorias: draft.pie.categorias.map((x, j) => (j === i ? v : x)) })
 
   const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
-  const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
+  const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
   const area: React.CSSProperties = { ...inp, minHeight: 74, resize: 'vertical' }
 
   // Campo de texto de una línea.

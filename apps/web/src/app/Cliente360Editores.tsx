@@ -11,8 +11,8 @@ import { TIPOS_DOMICILIO, type DoctorLocation } from '../data/ops/doctorLocation
 import { nombreRegimen } from '../data/sat/regimenesFiscales'
 import { nombreUsoCfdi } from '../data/sat/usosCfdi'
 
-const campo: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13.5, width: '100%' }
-const fila: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, flexWrap: 'wrap' }
+const campo: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13.5, width: '100%' }
+const fila: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12, flexWrap: 'wrap' }
 const etiq = (k: string) => ETIQUETAS_TELEFONO.find((e) => e.key === k)?.label ?? k
 
 function Aviso({ texto }: { texto: string | null }) {

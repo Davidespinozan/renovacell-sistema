@@ -36,8 +36,8 @@ const BLOQUE: React.CSSProperties = { marginTop: 16, padding: '12px 14px', borde
 
 // El sistema de diseño no tiene clase de input: se estilan en línea, como en Precios.
 const INP: React.CSSProperties = {
-  padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10,
-  fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--cp-surface)', width: '100%',
+  padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12,
+  fontFamily: 'inherit', fontSize: 13, outline: 'none', backgroundColor: 'var(--cp-surface)', width: '100%',
 }
 
 const ESTADO: Record<EstadoFila, { label: string; cls: string }> = {
@@ -153,22 +153,22 @@ function TabProductos({ filas, categorias, loading, reload }: {
             <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <Search size={13} style={{ position: 'absolute', left: 9, color: 'var(--muted)' }} />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto" aria-label="Buscar producto"
-                style={{ padding: '8px 11px 8px 27px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                style={{ padding: '8px 11px 8px 27px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
             </span>
             <select value={estado} onChange={(e) => setEstado(e.target.value as 'todos' | EstadoFila)} aria-label="Filtrar por estado"
-              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}>
+              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13 }}>
               <option value="todos">Todos los estados</option>
               <option value="incompleto">Incompletos</option>
               <option value="pendiente">Completos sin validar</option>
               <option value="validado">Validados</option>
             </select>
             <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Filtrar por categoría"
-              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}>
+              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13 }}>
               <option value="">Todas las categorías</option>
               {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <select value={ev} onChange={(e) => setEv(e.target.value as typeof ev)} aria-label="Filtrar por evidencia histórica"
-              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}>
+              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13 }}>
               <option value="todas">Toda la evidencia</option>
               <option value="con">Con evidencia histórica</option>
               <option value="sin">Sin evidencia histórica</option>
@@ -398,7 +398,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
       </section>
 
       {/* ---------- 2. BORRADOR FISCAL ---------- */}
-      <section style={{ ...BLOQUE, background: 'var(--cp-surface)', borderLeft: '3px solid var(--green-deep)' }}>
+      <section style={{ ...BLOQUE, backgroundColor: 'var(--cp-surface)', borderLeft: '3px solid var(--green-deep)' }}>
         <div className="eyebrow" style={{ marginTop: 0 }}>
           <Pencil size={12} /> 2 · Borrador fiscal
           <span style={{ fontWeight: 400, textTransform: 'none' }}> — editable, aún SIN autoridad fiscal</span>
@@ -578,7 +578,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
 function Observacion({ o }: { o: ObservacionEvidencia }) {
   const meta = EVIDENCIA[o.clasificacion as EvidenciaClase]
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cp-surface)' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px', marginBottom: 8, backgroundColor: 'var(--cp-surface)' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
         <span className={`pill ${meta?.tono === 'dang' ? 'p-dang' : meta?.tono === 'warn' ? 'p-warn' : 'p-neu'}`}>
           {meta?.etiqueta ?? o.clasificacion}

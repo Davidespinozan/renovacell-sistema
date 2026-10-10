@@ -57,7 +57,7 @@ export function Recibo() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}>Selecciona el envío</div>
         <select
-          style={{ marginLeft: 'auto', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13 }}
+          style={{ marginLeft: 'auto', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13 }}
           value={selectedId}
           onChange={(e) => setSelected(e.target.value)}
         >

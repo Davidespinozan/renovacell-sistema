@@ -218,7 +218,7 @@ export function Importar() {
           value={text}
           onChange={(e) => { setText(e.target.value); setRows(null); setResult(null) }}
           placeholder={def.ejemplo}
-          style={{ width: '100%', minHeight: 150, padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'var(--mono, ui-monospace, monospace)', fontSize: 12.5, outline: 'none', resize: 'vertical' }}
+          style={{ width: '100%', minHeight: 150, padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'var(--mono, ui-monospace, monospace)', fontSize: 12.5, outline: 'none', resize: 'vertical' }}
         />
 
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>

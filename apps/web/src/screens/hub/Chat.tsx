@@ -113,7 +113,7 @@ export function Chat() {
         ) : (
           /* Lista de conversaciones (nada abierto) */
           <div className="conv-list">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, background: 'var(--cp-surface)', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, backgroundColor: 'var(--cp-surface)', zIndex: 1 }}>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Conversaciones</span>
               <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNewOpen(true)}><Plus size={14} /> Nuevo</button>
             </div>

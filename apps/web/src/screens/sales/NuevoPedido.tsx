@@ -155,7 +155,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
                   const stock = stockInfoFor(stockMap, p.id)
                   const out = !stock.tracked || stock.qty <= 0
                   return (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 11, opacity: out ? 0.55 : 1 }}>
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, opacity: out ? 0.55 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.name}</div>
                         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>

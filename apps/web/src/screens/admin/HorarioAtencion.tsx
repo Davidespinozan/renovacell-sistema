@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { atencion as clientePorDefecto, DIAS, textoEstadoHorario, validarSemana, type ClienteAtencion, type ConfigAtencion, type DiaHorario, type Horario } from '../../data/ops/atencion'
 
-const campo: React.CSSProperties = { padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13 }
+const campo: React.CSSProperties = { padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 13 }
 const ZONAS = ['America/Mazatlan', 'America/Mexico_City', 'America/Tijuana', 'America/Hermosillo', 'America/Monterrey', 'America/Cancun']
 
 export function HorarioAtencion({ cliente = clientePorDefecto, onCambio }: { cliente?: ClienteAtencion; onCambio?: () => void }) {

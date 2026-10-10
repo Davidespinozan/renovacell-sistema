@@ -45,8 +45,8 @@ function payInfo(o: OrderWithItems, m?: OrderMoney | null): PayInfo {
 const channelOf = (o: OrderWithItems): 'portal' | 'pos' => (isPosOrder(o) ? 'pos' : 'portal')
 
 const sel: React.CSSProperties = {
-  padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 11,
-  fontFamily: 'inherit', fontSize: 13, background: 'var(--cp-surface)', outline: 'none',
+  padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12,
+  fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)', outline: 'none',
 }
 
 export function VentasDetalle() {
@@ -400,7 +400,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
     onClose()
   }
 
-  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none' }
+  const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none' }
   return (
     <div style={{ marginTop: 14, padding: 14, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }}>
       <div className="seg" style={{ marginBottom: 12 }}>
@@ -448,7 +448,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <input style={{ ...fld, marginTop: 5, marginBottom: 8 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {(tipo === 'devolucion' ? PRESETS_DEV : PRESETS_CORR).map((pz) => (
-          <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--cp-surface)', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
+          <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, backgroundColor: 'var(--cp-surface)', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
         ))}
       </div>
       {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginBottom: 10 }}><span>{err}</span></div>}
@@ -491,7 +491,7 @@ function CreditoAcciones({ order, dinero }: { order: OrderWithItems; dinero: Ord
     if (!r.ok) window.alert(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo revocar el crédito.'))
   }
 
-  const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }
+  const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 
   if (dinero.credito_autorizado) {
     return (
@@ -548,7 +548,7 @@ function PagarReembolso({ refundId, monto, usuario }: { refundId: string; monto:
     renew(); setAbierto(false)
   }
 
-  const fld: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--cp-surface)' }
+  const fld: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 
   if (!abierto) return <button className="btn ghost sm" type="button" onClick={() => setAbierto(true)}>Pagar {money(monto)}</button>
   return (

@@ -35,8 +35,8 @@ function lotStatus(lot: Lot): { label: string; pill: string } {
 }
 
 const selStyle: React.CSSProperties = {
-  padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11,
-  fontFamily: 'inherit', fontSize: 13.5, background: 'var(--cp-surface)', minWidth: 260,
+  padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 12,
+  fontFamily: 'inherit', fontSize: 13.5, backgroundColor: 'var(--cp-surface)', minWidth: 260,
 }
 
 export function Trazabilidad() {

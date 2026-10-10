@@ -72,7 +72,7 @@ export function ExportButton<T>({ name, rows, columns, label = 'Exportar', class
           role="menu"
           style={{
             position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 60, minWidth: 190,
-            background: 'var(--cp-surface)', border: '1px solid var(--line)', borderRadius: 12,
+            backgroundColor: 'var(--cp-surface)', border: '1px solid var(--line)', borderRadius: 12,
             boxShadow: '0 12px 32px -12px rgba(20,40,28,.35)', overflow: 'hidden', padding: 4,
           }}
         >

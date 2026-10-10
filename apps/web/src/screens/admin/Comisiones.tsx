@@ -149,7 +149,7 @@ function MetaRow({ row, onSetMeta }: { row: Row; onSetMeta: (v: number) => void 
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: 'var(--ink-3)' }}>$</span>
           <input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && save()} inputMode="numeric"
-            placeholder="0" style={{ width: 92, padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+            placeholder="0" style={{ width: 92, padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
         </span>
       </td>
       <td data-label="Avance">

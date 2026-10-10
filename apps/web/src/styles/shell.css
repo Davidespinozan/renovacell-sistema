@@ -4,6 +4,27 @@
    Las variables (:root) viven en @renovacell/ui/tokens.css.
    ============================================================================ */
 *{margin:0;padding:0;box-sizing:border-box}
+/* ── Línea base de controles de formulario ───────────────────────────────────────
+   Tailwind preflight está apagado y muchos campos llevan estilos inline, así que aquí
+   va lo que inline no puede expresar: fuente, color, placeholder, anillo de foco,
+   selects con chevron propio y controles nativos en tema claro. */
+input,select,textarea,button{font-family:inherit}
+input,select,textarea{color:var(--ink);color-scheme:light;accent-color:var(--green)}
+input::placeholder,textarea::placeholder{color:var(--cp-text-3);opacity:1}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus,select:focus,textarea:focus{box-shadow:0 0 0 1px var(--green-soft),0 0 0 4px rgba(95,184,115,.16)}
+.searchbox input:focus,.trace-in .fld input:focus{box-shadow:none}
+input,select,textarea{transition:box-shadow var(--dur-fast,.16s),border-color var(--dur-fast,.16s)}
+select:not([multiple]){appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center;background-size:16px;padding-right:34px!important}
+input[type=date],input[type=time],input[type=datetime-local],input[type=month]{min-height:40px}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;cursor:pointer}
+input[type=checkbox],input[type=radio]{width:16px;height:16px;cursor:pointer}
+button{cursor:pointer}button[disabled]{cursor:not-allowed}
+/* Scrollbars finos y neutros */
+*{scrollbar-width:thin;scrollbar-color:rgba(11,18,32,.18) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(11,18,32,.18);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(11,18,32,.3);border:3px solid transparent;background-clip:content-box}
 html,body{height:100%}
 body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'ss01','cv11';color:var(--ink);background:var(--hueso);-webkit-font-smoothing:antialiased}
 .serif{font-family:'Inter',sans-serif;letter-spacing:-.022em}.display{font-family:'Special Gothic Expanded One',sans-serif;font-weight:400}
@@ -144,14 +165,14 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .canvas{padding:22px 30px 60px;overflow:auto;flex:1;min-height:0}
 /* Solo opacidad (sin transform): un transform con fill-mode 'both' convertiría a
    #content en "containing block" y atraparía los modales position:fixed (iOS). */
-#content{animation:fade .4s ease both}
+#content{animation:fade .22s ease both}
 .grid{display:grid;gap:18px}
-.card{position:relative;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-card);animation:rise .5s var(--ease-soft) both;transition:box-shadow var(--dur) ease,transform var(--dur) var(--ease-soft)}
-@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.card{position:relative;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-card);animation:rise .32s var(--ease-soft) both;transition:box-shadow var(--dur) ease,transform var(--dur) var(--ease-soft)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* Entrada escalonada: las tarjetas del lienzo aparecen en cascada. */
 /* Solo las TARJETAS hacen el rise (transform). El contenedor .grid NO se anima
    con transform, para no atrapar los modales fixed que cuelgan de él. */
-.canvas #content > .grid > .card{animation:rise .5s var(--ease-soft) both}
+.canvas #content > .grid > .card{animation:rise .32s var(--ease-soft) both}
 .canvas #content > .grid > *:nth-child(1){animation-delay:.03s}
 .canvas #content > .grid > *:nth-child(2){animation-delay:.07s}
 .canvas #content > .grid > *:nth-child(3){animation-delay:.11s}
@@ -185,9 +206,9 @@ th{font-size:11px;line-height:14px;letter-spacing:.08em;text-transform:uppercase
 td{padding:13px 14px;border-bottom:1px solid rgba(230,234,240,.8);font-size:13.5px}
 tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-child td{border-bottom:none}
 .clickrow{cursor:pointer}
-.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-weight:600}
+.mono{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-weight:600}
 .btn{font-family:inherit;border:none;background:var(--grad-green);color:#fff;font-weight:600;font-size:14px;min-height:44px;padding:10px 16px;border-radius:var(--r-field);cursor:pointer;box-shadow:var(--glow);transition:transform var(--dur-fast) var(--ease-soft),filter var(--dur-fast),background var(--dur-fast),box-shadow var(--dur-fast);display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.btn svg{width:16px;height:16px}.btn:hover{filter:brightness(1.06)}.btn:active{transform:scale(.985)}
+.btn svg{width:16px;height:16px}.btn:hover{box-shadow:0 1px 2px rgba(11,18,32,.06),0 12px 24px -10px rgba(0,115,17,.55)}.btn:active{transform:scale(.985)}
 /* .btn-primary se usaba en el código sin estar definido: es el mismo botón principal (alias explícito). */
 .btn-primary{font-family:inherit;border:none;background:var(--grad-green);color:#fff;font-weight:600;font-size:14px;min-height:44px;padding:10px 16px;border-radius:var(--r-field);box-shadow:var(--glow);display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 /* Secundario: blanco, borde hairline, texto slate-700. Fantasma: relleno slate-100. Peligro: rojo pleno. */
@@ -244,7 +265,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .lotebox .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
 .lotebox .pn{font-size:13.5px;font-weight:600}
 .lote{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px}
-.lote .lc{font-family:'JetBrains Mono',monospace;font-weight:600;background:var(--hueso);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:11.5px}
+.lote .lc{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-weight:600;background:var(--hueso);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:11.5px}
 .lote .lq{margin-left:auto;font-weight:600}
 .fefo{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--green-deep);background:var(--ok-bg);padding:3px 8px;border-radius:var(--pill)}
 .fefo svg{width:11px;height:11px}
@@ -254,7 +275,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .trace-in .fld svg{width:16px;height:16px;color:var(--ink-3)}
 .trace-in .fld input{border:none;outline:none;font-family:inherit;font-size:13.5px;width:100%;background:none}
 .chiprow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.lchip{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding:6px 12px;border-radius:var(--pill);border:1px solid var(--line);background:var(--cp-surface);cursor:pointer;transition:.15s}
+.lchip{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:12px;font-weight:600;padding:6px 12px;border-radius:var(--pill);border:1px solid var(--line);background:var(--cp-surface);cursor:pointer;transition:.15s}
 .lchip:hover{border-color:var(--green-soft);color:var(--green-deep)}
 .lchip.on{background:var(--grad-green);color:#fff;border-color:transparent;box-shadow:var(--glow)}
 .gate{display:flex;align-items:center;gap:14px;background:var(--ok-bg);border:1px solid var(--ok-line);border-radius:var(--r);padding:14px 18px;margin-bottom:18px}
@@ -268,7 +289,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .poscard .lt{font-size:10.5px;color:var(--ink-3);margin-bottom:8px}
 .poscard .pr{font-family:'Inter';font-weight:600;font-size:15px}
 .ticket .titem{display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line)}
-.ticket .titem .tl{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-3)}
+.ticket .titem .tl{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:10.5px;color:var(--ink-3)}
 .ticket .empty{color:var(--ink-3);font-size:13px;padding:14px 0;text-align:center}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
 .pcard{background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:.16s;box-shadow:var(--sh-card);display:flex;flex-direction:column}
@@ -285,6 +306,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .pcard .pr{font-family:'Inter',serif;font-weight:600;font-size:18px;margin:10px 0}
 .pcard .addb{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--grad-green);color:#fff;font-weight:600;font-size:13px;min-height:40px;padding:9px;border-radius:var(--r-field);box-shadow:var(--glow)}
 .pcard .addb svg{width:15px;height:15px}
+.pcard .addb[disabled]{background:var(--cp-slate-100);color:var(--cp-text-2);box-shadow:none}
 .trk{display:flex;align-items:flex-start;margin:16px 0 4px}
 .tnode{display:flex;flex-direction:column;align-items:center;width:62px;flex:none}
 .tdot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--cp-slate-200);color:#fff;border:2px solid var(--cp-slate-200)}
@@ -322,11 +344,11 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .dbrand{display:flex;align-items:center;gap:11px;min-width:0}
 .dbrand img{width:34px;height:34px;object-fit:contain;flex:none}
 .dbrand .dbn{font-size:15px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
-.dbrand .dbs{font-size:10.5px;color:var(--ink-3);font-family:'JetBrains Mono',monospace;letter-spacing:.02em;margin-top:2px}
+.dbrand .dbs{font-size:10.5px;color:var(--ink-3);font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em;margin-top:2px}
 .deck{position:relative;min-height:330px}
 .slide{display:none}.slide.on{display:block;animation:fade .25s}
 .sl-pad{padding:22px 26px 8px}
-.sl-eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:11px}
+.sl-eyebrow{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:11px}
 .sl-ph{font-size:12.5px;color:var(--ink-3);background:var(--bone-warm);border:1px dashed var(--line);border-radius:var(--r-sm);padding:12px 14px;line-height:1.5}
 .sl-stats{display:flex;gap:10px;flex-wrap:wrap}
 .sl-stat{background:var(--bone-warm);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 14px;font-size:12.5px;color:var(--ink)}
@@ -338,7 +360,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 .ddots{display:flex;gap:7px;align-items:center}
 .ddot{width:8px;height:8px;border-radius:50%;background:var(--line);cursor:pointer;transition:.18s}
 .ddot.on{background:var(--green);width:22px;border-radius:5px}
-.dcount{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mid);letter-spacing:.04em}
+.dcount{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:11px;color:var(--mid);letter-spacing:.04em}
 .tl{position:relative;padding-left:24px;margin-top:6px}
 .tl::before{content:"";position:absolute;left:6px;top:6px;bottom:10px;width:2px;background:var(--line)}
 .tli{position:relative;padding:0 0 18px}
