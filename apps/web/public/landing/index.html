@@ -9,7 +9,11 @@
      la pestaña salía con el ícono genérico y al pegar el enlace en WhatsApp o
      redes no aparecía ni título ni imagen. -->
 <link rel="icon" type="image/png" sizes="32x32" href="/brand/icon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/brand/icon-180.png">
+<!-- Ícono al agregar a pantalla de inicio: opaco, con el verde del menú y el logo centrado (iOS pinta de
+     negro cualquier transparencia). Mismo arte que la app del sistema. El nombre corto evita que iOS
+     recorte el título completo de la página. -->
+<link rel="apple-touch-icon" sizes="180x180" href="/brand/app-apple-180.png">
+<meta name="apple-mobile-web-app-title" content="Renovacell">
 <meta name="theme-color" content="#007311">
 <link rel="canonical" href="https://renovacell.mx/">
 
@@ -3405,7 +3409,10 @@ document.addEventListener('keydown', e => {
     if(b.logoUrl){
       [].slice.call(document.querySelectorAll('.nav-logo img,.foot-logo img'))
         .forEach(function(img){ img.src = b.logoUrl; });
-      [].slice.call(document.querySelectorAll('link[rel="icon"],link[rel="apple-touch-icon"]'))
+      // Solo la pestaña. El ícono de pantalla de inicio (apple-touch-icon) NO se reemplaza: el logo
+      // subido es transparente y ocupa todo el lienzo, e iOS lo pintaba sobre negro tapando el cuadro.
+      // Ese ícono es un arte propio (fondo verde, logo centrado) que vive en /brand/app-apple-180.png.
+      [].slice.call(document.querySelectorAll('link[rel="icon"]'))
         .forEach(function(l){ l.href = b.logoUrl; });
       var og=document.querySelector('meta[property="og:image"]');
       var tw=document.querySelector('meta[name="twitter:image"]');
