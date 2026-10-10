@@ -24,7 +24,7 @@ import { currentUserId } from '../../lib/supabase'
 
 const fld: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10,
-  fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff',
+  fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)',
 }
 
 export function Eventos() {
@@ -56,7 +56,7 @@ export function Eventos() {
         </div>
       )}
       {msg && (
-        <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+        <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
           <span>{msg}</span>
         </div>
       )}

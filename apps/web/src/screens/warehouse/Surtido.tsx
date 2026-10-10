@@ -223,14 +223,14 @@ function SurtirModal({
               ))}
 
               {!ok && (
-                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>
+                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>
                   <Icon name="x" />
                   <span>No alcanza el inventario para todos los productos de este pedido. Registra una entrada o ajusta el pedido.</span>
                 </div>
               )}
 
               {err && (
-                <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>
+                <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>
                   <Icon name="x" /><span>{err}</span>
                 </div>
               )}

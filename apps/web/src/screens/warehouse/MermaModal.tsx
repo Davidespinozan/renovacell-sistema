@@ -30,7 +30,7 @@ export function MermaModal({ lot, onClose }: {
     onClose()
   }
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   return (
@@ -55,7 +55,7 @@ export function MermaModal({ lot, onClose }: {
           </div>
           {n > 0 && n < lot.quantity && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>Quedan {lot.quantity - n} u en el lote tras la baja.</div>}
 
-          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
+          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" onClick={dar} disabled={n <= 0 || busy} style={n <= 0 || busy ? { opacity: 0.5, cursor: 'not-allowed' } : { background: 'var(--danger)' }}>

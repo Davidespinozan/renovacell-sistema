@@ -48,7 +48,7 @@ export function Ajustes({ onClose }: { onClose: () => void }) {
           </div>
 
           {perm === 'granted' ? (
-            <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+            <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
               <Check size={18} /><span>Notificaciones permitidas en este dispositivo.</span>
             </div>
           ) : perm === 'denied' ? (

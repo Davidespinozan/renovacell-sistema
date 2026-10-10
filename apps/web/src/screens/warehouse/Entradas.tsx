@@ -39,7 +39,7 @@ const reasonLabel = (r: string | null): string => ({
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 12px', border: '1px solid var(--line)',
-  borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff',
+  borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)',
 }
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em',
@@ -79,7 +79,7 @@ export function Entradas() {
         llegó todo, queda completa.
       </PageHead>
 
-      {toast && !toast.ok && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{toast.text}</span></div>}
+      {toast && !toast.ok && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{toast.text}</span></div>}
 
       {/* 1) Compras pendientes de recibir → recepción física */}
       <div className="card" style={{ padding: 0 }}>

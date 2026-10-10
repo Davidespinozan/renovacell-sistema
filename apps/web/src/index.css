@@ -17,13 +17,18 @@ html,body,#root{height:100%}
    Solo se muestra en foco por teclado (no al hacer clic con el mouse). */
 a[role="button"]:focus-visible, button:focus-visible, [tabindex]:focus-visible,
 input:focus-visible, select:focus-visible, textarea:focus-visible, [role="dialog"] :focus-visible {
-  outline: 2px solid var(--green-deep, #007311);
+  outline: 2px solid rgba(0,115,17,.6); /* verde Renovacell al 60 % */
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* Movimiento: todo apagado con prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
 /* Miniatura del producto en el Punto de Venta. Sale de products.image_url, la
    misma fuente que alimenta el catálogo del doctor y la landing: una imagen
    subida desde Administración aparece en los tres lados. */
-.posthumb{width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;
+.posthumb{width:100%;aspect-ratio:4/3;object-fit:contain;background:var(--cp-surface);
   border:1px solid var(--line);border-radius:6px;margin-bottom:9px;padding:6px}

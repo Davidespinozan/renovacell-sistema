@@ -131,7 +131,7 @@ export function Custodias() {
         </div>
         {hallazgos != null && (
           errores.length === 0 && avisos.length === 0 ? (
-            <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+            <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
               <span>Todo cuadra: sin hallazgos.</span>
             </div>
           ) : (
@@ -140,7 +140,7 @@ export function Custodias() {
                 <div key={i} className="sysnote" style={{
                   marginBottom: 8,
                   ...(h.severidad === 'error'
-                    ? { background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }
+                    ? { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }
                     : { background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }),
                 }}>
                   <AlertTriangle size={15} />

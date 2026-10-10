@@ -55,7 +55,7 @@ export function GuiaManualVoid({ orderId }: { orderId: string }) {
       <input style={fld} value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Folio / confirmación del portal" />
       <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', display: 'block', marginTop: 8 }}>Evidencia (opcional)</label>
       <input style={fld} value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Nota o nombre de la captura" />
-      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
+      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
       <div style={{ textAlign: 'right', marginTop: 10 }}>
         <button className="btn sm" type="button" disabled={!ref.trim() || busy} onClick={anular} style={!ref.trim() || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
           {busy ? 'Registrando…' : 'Registrar guía anulada manualmente'}

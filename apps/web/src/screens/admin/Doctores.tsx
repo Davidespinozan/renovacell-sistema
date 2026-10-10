@@ -169,7 +169,7 @@ export function Doctores() {
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
               Precios:
               <select value={d.price_list_id ?? ''} onChange={(e) => setPriceList(d.id, e.target.value || null)}
-                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none', background: '#fff' }}>
+                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none', background: 'var(--cp-surface)' }}>
                 <option value="">General (base)</option>
                 {lists.filter((l) => !l.is_default).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
@@ -250,7 +250,7 @@ export function Doctores() {
 function EditDoctorModal({ initial, onClose, onSave }: { initial: { name: string; org: string }; onClose: () => void; onSave: (name: string, org: string) => void }) {
   const [name, setName] = useState(initial.name)
   const [org, setOrg] = useState(initial.org)
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   return (
     <div className="overlay" onClick={onClose}>

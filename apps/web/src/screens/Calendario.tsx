@@ -141,7 +141,7 @@ function fmtLong(dateIso: string): string {
   return `${d} de ${MONTHS[m - 1]} ${y}`
 }
 
-const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
 function NuevoCompromiso({ date, onClose, onCreate }: { date: string; onClose: () => void; onCreate: (title: string, kind: CalKind, notes: string) => void }) {

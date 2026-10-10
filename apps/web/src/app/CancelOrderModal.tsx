@@ -34,7 +34,7 @@ export function CancelOrderModal({ orderId, folio, requireReason, actor, onClose
     onDone?.(r)
   }
 
-  const fld: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff', marginTop: 6 }
+  const fld: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
@@ -68,7 +68,7 @@ export function CancelOrderModal({ orderId, folio, requireReason, actor, onClose
                   </div>
                 </>
               )}
-              {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><Icon name="x" /><span>{err}</span></div>}
+              {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><Icon name="x" /><span>{err}</span></div>}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Volver</button>
                 <button className="btn" type="button" disabled={!valid || busy} onClick={submit}

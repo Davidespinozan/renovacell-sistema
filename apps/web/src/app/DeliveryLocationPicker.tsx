@@ -100,7 +100,7 @@ export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowMa
     const captureMode: Mode = allowManage ? 'new' : 'oneoff' // persistible (doctor) vs one-off (staff)
     return (
       <div>
-        {error && <div className="sysnote" style={{ marginBottom: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>}
+        {error && <div className="sysnote" style={{ marginBottom: 10, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>}
         {shouldOfferLegacy(active, legacyBase) && (
           <label className="addr-opt" style={optStyle(mode === 'legacy')} onClick={() => setMode('legacy')}>
             <input type="radio" checked={mode === 'legacy'} onChange={() => setMode('legacy')} />
@@ -142,7 +142,7 @@ export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowMa
   const needsChoice = mode === null
   return (
     <div>
-      {error && <div className="sysnote" style={{ marginBottom: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>}
+      {error && <div className="sysnote" style={{ marginBottom: 10, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>}
       {needsChoice && <div style={{ fontSize: 12.5, color: 'var(--warn)', marginBottom: 8 }}>Tienes varias ubicaciones y ninguna predeterminada. Elige a dónde enviar este pedido.</div>}
       <div style={{ display: 'grid', gap: 8 }}>
         {active.map((loc) => {

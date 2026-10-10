@@ -234,7 +234,7 @@ export function Caja() {
           value={buscar}
           onChange={(e) => setBuscar(e.target.value)}
           placeholder="Buscar producto por nombre, categoría o SKU…"
-          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)' }}
         />
         {filtered.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ningún producto coincide con “{buscar}”.</div>
@@ -283,7 +283,7 @@ export function Caja() {
             <Icon name="store" style={{ width: 15, height: 15, color: custodyId ? 'var(--green-deep)' : 'var(--ink-3)' }} />
             <span style={{ whiteSpace: 'nowrap' }}>Vendiendo en</span>
             <select value={custodyId ?? ''} onChange={(e) => { setCustodyId(e.target.value || null); setCart({}) }}
-              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none', fontWeight: custodyId ? 600 : 400 }}>
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 13, background: 'var(--cp-surface)', outline: 'none', fontWeight: custodyId ? 600 : 400 }}>
               <option value="">Mostrador · del almacén</option>
               {misCustodias.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -339,7 +339,7 @@ export function Caja() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 56 }}>Recibí</span>
                   <input type="number" min={0} value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="¿con cuánto paga? (opcional)"
-                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, outline: 'none', background: '#fff' }} />
+                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, outline: 'none', background: 'var(--cp-surface)' }} />
                 </div>
                 {recibido !== '' && (
                   <div className="tket-total" style={{ marginTop: 8, color: cambio < 0 ? 'var(--danger)' : 'var(--green-deep)' }}>
@@ -378,7 +378,7 @@ export function Caja() {
           </>
         )}
 
-        {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><Icon name="x" /><span>{err}</span></div>}
+        {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><Icon name="x" /><span>{err}</span></div>}
 
         {ventasTurno.length > 0 && (
           <details style={{ marginTop: 14 }}>

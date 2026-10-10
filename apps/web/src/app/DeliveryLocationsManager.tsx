@@ -67,7 +67,7 @@ export function DeliveryLocationsManager({ doctorId }: { doctorId?: string }) {
       </div>
       <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>Domicilios a los que enviamos tus pedidos. No incluyen datos fiscales.</div>
 
-      {error && <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>}
+      {error && <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>}
 
       {loading ? (
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 12 }}>Cargando ubicaciones…</div>

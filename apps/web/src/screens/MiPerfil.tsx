@@ -32,7 +32,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     void supabase.from('customers').select('id').eq('profile_id', uid).maybeSingle().then(({ data }) => { if (data?.id) setCustomerId(data.id) })
   }, [isDoctor])
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   // Sube la foto a Storage y guarda su URL (persistente), no un data-URI temporal.
@@ -98,7 +98,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             {pwError && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>{pwError}</div>}
           </div>
 
-          {error && <div className="sysnote" style={{ marginTop: 14, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>}
+          {error && <div className="sysnote" style={{ marginTop: 14, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>}
           {toast && <div className="sysnote" style={{ marginTop: 14 }}><Check size={16} /> <span>{toast}</span></div>}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>

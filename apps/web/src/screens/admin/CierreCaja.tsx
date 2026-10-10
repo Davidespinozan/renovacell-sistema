@@ -174,7 +174,7 @@ export function CierreCaja() {
     requestAnimationFrame(() => requestAnimationFrame(() => imprimirCorte()))
   }
 
-  const sel: React.CSSProperties = { padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }
+  const sel: React.CSSProperties = { padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: 'var(--cp-surface)' }
   const fld: React.CSSProperties = { width: '100%', padding: '11px 13px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 16, outline: 'none', marginTop: 6 }
   const lbl: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
@@ -229,8 +229,8 @@ export function CierreCaja() {
 
           {contado !== '' && (
             <div className="sysnote" style={{ marginTop: 14, ...(cuadra
-              ? { background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }
-              : { background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }) }}>
+              ? { background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }
+              : { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }) }}>
               {cuadra ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
               <span>{cuadra ? 'Cuadra.' : `${diferencia > 0 ? 'Sobrante' : 'Faltante'} de ${money(Math.abs(diferencia))}.`}</span>
             </div>
@@ -246,8 +246,8 @@ export function CierreCaja() {
           <button className="btn" type="button" style={{ width: '100%', marginTop: 18, opacity: valid && !busy ? 1 : 0.5, cursor: valid && !busy ? 'pointer' : 'not-allowed' }} disabled={!valid || busy} onClick={cerrar}>
             {busy ? 'Registrando…' : 'Registrar cierre'}
           </button>
-          {err && <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{err}</span></div>}
-          {done && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}><span>Cierre registrado.</span></div>}
+          {err && <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{err}</span></div>}
+          {done && <div className="sysnote" style={{ marginTop: 12, background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}><span>Cierre registrado.</span></div>}
         </div>
 
         {/* Historial */}

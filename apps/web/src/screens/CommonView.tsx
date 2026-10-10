@@ -240,7 +240,7 @@ export function CommonView() {
 function ResourceRequestModal({ onClose, onSave }: { onClose: () => void; onSave: (i: { title: string; description: string }) => void }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
   return (
     <div className="overlay" onClick={onClose}>
@@ -273,7 +273,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
   const [fileName, setFileName] = useState('')
   const [tags, setTags] = useState('')
   const [busy, setBusy] = useState(false)
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 
   const onFile = (f: File | undefined) => {
     if (!f) return
@@ -423,7 +423,7 @@ function Composer({ onPublish, meUrl, meName }: { onPublish: (input: { title: st
           <select
             aria-label="Destinatario del anuncio"
             value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}
-            style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 'var(--pill)', fontFamily: 'inherit', fontSize: 12.5, background: '#fff' }}
+            style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 'var(--pill)', fontFamily: 'inherit', fontSize: 12.5, background: 'var(--cp-surface)' }}
           >
             <option value="">Todo el equipo</option>
             {STAFF.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
@@ -490,7 +490,7 @@ function EditModal({ announcement, onClose, onSave }: {
   const [kind, setKind] = useState<AnnouncementKind>(kindOf(announcement))
   const [pinned, setPinned] = useState(isPinned(announcement))
   const [audience, setAudience] = useState<RoleId | ''>(audienceOf(announcement) ?? '')
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 
   return (
     <div className="overlay" onClick={onClose}>

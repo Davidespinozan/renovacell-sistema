@@ -36,7 +36,7 @@ export function RevisionEconomica({ cliente, revisar = revisarPorDefecto }: { cl
       {rev.estado === 'cargando' || rev.estado === 'inactivo' ? <Aviso testid="revision-cargando">Cargando revisión económica…</Aviso>
         : rev.estado === 'no_autorizado' ? <Aviso testid="revision-no-autorizado">{rev.mensaje}</Aviso>
         : rev.estado === 'error' ? (
-          <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }} data-testid="revision-error">
+          <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }} data-testid="revision-error">
             <span style={{ flex: 1 }}>{rev.mensaje}</span>
             <button type="button" className="btn ghost sm" onClick={() => void rev.recargar()}>Reintentar</button>
           </div>

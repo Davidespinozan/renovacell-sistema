@@ -183,7 +183,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       </div>
 
       {stuck && (
-        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginBottom: 10 }}>
+        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginBottom: 10 }}>
           <Icon name="truck" />
           <span>{reason}</span>
         </div>
@@ -207,7 +207,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
           {puedeCerrarPaqueteria && (marcando ? (
             <>
               <input value={recibio} onChange={(e) => setRecibio(e.target.value)} placeholder="¿Quién recibió? (acuse de paquetería)"
-                style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }} />
+                style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--cp-surface)' }} />
               <button className="btn sm" type="button" disabled={!recibio.trim()} style={!recibio.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={cerrarPaqueteria}><Icon name="check" /> Confirmar entrega</button>
               <button className="btn ghost sm" type="button" onClick={() => setMarcando(false)}>Cancelar</button>
             </>

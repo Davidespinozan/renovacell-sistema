@@ -29,7 +29,7 @@ function fileToDataUrl(file: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file) })
 }
 
-const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
 export function PaymentModal({
@@ -172,7 +172,7 @@ export function PaymentModal({
                 </>
               ) : (
                 <>
-                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)', marginTop: 16 }}>
+                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)', marginTop: 16 }}>
                     <Icon name="receipt" />
                     <span>Transfiere <b>{money(amount)}</b> e indica el folio <b>{folio}</b> como referencia.
                       {banks.length > 1 && <> Elige la cuenta a la que transferiste:</>}
@@ -219,7 +219,7 @@ export function PaymentModal({
               )}
 
               {error && (
-                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>
+                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>
                   <Icon name="x" /><span>{error}</span>
                 </div>
               )}

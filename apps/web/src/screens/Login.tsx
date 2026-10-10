@@ -8,7 +8,7 @@ import { BrandLogo } from '../app/BrandLogo'
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px 11px 38px', border: '1px solid var(--line)',
-  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff',
+  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)',
 }
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }
@@ -113,7 +113,7 @@ export function Login() {
                   <button type="button" style={linkBtn} onClick={() => { setView('recover'); setError(null); setSent(false) }}>¿Olvidaste tu contraseña?</button>
                 </div>
 
-                {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
+                {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
 
                 <button className="btn" type="submit" disabled={busy} style={{ width: '100%', marginTop: 16, opacity: busy ? 0.7 : 1 }}><LogIn size={16} /> {busy ? 'Entrando…' : 'Entrar'}</button>
               </form>
@@ -142,7 +142,7 @@ export function Login() {
                 </>
               ) : regMsg?.kind === 'exists' ? (
                 <>
-                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
                     <span>{regMsg.text ?? 'Ese correo ya tiene cuenta.'}</span>
                   </div>
                   <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => { setView('login'); setRegMsg(null) }}>Ir a iniciar sesión</button>
@@ -173,9 +173,9 @@ export function Login() {
                     <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
                   </div>
 
-                  {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
+                  {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
                   {regMsg?.kind === 'reject' && (
-                    <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12, textAlign: 'left' }}>
+                    <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12, textAlign: 'left' }}>
                       <div style={{ fontWeight: 600, marginBottom: 4 }}>No pudimos verificar tu cédula.</div>
                       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5 }}>{(regMsg.reasons ?? []).map((r, i) => <li key={i}>{r}</li>)}</ul>
                     </div>
@@ -199,7 +199,7 @@ export function Login() {
 
               {sent ? (
                 <>
-                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+                  <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
                     <span>Si <b>{email || 'tu correo'}</b> está registrado y el envío de correos está habilitado, recibirás las instrucciones para restablecer tu contraseña. Si no llega, contacta a Renovacell.</span>
                   </div>
                   <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => { setView('login'); setSent(false) }}>Volver a iniciar sesión</button>

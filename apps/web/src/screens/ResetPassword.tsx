@@ -10,7 +10,7 @@ import { BrandLogo } from '../app/BrandLogo'
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px 11px 38px', border: '1px solid var(--line)',
-  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff',
+  borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)',
 }
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }
@@ -65,7 +65,7 @@ export function ResetPassword() {
 
           {done ? (
             <>
-              <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: '#C9E4CF', color: 'var(--green-deep)' }}>
+              <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
                 <ShieldCheck size={16} /><span>Contraseña actualizada. Ya puedes iniciar sesión con tu nueva contraseña.</span>
               </div>
               <button type="button" className="btn" style={{ width: '100%', marginTop: 16 }} onClick={() => setMode('login')}>Ir a iniciar sesión</button>
@@ -85,7 +85,7 @@ export function ResetPassword() {
                   <Lock size={16} style={iconStyle} />
                   <input style={input} type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} placeholder="••••••••" />
                 </div>
-                {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
+                {error && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}>{error}</div>}
                 <button className="btn" type="submit" disabled={busy} style={{ width: '100%', marginTop: 16, opacity: busy ? 0.7 : 1 }}>{busy ? 'Guardando…' : 'Guardar contraseña'}</button>
               </form>
             </>

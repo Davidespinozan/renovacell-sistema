@@ -76,7 +76,7 @@ export function ImageField({ label, value, onChange, hint, folder = 'landing', r
             placeholder="…o pega aquí la dirección de una imagen"
             style={{
               width: '100%', marginTop: 8, padding: '8px 10px', border: '1px solid var(--line)',
-              borderRadius: 9, fontFamily: 'monospace', fontSize: 12, outline: 'none', background: '#fff',
+              borderRadius: 9, fontFamily: 'monospace', fontSize: 12, outline: 'none', background: 'var(--cp-surface)',
             }}
           />
           {error && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>{error}</div>}

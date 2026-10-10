@@ -109,17 +109,17 @@ export function CustomerDirectory({ title, scope, carteraToggle = false, cliente
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Buscar por nombre, correo, teléfono, ciudad o vendedor…"
-        style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff' }}
+        style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)' }}
       />
 
       {loading ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando directorio…</div>
       ) : error ? (
-        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{error}</span></div>
+        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>
       ) : enCartera && mi.cargando ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tu cartera…</div>
       ) : enCartera && mi.error ? (
-        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }} data-testid="cartera-error"><span>{mi.error}</span></div>
+        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }} data-testid="cartera-error"><span>{mi.error}</span></div>
       ) : customers.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }} data-testid="cartera-vacia">{effectiveScope === 'cartera' ? 'No tienes clientes asignados.'
           : effectiveScope === 'historica' ? (mi.equivalencias.length ? 'No hay registros históricos de Odoo para tus equivalencias.' : 'Dirección aún no ha registrado una equivalencia entre tu usuario y un vendedor de Odoo.')
@@ -159,7 +159,7 @@ export function CustomerDirectory({ title, scope, carteraToggle = false, cliente
 // Paginación: "Mostrando 1–100 de 2,568 · Página 1 de 26" + ← números … → (desktop) / ← Página X de Y → (móvil).
 function Pager({ pg, onPage }: { pg: import('../data/ops/customer').Page<Customer>; onPage: (p: number) => void }) {
   const nf = (n: number) => n.toLocaleString('es-MX')
-  const btn: React.CSSProperties = { minWidth: 34, height: 34, padding: '0 9px', border: '1px solid var(--line)', borderRadius: 9, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }
+  const btn: React.CSSProperties = { minWidth: 34, height: 34, padding: '0 9px', border: '1px solid var(--line)', borderRadius: 9, background: 'var(--cp-surface)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }
   const off = (on: boolean): React.CSSProperties => (on ? {} : { opacity: 0.4, cursor: 'not-allowed' })
   const prev = () => onPage(pg.page - 1)
   const next = () => onPage(pg.page + 1)

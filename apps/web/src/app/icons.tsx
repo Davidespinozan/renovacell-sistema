@@ -47,9 +47,12 @@ const P: Record<IconName, React.ReactNode> = {
   cart: <><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /><path d="M2 3h3l2.5 13h11l2-9H6" /></>,
 }
 
+// Un solo juego de trazo (tipo Feather): 1.8 por defecto; los íconos de acción fuerte suben a 2.
+const TRAZO_FUERTE = new Set<IconName>(['check', 'chevronRight', 'chevronLeft', 'x', 'menu', 'plus', 'minus'])
+
 export function Icon({ name, ...rest }: { name: IconName } & React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...rest}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={TRAZO_FUERTE.has(name) ? 2 : 1.8} strokeLinecap="round" strokeLinejoin="round" {...rest}>
       {P[name]}
     </svg>
   )

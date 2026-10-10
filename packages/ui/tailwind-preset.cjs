@@ -7,16 +7,17 @@ module.exports = {
       colors: {
         green: { DEFAULT: '#007311', soft: '#5FB873', deep: '#00590D' },
         carbon: '#23271F',
-        hueso: '#F9FAF8',
-        ink: { DEFAULT: '#0A0C08', 2: '#252921', 3: '#3D4238' },
-        mid: '#747D6C',
-        line: '#E7E9E3',
-        warn: { DEFAULT: '#B5730E', bg: '#FBF1E0' },
-        danger: { DEFAULT: '#B23A33', bg: '#FBECEA' },
-        ok: { DEFAULT: '#007311', bg: '#E7F3E9' },
-        brandblue: { DEFAULT: '#2C6E8F', bg: '#E7F0F4' }
+        hueso: '#f4f6f9',
+        ink: { DEFAULT: '#0b1220', 2: '#0b1220', 3: '#5b6472' },
+        mid: '#8a94a3',
+        line: '#e6eaf0',
+        accent: '#007311',
+        warn: { DEFAULT: '#b45309', bg: '#fffbeb', line: '#fef3c7' },
+        danger: { DEFAULT: '#b91c1c', bg: '#fef2f2', line: '#fee2e2', solid: '#dc2626' },
+        ok: { DEFAULT: '#007311', bg: '#E7F3E9', line: '#C9E4CF' },
+        brandblue: { DEFAULT: '#1d4ed8', bg: '#eff6ff', line: '#dbeafe' }
       },
-      borderRadius: { sm: '10px', DEFAULT: '14px', lg: '20px', pill: '999px' },
+      borderRadius: { sm: '12px', DEFAULT: '14px', lg: '20px', xl: '28px', pill: '999px' },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Special Gothic Expanded One"', 'sans-serif'],

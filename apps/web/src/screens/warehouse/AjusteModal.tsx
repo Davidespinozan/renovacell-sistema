@@ -36,7 +36,7 @@ export function AjusteModal({ lot, onClose }: {
     onClose()
   }
 
-  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: '#fff', marginTop: 6 }
+  const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 
   return (
@@ -63,7 +63,7 @@ export function AjusteModal({ lot, onClose }: {
           )}
 
           {positivoBloqueado && <div className="sysnote" style={{ marginTop: 12 }}><span>Un ajuste que <b>suma</b> unidades lo registra <b>Dirección</b>. Pídeselo con el conteo.</span></div>}
-          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
+          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" onClick={aplicar} disabled={delta === 0 || busy || positivoBloqueado} style={delta === 0 || busy || positivoBloqueado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>

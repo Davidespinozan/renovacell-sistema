@@ -246,7 +246,7 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { 
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
         {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: 10, opacity: sellable ? 1 : 0.55 }} />
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'var(--cp-surface)', padding: 10, opacity: sellable ? 1 : 0.55 }} />
           : <Icon name="leaf" />}
       </div>
       <div className="pb">
@@ -303,7 +303,7 @@ function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; 
       <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
         <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
         {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', padding: 10 }} />
+          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'var(--cp-surface)', padding: 10 }} />
           : <Icon name="leaf" />}
       </div>
       <div className="pb">
@@ -344,7 +344,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--line)' }} />}
+            {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', background: 'var(--cp-surface)', border: '1px solid var(--line)' }} />}
             <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} variante(s) · elige presentación</div></div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>

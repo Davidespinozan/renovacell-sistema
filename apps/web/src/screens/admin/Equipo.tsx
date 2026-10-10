@@ -11,7 +11,7 @@ import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
 
 const STAFF_ROLES = ROLES.filter((r) => r.isStaff)
-const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 const randomPass = () => {
   const a = 'abcdefghijkmnpqrstuvwxyz23456789'
@@ -161,7 +161,7 @@ function NewUser({ onClose, onSave, onDone }: {
           <div className="sysnote" style={{ marginTop: 14 }}>
             <span>Tras crearlo, asígnale responsabilidades (Diseño, Comercial…) desde su tarjeta. La contraseña se la das tú al trabajador; él puede cambiarla después.</span>
           </div>
-          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{err}</span></div>}
+          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={save}>
@@ -208,7 +208,7 @@ function EditUser({ user, onClose, onSave, onDone }: {
           <select style={input} value={role} onChange={(e) => setRole(e.target.value as RoleKey)}>
             {STAFF_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </select>
-          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{err}</span></div>}
+          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!name.trim() || busy} style={!name.trim() || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={save}>
@@ -254,7 +254,7 @@ function PasswordModal({ user, onClose, onSave, onDone }: {
             <button type="button" className="btn ghost sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setPass(randomPass())}>Generar</button>
           </div>
           <div className="sysnote" style={{ marginTop: 14 }}><span>Comunícale la nueva contraseña al trabajador. Él la puede cambiar después desde “¿Olvidaste tu contraseña?”.</span></div>
-          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}><span>{err}</span></div>}
+          {err && <div className="sysnote" style={{ marginTop: 10, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={password.length < 6 || busy} style={password.length < 6 || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={save}>

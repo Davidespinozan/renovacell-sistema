@@ -46,7 +46,7 @@ const channelOf = (o: OrderWithItems): 'portal' | 'pos' => (isPosOrder(o) ? 'pos
 
 const sel: React.CSSProperties = {
   padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 11,
-  fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none',
+  fontFamily: 'inherit', fontSize: 13, background: 'var(--cp-surface)', outline: 'none',
 }
 
 export function VentasDetalle() {
@@ -448,10 +448,10 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <input style={{ ...fld, marginTop: 5, marginBottom: 8 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {(tipo === 'devolucion' ? PRESETS_DEV : PRESETS_CORR).map((pz) => (
-          <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: '#fff', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
+          <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--cp-surface)', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
         ))}
       </div>
-      {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginBottom: 10 }}><span>{err}</span></div>}
+      {err && <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginBottom: 10 }}><span>{err}</span></div>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button className="btn ghost sm" type="button" onClick={onClose}>Cancelar</button>
         <button className="btn sm" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
@@ -491,7 +491,7 @@ function CreditoAcciones({ order, dinero }: { order: OrderWithItems; dinero: Ord
     if (!r.ok) window.alert(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo revocar el crédito.'))
   }
 
-  const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }
+  const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }
 
   if (dinero.credito_autorizado) {
     return (
@@ -548,7 +548,7 @@ function PagarReembolso({ refundId, monto, usuario }: { refundId: string; monto:
     renew(); setAbierto(false)
   }
 
-  const fld: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff' }
+  const fld: React.CSSProperties = { padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--cp-surface)' }
 
   if (!abierto) return <button className="btn ghost sm" type="button" onClick={() => setAbierto(true)}>Pagar {money(monto)}</button>
   return (

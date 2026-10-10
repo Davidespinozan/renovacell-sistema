@@ -37,7 +37,7 @@ const BLOQUE: React.CSSProperties = { marginTop: 16, padding: '12px 14px', borde
 // El sistema de diseño no tiene clase de input: se estilan en línea, como en Precios.
 const INP: React.CSSProperties = {
   padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 10,
-  fontFamily: 'inherit', fontSize: 13, outline: 'none', background: '#fff', width: '100%',
+  fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--cp-surface)', width: '100%',
 }
 
 const ESTADO: Record<EstadoFila, { label: string; cls: string }> = {
@@ -398,7 +398,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
       </section>
 
       {/* ---------- 2. BORRADOR FISCAL ---------- */}
-      <section style={{ ...BLOQUE, background: '#fff', borderLeft: '3px solid var(--green-deep)' }}>
+      <section style={{ ...BLOQUE, background: 'var(--cp-surface)', borderLeft: '3px solid var(--green-deep)' }}>
         <div className="eyebrow" style={{ marginTop: 0 }}>
           <Pencil size={12} /> 2 · Borrador fiscal
           <span style={{ fontWeight: 400, textTransform: 'none' }}> — editable, aún SIN autoridad fiscal</span>
@@ -578,7 +578,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
 function Observacion({ o }: { o: ObservacionEvidencia }) {
   const meta = EVIDENCIA[o.clasificacion as EvidenciaClase]
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: '#fff' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cp-surface)' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
         <span className={`pill ${meta?.tono === 'dang' ? 'p-dang' : meta?.tono === 'warn' ? 'p-warn' : 'p-neu'}`}>
           {meta?.etiqueta ?? o.clasificacion}

@@ -230,7 +230,7 @@ export function Importar() {
         </div>
 
         {error && (
-          <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)' }}>
+          <div className="sysnote" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}>
             <AlertTriangle size={16} /><span>{error}</span>
           </div>
         )}

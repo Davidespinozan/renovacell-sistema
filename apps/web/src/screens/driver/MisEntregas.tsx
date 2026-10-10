@@ -295,7 +295,7 @@ export function MisEntregas() {
                       <select
                         value={loadType[s.id] ?? LOAD_INCIDENT_TYPES[0]}
                         onChange={(e) => setLoadType((m) => ({ ...m, [s.id]: e.target.value }))}
-                        style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }}
+                        style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: 'var(--cp-surface)' }}
                       >
                         {LOAD_INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -303,7 +303,7 @@ export function MisEntregas() {
                         value={loadNote[s.id] ?? ''}
                         onChange={(e) => setLoadNote((m) => ({ ...m, [s.id]: e.target.value }))}
                         placeholder="Detalle (ej. faltan 2 cajas del producto X)"
-                        style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                        style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }}
                       />
                       <button className="btn sm" type="button" onClick={() => reportLoad(s.id, order.external_ref ?? order.id)}>Avisar a Almacén</button>
                     </div>
@@ -317,7 +317,7 @@ export function MisEntregas() {
                   value={received[s.id] ?? ''}
                   onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))}
                   placeholder="Ej. Recepción / nombre de quien recibe"
-                  style={{ width: '100%', maxWidth: 320, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                  style={{ width: '100%', maxWidth: 320, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }}
                 />
               </div>
 
@@ -347,14 +347,14 @@ export function MisEntregas() {
                 })()}
               </div>
               {upErr[s.id] && (
-                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                   <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Icon name="x" /> No se pudo subir la foto (revisa tu señal). Vuelve a intentarlo, o si ya entregaste, ciérrala registrando el motivo.</span>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <input
                       value={noPhoto[s.id] ?? ''}
                       onChange={(e) => setNoPhoto((m) => ({ ...m, [s.id]: e.target.value }))}
                       placeholder="Motivo (obligatorio): ej. sin señal en la zona"
-                      style={{ flex: 1, minWidth: 180, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', color: 'var(--ink)' }}
+                      style={{ flex: 1, minWidth: 180, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', color: 'var(--ink)' }}
                     />
                     {(() => {
                       const ok = Boolean(noPhoto[s.id]?.trim()) && Boolean(received[s.id]?.trim())
@@ -379,7 +379,7 @@ export function MisEntregas() {
                   <select
                     value={incType[s.id] ?? INCIDENT_TYPES[0]}
                     onChange={(e) => setIncType((m) => ({ ...m, [s.id]: e.target.value }))}
-                    style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: '#fff' }}
+                    style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, background: 'var(--cp-surface)' }}
                   >
                     {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -387,7 +387,7 @@ export function MisEntregas() {
                     value={incNote[s.id] ?? ''}
                     onChange={(e) => setIncNote((m) => ({ ...m, [s.id]: e.target.value }))}
                     placeholder="Nota (opcional)"
-                    style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                    style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)' }}
                   />
                   <button className="btn ghost sm" type="button" onClick={() => reportInc(s.id, order.external_ref ?? order.id)}>Enviar incidencia</button>
                 </div>

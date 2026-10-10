@@ -6,7 +6,7 @@ import { REGIMENES_OPTIONS, nombreRegimen } from '../data/sat/regimenesFiscales'
 import { USOS_CFDI_OPTIONS, nombreUsoCfdi } from '../data/sat/usosCfdi'
 import { validateFiscalProfile, personTypeFromRfc, type FiscalProfile } from '../data/ops/fiscal'
 
-const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff', marginTop: 6 }
+const inp: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: 'var(--cp-surface)', marginTop: 6 }
 const lbl: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 14 }
 const err: React.CSSProperties = { fontSize: 11.5, color: 'var(--danger)', marginTop: 4 }
 

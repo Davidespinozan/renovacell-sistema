@@ -108,7 +108,7 @@ function DisposicionCard({ ret, lines }: { ret: StockReturn; lines: StockReturnL
           </div>
         )
       })}
-      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
+      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
       <div style={{ textAlign: 'right', marginTop: 10 }}>
         <button className="btn sm" type="button" disabled={busy} onClick={aplicar}><Icon name="check" /> {busy ? 'Aplicando…' : err ? 'Reintentar' : 'Aplicar destino'}</button>
       </div>
@@ -135,7 +135,7 @@ function Conciliacion() {
         <div className="eyebrow" style={{ margin: 0 }}>Conciliación lote ↔ kardex</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busy || !hasSupabase} onClick={() => void correr()}>{busy ? 'Conciliando…' : 'Conciliar ahora'}</button>
       </div>
-      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
+      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
       {rows && (
         <div style={{ marginTop: 12 }}>
           <div className="sysnote" style={errores.length ? { background: 'var(--danger-bg)', color: 'var(--danger)' } : undefined}>
@@ -180,7 +180,7 @@ function Bajas() {
         <div className="eyebrow" style={{ margin: 0 }}>Bajas de almacén · últimos 30 días</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busy || !hasSupabase} onClick={() => void cargar()}>{busy ? 'Cargando…' : rows ? 'Actualizar' : 'Ver bajas'}</button>
       </div>
-      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
+      {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
       {rows && (rows.length === 0 ? <div style={{ color: 'var(--ink-3)', marginTop: 10 }}>Sin bajas en el periodo.</div> : (
         <table className="tbl-cards" style={{ marginTop: 10 }}>
           <thead><tr><th>Fecha</th><th>Quién</th><th>Tipo</th><th>SKU / lote</th><th>Cant.</th><th>Motivo</th></tr></thead>

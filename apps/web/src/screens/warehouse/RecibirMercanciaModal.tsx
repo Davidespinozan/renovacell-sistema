@@ -111,7 +111,7 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
             <span>{mode === 'cerrar' ? 'La compra queda cerrada y NO se reabre; el faltante se pide con una compra nueva.'
               : 'Al confirmar, el lote entra al inventario con su movimiento de entrada (o se suma al mismo lote si código y caducidad coinciden). La compra queda parcial o completa según lo recibido.'}</span>
           </div>
-          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: '#ECCAC6', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
+          {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit} data-testid="recibir-confirmar">
