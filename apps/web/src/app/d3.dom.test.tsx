@@ -176,8 +176,8 @@ describe('D3 · cobertura repuesta (notifica, nunca abre)', () => {
     await act(async () => { k.conectar() }); await esperar(200)
     expect(s.lecturas()).toBeGreaterThan(antes); expect(vista()).toBeNull()
   })
-  it('C4-21 · alcance: /chat sigue a página completa; Asesorías y ChatCanonico sin lógica de aviso/apertura del lanzador', () => {
-    expect(String(fuenteApp)).toMatch(/else if \(esRutaChat\) view = <ChatCanonico \/>/)
+  it('C4-21 · alcance: /chat ya no se sirve a página completa (pasa por las puertas del portal); Asesorías y ChatCanonico sin lógica de aviso/apertura del lanzador', () => {
+    expect(String(fuenteApp)).not.toMatch(/esRutaChat\) view = <ChatCanonico/)
     expect(String(fuenteApp)).not.toMatch(/ChatFlotante/)
     expect(String(fuenteAsesorias)).not.toMatch(/autoapertura|chat-vista|abrirAuto/)
     expect(String(fuenteCanonico)).not.toMatch(/autoapertura|abrirAuto|chatMetricas/)

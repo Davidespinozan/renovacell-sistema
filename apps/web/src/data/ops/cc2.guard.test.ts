@@ -103,9 +103,14 @@ describe('frontend', () => {
     expect(cuerpos.length).toBeGreaterThan(8)
     for (const b of cuerpos) expect(b).not.toMatch(/actor|profile_id|seller_profile_id|visitor_id/)
   })
-  it('/chat enrutado en Netlify y en App (sin router); el componente sirve a visitante, doctor y asesor; la cola NO está en Bandeja', () => {
+  // Decisión del dueño (10 oct 2026): /chat deja de ser pública. La URL sigue resolviendo a la app (enlaces
+  // viejos), pero NO renderiza el chat sin pasar por login y verificación; con acceso, abre la conversación del portal.
+  it('/chat NO es pública: pasa por login y verificación; con acceso abre la conversación del portal; la cola NO está en Bandeja', () => {
     expect(codigo(netlify)).toMatch(/from = "\/chat"\n\s+to = "\/index\.html"\n\s+status = 200/)
-    expect(codigo(appSrc)).toMatch(/esRutaChat\) view = <ChatCanonico \/>/)
+    expect(codigo(appSrc)).not.toMatch(/esRutaChat\) view = <ChatCanonico/)
+    expect(codigo(appSrc)).not.toMatch(/import \{ ChatCanonico \}/)
+    expect(codigo(appSrc)).toMatch(/const conAcceso = mode === 'app' && !\(role === 'doctor' && !verified\)/)
+    expect(codigo(appSrc)).toMatch(/if \(esRutaChat && conAcceso && role === 'doctor'\) setScreen\('chat_cc'\)/)
     expect(pantallaSrc).toMatch(/asesor \? 'Asesoría' : 'Renovacell'/)   // UX V2-B · encabezado de producto, no de panel
     expect(asesoriasSrc).toMatch(/cliente\.cola\(\)/)
     expect(codigo(asesoriasSrc)).not.toMatch(/Bandeja/)
