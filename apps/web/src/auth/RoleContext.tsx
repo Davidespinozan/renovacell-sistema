@@ -136,3 +136,8 @@ export function useRole(): RoleState {
   if (!ctx) throw new Error('useRole debe usarse dentro de <RoleProvider>')
   return ctx
 }
+/** Variante tolerante: null fuera de <RoleProvider> (componentes de presentación que solo
+    necesitan saber en qué pantalla están, p. ej. PageHead). */
+export function useRoleOpcional(): RoleState | null {
+  return useContext(RoleCtx)
+}

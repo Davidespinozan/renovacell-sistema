@@ -44,8 +44,7 @@ export function Ventas() {
   return (
     <div className="grid" style={{ gap: 18 }}>
       <div>
-        <div className="eyebrow" style={{ marginBottom: 4 }}>Administración · Ventas</div>
-        <h1 style={{ fontSize: 22, fontWeight: 600 }}>Ventas</h1>
+        <div className="eyebrow" style={{ marginBottom: 0 }}>Administración · Ventas</div>
       </div>
       <div className="fchips">
         <button type="button" className={'fchip' + (tab === 'detalle' ? ' on' : '')} onClick={() => setTab('detalle')}>Detalle</button>

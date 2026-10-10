@@ -195,6 +195,25 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
   box-shadow:var(--sh-card)}
 .page-h::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:var(--edge-light)}
 .page-h::after{content:"";position:absolute;top:-90px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--area-tint),transparent 70%);filter:blur(36px);opacity:.8;pointer-events:none}
+/* Solo la línea explicativa (el título lo pone la cabecera): más compacto, sin hero. */
+.page-h--lead{padding:12px 16px;background:var(--cp-surface);box-shadow:none}
+.page-h--lead::after{display:none}
+.page-h--lead p{margin-top:0}
+/* ── Barra de filtros ─────────────────────────────────────────────────────────────
+   Escritorio: una fila que envuelve. Teléfono: rejilla de 2 columnas, buscador a lo
+   ancho, exportaciones abajo. Las vistas no dibujan esto a mano. */
+.filters{--filters-end:auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filters .searchbox{width:auto;max-width:none;flex:1 1 200px;min-width:0}
+.filters label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);white-space:nowrap}
+.filters label input{min-width:0}
+@media (max-width:640px){
+  .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .filters .searchbox{grid-column:1 / -1}
+  .filters > *{min-width:0;max-width:100%}
+  .filters label input,.filters > select,.filters > input{width:100%}
+  .filters label input{flex:1}
+  .filters{--filters-end:0}
+}
 .page-h h1{position:relative;font-size:20px;line-height:24px;font-weight:600;letter-spacing:-.015em;color:var(--ink)}
 .page-h p{position:relative;font-size:13px;color:var(--ink-3);line-height:18px;margin-top:6px;max-width:62ch}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:var(--pill);border:1px solid transparent;white-space:nowrap}
@@ -406,7 +425,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
   .top-r{margin-left:auto}
   .canvas{padding:18px 16px 56px}
   .switch{padding:13px 16px 2px}
-  .searchbox{display:none}
+  .top .searchbox{display:none}
   .op-wrap,.pos-wrap{grid-template-columns:1fr}
   .screen-title{font-size:18px}
   .menu-wrap{padding:30px 18px 56px}

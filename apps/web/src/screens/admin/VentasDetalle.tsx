@@ -124,8 +124,8 @@ export function VentasDetalle() {
       </div>
 
       {/* Filtros */}
-      <div className="card" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="searchbox" style={{ width: 220 }}>
+      <div className="card filters">
+        <div className="searchbox">
           <Search size={15} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cliente o folio…" />
         </div>
@@ -146,7 +146,7 @@ export function VentasDetalle() {
         {(from || to || channel !== 'todos' || pay !== 'todos' || q) && (
           <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setQ('') }}>Limpiar</button>
         )}
-        <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'auto' }} columns={[
+        <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'var(--filters-end, auto)' }} columns={[
           { key: 'external_ref', label: 'Folio' },
           { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
