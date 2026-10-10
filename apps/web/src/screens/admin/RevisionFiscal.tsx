@@ -147,9 +147,9 @@ function TabProductos({ filas, categorias, loading, reload }: {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card" style={{ padding: 0, minWidth: 0 }}>
-        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="filters" style={{ padding: '14px 16px' }}>
           <div className="eyebrow" style={{ margin: 0 }}><FileSearch size={13} /> Productos vendibles · {lista.length}</div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="filters" style={{ marginLeft: 'var(--filters-end, auto)', gap: 8 }}>
             <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <Search size={13} style={{ position: 'absolute', left: 9, color: 'var(--muted)' }} />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto" aria-label="Buscar producto"

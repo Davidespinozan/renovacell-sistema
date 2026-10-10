@@ -24,7 +24,8 @@
 /* --- Patrón SCROLL HORIZONTAL (tablas densas mejor no partir, p.ej. en modal) -
    Envolver: <div class="tbl-scroll"><table>…</table></div> */
 .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-@media (max-width: 640px) { .tbl-scroll table { min-width: 460px; } }
+/* El ancho mínimo es para tablas que SIGUEN siendo tablas; las que pasan a tarjetas (.tbl-cards) no lo necesitan. */
+@media (max-width: 640px) { .tbl-scroll table:not(.tbl-cards) { min-width: 460px; } }
 
 /* --- Form grid de 2 columnas que colapsa a 1 en teléfono --------------------- */
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

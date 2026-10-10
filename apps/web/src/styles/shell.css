@@ -158,7 +158,8 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .icobtn .bdg{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid #fff}
 .switch{display:flex;align-items:center;gap:11px;padding:13px 30px 2px;overflow-x:auto}
 .switch-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;flex:none}
-.seg{display:flex;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r-field);padding:4px;box-shadow:var(--sh-sm);flex:none}
+.seg{display:flex;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r-field);padding:4px;box-shadow:var(--sh-sm);flex:none;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.seg::-webkit-scrollbar{display:none}
 .seg button{font-family:inherit;border:none;background:none;padding:9px 13px;border-radius:10px;min-height:36px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:.18s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .seg button svg{width:14px;height:14px}.seg button:hover{color:var(--ink)}
 .seg button.active{background:var(--grad-green);color:#fff;box-shadow:var(--glow)}
@@ -167,6 +168,8 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
    #content en "containing block" y atraparía los modales position:fixed (iOS). */
 #content{animation:fade .22s ease both}
 .grid{display:grid;gap:18px}
+/* Un hijo con contenido ancho (tabla, segmentado) no debe ensanchar la rejilla: scroll interno. */
+.grid > *{min-width:0}
 .card{position:relative;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh-card);animation:rise .32s var(--ease-soft) both;transition:box-shadow var(--dur) ease,transform var(--dur) var(--ease-soft)}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* Entrada escalonada: las tarjetas del lienzo aparecen en cascada. */
@@ -208,10 +211,11 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .filters label input{min-width:0}
 @media (max-width:640px){
   .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .filters .searchbox{grid-column:1 / -1}
+  .filters .searchbox,.filters > input:not([type=checkbox]):not([type=radio]),.filters > .eyebrow,.filters > .filters{grid-column:1 / -1}
   .filters > *{min-width:0;max-width:100%}
   .filters label input,.filters > select,.filters > input{width:100%}
   .filters label input{flex:1}
+  .filters > span{display:flex;min-width:0}.filters > span > input{width:100%;min-width:0}
   .filters{--filters-end:0}
 }
 .page-h h1{position:relative;font-size:20px;line-height:24px;font-weight:600;letter-spacing:-.015em;color:var(--ink)}

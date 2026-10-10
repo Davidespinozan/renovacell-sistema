@@ -323,11 +323,11 @@ function PestanaCartera({ vendedores, cliente, onCambio }: { vendedores: Vendedo
       <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 10 }} data-testid="explica-cartera">
         <b>La cartera es permanente:</b> define qué vendedor atiende las compras futuras del cliente. Para pasar SOLO una solicitud a otra persona usa <b>Reasignar esta solicitud</b> en Solicitudes.
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)' }} aria-label="Filtro">
+      <div className="filters" style={{ marginBottom: 10 }}>
+        <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} style={{ padding: '8px 11px', borderRadius: 14, border: '1px solid var(--line)', fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)' }} aria-label="Filtro">
           <option value="sin_vendedor">Sin vendedor</option><option value="reasignacion">Requieren reasignación</option><option value="todos">Todos</option>
         </select>
-        <input placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} style={{ flex: 1, minWidth: 180, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)' }} />
+        <input placeholder="Buscar cliente…" value={busca} onChange={(e) => setBusca(e.target.value)} style={{ flex: 1, minWidth: 180, padding: '8px 11px', borderRadius: 14, border: '1px solid var(--line)', fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)', outline: 'none' }} />
       </div>
       {msg && <div role="alert" style={{ marginBottom: 10, color: 'var(--danger)' }}>{msg}</div>}
       {visibles.length === 0 && <div style={{ color: 'var(--ink-3)' }}>Sin clientes en este filtro.</div>}

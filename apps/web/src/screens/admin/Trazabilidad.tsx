@@ -128,7 +128,7 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className="filters" style={{ gap: 12 }}>
         <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Lote</span>
         <select style={selStyle} value={lotId} onChange={(e) => setLotId(e.target.value)}>
           {lots.map((l) => <option key={l.id} value={l.id}>{l.lot_code} · {prodName[l.product_id] ?? 'Producto'}</option>)}

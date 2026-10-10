@@ -56,10 +56,10 @@ function GeneralTab({ skus }: { skus: ProductSafe[] }) {
   }, [skus, q])
   return (
     <div className="card" style={{ padding: 0 }}>
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className="filters" style={{ padding: '14px 16px', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}><DollarSign size={13} /> Precio general (base) · {list.length}</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto"
-          style={{ marginLeft: 'auto', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+          style={{ marginLeft: 'var(--filters-end, auto)', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
       </div>
       <div className="tbl-scroll">
         <table className="tbl-cards">
@@ -215,10 +215,10 @@ function VolumenTab({ skus }: { skus: ProductSafe[] }) {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className="card filters" style={{ gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}><Layers size={13} /> Descuentos por cantidad (por SKU)</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU o producto para agregar reglas"
-          style={{ marginLeft: 'auto', width: 280, maxWidth: '100%', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+          style={{ marginLeft: 'var(--filters-end, auto)', width: 280, maxWidth: '100%', padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
       </div>
       {list.length === 0 && (
         <div className="card" style={{ color: 'var(--ink-3)' }}>
