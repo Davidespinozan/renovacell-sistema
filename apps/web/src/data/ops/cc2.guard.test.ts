@@ -117,8 +117,14 @@ describe('frontend', () => {
     expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido \/>,\n\s+asesorias: \(\) => <AsesoriasPantalla \/>/)   // CC-7 · Dirección vs vendedor
     expect(r).toMatch(/key: 'nuevos_clientes', label: 'Recibir clientes nuevos'/); expect(codigo(registrySrc)).toMatch(/av_atencion: \(\) => <AtencionComercialPantalla \/>/)
   })
-  it('landing canónica: CTA a /chat (misma origen → el token de visitante persiste)', () => {
-    expect(landingSrc).toMatch(/cta\.href='\/chat'/)
+  // Decisión del dueño (10 oct 2026): en la landing SOLO atiende el agente de orientación. La conversación
+  // con un asesor humano existe dentro del sistema, tras la verificación. Antes esta guarda exigía el CTA.
+  it('landing canónica: SIN enlace a /chat; conserva el agente y la identidad anónima del visitante', () => {
+    expect(landingSrc).not.toMatch(/href\s*=\s*['"]\/chat['"]/)
+    expect(landingSrc).not.toMatch(/rc-chat-cta|document\.createElement\('a'\)[^<]*\/chat/)
+    expect(landingSrc).toMatch(/\/functions\/v1\/assistant/)                 // el agente de la landing
+    expect(landingSrc).toMatch(/\/functions\/v1\/visitor/)                   // atribución del visitante (CC-1)
+    expect(landingSrc).toMatch(/localStorage\.setItem\(KEY,d\.token\)/)       // el token de visitante persiste
   })
   it('AG · el chat interno de staff (legacy) sigue intacto', () => {
     expect(legacyChatStore).toMatch(/from\('messages'\)/); expect(legacyChatStore).not.toMatch(/cc_messages/)
