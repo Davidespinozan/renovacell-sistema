@@ -2990,6 +2990,20 @@ document.addEventListener('keydown', e => {
 .rnc-ai-foot input{flex:1;background:#16241c;border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:20px;padding:10px 12px;font-size:13.5px;outline:none;font-family:inherit}
 .rnc-ai-send{background:#0a8f1f;border:none;color:#fff;border-radius:20px;padding:0 14px;cursor:pointer;font-size:16px}
 .rnc-ai-note{font-size:10.5px;color:#6b7d70;text-align:center;padding:0 16px 11px}
+/* ── Estabilidad en teléfono ─────────────────────────────────────────────────────────────
+   El asistente saltaba y hacía zoom al abrirse en iPhone. Tres causas, tres arreglos:
+   1) Safari hace zoom en todo campo de menos de 16 px → el campo va a 16 px.
+   2) El alto usaba 100vh (pantalla completa, sin descontar teclado ni barra de Safari) → se usa
+      la altura VISIBLE real (--rnc-vvh, que mantiene el guion) y el panel se ancla sobre el teclado.
+   3) La página de atrás seguía desplazándose → se bloquea mientras el panel está abierto. */
+.rnc-ai-foot input{font-size:16px}
+.rnc-ai-body{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.rnc-ai-x{width:36px;height:36px;font-size:18px}
+@media(max-width:640px){
+  .rnc-ai-panel{left:8px;right:8px;width:auto;bottom:calc(8px + var(--rnc-kb,0px));height:min(566px,calc(var(--rnc-vvh,100dvh) - 16px));max-height:calc(var(--rnc-vvh,100dvh) - 16px)}
+  html.rnc-ai-open,html.rnc-ai-open body{overflow:hidden;overscroll-behavior:none}
+  .rnc-ai-send{min-width:44px;min-height:44px}
+}
 </style>
 <div class="rnc-fabs">
   <a class="rnc-fab-wa" href="https://wa.me/526675310910" target="_blank" rel="noreferrer"
@@ -3025,8 +3039,28 @@ document.addEventListener('keydown', e => {
   var panel=document.getElementById('rncAiPanel'),fab=document.getElementById('rncAiFab');
   var body=document.getElementById('rncAiBody'),chipsEl=document.getElementById('rncAiChips');
   var input=document.getElementById('rncAiInput');
-  function openP(){panel.classList.add('open');fab.style.display='none';if(!body.children.length)greet();input.focus();}
-  function closeP(){panel.classList.remove('open');fab.style.display='flex';}
+  // En táctil NO se enfoca el campo al abrir: el foco levanta el teclado en el mismo instante en que
+  // aparece el panel y todo salta. Primero se leen el saludo y las sugerencias; el teclado sale al tocar el campo.
+  var tactil=!!(window.matchMedia&&window.matchMedia('(hover: none), (pointer: coarse)').matches);
+  var vv=window.visualViewport,raiz=document.documentElement;
+  // Altura visible real y alto del teclado: el panel se ajusta a lo que de verdad se ve y queda sobre el teclado.
+  function medir(){
+    if(!vv)return;
+    raiz.style.setProperty('--rnc-vvh',Math.round(vv.height)+'px');
+    raiz.style.setProperty('--rnc-kb',Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop))+'px');
+  }
+  function openP(){
+    panel.classList.add('open');fab.style.display='none';raiz.classList.add('rnc-ai-open');
+    medir();if(vv){vv.addEventListener('resize',medir);vv.addEventListener('scroll',medir);}
+    if(!body.children.length)greet();
+    if(!tactil)input.focus();
+  }
+  function closeP(){
+    panel.classList.remove('open');fab.style.display='flex';raiz.classList.remove('rnc-ai-open');
+    if(vv){vv.removeEventListener('resize',medir);vv.removeEventListener('scroll',medir);}
+    raiz.style.removeProperty('--rnc-kb');
+    try{input.blur();}catch(e){}
+  }
   fab.onclick=openP;document.getElementById('rncAiClose').onclick=closeP;
   function add(text,who){var d=document.createElement('div');d.className='rnc-ai-msg '+(who==='user'?'rnc-ai-user':'rnc-ai-bot');d.innerHTML=text;body.appendChild(d);body.scrollTop=body.scrollHeight;return d;}
   function chips(arr){chipsEl.innerHTML='';arr.forEach(function(c){var b=document.createElement('button');b.className='rnc-ai-chip';b.textContent=c;b.onclick=function(){handle(c);};chipsEl.appendChild(b);});}
