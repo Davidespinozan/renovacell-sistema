@@ -163,7 +163,7 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .seg button{font-family:inherit;border:none;background:none;padding:9px 13px;border-radius:10px;min-height:36px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:.18s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .seg button svg{width:14px;height:14px}.seg button:hover{color:var(--ink)}
 .seg button.active{background:var(--grad-green);color:#fff;box-shadow:var(--glow)}
-.canvas{padding:22px 30px 60px;overflow:auto;flex:1;min-height:0}
+.canvas{--canvas-pt:22px;padding:var(--canvas-pt) 30px 60px;overflow:auto;flex:1;min-height:0}
 /* Solo opacidad (sin transform): un transform con fill-mode 'both' convertiría a
    #content en "containing block" y atraparía los modales position:fixed (iOS). */
 #content{animation:fade .22s ease both}
@@ -242,6 +242,22 @@ th{font-size:11px;line-height:14px;letter-spacing:.08em;text-transform:uppercase
 td{padding:13px 14px;border-bottom:1px solid rgba(230,234,240,.8);font-size:13.5px}
 tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-child td{border-bottom:none}
 .clickrow{cursor:pointer}
+/* Fila que abre un detalle: hover más marcado, pulsado y foco por teclado visibles. */
+tbody tr.clickrow:hover{background:var(--cp-slate-100)}
+tbody tr.clickrow:active{background:var(--cp-slate-200)}
+tbody tr.clickrow:focus-visible{outline:2px solid rgba(0,115,17,.6);outline-offset:-2px;background:var(--cp-slate-50)}
+/* Cabecera pegajosa: al recorrer una tabla larga las columnas siguen a la vista. Se pega
+   al borde del contenedor que hace scroll (.canvas, modal u hoja). Fondo opaco y línea por
+   box-shadow, porque con border-collapse el borde no viaja con la celda. Solo en pantalla
+   y desde 901 px: por debajo el shell desplaza el documento entero (no .canvas) y la
+   cabecera quedaría oculta tras la barra superior; en teléfono las tablas son tarjetas. */
+@media screen and (min-width:901px){
+  th{position:sticky;top:0;z-index:2;background:var(--cp-slate-50);border-bottom-color:transparent;box-shadow:inset 0 -1px 0 var(--line)}
+  /* El área pegajosa descuenta el padding del contenedor: sin esto queda un hueco por el que asoman las filas. */
+  .canvas th{top:calc(-1 * var(--canvas-pt,22px))}
+  .recibo th,.manifiesto-doc th,.corte-ticket th{position:static;box-shadow:none}
+  .recibo th{border-bottom-color:var(--line)}
+}
 .mono{font-family:'Inter',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-weight:600}
 .btn{font-family:inherit;border:none;background:var(--grad-green);color:#fff;font-weight:600;font-size:14px;min-height:44px;padding:10px 16px;border-radius:var(--r-field);cursor:pointer;box-shadow:var(--glow);transition:transform var(--dur-fast) var(--ease-soft),filter var(--dur-fast),background var(--dur-fast),box-shadow var(--dur-fast);display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn svg{width:16px;height:16px}.btn:hover{box-shadow:0 1px 2px rgba(11,18,32,.06),0 12px 24px -10px rgba(0,115,17,.55)}.btn:active{transform:scale(.985)}
@@ -440,7 +456,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
      basta. (.hamb se queda en display:none.) */
   .top{padding:12px 14px;justify-content:flex-start}
   .top-r{margin-left:auto}
-  .canvas{padding:18px 16px 56px}
+  .canvas{--canvas-pt:18px;padding:var(--canvas-pt) 16px 56px}
   .switch{padding:13px 16px 2px}
   .top .searchbox{display:none}
   .op-wrap,.pos-wrap{grid-template-columns:1fr}
@@ -457,7 +473,7 @@ tbody tr{transition:.14s}tbody tr:hover{background:var(--cp-slate-50)}tr:last-ch
 /* Móvil-first: menos "aire". Compacta padding/gaps en teléfono para que la
    información rinda más en pantalla chica (sin apretar de más). */
 @media (max-width:640px){
-  .canvas{padding:12px 12px 56px}
+  .canvas{--canvas-pt:12px;padding:var(--canvas-pt) 12px 56px}
   .canvas #content > .grid{gap:11px!important}
   .card{padding:13px}
   .card.sig{padding:12px 13px}

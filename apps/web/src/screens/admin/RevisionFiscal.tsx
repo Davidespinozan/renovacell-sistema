@@ -206,7 +206,7 @@ function TabProductos({ filas, categorias, loading, reload }: {
               {lista.map((f) => {
                 const e = estadoDeFila(f)
                 return (
-                  <tr key={f.product_id} style={{ cursor: 'pointer' }} onClick={() => setAbierto(f.product_id)}>
+                  <tr key={f.product_id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setAbierto(f.product_id)}>
                     <td data-label="SKU" className="mono" style={{ fontSize: 12 }}>{f.sku ?? '—'}</td>
                     <td data-label="Producto">{f.nombre}</td>
                     <td data-label="Categoría">{f.categoria ?? '—'}</td>

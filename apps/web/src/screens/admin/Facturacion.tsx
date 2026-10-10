@@ -214,7 +214,7 @@ export function Facturacion() {
               {rows.map((o) => {
                 const cob = cobroTag(o); const cf = cfdiTag(o); const pos = isPosOrder(o)
                 return (
-                  <tr key={o.id} className="clickrow" onClick={() => setSelected(o.id)}>
+                  <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Cliente">{clientName(o)}{pos ? ' ' : ''}</td>

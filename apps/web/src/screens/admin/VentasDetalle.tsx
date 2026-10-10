@@ -196,7 +196,7 @@ export function VentasDetalle() {
               {rows.map((o) => {
                 const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status); const isPos = channelOf(o) === 'pos'
                 return (
-                  <tr key={o.id} className="clickrow" onClick={() => setSelected(o.id)}>
+                  <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Canal"><span className={'pill ' + (isPos ? 'p-neu' : 'p-blue')}>{isPos ? 'POS' : 'Portal'}</span></td>
