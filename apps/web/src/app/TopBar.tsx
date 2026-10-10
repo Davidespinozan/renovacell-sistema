@@ -2,6 +2,7 @@
 // buscador GLOBAL (indexado, acotado por rol) y campana.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './icons'
+import { BrandLogo } from './BrandLogo'
 import { getRole, getScreenDef, getNav, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
@@ -60,10 +61,14 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       <button className="hamb" aria-label="Abrir menú" type="button" onClick={onMenu}>
         <Icon name="menu" />
       </button>
-      <div>
+      <div className="top-title">
         <h1 className="screen-title serif">{s.label}</h1>
         <div className="screen-sub">{sub}</div>
       </div>
+      {/* Marca siempre a la vista en teléfono: centrada en la cabecera de todos los roles (en escritorio
+          el logo ya está fijo en el menú lateral, así que aquí se oculta por CSS). Decorativa: el nombre
+          de la pantalla es el <h1>. */}
+      <span className="top-logo" aria-hidden="true"><BrandLogo alt="" /></span>
       <div className="top-r">
         <div style={{ position: 'relative' }}>
           <div className="searchbox">

@@ -16,6 +16,8 @@ button { color: inherit; }
 }
 .btn:hover, .btn-primary:hover { background: var(--green-deep); box-shadow: 0 1px 2px rgba(11, 18, 32, .10); filter: none; }
 .fchip, .lchip { box-shadow: none; }
+/* "Agregar" del catálogo es un <button>: sin esto conserva el borde biselado del navegador. */
+.pcard .addb { border: 0; font-family: inherit; cursor: pointer; }
 
 /* ── Lista de tareas: una tarjeta, filas con divisor ───────────────────────── */
 .tasklist { background: var(--cp-surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-card); overflow: hidden; min-width: 0; }
@@ -36,15 +38,29 @@ button.taskrow:focus-visible { outline: 2px solid rgba(0, 115, 17, .6); outline-
 /* ── Tira de cifras (Prospectos): 4 columnas; 2 en teléfono, sin celda de relleno ── */
 .kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); margin: 10px 0; }
 
+/* Logo de la cabecera: solo en teléfono (en escritorio la marca vive en el menú lateral). */
+.top-logo { display: none; }
+
 /* ── Teléfono y tableta chica ──────────────────────────────────────────────── */
 @media (max-width: 900px) {
+  /* Cabecera en tres columnas: título · LOGO centrado · campana. Las columnas laterales miden lo mismo,
+     así el logo queda en el centro exacto sin importar el largo del título. */
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+  .top-title { min-width: 0; }
+  .top-r { margin-left: 0; justify-self: end; }
+  .top-logo { display: grid; place-items: center; position: relative; width: 40px; height: 40px; }
+  .top-logo::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .26), transparent 70%); }
+  .top-logo img { position: relative; width: 38px; height: 38px; border-radius: 50%; object-fit: contain; }
+  .top .screen-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; overflow-wrap: anywhere; }
+  .top .screen-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Cabecera compacta */
   .top { padding: 10px 14px; }
   .screen-title { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
   .screen-sub { font-size: 12px; margin-top: 1px; }
 
   /* Barra inferior: etiqueta normal de 11 px y píldora solo en el ícono activo */
-  .bnav { padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px)); gap: 0; }
+  /* 10 px bajo las etiquetas: pegadas al borde quedaban encima del indicador de inicio del iPhone. */
+  .bnav { padding: 4px 6px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 0; }
   .bnav a { gap: 2px; padding: 4px 2px; min-height: 52px; justify-content: center; border-radius: 0; background: none;
     font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, .62); }
   .bnav a svg { width: 20px; height: 20px; padding: 5px 14px; box-sizing: content-box; border-radius: 999px; }
