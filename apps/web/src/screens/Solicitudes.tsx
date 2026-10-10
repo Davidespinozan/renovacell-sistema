@@ -2,6 +2,7 @@
 // responsabilidad de Diseño atiende aquí lo que el equipo pide desde la Vista
 // Común Y ADEMÁS puede crear sus propios pendientes (planear diseños por
 // iniciativa propia, sin que nadie los haya solicitado).
+import { Vacio } from '../app/EmptyState'
 import React, { useState } from 'react'
 import { Play, Check, Upload, Eye, Plus, Sparkles, X } from 'lucide-react'
 import { fmtDate } from '../lib/format'
@@ -97,7 +98,7 @@ export function Solicitudes() {
           </div>
         )
       })}
-      {sorted.length === 0 && <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Sin pendientes. Crea uno con “Nuevo pendiente”.</div>}
+      {sorted.length === 0 && <Vacio icono="check" titulo="Sin pendientes." pista="Crea uno con “Nuevo pendiente”." accion={<button type="button" className="btn ghost sm" onClick={() => setNuevo(true)}>Nuevo pendiente</button>} />}
 
       {nuevo && <NuevoPendiente onCreate={onCrearPendiente} onClose={() => setNuevo(false)} />}
       {toast && <div className="toast show"><Check size={16} /> {toast}</div>}

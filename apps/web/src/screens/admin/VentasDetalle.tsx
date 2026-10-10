@@ -2,6 +2,7 @@
 // Portal + ventas POS (mismo store), filtrable. NO es el Tablero ni Trazabilidad.
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
+import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -106,9 +107,7 @@ export function VentasDetalle() {
 
   if (orders.length === 0) {
     return (
-      <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-        Aún no hay ventas. Crea un pedido en el Portal del Doctor o cobra en Punto de Venta.
-      </div>
+      <Vacio icono="chart" titulo="Aún no hay ventas." pista="Crea un pedido en el Portal del Doctor o cobra en Punto de Venta." />
     )
   }
 

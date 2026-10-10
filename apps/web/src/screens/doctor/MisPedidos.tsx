@@ -1,5 +1,6 @@
 // Mis pedidos: pedidos ACTIVOS del doctor (no entregados/cancelados) con su
 // estatus y seguimiento. Solo ve SUS pedidos (lo garantiza el store/RLS).
+import { Vacio, Cargando } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useOrderMoney, usePaymentClaims } from '../../data/hooks/useMoney'
@@ -39,11 +40,9 @@ export function MisPedidos() {
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Portal del Doctor · Mis pedidos</div>
       {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tus pedidos…</div>
+        <Cargando etiqueta="Cargando tus pedidos…" />
       ) : active.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No tienes pedidos activos. Crea uno desde el catálogo.
-        </div>
+        <Vacio icono="bag" titulo="No tienes pedidos activos." pista="Crea uno desde el catálogo." />
       ) : (
         active.map((o) => (
           <OrderCard

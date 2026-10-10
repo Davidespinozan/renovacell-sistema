@@ -1,5 +1,6 @@
 // Recibo de entrega: resumen imprimible del envío de un pedido (etiqueta/recibo
 // con marca). Incluye lote por renglón (traza COFEPRIS).
+import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { fmtDate } from '../../lib/format'
@@ -37,9 +38,7 @@ export function Recibo() {
     return (
       <div className="grid" style={{ gap: 16 }}>
         <div className="eyebrow">Empaque · Recibo de entrega</div>
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No hay envíos para generar recibo. Asigna un envío en la cola de empaque.
-        </div>
+        <Vacio icono="receipt" titulo="No hay envíos para generar recibo." pista="Asigna un envío en la cola de empaque." />
       </div>
     )
   }

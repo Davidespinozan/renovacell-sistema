@@ -3,6 +3,7 @@
 // cobro y de CFDI, y permite "Emitir CFDI" / "Marcar cobrado". La emisión REAL
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
+import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -129,7 +130,7 @@ export function Facturacion() {
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
 
   if (orders.length === 0) {
-    return <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Aún no hay ventas que facturar.</div>
+    return <Vacio icono="receipt" titulo="Aún no hay ventas que facturar." pista="Las ventas con factura solicitada aparecerán aquí." />
   }
 
   const CHIPS: { k: Filter; label: string }[] = [

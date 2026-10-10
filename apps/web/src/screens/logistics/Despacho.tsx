@@ -2,6 +2,7 @@
 // del día de cada chofer en una hoja de salida, la despacha de un tiro (no pedido por
 // pedido) y la imprime para que el chofer FIRME al recibirla. Queda registrado quién la
 // entregó y a qué hora. El chofer luego confirma la recepción para salir a reparto.
+import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../../app/icons'
@@ -101,7 +102,7 @@ export function Despacho() {
       </PageHead>
 
       {manifiestos.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Nada por despachar.</div>
+        <Vacio icono="truck" titulo="Nada por despachar." pista="Los envíos empacados y asignados a un chofer aparecerán aquí." />
       ) : manifiestos.map((mf) => (
         <div key={mf.driverId} className="card" style={{ padding: 0 }}>
           <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

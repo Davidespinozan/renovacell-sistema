@@ -1,6 +1,7 @@
 // Surtido (FEFO): toma un pedido pendiente del store compartido y lo surte
 // asignando lotes por caducidad ascendente. Al confirmar, descuenta lotes,
 // registra movimientos y mueve el pedido a Empacado (se ve en el Portal).
+import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
@@ -107,9 +108,7 @@ export function Surtido() {
       )}
 
       {pending.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No hay pedidos por preparar. Todo al día.
-        </div>
+        <Vacio icono="check" titulo="No hay pedidos por preparar." pista="Todo al día." />
       ) : (
         <>
           {allFulfillable.length > 1 && selIds.length === 0 && (

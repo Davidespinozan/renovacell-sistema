@@ -1,6 +1,7 @@
 // Cola de empaque: pedidos en estado "Empacado" (surtidos por Almacén), listos
 // para enviar. Asignar envío por paquetería (carrier+guía) o chofer propio.
 // Al asignar se crea el shipment y el pedido pasa a "En camino".
+import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
@@ -54,9 +55,7 @@ export function Cola() {
       <div className="eyebrow">Empaque · Por empacar</div>
 
       {queue.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No hay pedidos empacados pendientes de envío. (Surte un pedido en Almacén para que llegue aquí.)
-        </div>
+        <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
       ) : (
         queue.map((o) => (
           <div key={o.id} className="card">

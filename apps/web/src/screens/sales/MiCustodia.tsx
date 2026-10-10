@@ -5,6 +5,7 @@
 // custodia del servidor. Vender se hace en Punto de venta eligiendo la custodia, para
 // que la venta pase por la misma ruta que el mostrador (pedido, precio del servidor,
 // inventario y cobro). Aquí solo se consulta y se pide reabasto.
+import { Vacio, Cargando } from '../../app/EmptyState'
 import React, { useMemo } from 'react'
 import { Box, AlertTriangle, Store } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
@@ -70,11 +71,9 @@ export function MiCustodia() {
       )}
 
       {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div>
+        <Cargando />
       ) : !mia ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No tienes inventario en custodia. Almacén te abre una custodia y te entrega producto.
-        </div>
+        <Vacio icono="box" titulo="No tienes inventario en custodia." pista="Almacén te abre una custodia y te entrega producto." />
       ) : (
         <>
           <div className="card" style={{ padding: 0 }}>

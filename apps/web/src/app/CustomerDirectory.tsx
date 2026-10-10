@@ -4,6 +4,7 @@
 // CARTERA-P1 · Ventas alterna tres vistas SEPARADAS: "Todos" (lo que permite la RLS), "Mi cartera" (asignación
 // VIGENTE de cc_cartera, la que asigna Dirección) y "Cartera histórica (Odoo)" (registros heredados por
 // equivalencia EXPLÍCITA; no son asignaciones). Ambas carteras vienen del servidor por id, nunca por nombre.
+import { Vacio, Cargando } from './EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
@@ -113,19 +114,19 @@ export function CustomerDirectory({ title, scope, carteraToggle = false, cliente
       />
 
       {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando directorio…</div>
+        <Cargando etiqueta="Cargando directorio…" />
       ) : error ? (
         <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{error}</span></div>
       ) : enCartera && mi.cargando ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tu cartera…</div>
+        <Cargando etiqueta="Cargando tu cartera…" />
       ) : enCartera && mi.error ? (
         <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }} data-testid="cartera-error"><span>{mi.error}</span></div>
       ) : customers.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }} data-testid="cartera-vacia">{effectiveScope === 'cartera' ? 'No tienes clientes asignados.'
+        <Vacio icono="usercheck" data-testid="cartera-vacia" titulo={effectiveScope === 'cartera' ? 'No tienes clientes asignados.'
           : effectiveScope === 'historica' ? (mi.equivalencias.length ? 'No hay registros históricos de Odoo para tus equivalencias.' : 'Dirección aún no ha registrado una equivalencia entre tu usuario y un vendedor de Odoo.')
-          : 'No hay registros en el directorio.'}</div>
+          : 'No hay registros en el directorio.'} />
       ) : shown.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ninguno coincide con “{q}”.</div>
+        <Vacio icono="search" titulo={<>Ninguno coincide con “{q}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setQ('')}>Limpiar búsqueda</button>} />
       ) : (
         <>
           {visible.map((c) => (

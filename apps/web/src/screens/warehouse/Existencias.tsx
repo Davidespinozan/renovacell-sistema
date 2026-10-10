@@ -1,4 +1,5 @@
 // Existencias: stock por producto y por LOTE (lote + caducidad + cantidad).
+import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
@@ -58,9 +59,7 @@ export function Existencias() {
         <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} onAjuste={setAjusteLot} />
       ))}
       {groups.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Todavía no hay producto en almacén. Entra al recibir la mercancía de una compra (“Recibir mercancía”).
-        </div>
+        <Vacio icono="box" titulo="Todavía no hay producto en almacén." pista="Entra al recibir la mercancía de una compra (“Recibir mercancía”)." />
       )}
 
       {mermaLot && <MermaModal lot={mermaLot} onClose={() => setMermaLot(null)} />}

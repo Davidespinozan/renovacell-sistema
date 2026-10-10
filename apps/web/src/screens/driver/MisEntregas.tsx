@@ -1,5 +1,6 @@
 // CHOFER: solo SUS entregas (driver_id = chofer logueado). Marca entregado +
 // sube foto de prueba. Al confirmar, envío y pedido pasan a Entregado (cierra el ciclo).
+import { Vacio } from '../../app/EmptyState'
 import { useMemo, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
@@ -230,9 +231,7 @@ export function MisEntregas() {
       )}
 
       {mine.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          No tienes entregas asignadas pendientes.
-        </div>
+        <Vacio icono="truck" titulo="No tienes entregas asignadas pendientes." pista="Cuando Despacho te asigne una ruta aparecerá aquí." />
       ) : (
         orderedMine.map((s) => {
           const order = orderById[s.order_id]

@@ -189,6 +189,18 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 /* Carga: esqueleto con shimmer (#EEF1F5 → #F6F8FB), nunca spinner a pantalla completa. */
 .skel{position:relative;overflow:hidden;border-radius:var(--r-sm);background:linear-gradient(90deg,#EEF1F5 25%,#F6F8FB 50%,#EEF1F5 75%);background-size:200% 100%;animation:shimmer 1.2s linear infinite;color:transparent}
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.skel-list{display:grid;gap:14px}
+.skel-row{display:flex;align-items:center;gap:12px}
+.skel-dot{width:40px;height:40px;border-radius:var(--r-sm);flex:none}
+.skel-lines{flex:1;display:grid;gap:8px}
+.skel-lines .skel{height:12px;border-radius:6px}
+/* Estado vacío: ícono en caja, frase corta, pista y una acción. */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:32px 20px}
+.empty-ic{width:44px;height:44px;border-radius:var(--r-sm);background:var(--cp-slate-100);color:var(--cp-text-2);display:grid;place-items:center;margin-bottom:8px}
+.empty-ic svg{width:20px;height:20px}
+.empty-t{font-size:15px;line-height:22px;font-weight:600;color:var(--ink)}
+.empty-d{font-size:13px;line-height:18px;color:var(--ink-3);max-width:48ch}
+.empty-a{margin-top:12px}
 .eyebrow{display:flex;align-items:center;gap:9px;font-family:'Inter',system-ui,sans-serif;font-size:11px;line-height:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:16px}
 .eyebrow::before{content:"";width:18px;height:2px;border-radius:2px;background:var(--green)}
 /* Encabezado de pantalla: hero sobrio con luz propia (gradiente verde sutil +

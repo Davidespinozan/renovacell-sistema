@@ -1,6 +1,7 @@
 // Caja (Punto de Venta): venta en persona. Selecciona productos, arma la venta,
 // cobra (efectivo/tarjeta) y completa. Al cobrar: crea orden POS pagada/entregada
 // y descuenta inventario por lote (FEFO de Almacén, reutilizada).
+import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -237,7 +238,7 @@ export function Caja() {
           style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
         />
         {filtered.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Ningún producto coincide con “{buscar}”.</div>
+          <Vacio icono="search" titulo={<>Ningún producto coincide con “{buscar}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setBuscar('')}>Limpiar búsqueda</button>} />
         ) : (
         <div className="posgrid">
           {filtered.map((p) => {

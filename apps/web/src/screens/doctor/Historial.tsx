@@ -1,4 +1,5 @@
 // Historial: pedidos pasados del doctor (entregados / cancelados).
+import { Vacio, Cargando } from '../../app/EmptyState'
 import React, { useMemo } from 'react'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -33,11 +34,9 @@ export function Historial() {
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Portal del Doctor · Historial</div>
       {loading ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>Cargando tu historial…</div>
+        <Cargando etiqueta="Cargando tu historial…" />
       ) : past.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
-          Aún no hay pedidos en tu historial.
-        </div>
+        <Vacio icono="clock" titulo="Aún no hay pedidos en tu historial." pista="Aquí verás los pedidos ya entregados o cerrados." />
       ) : (
         past.map((o) => <OrderCard key={o.id} order={o} productsById={byId} showTracking={false} dinero={byOrder[o.id] ?? null} onReorder={() => reorder(o)} />)
       )}

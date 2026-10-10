@@ -1,6 +1,7 @@
 // DOCTORES (Administración): gate del canal comercial. El admin verifica/revoca
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
+import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -145,7 +146,7 @@ export function Doctores() {
       )}
 
       {queue.length === 0 && orphans.length === 0 && (
-        <div className="card" style={{ color: 'var(--ink-3)' }}>No hay doctores pendientes de verificación.</div>
+        <Vacio icono="usercheck" titulo="No hay doctores pendientes de verificación." pista="Los registros nuevos del Portal del Doctor aparecerán aquí." />
       )}
 
       {queue.map((d) => (
