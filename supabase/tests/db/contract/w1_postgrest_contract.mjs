@@ -495,4 +495,61 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C2 · anon: vistas de custodia denegadas', !!s1.error && !!l1.error && !s1.data && !l1.data, s1.data ?? l1.data)
 }
 
+// 27) SEC-C2b · estado_custodia y vender_pos por la API, con una custodia de titular "tercero" (holder_user_id NULL).
+//     Lee: Dirección/Facturación/Almacén/Empaque o el titular-usuario. Vende: Dirección o el titular-usuario. Nadie más;
+//     customers.profile_id (el doctor ligado al cliente tercero) NO autoriza. Ajena e inexistente responden lo mismo.
+{
+  r = await admin.rpc('abrir_custodia', { p_op_id: uuid(), p_kind: 'vendedor', p_holder_kind: 'tercero', p_holder_customer_id: ids.cust })
+  expect('SEC-C2b · custodia de titular tercero abierta por Dirección', r.data?.status === 'applied', r.error ?? r.data)
+  const cusT = r.data?.custody_id
+  r = await wh.rpc('entregar_custodia', { p_op_id: uuid(), p_custody: cusT, p_lines: [{ lot_id: lotCus, qty: 2 }] })
+  expect('SEC-C2b · se le entregan 2 unidades', r.data?.status === 'applied', r.error ?? r.data)
+  const noAut = (x) => /NO_AUTORIZADO/.test(x.error?.message ?? '') && x.data == null
+  for (const [rol, cli] of Object.entries({ Dirección: admin, Facturación: as(ids.bill), Almacén: wh, Empaque: as(ids.pk) })) {
+    r = await cli.rpc('estado_custodia', { p_custody: cusT })
+    expect(`SEC-C2b · ${rol}: lee el estado de la custodia de tercero`, !r.error && Number(r.data?.unidades_en_poder) === 2 && r.data?.holder_kind === 'tercero', r.error ?? r.data)
+  }
+  r = await pos.rpc('estado_custodia', { p_custody: cusId })
+  expect('SEC-C2b · POS titular: sigue leyendo SU custodia', !r.error && r.data?.holder_kind === 'staff', r.error ?? r.data)
+  const inexistente = uuid()
+  for (const [rol, cli] of Object.entries({ 'POS titular de otra': pos, 'otro POS': otroPos, 'doctor ligado al cliente tercero (customers.profile_id)': doc, 'sin perfil': as(uuid()) })) {
+    const a = await cli.rpc('estado_custodia', { p_custody: cusT }), b = await cli.rpc('estado_custodia', { p_custody: inexistente })
+    expect(`SEC-C2b · ${rol}: NO lee la custodia de tercero`, noAut(a), a.error ?? a.data)
+    expect(`SEC-C2b · ${rol}: ajena e inexistente responden igual (mismo código y mensaje)`, noAut(b) && a.error?.message === b.error?.message && a.error?.code === b.error?.code, { ajena: a.error, inexistente: b.error })
+  }
+  r = await admin.rpc('estado_custodia', { p_custody: inexistente })
+  expect('SEC-C2b · Dirección: una custodia que no existe se dice inexistente', /CUSTODIA_INEXISTENTE/.test(r.error?.message ?? ''), r.error ?? r.data)
+  r = await as(ids.susp).rpc('estado_custodia', { p_custody: cusT })
+  expect('SEC-C2b · cuenta suspendida: rechazada', /CUENTA_SUSPENDIDA/.test(r.error?.message ?? '') && r.data == null, r.error ?? r.data)
+  r = await anon.rpc('estado_custodia', { p_custody: cusT })
+  expect('SEC-C2b · anon: no ejecuta estado_custodia', !!r.error && r.data == null && !/NO_AUTORIZADO/.test(r.error.message ?? ''), r.error ?? r.data)
+
+  // Venta: el pos sin relación NO vende de la custodia de tercero, y no cambia nada (lote, pedidos, renglones de custodia).
+  const foto = async () => {
+    const l = await admin.from('lots').select('quantity').eq('id', lotCus).single()
+    const o = await admin.from('orders').select('id', { count: 'exact', head: true })
+    const c = await admin.from('custody_lines').select('id', { count: 'exact', head: true }).eq('custody_id', cusT)
+    return `${l.data?.quantity}|${o.count}|${c.count}`
+  }
+  // Mismos parámetros que manda el POS real (los obligatorios completos: sin ellos PostgREST no resuelve la función).
+  const venta = (id) => ({ p_order_id: id, p_folio: 'POS-C2B', p_total: 1, p_payment_method: 'efectivo', p_doctor_id: null,
+    p_shipping_meta: { channel: 'pos', event_id: null, seller: null }, p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 1 }],
+    p_allocations: [{ line_index: 0, lot_id: lotCus, qty: 1 }], p_invoice_requested: false, p_efectivo_recibido: 500, p_custody_id: cusT })
+  const antes = await foto()
+  for (const [rol, cli] of Object.entries({ 'POS titular de otra': pos, 'otro POS': otroPos })) {
+    const id = uuid()
+    r = await cli.rpc('vender_pos', venta(id))
+    expect(`SEC-C2b · ${rol}: NO vende de la custodia de tercero`, noAut(r), r.error ?? r.data)
+    r = await cli.rpc('vender_pos', venta(id))
+    expect(`SEC-C2b · ${rol}: el reintento con el mismo id se rechaza igual`, noAut(r), r.error ?? r.data)
+  }
+  r = await doc.rpc('vender_pos', venta(uuid()))
+  expect('SEC-C2b · el doctor ligado al cliente tercero no vende (rechazo de rol, no error de firma)', /No autorizado/.test(r.error?.message ?? '') && r.data == null, r.error ?? r.data)
+  expect('SEC-C2b · tras los rechazos: lote, pedidos y renglones de la custodia sin cambio', (await foto()) === antes, { antes, despues: await foto() })
+  r = await admin.rpc('vender_pos', { ...venta(uuid()), p_payment_method: 'tarjeta', p_efectivo_recibido: null })
+  expect('SEC-C2b · Dirección sí vende de la custodia de tercero', r.data === true, r.error ?? r.data)
+  r = await admin.rpc('estado_custodia', { p_custody: cusT })
+  expect('SEC-C2b · y el estado lo refleja (1 en poder, 1 vendida)', !r.error && Number(r.data?.unidades_en_poder) === 1 && Number(r.data?.unidades_vendidas) === 1, r.error ?? r.data)
+}
+
 process.exit(failed)
