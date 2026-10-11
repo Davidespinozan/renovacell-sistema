@@ -552,4 +552,101 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C2b · y el estado lo refleja (1 en poder, 1 vendida)', !r.error && Number(r.data?.unidades_en_poder) === 1 && Number(r.data?.unidades_vendidas) === 1, r.error ?? r.data)
 }
 
+// 28) SEC-C3 · doctor_directory y staff_directory por la API, con las MISMAS consultas del frontend (doctorsStore y
+//     directoryStore). Filas por lista explícita de roles; contacto solo Dirección, Ventas con cartera validada y chofer con
+//     envío en curso. Sin perfil, doctor y suspendido: nada. La forma de la respuesta no cambia.
+{
+  const dirDoc = (c) => c.from('doctor_directory').select('id, name, organization, verified, meta').order('name')
+  const dirStaff = (c) => c.from('staff_directory').select('id, name, avatar_url, role_id')
+  const fila = (x) => (x.data ?? []).find((d) => d.id === ids.doc3)
+  const llaves = (m) => Object.keys(m ?? {}).sort().join(',')
+  const conContacto = (m) => m?.phone === '667-C3' && m?.address === 'Calle C3' && m?.city === 'Culiacán' && m?.specialty === 'Derma'
+  const sinContacto = (m) => llaves(m) === 'address,city,phone,specialty' && Object.values(m).every((v) => v === null)
+  const total = (await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role_id', 'doctor')).count
+  const personal = (await admin.from('profiles').select('id', { count: 'exact', head: true }).neq('role_id', 'doctor')).count
+  for (const [rol, c, contacto] of [['Dirección', admin, true], ['Facturación', as(ids.bill), false], ['Almacén', wh, false], ['Empaque', as(ids.pk), false],
+    ['Ventas con cartera del doctor', as(ids.pos3), true], ['Ventas sin cartera', pos, false]]) {
+    const d = await dirDoc(c), s = await dirStaff(c), f = fila(d)
+    expect(`SEC-C3 · ${rol}: ve el directorio de doctores completo y el del personal`, !d.error && !s.error && d.data.length === total && s.data.length === personal, d.error ?? s.error ?? [d.data?.length, total, s.data?.length, personal])
+    expect(`SEC-C3 · ${rol}: misma forma (nombre, clínica, verificado y las 4 llaves de contacto; sin cédula ni correo)`,
+      !!f && f.name && f.organization === 'Clínica C3' && typeof f.verified === 'boolean' && llaves(f.meta) === 'address,city,phone,specialty' && !/CED-C3|contrato-c3-doc/.test(JSON.stringify(d.data)), f)
+    expect(`SEC-C3 · ${rol}: ${contacto ? 'recibe' : 'NO recibe'} teléfono y dirección del doctor`, !!f && (contacto ? conContacto(f.meta) : sinContacto(f.meta)), f?.meta)
+  }
+  let d = await dirDoc(as(ids.drv)), s = await dirStaff(as(ids.drv))
+  expect('SEC-C3 · chofer con envío en curso: ve SOLO a ese doctor, con su contacto, y el directorio del personal', !d.error && d.data.length === 1 && conContacto(fila(d)?.meta) && s.data?.length === personal, d.error ?? d.data)
+  d = await dirDoc(as(ids.drv2)); s = await dirStaff(as(ids.drv2))
+  expect('SEC-C3 · chofer sin envíos: ningún doctor (el personal sí)', !d.error && d.data.length === 0 && s.data?.length === personal, d.error ?? d.data)
+  for (const [rol, c] of [['doctor', doc], ['el propio doctor listado', as(ids.doc3)], ['cuenta sin perfil', as(uuid())]]) {
+    d = await dirDoc(c); s = await dirStaff(c)
+    expect(`SEC-C3 · ${rol}: directorios vacíos (sin error que revele nada)`, !d.error && !s.error && d.data.length === 0 && s.data.length === 0, d.error ?? s.error ?? [d.data, s.data])
+  }
+  d = await dirDoc(as(ids.susp)); s = await dirStaff(as(ids.susp))
+  expect('SEC-C3 · cuenta suspendida: rechazada en ambos directorios', /CUENTA_SUSPENDIDA/.test(d.error?.message ?? '') && /CUENTA_SUSPENDIDA/.test(s.error?.message ?? '') && !d.data && !s.data, d.error ?? d.data)
+  d = await dirDoc(anon); s = await dirStaff(anon)
+  expect('SEC-C3 · anon: directorios denegados', !!d.error && !!s.error && !d.data && !s.data, d.data ?? s.data)
+  // Los filtros del cliente no abren nada: pedir el doctor por id o filtrar por el teléfono no devuelve contacto a quien no lo tiene.
+  d = await wh.from('doctor_directory').select('id, meta').eq('id', ids.doc3)
+  const porTel = await wh.from('doctor_directory').select('id').eq('meta->>phone', '667-C3')
+  expect('SEC-C3 · Almacén: ni pidiéndolo por id ni filtrando por teléfono obtiene (o confirma) el contacto', sinContacto(d.data?.[0]?.meta) && !porTel.error && porTel.data.length === 0, [d.data, porTel.error ?? porTel.data])
+  r = await wh.from('doctor_directory').update({ organization: 'X' }).eq('id', ids.doc3)
+  expect('SEC-C3 · el directorio sigue siendo de solo lectura', !!r.error, r.data)
+}
+
+// 29) SEC-C3b · envíos y evidencia por la API, con las MISMAS escrituras del frontend (shipmentsStore.patch y ops/entregar).
+//     El chofer solo confirma su carga o reporta una incidencia; "entregado" solo llega por confirmar_entrega, con una
+//     evidencia que él subió y que no es de otra entrega; una entrega cerrada no se toca.
+{
+  const drv = as(ids.drv), ajeno = as(ids.drv2)
+  const fila = async (id) => (await admin.from('shipments').select('*').eq('id', id).single()).data
+  const contacto = async () => (await drv.from('doctor_directory').select('id, meta').eq('id', ids.doc3)).data?.[0]?.meta?.phone ?? null
+  const cerrada0 = JSON.stringify(await fila(ids.shpEnt)), activa0 = JSON.stringify(await fila(ids.shpAct))
+  // ataques por PATCH directo
+  for (const [n, id, cuerpo, patron] of [
+    ['reabrir la entrega cerrada', ids.shpEnt, { status: 'despachado' }, /ENVIO_CERRADO/],
+    ['quitar la evidencia de la entrega cerrada', ids.shpEnt, { proof_image_url: null }, /ENVIO_CERRADO/],
+    ['cambiar receptor y fecha de la entrega cerrada', ids.shpEnt, { received_by: 'Otro', delivered_at: new Date().toISOString() }, /ENVIO_CERRADO/],
+    ['apuntar la evidencia a la foto de otro chofer', ids.shpAct, { proof_image_url: 'proofs/ct-ajena.png' }, /No autorizado/],
+    ['marcar entregado por escritura directa (como el frontend viejo)', ids.shpAct, { status: 'delivered', delivered_at: new Date().toISOString(), proof_image_url: 'proofs/ct-nueva.png', received_by: 'Yo' }, /No autorizado/],
+    ['reasignarse el envío a otro chofer', ids.shpAct, { driver_id: ids.drv2 }, /No autorizado/],
+    ['cambiar el destinatario', ids.shpAct, { ship_to: { line1: 'Falsa' } }, /No autorizado/],
+    ['saltar a un estado que no es suyo', ids.shpAct, { status: 'cancelado' }, /TRANSICION_NO_PERMITIDA/],
+  ]) {
+    r = await drv.from('shipments').update(cuerpo).eq('id', id).select('id')
+    expect(`SEC-C3b · chofer: ${n} → rechazado con error`, !!r.error && patron.test(r.error.message ?? '') && !r.data, r.error ?? r.data)
+  }
+  r = await ajeno.from('shipments').update({ status: 'incident', incident: { type: 'x' } }).eq('id', ids.shpAct).select('id')
+  expect('SEC-C3b · chofer ajeno: no escribe un envío que no es suyo (0 filas)', !r.error && r.data.length === 0, r.error ?? r.data)
+  r = await drv.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_proof_path: 'proofs/ct-nueva.png', p_received_by: 'Recepción' })
+  expect('SEC-C3b · chofer: no entrega sin haber confirmado su carga', /ESTADO_INVALIDO/.test(r.error?.message ?? ''), r.error ?? r.data)
+  expect('SEC-C3b · tras los ataques: la entrega cerrada y el envío activo están EXACTAMENTE como antes', JSON.stringify(await fila(ids.shpEnt)) === cerrada0 && JSON.stringify(await fila(ids.shpAct)) === activa0, null)
+  // flujo legítimo, con las mismas cargas útiles del frontend
+  r = await drv.from('shipments').update({ status: 'out_for_delivery', load_confirmed_at: new Date().toISOString() }).eq('id', ids.shpAct)
+  expect('SEC-C3b · chofer: confirma su carga (confirmLoad)', !r.error && (await fila(ids.shpAct)).status === 'out_for_delivery', r.error)
+  r = await drv.from('shipments').update({ status: 'incident', incident: { type: 'No estaba', note: null, at: new Date().toISOString(), resolved: false } }).eq('id', ids.shpAct)
+  expect('SEC-C3b · chofer: reporta una incidencia (reportIncident) y conserva el contacto del doctor', !r.error && (await fila(ids.shpAct)).status === 'incident' && (await contacto()) === '667-C3', r.error ?? await contacto())
+  r = await drv.from('shipments').update({ status: 'out_for_delivery', incident: { type: 'No estaba', resolved: true } }).eq('id', ids.shpAct).select('id')
+  expect('SEC-C3b · chofer: NO resuelve su propia incidencia', /TRANSICION_NO_PERMITIDA/.test(r.error?.message ?? ''), r.error ?? r.data)
+  r = await wh.from('shipments').update({ status: 'out_for_delivery', incident: { type: 'No estaba', resolved: true } }).eq('id', ids.shpAct)
+  expect('SEC-C3b · Almacén: resuelve la incidencia (resolveIncident)', !r.error && (await fila(ids.shpAct)).status === 'out_for_delivery', r.error)
+  for (const [n, ruta] of [['la foto de otro chofer', 'proofs/ct-ajena.png'], ['la prueba de otra entrega', 'proofs/ct-ent.png'], ['un archivo que no existe', 'proofs/ct-nada.png'], ['una ruta de INE', `identity/${ids.doc3}/ine-front.jpg`]]) {
+    r = await drv.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_proof_path: ruta, p_received_by: 'Recepción' })
+    expect(`SEC-C3b · chofer: no cierra con ${n}`, /EVIDENCIA_INVALIDA/.test(r.error?.message ?? ''), r.error ?? r.data)
+  }
+  r = await ajeno.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_proof_path: 'proofs/ct-ajena.png', p_received_by: 'Intruso' })
+  const sinPerfil = await as(uuid()).rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_received_by: 'Intruso' })
+  const sinSesion = await anon.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_received_by: 'Intruso' })
+  expect('SEC-C3b · chofer ajeno, cuenta sin perfil y anon: no cierran la entrega', /No tienes permiso/.test(r.error?.message ?? '') && /No tienes permiso/.test(sinPerfil.error?.message ?? '') && !!sinSesion.error, [r.error, sinPerfil.error, sinSesion.error])
+  expect('SEC-C3b · tras los rechazos el envío sigue en reparto y sin evidencia', (await fila(ids.shpAct)).status === 'out_for_delivery' && (await fila(ids.shpAct)).proof_image_url === null, await fila(ids.shpAct))
+  r = await drv.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_proof_path: 'proofs/ct-nueva.png', p_received_by: 'Dra. C3' })
+  let f = await fila(ids.shpAct)
+  expect('SEC-C3b · chofer: cierra su entrega con su foto (entregar)', !r.error && f.status === 'delivered' && f.proof_image_url === 'proofs/ct-nueva.png' && f.received_by === 'Dra. C3' && !!f.delivered_at, r.error ?? f)
+  r = await drv.rpc('confirmar_entrega', { p_shipment_id: ids.shpAct, p_proof_path: 'proofs/ct-nueva.png', p_received_by: 'Dra. C3' })
+  expect('SEC-C3b · reintento del cierre: responde bien y no cambia nada', !r.error && JSON.stringify(await fila(ids.shpAct)) === JSON.stringify(f), r.error)
+  expect('SEC-C3b · entregado: el chofer deja de recibir el contacto del doctor', (await contacto()) === null, await contacto())
+  r = await drv.from('shipments').update({ status: 'incident', incident: { type: 'reabrir' } }).eq('id', ids.shpAct).select('id')
+  expect('SEC-C3b · y ya no puede reabrirlo con una "incidencia"', /ENVIO_CERRADO/.test(r.error?.message ?? '') && (await contacto()) === null, r.error ?? r.data)
+  r = await admin.from('shipments').update({ received_by: 'Dra. C3 (corregido por Dirección)' }).eq('id', ids.shpAct)
+  expect('SEC-C3b · Dirección conserva la corrección administrativa', !r.error && (await fila(ids.shpAct)).received_by === 'Dra. C3 (corregido por Dirección)', r.error)
+}
+
 process.exit(failed)

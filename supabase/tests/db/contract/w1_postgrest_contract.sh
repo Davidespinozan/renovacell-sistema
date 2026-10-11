@@ -29,10 +29,21 @@ POS2=$(one "select tests.user('pos', 'contrato-pos2@test.local')")
 BILL=$(one "select tests.user('billing')"); PK=$(one "select tests.user('packing')")   # SEC-C1: contratos de lectura por rol
 SUSP=$(one "select tests.user('pos', 'contrato-susp@test.local')"); one "select tests.suspender('$SUSP')" >/dev/null   # SEC-C2: cuenta suspendida
 CUST=$(one "insert into public.customers (full_name, email, source, profile_id) values ('Tercero Contrato', 'tercero-contrato@test.local', 'portal', '$DOC') returning id")   # SEC-C2b: cliente titular "tercero" (ligado a la cuenta del doctor)
+# SEC-C3: doctor con contacto y cédula, cartera VALIDADA con un pos propio, y un chofer con un envío EN CURSO a ese doctor
+DOC3=$(one "select tests.user('doctor', 'contrato-c3-doc@test.local')"); POS3=$(one "select tests.user('pos', 'contrato-c3-pos@test.local')")
+DRV=$(one "select tests.user('driver', 'contrato-c3-drv@test.local')"); DRV2=$(one "select tests.user('driver', 'contrato-c3-drv2@test.local')")
+"${P[@]}" -c "do \$\$ begin perform set_config('app.trusted', 'on', true); update public.profiles set organization = 'Clínica C3', meta = coalesce(meta, '{}'::jsonb) || '{\"phone\":\"667-C3\",\"address\":\"Calle C3\",\"city\":\"Culiacán\",\"specialty\":\"Derma\",\"cedula\":\"CED-C3\"}' where id = '$DOC3'; end \$\$;" >/dev/null || { echo "FAIL: fixture SEC-C3"; exit 1; }
+one "insert into public.cc_cartera (profile_id, seller_profile_id) values ('$DOC3', '$POS3') returning 1" >/dev/null
+O5=$(one "select tests.order('$DOC3', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 1)))")
+SHPACT=$(one "insert into public.shipments (order_id, driver_id, status) values ('$O5', '$DRV', 'despachado') returning id")
+# SEC-C3b: una entrega ya cerrada del mismo chofer (con su prueba) y fotos en Storage: una propia sin usar y una de OTRO chofer
+O6=$(one "select tests.order('$DOC3', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 1)))")
+SHPENT=$(one "insert into public.shipments (order_id, driver_id, status, delivered_at, proof_image_url, received_by) values ('$O6', '$DRV', 'delivered', now(), 'proofs/ct-ent.png', 'Recepción') returning id")
+one "insert into storage.objects (bucket_id, name, owner, owner_id) values ('proofs', 'proofs/ct-ent.png', '$DRV', '$DRV'), ('proofs', 'proofs/ct-nueva.png', '$DRV', '$DRV'), ('proofs', 'proofs/ct-ajena.png', '$DRV2', '$DRV2') returning 1" >/dev/null
 OM=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 2)))")
 OC=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$P2'::uuid, 'qty', 1)))")
 one "select tests.stock('$P2', 'CT-C', 10)" >/dev/null
-CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s","susp":"%s","cust":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK" "$SUSP" "$CUST")
+CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s","susp":"%s","cust":"%s","doc3":"%s","pos3":"%s","drv":"%s","drv2":"%s","shpAct":"%s","shpEnt":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK" "$SUSP" "$CUST" "$DOC3" "$POS3" "$DRV" "$DRV2" "$SHPACT" "$SHPENT")
 SOCK=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${PGHOST}")
 cat > /tmp/w1_pgrst.conf.$$ <<CONF
 db-uri = "postgres://authenticator@/${DB}?host=${SOCK}&port=${PGPORT}"

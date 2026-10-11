@@ -9,7 +9,7 @@ begin
     -- W6-A1 (autorizado): auth_role/has_cap/log_audit/profiles_guard fallan cerrado ante una
     -- cuenta suspendida. Sus hashes se re-anclan aquí; el resto sigue intacto.
     ('auth_role()',                                           '663618f6d4eedf568db532bca55cddc5'),
-    ('confirmar_entrega(uuid,text,text)',                     '312b5ba18dac4f4a9419e1aaff4e80cb'),
+    ('confirmar_entrega(uuid,text,text)',                     '3da25f3db1514408463b5fb38f61d0b6'),
     -- CX-0b (autorizado): la cuenta comercial del pedido la decide el servidor (doctor = su cuenta; personal = pareja
     -- coherente) y el snapshot del cliente solo lo escribe el servidor. Precio, folio y contrato intactos. Prod previo 408d0b2d… (rollback cx0b).
     -- CX-0c (autorizado): además, vendedor (cartera), su origen y el capturista los decide el servidor. CX-0b previo 0de9f17f… (rollback cx0c).
@@ -31,7 +31,9 @@ begin
     -- autoridad comercial en meta (META_PROTEGIDA). Hash re-anclado; el resto sigue intacto.
     ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),
     ('refunds_append_only()',                                 '5f2ede8dcfe36c334b67b03bea2c4821'),
-    ('shipments_guard()',                                     '1e31cbc3ff2cd1e22e94d2e64584d617'),
+    -- SEC-C3b (autorizado): shipments_guard deja al chofer solo confirmar su carga o reportar una incidencia (entrega
+    -- cerrada inmutable), y confirmar_entrega autoriza NULL-safe y valida estado y evidencia. Hashes re-anclados.
+    ('shipments_guard()',                                     'b1e791b99ca8043cb1e2913e0b294600'),
     -- C360-F3 (autorizado): upsert_customer_fiscal queda como COMPATIBILIDAD sobre el perfil fiscal canónico
     -- predeterminado y pierde la autoridad de pos (solo Dirección, facturación y el doctor dueño). Hash re-anclado.
     ('upsert_customer_fiscal(uuid,jsonb)',                    'b6041b322c1b9657139591b28dcad316')
