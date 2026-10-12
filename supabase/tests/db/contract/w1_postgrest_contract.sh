@@ -40,10 +40,13 @@ SHPACT=$(one "insert into public.shipments (order_id, driver_id, status) values 
 O6=$(one "select tests.order('$DOC3', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 1)))")
 SHPENT=$(one "insert into public.shipments (order_id, driver_id, status, delivered_at, proof_image_url, received_by) values ('$O6', '$DRV', 'delivered', now(), 'proofs/ct-ent.png', 'Recepción') returning id")
 one "insert into storage.objects (bucket_id, name, owner, owner_id) values ('proofs', 'proofs/ct-ent.png', '$DRV', '$DRV'), ('proofs', 'proofs/ct-nueva.png', '$DRV', '$DRV'), ('proofs', 'proofs/ct-ajena.png', '$DRV2', '$DRV2') returning 1" >/dev/null
+# SEC-C4-A: dos cuentas sintéticas con el MISMO teléfono; una es la cuenta del doctor de la cartera de POS3
+one "insert into public.customers (full_name, email, phone, city, source, profile_id) values ('Contrato Búsqueda Uno', 'c4a-uno@test.local', '+52 667 555 0142', 'Culiacán', 'portal', '$DOC3') returning 1" >/dev/null
+CUSTB=$(one "insert into public.customers (full_name, email, phone, source, seller_name) values ('Contrato Búsqueda Dos', 'c4a-dos@test.local', '6675550142', 'odoo', 'vendedor-odoo') returning id")
 OM=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$PROD'::uuid, 'qty', 2)))")
 OC=$(one "select tests.order('$DOC', 'pending_payment', jsonb_build_array(jsonb_build_object('product_id', '$P2'::uuid, 'qty', 1)))")
 one "select tests.stock('$P2', 'CT-C', 10)" >/dev/null
-CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s","susp":"%s","cust":"%s","doc3":"%s","pos3":"%s","drv":"%s","drv2":"%s","shpAct":"%s","shpEnt":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK" "$SUSP" "$CUST" "$DOC3" "$POS3" "$DRV" "$DRV2" "$SHPACT" "$SHPENT")
+CTX=$(printf '{"admin":"%s","wh":"%s","pos":"%s","pos2":"%s","prod":"%s","rep":"%s","order":"%s","order2":"%s","attempt":"%s","doc":"%s","omoney":"%s","ocred":"%s","bill":"%s","pk":"%s","susp":"%s","cust":"%s","doc3":"%s","pos3":"%s","drv":"%s","drv2":"%s","shpAct":"%s","shpEnt":"%s","custB":"%s"}' "$ADMIN" "$WH" "$POS" "$POS2" "$PROD" "$REP" "$O1" "$O2" "$ATT" "$DOC" "$OM" "$OC" "$BILL" "$PK" "$SUSP" "$CUST" "$DOC3" "$POS3" "$DRV" "$DRV2" "$SHPACT" "$SHPENT" "$CUSTB")
 SOCK=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${PGHOST}")
 cat > /tmp/w1_pgrst.conf.$$ <<CONF
 db-uri = "postgres://authenticator@/${DB}?host=${SOCK}&port=${PGPORT}"

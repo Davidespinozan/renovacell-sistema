@@ -649,4 +649,43 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C3b · Dirección conserva la corrección administrativa', !r.error && (await fila(ids.shpAct)).received_by === 'Dra. C3 (corregido por Dirección)', r.error)
 }
 
+// 30) SEC-C4-A · buscar_clientes_pos por la API: SOLO customer_id, nombre y ••••últimos 4, para Dirección y Ventas.
+//     Por nombre (≥3 letras) o por exactamente 4 dígitos finales. Encontrar una cuenta no autoriza su expediente.
+{
+  const buscar = (c, q, limite) => c.rpc('buscar_clientes_pos', limite === undefined ? { q } : { q, limite })
+  const pos3 = as(ids.pos3)
+  r = await buscar(pos3, 'contrato busq')
+  const filas = r.data ?? []
+  expect('SEC-C4-A · Ventas: la búsqueda por nombre devuelve las dos cuentas', !r.error && filas.length === 2 && filas.map((f) => f.nombre).join('|') === 'Contrato Búsqueda Dos|Contrato Búsqueda Uno', r.error ?? filas)
+  expect('SEC-C4-A · cada fila trae EXACTAMENTE customer_id, nombre y telefono_mascara', filas.every((f) => Object.keys(f).sort().join(',') === 'customer_id,nombre,telefono_mascara'), filas)
+  expect('SEC-C4-A · el teléfono llega enmascarado (••••0142) y la respuesta no trae número completo, correo, ciudad ni vendedor', filas.every((f) => f.telefono_mascara === '••••0142')
+    && !/[0-9]{5,}|@|Culiac|vendedor-odoo|test\.local/.test(JSON.stringify(filas).replace(/"customer_id":"[0-9a-f-]{36}"/g, '')), filas)
+  r = await buscar(pos, '0142')
+  expect('SEC-C4-A · Ventas SIN cartera: por los últimos 4 dígitos obtiene lo mismo (la búsqueda no depende de la cartera)', !r.error && JSON.stringify(r.data) === JSON.stringify(filas), r.error ?? r.data)
+  r = await buscar(admin, 'CONTRATO  BÚSQUEDA', 500)
+  expect('SEC-C4-A · Dirección: misma respuesta; un límite de 500 no pasa de 20', !r.error && JSON.stringify(r.data) === JSON.stringify(filas), r.error ?? r.data)
+  r = await buscar(pos3, 'contrato busq', 1)
+  expect('SEC-C4-A · límite 1: una sola fila, la primera del mismo orden', !r.error && r.data.length === 1 && r.data[0].nombre === 'Contrato Búsqueda Dos', r.error ?? r.data)
+  r = await pos3.rpc('buscar_clientes_pos', { q: 'contrato busq' }).select('customer_id, nombre, telefono_mascara, phone')
+  const extra = await pos3.rpc('buscar_clientes_pos', { q: 'contrato busq' }).select('*, email')
+  expect('SEC-C4-A · pedir por la API una columna que no es del contrato (phone, email) falla: no hay columnas ocultas', !!r.error && !r.data && !!extra.error && !extra.data, r.data ?? extra.data)
+  for (const q of ['', 'ab', '123', '12345', '6675550142', '+52667', 'c4a-uno@test.local']) {
+    r = await buscar(pos3, q)
+    expect(`SEC-C4-A · entrada inválida «${q}»: BUSQUEDA_INVALIDA, sin datos`, /^BUSQUEDA_INVALIDA/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+  }
+  for (const [rol, c] of [['Facturación', as(ids.bill)], ['Almacén', wh], ['Empaque', as(ids.pk)], ['Chofer', as(ids.drv)], ['Doctor (dueño de una de las cuentas)', as(ids.doc3)], ['cuenta sin perfil', as(uuid())]]) {
+    r = await buscar(c, 'contrato busq')
+    expect(`SEC-C4-A · ${rol}: NO_AUTORIZADO, sin datos`, r.error?.message === 'NO_AUTORIZADO' && !r.data, r.error ?? r.data)
+  }
+  r = await buscar(as(ids.susp), 'contrato busq')
+  expect('SEC-C4-A · cuenta suspendida: rechazada', /CUENTA_SUSPENDIDA/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+  r = await buscar(anon, 'contrato busq'); const srv = await buscar(as(null, 'service_role'), 'contrato busq')
+  expect('SEC-C4-A · anon y service_role: sin permiso de ejecución', !!r.error && !r.data && !!srv.error && !srv.data, r.data ?? srv.data)
+  r = await fetch(`${URL}/rpc/buscar_clientes_pos?q=contrato%20busq`, { headers: { Authorization: `Bearer ${jwt(ids.pos3)}` } })
+  expect('SEC-C4-A · no se puede invocar por GET (función que escribe su contador): solo POST', r.status === 405, r.status)
+  // descubrir no autoriza: con el id de la cuenta ajena, el expediente sigue cerrado para Ventas
+  r = await pos3.rpc('cliente_360', { p_customer: ids.custB })
+  expect('SEC-C4-A · con el id hallado en la búsqueda, cliente_360 de una cuenta fuera de cartera sigue rechazando', /NO_AUTORIZADO/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+}
+
 process.exit(failed)
