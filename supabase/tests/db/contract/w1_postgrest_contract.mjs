@@ -650,29 +650,34 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
 }
 
 // 30) SEC-C4-A · buscar_clientes_pos por la API: SOLO customer_id, nombre y ••••últimos 4, para Dirección y Ventas.
-//     Por nombre (≥3 letras) o por exactamente 4 dígitos finales. Encontrar una cuenta no autoriza su expediente.
+//     Máx. 10 por búsqueda. Estado 200 = resultados; 400 = entrada inválida; 429 = cuota (20 búsquedas en 60 s, 300 filas
+//     por día). Los rechazos 400/429 NO son excepciones: responden vacío y el consumo y el exceso quedan guardados.
+//     Encontrar una cuenta no autoriza su expediente.
 {
   const buscar = (c, q, limite) => c.rpc('buscar_clientes_pos', limite === undefined ? { q } : { q, limite })
+  const crudo = async (sub, body) => { const x = await fetch(`${URL}/rpc/buscar_clientes_pos`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${jwt(sub)}` }, body: JSON.stringify(body) }); return { status: x.status, estado: x.headers.get('x-busqueda-estado'), cuerpo: await x.text() } }
   const pos3 = as(ids.pos3)
   r = await buscar(pos3, 'contrato busq')
   const filas = r.data ?? []
-  expect('SEC-C4-A · Ventas: la búsqueda por nombre devuelve las dos cuentas', !r.error && filas.length === 2 && filas.map((f) => f.nombre).join('|') === 'Contrato Búsqueda Dos|Contrato Búsqueda Uno', r.error ?? filas)
+  expect('SEC-C4-A · Ventas: la búsqueda por nombre devuelve las dos cuentas (estado 200)', !r.error && r.status === 200 && filas.length === 2 && filas.map((f) => f.nombre).join('|') === 'Contrato Búsqueda Dos|Contrato Búsqueda Uno', r.error ?? filas)
   expect('SEC-C4-A · cada fila trae EXACTAMENTE customer_id, nombre y telefono_mascara', filas.every((f) => Object.keys(f).sort().join(',') === 'customer_id,nombre,telefono_mascara'), filas)
   expect('SEC-C4-A · el teléfono llega enmascarado (••••0142) y la respuesta no trae número completo, correo, ciudad ni vendedor', filas.every((f) => f.telefono_mascara === '••••0142')
     && !/[0-9]{5,}|@|Culiac|vendedor-odoo|test\.local/.test(JSON.stringify(filas).replace(/"customer_id":"[0-9a-f-]{36}"/g, '')), filas)
   r = await buscar(pos, '0142')
   expect('SEC-C4-A · Ventas SIN cartera: por los últimos 4 dígitos obtiene lo mismo (la búsqueda no depende de la cartera)', !r.error && JSON.stringify(r.data) === JSON.stringify(filas), r.error ?? r.data)
   r = await buscar(admin, 'CONTRATO  BÚSQUEDA', 500)
-  expect('SEC-C4-A · Dirección: misma respuesta; un límite de 500 no pasa de 20', !r.error && JSON.stringify(r.data) === JSON.stringify(filas), r.error ?? r.data)
+  expect('SEC-C4-A · Dirección: misma respuesta; un límite de 500 no pasa de 10', !r.error && JSON.stringify(r.data) === JSON.stringify(filas) && r.data.length <= 10, r.error ?? r.data)
   r = await buscar(pos3, 'contrato busq', 1)
   expect('SEC-C4-A · límite 1: una sola fila, la primera del mismo orden', !r.error && r.data.length === 1 && r.data[0].nombre === 'Contrato Búsqueda Dos', r.error ?? r.data)
   r = await pos3.rpc('buscar_clientes_pos', { q: 'contrato busq' }).select('customer_id, nombre, telefono_mascara, phone')
   const extra = await pos3.rpc('buscar_clientes_pos', { q: 'contrato busq' }).select('*, email')
   expect('SEC-C4-A · pedir por la API una columna que no es del contrato (phone, email) falla: no hay columnas ocultas', !!r.error && !r.data && !!extra.error && !extra.data, r.data ?? extra.data)
   for (const q of ['', 'ab', '123', '12345', '6675550142', '+52667', 'c4a-uno@test.local']) {
-    r = await buscar(pos3, q)
-    expect(`SEC-C4-A · entrada inválida «${q}»: BUSQUEDA_INVALIDA, sin datos`, /^BUSQUEDA_INVALIDA/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+    const x = await crudo(ids.pos3, { q })
+    expect(`SEC-C4-A · entrada inválida «${q}»: estado 400, cuerpo vacío, mismo indicador`, x.status === 400 && x.cuerpo === '[]' && x.estado === 'BUSQUEDA_INVALIDA', x)
   }
+  r = await buscar(pos3, 'ab')
+  expect('SEC-C4-A · con el cliente de Supabase una entrada inválida se reconoce por status 400 y sin datos', r.status === 400 && !r.data?.length, { status: r.status, data: r.data })
   for (const [rol, c] of [['Facturación', as(ids.bill)], ['Almacén', wh], ['Empaque', as(ids.pk)], ['Chofer', as(ids.drv)], ['Doctor (dueño de una de las cuentas)', as(ids.doc3)], ['cuenta sin perfil', as(uuid())]]) {
     r = await buscar(c, 'contrato busq')
     expect(`SEC-C4-A · ${rol}: NO_AUTORIZADO, sin datos`, r.error?.message === 'NO_AUTORIZADO' && !r.data, r.error ?? r.data)
@@ -682,10 +687,27 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   r = await buscar(anon, 'contrato busq'); const srv = await buscar(as(null, 'service_role'), 'contrato busq')
   expect('SEC-C4-A · anon y service_role: sin permiso de ejecución', !!r.error && !r.data && !!srv.error && !srv.data, r.data ?? srv.data)
   r = await fetch(`${URL}/rpc/buscar_clientes_pos?q=contrato%20busq`, { headers: { Authorization: `Bearer ${jwt(ids.pos3)}` } })
-  expect('SEC-C4-A · no se puede invocar por GET (función que escribe su contador): solo POST', r.status === 405, r.status)
+  expect('SEC-C4-A · no se puede invocar por GET (función que escribe su cuota): solo POST', r.status === 405, r.status)
   // descubrir no autoriza: con el id de la cuenta ajena, el expediente sigue cerrado para Ventas
   r = await pos3.rpc('cliente_360', { p_customer: ids.custB })
   expect('SEC-C4-A · con el id hallado en la búsqueda, cliente_360 de una cuenta fuera de cartera sigue rechazando', /NO_AUTORIZADO/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+  // cuotas por HTTP: lo consumido y lo rechazado QUEDA guardado aunque la respuesta sea 400 o 429
+  let cuota = (await admin.from('c4a_cuota').select('filas, invalidas, marcas').eq('user_id', ids.pos3).single()).data
+  expect('SEC-C4-A · Dirección ve el uso del vendedor: 3 filas devueltas, 8 inválidas y 10 búsquedas en la ventana (las respuestas 400 sí se confirmaron; las dos peticiones de columnas ajenas ni llegaron a la función)', cuota?.filas === 3 && cuota?.invalidas === 8 && cuota?.marcas?.length === 10, cuota)
+  const rafaga = await Promise.all(Array.from({ length: 30 }, () => crudo(ids.pos3, { q: 'zzz sin resultados' })))
+  const pasan = rafaga.filter((x) => x.status === 200).length, frenadas = rafaga.filter((x) => x.status === 429 && x.cuerpo === '[]' && x.estado === 'LIMITE_FRECUENCIA').length
+  expect('SEC-C4-A · 30 búsquedas simultáneas con 10 ya hechas en el minuto: pasan exactamente 10 y 20 responden 429 vacío', pasan === 10 && frenadas === 20, { pasan, frenadas })
+  r = await buscar(pos3, 'contrato busq')
+  expect('SEC-C4-A · con el cliente de Supabase el freno se reconoce por status 429 y sin datos', r.status === 429 && !r.data?.length, { status: r.status, data: r.data })
+  const exc = (await admin.from('c4a_excesos').select('tipo, intentos, dia').eq('user_id', ids.pos3)).data
+  expect('SEC-C4-A · el exceso quedó anotado para Dirección (una fila de frecuencia con 21 intentos), aunque la respuesta fue un rechazo', exc?.length === 1 && exc[0].tipo === 'frecuencia' && exc[0].intentos === 21, exc)
+  expect('SEC-C4-A · el registro de excesos no guarda qué se buscó', Object.keys(exc?.[0] ?? {}).sort().join(',') === 'dia,intentos,tipo' && Object.keys((await admin.from('c4a_excesos').select('*').limit(1)).data?.[0] ?? {}).sort().join(',') === 'dia,intentos,primer_at,tipo,ultimo_at,user_id', exc)
+  const propio = await pos3.from('c4a_excesos').select('*'), propiaCuota = await pos3.from('c4a_cuota').select('*')
+  expect('SEC-C4-A · el vendedor no ve sus excesos ni su cuota', !propio.error && propio.data.length === 0 && !propiaCuota.error && propiaCuota.data.length === 0, [propio.data, propiaCuota.data])
+  const borra = await pos3.from('c4a_excesos').delete().eq('user_id', ids.pos3), reinicia = await pos3.from('c4a_cuota').update({ filas: 0, marcas: [] }).eq('user_id', ids.pos3), admEscribe = await admin.from('c4a_cuota').update({ filas: 0 }).eq('user_id', ids.pos3)
+  expect('SEC-C4-A · nadie borra excesos ni reinicia cuotas por la API (ni el vendedor ni Dirección)', !!borra.error && !!reinicia.error && !!admEscribe.error, [borra.error?.message, reinicia.error?.message, admEscribe.error?.message])
+  r = await buscar(admin, 'contrato busq')
+  expect('SEC-C4-A · Dirección sigue buscando sin cuota mientras el vendedor está frenado', !r.error && r.data.length === 2, r.error ?? r.data)
 }
 
 process.exit(failed)
