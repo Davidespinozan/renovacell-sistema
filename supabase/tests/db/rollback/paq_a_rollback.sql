@@ -1,5 +1,6 @@
 -- PAQ-A (148) · el down elimina solo el rastreo (función y dos tablas); envíos, pedidos y sus funciones quedan igual.
 begin;
+\ir ../../../rollback/paq_b/99_down.sql   -- PAQ-B (149) se baja primero (anular_guia consulta el rastreo de la 148)
 create temp table _paq as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname <> 'registrar_rastreo') fns,
   (select md5(string_agg(policyname || coalesce(qual, '') || coalesce(with_check, ''), ',' order by tablename, policyname)) from pg_policies where schemaname = 'public' and tablename not like 'shipment_tracking%') pol,
