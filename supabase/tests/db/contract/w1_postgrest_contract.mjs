@@ -710,4 +710,34 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C4-A · Dirección sigue buscando sin cuota mientras el vendedor está frenado', !r.error && r.data.length === 2, r.error ?? r.data)
 }
 
+// SEC-C4-FISCAL-2 (146) · por HTTP real: el receptor fiscal de una venta POS lo valida y lo normaliza el servidor
+{
+  const rec = { rfc: 'XAXX010101000', razon_social: 'Cliente Contrato SA', regimen: '601', cp: '80000', uso_cfdi: 'G03', email_facturacion: 'factura@test.local' }
+  const venta = (id, folio, extra) => ({ p_order_id: id, p_folio: folio, p_total: 1, p_payment_method: 'efectivo', p_doctor_id: null,
+    p_shipping_meta: { channel: 'pos', event_id: null, seller: null }, p_lines: [{ product_id: ids.prod, qty: 1, unit_price: 150 }],
+    p_allocations: [{ line_index: 0, lot_id: lot, qty: 1 }], ...extra })
+  const f1 = uuid()
+  r = await pos.rpc('vender_pos', venta(f1, 'POS-F2A', { p_invoice_requested: true, p_invoice_meta: { receiver: rec, status: 'timbrada', uuid: '11111111-2222-4333-8444-555555555555' } }))
+  expect('SEC-C4-FISCAL-2 · estado timbrada inyectado por la API ⇒ 400 FISCAL_INVALIDO', r.status === 400 && /FISCAL_INVALIDO/.test(r.error?.message ?? ''), [r.status, r.error?.message ?? r.data])
+  r = await pos.rpc('vender_pos', venta(f1, 'POS-F2A', { p_invoice_requested: true, p_invoice_meta: { receiver: { ...rec, rfc: 'MAL' } } }))
+  expect('SEC-C4-FISCAL-2 · RFC inválido por la API ⇒ 400 FISCAL_INVALIDO', r.status === 400 && /FISCAL_INVALIDO/.test(r.error?.message ?? ''), [r.status, r.error?.message ?? r.data])
+  r = await pos.rpc('vender_pos', venta(f1, 'POS-F2A', { p_invoice_requested: true }))
+  expect('SEC-C4-FISCAL-2 · factura solicitada sin receptor ⇒ 400 DATOS_FISCALES_REQUERIDOS', r.status === 400 && /DATOS_FISCALES_REQUERIDOS/.test(r.error?.message ?? ''), [r.status, r.error?.message ?? r.data])
+  r = await admin.from('orders').select('id').eq('id', f1)
+  expect('SEC-C4-FISCAL-2 · las ventas rechazadas no dejaron pedido', !r.error && r.data.length === 0, r.error ?? r.data)
+  r = await pos.rpc('vender_pos', venta(f1, 'POS-F2A', { p_invoice_requested: true, p_invoice_meta: { receiver: { ...rec, rfc: ' xaxx010101000 ', email_facturacion: 'Factura@Test.Local' } } }))
+  expect('SEC-C4-FISCAL-2 · mismo identificador con receptor válido (forma que envía la Caja) ⇒ true', r.data === true, r.error ?? r.data)
+  r = await admin.from('orders').select('invoice_requested, invoice_meta').eq('id', f1).single()
+  expect('SEC-C4-FISCAL-2 · invoice_meta persistido = {receiver} canónico, sin otras claves',
+    r.data?.invoice_requested === true && JSON.stringify(Object.keys(r.data?.invoice_meta ?? {})) === '["receiver"]'
+    && JSON.stringify(Object.entries(r.data.invoice_meta.receiver).sort()) === JSON.stringify(Object.entries(rec).sort()), r.error ?? r.data)
+  const f2 = uuid()
+  r = await pos.rpc('vender_pos', venta(f2, 'POS-F2B', { p_invoice_requested: false, p_invoice_meta: { receiver: rec, status: 'timbrada' } }))
+  expect('SEC-C4-FISCAL-2 · sin factura, lo fiscal recibido se ignora ⇒ true', r.data === true, r.error ?? r.data)
+  r = await admin.from('orders').select('invoice_requested, invoice_meta').eq('id', f2).single()
+  expect('SEC-C4-FISCAL-2 · sin factura no se persiste nada fiscal', r.data?.invoice_requested === false && r.data?.invoice_meta === null, r.error ?? r.data)
+  r = await pos.rpc('_fiscal_entrada_pos', { p_requested: true, p_meta: { receiver: rec } })
+  expect('SEC-C4-FISCAL-2 · las funciones auxiliares no se exponen por la API', !!r.error && r.data == null, r.error ?? r.data)
+}
+
 process.exit(failed)

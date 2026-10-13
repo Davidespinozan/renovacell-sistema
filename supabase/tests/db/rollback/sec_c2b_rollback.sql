@@ -2,6 +2,7 @@
 -- dueño, permisos y forma); SEC-C2 (141), políticas y datos intactos. Revertir REABRE el P1 (se demuestra abajo).
 begin;
 create temp table _secc2b as select (select count(*) from public.custodies) c, (select count(*) from public.custody_lines) l, (select count(*) from public.orders) o;
+\ir ../../../rollback/sec_c4_fiscal2/99_down.sql   -- SEC-C4-FISCAL-2 (146) se baja primero (redefine vender_pos sobre la de SEC-C2b)
 \ir ../../../rollback/sec_c2b/99_down.sql
 do $t$
 declare v_admin uuid := tests.fixture_admin(); posX uuid := tests.user('pos'); dN uuid := tests.user('doctor'); dT uuid := tests.user('doctor');

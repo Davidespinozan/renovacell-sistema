@@ -50,7 +50,7 @@ begin
                     where pronamespace = 'public'::regnamespace and proname in ('revisar_pago','pagar_reembolso','reversar_asiento','vender_pos','crear_pedido','_w2_asiento','_w2_op_begin','orders_guard','anular_corte_caja','efectivo_esperado','tramo_corte_caja'))
                = '_w2_asiento=1ddccce14ab994f77165597df318cca6,_w2_op_begin=7e881d23606587cfd75b21eec6810085,anular_corte_caja=431d07d3cc17a95c9ddf7e62e7a80704,crear_pedido=bee5aa3614e2b9e0327ebec6a1b38e2e,'
                  'efectivo_esperado=85db31cc72539b1097166d272887dccc,orders_guard=e88f1bb21a69f79a1d31585cbc75bf7d,pagar_reembolso=ad015dc571cab6e7f58a5754c09fa640,reversar_asiento=ac308403a981da135ff59c031171b974,'
-                 'revisar_pago=238145e1eaabc925e64c55aab22cb064,tramo_corte_caja=fe2088f04d3b6e4d0136a0e084cb06b6,vender_pos=3b85cb0590122e4e9056455780fb7231',
+                 'revisar_pago=238145e1eaabc925e64c55aab22cb064,tramo_corte_caja=fe2088f04d3b6e4d0136a0e084cb06b6,vender_pos=643cda22dcd76283ae8225ebb6afd188',
     -- efectivo_esperado / tramo_corte_caja re-anclados por SEC-C1 (140): POS solo arquea su propio corte (lectura)
     'G3 · fuera de alcance intacto: vender_pos, crear_pedido, revisar_pago, pagar_reembolso, reversar_asiento, helpers W2, guard y cortes');
   perform tests.eq((select md5(string_agg(tablename || policyname || cmd || coalesce(qual, '') || coalesce(with_check, ''), '|' order by tablename, policyname)) from pg_policies

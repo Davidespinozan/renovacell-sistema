@@ -55,8 +55,8 @@ begin
 
   -- ══ FORMA ════════════════════════════════════════════════════════════════════════════════════
   perform tests.ok(md5(pg_get_functiondef('public.estado_custodia(uuid)'::regprocedure)) = '79e390a5879eb28c1ef28c2645a0169b'
-               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '3b85cb0590122e4e9056455780fb7231',
-    'G1 · estado_custodia y vender_pos con la definición SEC-C2b');
+               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '643cda22dcd76283ae8225ebb6afd188',
+    'G1 · estado_custodia con la definición SEC-C2b y vender_pos con la vigente (SEC-C2b + SEC-C4-FISCAL-2, 146: solo cambió el receptor fiscal)');
   perform tests.ok((select count(*) = 2 and bool_and(proowner = 'postgres'::regrole and prosecdef and proconfig = array['search_path=public'])
                     from pg_proc where pronamespace = 'public'::regnamespace and proname in ('estado_custodia', 'vender_pos'))
                and (select provolatile::text || prorettype::regtype::text from pg_proc where oid = 'public.estado_custodia(uuid)'::regprocedure) = 'sjsonb'
