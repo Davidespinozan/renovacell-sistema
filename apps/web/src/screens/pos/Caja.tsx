@@ -21,6 +21,8 @@ import { currentUserId } from '../../lib/supabase'
 import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
+import { BuscadorClientes } from '../../data/ops/buscarClientes'
+import { SelectorClienteVentas } from './SelectorCliente'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
 import { venderPOS, newPosOp, type PosOp, type PosResult } from '../../data/ops/pos'
 import { estadoOperacion } from '../../data/ops/w1Command'
@@ -39,13 +41,19 @@ export function Caja() {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
-  const { data: allCustomers } = useCustomers()
   // W2-C · contexto de venta: MOSTRADOR o una CUSTODIA propia (consignación o evento).
   // Las dos venden por la misma ruta (venderPOS); la custodia solo añade de qué saldo sale.
   const { data: custodias } = useCustodies()
   const { data: custodyStock } = useCustodyStock()
   const { data: volRules } = useVolumePrices()
-  const { user } = useRole()
+  const { user, role, logout } = useRole()
+  // SEC-C4-B3 · Solo Dirección conserva el directorio completo en el selector. Ventas (y cualquier otro rol que llegue
+  // a la Caja) NO lo precarga: elige de su cartera o con la búsqueda segura (nombre y últimos 4 dígitos).
+  const esDireccion = role === 'admin'
+  const { data: allCustomers } = useCustomers(esDireccion)
+  const buscadorRef = useRef<BuscadorClientes | null>(null)
+  if (!buscadorRef.current) buscadorRef.current = new BuscadorClientes()
+  useEffect(() => () => { buscadorRef.current?.limpiar() }, [])
   // Precio unitario efectivo previsto = LEAST(precio base, volumen por cantidad). El servidor
   // (vender_pos → precio_de) es la autoridad del cobro; esto es previsualización para el vendedor.
   const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty) ?? (p.price ?? 0)
@@ -405,7 +413,15 @@ export function Caja() {
         <VentaTicketPrint order={reprint.order} productName={productName} pago={reprint.pago} clientName={reprint.clientName} />
       )}
 
-      {pickOpen && (
+      {pickOpen && !esDireccion && (
+        <SelectorClienteVentas
+          buscador={buscadorRef.current}
+          onPick={(c) => { setClient(c); setPickOpen(false) }}
+          onClose={() => setPickOpen(false)}
+          alExpirarSesion={logout}
+        />
+      )}
+      {pickOpen && esDireccion && (
         <ClientPicker
           customers={allCustomers}
           onPick={(c) => { setClient(c); setPickOpen(false) }}
