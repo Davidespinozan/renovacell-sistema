@@ -15,6 +15,7 @@ import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
 import { currentCompany } from '../../data/store/companyStore'
 import { missingForShipment } from '../../data/shipping/validate'
+import { cpSugerido, faltantesEntrega, receptorParaGuia } from '../../data/shipping/entregaGuia'
 import type { LogisticsPackage, Receiver } from '../../data/shipping/model'
 import type { ProductSafe } from '../../data/types'
 
@@ -90,7 +91,13 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
   const [driverId, setDriverId] = useState('')
 
   // Paquetería: datos reales del pedido/empresa → validar → cotizar → guía.
-  const receiver = useMemo(() => receiverOf(order), [order])
+  // El pedido manda. Si su domicilio no trae C.P. estructurado o teléfono utilizable (domicilios en texto libre),
+  // empaque los captura SOLO para esta guía; el C.P. detectado en el texto es una sugerencia, no un valor por defecto.
+  const destino = useMemo(() => receiverOf(order), [order])
+  const faltaEntrega = useMemo(() => faltantesEntrega(destino), [destino])
+  const sugerenciaCp = useMemo(() => (faltaEntrega.cp ? cpSugerido(destino) : null), [destino, faltaEntrega.cp])
+  const [entrega, setEntrega] = useState({ cp: '', phone: '' })
+  const receiver = useMemo(() => receptorParaGuia(destino, entrega), [destino, entrega])
   const shipperInfo = useMemo(() => shipperFromCompany(currentCompany()), [])
   // Paquete FÍSICO final: se captura en empaque. SIN defaults silenciosos (vacío
   // hasta que el operador lo mida). pieces por defecto 1 (bulto único).
@@ -236,13 +243,37 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                     </div>
                   )}
 
+                  {(faltaEntrega.cp || faltaEntrega.phone) && (
+                    <div style={{ marginBottom: 14 }} data-testid="entrega-guia">
+                      <label style={labelStyle}>Datos de entrega para la guía</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: faltaEntrega.cp && faltaEntrega.phone ? '1fr 1.4fr' : '1fr', gap: 8 }}>
+                        {faltaEntrega.cp && (
+                          <input style={f2} inputMode="numeric" maxLength={5} aria-label="Código postal de entrega" placeholder="C.P. de entrega (5 dígitos)"
+                            value={entrega.cp} onChange={(e) => { setEntrega({ ...entrega, cp: e.target.value.replace(/\D/g, '').slice(0, 5) }); setRates(null) }} />
+                        )}
+                        {faltaEntrega.phone && (
+                          <input style={f2} inputMode="tel" maxLength={20} aria-label="Teléfono de entrega" placeholder="Teléfono de quien recibe (10 dígitos)"
+                            value={entrega.phone} onChange={(e) => { setEntrega({ ...entrega, phone: e.target.value }); setRates(null) }} />
+                        )}
+                      </div>
+                      {sugerenciaCp && entrega.cp !== sugerenciaCp && (
+                        <button type="button" className="btn ghost sm" style={{ marginTop: 6 }} data-testid="usar-cp-sugerido"
+                          onClick={() => { setEntrega({ ...entrega, cp: sugerenciaCp }); setRates(null) }}>Usar el C.P. {sugerenciaCp} que aparece en el domicilio</button>
+                      )}
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>El domicilio del pedido no trae estos datos por separado. Se usan solo para esta guía; no cambian el pedido.</div>
+                    </div>
+                  )}
+
                   <label style={labelStyle}>Paquete final (medido en empaque)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 600, marginBottom: 3 }}>
+                    <span>Peso (kg)</span><span>Largo (cm)</span><span>Ancho (cm)</span><span>Alto (cm)</span><span>Piezas</span>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
-                    <input style={f2} type="number" min="0.1" step="0.1" value={parcel.weightKg} onChange={(e) => { setParcel({ ...parcel, weightKg: e.target.value }); setRates(null) }} placeholder="kg" />
-                    <input style={f2} type="number" min="1" value={parcel.lengthCm} onChange={(e) => { setParcel({ ...parcel, lengthCm: e.target.value }); setRates(null) }} placeholder="largo" />
-                    <input style={f2} type="number" min="1" value={parcel.widthCm} onChange={(e) => { setParcel({ ...parcel, widthCm: e.target.value }); setRates(null) }} placeholder="ancho" />
-                    <input style={f2} type="number" min="1" value={parcel.heightCm} onChange={(e) => { setParcel({ ...parcel, heightCm: e.target.value }); setRates(null) }} placeholder="alto" />
-                    <input style={f2} type="number" min="1" step="1" value={parcel.pieces} onChange={(e) => { setParcel({ ...parcel, pieces: e.target.value }); setRates(null) }} placeholder="piezas" />
+                    <input style={f2} type="number" min="0.1" step="0.1" aria-label="Peso en kilogramos" value={parcel.weightKg} onChange={(e) => { setParcel({ ...parcel, weightKg: e.target.value }); setRates(null) }} placeholder="kg" />
+                    <input style={f2} type="number" min="1" aria-label="Largo en centímetros" value={parcel.lengthCm} onChange={(e) => { setParcel({ ...parcel, lengthCm: e.target.value }); setRates(null) }} placeholder="largo" />
+                    <input style={f2} type="number" min="1" aria-label="Ancho en centímetros" value={parcel.widthCm} onChange={(e) => { setParcel({ ...parcel, widthCm: e.target.value }); setRates(null) }} placeholder="ancho" />
+                    <input style={f2} type="number" min="1" aria-label="Alto en centímetros" value={parcel.heightCm} onChange={(e) => { setParcel({ ...parcel, heightCm: e.target.value }); setRates(null) }} placeholder="alto" />
+                    <input style={f2} type="number" min="1" step="1" aria-label="Número de piezas" value={parcel.pieces} onChange={(e) => { setParcel({ ...parcel, pieces: e.target.value }); setRates(null) }} placeholder="piezas" />
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>Peso (kg), medidas en cm (largo × ancho × alto) y número de piezas de la caja final.</div>
 
