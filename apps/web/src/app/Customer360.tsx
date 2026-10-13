@@ -41,7 +41,7 @@ const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repe
 const ESTADO_PAGO: Record<string, string> = { pagado: 'Pagado', pendiente: 'Pendiente', parcial: 'Parcial', credito: 'A crédito', liberado: 'Liberado' }
 
 export function Customer360Page({ customerId, onBack, canOrder = false, onOrder, onAsesorias, cliente = clientePorDefecto, atencion = atencionPorDefecto, inicial, lectorChat = chatPorDefecto }: {
-  customerId: string; inicial?: { nombre: string; email?: string | null; portal: boolean }; onBack: () => void; canOrder?: boolean; onOrder?: () => void; onAsesorias?: () => void; cliente?: ClienteC360; atencion?: ClienteAtencion; lectorChat?: LectorSesiones
+  customerId: string; inicial?: { nombre: string; email?: string | null; portal?: boolean }; onBack: () => void; canOrder?: boolean; onOrder?: () => void; onAsesorias?: () => void; cliente?: ClienteC360; atencion?: ClienteAtencion; lectorChat?: LectorSesiones
 }) {
   const { data, loading, error, recargar } = useCustomer360(customerId, cliente)
   const [tab, setTab] = useState<Pestana>('resumen')
@@ -72,7 +72,7 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
             <div style={{ minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 20 }}>{inicial.nombre}</h2>
               {inicial.email && <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{inicial.email}</div>}
-              <span className={'pill ' + (inicial.portal ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5, marginTop: 2 }}>{inicial.portal ? <UserCheck size={12} /> : <UserX size={12} />} {inicial.portal ? 'Con acceso al portal' : 'Sin acceso al portal'}</span>
+              {inicial.portal !== undefined && <span className={'pill ' + (inicial.portal ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5, marginTop: 2 }}>{inicial.portal ? <UserCheck size={12} /> : <UserX size={12} />} {inicial.portal ? 'Con acceso al portal' : 'Sin acceso al portal'}</span>}
             </div>
           </>
         )}

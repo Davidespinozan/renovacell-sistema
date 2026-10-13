@@ -16,6 +16,7 @@ import type { ClienteCartera } from '../data/ops/cartera'
 import { useRole } from '../auth/RoleContext'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
+import { DirectorioVentas } from './DirectorioVentas'
 
 const PAGE_SIZE = 100
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
@@ -29,7 +30,17 @@ const EXPLICACION: Record<VistaCartera, string> = {
   historica: 'Registros heredados de Odoo según la equivalencia de vendedor que autorizó Dirección. Son de consulta: no son asignaciones vigentes.',
 }
 
-export function CustomerDirectory({ title, scope, carteraToggle = false, clienteCartera }: { title: string; scope: VistaCartera; carteraToggle?: boolean; clienteCartera?: ClienteCartera }) {
+type Props = { title: string; scope: VistaCartera; carteraToggle?: boolean; clienteCartera?: ClienteCartera }
+
+// SEC-C4-B4 · Solo Dirección monta el directorio completo (y lo descarga). Ventas, y cualquier otro rol que llegue
+// aquí, recibe la vista de descubrimiento mínimo: buscador seguro + su cartera; nunca la precarga de customers.
+export function CustomerDirectory(props: Props) {
+  const { role } = useRole()
+  if (role !== 'admin') return <DirectorioVentas title={props.title} conCartera={!!props.carteraToggle} clienteCartera={props.clienteCartera} />
+  return <DirectorioDireccion {...props} />
+}
+
+function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCartera }: Props) {
   const { data: all, loading, error } = useCustomers()
   const { role, user, setScreen } = useRole()
   const isAdmin = role === 'admin'
