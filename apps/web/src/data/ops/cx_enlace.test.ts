@@ -11,6 +11,8 @@ import netlify from '../../../../../netlify.toml?raw'
 import router from '../../../../../netlify/edge-functions/host-router.ts?raw'
 import landing from '../../../public/landing/index.html?raw'
 import appSrc from '../../App.tsx?raw'
+import contactoHtml from '../../../contacto.html?raw'
+import viteCfg from '../../../vite.config.ts?raw'
 
 const TOKEN = 'A'.repeat(43)
 const almacen = (inicial: Record<string, string> = {}) => { const m = new Map(Object.entries(inicial)); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v) }, removeItem: (k: string) => { m.delete(k) }, m } }
@@ -104,9 +106,16 @@ describe('CX-ENLACE · guardas de seguridad y despliegue', () => {
   })
   it('la página es pública y va antes de login y roles; Netlify la sirve y las puertas del sistema la mandan al dominio público', () => {
     expect(appSrc).toMatch(/else if \(esRutaContacto\) view = <Contacto \/>\s*\n\s*else if \(mode === 'landing'\)/)
-    expect(netlify).toMatch(/from = "\/contacto"\s*\n\s*to = "\/index\.html"\s*\n\s*status = 200/)
+    expect(netlify).toMatch(/from = "\/contacto"\s*\n\s*to = "\/contacto\.html"\s*\n\s*status = 200/)
     expect(netlify.indexOf('from = "/contacto"')).toBeLessThan(netlify.indexOf('from = "/*"'))
     expect(router).toMatch(/APP_DOORS\.has\(host\) && \/\^\\\/contacto\(\\\/\|\$\)\/\.test\(url\.pathname\)/); expect(router).toMatch(/https:\/\/renovacell\.mx\$\{url\.pathname\}\$\{url\.search\}`, 302/)
+  })
+  it('al compartir el enlace se ve la marca del negocio, nunca "Sistema operativo"', () => {
+    expect(contactoHtml).not.toMatch(/sistema operativo/i); expect(contactoHtml).not.toMatch(/manifest\.webmanifest/)
+    expect(contactoHtml).toMatch(/<title>Renovacell · Habla con nosotros<\/title>/)
+    expect(contactoHtml).toMatch(/property="og:title" content="Habla con Renovacell"/); expect(contactoHtml).toMatch(/property="og:image" content="https:\/\/renovacell\.mx\/brand\/og-renovacell\.jpg"/)
+    expect(contactoHtml).toMatch(/src="\/src\/main\.tsx"/)                       // la misma aplicación
+    expect(viteCfg).toMatch(/input: \{ main: 'index\.html', contacto: 'contacto\.html' \}/)
   })
   it('la landing reutiliza el prerregistro en su formulario y sigue sin ofrecer chat humano', () => {
     expect(landing).toMatch(/localStorage\.getItem\('rc_prefill'\)/)

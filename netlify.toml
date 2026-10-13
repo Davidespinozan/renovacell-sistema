@@ -72,15 +72,19 @@
   status = 200
 
 # 2c) CX-ENLACE · /contacto: el enlace único de contacto (el mismo chat del sistema, con prerregistro).
+#     Tiene su PROPIA página (contacto.html): mismo programa, pero con el título y la vista previa del negocio,
+#     que es lo que WhatsApp muestra al compartir el enlace. `force` porque Netlify resolvería /contacto.html solo.
 [[redirects]]
   from = "/contacto"
-  to = "/index.html"
+  to = "/contacto.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/contacto/*"
-  to = "/index.html"
+  to = "/contacto.html"
   status = 200
+  force = true
 
 # 3) /landing sigue sirviéndose como archivo (lo usa la vista previa del editor
 #    en Administración), pero ya no es la dirección pública.

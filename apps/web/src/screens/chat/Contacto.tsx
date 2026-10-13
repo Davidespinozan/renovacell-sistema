@@ -9,18 +9,28 @@ import { BrandLogo } from '../../app/BrandLogo'
 import { supabase, hasSupabase } from '../../lib/supabase'
 import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, type CampoPrerregistro, type DatosPrerregistro } from '../../data/ops/visitante'
 import { ChatCanonico } from './ChatCanonico'
+import { urlEnlaceContacto } from '../../data/ops/contactoEnlace'
 import type { ClienteChat } from '../../data/ops/chat'
 
 export const URL_LANDING = '/'
 export const URL_VERIFICACION = '/#contacto'       // formulario de verificación de la landing (mismo origen: reusa el prerregistro)
 export const URL_PRIVACIDAD = '/landing/privacidad.html'
 
-type Paso = 'cargando' | 'formulario' | 'chat'
-interface Deps { estado?: typeof estadoVisitante; abrir?: typeof abrirVisitante; registrar?: typeof prerregistrar; conSesion?: () => Promise<boolean>; cliente?: ClienteChat }
+type Paso = 'cargando' | 'formulario' | 'chat' | 'personal'
+export type SesionContacto = 'ninguna' | 'cliente' | 'personal'
+interface Deps { estado?: typeof estadoVisitante; abrir?: typeof abrirVisitante; registrar?: typeof prerregistrar; conSesion?: () => Promise<SesionContacto>; cliente?: ClienteChat }
 
-async function haySesion(): Promise<boolean> {
-  if (!hasSupabase) return false
-  try { const { data } = await supabase.auth.getSession(); return !!data.session } catch { return false }
+// ¿Quién abre el enlace? Sin sesión: un visitante. Con sesión de doctor: su cuenta. Con sesión del PERSONAL: no es un
+// cliente; este enlace no es su lugar de trabajo (ahí no puede pedir asesor ni se le pide prerregistro).
+async function haySesion(): Promise<SesionContacto> {
+  if (!hasSupabase) return 'ninguna'
+  try {
+    const { data } = await supabase.auth.getSession()
+    const uid = data.session?.user?.id
+    if (!uid) return 'ninguna'
+    const { data: p } = await supabase.from('profiles').select('role_id').eq('id', uid).maybeSingle()
+    return (p as { role_id?: string } | null)?.role_id === 'doctor' ? 'cliente' : 'personal'
+  } catch { return 'ninguna' }
 }
 
 export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, registrar = prerregistrar, conSesion = haySesion, cliente }: Deps) {
@@ -28,8 +38,9 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
   useEffect(() => {
     let vivo = true
     void (async () => {
-      // Con sesión (doctor o personal) manda la cuenta: el servidor decide si puede conversar.
-      if (await conSesion()) { if (vivo) setPaso('chat'); return }
+      // Con sesión de doctor manda la cuenta (el servidor decide si puede conversar). El personal ve un aviso.
+      const sesion = await conSesion()
+      if (sesion !== 'ninguna') { if (vivo) setPaso(sesion === 'cliente' ? 'chat' : 'personal'); return }
       await abrir()
       const e = await estado()
       if (vivo) setPaso(e.prerregistrado ? 'chat' : 'formulario')
@@ -52,10 +63,29 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
             <div className="rc-title"><div className="rc-name">Renovacell</div><div className="rc-state">Tecnologías Antiedad</div></div>
           </header>
           <div className="rc-pre-cuerpo">
-            {paso === 'cargando' ? <div className="rc-sys" role="status">Cargando…</div> : <Prerregistro registrar={registrar} onListo={() => setPaso('chat')} />}
+            {paso === 'cargando' ? <div className="rc-sys" role="status">Cargando…</div>
+              : paso === 'personal' ? <AvisoPersonal />
+              : <Prerregistro registrar={registrar} onListo={() => setPaso('chat')} />}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// El personal con sesión abierta no es un cliente: se le explica cómo verlo como cliente y dónde atiende.
+function AvisoPersonal() {
+  const [copiado, setCopiado] = useState(false)
+  const copiar = async () => {
+    const url = urlEnlaceContacto()
+    try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { window.prompt('Copia el enlace de contacto:', url) }
+  }
+  return (
+    <div className="rc-pre-tarjeta" data-testid="aviso-personal">
+      <h1>Este enlace es para clientes</h1>
+      <p>Tienes abierta tu sesión del sistema en este navegador, así que aquí no se te pide registro ni puedes pedir un asesor. Para verlo como lo ve un cliente, ábrelo en una <b>ventana de incógnito</b> o en otro navegador.</p>
+      <button type="button" className="rc-pre-enviar" onClick={() => void copiar()} data-testid="copiar-enlace-contacto">{copiado ? 'Enlace copiado' : 'Copiar enlace para compartir'}</button>
+      <p className="rc-pre-nota">Las conversaciones que lleguen por este enlace las atiendes en <a href="/sistema">el sistema</a>, en Conversaciones.</p>
     </div>
   )
 }

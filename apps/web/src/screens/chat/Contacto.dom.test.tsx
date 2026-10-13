@@ -12,7 +12,7 @@ const conv: Conversacion = { conversation_id: 'C1', estado: 'abierta', modo: 'ai
   { id: 'm1', seq: 1, actor: 'visitor', content: 'Hola', created_at: new Date().toISOString(), propio: true },
   { id: 'm2', seq: 2, actor: 'ai', content: 'Hola, ¿en qué te ayudo?', created_at: new Date().toISOString(), propio: false }] }
 const cliente = () => new ClienteChat(async (_f, { body }) => body.action === 'abrir' ? { data: { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', nuevo: false }, error: null } : { data: body.action === 'leer' ? conv : { ok: true }, error: null }, () => null)
-const base = { abrir: vi.fn(async () => 'reanudado' as const), conSesion: async () => false }
+const base = { abrir: vi.fn(async () => 'reanudado' as const), conSesion: async () => 'ninguna' as const }
 const llenar = (label: string, v: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: v } })
 
 describe('Enlace de contacto', () => {
@@ -53,9 +53,16 @@ describe('Enlace de contacto', () => {
     expect(screen.getByTestId('msg-visitor').querySelector('.rc-tick')).toBeTruthy(); expect(screen.getByTestId('msg-ai').querySelector('.rc-tick')).toBeNull()
     expect(screen.queryByTestId('carrito-toggle')).toBeNull(); expect(screen.queryByTestId('prerregistro')).toBeNull()
   })
-  it('con sesión manda la cuenta: no se pide prerregistro ni se consulta al visitante', async () => {
+  it('con sesión de doctor manda la cuenta: no se pide prerregistro ni se consulta al visitante', async () => {
     const estado = vi.fn(async () => ({ visitante: false, prerregistrado: false, nombre: null }))
-    render(<Contacto abrir={base.abrir} conSesion={async () => true} estado={estado} cliente={cliente()} />)
+    render(<Contacto abrir={base.abrir} conSesion={async () => 'cliente'} estado={estado} cliente={cliente()} />)
     await screen.findByTestId('chat-canonico'); expect(estado).not.toHaveBeenCalled()
+  })
+  it('con sesión del personal: ni chat ni formulario; se le explica que es para clientes y puede copiar el enlace', async () => {
+    const estado = vi.fn(async () => ({ visitante: false, prerregistrado: false, nombre: null }))
+    render(<Contacto abrir={base.abrir} conSesion={async () => 'personal'} estado={estado} cliente={cliente()} />)
+    const aviso = await screen.findByTestId('aviso-personal')
+    expect(aviso.textContent).toMatch(/ventana de incógnito/); expect(screen.getByTestId('copiar-enlace-contacto')).toBeTruthy()
+    expect(screen.queryByTestId('chat-canonico')).toBeNull(); expect(screen.queryByTestId('prerregistro')).toBeNull(); expect(estado).not.toHaveBeenCalled()
   })
 })

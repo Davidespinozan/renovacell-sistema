@@ -17,6 +17,8 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 700, // recharts es un chunk lazy grande, esperado
     rollupOptions: {
+      // Dos páginas, una aplicación: el sistema y el enlace de contacto (su propio título y vista previa al compartir).
+      input: { main: 'index.html', contacto: 'contacto.html' },
       output: {
         // Separa librerías pesadas en chunks propios (mejor cacheo y carga).
         manualChunks: {
