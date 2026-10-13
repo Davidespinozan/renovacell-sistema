@@ -1,11 +1,12 @@
 // Guías: envíos generados (paquetería con guía o chofer propio) con su estatus.
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { driverName } from '../../data/mock/shipments'
+import { etiquetaDeGuia } from '../../data/shipping/provider'
 
 function shipPill(status: string | null): { label: string; pill: string } {
   switch (status) {
@@ -13,6 +14,7 @@ function shipPill(status: string | null): { label: string; pill: string } {
     case 'por_despachar': return { label: 'Por despachar', pill: 'p-warn' }
     case 'despachado': return { label: 'Despachado', pill: 'p-blue' }
     case 'in_transit': return { label: 'En camino', pill: 'p-blue' }
+    case 'guia_generada': return { label: 'Guía generada · por entregar a paquetería', pill: 'p-warn' }
     case 'out_for_delivery': return { label: 'En reparto', pill: 'p-blue' }
     case 'incident': return { label: 'Incidencia', pill: 'p-dang' }
     case 'delivered': return { label: 'Entregado', pill: 'p-ok' }
@@ -20,9 +22,34 @@ function shipPill(status: string | null): { label: string; pill: string } {
   }
 }
 
+// Una guía de paquetería recién generada NO está "en camino": el paquete sigue en el local hasta que se entrega a la
+// paquetería. El servidor la registra como in_transit; aquí se muestra lo que realmente pasa mientras nadie la despache.
+function estadoVisible(s: { status: string | null; tracking_number?: string | null; driver_id?: string | null; dispatched_at?: string | null }): string | null {
+  return s.status === 'in_transit' && s.tracking_number && !s.driver_id && !s.dispatched_at ? 'guia_generada' : s.status
+}
+
 export function Guias() {
   const { data: shipments } = useShipments()
   const { data: orders } = useAllOrders()
+
+  // Reimprimir la etiqueta de una guía ya generada (enlace nuevo de 1 h; no vuelve a comprar la guía).
+  const [bajando, setBajando] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const descargar = async (orderId: string, shipmentId: string) => {
+    if (bajando) return
+    setBajando(shipmentId); setAviso(null)
+    // La pestaña se abre en el clic (si se abre después de esperar, el navegador la bloquea).
+    const w = window.open('', '_blank')
+    try {
+      const e = await etiquetaDeGuia(orderId)
+      if (!e) throw new Error('sin etiqueta')
+      if (w) w.location.href = e.url; else window.location.href = e.url
+    } catch {
+      w?.close()
+      setAviso('No se pudo obtener la etiqueta de esa guía. Intenta de nuevo; si persiste, avisa a Dirección.')
+    }
+    setBajando(null)
+  }
 
   const folioOf = useMemo(() => {
     const m: Record<string, string> = {}
@@ -41,7 +68,7 @@ export function Guias() {
             pedido: folioOf[s.order_id] ?? s.order_id,
             metodo: s.driver_id ? `Chofer propio · ${driverName(s.driver_id)}` : `${s.carrier ?? ''}${s.tracking_number ? ` · guía ${s.tracking_number}` : ''}`,
             estimada: s.estimated_delivery_at ?? '',
-            estatus: shipPill(s.status).label,
+            estatus: shipPill(estadoVisible(s)).label,
           }))}
           columns={[
             { key: 'pedido', label: 'Pedido' },
@@ -51,6 +78,7 @@ export function Guias() {
           ]}
         />
       </div>
+      {aviso && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }}><span>{aviso}</span></div>}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
@@ -59,7 +87,7 @@ export function Guias() {
             </thead>
             <tbody>
               {shipments.map((s) => {
-                const sp = shipPill(s.status)
+                const sp = shipPill(estadoVisible(s))
                 return (
                   <tr key={s.id}>
                     <td data-label="Pedido" className="mono">{folioOf[s.order_id] ?? s.order_id}</td>
@@ -67,7 +95,9 @@ export function Guias() {
                       {s.driver_id ? (
                         <span><Icon name="usercheck" style={{ width: 13, height: 13, display: 'inline', verticalAlign: '-2px' }} /> {driverName(s.driver_id)}</span>
                       ) : (
-                        <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}</span>
+                        <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}
+                          {s.tracking_number && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>La guía no incluye recolección: entrega el paquete en una sucursal o agenda la recolección con la paquetería.</span>}
+                        </span>
                       )}
                     </td>
                     <td data-label="Estimada">{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
@@ -75,7 +105,9 @@ export function Guias() {
                     <td data-label="Etiqueta">
                       {s.label_url
                         ? <a className="btn ghost sm" href={s.label_url} target="_blank" rel="noreferrer"><Icon name="download" style={{ width: 13, height: 13 }} /> Guía</a>
-                        : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
+                        : s.tracking_number && !s.driver_id
+                          ? <button className="btn ghost sm" type="button" disabled={bajando === s.id} onClick={() => void descargar(s.order_id, s.id)} data-testid="descargar-etiqueta"><Icon name="download" style={{ width: 13, height: 13 }} /> {bajando === s.id ? 'Abriendo…' : 'Descargar etiqueta'}</button>
+                          : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
                     </td>
                   </tr>
                 )

@@ -139,6 +139,17 @@ export async function createShipmentReal(args: { order_id: string; orderRef: str
   return { label: { ...label, provider: 'mock' } }
 }
 
+// ETIQUETA DE UNA GUÍA YA GENERADA. La etiqueta vive en un bucket privado; el enlace se firma por 1 h. El servidor, si el
+// pedido YA tiene guía, devuelve la misma etiqueta con un enlace nuevo SIN llamar a la paquetería (no recompra ni cobra).
+export async function etiquetaDeGuia(orderId: string): Promise<{ url: string; tracking: string } | null> {
+  if (!hasSupabase) return null
+  const r = await callShipping<{ label?: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', order_id: orderId, serviceCode: 'reimpresion' })
+  if (r === NOT_CONFIGURED) throw new Error('shipping_not_configured')
+  // Solo es válido si el servidor confirmó que era una guía EXISTENTE; cualquier otra respuesta no se usa.
+  if (!r?.idempotent || !r.label?.labelUrl) return null
+  return { url: r.label.labelUrl, tracking: r.label.tracking }
+}
+
 // TRACKING (neutral) por número de guía real.
 export async function trackShipment(tracking: string): Promise<TrackResult | null> {
   if (!hasSupabase) return null
