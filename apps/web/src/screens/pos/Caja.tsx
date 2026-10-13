@@ -99,8 +99,11 @@ export function Caja() {
   const [cobrando, setCobrando] = useState(false)
   const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
-  // CFDI: el cliente puede pedir factura en la venta. AUTORIDAD = customers.meta.fiscal (master
-  // omnicanal): se precarga del cliente seleccionado y, al guardar, se persiste vía RPC + snapshot.
+  // CFDI: el cliente puede pedir factura en la venta. El receptor viaja en `invoice_meta.receiver` y el servidor lo
+  // registra en la MISMA operación del cobro (vender_pos, atómico e idempotente).
+  // SEC-C4-B5b · DATOS FISCALES DE LA VENTA ≠ PERFIL FISCAL PERMANENTE: solo Dirección precarga y actualiza el
+  // perfil permanente del cliente (customers.meta.fiscal vía RPC). Ventas captura el receptor SOLO para esta
+  // venta: no lee el expediente fiscal de la cuenta ni escribe en él.
   const [invoiceReq, setInvoiceReq] = useState(false)
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
   const [showFiscalErr, setShowFiscalErr] = useState(false)
@@ -110,21 +113,22 @@ export function Caja() {
   // confirmar o ante un rechazo definitivo.
   const posOpRef = useRef<{ fp: string; op: PosOp } | null>(null)
 
-  // Precarga el perfil fiscal MASTER del cliente al activar factura o cambiar de cliente.
+  // Precarga (solo Dirección) el perfil fiscal MASTER del cliente al activar factura o cambiar de cliente.
+  // Para los demás el formulario arranca en blanco, también al cambiar de cuenta (no se arrastra el receptor).
   useEffect(() => {
     const key = `${invoiceReq ? '1' : '0'}|${client?.id ?? ''}`
     if (key === fiscalKeyRef.current) return
     fiscalKeyRef.current = key
     if (!invoiceReq) return
     ;(async () => {
-      if (hasSupabase && client?.id) {
+      if (esDireccion && hasSupabase && client?.id) {
         const { data } = await supabase.from('customers').select('meta').eq('id', client.id).maybeSingle()
         setFiscal(customerFiscal(data as { meta: unknown } | null))
       } else {
         setFiscal(emptyFiscalProfile())
       }
     })()
-  }, [invoiceReq, client?.id])
+  }, [invoiceReq, client?.id, esDireccion])
   // Ventas del turno (en memoria) para poder REIMPRIMIR el recibo si el cliente vuelve.
   type VentaTurno = { order: OrderWithItems; clientName: string; pago: { recibido: number; cambio: number } | null }
   const [ventasTurno, setVentasTurno] = useState<VentaTurno[]>([])
@@ -173,11 +177,12 @@ export function Caja() {
     // el asiento de dinero son los mismos que en mostrador.
     let res: PosResult
     {
-      // CFDI omnicanal: guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC y
-      // congela el SNAPSHOT del receptor en el pedido (invoice_meta.receiver, atómico en vender_pos).
+      // CFDI omnicanal: Dirección guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC. Para todos,
+      // el SNAPSHOT del receptor queda en el pedido (invoice_meta.receiver, atómico en vender_pos).
       let invoiceMeta: Record<string, unknown> | null = null
       if (invoiceReq) {
-        if (client?.id) {
+        if (!isFiscalProfileComplete(fiscal)) { setCobrando(false); setShowFiscalErr(true); return }   // sin receptor válido no se cobra
+        if (esDireccion && client?.id) {
           const saved = await upsertCustomerFiscal(client.id, fiscal)
           if (!saved.ok) { setCobrando(false); setErr(saved.error ?? 'No se pudieron guardar los datos fiscales.'); window.setTimeout(() => setErr(null), 4000); return }
         }
@@ -370,7 +375,9 @@ export function Caja() {
                 </label>
                 {invoiceReq && (
                   <div style={{ marginTop: 8 }}>
-                    {client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Datos fiscales de {client.name} (se guardan en su ficha para futuras compras).</div>}
+                    {esDireccion
+                      ? client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Datos fiscales de {client.name} (se guardan en su ficha para futuras compras).</div>
+                      : <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="caja-fiscal-solo-venta"><b>Datos fiscales para esta venta.</b> Estos datos se utilizarán únicamente para la operación actual. No modificarán el perfil fiscal permanente del cliente.</div>}
                     <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
                     {!isFiscalProfileComplete(fiscal) && <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 6 }}>Completa los 6 campos fiscales para poder facturar.</div>}
                   </div>
