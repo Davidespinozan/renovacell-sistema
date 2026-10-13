@@ -2556,6 +2556,12 @@ body.rc-has-ann .nav{top:38px}
           </div>
           <div class="form-row">
             <div class="form-field">
+              <label>— Teléfono celular</label>
+              <input name="telefono" type="tel" class="form-input" placeholder="10 dígitos" inputmode="numeric" autocomplete="tel" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
               <label>— Domicilio de entrega <span style="opacity:.55">(base para sus envíos · opcional)</span></label>
               <input name="calle" type="text" class="form-input" placeholder="Calle y número">
             </div>
@@ -3370,11 +3376,14 @@ document.addEventListener('keydown', e => {
       organization:(f.consultorio.value||'').trim(), website:f.website.value||'',
       address:(f.calle&&f.calle.value||'').trim(), colonia:(f.colonia&&f.colonia.value||'').trim(),
       cp:(f.cp&&f.cp.value||'').trim(), city:(f.ciudad&&f.ciudad.value||'').trim(), state:(f.estado&&f.estado.value||'').trim(),
+      phone:(f.telefono&&f.telefono.value||'').replace(/\D/g,''), consent:!!(consent&&consent.checked),
       ineFront:captured.ineFront, ineBack:captured.ineBack
     };
     if(d.name.length<3) return say('err','Escriba su nombre completo.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return say('err','El correo no parece válido.');
     if(d.cedula.replace(/\D/g,'').length<5) return say('err','Escriba su número de cédula profesional.');
+    if(d.phone.length!==10) return say('err','Escriba su teléfono celular a 10 dígitos.');
+    if(d.cp && !/^\d{5}$/.test(d.cp)) return say('err','El código postal debe tener 5 dígitos.');
     if(d.password.length<6) return say('err','La contraseña debe tener al menos 6 caracteres.');
     if(!d.ineFront || !d.ineBack) return say('err','Sube la foto de tu INE por ambos lados (frente y reverso) para verificar tu identidad.');
 

@@ -193,10 +193,14 @@ Deno.serve(conCors(async (req) => {
   const ligarProspecto = async (id: string | null | undefined) => { if (visitorHash && id) await admin.rpc('cc_visitante_prospecto', { p_hash: visitorHash, p_prospect: id }).then(() => {}, () => {}) }
 
   // Domicilio BASE de entrega (opcional al registrarse; si falta, se pide al pedir).
+  // Todo lo que el doctor escribió se guarda, aunque el domicilio venga incompleto (antes, sin calle se descartaban
+  // colonia, C.P., ciudad, estado y teléfono).
   const line1 = (p.address ?? '').trim().slice(0, 160)
-  const shipping = line1
-    ? { line1, colonia: (p.colonia ?? '').trim().slice(0, 80), cp: (p.cp ?? '').trim().slice(0, 10), city: (p.city ?? '').trim().slice(0, 80), state: (p.state ?? '').trim().slice(0, 80), phone: (p.phone ?? '').trim().slice(0, 40) }
-    : null
+  const telefono = (p.phone ?? '').replace(/\D/g, '').slice(-10)
+  const contacto = { line1, colonia: (p.colonia ?? '').trim().slice(0, 80), cp: (p.cp ?? '').trim().slice(0, 10), city: (p.city ?? '').trim().slice(0, 80), state: (p.state ?? '').trim().slice(0, 80), phone: telefono }
+  const shipping = Object.values(contacto).some((v) => v !== '') ? contacto : null
+  // Constancia de que aceptó el Aviso de privacidad (el formulario no deja enviar sin marcarlo).
+  const consentimiento = (p as { consent?: unknown }).consent === true ? { privacidad: true, at: new Date().toISOString() } : null
 
   const name = (p.name ?? '').trim().slice(0, 120)
   const email = (p.email ?? '').trim().toLowerCase().slice(0, 160)
@@ -236,8 +240,8 @@ Deno.serve(conCors(async (req) => {
     const reasons = [...cel.reasons]
     if (idHardFail(id)) reasons.push(id.live === false ? 'La prueba de vida no fue superada (no se detectó una persona real).' : 'La selfie no coincide con la foto del INE.')
     const { data: pr } = await admin.from('prospects').insert({
-      name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
-      meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, identity: id, capturedVia: 'auto-registro' },
+      name, email, phone: telefono || null, cedula, source: 'Landing', status: 'nuevo',
+      meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, identity: id, capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}), ...(consentimiento ? { consentimiento } : {}) },
     }).select('id').maybeSingle()
     await ligarProspecto(pr?.id)
     return json(200, { decision: 'reject', reasons })
@@ -252,8 +256,8 @@ Deno.serve(conCors(async (req) => {
   // comportamiento anterior (prospecto sin cuenta) para no crear cuentas de cédulas dudosas.
   if (!id.attempted && cel.decision !== 'auto') {
     const { data: pr } = await admin.from('prospects').insert({
-      name, email, phone: p.phone ?? null, cedula, source: 'Landing', status: 'nuevo',
-      meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro' },
+      name, email, phone: telefono || null, cedula, source: 'Landing', status: 'nuevo',
+      meta: { organization: p.organization ?? null, interest: [], notes: [], verifyResult: cel, capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}), ...(consentimiento ? { consentimiento } : {}) },
     }).select('id').maybeSingle()
     await ligarProspecto(pr?.id)
     return json(200, { decision: cel.decision, reasons: cel.reasons })
@@ -277,7 +281,7 @@ Deno.serve(conCors(async (req) => {
   // sistema ya no puede ignorar que existía un customer previo. AMBIGUOUS → REVIEW en el cockpit.
   let commercial: { status: string; customer_id: string | null; signals: unknown } | null = null
   try {
-    const { data: r } = await admin.rpc('resolve_customer_identity', { p_email: email, p_phone: p.phone ?? null, p_name: name })
+    const { data: r } = await admin.rpc('resolve_customer_identity', { p_email: email, p_phone: telefono || null, p_name: name })
     if (r) commercial = r as { status: string; customer_id: string | null; signals: unknown }
   } catch { /* el registro no debe fallar por el resolver */ }
 
@@ -290,6 +294,7 @@ Deno.serve(conCors(async (req) => {
       cedula, verifyResult: cel, identity: { ...id, status: identityStatus, evidence },
       verification: { status: 'pending', auto_ok: autoOk },
       capturedVia: 'auto-registro', ...(shipping ? { shipping } : {}),
+      ...(consentimiento ? { consentimiento } : {}),
       ...(commercial ? { commercial } : {}),
     },
   })
@@ -301,7 +306,7 @@ Deno.serve(conCors(async (req) => {
   await admin.from('notifications').insert({
     body: autoOk
       ? `Doctor nuevo (validación automática OK) PENDIENTE de aprobación: ${name}`
-      : `Doctor EN REVISIÓN de identidad: ${name} — revisa cédula/selfie/INE`,
+      : `Doctor EN REVISIÓN de identidad: ${name} — revisa cédula e INE`,
     roles: ['admin'], screen: 'av_verif',
   }).then(() => {}, () => {})
 
