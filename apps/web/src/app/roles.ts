@@ -111,7 +111,7 @@ export const ROLES: RoleDef[] = [
       { key: 'cola', label: 'Por empacar', icon: 'pkg', section: 'Empaque' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Empaque' },
       { key: 'guia', label: 'Guías', icon: 'truck', section: 'Empaque' },
-      { key: 'recibo', label: 'Recibo de entrega', icon: 'receipt', section: 'Empaque' },
+      { key: 'recibo', label: 'Remisión del paquete', icon: 'receipt', section: 'Empaque' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Empaque' },
     ],
   },

@@ -22,6 +22,7 @@ import {
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
+import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -103,12 +104,73 @@ Deno.serve(conCors(async (req) => {
   const q = await resolverQuien(caller, admin)
   if (!q.ok) return json(q.status, q.body)
   const who = { user: { id: q.quien.uid } }
-  if (!tieneRol(q.quien, ['admin', 'warehouse', 'packing'])) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
+  const esLogistica = tieneRol(q.quien, ['admin', 'warehouse', 'packing'])
 
   // deno-lint-ignore no-explicit-any
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const action = p.action
+
+  // ===================== PAQ-A · RASTREO (sincronizar un envío con la paquetería) =====================
+  // Lo puede pedir quien YA ve el envío (logística, el chofer asignado o el dueño del pedido): la visibilidad la
+  // decide la RLS de `shipments` con la identidad del llamante. Se consulta a la paquetería como mucho una vez cada
+  // 10 min por envío (forzar es solo de logística) y nunca después de entregado.
+  if (action === 'sync_tracking') {
+    const orderId = s(p.order_id)
+    if (!orderId) return json(400, { error: 'Falta order_id.' })
+    const { data: sh, error: shErr } = await caller.from('shipments')
+      .select('id, tracking_number, provider, carrier, status').eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+    if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
+    if (!sh) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería a tu alcance.' })
+    const proveedor = s(sh.provider) || 'dhl'
+    const { data: prev } = await admin.from('shipment_tracking').select('estado, synced_at').eq('shipment_id', sh.id).maybeSingle()
+    const cerrado = sh.status === 'delivered' || sh.status === 'cancelado'
+    let consultado = false, cierre: 'cerrado' | 'pendiente' | null = null, aviso: string | null = null
+    if (!cerrado && debeConsultar(prev, Date.now(), p.force === true && esLogistica)) {
+      if (proveedor !== 'dhl') {
+        aviso = 'El rastreo automático aún no está disponible para esta paquetería.'
+      } else {
+        const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD')
+        if (!user || !pass) return json(501, { error: 'not_configured', message: 'DHL no habilitado.' })
+        const base = dhlBaseUrl(Deno.env.get('DHL_API_ENV'))
+        try {
+          const r = await fetch(`${base}/shipments/${encodeURIComponent(s(sh.tracking_number))}/tracking`, { headers: { Authorization: 'Basic ' + btoa(`${user}:${pass}`) } })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok && !isTrackingNoData(r.status, data)) {
+            obs('sync_tracking', 'provider_error', { code: r.status, mensaje: 'DHL respondió error en rastreo' })
+            await admin.rpc('registrar_rastreo', { p_shipment: sh.id, p_provider: proveedor, p_estado: null, p_error: `DHL ${r.status}` })
+            aviso = 'La paquetería no respondió; se muestra lo último conocido.'
+          } else {
+            const res = r.ok ? resumenDhl(data) : resumenDhl({})
+            const { error: regErr } = await admin.rpc('registrar_rastreo', {
+              p_shipment: sh.id, p_provider: proveedor, p_estado: res.estado, p_descripcion: res.descripcion,
+              p_firmado_por: res.firmadoPor, p_entregado_at: res.entregadoAt, p_eventos: res.eventos,
+            })
+            if (regErr) return json(500, { error: 'No se pudo guardar el rastreo.' })
+            consultado = true
+            // La paquetería confirmó la entrega: se cierra con el comando de siempre (confirmar_entrega) y la identidad
+            // de quien sincroniza. Solo logística puede cerrar; si quien mira es el cliente, queda anotado y se cierra
+            // cuando logística sincronice.
+            if (res.estado === 'entregado') {
+              if (esLogistica) {
+                const { error: cErr } = await caller.rpc('confirmar_entrega', { p_shipment_id: sh.id, p_proof_path: null, p_received_by: recibioSegunPaqueteria(res, proveedor) })
+                cierre = cErr ? 'pendiente' : 'cerrado'
+              } else cierre = 'pendiente'
+            }
+          }
+        } catch (_e) {
+          obs('sync_tracking', 'provider_error', { code: 'red', mensaje: 'sin respuesta de DHL en rastreo' })
+          await admin.rpc('registrar_rastreo', { p_shipment: sh.id, p_provider: proveedor, p_estado: null, p_error: 'sin respuesta de la paquetería' })
+          aviso = 'La paquetería no respondió; se muestra lo último conocido.'
+        }
+      }
+    }
+    const { data: tr } = await admin.from('shipment_tracking').select('estado, descripcion, firmado_por, entregado_at, ultimo_evento_at, synced_at').eq('shipment_id', sh.id).maybeSingle()
+    const { data: evs } = await admin.from('shipment_tracking_events').select('ocurrido_at, codigo, descripcion, lugar').eq('shipment_id', sh.id).order('ocurrido_at', { ascending: false }).limit(60)
+    return json(200, { shipment_id: sh.id, tracking: sh.tracking_number, carrier: sh.carrier, consultado, cierre, aviso, rastreo: tr ?? null, eventos: evs ?? [] })
+  }
+
+  if (!esLogistica) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
 
   // ===================== PROVIDER DHL (acciones neutras) =====================
   if (action === 'rate' || action === 'create_shipment' || action === 'track') {

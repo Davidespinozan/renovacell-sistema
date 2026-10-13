@@ -2,6 +2,10 @@
 // paquetería— con su estatus, y DETECCIÓN DE ATORADOS (vencidos o surtidos sin
 // salir). Es la vista para cazar el pedido que se atoró (caso S12840).
 import React, { useMemo, useState } from 'react'
+import { useRastreo } from '../../data/hooks/useRastreo'
+import { RastreoEnvio } from '../../app/RastreoEnvio'
+import { reloadShipments } from '../../data/store/shipmentsStore'
+import { reloadOrders } from '../../data/store/ordersStore'
 import { Icon } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
@@ -151,6 +155,10 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       : `${shipment.carrier}${shipment.tracking_number ? ` · guía ${shipment.tracking_number}` : ''}`
     : 'Sin asignar'
 
+  // PAQ-A · Envío por paquetería: su estado lo reporta la paquetería. Se pone al día al abrir; si ya entregó, el
+  // pedido se cierra solo. El cierre manual queda solo como respaldo (cuando la paquetería no lo refleja).
+  const tieneGuia = !!shipment && !shipment.driver_id && !!shipment.tracking_number
+  const { rastreo, cargando: consultando, actualizar: actualizarRastreo } = useRastreo(order.id, tieneGuia && shipment?.status !== 'delivered', () => { reloadShipments(); reloadOrders() })
   const [recibio, setRecibio] = useState('')
   const [marcando, setMarcando] = useState(false)
   // Paquetería (envío sin chofer, en tránsito): staff cierra la entrega — antes no había
@@ -196,6 +204,8 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
       </div>
 
+      {tieneGuia && <RastreoEnvio rastreo={rastreo} cargando={consultando} onActualizar={actualizarRastreo} />}
+
       {(tienePrueba || puedeCerrarPaqueteria) && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           {tienePrueba && (
@@ -206,13 +216,13 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
           )}
           {puedeCerrarPaqueteria && (marcando ? (
             <>
-              <input value={recibio} onChange={(e) => setRecibio(e.target.value)} placeholder="¿Quién recibió? (acuse de paquetería)"
+              <input value={recibio} onChange={(e) => setRecibio(e.target.value)} placeholder="¿Quién recibió el paquete? (acuse de la paquetería)"
                 style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
               <button className="btn sm" type="button" disabled={!recibio.trim()} style={!recibio.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={cerrarPaqueteria}><Icon name="check" /> Confirmar entrega</button>
               <button className="btn ghost sm" type="button" onClick={() => setMarcando(false)}>Cancelar</button>
             </>
           ) : (
-            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setMarcando(true)}><Icon name="check" /> Marcar entregado (paquetería)</button>
+            <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setMarcando(true)} title="Úsalo solo si la paquetería ya entregó al cliente y el sistema no lo refleja: normalmente se cierra solo al actualizar el rastreo."><Icon name="check" /> Cerrar entrega al cliente manualmente</button>
           ))}
         </div>
       )}

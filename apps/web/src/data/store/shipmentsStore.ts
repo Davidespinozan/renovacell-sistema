@@ -27,6 +27,8 @@ const live = makeLive<Shipment>(async () => {
 }, MOCK_SHIPMENTS)
 
 export const subscribe = live.subscribe
+// PAQ-A · tras sincronizar el rastreo (la paquetería confirmó la entrega) se recarga la verdad del servidor.
+export const reloadShipments = (): void => { if (hasSupabase) void live.reload() }
 export const getSnapshot = live.getSnapshot
 
 export interface ShipmentInput {

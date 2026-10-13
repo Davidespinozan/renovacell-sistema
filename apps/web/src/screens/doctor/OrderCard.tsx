@@ -1,5 +1,7 @@
 // Tarjeta de pedido reutilizable (Mis pedidos e Historial).
 import React from 'react'
+import { useRastreo } from '../../data/hooks/useRastreo'
+import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
 import { statusView } from './orderStatus'
@@ -86,6 +88,7 @@ export function OrderCard({
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 
       <ShippingLine meta={order.shipping_meta} />
+      <RastreoCliente order={order} />
 
       {(() => {
         // El doctor solo auto-cancela pedidos NO pagados: un pedido ya pagado que se
@@ -118,6 +121,15 @@ export function OrderCard({
       })()}
     </div>
   )
+}
+
+// PAQ-A · Rastreo de SU paquete para el cliente: estado actual e historial, tal como lo reporta la paquetería.
+function RastreoCliente({ order }: { order: OrderWithItems }) {
+  const m = (order.shipping_meta ?? {}) as { carrier?: string; tracking?: string; driver?: string }
+  const activo = !!m.tracking && !m.driver && (order.status === 'shipped' || order.status === 'delivered')
+  const { rastreo, cargando } = useRastreo(activo ? order.id : null, activo)
+  if (!activo) return null
+  return <RastreoEnvio rastreo={rastreo} cargando={cargando} vista="cliente" />
 }
 
 function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {

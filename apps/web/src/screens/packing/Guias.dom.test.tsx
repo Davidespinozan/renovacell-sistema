@@ -10,6 +10,7 @@ vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: h
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: [{ id: 'O-1', external_ref: 'S100001' }, { id: 'O-2', external_ref: 'S100002' }] }) }))
 vi.mock('../../data/shipping/provider', () => ({ etiquetaDeGuia: (...a: unknown[]) => h.etiqueta(...a) }))
 vi.mock('../../app/ExportButton', () => ({ ExportButton: () => null }))
+vi.mock('../../data/hooks/useRastreo', () => ({ useRastreo: () => ({ rastreo: null, cargando: false, actualizar: () => {} }) }))
 import { Guias } from './Guias'
 
 const DHL = { id: 'SH-1', order_id: 'O-1', carrier: 'DHL', tracking_number: '8664197986', label_url: null, driver_id: null, status: 'in_transit', estimated_delivery_at: '2026-10-14T17:00:00Z', dispatched_at: null }

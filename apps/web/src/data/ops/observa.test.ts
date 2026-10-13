@@ -300,7 +300,7 @@ describe('observa.ts · aislamiento', () => {
 
 // ───────────────────────── instrumentación de las Edge Functions ─────────────────────────
 const INSTRUMENTADAS: Record<string, number> = {
-  shipping: 11, 'cfdi-send': 1, 'cfdi-cancel': 4, 'cfdi-cancel-status': 2, 'cfdi-download': 1,
+  shipping: 13, 'cfdi-send': 1, 'cfdi-cancel': 4, 'cfdi-cancel-status': 2, 'cfdi-download': 1,
   'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 3, 'verify-cedula': 2,
   'stripe-webhook': 3, 'meta-webhook': 1, 'report-transfer': 1,
 }
@@ -360,7 +360,7 @@ describe('Edge Functions · qué reporta y qué no', () => {
     expect(markUnknown).toBe(3)
     expect(unknown).toBe(markUnknown)
     const provider = (src.match(/obs\('[a-z_]+', 'provider_error'/g) ?? []).length
-    expect(provider).toBe(8)
+    expect(provider).toBe(10)   // PAQ-A: +2 en la sincronización de rastreo (error de DHL y sin respuesta)
   })
   it('L2 · fiscal: incierto → unknown; persistencia → internal_error; 502 Facturama → provider_error', () => {
     const cancel = soloCodigo(edge('cfdi-cancel'))

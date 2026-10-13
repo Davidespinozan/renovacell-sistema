@@ -37,7 +37,7 @@ export function Recibo() {
   if (!shipment || !order) {
     return (
       <div className="grid" style={{ gap: 16 }}>
-        <div className="eyebrow">Empaque · Recibo de entrega</div>
+        <div className="eyebrow">Empaque · Remisión del paquete</div>
         <Vacio icono="receipt" titulo="No hay envíos para generar recibo." pista="Asigna un envío en la cola de empaque." />
       </div>
     )
@@ -49,9 +49,9 @@ export function Recibo() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Recibo de entrega">
+      <PageHead title="Remisión del paquete">
         El comprobante imprimible que acompaña al paquete: qué producto va, de qué <b>lote</b> (traza),
-        y a qué cliente. Elige el envío y dale <b>Imprimir</b>; quien recibe lo firma como prueba de entrega.
+        y a qué cliente. Es la hoja de contenido que va DENTRO de la caja: elige el envío y dale <b>Imprimir</b>. No es la guía ni la prueba de entrega (esa la da la paquetería o la foto del chofer).
       </PageHead>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow" style={{ margin: 0 }}>Selecciona el envío</div>
@@ -80,7 +80,7 @@ export function Recibo() {
             </div>
           </div>
           <div className="rdoc">
-            <div className="t">Recibo de entrega</div>
+            <div className="t">Remisión del paquete</div>
             <div className="f">{order.external_ref}</div>
           </div>
         </div>
@@ -110,7 +110,7 @@ export function Recibo() {
         </div>
 
         <div className="rfoot">
-          <div className="note">Producto regulado · trazabilidad por lote (COFEPRIS). Conserva este recibo.</div>
+          <div className="note">Producto regulado · trazabilidad por lote (COFEPRIS). Conserva esta remisión.</div>
           <Icon name="shield" style={{ width: 22, height: 22, color: 'var(--green-deep)' }} />
         </div>
       </div>

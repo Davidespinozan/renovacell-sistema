@@ -7,6 +7,10 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { driverName } from '../../data/mock/shipments'
 import { etiquetaDeGuia } from '../../data/shipping/provider'
+import { useRastreo } from '../../data/hooks/useRastreo'
+import { RastreoEnvio } from '../../app/RastreoEnvio'
+import { reloadShipments } from '../../data/store/shipmentsStore'
+import { reloadOrders } from '../../data/store/ordersStore'
 
 function shipPill(status: string | null): { label: string; pill: string } {
   switch (status) {
@@ -26,6 +30,13 @@ function shipPill(status: string | null): { label: string; pill: string } {
 // paquetería. El servidor la registra como in_transit; aquí se muestra lo que realmente pasa mientras nadie la despache.
 function estadoVisible(s: { status: string | null; tracking_number?: string | null; driver_id?: string | null; dispatched_at?: string | null }): string | null {
   return s.status === 'in_transit' && s.tracking_number && !s.driver_id && !s.dispatched_at ? 'guia_generada' : s.status
+}
+
+// Rastreo de UNA guía: se pone al día al abrir la pantalla; si la paquetería ya entregó, el pedido se cierra y la
+// lista se recarga.
+function RastreoDeGuia({ orderId }: { orderId: string }) {
+  const { rastreo, cargando, actualizar } = useRastreo(orderId, true, () => { reloadShipments(); reloadOrders() })
+  return <RastreoEnvio rastreo={rastreo} cargando={cargando} onActualizar={actualizar} />
 }
 
 export function Guias() {
@@ -89,7 +100,8 @@ export function Guias() {
               {shipments.map((s) => {
                 const sp = shipPill(estadoVisible(s))
                 return (
-                  <tr key={s.id}>
+                  <React.Fragment key={s.id}>
+                  <tr>
                     <td data-label="Pedido" className="mono">{folioOf[s.order_id] ?? s.order_id}</td>
                     <td data-label="Método">
                       {s.driver_id ? (
@@ -110,6 +122,10 @@ export function Guias() {
                           : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
                     </td>
                   </tr>
+                  {s.tracking_number && !s.driver_id && s.status !== 'delivered' && s.status !== 'cancelado' && (
+                    <tr><td colSpan={5} style={{ paddingTop: 0 }}><RastreoDeGuia orderId={s.order_id} /></td></tr>
+                  )}
+                  </React.Fragment>
                 )
               })}
               {shipments.length === 0 && (

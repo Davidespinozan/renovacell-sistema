@@ -20,6 +20,6 @@ describe('Empaque', () => {
   it('<Recibo> muestra el recibo de entrega (selección de envío)', () => {
     renderWithRole(<Recibo />)
     // Con envíos mock renderiza el selector; sin ellos, el encabezado del recibo.
-    expect(screen.getAllByText(/Selecciona el envío|Recibo de entrega/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Selecciona el envío|Remisión del paquete/).length).toBeGreaterThan(0)
   })
 })
