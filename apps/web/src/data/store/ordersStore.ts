@@ -117,7 +117,7 @@ if (hasSupabase) {
 
 // El pedido solo "se creó" cuando el servidor lo confirmó. `ambiguous` = no se sabe.
 export type PedidoCreado =
-  | { ok: true; order: OrderWithItems }
+  | { ok: true; order: OrderWithItems; fiscalPendiente?: boolean }   // fiscalPendiente: el pedido existe, su receptor fiscal NO quedó
   | { ok: false; error: string; ambiguous: boolean }
 
 export async function createOrder(input: {
@@ -241,8 +241,12 @@ export async function createOrder(input: {
     const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
     const { error: fErr } = await rpc('set_order_fiscal_snapshot', { p_order_id: id, p_receiver: normalizeFiscalProfile(input.receiver) })
     // El pedido SÍ existe; lo que no quedó son sus datos fiscales. Se dice tal cual.
-    if (fErr) reportarFallo(`guardar los datos fiscales del pedido ${folio}`,
-      'El pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.', false)
+    if (fErr) {
+      reportarFallo(`guardar los datos fiscales del pedido ${folio}`,
+        'El pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.', false)
+      hydrate()
+      return { ok: true, order: creado, fiscalPendiente: true }   // quien llama NO debe anunciar la factura como lista
+    }
   }
   hydrate() // trae unit_price/total AUTORITATIVOS del servidor
   return { ok: true, order: creado }

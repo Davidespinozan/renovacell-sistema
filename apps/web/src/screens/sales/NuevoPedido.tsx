@@ -18,6 +18,7 @@ import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryL
 import { AddressPicker } from '../../app/AddressPicker'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
+import { useRole } from '../../auth/RoleContext'
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
 // Exactamente uno de doctor|customer. Customer-only ⇒ doctor_id NULL + customer_id + snapshot.
@@ -28,6 +29,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   onClose: () => void
 }) {
   const isCustomer = !!customer
+  // SEC-C4-B5 · DATOS FISCALES DEL PEDIDO ≠ PERFIL FISCAL PERMANENTE DEL CLIENTE.
+  // Solo Dirección consulta y actualiza el perfil permanente desde aquí. Los demás (Ventas) capturan el receptor
+  // SOLO para este pedido: no se lee el expediente fiscal de la cuenta ni se escribe en él; el servidor lo congela
+  // en el pedido (set_order_fiscal_snapshot) y lo valida. Elegir una cuenta no da acceso a su perfil fiscal.
+  const { role } = useRole()
+  const fiscalPermanente = role === 'admin'
   const target = customer ?? doctor!
   const { data: products } = useProducts()
   const { data: lots } = useLots()
@@ -49,6 +56,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custAddr, setCustAddr] = useState<ShippingAddress | null>(null) // flujo customer (one-off)
   const [folio, setFolio] = useState<string | null>(null)
+  const [fiscalPendiente, setFiscalPendiente] = useState(false)   // el pedido se creó, pero su receptor fiscal no quedó
   const shipping = isCustomer ? custAddr : (choice?.address ?? null)
 
   // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
@@ -67,7 +75,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   useEffect(() => {
     if (!invoice || fiscalLoaded) return
     ;(async () => {
-      if (hasSupabase && isCustomer && customer?.id) {
+      if (!fiscalPermanente) {
+        setEditingFiscal(true)                         // captura para el pedido: formulario en blanco, sin lecturas
+      } else if (hasSupabase && isCustomer && customer?.id) {
         setFiscalCustomerId(customer.id)
         const { data } = await supabase.from('customers').select('meta').eq('id', customer.id).maybeSingle()
         const m = customerFiscal(data as { meta: unknown } | null); setFiscal(m); setEditingFiscal(!isFiscalProfileComplete(m))
@@ -86,7 +96,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
       }
       setFiscalLoaded(true)
     })()
-  }, [invoice, fiscalLoaded])
+  }, [invoice, fiscalLoaded, fiscalPermanente])
 
   const add = (id: string) => setCart((c) => {
     const info = stockInfoFor(stockMap, id)
@@ -107,7 +117,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const crear = async () => {
     if (lines.length === 0 || !shipping) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
-    if (invoice && fiscalCustomerId && editingFiscal) {
+    if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
       setSavingFiscal(true)
       const res = await upsertCustomerFiscal(fiscalCustomerId, fiscal)
       setSavingFiscal(false)
@@ -127,6 +137,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     })
     setCreando(false)
     if (!r.ok) { setErrorPedido(r.error); return }
+    setFiscalPendiente(!!r.fiscalPendiente)
     setFolio(r.order.external_ref ?? '—')
   }
 
@@ -139,6 +150,11 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               <div className="ck"><Plus size={26} /></div>
               <h3>Pedido creado</h3>
               <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
+              {fiscalPendiente && (
+                <div role="alert" data-testid="np-fiscal-pendiente" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13, textAlign: 'left' }}>
+                  <b>Los datos fiscales NO quedaron guardados en el pedido.</b> La factura no está solicitada todavía: pide a Facturación que los capture con el folio {folio}.
+                </div>
+              )}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
@@ -185,9 +201,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               {invoice && (
                 <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--surface-2, #fafafa)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales del cliente</div>
-                    {fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
+                    <div className="eyebrow" style={{ margin: 0 }}>{fiscalPermanente ? 'Datos fiscales del cliente' : 'Datos fiscales para este pedido'}</div>
+                    {fiscalPermanente && fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
                   </div>
+                  {!fiscalPermanente && <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="np-fiscal-solo-pedido">Se guardan solo en este pedido. El perfil fiscal del cliente no se consulta ni se modifica.</div>}
                   {!fiscalLoaded ? (
                     <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando…</div>
                   ) : editingFiscal ? (
