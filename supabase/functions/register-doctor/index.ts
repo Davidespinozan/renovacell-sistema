@@ -108,11 +108,13 @@ interface IdRecord {
   provider?: string; checkedAt?: string; folio?: string
 }
 async function lookupIdentity(imgs: { selfie?: string; ineFront?: string; ineBack?: string }, enteredName: string): Promise<IdRecord> {
-  const attempted = !!(imgs.selfie && imgs.ineFront)
+  // Decisión del dueño (identidad MANUAL): ya no se pide selfie. Basta el INE para que el registro cuente como
+  // "adjuntó identidad" y su evidencia se guarde para la revisión de Dirección.
+  const attempted = !!imgs.ineFront
   const checkedAt = new Date().toISOString()
   if (!attempted) return { attempted: false } // el registro no adjuntó identidad
   const apiUrl = Deno.env.get('IDENTITY_API_URL')
-  if (apiUrl) {
+  if (apiUrl && imgs.selfie) {   // el cotejo biométrico solo tiene sentido con selfie (registros antiguos)
     try {
       const key = Deno.env.get('IDENTITY_API_KEY') ?? ''
       const header = Deno.env.get('IDENTITY_API_KEY_HEADER') ?? 'Authorization'

@@ -905,17 +905,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 .form-consent input{margin-top:2px;flex:none;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
 .form-consent a{color:var(--green);font-weight:600;}
 
-/* VERIFICACIÓN DE IDENTIDAD (INE + selfie) */
+/* VERIFICACIÓN DE IDENTIDAD (INE frente y reverso) */
 .id-verify{margin:4px 0 14px;padding:16px;border:1px solid var(--line);border-radius:14px;background:rgba(0,115,17,.03);}
 .id-verify-head{display:flex;flex-direction:column;gap:2px;margin-bottom:12px;}
 .id-verify-head span{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:.01em;}
 .id-verify-head small{font-size:11.5px;color:var(--soft);}
-.id-tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
-.id-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;
-  aspect-ratio:3/4;padding:10px 6px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;cursor:pointer;overflow:hidden;
+.id-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.id-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;
+  aspect-ratio:16/10;max-height:170px;padding:10px 6px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;cursor:pointer;overflow:hidden;
   transition:border-color .2s var(--ease),box-shadow .2s var(--ease);}
 .id-tile:hover{border-color:var(--green);box-shadow:0 8px 20px rgba(0,115,17,.10);}
-.id-tile .id-ico{font-size:24px;line-height:1;}
+.id-tile .id-ico{width:30px;height:30px;color:var(--green);margin-bottom:2px;}
 .id-tile .id-lbl{font-size:11.5px;font-weight:600;color:var(--ink);}
 .id-tile .id-hint{font-size:10px;color:var(--soft);line-height:1.2;}
 .id-tile.done{border-style:solid;border-color:var(--green);}
@@ -2591,30 +2591,24 @@ body.rc-has-ann .nav{top:38px}
             </div>
           </div>
 
-          <!-- VERIFICACIÓN DE IDENTIDAD: INE (frente/reverso) + selfie con prueba de vida. -->
+          <!-- VERIFICACIÓN DE IDENTIDAD: INE (frente/reverso). La revisión es manual, por Dirección; no se pide selfie. -->
           <div class="id-verify">
             <div class="id-verify-head">
-              <span>— Verificación de identidad</span>
-              <small>Confirmamos que eres tú, no solo tus documentos.</small>
+              <span>Verificación de identidad</span>
+              <small>Una persona de nuestro equipo revisa tu identificación oficial.</small>
             </div>
             <div class="id-tiles">
               <label class="id-tile" data-for="ineFront">
                 <input type="file" accept="image/*" capture="environment" hidden>
-                <span class="id-ico">🪪</span>
-                <span class="id-lbl">INE — frente</span>
+                <svg class="id-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16c.6-1.6 1.8-2.4 3.3-2.4s2.7.8 3.3 2.4M14.5 10h4M14.5 13.5h4"/></svg>
+                <span class="id-lbl">INE · frente</span>
                 <span class="id-hint">Toca para tomar la foto</span>
               </label>
               <label class="id-tile" data-for="ineBack">
                 <input type="file" accept="image/*" capture="environment" hidden>
-                <span class="id-ico">🪪</span>
-                <span class="id-lbl">INE — reverso</span>
+                <svg class="id-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9h19M6 13h7M6 16h4M16 13.2h2.5v2.6H16z"/></svg>
+                <span class="id-lbl">INE · reverso</span>
                 <span class="id-hint">Toca para tomar la foto</span>
-              </label>
-              <label class="id-tile" data-for="selfie">
-                <input type="file" accept="image/*" capture="user" hidden>
-                <span class="id-ico">🤳</span>
-                <span class="id-lbl">Selfie</span>
-                <span class="id-hint">Mira a la cámara</span>
               </label>
             </div>
             <p class="id-note">Tus fotos se tratan de forma confidencial y solo se usan para verificar tu identidad.</p>
@@ -3087,7 +3081,7 @@ document.addEventListener('keydown', e => {
       .catch(function(){t.remove();mockAnswer(q);});
   }
   function defaultChips(){chips(['¿Qué es S²RM®?','¿Cómo obtengo acceso?','¿Tienen certificaciones?']);}
-  function greet(){add('Hola 👋 Soy el asistente de Renovacell. Te oriento sobre nuestra tecnología, el cumplimiento regulatorio y cómo obtener acceso como profesional de la salud.','bot');defaultChips();}
+  function greet(){add('Hola. Soy el asistente de Renovacell. Te oriento sobre nuestra tecnología, el cumplimiento regulatorio y cómo obtener acceso como profesional de la salud.','bot');defaultChips();}
   function send(){var v=input.value.trim();if(!v)return;input.value='';handle(v);}
   document.getElementById('rncAiSend').onclick=send;
   input.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
@@ -3333,9 +3327,9 @@ document.addEventListener('keydown', e => {
   function say(kind,html){ out.className='rnc-vout '+kind; out.innerHTML=html; }
   function listo(){ btn.disabled=false; btn.textContent='Enviar mi verificación'; }
 
-  // --- Captura de identidad: INE (frente/reverso) + selfie. Cada foto se reduce en el
+  // --- Captura de identidad: INE (frente/reverso). Cada foto se reduce en el
   //     navegador (canvas) a ~1200px JPEG antes de enviarse, para no mandar megas de más. ---
-  var captured={ineFront:null,ineBack:null,selfie:null};
+  var captured={ineFront:null,ineBack:null};
   function downscale(file,cb){
     var img=new Image(); var url=URL.createObjectURL(file);
     img.onload=function(){
@@ -3376,13 +3370,13 @@ document.addEventListener('keydown', e => {
       organization:(f.consultorio.value||'').trim(), website:f.website.value||'',
       address:(f.calle&&f.calle.value||'').trim(), colonia:(f.colonia&&f.colonia.value||'').trim(),
       cp:(f.cp&&f.cp.value||'').trim(), city:(f.ciudad&&f.ciudad.value||'').trim(), state:(f.estado&&f.estado.value||'').trim(),
-      selfie:captured.selfie, ineFront:captured.ineFront, ineBack:captured.ineBack
+      ineFront:captured.ineFront, ineBack:captured.ineBack
     };
     if(d.name.length<3) return say('err','Escriba su nombre completo.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return say('err','El correo no parece válido.');
     if(d.cedula.replace(/\D/g,'').length<5) return say('err','Escriba su número de cédula profesional.');
     if(d.password.length<6) return say('err','La contraseña debe tener al menos 6 caracteres.');
-    if(!d.ineFront || !d.selfie) return say('err','Sube la foto de tu INE (frente) y una selfie para verificar tu identidad.');
+    if(!d.ineFront || !d.ineBack) return say('err','Sube la foto de tu INE por ambos lados (frente y reverso) para verificar tu identidad.');
 
     btn.disabled=true; btn.textContent='Verificando…';
     say('wait','Validando tu cédula e identidad…');

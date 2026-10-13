@@ -317,7 +317,7 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
       {manual ? (
         <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 10 }}>
           <IdCard size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-          Revisión manual — el proveedor biométrico (Nubarium) aún no está configurado. Compara la selfie con la foto del INE antes de aprobar.
+          Revisión manual: coteja el nombre y la foto del INE con los datos del registro y la cédula antes de aprobar.
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
