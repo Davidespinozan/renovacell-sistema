@@ -11,6 +11,7 @@ import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { RecoleccionGuia } from '../../app/RecoleccionGuia'
 import { recoleccionDe } from '../../data/shipping/recoleccion'
+import { BotonRemision } from './Remision'
 import { anularGuia } from '../../data/shipping/anularGuia'
 import { useOpId } from '../../data/hooks/useOpId'
 import { reloadShipments } from '../../data/store/shipmentsStore'
@@ -44,7 +45,7 @@ const guiaAnulada = (s: { provider_meta?: Record<string, unknown> | null }): str
 }
 
 // Anular la guía de un pedido que aún no sale del local: pide el motivo y, al confirmar el servidor, el pedido vuelve
-// a "Por empacar" para generar una guía nueva.
+// a "Por enviar" para generar una guía nueva.
 export function AnularGuia({ orderId, guia, folio, anular = anularGuia }: { orderId: string; guia: string; folio: string; anular?: typeof anularGuia }) {
   const [abierto, setAbierto] = useState(false)
   const [motivo, setMotivo] = useState('')
@@ -65,7 +66,7 @@ export function AnularGuia({ orderId, guia, folio, anular = anularGuia }: { orde
   }
   return (
     <div style={{ marginTop: 8, padding: '10px 12px', border: '1px solid var(--danger-line, #f3c7c7)', borderRadius: 12 }} data-testid="anular-form">
-      <div style={{ fontSize: 12.5 }}>Anular la guía <b className="mono">{guia}</b>{folio ? <> del pedido <b>{folio}</b></> : null}. El pedido volverá a <b>Por empacar</b> para generar una guía nueva. Úsalo solo si el paquete sigue en el local.</div>
+      <div style={{ fontSize: 12.5 }}>Anular la guía <b className="mono">{guia}</b>{folio ? <> del pedido <b>{folio}</b></> : null}. El pedido volverá a <b>Por enviar</b> para generar una guía nueva. Úsalo solo si el paquete sigue en el local.</div>
       <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} aria-label="Motivo de la anulación" placeholder="Motivo (dirección equivocada, paquete mal medido…)"
         style={{ width: '100%', marginTop: 8, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
       {error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
@@ -139,7 +140,7 @@ export function Guias() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Pedido</th><th>Método</th><th>Estimada</th><th>Estatus</th><th>Etiqueta</th></tr>
+              <tr><th>Pedido</th><th>Método</th><th>Estimada</th><th>Estatus</th><th>Documentos</th></tr>
             </thead>
             <tbody>
               {shipments.map((s) => {
@@ -160,12 +161,13 @@ export function Guias() {
                     </td>
                     <td data-label="Estimada">{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
                     <td data-label="Estatus"><span className={'pill ' + sp.pill}>{sp.label}</span></td>
-                    <td data-label="Etiqueta">
+                    <td data-label="Documentos">
                       {s.label_url
                         ? <a className="btn ghost sm" href={s.label_url} target="_blank" rel="noreferrer"><Icon name="download" style={{ width: 13, height: 13 }} /> Guía</a>
                         : s.tracking_number && !s.driver_id
                           ? <button className="btn ghost sm" type="button" disabled={bajando === s.id} onClick={() => void descargar(s.order_id, s.id)} data-testid="descargar-etiqueta"><Icon name="download" style={{ width: 13, height: 13 }} /> {bajando === s.id ? 'Abriendo…' : 'Descargar etiqueta'}</button>
                           : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
+                      {(() => { const o = orders.find((x) => x.id === s.order_id); return o && s.status !== 'cancelado' ? <span style={{ marginLeft: 6 }}><BotonRemision order={o} envio={s} /></span> : null })()}
                     </td>
                   </tr>
                   {s.tracking_number && !s.driver_id && s.status !== 'delivered' && s.status !== 'cancelado' && (

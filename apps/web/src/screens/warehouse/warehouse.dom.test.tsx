@@ -13,7 +13,7 @@ beforeEach(cleanup)
 describe('<Existencias>', () => {
   it('muestra el inventario del almacén', () => {
     renderWithRole(<Existencias />)
-    expect(screen.getByText('Lo que hay en almacén')).toBeInTheDocument()
+    expect(screen.getByText('Inventario')).toBeInTheDocument()
   })
 })
 

@@ -20,7 +20,6 @@ import { Entradas } from './warehouse/Entradas'
 import { Devoluciones } from './warehouse/Devoluciones'
 import { Cola } from './packing/Cola'
 import { Guias } from './packing/Guias'
-import { Recibo } from './packing/Recibo'
 import { Seguimiento } from './logistics/Seguimiento'
 import { Despacho } from './logistics/Despacho'
 import { MisEntregas } from './driver/MisEntregas'
@@ -81,7 +80,6 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   devoluciones: () => <Devoluciones />,
   cola: () => <Cola />,
   guia: () => <Guias />,
-  recibo: () => <Recibo />,
   seguimiento: () => <Seguimiento />,
   despacho: () => <Despacho />,
   driver_home: () => <MisEntregas />,

@@ -101,18 +101,19 @@ export const ROLES: RoleDef[] = [
     icon: 'box', isStaff: true, ready: true,
     modules: [
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
-      { key: 'stock', label: 'Lo que hay en almacén', icon: 'box', section: 'Almacén' },
-      { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Almacén' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Almacén' },
+      // Orden = el recorrido real. Almacén: lo que hay y lo que entra. Pedidos y envíos: surtir → enviar → guía → salida → rastreo.
+      // La remisión del paquete no es una pantalla: se imprime desde "Por enviar" y desde "Guías".
+      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Almacén' },
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Almacén' },   // UX-2 · recepción física de compras
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Almacén' },
-      { key: 'devoluciones', label: 'Devoluciones y reingresos', icon: 'box', section: 'Almacén' },
+      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Almacén' },
+      { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Almacén' },
       { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Almacén' },
-      { key: 'cola', label: 'Por empacar', icon: 'pkg', section: 'Empaque' },
-      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Empaque' },
-      { key: 'guia', label: 'Guías', icon: 'truck', section: 'Empaque' },
-      { key: 'recibo', label: 'Remisión del paquete', icon: 'receipt', section: 'Empaque' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Empaque' },
+      { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Pedidos y envíos' },
+      { key: 'cola', label: 'Por enviar', icon: 'pkg', section: 'Pedidos y envíos' },
+      { key: 'guia', label: 'Guías', icon: 'truck', section: 'Pedidos y envíos' },
+      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
+      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Pedidos y envíos' },
     ],
   },
   {

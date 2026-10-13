@@ -187,7 +187,7 @@ export function HomeAlmacen() {
   const atajos = useAccesos([
     { key: 'entradas', label: 'Recibir mercancía', icon: 'download' },
     { key: 'surtido', label: 'Preparar pedidos', icon: 'layers' },
-    { key: 'cola', label: 'Por empacar', icon: 'pkg' },
+    { key: 'cola', label: 'Por enviar', icon: 'pkg' },
   ])
   return (
     <div className="rh" data-testid="home-almacen">

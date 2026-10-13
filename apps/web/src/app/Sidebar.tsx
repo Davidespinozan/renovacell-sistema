@@ -53,7 +53,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </span>
         <div>
           <div className="bn">Renovacell</div>
-          <div className="bs">Sistema operativo</div>
+          <div className="bs">{role === 'doctor' ? 'Tecnologías Antiedad' : 'Sistema operativo'}</div>
         </div>
       </div>
 

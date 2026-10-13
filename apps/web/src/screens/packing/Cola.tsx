@@ -18,6 +18,7 @@ import { missingForShipment } from '../../data/shipping/validate'
 import { cpSugerido, faltantesEntrega, receptorParaGuia } from '../../data/shipping/entregaGuia'
 import type { LogisticsPackage, Receiver } from '../../data/shipping/model'
 import type { ProductSafe } from '../../data/types'
+import { BotonRemision } from './Remision'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -53,7 +54,7 @@ export function Cola() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Empaque · Por empacar</div>
+      <div className="eyebrow">Envíos · Por enviar</div>
 
       {queue.length === 0 ? (
         <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
@@ -71,9 +72,12 @@ export function Cola() {
                 <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}
-            <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>
-              <Icon name="truck" /> Asignar envío
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+              <button className="btn" type="button" onClick={() => setActive(o)}>
+                <Icon name="truck" /> Asignar envío
+              </button>
+              <BotonRemision order={o} className="btn ghost" />
+            </div>
           </div>
         ))
       )}

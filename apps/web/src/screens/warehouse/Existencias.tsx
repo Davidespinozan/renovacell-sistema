@@ -34,7 +34,7 @@ export function Existencias() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Lo que hay en almacén">
+      <PageHead title="Inventario">
         Todo el producto guardado, agrupado por tipo y por lote. La etiqueta
         <b> Usar primero</b> marca el lote que debe salir antes, porque es el que caduca más pronto.
       </PageHead>

@@ -21,7 +21,9 @@ describe('UX-2 · terminología', () => {
     expect(wh.find((s) => s.key === 'entradas')?.label).toBe('Recibir mercancía')
     expect(wh.find((s) => s.key === 'compras')?.label).toBe('Compras a proveedores')
     expect(adm.find((s) => s.key === 'av_inv')?.label).toBe('Compras a proveedores')
-    expect(codigo(rolesSrc)).not.toMatch(/label: 'Compras'|Registrar entradas|label: 'Inventario'/)
+    expect(codigo(rolesSrc)).not.toMatch(/label: 'Compras'|Registrar entradas/)
+    // "Inventario" nombra SOLO las existencias del almacén (decisión del dueño, 13 oct 2026); la compra nunca se llama así.
+    expect([...wh, ...adm].filter((s) => s.label === 'Inventario').map((s) => s.key)).toEqual(['stock'])
     for (const [p, src] of Object.entries(fuentes)) if (!/guard/.test(p)) expect(src, p).not.toMatch(/Registrar entradas/)
     expect(comprasSrc).toMatch(/<PageHead title="Compras a proveedores">/)
     expect(entradasSrc).toMatch(/<PageHead title="Recibir mercancía">/)

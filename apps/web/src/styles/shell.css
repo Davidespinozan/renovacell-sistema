@@ -554,6 +554,13 @@ a.btn,a.btn:hover{text-decoration:none}
   body.printing-manifiesto .manifiesto-print-root{display:block !important}
   body.printing-manifiesto .manifiesto-doc{max-width:100%;box-shadow:none}
 }
+/* Remisión del paquete: se imprime sola desde "Por enviar" y "Guías" (mismo patrón de impresión aislada). */
+.remision-print-root{display:none}
+@media print{
+  body.printing-remision > :not(.remision-print-root){display:none !important}
+  body.printing-remision .remision-print-root{display:block !important}
+  body.printing-remision .recibo{max-width:100%;box-shadow:none;border:0}
+}
 @media print{ @page{margin:14mm} }
 
 /* Paginación del directorio comercial: desktop = números + etiquetas; móvil = "Página X de Y". */
