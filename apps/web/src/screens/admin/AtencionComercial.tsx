@@ -20,6 +20,7 @@ import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, irAConversacion, useIntento } from '../../data/store/navIntentStore'
 import { HorarioYAlertas } from './HorarioAtencion'
 import { useRole } from '../../auth/RoleContext'
+import { EnlaceContacto } from '../../app/EnlaceContacto'
 
 type Pestana = 'pendientes' | 'cartera' | 'vendedores' | 'horario'
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
@@ -56,6 +57,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
   return (
     <div className="grid" style={{ gap: 14, maxWidth: 1040, minWidth: 0 }} data-testid="atencion-comercial">
       <div className="eyebrow" style={{ margin: 0 }}>Dirección · Atención comercial</div>
+      <EnlaceContacto />
       <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontWeight: 600 }} data-testid="estado-horario">{textoEstadoHorario(r?.horario)}</div>
