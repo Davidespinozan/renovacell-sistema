@@ -112,8 +112,8 @@ describe('CX-ENLACE · guardas de seguridad y despliegue', () => {
   })
   it('al compartir el enlace se ve la marca del negocio, nunca "Sistema operativo"', () => {
     expect(contactoHtml).not.toMatch(/sistema operativo/i); expect(contactoHtml).not.toMatch(/manifest\.webmanifest/)
-    expect(contactoHtml).toMatch(/<title>Renovacell · Habla con nosotros<\/title>/)
-    expect(contactoHtml).toMatch(/property="og:title" content="Habla con Renovacell"/); expect(contactoHtml).toMatch(/property="og:image" content="https:\/\/renovacell\.mx\/brand\/og-renovacell\.jpg"/)
+    expect(contactoHtml).toMatch(/<title>Renovacell · Tecnologías Antiedad<\/title>/)
+    expect(contactoHtml).toMatch(/property="og:title" content="Renovacell · Tecnologías Antiedad"/); expect(contactoHtml).toMatch(/property="og:description" content="Chatea con un asesor\."/); expect(contactoHtml).toMatch(/property="og:image" content="https:\/\/renovacell\.mx\/brand\/og-renovacell\.jpg"/)
     expect(contactoHtml).toMatch(/src="\/src\/main\.tsx"/)                       // la misma aplicación
     expect(viteCfg).toMatch(/input: \{ main: 'index\.html', contacto: 'contacto\.html' \}/)
   })
