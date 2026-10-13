@@ -52,7 +52,7 @@ type Invocar = (fn: string, opts: { body: Record<string, unknown> }) => Promise<
 const invocarPorDefecto: Invocar = (fn, opts) => supabase.functions.invoke(fn, opts) as unknown as Promise<{ data: unknown; error: unknown }>
 
 /** Abre o reanuda la sesión de visitante. Nunca lanza; si falla, no pasa nada. */
-export async function abrirVisitante(deps: { invocar?: Invocar; st?: Almacen | null; loc?: { search: string; pathname: string }; referrer?: string } = {}): Promise<'nuevo' | 'reanudado' | 'omitido' | 'error'> {
+async function abrirVisitanteUnaVez(deps: { invocar?: Invocar; st?: Almacen | null; loc?: { search: string; pathname: string }; referrer?: string } = {}): Promise<'nuevo' | 'reanudado' | 'omitido' | 'error'> {
   if (!hasSupabase && !deps.invocar) return 'omitido'
   const st = deps.st === undefined ? almacen() : deps.st
   try {
@@ -66,6 +66,18 @@ export async function abrirVisitante(deps: { invocar?: Invocar; st?: Almacen | n
   } catch {
     return 'error'
   }
+}
+
+// Una sola apertura a la vez por pestaña: el arranque de la app y la página de contacto la piden al mismo tiempo, y
+// dos aperturas simultáneas sin token crean DOS visitantes (el prerregistro quedaría en uno y el token en el otro).
+let aperturaEnCurso: ReturnType<typeof abrirVisitanteUnaVez> | null = null
+/** Abre o reanuda la sesión de visitante. Nunca lanza; llamadas simultáneas comparten la misma apertura. */
+export function abrirVisitante(deps: { invocar?: Invocar; st?: Almacen | null; loc?: { search: string; pathname: string }; referrer?: string } = {}): Promise<'nuevo' | 'reanudado' | 'omitido' | 'error'> {
+  if (aperturaEnCurso) return aperturaEnCurso
+  const p = abrirVisitanteUnaVez(deps)
+  aperturaEnCurso = p
+  void p.finally(() => { if (aperturaEnCurso === p) aperturaEnCurso = null })
+  return p
 }
 
 /** La cuenta autenticada adopta su visitante (token) o lo que su registro dejó vinculado. */

@@ -3,8 +3,10 @@
 // y las piezas de despliegue que lo hacen UN solo origen (regla de Netlify, redirección por host, prellenado).
 import { describe, it, expect, vi } from 'vitest'
 import { limpiarPrerregistro, mapearErrorPrerregistro } from '../../../../../supabase/functions/_shared/visitante'
+import { esSesionDeUsuario } from '../../../../../supabase/functions/_shared/quien'
+import chatEdge from '../../../../../supabase/functions/chat/index.ts?raw'
 import { LIMITES } from '../../../../../supabase/functions/_shared/limite'
-import { estadoVisitante, prerregistrar, validarPrerregistro, LLAVE_PRELLENADO, LLAVE_VISITANTE } from './visitante'
+import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, LLAVE_PRELLENADO, LLAVE_VISITANTE } from './visitante'
 import { contactoDe, urlEnlaceContacto } from './contactoEnlace'
 import mig from '../../../../../supabase/migrations/20261203120000_cx_enlace_prerregistro.sql?raw'
 import netlify from '../../../../../netlify.toml?raw'
@@ -39,6 +41,21 @@ describe('CX-ENLACE · forma del prerregistro en el servidor', () => {
   })
 })
 
+describe('CX-ENLACE · el visitante anónimo no se confunde con una sesión', () => {
+  const jwt = (carga: Record<string, unknown>) => `h.${btoa(JSON.stringify(carga)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.f`
+  it('la llave pública del sitio (JWT anon o sb_publishable) NO es una sesión; un token de usuario sí', () => {
+    expect(esSesionDeUsuario('Bearer ' + jwt({ role: 'anon', iss: 'supabase' }))).toBe(false)
+    expect(esSesionDeUsuario('Bearer sb_publishable_abc123')).toBe(false)
+    expect(esSesionDeUsuario('')).toBe(false); expect(esSesionDeUsuario(null)).toBe(false); expect(esSesionDeUsuario('Bearer a.b.c')).toBe(false)
+    expect(esSesionDeUsuario('Bearer ' + jwt({ role: 'service_role' }))).toBe(false)
+    expect(esSesionDeUsuario('Bearer ' + jwt({ sub: '11111111-1111-1111-1111-111111111111', role: 'authenticated' }))).toBe(true)
+    expect(esSesionDeUsuario('bearer ' + jwt({ sub: 'ñandú-ü', role: 'authenticated' }))).toBe(true)
+  })
+  it('la función chat clasifica por el contenido del token, no comparando contra la llave del entorno', () => {
+    expect(chatEdge).toMatch(/if \(esSesionDeUsuario\(authHeader\)\) \{/); expect(chatEdge).not.toMatch(/!== anon\)/)
+  })
+})
+
 describe('CX-ENLACE · cliente', () => {
   it('valida antes de enviar', () => {
     const d = { nombre: 'Ana Ruiz', telefono: '6690000001', email: 'ana@test.local', es_medico: false, cedula: '' }
@@ -46,6 +63,16 @@ describe('CX-ENLACE · cliente', () => {
     expect(validarPrerregistro({ ...d, telefono: '669' }, true)?.campo).toBe('telefono')
     expect(validarPrerregistro(d, false)?.campo).toBe('consentimiento')
     expect(validarPrerregistro({ ...d, cedula: '12' }, true)).toBeNull()   // sin marcar "profesional de la salud" la cédula no cuenta
+  })
+  it('dos aperturas simultáneas (arranque de la app + página de contacto) crean UN solo visitante', async () => {
+    const st = almacen(); let suelta: (v: unknown) => void = () => {}
+    const invocar = vi.fn(() => new Promise<{ data: unknown; error: unknown }>((r) => { suelta = r as (v: unknown) => void }))
+    const a = abrirVisitante({ invocar, st }); const b = abrirVisitante({ invocar, st })
+    await Promise.resolve(); suelta({ data: { nuevo: true, token: TOKEN }, error: null })
+    expect(await Promise.all([a, b])).toEqual(['nuevo', 'nuevo']); expect(invocar).toHaveBeenCalledTimes(1); expect(st.m.get(LLAVE_VISITANTE)).toBe(TOKEN)
+    await Promise.resolve()
+    invocar.mockResolvedValueOnce({ data: { nuevo: false }, error: null })
+    expect(await abrirVisitante({ invocar, st })).toBe('reanudado'); expect(invocar).toHaveBeenCalledTimes(2)   // ya terminada, la siguiente sí pregunta
   })
   it('estado: sin token no pregunta; con token devuelve lo que diga el servidor; ante un fallo pide el formulario', async () => {
     const invocar = vi.fn().mockResolvedValue({ data: { visitante: true, prerregistrado: true, nombre: 'Ana Ruiz' }, error: null })

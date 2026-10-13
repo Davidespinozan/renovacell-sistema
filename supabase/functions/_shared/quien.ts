@@ -54,3 +54,22 @@ export async function resolverQuien(caller: ClienteAuth, admin: ClienteAdmin): P
 
 /** ¿El rol del llamante está en la lista? (vacío = sin perfil = nunca). */
 export const tieneRol = (q: Quien, roles: readonly string[]): boolean => q.role !== '' && roles.includes(q.role)
+
+/**
+ * ¿La cabecera Authorization trae una SESIÓN de usuario (y no la llave pública del proyecto)?
+ * El cliente de Supabase siempre manda `Authorization: Bearer <algo>`: sin sesión, ese algo es la llave pública
+ * (un JWT con role=anon, o una llave `sb_publishable_…`). Compararla contra SUPABASE_ANON_KEY no sirve: la llave
+ * que inyecta la plataforma puede no ser la misma cadena que usa el sitio, y entonces un visitante anónimo se
+ * tomaba por una sesión inválida ("No autenticado"). Aquí solo se CLASIFICA leyendo el contenido del token; quien
+ * lo valida de verdad es `resolverQuien` (auth.getUser). Un token falsificado con `sub` no gana nada: lo rechaza.
+ */
+export function esSesionDeUsuario(authHeader: string | null | undefined): boolean {
+  const token = (authHeader ?? '').replace(/^Bearer\s+/i, '').trim()
+  const partes = token.split('.')
+  if (partes.length !== 3) return false            // vacío o llave que no es JWT (sb_publishable_…)
+  try {
+    const b64 = partes[1].replace(/-/g, '+').replace(/_/g, '/')
+    const carga = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))) as { sub?: unknown; role?: unknown }
+    return typeof carga.sub === 'string' && carga.sub.length > 0 && carga.role !== 'anon' && carga.role !== 'service_role'
+  } catch { return false }
+}

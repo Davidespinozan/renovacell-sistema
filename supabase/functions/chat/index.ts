@@ -19,7 +19,7 @@
 // descarte). Reintentos no duplican (un turno por disparador). Sin IA disponible, un aviso de
 // sistema una sola vez. El límite y el costo diario en tokens los aplica CC-0B aquí.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { resolverQuien } from '../_shared/quien.ts'
+import { resolverQuien, esSesionDeUsuario } from '../_shared/quien.ts'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
@@ -58,7 +58,7 @@ Deno.serve(conCors(async (req) => {
   // Identidad: JWT (si viene) manda; si no, visitante por token.
   const authHeader = req.headers.get('Authorization') ?? ''
   let quien: { uid: string; role: string; verified: boolean } | null = null
-  if (authHeader.replace(/^Bearer\s+/i, '').trim() && authHeader.replace(/^Bearer\s+/i, '').trim() !== anon) {
+  if (esSesionDeUsuario(authHeader)) {   // la llave pública del sitio NO es una sesión (ver _shared/quien.ts)
     const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
     const q = await resolverQuien(caller, admin)
     if (!q.ok) return json(q.status, q.body)
