@@ -115,6 +115,34 @@ export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralR
   }
 }
 
+// ---- Recolección (PAQ-B) ---------------------------------------------------
+// MyDHL API · POST /pickups (agenda que DHL pase por el paquete) y DELETE /pickups/{confirmación}.
+// La hora es la LOCAL del origen: Culiacán (America/Mazatlan) va en UTC-7 todo el año.
+// PENDIENTE: validar campos contra el sandbox (un 422 de DHL nombra el campo que no acepta).
+export interface PickupInput { date: string; ready: string; close: string; location: string; instructions?: string }
+const PICKUP_TZ = 'GMT-07:00'
+export function buildPickupRequest(shipper: NeutralShipper, pkg: NeutralPackage, accountNumber: string, productCode: string, i: PickupInput) {
+  const contacto = { phone: shipper.phone, companyName: shipper.name, fullName: shipper.name, email: shipper.email }
+  return {
+    plannedPickupDateAndTime: `${i.date}T${i.ready}:00 ${PICKUP_TZ}`,
+    closeTime: i.close,
+    location: i.location,
+    locationType: 'business',
+    accounts: [{ typeCode: 'shipper', number: accountNumber }],
+    ...(i.instructions ? { specialInstructions: [{ value: i.instructions, typeCode: 'TBD' }] } : {}),
+    customerDetails: {
+      shipperDetails: { postalAddress: shipperAddress(shipper), contactInformation: contacto },
+      pickupDetails: { postalAddress: shipperAddress(shipper), contactInformation: contacto },
+    },
+    shipmentDetails: [{ productCode, isCustomsDeclarable: false, unitOfMeasurement: 'metric', packages: packagesOf(pkg) }],
+  }
+}
+// deno-lint-ignore no-explicit-any
+export function parsePickup(data: any): { confirmation: string } {
+  const n = Array.isArray(data?.dispatchConfirmationNumbers) ? data.dispatchConfirmationNumbers[0] : data?.dispatchConfirmationNumber
+  return { confirmation: n == null ? '' : String(n).trim().slice(0, 60) }
+}
+
 // deno-lint-ignore no-explicit-any
 export function parseShipment(data: any): { tracking: string; labelBase64: string | null; labelFormat: string } {
   const tracking = String(data?.shipmentTrackingNumber ?? '')

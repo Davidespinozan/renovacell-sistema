@@ -9,6 +9,8 @@ import { driverName } from '../../data/mock/shipments'
 import { etiquetaDeGuia } from '../../data/shipping/provider'
 import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
+import { RecoleccionGuia } from '../../app/RecoleccionGuia'
+import { recoleccionDe } from '../../data/shipping/recoleccion'
 import { reloadShipments } from '../../data/store/shipmentsStore'
 import { reloadOrders } from '../../data/store/ordersStore'
 
@@ -108,7 +110,7 @@ export function Guias() {
                         <span><Icon name="usercheck" style={{ width: 13, height: 13, display: 'inline', verticalAlign: '-2px' }} /> {driverName(s.driver_id)}</span>
                       ) : (
                         <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}
-                          {s.tracking_number && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>La guía no incluye recolección: entrega el paquete en una sucursal o agenda la recolección con la paquetería.</span>}
+                          {s.tracking_number && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{s.pickup_confirmation ? 'La paquetería pasará por el paquete (recolección agendada).' : 'La guía no incluye recolección: entrega el paquete en una sucursal o agenda la recolección aquí abajo.'}</span>}
                         </span>
                       )}
                     </td>
@@ -123,7 +125,10 @@ export function Guias() {
                     </td>
                   </tr>
                   {s.tracking_number && !s.driver_id && s.status !== 'delivered' && s.status !== 'cancelado' && (
-                    <tr><td colSpan={5} style={{ paddingTop: 0 }}><RastreoDeGuia orderId={s.order_id} /></td></tr>
+                    <tr><td colSpan={5} style={{ paddingTop: 0 }}>
+                      <RecoleccionGuia orderId={s.order_id} agendada={recoleccionDe(s)} onCambio={reloadShipments} />
+                      <RastreoDeGuia orderId={s.order_id} />
+                    </td></tr>
                   )}
                   </React.Fragment>
                 )

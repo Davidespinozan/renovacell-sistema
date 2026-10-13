@@ -139,6 +139,8 @@ export interface Shipment {
   received_by: string | null    // nombre de quien recibió en destino (prueba de entrega)
   incident: ShipmentIncident | null // incidencia de entrega (ausente, dirección, rechazo…)
   created_at: ISODateTime
+  pickup_confirmation?: string | null            // PAQ-B · confirmación de recolección de la paquetería (si se agendó)
+  provider_meta?: Record<string, unknown> | null // PAQ-B · datos del proveedor (p. ej. la recolección agendada)
 }
 
 export interface ShipmentIncident {

@@ -20,7 +20,7 @@ const live = makeLive<Shipment>(async () => {
   // ya resuelven cuando la pantalla (que se suscribe a envíos) re-renderiza.
   await loadDrivers()
   const { data, error } = await leerTodo('los envíos', (a, b) => supabase.from('shipments')
-    .select('id, order_id, carrier, tracking_number, label_url, driver_id, status, estimated_delivery_at, delivered_at, proof_image_url, received_by, incident, dispatched_by, dispatched_at, load_confirmed_at, created_at')
+    .select('id, order_id, carrier, tracking_number, label_url, driver_id, status, estimated_delivery_at, delivered_at, proof_image_url, received_by, incident, dispatched_by, dispatched_at, load_confirmed_at, created_at, pickup_confirmation, provider_meta')
     .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Shipment[]

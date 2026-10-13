@@ -18,11 +18,12 @@ import { observador } from '../_shared/observa.ts'
 const obs = observador('shipping')
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
-  dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult,
+  dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult, buildPickupRequest, parsePickup,
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
+import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -187,6 +188,72 @@ Deno.serve(conCors(async (req) => {
     const label = await labelPayload(admin, sh)
     if (!label.labelUrl) return json(500, { error: 'No se pudo firmar el enlace de la etiqueta.' })
     return json(200, { idempotent: true, label })
+  }
+
+  // ===================== PAQ-B · RECOLECCIÓN (agendar / cancelar que la paquetería pase) =====================
+  // Solo logística. La guía ya existe; se usa el paquete, el servicio y el origen con los que se generó (del servidor).
+  // La confirmación queda en el envío (pickup_confirmation + provider_meta.pickup). Una recolección por guía.
+  if (action === 'schedule_pickup' || action === 'cancel_pickup') {
+    const orderId = s(p.order_id)
+    if (!orderId) return json(400, { error: 'Falta order_id.' })
+    const { data: sh, error: shErr } = await admin.from('shipments')
+      .select('id, tracking_number, provider, status, service_code, package, ship_from, pickup_confirmation, provider_meta')
+      .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+    if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
+    if (!sh?.tracking_number) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería.' })
+    if (sh.status === 'delivered' || sh.status === 'cancelado') return json(409, { error: 'envio_cerrado', message: 'Ese envío ya está cerrado.' })
+    if ((s(sh.provider) || 'dhl') !== 'dhl') return json(422, { error: 'proveedor_sin_recoleccion', message: 'La recolección desde el sistema aún no está disponible para esta paquetería.' })
+    const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD'), account = Deno.env.get('DHL_ACCOUNT_NUMBER')
+    if (!user || !pass || !account) return json(501, { error: 'not_configured', message: 'DHL no habilitado.' })
+    const base = dhlBaseUrl(Deno.env.get('DHL_API_ENV'))
+    const H = { 'Content-Type': 'application/json', Authorization: 'Basic ' + btoa(`${user}:${pass}`) }
+    // deno-lint-ignore no-explicit-any
+    const meta = ((sh.provider_meta ?? {}) as Record<string, any>)
+    const vigente = s(sh.pickup_confirmation)
+
+    if (action === 'schedule_pickup') {
+      if (vigente) return json(200, { idempotent: true, pickup: meta.pickup ?? { confirmation: vigente } })
+      const { hoy, ahoraMin } = ahoraLocalOrigen(Date.now())
+      const pedida = p.pickup as RecoleccionSolicitada
+      const motivo = errorRecoleccion(pedida, hoy, ahoraMin)
+      if (motivo) return json(422, { error: 'recoleccion_invalida', message: motivo })
+      const rec = limpiarRecoleccion(pedida)
+      const pkg = sh.package as NeutralPackage | null
+      if (!pkg || !(Number(pkg.weightKg) > 0)) return json(422, { error: 'sin_paquete', message: 'El envío no tiene guardadas las medidas del paquete; no se puede agendar la recolección desde aquí.' })
+      const shipper = (sh.ship_from as NeutralShipper | null) ?? (await companyShipper(admin)).shipper
+      let data: unknown = {}
+      try {
+        const r = await fetch(`${base}/pickups`, { method: 'POST', headers: H, body: JSON.stringify(buildPickupRequest(shipper, pkg, account, s(sh.service_code) || 'N', rec)) })
+        data = await r.json().catch(() => ({}))
+        if (!r.ok) { obs('schedule_pickup', 'provider_error', { code: r.status, mensaje: 'DHL respondió error al agendar la recolección' }); return json(502, { error: 'proveedor', message: dhlErrorMessage(r.status, data) }) }
+      } catch (_e) {
+        obs('schedule_pickup', 'unknown', { code: 'red', mensaje: 'sin respuesta de DHL al agendar la recolección' })
+        return json(504, { error: 'resultado_desconocido', message: 'DHL no respondió. Puede que la recolección SÍ haya quedado agendada: confírmalo con DHL antes de volver a intentar.' })
+      }
+      const { confirmation } = parsePickup(data)
+      if (!confirmation) { obs('schedule_pickup', 'unknown', { code: 'sin_confirmacion', mensaje: 'DHL 2xx sin número de confirmación' }); return json(502, { error: 'sin_confirmacion', message: 'DHL aceptó la solicitud pero no devolvió número de confirmación. Confírmalo con DHL.' }) }
+      const pickup = { confirmation, ...rec, requested_by: who.user.id, requested_at: new Date().toISOString() }
+      // Se escribe con la identidad de quien agenda (logística): es lo que admite el candado de envíos.
+      const { error: upErr } = await caller.from('shipments').update({ pickup_confirmation: confirmation, provider_meta: { ...meta, pickup } }).eq('id', sh.id)
+      if (upErr) { obs('schedule_pickup', 'internal_error', { code: 'guardar', mensaje: 'recolección agendada en DHL pero no guardada' }); return json(500, { error: 'no_guardada', message: `DHL agendó la recolección (confirmación ${confirmation}) pero no se pudo guardar en el sistema. Anota ese número.`, pickup }) }
+      return json(200, { pickup })
+    }
+
+    // cancel_pickup
+    if (!vigente) return json(404, { error: 'sin_recoleccion', message: 'Esa guía no tiene una recolección agendada.' })
+    const motivoCancel = s(p.reason).slice(0, 80) || 'Cancelada por el remitente'
+    const quienPide = (s(q.quien.full_name) || 'Renovacell').slice(0, 45)
+    try {
+      const r = await fetch(`${base}/pickups/${encodeURIComponent(vigente)}?requestorName=${encodeURIComponent(quienPide)}&reason=${encodeURIComponent(motivoCancel)}`, { method: 'DELETE', headers: H })
+      if (!r.ok) { const d = await r.json().catch(() => ({})); obs('cancel_pickup', 'provider_error', { code: r.status, mensaje: 'DHL respondió error al cancelar la recolección' }); return json(502, { error: 'proveedor', message: dhlErrorMessage(r.status, d) }) }
+    } catch (_e) {
+      obs('cancel_pickup', 'unknown', { code: 'red', mensaje: 'sin respuesta de DHL al cancelar la recolección' })
+      return json(504, { error: 'resultado_desconocido', message: 'DHL no respondió. Confirma con DHL si la recolección quedó cancelada.' })
+    }
+    const pickupAnterior = { ...(meta.pickup ?? {}), cancelled_by: who.user.id, cancelled_at: new Date().toISOString(), cancel_reason: motivoCancel }
+    const { error: upErr } = await caller.from('shipments').update({ pickup_confirmation: null, provider_meta: { ...meta, pickup: null, pickup_cancelada: pickupAnterior } }).eq('id', sh.id)
+    if (upErr) return json(500, { error: 'no_guardada', message: 'DHL canceló la recolección pero no se pudo actualizar el sistema. Vuelve a intentar.' })
+    return json(200, { cancelled: true })
   }
 
   // ===================== PROVIDER DHL (acciones neutras) =====================
