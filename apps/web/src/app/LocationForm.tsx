@@ -2,6 +2,7 @@
 // SOLO datos de ENTREGA — nunca fiscales (RFC/CFDI viven en meta.fiscal, otra pantalla).
 // Reutilizado por "Mi perfil → Ubicaciones" y por el checkout cuando no hay ubicaciones.
 import React, { useState } from 'react'
+import { esCpValido, esTelefonoEntregaValido } from '../data/ops/shippingAddress'
 import type { LocationFields } from '../data/store/doctorLocationsStore'
 
 const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 5 }
@@ -13,10 +14,12 @@ export const EMPTY_LOCATION: LocationFields = {
   contact_name: '', contact_phone: '',
 }
 
-// Campos mínimos obligatorios (§1): name, line1, postal_code, city, state, country.
+// Campos mínimos obligatorios (§1): name, line1, postal_code, city, state, country — y, para que la guía no se
+// atore en Empaque, C.P. de 5 dígitos y teléfono de contacto de 10 dígitos.
 export function isLocationValid(f: LocationFields): boolean {
   return [f.name, f.line1, f.postal_code, f.city, f.state, f.country]
     .every((v) => (v ?? '').toString().trim().length > 0)
+    && esCpValido(f.postal_code) && esTelefonoEntregaValido(f.contact_phone)
 }
 
 export function LocationForm({ value, onChange }: { value: LocationFields; onChange: (f: LocationFields) => void }) {
@@ -46,9 +49,9 @@ export function LocationForm({ value, onChange }: { value: LocationFields; onCha
       <input style={input} value={s(value.reference_notes)} onChange={(e) => set({ reference_notes: e.target.value })} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><label style={label}>Contacto</label><input style={input} value={s(value.contact_name)} onChange={(e) => set({ contact_name: e.target.value })} /></div>
-        <div><label style={label}>Teléfono</label><input style={input} inputMode="tel" value={s(value.contact_phone)} onChange={(e) => set({ contact_phone: e.target.value })} /></div>
+        <div><label style={label}>Teléfono de quien recibe *</label><input style={input} inputMode="tel" value={s(value.contact_phone)} onChange={(e) => set({ contact_phone: e.target.value })} /></div>
       </div>
-      {!isLocationValid(value) && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>Nombre, calle, C.P., ciudad, estado y país son obligatorios.</div>}
+      {!isLocationValid(value) && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>Nombre, calle, C.P. (5 dígitos), ciudad, estado, país y teléfono de quien recibe (10 dígitos) son obligatorios.</div>}
     </div>
   )
 }

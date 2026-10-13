@@ -12,9 +12,17 @@ afterEach(cleanup)
 describe('<DeliveryLocationPicker> (mock)', () => {
   it('con domicilio legacy usable lo ofrece y lo reporta como snapshot', async () => {
     const onChange = vi.fn()
-    render(<DeliveryLocationPicker legacyBase={{ line1: 'Calle 1', city: 'CDMX' }} onChange={onChange} />)
+    render(<DeliveryLocationPicker legacyBase={{ line1: 'Calle 1', city: 'CDMX', cp: '06000', phone: '55 1234 5678' }} onChange={onChange} />)
     await waitFor(() => expect(screen.getByText('Usar el domicilio registrado')).toBeTruthy())
-    expect(onChange).toHaveBeenCalledWith({ address: { line1: 'Calle 1', city: 'CDMX' } })
+    expect(onChange).toHaveBeenCalledWith({ address: { line1: 'Calle 1', city: 'CDMX', cp: '06000', phone: '55 1234 5678' } })
+  })
+
+  it('domicilio registrado SIN C.P. ni teléfono real (caso S100001): no se ofrece tal cual; se pide capturarlo completo', async () => {
+    const onChange = vi.fn()
+    render(<DeliveryLocationPicker legacyBase={{ line1: 'avenida federalismo 3119-25', city: 'tabachines, 80104, culiacan, sinaloa', phone: '—' }} onChange={onChange} />)
+    await waitFor(() => expect(screen.getByPlaceholderText(/Clínica Centro/)).toBeTruthy())
+    expect(screen.queryByText('Usar el domicilio registrado')).toBeNull()
+    expect(onChange).toHaveBeenLastCalledWith(null)
   })
 
   it('sin ubicaciones ni legacy → pide capturar una nueva (formulario)', async () => {
@@ -29,11 +37,11 @@ describe('<DeliveryLocationPicker> (mock)', () => {
 describe('<DeliveryLocationPicker> staff/POS (allowManage=false)', () => {
   it('con legacy del doctor: lo ofrece y NO muestra guardar/predeterminada', async () => {
     const onChange = vi.fn()
-    render(<DeliveryLocationPicker doctorId="doc-legacy" legacyBase={{ line1: 'Calle 9', city: 'GDL' }} allowManage={false} onChange={onChange} />)
+    render(<DeliveryLocationPicker doctorId="doc-legacy" legacyBase={{ line1: 'Calle 9', city: 'GDL', cp: '44100', phone: '33 1234 5678' }} allowManage={false} onChange={onChange} />)
     await waitFor(() => expect(screen.getByText('Usar el domicilio registrado')).toBeTruthy())
     expect(screen.queryByText(/Guardar esta ubicación/)).toBeNull()
     expect(screen.queryByText(/Guardar como predeterminada/)).toBeNull()
-    expect(onChange).toHaveBeenCalledWith({ address: { line1: 'Calle 9', city: 'GDL' } })
+    expect(onChange).toHaveBeenCalledWith({ address: { line1: 'Calle 9', city: 'GDL', cp: '44100', phone: '33 1234 5678' } })
   })
 
   it('sin ubicaciones ni legacy: captura one-off (AddressPicker), sin alias ni guardar', async () => {

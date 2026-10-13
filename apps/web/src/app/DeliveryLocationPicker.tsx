@@ -11,7 +11,7 @@ import { AddressPicker } from './AddressPicker'
 import { LocationForm, EMPTY_LOCATION, isLocationValid } from './LocationForm'
 import { useDoctorLocations } from '../data/hooks/useDoctorLocations'
 import { initialLocationSelection, shouldOfferLegacy, summarizeLocation, locationToShippingAddress } from '../data/ops/doctorLocation'
-import { formatAddress, isAddressUsable, type ShippingAddress } from '../data/ops/shippingAddress'
+import { faltantesDeEntrega, formatAddress, isAddressDeliverable, type ShippingAddress } from '../data/ops/shippingAddress'
 import type { LocationFields } from '../data/store/doctorLocationsStore'
 
 export interface DeliveryChoice { address: ShippingAddress | null; locationId?: string }
@@ -69,11 +69,12 @@ export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowMa
   useEffect(() => {
     if (mode === 'existing') {
       const loc = active.find((l) => l.id === selectedId)
-      onChange(loc ? { address: locationToShippingAddress(loc), locationId: loc.id } : null)
+      // Una ubicación guardada a la que le falta C.P. o teléfono NO se acepta: se completa aquí, antes de comprar.
+      onChange(loc && isAddressDeliverable(locationToShippingAddress(loc)) ? { address: locationToShippingAddress(loc), locationId: loc.id } : null)
     } else if (mode === 'legacy') {
-      onChange(isAddressUsable(legacyBase) ? { address: legacyBase } : null)
+      onChange(isAddressDeliverable(legacyBase) ? { address: legacyBase } : null)
     } else if (mode === 'oneoff') {
-      onChange(isAddressUsable(oneoff) ? { address: oneoff } : null)
+      onChange(isAddressDeliverable(oneoff) ? { address: oneoff } : null)
     } else if (mode === 'new') {
       onChange(isLocationValid(form) ? { address: fieldsToShipping(form) } : null)
     } else {
@@ -153,6 +154,11 @@ export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowMa
               <span style={{ flex: 1 }}>
                 <b style={{ display: 'block', fontSize: 13 }}>{loc.name} {loc.is_default && <span className="pill" style={{ background: 'var(--ok-bg, #EAF4EC)', color: 'var(--green-deep)', marginLeft: 6 }}>Predeterminada</span>}</b>
                 <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{summarizeLocation(loc)}</span>
+                {on && !isAddressDeliverable(locationToShippingAddress(loc)) && (
+                  <span style={{ display: 'block', fontSize: 11.5, color: 'var(--warn, #b45309)', marginTop: 3 }} data-testid="ubicacion-incompleta">
+                    A esta ubicación le falta: {faltantesDeEntrega(locationToShippingAddress(loc)).join(', ')}. Complétala en «Mis ubicaciones» o usa otra dirección.
+                  </span>
+                )}
               </span>
               {on && <Icon name="check" style={{ width: 15, height: 15, color: 'var(--green-deep)' }} />}
             </label>

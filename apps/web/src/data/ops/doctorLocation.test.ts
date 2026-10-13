@@ -101,8 +101,12 @@ describe('snapshot autoritativo — la elección se copia al pedido', () => {
 
 describe('legacy y desactivación', () => {
   it('shouldOfferLegacy: solo sin ubicaciones y con legacy usable', () => {
-    const legacy = { line1: 'Calle 1', city: 'CDMX' }
+    const legacy = { line1: 'Calle 1', city: 'CDMX', cp: '06000', phone: '55 1234 5678' }
     expect(shouldOfferLegacy([], legacy)).toBe(true)
+    // Sin C.P. o sin teléfono real NO se ofrece tal cual: se pide completarlo al comprar (caso S100001).
+    expect(shouldOfferLegacy([], { line1: 'avenida federalismo 3119-25', city: 'tabachines, 80104, culiacan, sinaloa', phone: '—' })).toBe(false)
+    expect(shouldOfferLegacy([], { ...legacy, phone: '—' })).toBe(false)
+    expect(shouldOfferLegacy([], { ...legacy, cp: '0600' })).toBe(false)
     expect(shouldOfferLegacy([], { line1: '', city: '' })).toBe(false)     // legacy inusable
     expect(shouldOfferLegacy([mk({ id: 'a' })], legacy)).toBe(false)        // ya hay ubicaciones
   })

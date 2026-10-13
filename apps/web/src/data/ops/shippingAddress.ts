@@ -29,6 +29,23 @@ export function isAddressUsable(a?: ShippingAddress | null): boolean {
   return !!a && a.line1.trim().length > 3 && (a.city ?? '').trim().length > 1
 }
 
+// ENTREGABLE = lo que Empaque y la paquetería necesitan para generar la guía SIN volver a preguntar: calle, ciudad,
+// C.P. de 5 dígitos y un teléfono de contacto real (10 dígitos; "—" o "s/n" no cuentan). Se exige al CAPTURAR el
+// pedido (venta o compra), no tres pasos después en Empaque.
+export const esCpValido = (v: unknown): boolean => /^\d{5}$/.test(String(v ?? '').trim())
+export const esTelefonoEntregaValido = (v: unknown): boolean => String(v ?? '').replace(/\D/g, '').length >= 10
+export function faltantesDeEntrega(a?: ShippingAddress | null): string[] {
+  const f: string[] = []
+  if (!a || a.line1.trim().length <= 3) f.push('calle y número')
+  if (!a || (a.city ?? '').trim().length <= 1) f.push('ciudad')
+  if (!esCpValido(a?.cp)) f.push('código postal de 5 dígitos')
+  if (!esTelefonoEntregaValido(a?.phone)) f.push('teléfono de quien recibe (10 dígitos)')
+  return f
+}
+export function isAddressDeliverable(a?: ShippingAddress | null): boolean {
+  return faltantesDeEntrega(a).length === 0
+}
+
 // Domicilio BASE del cliente. Nuevo modelo: `profiles.meta.shipping` (estructurado).
 // Compatibilidad hacia atrás: si no existe, arma uno con los `meta.address`/`meta.city`
 // sueltos que ya usaban el mock y la migración previa.

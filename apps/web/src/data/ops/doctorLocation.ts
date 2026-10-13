@@ -2,7 +2,7 @@
 // `doctor_locations` al snapshot de envío del pedido y convierten el domicilio legacy.
 // SOLO entrega: nunca tocan datos fiscales (meta.fiscal).
 import type { Database } from '../database.types'
-import { isAddressUsable, type ShippingAddress } from './shippingAddress'
+import { isAddressDeliverable, type ShippingAddress } from './shippingAddress'
 
 // C360-F3 · tipo/municipio (migración 121); opcionales hasta regenerar los tipos contra producción.
 // tipo/municipio (C360-F3) se declaran aquí igual con o sin tipos regenerados (en la BD son columnas de 121).
@@ -88,5 +88,6 @@ export function initialLocationSelection(locations: DoctorLocation[]): LocationS
 // ¿Ofrecer la dirección legacy (profiles.meta.shipping) como opción? SOLO si el doctor aún no
 // tiene ubicaciones activas y la legacy es usable. Nunca migra sola (evita duplicados por render).
 export function shouldOfferLegacy(locations: DoctorLocation[], legacy: ShippingAddress | null | undefined): boolean {
-  return activeLocations(locations).length === 0 && isAddressUsable(legacy)
+  // Solo se ofrece si está COMPLETO para entregar (C.P. y teléfono incluidos); si no, se pide capturar la dirección.
+  return activeLocations(locations).length === 0 && isAddressDeliverable(legacy)
 }
