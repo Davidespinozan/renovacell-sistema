@@ -57,3 +57,37 @@ export function mapearErrorAdopcion(mensaje: string | undefined): { status: numb
   if (/PERFIL_INEXISTENTE/.test(m)) return { status: 403, body: { error: 'sin_perfil', message: 'La cuenta no tiene perfil.' } }
   return { status: 500, body: { error: 'no_disponible', message: 'No se pudo completar la operación. Intenta más tarde.' } }
 }
+
+// CX-ENLACE · Prerregistro del enlace de contacto. Aquí solo se acota la forma; la base vuelve a validar y es la
+// que decide (normaliza, deduplica el prospecto y calcula la coincidencia con clientes).
+export interface Prerregistro { nombre: string; telefono: string; email: string; es_medico: boolean; cedula: string | null; consent: true }
+export type CampoPrerregistro = 'nombre' | 'telefono' | 'email' | 'cedula' | 'consentimiento'
+export const MENSAJE_PRERREGISTRO: Record<CampoPrerregistro, string> = {
+  nombre: 'Escribe tu nombre completo.',
+  telefono: 'Escribe tu celular a 10 dígitos.',
+  email: 'El correo no parece válido.',
+  cedula: 'La cédula profesional no parece válida.',
+  consentimiento: 'Para continuar, acepta el Aviso de privacidad.',
+}
+export function limpiarPrerregistro(entrada: unknown): { ok: true; datos: Prerregistro } | { ok: false; campo: CampoPrerregistro } {
+  const o = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>
+  const txt = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '')
+  const nombre = txt(o.nombre, 120)
+  if (nombre.length < 3) return { ok: false, campo: 'nombre' }
+  const digitos = (typeof o.telefono === 'string' ? o.telefono : '').replace(/\D/g, '')
+  const telefono = digitos.length === 12 && digitos.startsWith('52') ? digitos.slice(2) : digitos.length === 13 && digitos.startsWith('521') ? digitos.slice(3) : digitos
+  if (!/^\d{10}$/.test(telefono)) return { ok: false, campo: 'telefono' }
+  const email = txt(o.email, 160).toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, campo: 'email' }
+  const cedula = txt(o.cedula, 40) || null
+  if (cedula !== null && cedula.length < 5) return { ok: false, campo: 'cedula' }
+  if (o.consent !== true) return { ok: false, campo: 'consentimiento' }
+  return { ok: true, datos: { nombre, telefono, email, es_medico: o.es_medico === true, cedula, consent: true } }
+}
+export function mapearErrorPrerregistro(mensaje: string | undefined): { status: number; body: { error: string; message: string; campo?: string } } {
+  const m = mensaje ?? ''
+  if (/SESION_INVALIDA/.test(m)) return { status: 400, body: { error: 'sesion_invalida', message: 'Tu sesión expiró. Recarga la página e inténtalo de nuevo.' } }
+  const campo = /PRERREGISTRO_INVALIDO: (\w+)/.exec(m)?.[1] as CampoPrerregistro | undefined
+  if (campo && campo in MENSAJE_PRERREGISTRO) return { status: 400, body: { error: 'prerregistro_invalido', message: MENSAJE_PRERREGISTRO[campo], campo } }
+  return { status: 503, body: { error: 'no_disponible', message: 'No se pudo guardar tu registro. Intenta más tarde.' } }
+}

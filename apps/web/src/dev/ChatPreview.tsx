@@ -111,6 +111,13 @@ export function ChatPreview() {
     return () => clearInterval(auto)   // StrictMode monta dos veces: un solo recorrido
   }, [expandir, estado])
   const panel = params.get('panel') !== '0'
+  // CX-ENLACE · ?piel=wa: la piel de mensajería del enlace de contacto, a página completa.
+  if (params.get('piel') === 'wa') return (
+    <div className="rc-contacto">
+      <ChatCanonico estilo="mensajeria" conCarrito={false} cliente={cliente} intervaloMs={600_000}
+        barra={<><a href="#v" className="rc-barra--fuerte">Verificar mi cédula</a><a href="#l">Conocer Renovacell</a></>} />
+    </div>
+  )
   return (
     <div style={{ height: '100dvh', display: 'flex', justifyContent: 'flex-end', background: 'var(--hueso)' }}>
       <div className="chat-drawer" style={{ animation: 'none' }}>

@@ -89,3 +89,63 @@ export async function adoptarVisitante(deps: { invocar?: Invocar; st?: Almacen |
     return 'error'
   }
 }
+
+// ── CX-ENLACE · Prerregistro del enlace de contacto ────────────────────────────────────────────────
+// Quien entra por el enlace que se comparte en grupos deja sus datos mínimos antes de conversar. El servidor
+// valida de nuevo, crea o reutiliza el prospecto y decide a quién le llega la conversación; aquí nunca se sabe
+// (ni se manda) si coincidió con un cliente ni con qué vendedor.
+export interface DatosPrerregistro { nombre: string; telefono: string; email: string; es_medico: boolean; cedula: string }
+export type CampoPrerregistro = 'nombre' | 'telefono' | 'email' | 'cedula' | 'consentimiento'
+export interface EstadoVisitante { visitante: boolean; prerregistrado: boolean; nombre: string | null }
+export const LLAVE_PRELLENADO = 'rc_prefill'   // la landing (mismo origen) lo lee para no volver a pedir lo ya escrito
+
+/** Valida lo que se puede validar sin servidor (el servidor repite todo). Devuelve el primer campo con problema. */
+export function validarPrerregistro(d: DatosPrerregistro, acepta: boolean): { campo: CampoPrerregistro; mensaje: string } | null {
+  if (d.nombre.trim().length < 3) return { campo: 'nombre', mensaje: 'Escribe tu nombre completo.' }
+  if (d.telefono.replace(/\D/g, '').length !== 10) return { campo: 'telefono', mensaje: 'Escribe tu celular a 10 dígitos.' }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim())) return { campo: 'email', mensaje: 'El correo no parece válido.' }
+  if (d.es_medico && d.cedula.trim() !== '' && d.cedula.trim().length < 5) return { campo: 'cedula', mensaje: 'La cédula profesional no parece válida.' }
+  if (!acepta) return { campo: 'consentimiento', mensaje: 'Para continuar, acepta el Aviso de privacidad.' }
+  return null
+}
+
+/** ¿Este navegador ya dejó su prerregistro? Nunca lanza: ante cualquier duda, se pide el formulario. */
+export async function estadoVisitante(deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<EstadoVisitante> {
+  const nada: EstadoVisitante = { visitante: false, prerregistrado: false, nombre: null }
+  if (!hasSupabase && !deps.invocar) return nada
+  try {
+    const token = leerTokenVisitante(deps.st === undefined ? almacen() : deps.st)
+    if (!token) return nada
+    const { data, error } = await (deps.invocar ?? invocarPorDefecto)('visitor', { body: { action: 'estado', token } })
+    if (error || !data || typeof data !== 'object') return nada
+    const d = data as Partial<EstadoVisitante>
+    return { visitante: d.visitante === true, prerregistrado: d.prerregistrado === true, nombre: typeof d.nombre === 'string' ? d.nombre : null }
+  } catch { return nada }
+}
+
+export type ResultadoPrerregistro = { ok: true; nombre: string } | { ok: false; mensaje: string; campo?: CampoPrerregistro }
+export async function prerregistrar(d: DatosPrerregistro, deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<ResultadoPrerregistro> {
+  const sinRed = 'No hay conexión con el servidor. Intenta de nuevo.'
+  if (!hasSupabase && !deps.invocar) return { ok: false, mensaje: 'El registro requiere conexión con el servidor.' }
+  const st = deps.st === undefined ? almacen() : deps.st
+  try {
+    // Sin sesión de visitante (primera visita, almacenamiento borrado) se abre una antes de registrar.
+    if (!leerTokenVisitante(st)) await abrirVisitante({ invocar: deps.invocar, st })
+    const token = leerTokenVisitante(st)
+    if (!token) return { ok: false, mensaje: 'No se pudo iniciar tu sesión. Revisa que tu navegador permita guardar datos del sitio e inténtalo de nuevo.' }
+    const datos = { nombre: d.nombre.trim(), telefono: d.telefono.replace(/\D/g, ''), email: d.email.trim().toLowerCase(), es_medico: d.es_medico, cedula: d.es_medico ? d.cedula.trim() : '', consent: true }
+    const { data, error } = await (deps.invocar ?? invocarPorDefecto)('visitor', { body: { action: 'prerregistrar', token, datos } })
+    if (error) {
+      try {
+        const ctx = (error as { context?: Response }).context
+        if (ctx) { const b = (await ctx.json()) as { message?: string; campo?: CampoPrerregistro; error?: string }; if (b.error === 'sesion_invalida') olvidarTokenVisitante(st); return { ok: false, mensaje: b.message ?? sinRed, campo: b.campo } }
+      } catch { /* sin detalle */ }
+      return { ok: false, mensaje: sinRed }
+    }
+    const r = (data ?? {}) as { estado?: string; nombre?: string }
+    if (r.estado !== 'registrado' && r.estado !== 'ya_registrado') return { ok: false, mensaje: 'No se pudo guardar tu registro. Intenta más tarde.' }
+    // Para "Verificarme": la landing (mismo origen) rellena con esto su formulario. Solo lo que la persona escribió.
+    try { st?.setItem(LLAVE_PRELLENADO, JSON.stringify({ nombre: datos.nombre, telefono: datos.telefono, correo: datos.email, cedula: datos.cedula })) } catch { /* sin almacenamiento */ }
+    return { ok: true, nombre: r.nombre ?? datos.nombre }
+  } catch { return { ok: false, mensaje: sinRed } }
+}

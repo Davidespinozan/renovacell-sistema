@@ -15,10 +15,11 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico, TEXTO_ASESORIA_FINALIZADA } from './ChatCanonico'
 import { useRole } from '../../auth/RoleContext'
+import { contactoDe as contactoPorDefecto, urlEnlaceContacto, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
-export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esDireccion = false, onAtencion }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void }) {
+export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esDireccion = false, onAtencion, contactoDe = contactoPorDefecto }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void; contactoDe?: typeof contactoPorDefecto }) {
   const [cola, setCola] = useState<ColaItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -27,6 +28,21 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   const [aviso, setAviso] = useState<string | null>(null)
   const [enfocar, setEnfocar] = useState(false)
   const intento = useIntento('asesorias')
+  // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
+  const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
+  useEffect(() => {
+    setContacto(null)
+    if (!abierta) return
+    let vivo = true
+    void contactoDe(abierta).then((c) => { if (vivo) setContacto(c) })
+    return () => { vivo = false }
+  }, [abierta, contactoDe])
+  const [copiado, setCopiado] = useState(false)
+  const copiarEnlace = async () => {
+    const url = urlEnlaceContacto()
+    try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) }
+    catch { window.prompt('Copia el enlace de contacto:', url) }
+  }
 
   const cargar = useCallback(async () => {
     const r = await cliente.cola()
@@ -70,6 +86,15 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
+      {contacto && (
+        <div className="rc-contacto-ficha" data-testid="contacto-enlace">
+          <div><b>{contacto.nombre}</b>{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</div>
+          <div className="rc-contacto-datos"><a href={`tel:${contacto.telefono}`}>{contacto.telefono}</a><a href={`mailto:${contacto.email}`}>{contacto.email}</a><span>Llegó por el enlace de contacto</span></div>
+          {contacto.posible_cliente && !contacto.confirmado && (
+            <div className="rc-contacto-ojo" role="note">Sus datos coinciden con el cliente <b>{contacto.posible_cliente}</b>, pero <b>no está confirmado</b>: no compartas historial, precios ni pedidos hasta que inicie sesión.</div>
+          )}
+        </div>
+      )}
       <ChatCanonico embebido asesor conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
@@ -84,7 +109,10 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
 
   return (
     <div className="card" data-testid="asesorias">
-      <h2 style={{ margin: '0 0 4px' }}>Conversaciones con clientes</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
+        <button type="button" className="btn ghost sm" onClick={() => void copiarEnlace()} title="El enlace único para compartir en grupos: quien lo abre deja sus datos y conversa en este mismo chat." data-testid="copiar-enlace">{copiado ? 'Enlace copiado' : 'Copiar enlace de contacto'}</button>
+      </div>
       <p style={{ margin: '0 0 12px', color: 'var(--ink-3, #667)', fontSize: 13 }}>
         {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Atención comercial.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
       </p>

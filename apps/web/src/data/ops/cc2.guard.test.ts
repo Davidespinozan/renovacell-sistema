@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import mig from '../../../../../supabase/migrations/20261028120000_cc2_conversacion.sql?raw'
 import down from '../../../../../supabase/rollback/cc2/99_down.sql?raw'
 import chatSrc from '../../../../../supabase/functions/chat/index.ts?raw'
+import visitorSrc from '../../../../../supabase/functions/visitor/index.ts?raw'
 import chatShared from '../../../../../supabase/functions/_shared/chat.ts?raw'
 import limiteSrc from '../../../../../supabase/functions/_shared/limite.ts?raw'
 import opsSrc from './chat.ts?raw'
@@ -131,17 +132,28 @@ describe('frontend', () => {
     expect(landingSrc).toMatch(/\/functions\/v1\/visitor/)                   // atribución del visitante (CC-1)
     expect(landingSrc).toMatch(/localStorage\.setItem\(KEY,d\.token\)/)       // el token de visitante persiste
   })
-  // Decisión del dueño (10 oct 2026): la conversación existe solo dentro del sistema. La función de servidor
-  // no atiende a un anónimo ni a un doctor sin verificar, y lo decide ANTES de tocar la base o el limitador.
-  it('Edge chat: sin sesión → 401 y doctor sin verificar → 403, antes de cualquier comando; el token de visitante ya no abre la puerta', () => {
+  // Decisiones del dueño (10 y 13 oct 2026): conversan las cuentas con acceso y, por el enlace de contacto, quien
+  // dejó su prerregistro. La puerta la decide la BASE (cc_puerta_chat) antes del limitador y de cualquier otro comando.
+  it('Edge chat: la puerta va primero; sin sesión solo pasa un visitante con prerregistro y el doctor sin verificar solo si viene de uno', () => {
     const c = codigo(chatSrc)
-    const iPuerta = c.indexOf("if (!quien) return json(401, { error: 'sin_identidad'")
-    const iAcceso = c.indexOf("if (quien.role === 'doctor' && !quien.verified) return json(403, { error: 'sin_acceso'")
-    const iPrimerComando = Math.min(...['admin.rpc(', 'caller.rpc(', 'limitarTodas(', 'limitar('].map((x) => c.indexOf(x)).filter((n) => n >= 0))
-    expect(iPuerta).toBeGreaterThan(0); expect(iAcceso).toBeGreaterThan(iPuerta); expect(iPrimerComando).toBeGreaterThan(iAcceso)
-    expect(c).toMatch(/verified: q\.quien\.verified/)                 // la verificación sale del perfil, no del cliente
-    expect(c).toMatch(/const hash: string \| null = null/)            // ningún comando recibe hash de visitante
-    expect(c).not.toMatch(/hashToken|sujetoPublico|p\.token/)         // el token de visitante ni se lee
+    const iPuerta = c.indexOf("admin.rpc('cc_puerta_chat'")
+    const otros = ['limitarTodas(', 'limitar(', 'caller.rpc(', "admin.rpc('cc_abrir_conversacion'", "admin.rpc('cc_enviar_mensaje'", "admin.rpc('cc_solicitar_asesor'"].map((x) => c.indexOf(x)).filter((n) => n >= 0)
+    expect(iPuerta).toBeGreaterThan(0); expect(Math.min(...otros)).toBeGreaterThan(iPuerta)
+    expect(c).toMatch(/if \(!quien \|\| \(quien\.role === 'doctor' && !quien\.verified\)\) \{/)   // exactamente esos dos casos pasan por la puerta
+    expect(c).toMatch(/if \(!quien && !hash\) return json\(401, \{ error: 'sin_identidad'/)          // sin sesión y sin token: nada
+    expect(c).toMatch(/if \(!quien && !pu\.visitante\) return json\(401/)                            // token que no es de un visitante vigente
+    expect(c).toMatch(/if \(!pu\.prerregistrado\) \{[\s\S]{0,260}json\(403, \{ error: 'sin_acceso'[\s\S]{0,220}json\(403, \{ error: 'prerregistro_requerido'/)
+    expect(c).toMatch(/if \(ePuerta \|\| !puerta\) return json\(503/)                               // falla cerrado
+    expect(c).toMatch(/verified: q\.quien\.verified/)                                                // la verificación sale del perfil, no del cliente
+    expect(c).toMatch(/const hash: string \| null = quien \? null : await hashToken\(p\.token\)/)     // con sesión, el token de visitante ni se lee
+    expect(c).toMatch(/p_profile: quien \? quien\.uid : null/)                                        // la cuenta la da el JWT, nunca el cuerpo
+  })
+  it('CX-ENLACE · la función visitor acota y limita el prerregistro, y no revela coincidencias', () => {
+    const v = codigo(visitorSrc)
+    const iLimpia = v.indexOf('limpiarPrerregistro(p.datos)'); const iLimite = v.indexOf("scope: 'visitor_prerregistro'"); const iRpc = v.indexOf("admin.rpc('cc_visitante_prerregistrar'")
+    expect(iLimpia).toBeGreaterThan(0); expect(iLimite).toBeGreaterThan(iLimpia); expect(iRpc).toBeGreaterThan(iLimite)
+    expect(v).toMatch(/return json\(200, \{ estado: r\.estado, nombre: r\.nombre \}\)/)
+    expect(v).not.toMatch(/posible_|seller|customer/)
   })
   it('AG · el chat interno de staff (legacy) sigue intacto', () => {
     expect(legacyChatStore).toMatch(/from\('messages'\)/); expect(legacyChatStore).not.toMatch(/cc_messages/)

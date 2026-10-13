@@ -4,7 +4,8 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, History, Send, X } from 'lucide-react'
+import { CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
+import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
@@ -28,6 +29,8 @@ interface Props {
   autoFoco?: boolean                 // UX V2-B · al abrir el cajón, el foco entra al redactor
   nombreCliente?: string | null      // Chat V2-C3 · nombre del dueño que manda el servidor (vista del personal)
   onFin?: (motivo: 'terminada') => void   // D4-FIX · el asesor terminó la asesoría: quien monta vuelve a su lista
+  estilo?: 'mensajeria'              // CX-ENLACE · piel de mensajería (enlace de contacto): mismo componente, mismo hilo
+  barra?: React.ReactNode            // CX-ENLACE · accesos bajo el encabezado (conocer Renovacell, verificarse)
 }
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
@@ -82,7 +85,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -276,12 +279,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     const etiqueta = etiquetaActor(m, visor, { nombreCliente, nombreAsesor, etiquetaAsesor: ETIQUETA_ASESOR })
     hilo.push(
       <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}`} data-testid={`msg-${m.actor}`}>
-        {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden>R</span>}
+        {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span>}
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
           {inicio && etiqueta && <div className="rc-meta">{etiqueta}</div>}
           <div className="rc-bubble" title={horaDe(m.created_at)}>{m.content}</div>
-          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}</time>
+          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
         </div>
       </div>,
     )
@@ -290,10 +293,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   if (!asesor && conv && !cerrada && modo === 'human_active') hilo.push(<div key="join" className="rc-join" data-testid="aviso-asesor-activo"><span>{nombreAsesor ?? 'Tu asesor'} está contigo</span></div>)
 
   return (
-    <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}`} data-testid="chat-canonico"
+    <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico"
       onKeyDown={(e) => { if (e.key === 'Escape' && vista.tipo === 'historial') { e.stopPropagation(); volverActual() } }}>
       <header className="rc-head">
-        <div className="rc-mark" aria-hidden>R</div>
+        <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>
         <div className="rc-title">
           <div className="rc-name">{asesor ? 'Asesoría' : 'Renovacell'}</div>
           <div className="rc-state" data-testid="chat-modo">{subtituloDe(conv, asesor)}</div>
@@ -317,6 +320,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           {onSalir && <button type="button" className="rc-ico" onClick={onSalir} aria-label={etiquetaSalir} title={etiquetaSalir} data-testid="btn-salir"><X size={18} /></button>}
         </div>
       </header>
+      {barra && <div className="rc-barra" data-testid="chat-barra">{barra}</div>}
 
       {finAtencion ? (
         <div className="rc-thread" data-testid="asesoria-fin">
@@ -353,7 +357,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           </div>
         )}
         {!cargando && mensajes.length === 0 && !error && !pendiente && (
-          <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="msg-bienvenida"><span className="rc-avatar" aria-hidden>R</span><div className="rc-bubble-wrap"><div className="rc-meta">Asistente</div><div className="rc-bubble">{asesor ? 'Sin mensajes todavía.' : 'Hola, soy el asistente de Renovacell. ¿En qué te ayudo?'}</div></div></div>
+          <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="msg-bienvenida"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-meta">Asistente</div><div className="rc-bubble">{asesor ? 'Sin mensajes todavía.' : 'Hola, soy el asistente de Renovacell. ¿En qué te ayudo?'}</div></div></div>
         )}
         {hilo}
         {pendiente && (
@@ -366,7 +370,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
             </div>
           </div>
         )}
-        {esperandoIA && <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="escribiendo" aria-label="El asistente está escribiendo"><span className="rc-avatar" aria-hidden>R</span><div className="rc-bubble-wrap"><div className="rc-bubble rc-typing"><i /><i /><i /></div></div></div>}
+        {esperandoIA && <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="escribiendo" aria-label="El asistente está escribiendo"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-bubble rc-typing"><i /><i /><i /></div></div></div>}
         <div ref={fin} />
       </div>
 

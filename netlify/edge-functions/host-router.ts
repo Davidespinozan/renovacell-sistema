@@ -41,6 +41,12 @@ export default async (request: Request, context: Context): Promise<Response | vo
     return Response.redirect(`https://${host}/sistema`, 301)
   }
 
+  // 2b) CX-ENLACE · el enlace de contacto vive en UN solo origen (renovacell.mx): ahí están la landing y el
+  //     registro, y comparten la sesión de visitante que da continuidad a la conversación.
+  if (APP_DOORS.has(host) && /^\/contacto(\/|$)/.test(url.pathname)) {
+    return Response.redirect(`https://renovacell.mx${url.pathname}${url.search}`, 302)
+  }
+
   // 3) renovacell.mx, *.netlify.app y rutas profundas de las puertas: passthrough.
   return context.next()
 }

@@ -142,3 +142,97 @@
 @media (prefers-reduced-motion:reduce){
   .rc-card,.rc-typing i,.rc-chip-chev,.rc-ico,.rc-send,.rc-hora,.rc-hist-item{animation:none;transition:none}
 }
+
+/* Logo de la marca en el encabezado y como avatar del asistente (un solo origen: BrandLogo). */
+.rc-mark,.rc-avatar{overflow:hidden}
+.rc-logo{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+.rc-tick{display:none}
+.rc-barra{display:flex;gap:8px;padding:8px 12px;background:var(--cp-surface);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.rc-barra::-webkit-scrollbar{display:none}
+.rc-barra a,.rc-barra button{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:var(--pill);border:1px solid var(--line);background:var(--cp-surface);color:var(--green-deep);font:inherit;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.rc-barra a:hover,.rc-barra button:hover{border-color:var(--green-soft);background:var(--ok-bg)}
+.rc-barra .rc-barra--fuerte{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
+.rc-barra .rc-barra--fuerte:hover{background:var(--green);border-color:var(--green)}
+
+/* ── CX-ENLACE · Piel de mensajería (enlace de contacto) ────────────────────────────────────────────
+   El mismo componente y el mismo hilo, con el lenguaje visual que la gente ya conoce de su mensajero:
+   encabezado de marca con logo, lienzo con textura, burbujas con cola, hora y palomitas dentro de la burbuja. */
+.rc-chat--wa{--wa-lienzo:#e9ede7;--wa-propia:#d8f5cf;--wa-ajena:#fff;--wa-meta:#667781;background:var(--wa-lienzo)}
+.rc-chat--wa.rc-chat--pagina{box-shadow:0 12px 40px rgba(11,20,14,.18)}
+.rc-chat--wa .rc-head{background:var(--green-deep);border-bottom:0;padding:10px 12px;color:#fff;box-shadow:0 1px 3px rgba(11,20,14,.25);position:relative;z-index:2}
+.rc-chat--wa .rc-mark{width:42px;height:42px;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.28)}
+.rc-chat--wa .rc-name{color:#fff;font-size:16.5px;font-weight:600;letter-spacing:.005em}
+.rc-chat--wa .rc-state{color:rgba(255,255,255,.82);font-size:12.5px;-webkit-line-clamp:1}
+.rc-chat--wa .rc-ico{color:rgba(255,255,255,.9)}
+.rc-chat--wa .rc-ico:hover,.rc-chat--wa .rc-ico--on{background:rgba(255,255,255,.14);color:#fff}
+.rc-chat--wa .rc-thread,.rc-chat--wa .rc-hist,.rc-chat--wa .rc-hist-thread{background-color:var(--wa-lienzo);
+  background-image:radial-gradient(rgba(0,90,13,.055) 1.1px,transparent 1.2px),radial-gradient(rgba(0,90,13,.04) 1px,transparent 1.1px);background-size:22px 22px,22px 22px;background-position:0 0,11px 11px}
+.rc-chat--wa .rc-thread{padding:10px 5% 8px;gap:2px}
+.rc-chat--wa .rc-day{margin:10px 0 8px}
+.rc-chat--wa .rc-day span{background:#fff;color:var(--wa-meta);box-shadow:0 1px .5px rgba(11,20,14,.13);border-radius:8px;padding:5px 12px;font-size:12px;letter-spacing:0;text-transform:none;font-weight:500}
+.rc-chat--wa .rc-sys{background:#fdf6d8;color:#54656f;border-radius:8px;box-shadow:0 1px .5px rgba(11,20,14,.13);padding:6px 12px;margin:6px 0;font-size:12.5px;max-width:86%}
+.rc-chat--wa .rc-msg{padding-left:0;max-width:82%;gap:0}
+.rc-chat--wa .rc-msg--inicio{margin-top:8px}
+.rc-chat--wa .rc-avatar{display:none}
+.rc-chat--wa .rc-bubble-wrap{position:relative;display:block;background:var(--wa-ajena);border-radius:9px;padding:6px 9px 6px;box-shadow:0 1px .5px rgba(11,20,14,.13)}
+.rc-chat--wa .rc-msg--own .rc-bubble-wrap{background:var(--wa-propia)}
+.rc-chat--wa .rc-msg--inicio .rc-bubble-wrap{border-top-left-radius:0}
+.rc-chat--wa .rc-msg--own.rc-msg--inicio .rc-bubble-wrap{border-top-left-radius:9px;border-top-right-radius:0}
+.rc-chat--wa .rc-msg--inicio .rc-bubble-wrap::before{content:'';position:absolute;top:0;left:-8px;width:8px;height:13px;background:var(--wa-ajena);clip-path:polygon(0 0,100% 0,100% 100%)}
+.rc-chat--wa .rc-msg--own.rc-msg--inicio .rc-bubble-wrap::before{left:auto;right:-8px;background:var(--wa-propia);clip-path:polygon(0 0,100% 0,0 100%)}
+.rc-chat--wa .rc-meta{margin:0 0 2px;font-size:12.5px;font-weight:600;color:var(--green-deep)}
+.rc-chat--wa .rc-msg .rc-bubble{display:inline;padding:0;background:none;border:0;border-radius:0;color:#111b21;font-size:14.6px;line-height:1.42}
+.rc-chat--wa .rc-hora{float:right;display:inline-flex;align-items:center;gap:3px;opacity:1;max-height:none;overflow:visible;margin:6px 0 -3px 10px;font-size:11px;color:var(--wa-meta);font-variant-numeric:tabular-nums}
+.rc-chat--wa .rc-hora--fija{float:none;display:flex;justify-content:flex-end;margin:2px 0 -2px}
+.rc-chat--wa .rc-tick{display:inline-block;color:#8696a0}
+.rc-chat--wa .rc-msg--fallo .rc-bubble-wrap{background:var(--danger-bg)}
+.rc-chat--wa .rc-fallo{display:block;margin:4px 0 0}
+.rc-chat--wa .rc-msg .rc-bubble.rc-typing{display:inline-flex;gap:4px;align-items:center;padding:7px 4px}
+@media (min-width:800px){.rc-chat--wa .rc-msg{max-width:68%}}
+.rc-chat--wa .rc-card{background:#fff;box-shadow:0 1px .5px rgba(11,20,14,.13);border-radius:10px}
+.rc-chat--wa .rc-join span{background:#fff;box-shadow:0 1px .5px rgba(11,20,14,.13)}
+.rc-chat--wa .rc-anterior{background:#fff;border:0;box-shadow:0 1px .5px rgba(11,20,14,.13);border-radius:8px}
+.rc-chat--wa .rc-composer{background:#f0f2f1;border-top:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));gap:8px}
+.rc-chat--wa .rc-input{background:#fff;border-color:transparent;border-radius:24px;min-height:46px;padding:12px 18px;box-shadow:0 1px .5px rgba(11,20,14,.1)}
+.rc-chat--wa .rc-input:focus{border-color:transparent;box-shadow:0 1px .5px rgba(11,20,14,.1),0 0 0 2px rgba(0,115,17,.18)}
+.rc-chat--wa .rc-send{width:46px;height:46px;background:var(--green);box-shadow:0 1px 2px rgba(11,20,14,.22)}
+.rc-chat--wa .rc-foot{background:#f0f2f1;padding:0 14px calc(10px + env(safe-area-inset-bottom,0px))}
+.rc-chat--wa .rc-error{margin:6px 12px}
+@media (max-width:640px){
+  .rc-chat--wa .rc-thread{padding:8px 10px 6px}
+  .rc-chat--wa .rc-msg{max-width:88%}
+}
+
+/* Página del enlace de contacto: en escritorio el chat va centrado sobre un lienzo de marca. */
+.rc-contacto{min-height:100vh;min-height:100dvh;background:linear-gradient(180deg,var(--green-deep) 0,var(--green-deep) 132px,#dfe4dd 132px);display:flex;justify-content:center}
+.rc-contacto>.rc-chat--pagina,.rc-contacto>.rc-pre{width:100%;max-width:760px}
+@media (min-width:800px){
+  .rc-contacto{padding:22px 0}
+  .rc-contacto>.rc-chat--pagina{height:calc(100dvh - 44px);border-radius:14px;overflow:hidden}
+  .rc-contacto>.rc-pre{min-height:calc(100dvh - 44px);border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(11,20,14,.18)}
+}
+.rc-pre{display:flex;flex-direction:column;background:#f4f6f3;color:var(--ink);font-family:'Inter',system-ui,sans-serif}
+.rc-pre-cuerpo{flex:1;display:flex;flex-direction:column;align-items:center;padding:26px 18px calc(28px + env(safe-area-inset-bottom,0px))}
+.rc-pre-tarjeta{width:100%;max-width:440px;background:#fff;border-radius:16px;padding:24px 22px 22px;box-shadow:0 2px 14px rgba(11,20,14,.08)}
+.rc-pre-tarjeta h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.rc-pre-tarjeta>p{margin:6px 0 18px;font-size:14px;line-height:1.5;color:var(--ink-3)}
+.rc-campo{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.rc-campo>label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.rc-campo input{height:48px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:#fff;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.rc-campo input:focus{border-color:var(--green-soft);box-shadow:0 0 0 3px rgba(51,174,100,.18)}
+.rc-campo--mal input{border-color:var(--danger)}
+.rc-campo small{font-size:12.5px;color:var(--danger)}
+.rc-casilla{display:flex;align-items:flex-start;gap:10px;margin:4px 0 14px;font-size:13.5px;line-height:1.45;color:var(--ink-2);cursor:pointer}
+.rc-casilla input{width:20px;height:20px;flex:none;margin:0;accent-color:var(--green)}
+.rc-casilla a{color:var(--green-deep);font-weight:600}
+.rc-pre-enviar{width:100%;height:50px;border:0;border-radius:25px;background:var(--green);color:#fff;font:inherit;font-size:15.5px;font-weight:600;cursor:pointer;box-shadow:0 2px 6px rgba(0,115,17,.28);transition:transform var(--dur-fast),opacity var(--dur-fast)}
+.rc-pre-enviar:hover{transform:translateY(-1px)}
+.rc-pre-enviar:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+.rc-pre-nota{margin:14px 0 0;font-size:12.5px;line-height:1.5;color:var(--mid);text-align:center}
+.rc-pre-nota a{color:var(--green-deep);font-weight:600}
+
+/* CX-ENLACE · ficha de quien escribe por el enlace de contacto (vista del personal). */
+.rc-contacto-ficha{padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--cp-surface);font-size:13.5px;display:flex;flex-direction:column;gap:4px}
+.rc-contacto-datos{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--mid)}
+.rc-contacto-datos a{color:var(--green-deep);font-weight:600;text-decoration:none}
+.rc-contacto-ojo{margin-top:2px;padding:8px 10px;border-radius:var(--r-sm);background:var(--warn-bg);color:var(--warn);font-size:12.5px;line-height:1.45}

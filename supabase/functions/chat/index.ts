@@ -1,9 +1,12 @@
 // Edge Function (se despliega con --no-verify-jwt porque valida el JWT ella misma): CONVERSACIÓN CANÓNICA (CC-2).
 //
-// SOLO CUENTAS CON ACCESO (decisión del dueño, 10 oct 2026): la conversación con Renovacell —y con un
-// asesor humano— existe dentro del sistema, una vez que el doctor envió su verificación y fue aprobado.
-// Sin sesión no hay conversación (el token de visitante de CC-1 YA NO abre esta puerta), y un doctor sin
-// verificar tampoco. En la landing atiende el agente de orientación (función `assistant`), no esta.
+// DOS PUERTAS (decisiones del dueño, 10 y 13 oct 2026):
+//   · Cuentas con acceso: el doctor verificado y el personal conversan dentro del sistema (JWT).
+//   · Enlace de contacto (CX-ENLACE): quien entra por el enlace que se comparte en grupos conversa SIN estar
+//     verificado, pero solo después de dejar su prerregistro (nombre, celular, correo, aviso de privacidad).
+//     Un token de visitante sin prerregistro no abre nada; un doctor sin verificar solo sigue conversando si su
+//     cuenta viene de un prerregistro (no pierde su conversación al registrarse).
+// La landing no usa esta función: ahí atiende el agente de orientación (`assistant`).
 // El actor lo deriva el servidor: perfil+rol del JWT. Nunca se acepta actor_type,
 // actor_id, profile_id ni seller_profile_id del cliente. La autoridad está en los comandos
 // cc_* (solo service_role); aquí se acota la entrada, se aplica el limitador (CC-0B) y se
@@ -18,7 +21,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import { conCors } from '../_shared/cors.ts'
-import { limitarTodas, respuestaLimite, sujetoUid } from '../_shared/limite.ts'
+import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
+import { hashToken } from '../_shared/visitante.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
 import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
@@ -60,15 +64,24 @@ Deno.serve(conCors(async (req) => {
     if (!q.ok) return json(q.status, q.body)
     quien = { uid: q.quien.uid, role: q.quien.role, verified: q.quien.verified }
   }
-  // Puerta de acceso: sin sesión no se conversa, y el doctor debe estar verificado. Se responde ANTES de
-  // tocar la base o el limitador: un anónimo no crea conversaciones, no consume IA y no pide asesor.
-  if (!quien) return json(401, { error: 'sin_identidad', message: 'Inicia sesión para conversar con Renovacell.' })
-  if (quien.role === 'doctor' && !quien.verified) return json(403, { error: 'sin_acceso', message: 'Tu acceso aún no está aprobado. Podrás conversar con Renovacell cuando Dirección verifique tu cédula.' })
-  // El hash de visitante queda SIEMPRE en null: los comandos cc_* reciben solo el perfil de la cuenta.
-  const hash: string | null = null
+  // Puerta de acceso. Se decide ANTES de cualquier comando o del limitador: sin sesión solo pasa un visitante CON
+  // prerregistro; un doctor sin verificar, solo si su cuenta viene de uno. La base (cc_puerta_chat) es quien lo dice.
+  const hash: string | null = quien ? null : await hashToken(p.token)
+  if (!quien || (quien.role === 'doctor' && !quien.verified)) {
+    if (!quien && !hash) return json(401, { error: 'sin_identidad', message: 'Abre la conversación desde el enlace de contacto de Renovacell o inicia sesión.' })
+    const { data: puerta, error: ePuerta } = await admin.rpc('cc_puerta_chat', { p_hash: hash, p_profile: quien ? quien.uid : null })
+    if (ePuerta || !puerta) return json(503, { error: 'no_disponible', message: 'No se pudo completar la operación. Intenta más tarde.' })
+    const pu = puerta as { visitante: boolean; prerregistrado: boolean }
+    if (!quien && !pu.visitante) return json(401, { error: 'sin_identidad', message: 'Tu sesión expiró. Abre de nuevo el enlace de contacto de Renovacell.' })
+    if (!pu.prerregistrado) {
+      return quien
+        ? json(403, { error: 'sin_acceso', message: 'Tu acceso aún no está aprobado. Podrás conversar con Renovacell cuando Dirección verifique tu cédula.' })
+        : json(403, { error: 'prerregistro_requerido', message: 'Antes de conversar, déjanos tus datos de contacto.' })
+    }
+  }
   const actor = derivarActor(quien, hash)
-  if (!actor) return json(401, { error: 'sin_identidad', message: 'Inicia sesión o abre la conversación desde el sitio.' })
-  const sujeto = sujetoUid(quien.uid)
+  if (!actor) return json(401, { error: 'sin_identidad', message: 'Inicia sesión o abre la conversación desde el enlace de contacto.' })
+  const sujeto = quien ? sujetoUid(quien.uid) : await sujetoPublico(req)
   const conv = typeof p.conversation_id === 'string' && UUID.test(p.conversation_id) ? p.conversation_id : null
   const falla = (e: { message?: string } | null) => { const m = mapearErrorChat(e?.message); return json(m.status, m.body) }
 

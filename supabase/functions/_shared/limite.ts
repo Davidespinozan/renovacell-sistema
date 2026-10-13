@@ -69,6 +69,10 @@ export const LIMITES: Record<string, Regla> = {
   visitor_abrir:             { limite: 60,  ventanaSegs: 3600 },
   visitor_abrir_global:      { limite: 3000, ventanaSegs: 3600 },
   visitor_adoptar:           { limite: 10,  ventanaSegs: 3600 },
+  // CX-ENLACE: el prerregistro crea un prospecto; consultar la puerta es lectura.
+  visitor_prerregistro:        { limite: 8,   ventanaSegs: 3600 },
+  visitor_prerregistro_global: { limite: 600, ventanaSegs: 3600 },
+  visitor_estado:              { limite: 120, ventanaSegs: 3600 },
   // chat (CC-2): abrir es barato; enviar cuesta (y puede llamar a la IA); solicitar asesor es raro.
   chat_abrir:                { limite: 30,  ventanaSegs: 3600 },
   chat_abrir_uid:            { limite: 60,  ventanaSegs: 3600 },

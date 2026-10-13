@@ -5,12 +5,16 @@ import { LandingPreview } from './screens/LandingPreview'
 import { Login } from './screens/Login'
 import { ResetPassword } from './screens/ResetPassword'
 import { ReviewPending } from './screens/ReviewPending'
+import { Contacto } from './screens/chat/Contacto'
 
 // `/chat` YA NO es una ruta pública (decisión del dueño, 10 oct 2026): la conversación con Renovacell
 // —y con un asesor humano— existe DENTRO del sistema, una vez que el doctor envió su verificación y tiene
 // acceso. La URL se conserva (netlify.toml la sirve con index.html) para no romper enlaces viejos, pero pasa
 // por las mismas puertas que el resto: sin sesión → login; doctor sin verificar → verificación; con acceso →
 // el portal, que abre al doctor en su conversación.
+// `/contacto` SÍ es pública (decisión del dueño, 13 oct 2026): el enlace único que se comparte en grupos. Abre el
+// MISMO chat del sistema, pero exige un prerregistro mínimo antes de conversar; no pasa por login ni por roles.
+const esRutaContacto = typeof window !== 'undefined' && /^\/contacto(\/|$)/.test(window.location.pathname)
 const esRutaChat = typeof window !== 'undefined' && /^\/chat(\/|$)/.test(window.location.pathname)
 // Vista previa visual del chat, SOLO en desarrollo (no existe en producción).
 const esPreviewChat = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'chat'
@@ -31,6 +35,7 @@ function Root() {
   let view
   if (esPreviewChat && ChatPreview) view = <React.Suspense fallback={null}><ChatPreview /></React.Suspense>
   else if (esPreviewHome && HomePreview) view = <React.Suspense fallback={null}><HomePreview /></React.Suspense>
+  else if (esRutaContacto) view = <Contacto />
   else if (mode === 'landing') view = <LandingPreview />
   else if (mode === 'reset') view = <ResetPassword />
   else if (mode === 'login') view = <Login />

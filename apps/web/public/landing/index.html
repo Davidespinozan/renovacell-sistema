@@ -3327,6 +3327,8 @@ document.addEventListener('keydown', e => {
 (function(){
   var U='https://amurlvlvfohwucvxfdot.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdXJsdmx2Zm9od3VjdnhmZG90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNTYwMzcsImV4cCI6MjA5ODkzMjAzN30.bboS0ZBInxpVw-K9UZ1mnB-iki9-aAl5oi8KsJZ0EEI';
   var f=document.getElementById('rncVerifyForm'); if(!f) return;
+  // CX-ENLACE · quien viene del enlace de contacto ya escribió estos datos: no se le vuelven a pedir.
+  try{var pf=JSON.parse(localStorage.getItem('rc_prefill')||'null');if(pf&&typeof pf==='object'){[['nombre','nombre'],['telefono','telefono'],['correo','correo'],['cedula','cedula']].forEach(function(e){var c=f[e[0]],v=pf[e[1]];if(c&&!c.value&&typeof v==='string'&&v)c.value=v.slice(0,160)})}}catch(_){}
   var out=document.getElementById('rncVerifyOut');
   var btn=f.querySelector('.form-submit');
   var esc=function(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;};

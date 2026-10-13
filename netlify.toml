@@ -71,6 +71,17 @@
   to = "/index.html"
   status = 200
 
+# 2c) CX-ENLACE · /contacto: el enlace único de contacto (el mismo chat del sistema, con prerregistro).
+[[redirects]]
+  from = "/contacto"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/contacto/*"
+  to = "/index.html"
+  status = 200
+
 # 3) /landing sigue sirviéndose como archivo (lo usa la vista previa del editor
 #    en Administración), pero ya no es la dirección pública.
 [[redirects]]
