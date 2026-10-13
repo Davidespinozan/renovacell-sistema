@@ -561,6 +561,8 @@ a.btn,a.btn:hover{text-decoration:none}
   body.printing-remision .remision-print-root{display:block !important}
   body.printing-remision .recibo{max-width:100%;box-shadow:none;border:0}
 }
+/* La hoja se imprime en cuanto se monta: sin animación de entrada (arranca transparente y saldría en blanco). */
+.remision-print-root .recibo{animation:none}
 @media print{ @page{margin:14mm} }
 
 /* Paginación del directorio comercial: desktop = números + etiquetas; móvil = "Página X de Y". */

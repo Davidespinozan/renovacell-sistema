@@ -117,7 +117,7 @@ export function Guias() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Empaque · Guías</div>
+        <div className="eyebrow">Envíos · Guías</div>
         <ExportButton
           name="guias"
           style={{ marginLeft: 'auto' }}
@@ -162,12 +162,14 @@ export function Guias() {
                     <td data-label="Estimada">{s.estimated_delivery_at ? fmtDate(s.estimated_delivery_at) : '—'}</td>
                     <td data-label="Estatus"><span className={'pill ' + sp.pill}>{sp.label}</span></td>
                     <td data-label="Documentos">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', maxWidth: 210 }}>
                       {s.label_url
                         ? <a className="btn ghost sm" href={s.label_url} target="_blank" rel="noreferrer"><Icon name="download" style={{ width: 13, height: 13 }} /> Guía</a>
                         : s.tracking_number && !s.driver_id
                           ? <button className="btn ghost sm" type="button" disabled={bajando === s.id} onClick={() => void descargar(s.order_id, s.id)} data-testid="descargar-etiqueta"><Icon name="download" style={{ width: 13, height: 13 }} /> {bajando === s.id ? 'Abriendo…' : 'Descargar etiqueta'}</button>
-                          : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>}
-                      {(() => { const o = orders.find((x) => x.id === s.order_id); return o && s.status !== 'cancelado' ? <span style={{ marginLeft: 6 }}><BotonRemision order={o} envio={s} /></span> : null })()}
+                          : null}
+                      {(() => { const o = orders.find((x) => x.id === s.order_id); return o && s.status !== 'cancelado' ? <BotonRemision order={o} envio={s} /> : null })()}
+                      </div>
                     </td>
                   </tr>
                   {s.tracking_number && !s.driver_id && s.status !== 'delivered' && s.status !== 'cancelado' && (

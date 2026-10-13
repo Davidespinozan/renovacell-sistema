@@ -36,7 +36,7 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
       <div className="rmeta">
         <div><div className="k">Pedido</div><div className="v mono">{order.external_ref}</div></div>
         <div><div className="k">Fecha</div><div className="v">{fmtDate(order.created_at)}</div></div>
-        <div><div className="k">Para</div><div className="v">{meta.customer?.name || '—'}</div></div>
+        {meta.customer?.name && <div><div className="k">Para</div><div className="v">{meta.customer.name}</div></div>}
         <div><div className="k">Envío</div><div className="v">{metodo}</div></div>
         {destino && <div style={{ gridColumn: '1 / -1' }}><div className="k">Destino</div><div className="v">{destino}</div></div>}
       </div>
@@ -68,14 +68,17 @@ export function BotonRemision({ order, envio, className = 'btn ghost sm' }: { or
   useEffect(() => {
     if (!imprimiendo) return
     const fin = () => { document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin); setImprimiendo(false) }
-    document.body.classList.add('printing-remision')
-    window.addEventListener('afterprint', fin)
-    window.print()
-    return () => { document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin) }
+    // Dos cuadros de espera: la hoja ya debe estar pintada cuando el navegador toma la foto de impresión.
+    const cuadro = requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.body.classList.add('printing-remision')
+      window.addEventListener('afterprint', fin)
+      window.print()
+    }))
+    return () => { cancelAnimationFrame(cuadro); document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin) }
   }, [imprimiendo])
   return (
     <>
-      <button className={className} type="button" onClick={() => setImprimiendo(true)} data-testid="imprimir-remision"><Icon name="receipt" style={{ width: 13, height: 13 }} /> Imprimir remisión</button>
+      <button className={className} type="button" disabled={imprimiendo} onClick={() => setImprimiendo(true)} data-testid="imprimir-remision"><Icon name="receipt" style={{ width: 13, height: 13 }} /> Imprimir remisión</button>
       {imprimiendo && createPortal(<div className="remision-print-root"><RemisionView order={order} envio={envio} /></div>, document.body)}
     </>
   )
