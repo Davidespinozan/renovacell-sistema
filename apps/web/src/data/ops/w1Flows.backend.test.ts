@@ -56,6 +56,30 @@ describe('surtirPedido (W1)', () => {
     expect(r2.ok).toBe(true)
     expect((h.rpc.mock.calls[h.rpc.mock.calls.length - 1] as unknown[])[1]).toMatchObject({ p_op_id: 'op-s3' })
   })
+  // W2 · F-7: el cobro se registra en payment_status / el libro; orders.status sigue en pending_payment.
+  it('pedido COBRADO que sigue en pending_payment (caso S100001) ⇒ se manda al servidor y se surte', async () => {
+    h.rpc.mockResolvedValueOnce({ data: { status: 'applied' }, error: null })
+    const cobrado = { ...order, id: 'O-2', status: 'pending_payment', payment_status: 'paid' } as unknown as OrderWithItems
+    const r = await surtirPedido(cobrado, 'op-s4')
+    expect(r.ok).toBe(true)
+    expect(h.rpc).toHaveBeenCalledWith('surtir_pedido', expect.objectContaining({ p_op_id: 'op-s4', p_order: 'O-2' }))
+    expect(h.markPacked).toHaveBeenCalledTimes(1)
+  })
+  it('pending_payment SIN cobro ni crédito ⇒ lo decide el servidor (PEDIDO_NO_LIBERADO), sin empacado', async () => {
+    h.rpc.mockResolvedValueOnce({ data: null, error: { code: 'P0001', message: 'PEDIDO_NO_LIBERADO: el pedido no tiene cobro suficiente ni crédito autorizado' } })
+    const sinCobro = { ...order, id: 'O-3', status: 'pending_payment', payment_status: 'pending' } as unknown as OrderWithItems
+    const r = await surtirPedido(sinCobro, 'op-s5')
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/no está liberado para surtir/)
+    expect(h.markPacked).not.toHaveBeenCalled()
+  })
+  it('estados no surtibles (borrador, empacado, cancelado) ⇒ ni siquiera se llama al servidor', async () => {
+    for (const status of ['draft', 'packed', 'shipped', 'delivered', 'cancelled']) {
+      const r = await surtirPedido({ ...order, status } as unknown as OrderWithItems, 'op-s6')
+      expect(r.ok).toBe(false)
+    }
+    expect(h.rpc).not.toHaveBeenCalled()
+  })
 })
 
 describe('venderPOS (W1)', () => {

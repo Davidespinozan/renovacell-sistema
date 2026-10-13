@@ -91,9 +91,13 @@ export async function surtirPedido(order: OrderWithItems, opId: string = newOpId
   if (['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(order.status ?? '')) {
     return { ok: false, plans: [], error: 'Ese pedido ya fue surtido o cerrado.' }
   }
-  // Debe estar en estado EMPACABLE (pagado). Validarlo ANTES de consumir evita descontar
-  // inventario de un pedido que luego no se empacaría.
-  if (!['paid', 'picking'].includes(order.status ?? '')) {
+  // W2 · F-7: se surte lo LIBERADO (cobro suficiente o crédito autorizado), no lo "marcado como pagado". Desde W2 el
+  // cobro vive en el libro y en `payment_status`; `orders.status` sigue en `pending_payment` hasta empacar. Por eso el
+  // estado admitido es el MISMO que el del servidor (`surtir_pedido`): pending_payment | paid | picking.
+  // Con backend, si está liberado lo decide el servidor (PEDIDO_NO_LIBERADO); en demo, lo único observable es el pago.
+  const estado = order.status ?? ''
+  const liberadoDemo = ['paid', 'picking'].includes(estado) || order.payment_status === 'paid'
+  if (!['pending_payment', 'paid', 'picking'].includes(estado) || (!hasSupabase && !liberadoDemo)) {
     return { ok: false, plans: [], error: 'Ese pedido todavía no se puede surtir (debe estar pagado).' }
   }
   const plans = planSurtido(order, getSnapshotLots(), mapaEnCustodia())
