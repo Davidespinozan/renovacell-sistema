@@ -172,6 +172,23 @@ Deno.serve(conCors(async (req) => {
 
   if (!esLogistica) return json(403, { error: 'Solo staff de logística puede cotizar o generar guías.' })
 
+  // ===================== PAQ-A · ETIQUETA DE UNA GUÍA EXISTENTE (reimpresión) =====================
+  // Solo logística. No llama a la paquetería ni valida destinatario/paquete: la guía ya existe; se firma de nuevo el
+  // enlace del PDF guardado (1 h). Antes solo se podía bajar en el momento de generarla.
+  if (action === 'get_label') {
+    const orderId = s(p.order_id)
+    if (!orderId) return json(400, { error: 'Falta order_id.' })
+    const { data: sh, error: shErr } = await admin.from('shipments')
+      .select('tracking_number, label_path, carrier, service_code, estimated_delivery_at, provider_cost, currency')
+      .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+    if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
+    if (!sh?.tracking_number) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería.' })
+    if (!sh.label_path) return json(404, { error: 'sin_etiqueta', message: 'Esa guía no tiene una etiqueta guardada.' })
+    const label = await labelPayload(admin, sh)
+    if (!label.labelUrl) return json(500, { error: 'No se pudo firmar el enlace de la etiqueta.' })
+    return json(200, { idempotent: true, label })
+  }
+
   // ===================== PROVIDER DHL (acciones neutras) =====================
   if (action === 'rate' || action === 'create_shipment' || action === 'track') {
     const user = Deno.env.get('DHL_API_USERNAME')

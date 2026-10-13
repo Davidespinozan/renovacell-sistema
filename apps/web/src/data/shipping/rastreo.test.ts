@@ -84,6 +84,13 @@ describe('servidor: guardas de fuente de la acción de rastreo', () => {
     expect(bloque).not.toMatch(/admin\.rpc\('confirmar_entrega'/)
     expect(bloque).not.toMatch(/\.from\('(shipments|orders)'\)\.update/)
   })
+  it('reimprimir la etiqueta: acción propia, solo logística, sin llamar a la paquetería ni exigir destinatario/paquete', () => {
+    const b = c.slice(c.indexOf("if (action === 'get_label')"), c.indexOf("if (action === 'rate' || action === 'create_shipment'"))
+    expect(c.indexOf("if (!esLogistica) return json(403")).toBeLessThan(c.indexOf("if (action === 'get_label')"))
+    expect(b).toMatch(/labelPayload\(admin, sh\)/)
+    expect(b).not.toMatch(/fetch\(|missingReceiverPkg|companyShipper|DHL_API/)
+    expect(b).not.toMatch(/\.(insert|update|delete)\(/)
+  })
   it('cotizar y generar guías siguen siendo solo de logística', () => {
     expect(c).toMatch(/if \(!esLogistica\) return json\(403/)
     expect(c.indexOf("if (!esLogistica) return json(403")).toBeLessThan(c.indexOf("action === 'rate' || action === 'create_shipment'"))
