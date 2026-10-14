@@ -62,7 +62,10 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
                 {!data.resumen.activo && <span className="pill p-dang">Inactivo</span>}
               </div>
             </div>
-            {canOrder && onOrder && <button type="button" className="btn sm" style={{ marginLeft: 'auto' }} onClick={onOrder}>Levantar pedido</button>}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {data.permisos.estado && <EstadoCliente customerId={data.customer_id} activo={data.resumen.activo} cliente={cliente} onCambio={recargar} />}
+              {canOrder && onOrder && data.resumen.activo && <button type="button" className="btn sm" onClick={onOrder}>Levantar pedido</button>}
+            </div>
           </>
         )}
         {!data && inicial && (
@@ -98,7 +101,7 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Cambiar un perfil no modifica los pedidos ni las facturas ya emitidas: cada pedido conserva el receptor con el que se pidió.</div>
               </Section>
             )}
-            {tab === 'comercial' && <Comercial d={data} atencion={atencion} recargar={recargar} />}
+            {tab === 'comercial' && <Comercial d={data} atencion={atencion} cliente={cliente} recargar={recargar} />}
             {tab === 'pedidos' && <Pedidos d={data} />}
             {tab === 'pagos' && <Pagos d={data} />}
             {tab === 'facturas' && <Facturas d={data} />}
@@ -175,33 +178,39 @@ function Contacto({ d, cliente, recargar }: { d: Cliente360; cliente: ClienteC36
   )
 }
 
-function Comercial({ d, atencion, recargar }: { d: Cliente360; atencion: ClienteAtencion; recargar: () => Promise<void> }) {
+function Comercial({ d, atencion, cliente, recargar }: { d: Cliente360; atencion: ClienteAtencion; cliente: ClienteC360; recargar: () => Promise<void> }) {
   const c = d.comercial!
   const [vendedores, setVendedores] = useState<Vendedor[] | null>(null)
-  const [sel, setSel] = useState(''); const [motivo, setMotivo] = useState(''); const [msg, setMsg] = useState<string | null>(null)
+  const [sel, setSel] = useState(''); const [motivo, setMotivo] = useState(''); const [msg, setMsg] = useState<string | null>(null); const [ocupado, setOcupado] = useState(false)
   useEffect(() => { if (d.permisos.cartera) void atencion.vendedores().then((r) => r.ok && setVendedores(r.data)) }, [d.permisos.cartera, atencion])
-  // CC-7 · la asignación persistente es la cartera; se reutiliza el comando canónico (no se reimplementa).
-  const asignar = async () => {
-    const pid = d.resumen.portal.profile_id
-    if (!pid) { setMsg('Este cliente no tiene cuenta de portal: la cartera de CC-7 se asigna a doctores con portal.'); return }
-    const a = await atencion.asignar(pid, sel, motivo || null)
+  // CARTERA-CLIENTES · Dirección asigna vendedor a CUALQUIER cliente, tenga o no cuenta (el servidor decide dónde vive).
+  const guardar = async (vendedor: string | null) => {
+    if (ocupado) return
+    setOcupado(true); setMsg(null)
+    const a = await cliente.asignarVendedor(d.customer_id, vendedor, motivo.trim() || null)
+    setOcupado(false)
     if (!a.ok) { setMsg(a.error); return }
-    setMsg(null); setSel(''); setMotivo(''); await recargar()
+    setSel(''); setMotivo(''); await recargar()
   }
+  const elegibles = (vendedores ?? []).filter((v) => v.elegible_nuevos)
+  const actual = d.resumen.vendedor
   return (
     <>
-      <Section icon={<Building2 size={15} />} title="Vendedor (cartera)">
-        <Field label="Actual" value={d.resumen.vendedor?.nombre ?? 'Sin vendedor asignado'} note={d.resumen.vendedor?.desde ? `desde ${fmtDate(d.resumen.vendedor.desde)}` : null} />
-        {d.permisos.cartera && d.resumen.portal.tiene && vendedores && (
+      <Section icon={<Building2 size={15} />} title="Vendedor">
+        <Field label="Actual" value={actual?.nombre ?? 'Sin vendedor asignado'} note={actual?.desde ? `desde ${fmtDate(actual.desde)}${actual.elegible ? '' : ' · ya no puede atender'}` : null} />
+        {d.permisos.cartera && vendedores && (elegibles.length === 0
+          ? <div className="sysnote" style={{ marginTop: 6 }} data-testid="sin-vendedores">Ningún vendedor puede recibir clientes todavía. En <b>Equipo</b>, edita al vendedor y actívale "Atender conversaciones" y "Recibir clientes nuevos".</div>
+          : (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }} data-testid="cartera-asignar">
-            <select value={sel} onChange={(e) => setSel(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)' }} aria-label="Vendedor">
-              <option value="">{d.resumen.vendedor ? 'Reasignar a…' : 'Asignar a…'}</option>
-              {vendedores.filter((v) => v.elegible_nuevos).map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+            <select value={sel} onChange={(e) => setSel(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 36 }} aria-label="Vendedor">
+              <option value="">{actual ? 'Cambiar a…' : 'Asignar a…'}</option>
+              {elegibles.filter((v) => v.id !== actual?.id).map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
             </select>
-            {d.resumen.vendedor && <input placeholder="Motivo del cambio" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)' }} />}
-            <button type="button" className="btn sm" disabled={!sel} onClick={asignar}>{d.resumen.vendedor ? 'Reasignar' : 'Asignar'}</button>
+            {actual && <input placeholder="Motivo del cambio" aria-label="Motivo del cambio de vendedor" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 36 }} />}
+            <button type="button" className="btn sm" disabled={!sel || ocupado || (!!actual && !motivo.trim())} onClick={() => void guardar(sel)} data-testid="btn-asignar-vendedor">{actual ? 'Cambiar vendedor' : 'Asignar vendedor'}</button>
+            {actual && <button type="button" className="btn ghost sm" disabled={ocupado || !motivo.trim()} title={motivo.trim() ? undefined : 'Escribe el motivo para quitarlo'} onClick={() => void guardar(null)} data-testid="btn-quitar-vendedor">Quitar vendedor</button>}
           </div>
-        )}
+        ))}
         {msg && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12.5 }}>{msg}</div>}
         {c.historial && c.historial.length > 0 && (
           <div style={{ marginTop: 8 }}>
@@ -295,3 +304,31 @@ const Actividad = ({ d }: { d: Cliente360 }) => (
     ))}
   </Section>
 )
+
+// CARTERA-CLIENTES · Dirección da de baja o reactiva al cliente. La baja exige motivo y no borra nada.
+function EstadoCliente({ customerId, activo, cliente, onCambio }: { customerId: string; activo: boolean; cliente: ClienteC360; onCambio: () => Promise<void> }) {
+  const [abierto, setAbierto] = useState(false); const [motivo, setMotivo] = useState(''); const [msg, setMsg] = useState<string | null>(null); const [ocupado, setOcupado] = useState(false)
+  const guardar = async (nuevo: boolean) => {
+    if (ocupado) return
+    setOcupado(true); setMsg(null)
+    const r = await cliente.guardarEstado(customerId, nuevo, motivo.trim() || null)
+    setOcupado(false)
+    if (!r.ok) { setMsg(r.error); return }
+    setAbierto(false); setMotivo(''); await onCambio()
+  }
+  if (activo && !abierto) return <button type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={() => setAbierto(true)} data-testid="btn-dar-baja">Dar de baja</button>
+  if (!activo) return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      <button type="button" className="btn sm" disabled={ocupado} onClick={() => void guardar(true)} data-testid="btn-reactivar">Reactivar cliente</button>
+      {msg && <span role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>{msg}</span>}
+    </span>
+  )
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }} data-testid="form-baja">
+      <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} placeholder="Motivo de la baja" aria-label="Motivo de la baja" style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 34 }} />
+      <button type="button" className="btn sm" style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={ocupado || !motivo.trim()} onClick={() => void guardar(false)} data-testid="btn-confirmar-baja">Dar de baja</button>
+      <button type="button" className="btn ghost sm" onClick={() => { setAbierto(false); setMotivo(''); setMsg(null) }}>Cancelar</button>
+      {msg && <span role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>{msg}</span>}
+    </span>
+  )
+}

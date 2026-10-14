@@ -30,7 +30,7 @@ export interface Evento360 { at: string; tipo: string; actor_rol: string | null;
 export interface Cliente360 {
   customer_id: string
   rol: RolC360
-  permisos: { contacto: string[]; telefonos: boolean; domicilios: boolean; fiscal: boolean; notas: boolean; cartera: boolean; adoptar_alta: boolean }
+  permisos: { contacto: string[]; telefonos: boolean; domicilios: boolean; fiscal: boolean; notas: boolean; cartera: boolean; adoptar_alta: boolean; estado?: boolean }
   resumen: {
     nombre: string; activo: boolean; creado_at: string | null; origen: string | null
     portal: { tiene: boolean; verificado: boolean; activo: boolean; profile_id?: string | null }
@@ -91,7 +91,7 @@ export const ETIQUETA_EVENTO: Record<string, string> = {
   contacto_actualizado: 'Contacto actualizado', telefono_agregado: 'Teléfono agregado', telefono_actualizado: 'Teléfono editado', telefono_principal: 'Teléfono principal cambiado', telefono_archivado: 'Teléfono archivado',
   domicilio_agregado: 'Domicilio agregado', domicilio_actualizado: 'Domicilio editado', domicilio_predeterminado: 'Domicilio predeterminado cambiado', domicilio_archivado: 'Domicilio archivado', domicilio_adoptado_alta: 'Domicilio del registro adoptado',
   fiscal_agregado: 'Perfil fiscal agregado', fiscal_actualizado: 'Perfil fiscal editado', fiscal_predeterminado: 'Perfil fiscal predeterminado cambiado', fiscal_archivado: 'Perfil fiscal archivado',
-  nota_agregada: 'Nota agregada', cartera_asignada: 'Vendedor asignado', cartera_reasignada: 'Vendedor reasignado', cartera_retirada: 'Vendedor retirado', pedido_creado: 'Pedido creado', migracion: 'Migración',
+  nota_agregada: 'Nota agregada', vendedor_asignado: 'Vendedor actualizado', cliente_baja: 'Cliente dado de baja', cliente_reactivado: 'Cliente reactivado', cartera_asignada: 'Vendedor asignado', cartera_reasignada: 'Vendedor reasignado', cartera_retirada: 'Vendedor retirado', pedido_creado: 'Pedido creado', migracion: 'Migración',
 }
 
 // ── Cliente de comandos (RPC del servidor; inyectable en pruebas) ──────────────────────────────
@@ -110,6 +110,8 @@ export function mensajeError360(m: string | undefined): string {
   if (/ARCHIVAD|INACTIVA/.test(t)) return 'Ese elemento está archivado.'
   if (/NO_AUTORIZADO|permission denied/.test(t)) return 'No tienes permiso para esta acción sobre este cliente.'
   if (/CLIENTE_INEXISTENTE/.test(t)) return 'No encontramos el expediente de este cliente.'
+  if (/VENDEDOR_NO_ELEGIBLE/.test(t)) return 'Ese vendedor no puede recibir clientes: en Equipo actívale "Atender conversaciones" y "Recibir clientes nuevos".'
+  if (/MOTIVO_REQUERIDO/.test(t)) return 'Escribe el motivo del cambio.'
   return 'No se pudo completar. Intenta de nuevo.'
 }
 
@@ -143,5 +145,12 @@ export class ClienteC360 {
   fiscalPredeterminado(id: string) { return this.llamar('cliente_fiscal_predeterminar', { p_perfil: id }) }
   archivarFiscal(id: string) { return this.llamar('cliente_fiscal_archivar', { p_perfil: id }) }
   agregarNota(customerId: string, texto: string) { return this.llamar('cliente_nota_agregar', { p_customer: customerId, p_texto: texto }) }
+  // CARTERA-CLIENTES · Dirección: vendedor de CUALQUIER cliente (con o sin cuenta) y baja / reactivación.
+  asignarVendedor(customerId: string, vendedor: string | null, motivo?: string | null) {
+    return this.llamar<{ idempotente: boolean; por: 'cuenta' | 'cliente' }>('cliente_vendedor_asignar', { p_customer: customerId, p_vendedor: vendedor, p_motivo: motivo ?? null })
+  }
+  guardarEstado(customerId: string, activo: boolean, motivo?: string | null) {
+    return this.llamar<{ activo: boolean; idempotente: boolean }>('cliente_estado_guardar', { p_customer: customerId, p_activo: activo, p_motivo: motivo ?? null })
+  }
 }
 export const cliente360 = new ClienteC360()

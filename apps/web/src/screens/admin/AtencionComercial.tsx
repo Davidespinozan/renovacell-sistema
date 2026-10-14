@@ -305,7 +305,7 @@ function ModalCambiarCartera({ p, vendedores, carteraNombre, cliente, onCerrar, 
 }
 
 function PestanaCartera({ vendedores, cliente, onCambio }: { vendedores: Vendedor[]; cliente: ClienteAtencion; onCambio: () => void }) {
-  const [filtro, setFiltro] = useState<'todos' | 'sin_vendedor' | 'reasignacion'>('sin_vendedor')
+  const [filtro, setFiltro] = useState<'todos' | 'sin_vendedor' | 'reasignacion'>('todos')
   const [filas, setFilas] = useState<ClienteCartera[]>([])
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Record<string, string>>({})
@@ -324,6 +324,7 @@ function PestanaCartera({ vendedores, cliente, onCambio }: { vendedores: Vendedo
     <div className="card">
       <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 10 }} data-testid="explica-cartera">
         <b>La cartera es permanente:</b> define qué vendedor atiende las compras futuras del cliente. Para pasar SOLO una solicitud a otra persona usa <b>Reasignar esta solicitud</b> en Solicitudes.
+        <div style={{ marginTop: 6 }} data-testid="cartera-cualquier-cliente">Aquí aparecen los doctores con cuenta. A <b>cualquier cliente</b> (tenga o no cuenta) le asignas vendedor desde <b>Clientes</b> → su ficha → pestaña <b>Comercial</b>.</div>
       </div>
       <div className="filters" style={{ marginBottom: 10 }}>
         <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} style={{ padding: '8px 11px', borderRadius: 14, border: '1px solid var(--line)', fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)' }} aria-label="Filtro">
