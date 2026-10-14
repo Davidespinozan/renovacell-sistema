@@ -25,6 +25,7 @@ interface RoleState {
   setScreen: (s: string) => void
   setMode: (m: AppMode) => void
   login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
+  actualizarVerificacion: (verified: boolean) => void   // cuenta ≠ verificación: el portal refleja la decisión sin volver a entrar
   logout: () => void
   updateProfile: (patch: Partial<SessionUser> & { fiscal?: Record<string, string> }) => void
 }
@@ -125,7 +126,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout, updateProfile }),
+    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified }),
     [role, screen, mode, verified, user, capabilities],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>

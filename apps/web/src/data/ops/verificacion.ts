@@ -35,3 +35,33 @@ export async function evidenciaDoctor(profile: string, invocar: Invocar = invoca
   if (!hasSupabase && invocar === invocarPorDefecto) return {}
   try { const { data, error } = await invocar('verificacion', { body: { action: 'evidencia', profile_id: profile } }); return error || !data ? {} : ((data as { evidencia?: Record<string, string> }).evidencia ?? {}) } catch { return {} }
 }
+
+// ── MI VERIFICACIÓN (el propio doctor) ──────────────────────────────────────────────────────────
+export interface MiVerificacion { verificado: boolean; estado: 'pending' | 'verified' | 'rejected' | 'revoked'; motivo: string | null; revisado_at: string | null; cedula: string | null; faltan: Array<'cedula' | 'ine-front' | 'ine-back'> }
+export async function miVerificacion(rpc: Rpc = rpcPorDefecto): Promise<MiVerificacion | null> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return null
+  try { const { data, error } = await rpc('mi_verificacion', {}); return error || !data ? null : data as MiVerificacion } catch { return null }
+}
+export async function completarVerificacion(d: { cedula?: string; ineFront?: string | null; ineBack?: string | null }, invocar: Invocar = invocarPorDefecto): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  if (!hasSupabase && invocar === invocarPorDefecto) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+  try {
+    const { error } = await invocar('verificacion', { body: { action: 'completar', cedula: d.cedula ?? '', ineFront: d.ineFront ?? null, ineBack: d.ineBack ?? null } })
+    if (!error) return { ok: true }
+    try { const ctx = (error as { context?: Response }).context; if (ctx) { const b = (await ctx.json()) as { message?: string }; return { ok: false, mensaje: b.message ?? 'No se pudo guardar.' } } } catch { /* sin detalle */ }
+    return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' }
+  } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
+}
+/** Reduce la foto en el navegador (lado mayor ≤ 1600 px, JPEG) antes de mandarla: menos datos y siempre bajo el límite. */
+export function reducirFoto(file: File, max = 1600): Promise<string | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file); const img = new Image()
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas')
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url)
+      try { resolve(c.toDataURL('image/jpeg', 0.85)) } catch { resolve(null) }
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    img.src = url
+  })
+}

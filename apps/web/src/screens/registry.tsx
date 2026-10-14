@@ -1,6 +1,7 @@
 // Registro de pantallas: mapea pantalla -> componente.
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
+import { MiVerificacion } from './doctor/MiVerificacion'
 import React, { useEffect } from 'react'
 import { useRole } from '../auth/RoleContext'
 import { Placeholder } from './Placeholder'
@@ -118,6 +119,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_custodias: () => <Custodias />,
   // CC-2 · conversación canónica
   chat_cc: () => <ChatCanonico embebido />,
+  mi_verificacion: () => <MiVerificacion />,   // cuenta ≠ verificación
   asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
 }
 

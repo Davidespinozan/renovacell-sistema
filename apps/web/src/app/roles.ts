@@ -93,6 +93,7 @@ export const ROLES: RoleDef[] = [
       // UX-1 · UNA sola conversación con Renovacell (IA + asesor humano en el mismo hilo). El antiguo
       // 'asist' (Asistente IA) ya no es módulo: su clave sigue resolviendo a esta pantalla (alias).
       { key: 'chat_cc', label: 'Habla con Renovacell', icon: 'chat' },
+      { key: 'mi_verificacion', label: 'Mi verificación', icon: 'shield' },   // cuenta ≠ verificación
     ],
   },
   {
