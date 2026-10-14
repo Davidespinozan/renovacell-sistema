@@ -5,7 +5,9 @@ do $t$
 declare r record;
 begin
   for r in select * from (values
-    ('admin_approve_doctor(uuid,uuid,jsonb)',                 'ae578fcf8652206d6db0c611d7a4a5ef'),
+    -- CONTINUIDAD (156, autorizado por el dueño): al aprobar, liga el prerregistro único con el mismo correo. Hash
+    -- re-anclado; el previo (ae578fcf…) lo restaura supabase/rollback/continuidad.
+    ('admin_approve_doctor(uuid,uuid,jsonb)',                 '1341a6ea2d5c683ae36b9b7fe4b2a4e4'),
     -- W6-A1 (autorizado): auth_role/has_cap/log_audit/profiles_guard fallan cerrado ante una
     -- cuenta suspendida. Sus hashes se re-anclan aquí; el resto sigue intacto.
     ('auth_role()',                                           '663618f6d4eedf568db532bca55cddc5'),
