@@ -2,6 +2,7 @@
 // Lee del servidor (`cliente_360`, redacción por rol) y edita SOLO con comandos (cliente_*); la cartera se
 // asigna con los comandos de CC-7. Pestañas solo con datos canónicos para el rol; divulgación progresiva.
 // Lo profesional/verificación se muestra (sin evidencia biométrica); no se edita aquí.
+import { InvitarCliente } from './InvitarCliente'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Mail, Phone, MapPin, UserCheck, UserX, IdCard, Building2, ShoppingBag, Receipt, FileText, Clock, MessageCircle, ShieldCheck } from 'lucide-react'
 import { initials, avatarColor, money, fmtDate } from '../lib/format'
@@ -63,6 +64,7 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
               </div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {!data.resumen.portal.tiene && data.resumen.activo && (data.rol === 'direccion' || data.rol === 'vendedor') && <InvitarCliente customerId={data.customer_id} />}
               {data.permisos.estado && <EstadoCliente customerId={data.customer_id} activo={data.resumen.activo} cliente={cliente} onCambio={recargar} />}
               {canOrder && onOrder && data.resumen.activo && <button type="button" className="btn sm" onClick={onOrder}>Levantar pedido</button>}
             </div>

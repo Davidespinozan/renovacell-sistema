@@ -73,6 +73,11 @@ export const LIMITES: Record<string, Regla> = {
   visitor_prerregistro:        { limite: 8,   ventanaSegs: 3600 },
   visitor_prerregistro_global: { limite: 600, ventanaSegs: 3600 },
   visitor_estado:              { limite: 120, ventanaSegs: 3600 },
+  // INVITACIONES: crear es del personal; ver y aceptar son públicas (con el secreto del enlace).
+  invitacion_crear_uid:        { limite: 60,  ventanaSegs: 3600 },
+  invitacion_ver:              { limite: 60,  ventanaSegs: 3600 },
+  invitacion_aceptar:          { limite: 10,  ventanaSegs: 3600 },
+  invitacion_aceptar_global:   { limite: 300, ventanaSegs: 3600 },
   // chat (CC-2): abrir es barato; enviar cuesta (y puede llamar a la IA); solicitar asesor es raro.
   chat_abrir:                { limite: 30,  ventanaSegs: 3600 },
   chat_abrir_uid:            { limite: 60,  ventanaSegs: 3600 },

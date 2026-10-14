@@ -4,8 +4,9 @@ begin;
 create temp table _ck as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
-     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia', '_cartera_cliente_al_ligar', 'cliente_vendedor_asignar', 'cliente_estado_guardar')) resto,
+     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia', '_cartera_cliente_al_ligar', 'cliente_vendedor_asignar', 'cliente_estado_guardar') and p.proname not like 'cliente_invitacion_%') resto,
   (select count(*) from public.customers) n_c, (select count(*) from public.cc_cartera) n_k;
+\ir ../../../rollback/invitaciones/99_down.sql   -- INVITACIONES (153) se baja primero
 \ir ../../../rollback/cartera_clientes/99_down.sql
 do $t$ begin
   perform tests.ok(to_regclass('public.cc_cartera_clientes') is null and to_regclass('public.cc_cartera_clientes_historial') is null
@@ -19,6 +20,7 @@ do $t$ begin
   perform tests.ok((select n_c = (select count(*) from public.customers) and n_k = (select count(*) from public.cc_cartera) from _ck), '152 down · sin cambios de datos');
 end $t$;
 \ir ../../../migrations/20261205120000_cartera_clientes.sql
+\ir ../../../migrations/20261206120000_invitaciones_clientes.sql
 do $t$ begin
   perform tests.ok((select todas from _ck) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '152 · se vuelve a aplicar y queda idéntica');
 end $t$;

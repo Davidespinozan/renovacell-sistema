@@ -141,7 +141,7 @@ describe('CX-ENLACE · guardas de seguridad y despliegue', () => {
     expect(sql).toMatch(/case when cardinality\(v_cust\) = 1 then v_cust\[1\] end/); expect(sql).toMatch(/case when cardinality\(v_sell\) = 1 then v_sell\[1\] end/)
   })
   it('la página es pública y va antes de login y roles; Netlify la sirve y las puertas del sistema la mandan al dominio público', () => {
-    expect(appSrc).toMatch(/else if \(esRutaContacto\) view = <Contacto \/>\s*\n\s*else if \(mode === 'landing'\)/)
+    expect(appSrc).toMatch(/else if \(esRutaContacto\) view = <Contacto \/>\s*\n\s*else if \(esRutaInvitacion\) view = <Invitacion \/>\s*\n\s*else if \(mode === 'landing'\)/)
     expect(netlify).toMatch(/from = "\/contacto"\s*\n\s*to = "\/contacto\.html"\s*\n\s*status = 200/)
     expect(netlify.indexOf('from = "/contacto"')).toBeLessThan(netlify.indexOf('from = "/*"'))
     expect(router).toMatch(/APP_DOORS\.has\(host\) && \/\^\\\/contacto\(\\\/\|\$\)\/\.test\(url\.pathname\)/); expect(router).toMatch(/https:\/\/renovacell\.mx\$\{url\.pathname\}\$\{url\.search\}`, 302/)
@@ -152,7 +152,7 @@ describe('CX-ENLACE · guardas de seguridad y despliegue', () => {
     expect(contactoHtml).toMatch(/property="og:title" content="Renovacell · Tecnologías Antiedad"/); expect(contactoHtml).toMatch(/property="og:description" content="Chatea con un asesor\."/); expect(contactoHtml).toMatch(/property="og:image" content="https:\/\/renovacell\.mx\/brand\/app-apple-180-v2\.png"/)
     expect(contactoHtml).toMatch(/og:image:width" content="180"/); expect(contactoHtml).not.toMatch(/summary_large_image|og-renovacell/)   // miniatura, no foto grande
     expect(contactoHtml).toMatch(/src="\/src\/main\.tsx"/)                       // la misma aplicación
-    expect(viteCfg).toMatch(/input: \{ main: 'index\.html', contacto: 'contacto\.html' \}/)
+    expect(viteCfg).toMatch(/input: \{ main: 'index\.html', contacto: 'contacto\.html', invitacion: 'invitacion\.html' \}/)
   })
   it('la landing reutiliza el prerregistro en su formulario y sigue sin ofrecer chat humano', () => {
     expect(landing).toMatch(/localStorage\.getItem\('rc_prefill'\)/)

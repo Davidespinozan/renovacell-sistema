@@ -86,6 +86,13 @@
   status = 200
   force = true
 
+# 2d) INVITACIONES · /invitacion: el cliente existente crea su cuenta (página propia: título del negocio).
+[[redirects]]
+  from = "/invitacion"
+  to = "/invitacion.html"
+  status = 200
+  force = true
+
 # 3) /landing sigue sirviéndose como archivo (lo usa la vista previa del editor
 #    en Administración), pero ya no es la dirección pública.
 [[redirects]]
