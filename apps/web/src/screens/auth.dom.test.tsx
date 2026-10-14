@@ -20,6 +20,12 @@ describe('<Login>', () => {
     fireEvent.change(email, { target: { value: 'direccion@renovacell.mx' } })
     expect(email.value).toBe('direccion@renovacell.mx')
   })
+  it('"Verifica tu cédula" lleva al ÚNICO registro de doctores (el de la landing), no a un formulario corto', () => {
+    renderWithRole(<Login />)
+    const ir = screen.getByTestId('ir-registro-medico') as HTMLAnchorElement
+    expect(ir.getAttribute('href')).toMatch(/\/#contacto$/)
+    expect(screen.queryByText('Crear cuenta médica')).toBeNull(); expect(screen.queryByPlaceholderText('Número de cédula')).toBeNull()
+  })
 })
 
 describe('<ReviewPending>', () => {

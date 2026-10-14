@@ -28,3 +28,8 @@ export async function contactoDe(conversationId: string, rpc: Rpc = rpcPorDefect
       posible_cliente: typeof d.posible_cliente === 'string' ? d.posible_cliente : null, confirmado: d.confirmado === true }
   } catch { return null }
 }
+
+/** El registro de doctores es UNO: el formulario de la landing (sección #contacto). En producción, el dominio público. */
+export function urlVerificacionMedica(loc: { hostname: string; origin: string } = window.location): string {
+  return /(^|\.)renovacell\.mx$/i.test(loc.hostname) ? 'https://renovacell.mx/#contacto' : `${loc.origin}/#contacto`
+}

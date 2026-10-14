@@ -7,7 +7,7 @@ import { esSesionDeUsuario } from '../../../../../supabase/functions/_shared/qui
 import chatEdge from '../../../../../supabase/functions/chat/index.ts?raw'
 import { LIMITES } from '../../../../../supabase/functions/_shared/limite'
 import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, LLAVE_PRELLENADO, LLAVE_VISITANTE } from './visitante'
-import { contactoDe, urlEnlaceContacto } from './contactoEnlace'
+import { contactoDe, urlEnlaceContacto, urlVerificacionMedica } from './contactoEnlace'
 import mig from '../../../../../supabase/migrations/20261203120000_cx_enlace_prerregistro.sql?raw'
 import netlify from '../../../../../netlify.toml?raw'
 import router from '../../../../../netlify/edge-functions/host-router.ts?raw'
@@ -109,6 +109,10 @@ describe('CX-ENLACE · cliente', () => {
     expect(urlEnlaceContacto({ hostname: 'renovacell.mx', origin: 'https://renovacell.mx' })).toBe('https://renovacell.mx/contacto')
     expect(urlEnlaceContacto({ hostname: 'localhost', origin: 'http://localhost:5173' })).toBe('http://localhost:5173/contacto')
     expect(urlEnlaceContacto({ hostname: 'malrenovacell.mx', origin: 'https://malrenovacell.mx' })).toBe('https://malrenovacell.mx/contacto')
+  })
+  it('el registro de doctores también es uno: el de la landing, en el dominio público', () => {
+    expect(urlVerificacionMedica({ hostname: 'sistema.renovacell.mx', origin: 'https://sistema.renovacell.mx' })).toBe('https://renovacell.mx/#contacto')
+    expect(urlVerificacionMedica({ hostname: 'localhost', origin: 'http://localhost:5173' })).toBe('http://localhost:5173/#contacto')
   })
   it('contacto de una conversación: lee el comando y nunca lanza', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { nombre: 'Ana Ruiz', telefono: '6690000001', email: 'ana@test.local', es_medico: true, cedula: null, posible_cliente: 'Dra. Cartera', confirmado: false }, error: null })
