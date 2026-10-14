@@ -236,3 +236,17 @@
 .rc-contacto-datos{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--mid)}
 .rc-contacto-datos a{color:var(--green-deep);font-weight:600;text-decoration:none}
 .rc-contacto-ojo{margin-top:2px;padding:8px 10px;border-radius:var(--r-sm);background:var(--warn-bg);color:var(--warn);font-size:12.5px;line-height:1.45}
+
+/* CX-ENLACE · Antesala: el prerregistro vive DENTRO del chat (el asistente saluda y pide los datos en el hilo). */
+.rc-enlinea{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CF29A;margin-right:6px;box-shadow:0 0 0 0 rgba(124,242,154,.6);animation:rcpulso 2s infinite}
+@keyframes rcpulso{0%{box-shadow:0 0 0 0 rgba(124,242,154,.55)}70%{box-shadow:0 0 0 7px rgba(124,242,154,0)}100%{box-shadow:0 0 0 0 rgba(124,242,154,0)}}
+.rc-pre-enhilo{align-self:flex-start;width:min(430px,94%);max-width:none;margin:8px 0 10px;padding:16px 16px 14px;border-radius:0 12px 12px 12px;box-shadow:0 1px .5px rgba(11,20,14,.13);animation:rcaparece var(--dur) var(--ease-soft)}
+.rc-pre-enhilo h1{font-size:17px}
+.rc-pre-enhilo>p{margin:6px 0 14px;font-size:13.5px}
+.rc-pre-enhilo .rc-campo{margin-bottom:10px;gap:4px}
+.rc-pre-enhilo .rc-campo input{height:44px;border-radius:10px;background:#f7f8f7}
+.rc-pre-enhilo .rc-casilla{margin:2px 0 10px;font-size:13px}
+.rc-pre-enhilo .rc-pre-enviar{height:46px;font-size:15px}
+.rc-pre-enhilo .rc-pre-nota{margin-top:10px;font-size:12px}
+.rc-input--espera{display:flex;align-items:center;color:var(--mid);user-select:none}
+@media (prefers-reduced-motion:reduce){.rc-enlinea,.rc-pre-enhilo{animation:none}}

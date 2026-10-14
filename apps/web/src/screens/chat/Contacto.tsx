@@ -4,7 +4,7 @@
 // verificación; al registrarse desde este mismo navegador y entrar al sistema, la conversación continúa.
 // Quién atiende (su vendedor o Dirección) lo decide el servidor; esta página nunca lo sabe.
 import React, { useEffect, useState } from 'react'
-import { BadgeCheck, Globe } from 'lucide-react'
+import { BadgeCheck, Globe, Send } from 'lucide-react'
 import { BrandLogo } from '../../app/BrandLogo'
 import { supabase, hasSupabase } from '../../lib/supabase'
 import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, type CampoPrerregistro, type DatosPrerregistro } from '../../data/ops/visitante'
@@ -57,15 +57,24 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
             <a href={URL_LANDING} data-testid="ir-landing"><Globe size={15} /> Conocer Renovacell</a>
           </>} />
       ) : (
-        <div className="rc-pre rc-chat--wa">
+        // Antes del prerregistro YA se ve el chat: el asistente saluda y pide los datos dentro del hilo. No es un
+        // trámite previo, es el primer paso de la conversación; el redactor espera abajo.
+        <div className="rc-chat rc-chat--pagina rc-chat--wa" data-testid="contacto-antesala">
           <header className="rc-head">
             <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>
-            <div className="rc-title"><div className="rc-name">Renovacell</div><div className="rc-state">Tecnologías Antiedad</div></div>
+            <div className="rc-title"><div className="rc-name">Renovacell</div><div className="rc-state"><span className="rc-enlinea" aria-hidden />En línea · te atendemos por aquí</div></div>
           </header>
-          <div className="rc-pre-cuerpo">
-            {paso === 'cargando' ? <div className="rc-sys" role="status">Cargando…</div>
-              : paso === 'personal' ? <AvisoPersonal />
-              : <Prerregistro registrar={registrar} onListo={() => setPaso('chat')} />}
+          <div className="rc-thread">
+            <div className="rc-day"><span>Hoy</span></div>
+            {paso === 'cargando' ? <div className="rc-sys" role="status">Cargando…</div> : paso === 'personal' ? <AvisoPersonal /> : (<>
+              <div className="rc-msg rc-msg--ai rc-msg--inicio"><div className="rc-bubble-wrap"><div className="rc-meta">Renovacell</div><div className="rc-bubble">Hola, te damos la bienvenida. Ya estamos aquí para atenderte.</div></div></div>
+              <div className="rc-msg rc-msg--ai"><div className="rc-bubble-wrap"><div className="rc-bubble">Solo dinos quién eres para empezar. Es un momento y no te lo volvemos a pedir.</div></div></div>
+              <Prerregistro registrar={registrar} onListo={() => setPaso('chat')} />
+            </>)}
+          </div>
+          <div className="rc-composer" aria-hidden>
+            <div className="rc-input rc-input--espera">{paso === 'formulario' ? 'Completa tus datos para escribir…' : 'Escribe tu mensaje…'}</div>
+            <button type="button" className="rc-send" disabled tabIndex={-1}><Send size={18} /></button>
           </div>
         </div>
       )}
@@ -81,7 +90,7 @@ function AvisoPersonal() {
     try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { window.prompt('Copia el enlace de contacto:', url) }
   }
   return (
-    <div className="rc-pre-tarjeta" data-testid="aviso-personal">
+    <div className="rc-pre-tarjeta rc-pre-enhilo" data-testid="aviso-personal">
       <h1>Este enlace es para clientes</h1>
       <p>Tienes abierta tu sesión del sistema en este navegador, así que aquí no se te pide registro ni puedes pedir un asesor. Para verlo como lo ve un cliente, ábrelo en una <b>ventana de incógnito</b> o en otro navegador.</p>
       <button type="button" className="rc-pre-enviar" onClick={() => void copiar()} data-testid="copiar-enlace-contacto">{copiado ? 'Enlace copiado' : 'Copiar enlace para compartir'}</button>
@@ -109,9 +118,7 @@ function Prerregistro({ registrar, onListo }: { registrar: typeof prerregistrar;
   const mal = (c: CampoPrerregistro) => (fallo?.campo === c ? ' rc-campo--mal' : '')
   const aviso = (c: CampoPrerregistro) => (fallo?.campo === c ? <small role="alert">{fallo.mensaje}</small> : null)
   return (
-    <form className="rc-pre-tarjeta" onSubmit={enviar} noValidate data-testid="prerregistro">
-      <h1>Hablemos</h1>
-      <p>Déjanos tus datos para atenderte y darte seguimiento. Es un momento y solo se hace una vez.</p>
+    <form className="rc-pre-tarjeta rc-pre-enhilo" onSubmit={enviar} noValidate data-testid="prerregistro" aria-label="Tus datos para empezar a chatear">
       <div className={'rc-campo' + mal('nombre')}><label htmlFor="pre-nombre">Nombre completo</label>
         <input id="pre-nombre" value={d.nombre} onChange={pon('nombre')} autoComplete="name" maxLength={120} placeholder="Nombre y apellidos" />{aviso('nombre')}</div>
       <div className={'rc-campo' + mal('telefono')}><label htmlFor="pre-telefono">Celular</label>
@@ -127,7 +134,7 @@ function Prerregistro({ registrar, onListo }: { registrar: typeof prerregistrar;
       <label className="rc-casilla"><input type="checkbox" checked={acepta} onChange={(e) => { setAcepta(e.target.checked); setFallo(null) }} data-testid="acepta-aviso" />
         <span>He leído y acepto el <a href={URL_PRIVACIDAD} target="_blank" rel="noopener">Aviso de privacidad</a>.</span></label>
       {fallo && (!fallo.campo || fallo.campo === 'consentimiento') && <div role="alert" className="rc-error rc-error--inline">{fallo.mensaje}</div>}
-      <button type="submit" className="rc-pre-enviar" disabled={enviando} data-testid="iniciar-conversacion">{enviando ? 'Un momento…' : 'Iniciar conversación'}</button>
+      <button type="submit" className="rc-pre-enviar" disabled={enviando} data-testid="iniciar-conversacion">{enviando ? 'Un momento…' : 'Empezar a chatear'}</button>
       <p className="rc-pre-nota">¿Ya tienes cuenta? <a href="/sistema">Inicia sesión</a></p>
     </form>
   )

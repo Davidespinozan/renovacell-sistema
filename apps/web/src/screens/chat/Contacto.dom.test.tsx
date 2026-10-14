@@ -20,7 +20,10 @@ describe('Enlace de contacto', () => {
     const registrar = vi.fn(async () => ({ ok: true as const, nombre: 'Ana Ruiz' }))
     render(<Contacto {...base} estado={async () => ({ visitante: true, prerregistrado: false, nombre: null })} registrar={registrar} cliente={cliente()} />)
     await screen.findByTestId('prerregistro')
-    expect(document.querySelector('.rc-pre .rc-mark img')).toBeTruthy()            // logo de la marca
+    const antesala = screen.getByTestId('contacto-antesala')                       // ya se ve el chat: encabezado con logo, saludo en el hilo y redactor en espera
+    expect(antesala.className).toMatch(/rc-chat--wa/); expect(antesala.querySelector('.rc-head .rc-mark img')).toBeTruthy()
+    expect(antesala.querySelector('.rc-thread')!.textContent).toMatch(/Ya estamos aquí para atenderte/); expect(antesala.querySelector('.rc-thread [data-testid=prerregistro]')).toBeTruthy()
+    expect(antesala.querySelector('.rc-composer')!.textContent).toMatch(/Completa tus datos para escribir/)
     expect(screen.queryByTestId('chat-canonico')).toBeNull()
     fireEvent.click(screen.getByTestId('iniciar-conversacion'))
     expect(screen.getByRole('alert').textContent).toMatch(/nombre completo/)
