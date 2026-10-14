@@ -157,6 +157,11 @@ Deno.serve(conCors(async (req) => {
     const { data, error } = await admin.rpc('cc_enviar_mensaje', { ...base, p_client_id: clientId, p_content: c.texto })
     if (error) return falla(error)
     const r = data as { id: string; seq: number; idempotente: boolean; modo: string }
+    // CX-ENLACE-2 · el visitante del enlace de contacto entra a la cola humana con su primer mensaje (su vendedor o
+    // Dirección), sin tener que pedirlo; el asistente sigue atendiendo. La base decide si aplica; nunca bloquea el envío.
+    if (!r.idempotente && actor.actor === 'visitor' && (r.modo === 'ai_active' || r.modo === 'human_offered')) {
+      await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
+    }
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {

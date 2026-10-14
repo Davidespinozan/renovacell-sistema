@@ -3,6 +3,7 @@ begin;
 -- Rollback EN CAPAS (como W1/W2): CC-3 reutiliza _cc_append_only y CC-2 se apoya en cc_visitors
 -- (FK restrict), así que bajan primero, en orden inverso.
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/cx_enlace2/99_down.sql   -- CX-ENLACE-2 (151) se baja primero
 \ir ../../../rollback/cx_enlace/99_down.sql   -- CX-ENLACE (150) se baja primero (su tabla depende de cc_visitors)
 \ir ../../../rollback/cartera_p1/99_down.sql   -- CARTERA-P1 (131) se baja primero
 \ir ../../../rollback/chatv2d1/99_down.sql   -- CHAT V2-D1 (130) se baja primero

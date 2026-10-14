@@ -51,6 +51,11 @@ describe('CX-ENLACE · el visitante anónimo no se confunde con una sesión', ()
     expect(esSesionDeUsuario('Bearer ' + jwt({ sub: '11111111-1111-1111-1111-111111111111', role: 'authenticated' }))).toBe(true)
     expect(esSesionDeUsuario('bearer ' + jwt({ sub: 'ñandú-ü', role: 'authenticated' }))).toBe(true)
   })
+  it('el visitante del enlace entra a la cola humana con su primer mensaje, antes de que responda el asistente y sin bloquear el envío', () => {
+    const iEnvio = chatEdge.indexOf("admin.rpc('cc_enviar_mensaje'"); const iAuto = chatEdge.indexOf("admin.rpc('cc_enlace_auto_asesor'"); const iIA = chatEdge.indexOf('await responderIA(admin')
+    expect(iEnvio).toBeGreaterThan(0); expect(iAuto).toBeGreaterThan(iEnvio); expect(iIA).toBeGreaterThan(iAuto)
+    expect(chatEdge).toMatch(/if \(!r\.idempotente && actor\.actor === 'visitor' && \(r\.modo === 'ai_active' \|\| r\.modo === 'human_offered'\)\) \{\s*\n\s*await admin\.rpc\('cc_enlace_auto_asesor', \{ p_conv: conv, p_visitor_hash: hash \}\)\.then\(\(\) => \{\}, \(\) => \{\}\)/)
+  })
   it('la función chat clasifica por el contenido del token, no comparando contra la llave del entorno', () => {
     expect(chatEdge).toMatch(/if \(esSesionDeUsuario\(authHeader\)\) \{/); expect(chatEdge).not.toMatch(/!== anon\)/)
   })
