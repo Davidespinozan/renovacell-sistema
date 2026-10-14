@@ -18,12 +18,22 @@ describe('Panel de verificación (vendedor o Dirección)', () => {
     const verificar = vi.fn().mockResolvedValue({ ok: true })
     render(<PanelVerificacion conversationId="C1" leer={async () => doc} evidencia={async () => ({ 'ine-front': 'https://firmada/1' })} verificar={verificar} />)
     await screen.findByTestId('panel-verificacion')
-    expect(screen.getByText('Cédula 1234567')).toBeTruthy(); expect(screen.getByText('SEP: por revisar')).toBeTruthy()
+    expect(screen.getByText('Cédula 1234567')).toBeTruthy(); expect(screen.queryByText(/SEP/)).toBeNull()   // sin SEP: decisión del dueño
     await waitFor(() => expect((screen.getByTestId('evidencia-ine-front') as HTMLAnchorElement).href).toBe('https://firmada/1'))
     fireEvent.click(screen.getByTestId('btn-aprobar-verificacion'))
     await screen.findByTestId('verificacion-hecha')
     expect(verificar).toHaveBeenCalledWith(P, true, null)
     expect(screen.getByTestId('verificacion-hecha').textContent).toMatch(/ya ve precios/)
+  })
+  it('quien verifica captura la cédula ahí mismo (sin salir del chat)', async () => {
+    const capturar = vi.fn().mockResolvedValue({ ok: true })
+    render(<PanelVerificacion conversationId="C1" leer={async () => ({ ...doc, cedula: null })} evidencia={async () => ({})} capturar={capturar} />)
+    await screen.findByText('Sin cédula')
+    fireEvent.click(screen.getByTestId('btn-capturar-cedula'))
+    fireEvent.change(screen.getByLabelText('Cédula profesional del doctor'), { target: { value: '7654321' } })
+    fireEvent.click(screen.getByTestId('btn-guardar-cedula'))
+    await screen.findByText('Cédula 7654321')
+    expect(capturar).toHaveBeenCalledWith(P, '7654321')
   })
   it('rechazar exige motivo', async () => {
     const verificar = vi.fn().mockResolvedValue({ ok: true })

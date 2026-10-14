@@ -2,12 +2,12 @@
 // atiende puede verificarlo, aquí ve su cédula, el dictamen SEP y las fotos del INE, y lo aprueba o rechaza.
 import React, { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
-import { evidenciaDoctor, pendienteDeConversacion, verificarDoctor, type DoctorPendiente } from '../../data/ops/verificacion'
+import { capturarCedula as capturarPorDefecto, evidenciaDoctor, pendienteDeConversacion, verificarDoctor, type DoctorPendiente } from '../../data/ops/verificacion'
 
 const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso', selfie: 'Selfie' }
 
-export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, onCambio, onDoctor, version = 0 }: {
-  conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; onCambio?: () => void
+export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, capturar = capturarPorDefecto, onCambio, onDoctor, version = 0 }: {
+  conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; capturar?: typeof capturarPorDefecto; onCambio?: () => void
   onDoctor?: (d: DoctorPendiente | null) => void   // FOTOS · quien monta sabe si hay un doctor por verificar (para "Usar como INE")
   version?: number                                 // FOTOS · cambiarla recarga la evidencia (tras usar una foto del chat)
 }) {
@@ -15,6 +15,7 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
   const [fotos, setFotos] = useState<Record<string, string>>({})
   const [nota, setNota] = useState(''); const [rechazando, setRechazando] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [ocupado, setOcupado] = useState(false)
+  const [cedula, setCedula] = useState(''); const [editCed, setEditCed] = useState(false)
   useEffect(() => {
     let vivo = true
     setD(null); setFotos({}); setMsg(null)
@@ -36,9 +37,25 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
     <div className="rc-contacto-ficha" data-testid="panel-verificacion">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={16} style={{ color: 'var(--warn)' }} /><b>Verificación pendiente</b><span style={{ color: 'var(--mid)', fontSize: 12 }}>· tú puedes verificarlo</span></div>
       <div className="rc-contacto-datos">
-        <span>{d.nombre ?? '—'}</span>{d.cedula && <span>Cédula {d.cedula}</span>}{d.sep?.decision && <span>SEP: {d.sep.decision === 'auto' ? 'coincide' : d.sep.decision === 'reject' ? 'no coincide' : 'por revisar'}</span>}
+        <span>{d.nombre ?? '—'}</span><span>{d.cedula ? `Cédula ${d.cedula}` : 'Sin cédula'}</span>
         {d.telefono && <a href={`tel:${d.telefono}`}>{d.telefono}</a>}{d.organizacion && <span>{d.organizacion}</span>}
       </div>
+      {/* Sin SEP (decisión del dueño): la cédula la revisa una persona. Si el doctor la pasa por el chat, se captura aquí. */}
+      {!editCed ? (
+        <div><button type="button" className="rc-link" onClick={() => { setEditCed(true); setCedula(d.cedula ?? '') }} data-testid="btn-capturar-cedula">{d.cedula ? 'Corregir cédula' : 'Capturar cédula'}</button></div>
+      ) : (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" maxLength={20} placeholder="Número de cédula" aria-label="Cédula profesional del doctor" style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 34 }} />
+          <button type="button" className="btn sm" disabled={ocupado || !cedula.trim()} onClick={() => void (async () => {
+            setOcupado(true); setMsg(null)
+            const r = await capturar(d.profile_id, cedula.trim())
+            setOcupado(false)
+            if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+            setD({ ...d, cedula: cedula.replace(/\s+/g, '') }); setEditCed(false)
+          })()} data-testid="btn-guardar-cedula">Guardar cédula</button>
+          <button type="button" className="btn ghost sm" onClick={() => setEditCed(false)}>Cancelar</button>
+        </div>
+      )}
       {Object.keys(fotos).length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
           {Object.entries(fotos).map(([k, u]) => <a key={k} href={u} target="_blank" rel="noreferrer" title={ETIQUETA[k] ?? k} data-testid={`evidencia-${k}`}><img src={u} alt={ETIQUETA[k] ?? k} style={{ width: 110, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}

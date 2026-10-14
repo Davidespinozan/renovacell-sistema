@@ -76,3 +76,14 @@ export async function usarFotoComoIne(adjuntoId: string, clave: 'ine-front' | 'i
     return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' }
   } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
 }
+
+/** Quien verifica captura o corrige la cédula del doctor pendiente (sin SEP: la revisa una persona). */
+export async function capturarCedula(profile: string, cedula: string, rpc: Rpc = rpcPorDefecto): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+  try {
+    const { error } = await rpc('doctor_capturar_cedula', { p_profile: profile, p_cedula: cedula })
+    if (!error) return { ok: true }
+    const m = error.message ?? ''
+    return { ok: false, mensaje: /CEDULA_INVALIDA/.test(m) ? 'Escribe solo los números de la cédula (5 a 12 dígitos).' : mensajeVerificacion(m) }
+  } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
+}
