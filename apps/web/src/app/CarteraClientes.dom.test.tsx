@@ -30,12 +30,14 @@ function montar(d: Cliente360, vendedores = VEND) {
 }
 
 describe('Vendedor y estado desde la ficha (Dirección)', () => {
-  it('cliente SIN cuenta: se le asigna vendedor (solo aparecen los que pueden recibir clientes)', async () => {
+  it('cliente SIN cuenta: se le asigna vendedor; aparecen todos los vendedores y los que no tienen permisos, en gris con el porqué', async () => {
     const llamadas = montar(ficha())
     await screen.findByText('Clínica Sin Cuenta')
     fireEvent.click(screen.getByTestId('tab-comercial'))
     const select = await screen.findByLabelText('Vendedor') as HTMLSelectElement
-    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['Asignar a…', 'Lucía'])   // Alejandra no es elegible
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['Asignar a…', 'Lucía', 'Alejandra · en Equipo actívale "Atender conversaciones" y "Recibir clientes nuevos"'])
+    expect(Array.from(select.options).map((o) => o.disabled)).toEqual([false, false, true])   // aparece, pero no se puede elegir hasta tener permisos
+    expect(screen.getByTestId('vendedores-sin-permiso').textContent).toMatch(/Equipo/)
     expect(screen.queryByText(/no tiene cuenta de portal/)).toBeNull()
     fireEvent.change(select, { target: { value: 'V1' } })
     fireEvent.click(screen.getByTestId('btn-asignar-vendedor'))

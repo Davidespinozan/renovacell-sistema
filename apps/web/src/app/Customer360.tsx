@@ -192,8 +192,11 @@ function Comercial({ d, atencion, cliente, recargar }: { d: Cliente360; atencion
     if (!a.ok) { setMsg(a.error); return }
     setSel(''); setMotivo(''); await recargar()
   }
-  const elegibles = (vendedores ?? []).filter((v) => v.elegible_nuevos)
   const actual = d.resumen.vendedor
+  const elegibles = (vendedores ?? []).filter((v) => v.elegible_nuevos)
+  // Se listan TODOS los vendedores activos; los que aún no pueden recibir clientes aparecen deshabilitados con el porqué.
+  const faltan = (v: Vendedor): string => [!v.conversaciones && '"Atender conversaciones"', !v.nuevos_clientes && '"Recibir clientes nuevos"'].filter(Boolean).join(' y ')
+  const todos = (vendedores ?? []).filter((v) => v.activo && v.id !== actual?.id)
   return (
     <>
       <Section icon={<Building2 size={15} />} title="Vendedor">
@@ -204,13 +207,16 @@ function Comercial({ d, atencion, cliente, recargar }: { d: Cliente360; atencion
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }} data-testid="cartera-asignar">
             <select value={sel} onChange={(e) => setSel(e.target.value)} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 36 }} aria-label="Vendedor">
               <option value="">{actual ? 'Cambiar a…' : 'Asignar a…'}</option>
-              {elegibles.filter((v) => v.id !== actual?.id).map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+              {todos.map((v) => <option key={v.id} value={v.id} disabled={!v.elegible_nuevos}>{v.elegible_nuevos ? v.nombre : `${v.nombre} · en Equipo actívale ${faltan(v)}`}</option>)}
             </select>
             {actual && <input placeholder="Motivo del cambio" aria-label="Motivo del cambio de vendedor" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 36 }} />}
             <button type="button" className="btn sm" disabled={!sel || ocupado || (!!actual && !motivo.trim())} onClick={() => void guardar(sel)} data-testid="btn-asignar-vendedor">{actual ? 'Cambiar vendedor' : 'Asignar vendedor'}</button>
             {actual && <button type="button" className="btn ghost sm" disabled={ocupado || !motivo.trim()} title={motivo.trim() ? undefined : 'Escribe el motivo para quitarlo'} onClick={() => void guardar(null)} data-testid="btn-quitar-vendedor">Quitar vendedor</button>}
           </div>
         ))}
+        {d.permisos.cartera && vendedores && elegibles.length > 0 && todos.some((v) => !v.elegible_nuevos) && (
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }} data-testid="vendedores-sin-permiso">Los vendedores en gris aún no pueden recibir clientes: en <b>Equipo</b>, edítalos y activa los permisos que se indican.</div>
+        )}
         {msg && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12.5 }}>{msg}</div>}
         {c.historial && c.historial.length > 0 && (
           <div style={{ marginTop: 8 }}>
