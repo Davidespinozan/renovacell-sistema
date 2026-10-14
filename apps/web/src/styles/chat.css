@@ -250,3 +250,13 @@
 .rc-pre-enhilo .rc-pre-nota{margin-top:10px;font-size:12px}
 .rc-input--espera{display:flex;align-items:center;color:var(--mid);user-select:none}
 @media (prefers-reduced-motion:reduce){.rc-enlinea,.rc-pre-enhilo{animation:none}}
+
+/* FOTOS EN EL CHAT · imagen dentro de la burbuja (enlace temporal), y el botón de cámara del redactor. */
+.rc-bubble--img{display:flex;flex-direction:column;gap:6px;padding:4px}
+.rc-img{display:block;max-width:min(260px,62vw);max-height:320px;border-radius:12px;object-fit:cover;cursor:zoom-in}
+.rc-img-nd{font-size:13px;color:var(--mid);padding:6px 8px}
+.rc-img-uso{font-size:11.5px;font-weight:600;color:var(--green-deep)}
+.rc-adjuntar{align-self:center;flex:none}
+.rc-adjuntar:disabled{opacity:.4;cursor:not-allowed}
+.rc-chat--wa .rc-msg .rc-bubble.rc-bubble--img{display:flex}
+.rc-chat--wa .rc-adjuntar{color:var(--mid)}

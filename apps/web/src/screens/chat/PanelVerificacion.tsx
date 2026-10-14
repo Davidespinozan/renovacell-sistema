@@ -6,8 +6,10 @@ import { evidenciaDoctor, pendienteDeConversacion, verificarDoctor, type DoctorP
 
 const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso', selfie: 'Selfie' }
 
-export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, onCambio }: {
+export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, onCambio, onDoctor, version = 0 }: {
   conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; onCambio?: () => void
+  onDoctor?: (d: DoctorPendiente | null) => void   // FOTOS · quien monta sabe si hay un doctor por verificar (para "Usar como INE")
+  version?: number                                 // FOTOS · cambiarla recarga la evidencia (tras usar una foto del chat)
 }) {
   const [d, setD] = useState<DoctorPendiente | null>(null)
   const [fotos, setFotos] = useState<Record<string, string>>({})
@@ -16,9 +18,10 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
   useEffect(() => {
     let vivo = true
     setD(null); setFotos({}); setMsg(null)
-    void leer(conversationId).then(async (x) => { if (!vivo || !x) return; setD(x); const f = await evidencia(x.profile_id); if (vivo) setFotos(f) })
+    void leer(conversationId).then(async (x) => { if (!vivo) return; onDoctor?.(x); if (!x) return; setD(x); const f = await evidencia(x.profile_id); if (vivo) setFotos(f) })
     return () => { vivo = false }
-  }, [conversationId, leer, evidencia])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, leer, evidencia, version])
   if (!d) return msg?.ok ? <div className="rc-contacto-ficha" role="status" data-testid="verificacion-hecha">{msg.texto}</div> : null
   const decidir = async (aprobar: boolean) => {
     if (ocupado) return
@@ -27,7 +30,7 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     setMsg({ ok: true, texto: aprobar ? `${d.nombre ?? 'El doctor'} quedó verificado: ya ve precios y puede comprar.` : 'Verificación rechazada. El doctor sigue sin acceso a precios.' })
-    setD(null); onCambio?.()
+    setD(null); onDoctor?.(null); onCambio?.()
   }
   return (
     <div className="rc-contacto-ficha" data-testid="panel-verificacion">

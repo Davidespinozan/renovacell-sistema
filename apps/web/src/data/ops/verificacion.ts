@@ -65,3 +65,14 @@ export function reducirFoto(file: File, max = 1600): Promise<string | null> {
     img.src = url
   })
 }
+
+/** FOTOS · "Usar como INE": la foto que el propio doctor mandó por el chat pasa a su evidencia de verificación. */
+export async function usarFotoComoIne(adjuntoId: string, clave: 'ine-front' | 'ine-back', invocar: Invocar = invocarPorDefecto): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  if (!hasSupabase && invocar === invocarPorDefecto) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+  try {
+    const { error } = await invocar('verificacion', { body: { action: 'desde_chat', adjunto_id: adjuntoId, clave } })
+    if (!error) return { ok: true }
+    try { const ctx = (error as { context?: Response }).context; if (ctx) { const b = (await ctx.json()) as { message?: string }; return { ok: false, mensaje: b.message ?? 'No se pudo usar la foto.' } } } catch { /* sin detalle */ }
+    return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' }
+  } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
+}

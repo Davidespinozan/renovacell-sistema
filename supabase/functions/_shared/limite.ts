@@ -88,6 +88,10 @@ export const LIMITES: Record<string, Regla> = {
   chat_enviar_uid:           { limite: 60,  ventanaSegs: 60 },
   chat_enviar_global:        { limite: 5000, ventanaSegs: 3600 },
   chat_solicitar:            { limite: 10,  ventanaSegs: 3600 },
+  // FOTOS: subir imágenes al chat (pesan más que un mensaje).
+  chat_adjuntar:             { limite: 20,  ventanaSegs: 3600 },
+  chat_adjuntar_uid:         { limite: 60,  ventanaSegs: 3600 },
+  chat_adjuntar_global:      { limite: 2000, ventanaSegs: 3600 },
   // ia (CC-4): un turno de IA por mensaje del usuario; ráfaga por sujeto, techo global y costo diario en tokens.
   ia_turno:                  { limite: 20,  ventanaSegs: 60 },
   ia_turno_uid:              { limite: 40,  ventanaSegs: 60 },

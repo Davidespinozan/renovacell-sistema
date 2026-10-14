@@ -2,6 +2,7 @@
 begin;
 -- CC-4 (cc_ai_turns → cc_conversations) baja primero.
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/chat_adjuntos/99_down.sql   -- FOTOS (157) se baja primero (cc_adjuntos depende de cc_messages)
 \ir ../../../rollback/cartera_p1/99_down.sql   -- CARTERA-P1 (131) se baja primero
 \ir ../../../rollback/chatv2d1/99_down.sql   -- CHAT V2-D1 (130) se baja primero
 \ir ../../../rollback/ci1/99_down.sql   -- Commercial Intent CI-1 (128) se baja primero

@@ -18,6 +18,9 @@ import { useRole } from '../../auth/RoleContext'
 import { contactoDe as contactoPorDefecto, urlEnlaceContacto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 import { crearInvitacion } from '../../data/ops/invitacion'
 import { PanelVerificacion } from './PanelVerificacion'
+import { usarFotoComoIne } from '../../data/ops/verificacion'
+import type { DoctorPendiente } from '../../data/ops/verificacion'
+import type { Mensaje } from '../../data/ops/chat'
 
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
@@ -40,6 +43,21 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     return () => { vivo = false }
   }, [abierta, contactoDe])
   const [copiado, setCopiado] = useState(false)
+  // FOTOS · si el dueño de la conversación es un doctor por verificar, sus fotos ofrecen "Usar como INE".
+  const [pendiente, setPendiente] = useState<DoctorPendiente | null>(null)
+  const [versionPanel, setVersionPanel] = useState(0)
+  const usarComo = async (m: Mensaje, clave: 'ine-front' | 'ine-back') => {
+    if (!m.adjunto) return
+    const r = await usarFotoComoIne(m.adjunto.id, clave)
+    setHerr(r.ok ? `Foto guardada como ${clave === 'ine-front' ? 'INE frente' : 'INE reverso'} en su verificación.` : r.mensaje)
+    if (r.ok) setVersionPanel((n) => n + 1)
+  }
+  const accionesAdjunto = (m: Mensaje) => (pendiente && m.actor === 'doctor' && m.adjunto && !m.adjunto.uso ? (
+    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine">
+      <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-front')}>Usar como INE frente</button>
+      <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-back')}>Usar como INE reverso</button>
+    </span>
+  ) : null)
   // Herramientas del asesor: mandar en ESTA conversación el enlace de registro o la invitación a crear cuenta.
   const [herr, setHerr] = useState<string | null>(null)
   const mandar = async (texto: string, listo: string) => {
@@ -102,7 +120,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
-      <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} />
+      <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} onDoctor={setPendiente} version={versionPanel} />
       {contacto && (
         <div className="rc-contacto-ficha" data-testid="contacto-enlace">
           <div><b>{contacto.nombre}</b>{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</div>
@@ -119,7 +137,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
           {herr && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="herramienta-aviso">{herr}</div>}
         </div>
       )}
-      <ChatCanonico embebido asesor conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
+      <ChatCanonico embebido asesor accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )

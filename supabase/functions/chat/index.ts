@@ -24,6 +24,8 @@ import { resolverQuien, esSesionDeUsuario } from '../_shared/quien.ts'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
+import { decodificarFoto } from '../_shared/verificacion.ts'
+import { TEXTO_IMAGEN, idImagen, conAdjuntos } from '../_shared/adjuntos.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
 import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
@@ -41,7 +43,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion'])   // + Chat V2-C1
+const ACCIONES = new Set(['adjuntar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion'])   // + Chat V2-C1
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(conCors(async (req) => {
@@ -109,7 +111,7 @@ Deno.serve(conCors(async (req) => {
     const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
     const { data, error } = await admin.rpc('cc_sesion_leer', { p_session: sesion, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile, p_desde_seq: desde, p_limite: 100 })
     if (error) return falla(error)
-    return json(200, data)
+    return json(200, await conAdjuntos(admin, data))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
   }
 
   if (!conv) return json(400, { error: 'falta_conversacion', message: 'Falta conversation_id.' })
@@ -135,7 +137,7 @@ Deno.serve(conCors(async (req) => {
         const { data: k } = await q.maybeSingle(); cart_id = (k as { id?: string } | null)?.id ?? null
       }
     } catch { cart_id = null }
-    return json(200, { ...(data as Record<string, unknown>), cart_id })
+    return json(200, { ...(await conAdjuntos(admin, data) as Record<string, unknown>), cart_id })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0
@@ -165,6 +167,31 @@ Deno.serve(conCors(async (req) => {
       ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto) : 'silenciada'
     }
     return json(200, { ...r, ia })
+  }
+  // ── FOTOS · imagen en la conversación: se sube con service_role al bucket privado `chat` y viaja como un mensaje
+  //    NORMAL ("Envió una imagen."); la autoridad de quien escribe es la de cc_enviar_mensaje. La IA no responde a fotos.
+  if (action === 'adjuntar') {
+    const v = await limitarTodas(admin, quien
+      ? [{ scope: 'chat_adjuntar_uid', sujeto }, { scope: 'chat_adjuntar_global', sujeto: 'global' }]
+      : [{ scope: 'chat_adjuntar', sujeto }, { scope: 'chat_adjuntar_global', sujeto: 'global' }])
+    if (!v.permitido) return respuestaLimite(v)
+    const foto = decodificarFoto(p.imagen)
+    if (!foto || foto === 'invalida') return json(400, { error: 'imagen_invalida', message: 'La imagen debe ser JPG o PNG de menos de 3 MB.' })
+    const clientId = idImagen(p.client_message_id)
+    const ruta = `${conv}/${crypto.randomUUID()}.${foto.ext}`
+    const { error: eSub } = await admin.storage.from('chat').upload(ruta, foto.bytes, { contentType: foto.tipo })
+    if (eSub) return json(503, { error: 'no_disponible', message: 'No se pudo subir la imagen. Intenta de nuevo.' })
+    const quitar = () => admin.storage.from('chat').remove([ruta]).then(() => {}, () => {})
+    const { data, error } = await admin.rpc('cc_enviar_mensaje', { ...base, p_client_id: clientId, p_content: TEXTO_IMAGEN })
+    if (error) { await quitar(); return falla(error) }
+    const r = data as { id: string; seq: number; idempotente: boolean; modo: string }
+    if (r.idempotente) { await quitar(); return json(200, { ...r, ia: 'omitida' }) }   // reintento: la imagen ya quedó con su mensaje
+    const { error: eReg } = await admin.rpc('cc_adjunto_registrar', { p_message: r.id, p_ruta: ruta, p_tipo: foto.tipo, p_bytes: foto.bytes.length })
+    if (eReg) { await quitar(); return json(503, { error: 'no_disponible', message: 'No se pudo guardar la imagen. Intenta de nuevo.' }) }
+    if (actor.actor === 'visitor' && (r.modo === 'ai_active' || r.modo === 'human_offered')) {
+      await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
+    }
+    return json(200, { ...r, ia: 'omitida' })
   }
   if (action === 'solicitar_asesor') {
     const v = await limitarTodas(admin, [{ scope: 'chat_solicitar', sujeto }])

@@ -9,7 +9,8 @@ import type { Atencion } from './atencionComercial'
 
 export type ModoConversacion = 'ai_active' | 'human_offered' | 'human_requested' | 'human_assigned' | 'human_active' | 'human_ended'
 export type ActorMensaje = 'visitor' | 'doctor' | 'seller' | 'admin' | 'ai' | 'system'
-export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean }
+export interface AdjuntoMensaje { id: string; url: string | null; tipo: string; uso: string | null }   // FOTOS · enlace temporal (10 min)
+export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null }
 export interface Conversacion {
   conversation_id: string; estado: 'abierta' | 'cerrada'; modo: ModoConversacion; rol?: 'dueno' | 'asesor' | 'supervisor'
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
@@ -69,6 +70,10 @@ export class ClienteChat {
   leer(conversation_id: string, desde_seq = 0) { return this.llamar<Conversacion>({ action: 'leer', conversation_id, desde_seq }) }
   enviar(conversation_id: string, content: string, client_message_id = nuevoClientId()) {
     return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'enviar', conversation_id, content, client_message_id })
+  }
+  // FOTOS · imagen (data URL JPG/PNG ya reducida). Idempotente por client_message_id, como un mensaje.
+  adjuntar(conversation_id: string, imagen: string, client_message_id = 'img:' + nuevoClientId().replace(/^c:/, '')) {
+    return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'adjuntar', conversation_id, imagen, client_message_id })
   }
   leido(conversation_id: string, seq: number) { return this.llamar<{ ok: true }>({ action: 'leido', conversation_id, seq }) }
   solicitarAsesor(conversation_id: string) { return this.llamar<{ modo: ModoConversacion; asesor: boolean }>({ action: 'solicitar_asesor', conversation_id }) }

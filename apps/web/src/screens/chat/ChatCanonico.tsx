@@ -4,7 +4,8 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
+import { Camera, CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
+import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
@@ -31,6 +32,8 @@ interface Props {
   onFin?: (motivo: 'terminada') => void   // D4-FIX · el asesor terminó la asesoría: quien monta vuelve a su lista
   estilo?: 'mensajeria'              // CX-ENLACE · piel de mensajería (enlace de contacto): mismo componente, mismo hilo
   barra?: React.ReactNode            // CX-ENLACE · accesos bajo el encabezado (conocer Renovacell, verificarse)
+  accionesAdjunto?: (m: Mensaje) => React.ReactNode   // FOTOS · acciones bajo una imagen (p. ej. "Usar como INE" para quien verifica)
+  reducir?: (f: File) => Promise<string | null>        // FOTOS · inyectable en pruebas
 }
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
@@ -85,7 +88,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -215,6 +218,20 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (area.current) area.current.style.height = 'auto'
     await enviarTexto(t, nuevoClientId())
   }
+  // FOTOS · mandar una imagen: se reduce en el dispositivo y viaja con su propio id (reintento sin duplicar).
+  const archivo = useRef<HTMLInputElement | null>(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const mandarImagen = async (f: File | undefined) => {
+    if (!f || !convId || subiendo) return
+    setSubiendo(true); setError(null)
+    const dataUrl = await reducir(f)
+    if (!dataUrl) { setSubiendo(false); setError('No se pudo leer la imagen.'); return }
+    const r = await cliente.adjuntar(convId, dataUrl)
+    setSubiendo(false)
+    if (archivo.current) archivo.current.value = ''
+    if (!r.ok) { setError(r.error.mensaje); return }
+    await cargar(convId, ultimoSeq.current)
+  }
   const reintentar = () => { if (pendiente) void enviarTexto(pendiente.texto, pendiente.clientId) }
   const descartarPendiente = () => { if (pendiente) { setTexto(pendiente.texto); setPendiente(null) } }
   const accion = async (fn: () => Promise<{ ok: boolean; error?: { mensaje: string } }>) => {
@@ -283,7 +300,15 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
           {inicio && etiqueta && <div className="rc-meta">{etiqueta}</div>}
-          <div className="rc-bubble" title={horaDe(m.created_at)}>{m.content}</div>
+          {m.adjunto ? (
+            <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid="msg-imagen">
+              {m.adjunto.url
+                ? <a href={m.adjunto.url} target="_blank" rel="noreferrer"><img className="rc-img" src={m.adjunto.url} alt="Imagen enviada en la conversación" loading="lazy" /></a>
+                : <span className="rc-img-nd">Imagen no disponible</span>}
+              {m.adjunto.uso && <span className="rc-img-uso">Usada como {m.adjunto.uso === 'ine-front' ? 'INE frente' : 'INE reverso'}</span>}
+              {accionesAdjunto?.(m)}
+            </div>
+          ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{m.content}</div>}
           <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
         </div>
       </div>,
@@ -377,6 +402,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
 
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
+        <input ref={archivo} type="file" accept="image/jpeg,image/png,image/*" hidden onChange={(e) => void mandarImagen(e.target.files?.[0])} data-testid="input-imagen" />
+        <button type="button" className="rc-ico rc-adjuntar" onClick={() => archivo.current?.click()} disabled={!puedoEscribir || subiendo} aria-label={subiendo ? 'Subiendo imagen' : 'Mandar una foto'} title="Mandar una foto" data-testid="btn-imagen"><Camera size={20} /></button>
         <textarea
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target) }} onKeyDown={alTeclear}
