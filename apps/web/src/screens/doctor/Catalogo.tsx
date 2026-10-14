@@ -5,6 +5,7 @@
 // servidor y la compra se confirma con revisión + confirmación canónicas (CC-6). Sin backend (demo)
 // se conserva el carrito local.
 // Sin costo/margen (forma products_safe). Todos los productos tienen precio.
+import { useRole } from '../../auth/RoleContext'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -35,14 +36,18 @@ interface CartLine {
   qty: number
 }
 
-export function Catalogo() {
+// Montaje en el portal: la verificación sale de la sesión.
+export function CatalogoPantalla() { const { verified } = useRole(); return <Catalogo verified={verified} /> }
+
+// CUENTA ≠ VERIFICACIÓN: pendiente = conoce el catálogo, sin precios ni carrito (el servidor tampoco los da).
+export function Catalogo({ verified = true }: { verified?: boolean }) {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
   const { priceFor } = usePricing()
   const { data: volRules } = useVolumePrices()
   // Precio de LISTA del doctor (su tarifa/base). El descuento por VOLUMEN se previsualiza
   // aparte con `effOf(qty)`; el servidor (precio_de) es la autoridad del cobro final.
-  const priceOf = (p: ProductSafe): number | null => priceFor(p.id, p.price)
+  const priceOf = (p: ProductSafe): number | null => (verified ? priceFor(p.id, p.price) : null)
   // Precio unitario EFECTIVO previsto para una cantidad = LEAST(lista, volumen aplicable).
   const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty)
 
@@ -189,7 +194,7 @@ export function Catalogo() {
           ) : entries.map((e) => e.kind === 'family' ? (
             <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
           ) : (
-            <ProductCard key={e.product.id} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+            <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
           ))}
         </div>
       </div>
@@ -205,15 +210,15 @@ export function Catalogo() {
 
       {/* DERECHA: pedido en curso */}
       {hasSupabase && canon.error && <div role="alert" className="sysnote" style={{ gridColumn: '1 / -1' }}>{canon.error}</div>}
-      <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />
+      {verified && <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />}
       {/* MC-3 · barra contextual en móvil: mismo carrito, mismo checkout. Se oculta con checkout/modal abierto y con un
           carrito que no es el activo del servidor (convertido o inaccesible). Total = el mismo estimado del panel. */}
-      <BarraCarrito
+      {verified && <BarraCarrito
         unidades={lines.reduce((n, l) => n + l.qty, 0)}
         totalEstimado={lines.length ? total : null}
         bloqueada={checkout || !!openFamily || (hasSupabase && (!canon.cart || canon.cart.estado !== 'active'))}
         onRevisar={() => setCheckout(true)}
-      />
+      />}
 
       {checkout && (
         <CheckoutCanonico
@@ -236,7 +241,7 @@ function StockTag({ stock }: { stock: StockInfo }) {
   return <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Agotado</span>
 }
 
-function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec, pendiente = false }: { pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
@@ -265,7 +270,11 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec }: { 
         </div>
         {promo && !discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>{promo}</div>}
         {discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>Precio por volumen aplicado</div>}
-        {price == null ? (
+        {pendiente ? (
+          <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Los precios se habilitan al aprobar tu verificación" data-testid="precio-al-verificar">
+            Precio al verificar tu cuenta
+          </button>
+        ) : price == null ? (
           // Precio "a consultar": antes mostraba un "Agregar" habilitado que no hacía
           // nada (add() sale temprano). Ahora es un estado claro y no engañoso.
           <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Este producto se cotiza aparte">

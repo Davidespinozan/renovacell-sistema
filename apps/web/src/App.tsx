@@ -4,7 +4,6 @@ import { AppShell } from './app/AppShell'
 import { LandingPreview } from './screens/LandingPreview'
 import { Login } from './screens/Login'
 import { ResetPassword } from './screens/ResetPassword'
-import { ReviewPending } from './screens/ReviewPending'
 import { Contacto } from './screens/chat/Contacto'
 
 // `/chat` YA NO es una ruta pública (decisión del dueño, 10 oct 2026): la conversación con Renovacell
@@ -24,8 +23,9 @@ const esPreviewHome = import.meta.env.DEV && typeof window !== 'undefined' && ne
 const HomePreview = import.meta.env.DEV ? React.lazy(() => import('./dev/HomePreview').then((m) => ({ default: m.HomePreview }))) : null
 
 function Root() {
-  const { mode, role, verified, setScreen } = useRole()
-  const conAcceso = mode === 'app' && !(role === 'doctor' && !verified)
+  const { mode, role, setScreen } = useRole()
+  // CUENTA ≠ VERIFICACIÓN: el doctor con cuenta entra al portal aunque esté pendiente (sin precios ni compras).
+  const conAcceso = mode === 'app'
   // Quien llega por un enlace viejo a /chat y sí tiene acceso cae directo en su conversación del portal.
   useEffect(() => {
     if (esRutaChat && conAcceso && role === 'doctor') setScreen('chat_cc')
@@ -39,8 +39,6 @@ function Root() {
   else if (mode === 'landing') view = <LandingPreview />
   else if (mode === 'reset') view = <ResetPassword />
   else if (mode === 'login') view = <Login />
-  // Gate: doctor no verificado no entra al portal.
-  else if (role === 'doctor' && !verified) view = <ReviewPending />
   else view = <AppShell />
 
   return (

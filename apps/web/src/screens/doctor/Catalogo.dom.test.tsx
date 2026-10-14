@@ -60,4 +60,12 @@ describe('<Catalogo>', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Todos' }))
     expect(screen.getByText('Golden Serum')).toBeInTheDocument()
   })
+
+  it('CUENTA ≠ VERIFICACIÓN: el doctor pendiente ve los productos, pero sin precios, sin "Agregar" y sin carrito', () => {
+    render(<Catalogo verified={false} />)
+    expect(screen.getByText('Golden Serum')).toBeInTheDocument()
+    expect(screen.getAllByTestId('precio-al-verificar').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Agregar')).toBeNull()
+    expect(screen.queryByText(/\$\s?\d/)).toBeNull()                      // ningún importe a la vista
+  })
 })

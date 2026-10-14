@@ -8,9 +8,10 @@ import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
 import { AlertaComercial } from './AlertaComercial'
+import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 
 export function AppShell() {
-  const { role, screen } = useRole()
+  const { role, screen, verified } = useRole()
   const [drawer, setDrawer] = useState(false)
 
   // Drawer móvil: el CSS del demo usa body.drawer-open.
@@ -31,6 +32,7 @@ export function AppShell() {
           {/* Fuera de #content: no se desmonta al cambiar de pantalla. */}
           <FallosEscritura />
           <div id="content" key={`${role}:${screen}`}>
+            {role === 'doctor' && !verified && <AvisoVerificacion />}
             {renderScreen(role, screen)}
           </div>
         </main>

@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { screen, fireEvent, cleanup } from '@testing-library/react'
 import { renderWithRole } from '../test/utils'
 import { Login } from './Login'
-import { ReviewPending } from './ReviewPending'
 
 beforeEach(cleanup)
 
@@ -25,14 +24,5 @@ describe('<Login>', () => {
     const ir = screen.getByTestId('ir-registro-medico') as HTMLAnchorElement
     expect(ir.getAttribute('href')).toMatch(/\/#contacto$/)
     expect(screen.queryByText('Crear cuenta médica')).toBeNull(); expect(screen.queryByPlaceholderText('Número de cédula')).toBeNull()
-  })
-})
-
-describe('<ReviewPending>', () => {
-  it('ofrece capturar la cédula para verificación automática (doctor no verificado)', () => {
-    renderWithRole(<ReviewPending />)
-    expect(screen.getByText(/Verifica tu cédula profesional/)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Número de cédula profesional')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Verificar mi cédula/ })).toBeInTheDocument()
   })
 })

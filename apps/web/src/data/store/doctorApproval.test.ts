@@ -7,7 +7,7 @@ import { deriveVerificationStatus } from '../ops/verification'
 // Fuentes para guards de copy/flujo (?raw).
 import doctoresSrc from '../../screens/admin/Doctores.tsx?raw'
 import loginSrc from '../../screens/Login.tsx?raw'
-import reviewPendingSrc from '../../screens/ReviewPending.tsx?raw'
+import shellSrc from '../../app/AppShell.tsx?raw'
 import appSrc from '../../App.tsx?raw'
 import doctorsStoreSrc from './doctorsStore.ts?raw'
 import hardeningSrc from '../../../../../supabase/migrations/20260706194143_security_hardening.sql?raw'
@@ -79,16 +79,16 @@ describe('copy — sin afirmaciones falsas de envío', () => {
     expect(doctorsStoreSrc).not.toMatch(/Tu acceso al portal Renovacell está listo/)
     expect(doctorsStoreSrc).not.toMatch(/Acceso al Portal enviado/)
   })
-  it('Login/ReviewPending: "te avisaremos" del doctor en revisión eliminado', () => {
-    expect(reviewPendingSrc).not.toMatch(/Te avisaremos/)
+  it('Login: sin promesas del doctor en revisión (el registro vive en la landing)', () => {
     expect(loginSrc).not.toMatch(/te avisaremos/)
   })
 })
 
 describe('flujo/seguridad — gates server-side intactos', () => {
-  it('el portal gatea doctor no verificado → ReviewPending', () => {
-    expect(appSrc).toMatch(/role === 'doctor' && !verified/)
-    expect(appSrc).toMatch(/ReviewPending/)
+  it('CUENTA ≠ VERIFICACIÓN: el doctor pendiente entra al portal; precios y compras siguen cerrados en el servidor', () => {
+    expect(appSrc).not.toMatch(/ReviewPending/)
+    expect(appSrc).toMatch(/const conAcceso = mode === 'app'\n/)
+    expect(shellSrc).toMatch(/\{role === 'doctor' && !verified && <AvisoVerificacion \/>\}/)
   })
   it('is_verified sigue gateando catálogo/pedidos (no se debilitó)', () => {
     expect(hardeningSrc).toMatch(/is_verified/)

@@ -106,11 +106,11 @@ describe('frontend', () => {
   })
   // Decisión del dueño (10 oct 2026): /chat deja de ser pública. La URL sigue resolviendo a la app (enlaces
   // viejos), pero NO renderiza el chat sin pasar por login y verificación; con acceso, abre la conversación del portal.
-  it('/chat NO es pública: pasa por login y verificación; con acceso abre la conversación del portal; la cola NO está en Bandeja', () => {
+  it('/chat NO es pública: pasa por login; con sesión abre la conversación del portal; la cola NO está en Bandeja', () => {
     expect(codigo(netlify)).toMatch(/from = "\/chat"\n\s+to = "\/index\.html"\n\s+status = 200/)
     expect(codigo(appSrc)).not.toMatch(/esRutaChat\) view = <ChatCanonico/)
     expect(codigo(appSrc)).not.toMatch(/import \{ ChatCanonico \}/)
-    expect(codigo(appSrc)).toMatch(/const conAcceso = mode === 'app' && !\(role === 'doctor' && !verified\)/)
+    expect(codigo(appSrc)).toMatch(/const conAcceso = mode === 'app'\n/)   // cuenta ≠ verificación: el pendiente también entra
     expect(codigo(appSrc)).toMatch(/if \(esRutaChat && conAcceso && role === 'doctor'\) setScreen\('chat_cc'\)/)
     expect(pantallaSrc).toMatch(/asesor \? 'Asesoría' : 'Renovacell'/)   // UX V2-B · encabezado de producto, no de panel
     expect(asesoriasSrc).toMatch(/cliente\.cola\(\)/)
@@ -134,19 +134,17 @@ describe('frontend', () => {
   })
   // Decisiones del dueño (10 y 13 oct 2026): conversan las cuentas con acceso y, por el enlace de contacto, quien
   // dejó su prerregistro. La puerta la decide la BASE (cc_puerta_chat) antes del limitador y de cualquier otro comando.
-  it('Edge chat: la puerta va primero; sin sesión solo pasa un visitante con prerregistro y el doctor sin verificar solo si viene de uno', () => {
+  it('Edge chat: la puerta va primero; sin sesión solo pasa un visitante con prerregistro; con sesión manda la cuenta (el doctor pendiente también conversa)', () => {
     const c = codigo(chatSrc)
     const iPuerta = c.indexOf("admin.rpc('cc_puerta_chat'")
     const otros = ['limitarTodas(', 'limitar(', 'caller.rpc(', "admin.rpc('cc_abrir_conversacion'", "admin.rpc('cc_enviar_mensaje'", "admin.rpc('cc_solicitar_asesor'"].map((x) => c.indexOf(x)).filter((n) => n >= 0)
     expect(iPuerta).toBeGreaterThan(0); expect(Math.min(...otros)).toBeGreaterThan(iPuerta)
-    expect(c).toMatch(/if \(!quien \|\| \(quien\.role === 'doctor' && !quien\.verified\)\) \{/)   // exactamente esos dos casos pasan por la puerta
-    expect(c).toMatch(/if \(!quien && !hash\) return json\(401, \{ error: 'sin_identidad'/)          // sin sesión y sin token: nada
-    expect(c).toMatch(/if \(!quien && !pu\.visitante\) return json\(401/)                            // token que no es de un visitante vigente
-    expect(c).toMatch(/if \(!pu\.prerregistrado\) \{[\s\S]{0,260}json\(403, \{ error: 'sin_acceso'[\s\S]{0,220}json\(403, \{ error: 'prerregistro_requerido'/)
-    expect(c).toMatch(/if \(ePuerta \|\| !puerta\) return json\(503/)                               // falla cerrado
-    expect(c).toMatch(/verified: q\.quien\.verified/)                                                // la verificación sale del perfil, no del cliente
-    expect(c).toMatch(/const hash: string \| null = quien \? null : await hashToken\(p\.token\)/)     // con sesión, el token de visitante ni se lee
-    expect(c).toMatch(/p_profile: quien \? quien\.uid : null/)                                        // la cuenta la da el JWT, nunca el cuerpo
+    expect(c).toMatch(/if \(!quien\) \{\s*\n\s*if \(!quien && !hash\) return json\(401, \{ error: 'sin_identidad'/)
+    expect(c).toMatch(/if \(!pu\.visitante\) return json\(401/)
+    expect(c).toMatch(/if \(!pu\.prerregistrado\) return json\(403, \{ error: 'prerregistro_requerido'/)
+    expect(c).toMatch(/if \(ePuerta \|\| !puerta\) return json\(503/)
+    expect(c).toMatch(/const hash: string \| null = quien \? null : await hashToken\(p\.token\)/)
+    expect(c).not.toMatch(/sin_acceso/)                                                                    // CUENTA ≠ VERIFICACIÓN: el pendiente conversa
   })
   it('CX-ENLACE · la función visitor acota y limita el prerregistro, y no revela coincidencias', () => {
     const v = codigo(visitorSrc)

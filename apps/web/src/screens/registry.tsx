@@ -10,7 +10,7 @@ import { Calendario } from './Calendario'
 import { Clientes } from './Clientes'
 import { CommonView } from './CommonView'
 import { Chat } from './hub/Chat'
-import { Catalogo } from './doctor/Catalogo'
+import { Catalogo, CatalogoPantalla } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
 import { Existencias } from './warehouse/Existencias'
@@ -69,7 +69,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   dis_solicitudes: () => <Solicitudes />,
   dis_calendario: () => <Calendario />,
   clientes: () => <Clientes />,
-  catalogo: () => <Catalogo />,
+  catalogo: () => <CatalogoPantalla />,
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,
   asist: () => <RedirigirChat />,   // UX-1 · alias heredado ('Asistente IA') → la conversación canónica
