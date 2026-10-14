@@ -93,7 +93,7 @@ begin
   -- ══ 6 · quien atiende ve el contacto; nadie más ══
   perform tests.act_as(v_admin);
   perform tests.eq(public.cc_contacto_de(cB) ->> 'posible_cliente', (select full_name from public.customers where id = cu1), '6 · Dirección ve el posible cliente');
-  perform tests.eq(public.cc_contacto_de(cA) - 'desde', '{"nombre": "Ana Ruiz", "telefono": "6690000001", "email": "ana@test.local", "es_medico": true, "cedula": "1234567", "posible_cliente": null, "confirmado": false}'::jsonb, '6 · contacto completo, sin confirmar');
+  perform tests.eq(public.cc_contacto_de(cA) - 'desde' - 'posible_cliente_id', '{"nombre": "Ana Ruiz", "telefono": "6690000001", "email": "ana@test.local", "es_medico": true, "cedula": "1234567", "posible_cliente": null, "confirmado": false}'::jsonb, '6 · contacto completo, sin confirmar');
   perform tests.ok(exists (select 1 from public.cc_cola_asesorias() q where q.conversation_id = cA and q.dueno = 'Ana Ruiz (prerregistro)'), '6 · la cola muestra el nombre');
   perform tests.act_as(s1);
   perform tests.eq(public.cc_contacto_de(cB) ->> 'telefono', '6699999999', '6 · el asesor asignado ve el contacto');

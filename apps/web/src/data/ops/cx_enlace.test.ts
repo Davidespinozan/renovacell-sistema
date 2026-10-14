@@ -116,7 +116,7 @@ describe('CX-ENLACE · cliente', () => {
   })
   it('contacto de una conversación: lee el comando y nunca lanza', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { nombre: 'Ana Ruiz', telefono: '6690000001', email: 'ana@test.local', es_medico: true, cedula: null, posible_cliente: 'Dra. Cartera', confirmado: false }, error: null })
-    expect(await contactoDe('C-1', rpc)).toEqual({ nombre: 'Ana Ruiz', telefono: '6690000001', email: 'ana@test.local', es_medico: true, cedula: null, posible_cliente: 'Dra. Cartera', confirmado: false })
+    expect(await contactoDe('C-1', rpc)).toEqual({ nombre: 'Ana Ruiz', telefono: '6690000001', email: 'ana@test.local', es_medico: true, cedula: null, posible_cliente: 'Dra. Cartera', posible_cliente_id: null, confirmado: false })
     expect(rpc).toHaveBeenCalledWith('cc_contacto_de', { p_conv: 'C-1' })
     expect(await contactoDe('C-1', async () => ({ data: null, error: { message: 'NO_AUTORIZADO' } }))).toBeNull()
     expect(await contactoDe('C-1', async () => { throw new Error('red') })).toBeNull()

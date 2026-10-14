@@ -78,6 +78,8 @@ export const LIMITES: Record<string, Regla> = {
   invitacion_ver:              { limite: 60,  ventanaSegs: 3600 },
   invitacion_aceptar:          { limite: 10,  ventanaSegs: 3600 },
   invitacion_aceptar_global:   { limite: 300, ventanaSegs: 3600 },
+  // VERIF-VENDEDOR: enlaces temporales a la evidencia (solo personal autorizado).
+  verificacion_evidencia_uid:  { limite: 120, ventanaSegs: 3600 },
   // chat (CC-2): abrir es barato; enviar cuesta (y puede llamar a la IA); solicitar asesor es raro.
   chat_abrir:                { limite: 30,  ventanaSegs: 3600 },
   chat_abrir_uid:            { limite: 60,  ventanaSegs: 3600 },

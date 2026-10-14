@@ -5,6 +5,7 @@ import { hasSupabase, supabase } from '../../lib/supabase'
 export interface ContactoEnlace {
   nombre: string; telefono: string; email: string; es_medico: boolean; cedula: string | null
   posible_cliente: string | null     // coincide con un cliente por correo o celular: NO está confirmado hasta que inicie sesión
+  posible_cliente_id?: string | null // para invitarlo desde el chat, una vez que quien atiende confirmó que es esa persona
   confirmado: boolean                // la conversación ya pertenece a una cuenta
 }
 
@@ -25,7 +26,7 @@ export async function contactoDe(conversationId: string, rpc: Rpc = rpcPorDefect
     const d = data as Partial<ContactoEnlace>
     if (typeof d.nombre !== 'string' || typeof d.telefono !== 'string' || typeof d.email !== 'string') return null
     return { nombre: d.nombre, telefono: d.telefono, email: d.email, es_medico: d.es_medico === true, cedula: typeof d.cedula === 'string' ? d.cedula : null,
-      posible_cliente: typeof d.posible_cliente === 'string' ? d.posible_cliente : null, confirmado: d.confirmado === true }
+      posible_cliente: typeof d.posible_cliente === 'string' ? d.posible_cliente : null, posible_cliente_id: typeof d.posible_cliente_id === 'string' ? d.posible_cliente_id : null, confirmado: d.confirmado === true }
   } catch { return null }
 }
 

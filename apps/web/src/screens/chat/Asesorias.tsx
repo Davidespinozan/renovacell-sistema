@@ -15,7 +15,9 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico, TEXTO_ASESORIA_FINALIZADA } from './ChatCanonico'
 import { useRole } from '../../auth/RoleContext'
-import { contactoDe as contactoPorDefecto, urlEnlaceContacto, type ContactoEnlace } from '../../data/ops/contactoEnlace'
+import { contactoDe as contactoPorDefecto, urlEnlaceContacto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
+import { crearInvitacion } from '../../data/ops/invitacion'
+import { PanelVerificacion } from './PanelVerificacion'
 
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
@@ -31,13 +33,27 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
   const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
   useEffect(() => {
-    setContacto(null)
+    setContacto(null); setHerr(null)
     if (!abierta) return
     let vivo = true
     void contactoDe(abierta).then((c) => { if (vivo) setContacto(c) })
     return () => { vivo = false }
   }, [abierta, contactoDe])
   const [copiado, setCopiado] = useState(false)
+  // Herramientas del asesor: mandar en ESTA conversación el enlace de registro o la invitación a crear cuenta.
+  const [herr, setHerr] = useState<string | null>(null)
+  const mandar = async (texto: string, listo: string) => {
+    if (!abierta) return
+    const r = await cliente.enviar(abierta, texto)
+    setHerr(r.ok ? listo : r.error.codigo === 'asesoria_no_iniciada' ? 'Inicia la asesoría para poder escribirle.' : r.error.mensaje)
+  }
+  const mandarRegistro = () => void mandar(`Para verificar tu cédula y crear tu cuenta, llena este formulario (tus datos ya están prellenados si los dejaste aquí): ${urlVerificacionMedica()}`, 'Le mandaste el enlace de registro.')
+  const mandarInvitacion = async (customerId: string, nombre: string) => {
+    if (!window.confirm(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`)) return
+    const inv = await crearInvitacion(customerId)
+    if (!inv.ok) { setHerr(inv.mensaje); return }
+    await mandar(`Te dejo tu invitación para crear tu cuenta en Renovacell. Como ya eres cliente, queda verificada: ${inv.data.enlace}`, 'Le mandaste la invitación a crear su cuenta.')
+  }
   const copiarEnlace = async () => {
     const url = urlEnlaceContacto()
     try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) }
@@ -86,6 +102,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
+      <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} />
       {contacto && (
         <div className="rc-contacto-ficha" data-testid="contacto-enlace">
           <div><b>{contacto.nombre}</b>{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</div>
@@ -93,6 +110,13 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
           {contacto.posible_cliente && !contacto.confirmado && (
             <div className="rc-contacto-ojo" role="note">Sus datos coinciden con el cliente <b>{contacto.posible_cliente}</b>, pero <b>no está confirmado</b>: no compartas historial, precios ni pedidos hasta que inicie sesión.</div>
           )}
+          {!contacto.confirmado && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              <button type="button" className="btn ghost sm" onClick={mandarRegistro} data-testid="btn-mandar-registro">Mandar enlace de registro</button>
+              {contacto.posible_cliente_id && <button type="button" className="btn ghost sm" onClick={() => void mandarInvitacion(contacto.posible_cliente_id!, contacto.posible_cliente ?? contacto.nombre)} data-testid="btn-mandar-invitacion">Ya es cliente: mandar invitación</button>}
+            </div>
+          )}
+          {herr && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="herramienta-aviso">{herr}</div>}
         </div>
       )}
       <ChatCanonico embebido asesor conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}

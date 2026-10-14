@@ -1,0 +1,55 @@
+// VERIF-VENDEDOR · panel dentro de Conversaciones: si quien escribe es un doctor con verificación PENDIENTE y quien
+// atiende puede verificarlo, aquí ve su cédula, el dictamen SEP y las fotos del INE, y lo aprueba o rechaza.
+import React, { useEffect, useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
+import { evidenciaDoctor, pendienteDeConversacion, verificarDoctor, type DoctorPendiente } from '../../data/ops/verificacion'
+
+const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso', selfie: 'Selfie' }
+
+export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, onCambio }: {
+  conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; onCambio?: () => void
+}) {
+  const [d, setD] = useState<DoctorPendiente | null>(null)
+  const [fotos, setFotos] = useState<Record<string, string>>({})
+  const [nota, setNota] = useState(''); const [rechazando, setRechazando] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [ocupado, setOcupado] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    setD(null); setFotos({}); setMsg(null)
+    void leer(conversationId).then(async (x) => { if (!vivo || !x) return; setD(x); const f = await evidencia(x.profile_id); if (vivo) setFotos(f) })
+    return () => { vivo = false }
+  }, [conversationId, leer, evidencia])
+  if (!d) return msg?.ok ? <div className="rc-contacto-ficha" role="status" data-testid="verificacion-hecha">{msg.texto}</div> : null
+  const decidir = async (aprobar: boolean) => {
+    if (ocupado) return
+    setOcupado(true); setMsg(null)
+    const r = await verificar(d.profile_id, aprobar, nota.trim() || null)
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    setMsg({ ok: true, texto: aprobar ? `${d.nombre ?? 'El doctor'} quedó verificado: ya ve precios y puede comprar.` : 'Verificación rechazada. El doctor sigue sin acceso a precios.' })
+    setD(null); onCambio?.()
+  }
+  return (
+    <div className="rc-contacto-ficha" data-testid="panel-verificacion">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={16} style={{ color: 'var(--warn)' }} /><b>Verificación pendiente</b><span style={{ color: 'var(--mid)', fontSize: 12 }}>· tú puedes verificarlo</span></div>
+      <div className="rc-contacto-datos">
+        <span>{d.nombre ?? '—'}</span>{d.cedula && <span>Cédula {d.cedula}</span>}{d.sep?.decision && <span>SEP: {d.sep.decision === 'auto' ? 'coincide' : d.sep.decision === 'reject' ? 'no coincide' : 'por revisar'}</span>}
+        {d.telefono && <a href={`tel:${d.telefono}`}>{d.telefono}</a>}{d.organizacion && <span>{d.organizacion}</span>}
+      </div>
+      {Object.keys(fotos).length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+          {Object.entries(fotos).map(([k, u]) => <a key={k} href={u} target="_blank" rel="noreferrer" title={ETIQUETA[k] ?? k} data-testid={`evidencia-${k}`}><img src={u} alt={ETIQUETA[k] ?? k} style={{ width: 110, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}
+        </div>
+      )}
+      {Object.keys(d.evidencia ?? {}).length === 0 && <div style={{ fontSize: 12, color: 'var(--mid)' }}>Sin fotos de identificación: pídeselas por el chat antes de aprobar.</div>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+        <button type="button" className="btn sm" disabled={ocupado} onClick={() => void decidir(true)} data-testid="btn-aprobar-verificacion">Aprobar verificación</button>
+        {!rechazando ? <button type="button" className="btn ghost sm" onClick={() => setRechazando(true)} data-testid="btn-rechazar-verificacion">Rechazar</button> : (<>
+          <input value={nota} onChange={(e) => setNota(e.target.value)} maxLength={300} placeholder="Motivo del rechazo" aria-label="Motivo del rechazo" style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', minHeight: 34 }} />
+          <button type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} disabled={ocupado || !nota.trim()} onClick={() => void decidir(false)} data-testid="btn-confirmar-rechazo">Rechazar verificación</button>
+        </>)}
+      </div>
+      {msg && !msg.ok && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12.5 }}>{msg.texto}</div>}
+    </div>
+  )
+}

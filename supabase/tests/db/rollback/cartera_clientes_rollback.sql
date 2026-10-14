@@ -4,8 +4,9 @@ begin;
 create temp table _ck as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
-     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia', '_cartera_cliente_al_ligar', 'cliente_vendedor_asignar', 'cliente_estado_guardar') and p.proname not like 'cliente_invitacion_%') resto,
+     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia', '_cartera_cliente_al_ligar', 'cliente_vendedor_asignar', 'cliente_estado_guardar') and p.proname not like 'cliente_invitacion_%' and p.proname not in ('_puede_verificar', 'doctor_verificacion_ver', 'doctor_verificar', 'doctor_verificacion_de_conversacion', 'cc_contacto_de')) resto,
   (select count(*) from public.customers) n_c, (select count(*) from public.cc_cartera) n_k;
+\ir ../../../rollback/verificacion_vendedor/99_down.sql   -- VERIF-VENDEDOR (154) se baja primero
 \ir ../../../rollback/invitaciones/99_down.sql   -- INVITACIONES (153) se baja primero
 \ir ../../../rollback/cartera_clientes/99_down.sql
 do $t$ begin
@@ -16,11 +17,12 @@ do $t$ begin
     and md5(pg_get_functiondef('public.cc_mi_cartera()'::regprocedure)) = 'a02c498626e4454e236f4b6633502a41' and md5(pg_get_functiondef('public.cc_vendedores()'::regprocedure)) = 'cf9f22c438205f05d07ed450dd8ee009'
     and md5(pg_get_functiondef('public._cc_prerregistro_coincidencia(text,text)'::regprocedure)) = '0bcee140991db42178db2b6e6547371a', '152 down · funciones idénticas a producción');
   perform tests.ok((select resto from _ck) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
-     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia')), '152 down · ninguna otra función cambió');
+     and p.proname not in ('_c360_actor', 'cc_mi_cartera', 'cliente_360', 'cc_vendedores', '_cc_prerregistro_coincidencia', 'cc_contacto_de')), '152 down · ninguna otra función cambió');
   perform tests.ok((select n_c = (select count(*) from public.customers) and n_k = (select count(*) from public.cc_cartera) from _ck), '152 down · sin cambios de datos');
 end $t$;
 \ir ../../../migrations/20261205120000_cartera_clientes.sql
 \ir ../../../migrations/20261206120000_invitaciones_clientes.sql
+\ir ../../../migrations/20261207120000_verificacion_vendedor.sql
 do $t$ begin
   perform tests.ok((select todas from _ck) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '152 · se vuelve a aplicar y queda idéntica');
 end $t$;
