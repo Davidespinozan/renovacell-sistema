@@ -112,7 +112,7 @@ describe('frontend', () => {
     expect(codigo(appSrc)).not.toMatch(/import \{ ChatCanonico \}/)
     expect(codigo(appSrc)).toMatch(/const conAcceso = mode === 'app'\n/)   // cuenta ≠ verificación: el pendiente también entra
     expect(codigo(appSrc)).toMatch(/if \(esRutaChat && conAcceso && role === 'doctor'\) setScreen\('chat_cc'\)/)
-    expect(pantallaSrc).toMatch(/asesor \? 'Asesoría' : 'Renovacell'/)   // UX V2-B · encabezado de producto, no de panel
+    expect(pantallaSrc).toMatch(/asesor \? \(capitalizarNombre\(nombreCliente\) \|\| 'Asesoría'\) : 'Renovacell'/)   // UX V2-B → CHAT PRO · el personal ve el nombre de su cliente
     expect(asesoriasSrc).toMatch(/cliente\.cola\(\)/)
     expect(codigo(asesoriasSrc)).not.toMatch(/Bandeja/)
   })

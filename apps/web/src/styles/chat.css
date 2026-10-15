@@ -310,3 +310,16 @@
 .rc-rr-acciones{display:flex;gap:6px}
 .rc-rr-error{color:var(--danger);font-size:12.5px;padding:0 14px 6px}
 .rc-enlace-cand{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;background:var(--hueso);border-radius:8px;padding:6px 10px}
+
+/* CHAT PRO · la piel de mensajería es la de TODOS los chats: botones del personal sobre el encabezado verde, el cajón
+   del doctor y la vista de escritorio del vendedor. */
+.rc-chat--wa .rc-head .btn.ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.32);box-shadow:none}
+.rc-chat--wa .rc-head .btn.ghost:hover{background:rgba(255,255,255,.22);color:#fff}
+.rc-chat--wa .rc-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-chat--wa .rc-rr{background:#f0f2f1;border-top:0}
+.rc-chat--wa .rc-rr-item:hover,.rc-chat--wa .rc-rr-item--on{background:#fff}
+.rc-chat--wa .rc-mark--inicial{background:#dfe5e1;color:var(--green-deep);font-size:18px;font-weight:700}
+.rc-chat--wa .rc-input:focus-visible{outline:none}
+.rc-chat--wa .rc-title{min-width:0;flex:1}
+.rc-corta{display:none}
+@media (max-width:520px){.rc-chat--wa .rc-larga{display:none}.rc-chat--wa .rc-corta{display:inline}.rc-chat--wa .rc-head .btn{padding:6px 12px}}

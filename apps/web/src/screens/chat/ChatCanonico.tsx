@@ -14,7 +14,7 @@ import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
 import { diaEtiqueta, etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
 import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
-import { primerNombre } from '../../lib/nombres'
+import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 
@@ -33,7 +33,7 @@ interface Props {
   autoFoco?: boolean                 // UX V2-B · al abrir el cajón, el foco entra al redactor
   nombreCliente?: string | null      // Chat V2-C3 · nombre del dueño que manda el servidor (vista del personal)
   onFin?: (motivo: 'terminada') => void   // D4-FIX · el asesor terminó la asesoría: quien monta vuelve a su lista
-  estilo?: 'mensajeria'              // CX-ENLACE · piel de mensajería (enlace de contacto): mismo componente, mismo hilo
+  estilo?: 'mensajeria' | 'sistema'  // CHAT PRO · piel de mensajería en TODOS los chats (cliente, doctor y vendedor); 'sistema' = la anterior
   barra?: React.ReactNode            // CX-ENLACE · accesos bajo el encabezado (conocer Renovacell, verificarse)
   accionesAdjunto?: (m: Mensaje) => React.ReactNode   // FOTOS · acciones bajo una imagen (p. ej. "Usar como INE" para quien verifica)
   reducir?: (f: File) => Promise<string | null>        // FOTOS · inyectable en pruebas
@@ -111,7 +111,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria' }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -398,9 +398,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico"
       onKeyDown={(e) => { if (e.key === 'Escape' && vista.tipo === 'historial') { e.stopPropagation(); volverActual() } }}>
       <header className="rc-head">
-        <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>
+        {/* Como en un mensajero: el personal ve la inicial de su cliente; el cliente ve el logo de Renovacell. */}
+        {asesor && capitalizarNombre(nombreCliente)
+          ? <div className="rc-mark rc-mark--inicial" aria-hidden>{capitalizarNombre(nombreCliente).replace(/^(dra?\.?|doctora?|lic\.?)\s+/i, '').slice(0, 1).toUpperCase()}</div>
+          : <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>}
         <div className="rc-title">
-          <div className="rc-name">{asesor ? 'Asesoría' : 'Renovacell'}</div>
+          <div className="rc-name">{asesor ? (capitalizarNombre(nombreCliente) || 'Asesoría') : 'Renovacell'}</div>
           <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : subtituloDe(conv, asesor)}</div>
         </div>
         <div className="rc-actions">
@@ -409,11 +412,11 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               aria-label="Conversaciones anteriores" aria-pressed={vista.tipo === 'historial'} title="Conversaciones anteriores" data-testid="btn-historial"><History size={18} /></button>
           )}
           {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
-            <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.iniciar(convId!))} data-testid="btn-iniciar">Iniciar asesoría</button>
+            <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.iniciar(convId!))} data-testid="btn-iniciar"><span className="rc-larga">Iniciar asesoría</span><span className="rc-corta" aria-hidden>Iniciar</span></button>
           )}
           {/* D4-FIX · solo en los estados que el backend acepta (human_active / human_ended); en human_assigned se pulsa "Iniciar" */}
           {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_ended') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
-            <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria()} data-testid="btn-terminar">Terminar asesoría</button>
+            <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria()} data-testid="btn-terminar"><span className="rc-larga">Terminar asesoría</span><span className="rc-corta" aria-hidden>Terminar</span></button>
           )}
           {!finAtencion && vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
