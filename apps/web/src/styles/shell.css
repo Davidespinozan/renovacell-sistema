@@ -636,3 +636,49 @@ body.chat-open{overflow:hidden}
 }
 @keyframes rcbarra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rc-cart-bar{animation:none}}
+
+/* CATÁLOGO DEL DOCTOR (15 oct 2026) · foto completa en cuadro limpio, línea como texto discreto, promoción en chip,
+   disponibles primero y agotados aparte y compactos. */
+.dcat-barra{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dcat-barra .seg{flex:none}
+.dcat-buscar{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--pill);padding:0 14px;min-height:44px;box-shadow:var(--sh-card)}
+.dcat-buscar svg{width:16px;height:16px;color:var(--ink-3);flex:none}
+.dcat-buscar input{flex:1;border:0;outline:0;background:none;font:inherit;font-size:14px;color:var(--ink);min-width:0}
+.dcat-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.dcat-card{cursor:default}
+.dcat-card:hover{transform:translateY(-2px)}
+.dcat-foto{position:relative;aspect-ratio:5/4;background:#fff;border-bottom:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
+.dcat-foto img{width:100%;height:100%;object-fit:contain;padding:8px;transition:transform .25s}
+.dcat-card:hover .dcat-foto img{transform:scale(1.03)}
+.dcat-foto svg{width:40px;height:40px;color:var(--green)}
+.dcat-estado{position:absolute;top:10px;right:10px;background:rgba(17,27,33,.72);color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:var(--pill);letter-spacing:.01em}
+.dcat-estado--pocas{background:var(--warn-bg);color:var(--warn)}
+.dcat-linea{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcat-linea span{font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--ink-3);font-size:11.5px}
+.dcat-linea.prof{color:var(--blue)}.dcat-linea.cosm{color:#7A4E97}
+.dcat-card h5{font-size:15px;line-height:1.3;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.dcat-precio{display:flex;align-items:baseline;gap:8px;margin:8px 0 6px;font-size:20px}
+.dcat-precio s{font-size:12.5px;color:var(--ink-3);font-weight:500}
+.dcat-promo{align-self:flex-start;font-size:11.5px;font-weight:600;color:var(--green-deep);background:#e8f3ea;border-radius:var(--pill);padding:3px 9px;margin-bottom:10px}
+.dcat-card .addb,.dcat-cant{margin-top:auto}
+.dcat-cant{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dcat-cant .mono{font-size:15px}
+.dcat-nodisp{margin-top:auto;font-size:12.5px;color:var(--ink-3)}
+.dcat-sub{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-2);margin:6px 0 10px}
+.dcat-sub span{font-size:11.5px;font-weight:600;color:var(--ink-3);background:var(--cp-slate-100);border-radius:var(--pill);padding:1px 8px}
+.dcat-grid--agotados{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.dcat-card--agotado{box-shadow:none}
+.dcat-card--agotado .dcat-foto img{filter:grayscale(.35);opacity:.8;padding:18px}
+.dcat-card--agotado .pb{padding:10px 12px 12px}
+.dcat-card--agotado h5{font-size:13.5px;min-height:0}
+.dcat-card--agotado .dcat-precio{font-size:15px;margin:4px 0 2px;color:var(--ink-2)}
+.dcat-vaciar{margin-left:auto;font-size:13px}
+@media (max-width:600px){
+  .dcat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .dcat-grid--agotados{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .dcat-card .pb{padding:10px 11px 12px}
+  .dcat-card h5{font-size:13.5px}
+  .dcat-precio{font-size:17px}
+  .dcat-card--agotado .dcat-linea,.dcat-card--agotado .dcat-nodisp,.dcat-card--agotado .dcat-precio{display:none}
+  .dcat-barra .seg{width:100%}
+}

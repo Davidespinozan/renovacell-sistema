@@ -52,6 +52,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty)
 
   const [filter, setFilter] = useState<LineFilter>('all')
+  const [busca, setBusca] = useState('')
   const canon = useCarritoCanonico(hasSupabase)            // CC-7 · carrito canónico (servidor)
   const [cartLocal, setCartLocal] = useState<Cart>({})      // solo modo demo (sin backend)
   const cart: Cart = hasSupabase ? canon.qty : cartLocal
@@ -111,6 +112,24 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
     [products, filter],
   )
   const [openFamily, setOpenFamily] = useState<ProductSafe | null>(null)
+  // Búsqueda por nombre o categoría (sin acentos). Disponibles primero; lo agotado va aparte y compacto.
+  const plano = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const visibles = useMemo(() => {
+    const k = plano(busca.trim())
+    return k ? entries.filter((e) => plano(e.product.name).includes(k) || plano(e.product.category).includes(k)) : entries
+  }, [entries, busca])
+  const hayExistencia = (e: CatalogEntry): boolean => {
+    if (e.kind === 'family') return e.variants.some((v) => isSellableVariant(v) && stockInfoFor(stockMap, v.id).qty > 0)
+    const st = stockInfoFor(stockMap, e.product.id)
+    return st.tracked && st.qty > 0
+  }
+  const disponibles = visibles.filter(hayExistencia)
+  const agotados = visibles.filter((e) => !hayExistencia(e))
+  const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
+    <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
+  ) : (
+    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+  )
 
   const lines: CartLine[] = useMemo(
     () =>
@@ -170,7 +189,6 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
     <div className="grid pos-wrap">
       {/* IZQUIERDA: catálogo */}
       <div className="grid" style={{ gap: 16 }}>
-        <div className="eyebrow">Portal del Doctor · Catálogo</div>
         {reorderNote && (
           <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Icon name="cart" />
@@ -178,25 +196,33 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
             <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setReorderNote(null)}><Icon name="x" /></button>
           </div>
         )}
-        <div className="seg" style={{ alignSelf: 'flex-start' }}>
-          {([['all', 'Todos'], ['cosm', 'Home Care'], ['prof', 'Professional']] as const).map(([k, lbl]) => (
-            <button key={k} type="button" className={filter === k ? 'active' : undefined} onClick={() => setFilter(k)}>
-              {lbl}
-            </button>
-          ))}
+        <div className="dcat-barra">
+          <div className="seg" role="group" aria-label="Línea">
+            {([['all', 'Todos'], ['cosm', 'Home Care'], ['prof', 'Professional']] as const).map(([k, lbl]) => (
+              <button key={k} type="button" className={filter === k ? 'active' : undefined} onClick={() => setFilter(k)}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          <label className="dcat-buscar">
+            <Icon name="search" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar producto" aria-label="Buscar producto" data-testid="catalogo-buscar" />
+          </label>
         </div>
 
-        <div className="pgrid">
-          {entries.length === 0 ? (
-            <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ink-3)' }}>
-              No hay productos disponibles en este momento.
-            </div>
-          ) : entries.map((e) => e.kind === 'family' ? (
-            <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
-          ) : (
-            <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
-          ))}
-        </div>
+        {visibles.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
+            {busca.trim() ? `No encontramos productos que digan «${busca.trim()}».` : 'No hay productos disponibles en este momento.'}
+          </div>
+        ) : (<>
+          {disponibles.length > 0 && <div className="pgrid dcat-grid">{disponibles.map(tarjeta)}</div>}
+          {agotados.length > 0 && (
+            <section className="dcat-agotados" aria-label="Agotados por ahora">
+              <div className="dcat-sub">Agotados por ahora <span>{agotados.length}</span></div>
+              <div className="pgrid dcat-grid dcat-grid--agotados">{agotados.map(tarjeta)}</div>
+            </section>
+          )}
+        </>)}
       </div>
 
       {openFamily && (
@@ -235,63 +261,50 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   )
 }
 
-function StockTag({ stock }: { stock: StockInfo }) {
-  if (stock.status === 'ok') return null
-  if (stock.status === 'low') return <span className="pill p-warn" style={{ marginLeft: 'auto' }}>Quedan {stock.qty}</span>
-  return <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Agotado</span>
-}
-
+// Tarjeta de producto del portal: foto completa en un cuadro limpio, línea y categoría como texto discreto, precio
+// al frente y la promoción como un chip. Lo agotado se ve compacto y sin botón (no hay nada que hacer ahí).
 function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec, pendiente = false }: { pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
   const discounted = effPrice != null && price != null && effPrice < price // volumen aplicado a esta cantidad
   return (
-    <div className="pcard">
-      <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
-        <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
-        {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: 'var(--cp-surface)', padding: 10, opacity: sellable ? 1 : 0.55 }} />
-          : <Icon name="leaf" />}
+    <div className={'pcard dcat-card' + (sellable ? '' : ' dcat-card--agotado')}>
+      <div className="dcat-foto">
+        {p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Icon name="leaf" />}
+        {!sellable && <span className="dcat-estado">Agotado</span>}
+        {sellable && stock.status === 'low' && <span className="dcat-estado dcat-estado--pocas">Quedan {stock.qty}</span>}
       </div>
       <div className="pb">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h5 style={{ margin: 0 }}>{p.name}</h5>
-          <StockTag stock={stock} />
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.category}</div>
-        <div className="pr">
-          {discounted ? (
-            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline' }}>
-              <span>{money(effPrice)}</span>
-              <span style={{ fontSize: 12, color: 'var(--ink-3)', textDecoration: 'line-through' }}>{money(price)}</span>
-            </span>
-          ) : money(price)}
-        </div>
-        {promo && !discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>{promo}</div>}
-        {discounted && <div style={{ fontSize: 11.5, color: 'var(--green-deep)', fontWeight: 600, marginTop: 2 }}>Precio por volumen aplicado</div>}
+        <div className={'dcat-linea ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}{p.category ? <span> · {p.category}</span> : null}</div>
+        <h5>{p.name}</h5>
+        {!pendiente && price != null && (
+          <div className="pr dcat-precio">
+            {discounted ? (<><span>{money(effPrice)}</span><s>{money(price)}</s></>) : money(price)}
+          </div>
+        )}
+        {sellable && !pendiente && (promo || discounted) && (
+          <div className="dcat-promo">{discounted ? 'Precio por volumen aplicado' : promo}</div>
+        )}
         {pendiente ? (
           <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Los precios se habilitan al aprobar tu verificación" data-testid="precio-al-verificar">
             Precio al verificar tu cuenta
           </button>
         ) : price == null ? (
-          // Precio "a consultar": antes mostraba un "Agregar" habilitado que no hacía
-          // nada (add() sale temprano). Ahora es un estado claro y no engañoso.
+          // Precio "a consultar": estado claro y no engañoso (add() no agrega sin precio).
           <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Este producto se cotiza aparte">
             Precio a consultar
           </button>
         ) : !sellable ? (
-          <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }}>
-            {stock.tracked ? 'Agotado' : 'No disponible'}
-          </button>
+          <div className="dcat-nodisp">{stock.tracked ? 'Sin existencias por ahora' : 'No disponible'}</div>
         ) : qty === 0 ? (
           <button className="addb" type="button" onClick={onAdd}>
             <Icon name="plus" /> Agregar
           </button>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
+          <div className="dcat-cant">
             <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}><Icon name="minus" /></button>
-            <span className="mono" style={{ fontSize: 15 }}>{qty}</span>
+            <span className="mono">{qty}</span>
             <button className="btn sm" type="button" aria-label="Agregar uno" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
           </div>
         )}
@@ -308,15 +321,13 @@ function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; 
   const enCarrito = entry.variants.reduce((s, v) => s + (cart[v.id] ?? 0), 0)
   const isProf = p.line === 'prof'
   return (
-    <div className="pcard">
-      <div className={'ptile ' + (isProf ? 'prof' : 'cosm')} style={p.image_url ? { padding: 0, overflow: 'hidden' } : undefined}>
-        <span className="pbadge"><span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span></span>
-        {p.image_url
-          ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: 'var(--cp-surface)', padding: 10 }} />
-          : <Icon name="leaf" />}
+    <div className={'pcard dcat-card' + (disponibles > 0 ? '' : ' dcat-card--agotado')}>
+      <div className="dcat-foto">
+        {p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Icon name="leaf" />}
       </div>
       <div className="pb">
-        <h5 style={{ margin: 0 }}>{p.name}</h5>
+        <div className={'dcat-linea ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</div>
+        <h5>{p.name}</h5>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
           {entry.variants.length} variante(s){disponibles !== entry.variants.length ? ` · ${disponibles} con precio` : ''}
         </div>
@@ -419,7 +430,7 @@ function CartPanel({
         <Icon name="cart" style={{ width: 18, height: 18, color: 'var(--green-deep)' }} />
         <h3 style={{ fontSize: 16, fontWeight: 600 }}>Tu pedido</h3>
         {!empty && (
-          <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={onClear}>
+          <button className="rc-link dcat-vaciar" type="button" onClick={onClear}>
             Vaciar
           </button>
         )}

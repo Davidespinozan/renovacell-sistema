@@ -9,7 +9,7 @@ beforeEach(cleanup)
 describe('<Catalogo>', () => {
   it('muestra el catálogo con sus filtros y productos', () => {
     render(<Catalogo />)
-    expect(screen.getByText('Portal del Doctor · Catálogo')).toBeInTheDocument()
+    expect(screen.getByTestId('catalogo-buscar')).toBeInTheDocument()   // la ruta repetida se quitó: el encabezado ya dice Catálogo
     // Las pestañas de filtro son botones (evita chocar con los badges de producto).
     expect(screen.getByRole('button', { name: 'Todos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Home Care' })).toBeInTheDocument()
