@@ -53,7 +53,9 @@ const TRAZO_FUERTE = new Set<IconName>(['check', 'chevronRight', 'chevronLeft', 
 
 export function Icon({ name, ...rest }: { name: IconName } & React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={TRAZO_FUERTE.has(name) ? 2 : 1.8} strokeLinecap="round" strokeLinejoin="round" {...rest}>
+    // Tamaño por defecto (18 px): un ícono sin regla de estilo alrededor se estiraba al ancho de su tarjeta (flecha gigante en
+    // Recibir mercancía, 15 oct 2026). Las reglas CSS con tamaño explícito siguen mandando sobre estos atributos.
+    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={TRAZO_FUERTE.has(name) ? 2 : 1.8} strokeLinecap="round" strokeLinejoin="round" {...rest}>
       {P[name]}
     </svg>
   )
