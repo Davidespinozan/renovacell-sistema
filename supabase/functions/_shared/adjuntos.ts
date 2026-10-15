@@ -28,3 +28,18 @@ export async function conAdjuntos(admin: any, data: unknown): Promise<unknown> {
     return { ...(d as Record<string, unknown>), mensajes: msgs.map((m) => (porMsj.has(m.id as string) ? { ...m, adjunto: porMsj.get(m.id as string) } : m)) }
   } catch { return data }   // sin enlaces el mensaje sigue ahí ("Envió una imagen."): nunca se rompe la lectura
 }
+
+/**
+ * PALOMITAS · hasta qué mensaje leyó EL OTRO LADO de la conversación. Para el dueño (doctor o visitante) cuenta lo
+ * que leyó su asesor; para el personal, lo que leyó el dueño (que Dirección lo lea no es que el cliente lo vio).
+ * Se calcula después de que la base autorizó la lectura; nunca dice quién leyó, solo hasta dónde.
+ */
+// deno-lint-ignore no-explicit-any
+export async function conLecturaAjena(admin: any, conv: string, actor: string, data: unknown): Promise<unknown> {
+  try {
+    const roles = actor === 'visitor' || actor === 'doctor' ? ['asesor', 'supervisor'] : ['dueno']
+    const { data: ps } = await admin.from('cc_participants').select('last_read_seq, rol').eq('conversation_id', conv).in('rol', roles)
+    const leido = ((ps ?? []) as Array<{ last_read_seq: number | null }>).reduce((m, p) => Math.max(m, Number(p.last_read_seq ?? 0)), 0)
+    return { ...(data as Record<string, unknown>), leido_otro: leido }
+  } catch { return data }
+}

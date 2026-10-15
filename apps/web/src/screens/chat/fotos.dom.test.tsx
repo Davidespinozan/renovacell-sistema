@@ -87,3 +87,31 @@ describe('Mensajes con enlaces y nombre de quien entró por el enlace', () => {
     expect(etiquetaActor({ actor: 'visitor', propio: false }, 'cliente', { nombreCliente: 'magaly', etiquetaAsesor: 'Asesora' })).toBe('Tú')
   })
 })
+
+describe('Palomitas', () => {
+  const cli = (c: Conversacion) => new ClienteChat(async (_f, { body }) => body.action === 'abrir' ? { data: { conversation_id: 'C1', estado: 'abierta', modo: c.modo, nuevo: false }, error: null } : { data: body.action === 'leer' ? c : { ok: true }, error: null }, () => null)
+  it('dos grises = entregado; azules = el otro ya lo leyó (su cursor) o ya respondió después', async () => {
+    const c = { ...conv([
+      { id: 'm1', seq: 1, actor: 'visitor', content: 'Hola', created_at: ahora, propio: true },
+      { id: 'm2', seq: 2, actor: 'ai', content: 'Hola, ¿en qué te ayudo?', created_at: ahora, propio: false },
+      { id: 'm3', seq: 3, actor: 'visitor', content: '¿Precio?', created_at: ahora, propio: true },
+      { id: 'm4', seq: 4, actor: 'visitor', content: '¿Envío?', created_at: ahora, propio: true }]), leido_otro: 3 } as Conversacion
+    render(<ChatCanonico cliente={cli(c)} conCarrito={false} intervaloMs={600_000} />)
+    await screen.findByText('¿Envío?')
+    expect(screen.getAllByTestId('tick-visto')).toHaveLength(2)        // m1 (respondió el asistente) y m3 (cursor del asesor)
+    expect(screen.getAllByTestId('tick-entregado')).toHaveLength(1)    // m4 aún no lo ve nadie
+    expect(screen.queryByText('Enviando…')).toBeNull()
+  })
+  it('mientras se envía: una palomita gris, sin la palabra "Enviando…"', async () => {
+    const c = new ClienteChat(async (_f, { body }) => body.action === 'abrir' ? { data: { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', nuevo: false }, error: null }
+      : body.action === 'enviar' ? new Promise(() => {}) as never : { data: body.action === 'leer' ? conv([]) : { ok: true }, error: null }, () => null)
+    render(<ChatCanonico cliente={c} conCarrito={false} intervaloMs={600_000} />)
+    const area = await screen.findByLabelText('Escribe tu mensaje')
+    await waitFor(() => expect((area as HTMLTextAreaElement).disabled).toBe(false))
+    fireEvent.change(area, { target: { value: 'Hola' } }); fireEvent.click(screen.getByTestId('btn-enviar'))
+    expect(await screen.findByTestId('tick-enviando')).toBeTruthy(); expect(screen.queryByText('Enviando…')).toBeNull()
+  })
+  it('el servidor cuenta la lectura del OTRO lado (asesor para el cliente; dueño para el personal)', () => {
+    expect(chatEdge).toMatch(/conLecturaAjena\(admin, conv, actor\.actor, await conAdjuntos\(admin, data\)\)/)
+  })
+})

@@ -25,7 +25,7 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
-import { TEXTO_IMAGEN, idImagen, conAdjuntos } from '../_shared/adjuntos.ts'
+import { TEXTO_IMAGEN, idImagen, conAdjuntos, conLecturaAjena } from '../_shared/adjuntos.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
 import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
@@ -137,7 +137,7 @@ Deno.serve(conCors(async (req) => {
         const { data: k } = await q.maybeSingle(); cart_id = (k as { id?: string } | null)?.id ?? null
       }
     } catch { cart_id = null }
-    return json(200, { ...(await conAdjuntos(admin, data) as Record<string, unknown>), cart_id })
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0

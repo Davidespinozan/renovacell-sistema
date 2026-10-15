@@ -16,6 +16,7 @@ export interface Conversacion {
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
   handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
+  leido_otro?: number                    // PALOMITAS · hasta dónde leyó el otro lado (azules)
   leido_hasta?: number                   // UX-1 · cursor de lectura del actor (cc_participants.last_read_seq): el badge del portal no inventa estado
   sesion?: SesionResumen | null          // Chat V2-C1 · la lectura activa es la sesión actual (o la última cerrada si no hay abierta)
 }

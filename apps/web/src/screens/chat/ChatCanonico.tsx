@@ -4,7 +4,7 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
+import { Camera, Check, CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
@@ -270,6 +270,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
 
   const mensajes = useMemo(() => mensajesActuales(conv), [conv])
+  // PALOMITAS · azul = el otro lado ya lo vio: su cursor de lectura lo alcanzó, o ya respondió después (incluye al asistente).
+  const ultimoAjeno = useMemo(() => mensajes.reduce((s, m) => (!m.propio && m.actor !== 'system' ? Math.max(s, m.seq) : s), 0), [mensajes])
+  const visto = (seq: number): boolean => seq <= Math.max(conv?.leido_otro ?? 0, ultimoAjeno)
   const handoffVivo = !asesor && !!conv && !cerrada && !!conv.handoff?.origen && (modo === 'human_requested' || modo === 'human_assigned')
   // La tarjeta de handoff ocupa el lugar del último aviso del sistema (el servidor lo publica junto con el
   // handoff): así no hay banner + aviso duplicados. Si no hubiera aviso, la tarjeta va al final del hilo.
@@ -322,7 +325,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               {accionesAdjunto?.(m)}
             </div>
           ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{conEnlaces(m.content)}</div>}
-          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
+          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && (visto(m.seq)
+            ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tick-visto" />
+            : <CheckCheck className="rc-tick" size={15} aria-label="Entregado" data-testid="tick-entregado" />)}</time>
         </div>
       </div>,
     )
@@ -404,7 +409,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               <div className="rc-bubble">{pendiente.texto}</div>
               {pendiente.error
                 ? <div className="rc-fallo" role="alert">No se envió. <button type="button" className="rc-link" onClick={reintentar} data-testid="btn-reintentar">Reintentar</button> · <button type="button" className="rc-link" onClick={descartarPendiente}>Editar</button></div>
-                : <div className="rc-hora rc-hora--fija">Enviando…</div>}
+                : <div className="rc-hora rc-hora--fija" aria-label="Enviando"><Check className="rc-tick" size={15} data-testid="tick-enviando" /></div>}
             </div>
           </div>
         )}

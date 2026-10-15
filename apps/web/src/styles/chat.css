@@ -265,3 +265,10 @@
 .rc-enlace{color:inherit;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 .rc-msg--ai .rc-enlace,.rc-msg--seller .rc-enlace,.rc-msg--admin .rc-enlace,.rc-chat--wa .rc-enlace{color:var(--green-deep);font-weight:500}
 .rc-chat--wa .rc-msg--own .rc-enlace{color:#0b6b1d}
+
+/* PALOMITAS (como en mensajería): una gris = enviando; dos grises = entregado; dos azules = visto. En todas las pieles. */
+.rc-tick{display:inline-block;vertical-align:-3px;margin-left:3px;color:#8696a0}
+.rc-tick--visto{color:#34b7f1}
+.rc-msg--own .rc-hora{opacity:1;max-height:18px}
+.rc-msg--own .rc-bubble+.rc-hora{display:inline-flex;align-items:center;justify-content:flex-end}
+.rc-chat--wa .rc-tick--visto{color:#34b7f1}
