@@ -174,7 +174,8 @@ export async function misDatos(deps: { invocar?: Invocar; st?: Almacen | null } 
   } catch { return null }
 }
 export type ResultadoVerificarme = { ok: true; email: string } | { ok: false; mensaje: string; codigo?: string }
-export async function verificarme(d: { cedula: string; password: string; ineFront: string; ineBack: string }, deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<ResultadoVerificarme> {
+export interface DomicilioCaptura { line1: string; colonia: string; cp: string; city: string; state: string }
+export async function verificarme(d: { cedula: string; password: string; ineFront: string; ineBack: string; domicilio?: DomicilioCaptura }, deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<ResultadoVerificarme> {
   const sinRed = 'No hay conexión con el servidor. Intenta de nuevo.'
   if (!hasSupabase && !deps.invocar) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
   try {

@@ -144,7 +144,7 @@ Deno.serve(conCors(async (req) => {
       cedula: val.cedula, capturedVia: 'chat',
       identity: { status: 'pending', evidence: evidencia },
       verification: { status: 'pending' },
-      shipping: { line1: '', colonia: '', cp: '', city: '', state: '', phone: d.telefono },
+      shipping: { ...val.domicilio, phone: d.telefono },   // lo que capturó en el chat (opcional, como en la landing)
       consentimiento: { privacidad: true, at: d.consent_at },
     }
     const { error: eP } = await admin.from('profiles').update({ full_name: d.nombre, meta }).eq('id', uid)

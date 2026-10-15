@@ -93,11 +93,17 @@ export function mapearErrorPrerregistro(mensaje: string | undefined): { status: 
 }
 
 // VERIFICARME EN EL CHAT · lo que se pide dentro de la conversación (el resto ya está en el prerregistro).
-export function validarVerificarme(p: unknown): { ok: true; cedula: string; password: string } | { ok: false; campo: string; mensaje: string } {
+export interface DomicilioVerificarme { line1: string; colonia: string; cp: string; city: string; state: string }
+export function validarVerificarme(p: unknown): { ok: true; cedula: string; password: string; domicilio: DomicilioVerificarme } | { ok: false; campo: string; mensaje: string } {
   const o = (p && typeof p === 'object' && !Array.isArray(p) ? p : {}) as Record<string, unknown>
   const cedula = (typeof o.cedula === 'string' ? o.cedula : '').replace(/\s+/g, '')
   if (!/^[0-9]{5,12}$/.test(cedula)) return { ok: false, campo: 'cedula', mensaje: 'Escribe solo los números de tu cédula profesional.' }
   const password = typeof o.password === 'string' ? o.password : ''
   if (password.length < 8 || password.length > 72) return { ok: false, campo: 'password', mensaje: 'La contraseña debe tener entre 8 y 72 caracteres.' }
-  return { ok: true, cedula, password }
+  // Domicilio de entrega: opcional, igual que en el registro de la landing (si falta, se pide al hacer el pedido).
+  const d = (o.domicilio && typeof o.domicilio === 'object' && !Array.isArray(o.domicilio) ? o.domicilio : {}) as Record<string, unknown>
+  const txt = (k: string, max: number) => (typeof d[k] === 'string' ? (d[k] as string).replace(/\s+/g, ' ').trim().slice(0, max) : '')
+  const domicilio = { line1: txt('line1', 160), colonia: txt('colonia', 80), cp: txt('cp', 10).replace(/\D/g, ''), city: txt('city', 80), state: txt('state', 80) }
+  if (domicilio.cp && !/^[0-9]{5}$/.test(domicilio.cp)) return { ok: false, campo: 'cp', mensaje: 'El código postal debe tener 5 dígitos.' }
+  return { ok: true, cedula, password, domicilio }
 }

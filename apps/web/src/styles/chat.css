@@ -323,3 +323,8 @@
 .rc-chat--wa .rc-title{min-width:0;flex:1}
 .rc-corta{display:none}
 @media (max-width:520px){.rc-chat--wa .rc-larga{display:none}.rc-chat--wa .rc-corta{display:inline}.rc-chat--wa .rc-head .btn{padding:6px 12px}}
+/* VERIFICARME · domicilio de entrega opcional, igual que el registro de la landing. */
+.rc-domicilio{border:0;padding:0;min-width:0}
+.rc-domicilio legend{padding:0;margin-bottom:6px}
+.rc-opcional{font-weight:400;color:var(--ink-3);font-size:12px}
+.rc-domicilio-fila{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:8px}
