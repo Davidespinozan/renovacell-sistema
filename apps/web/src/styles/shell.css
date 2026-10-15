@@ -563,6 +563,17 @@ a.btn,a.btn:hover{text-decoration:none}
 }
 /* La hoja se imprime en cuanto se monta: sin animación de entrada (arranca transparente y saldría en blanco). */
 .remision-print-root .recibo{animation:none}
+/* Página propia sin márgenes del navegador: así no imprime su encabezado (título, fecha) ni su pie (dirección web). El
+   margen lo pone la hoja. Acuse de recibo y total de piezas. */
+@page remision{margin:0}
+@media print{
+  body.printing-remision .remision-print-root{page:remision;padding:16mm 15mm}
+  body.printing-remision .recibo .rhead{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+.recibo .rfirma{display:flex;gap:28px;padding:34px 26px 6px}
+.recibo .rfirma>div{border-top:1px solid #1a1f1c;padding-top:6px;font-size:11px;color:#5b665d}
+.recibo .rfirma>div:first-child{flex:2}.recibo .rfirma>div:last-child{flex:1}
+.recibo tfoot td{font-weight:600;border-top:1px solid var(--line);padding-top:10px}
 @media print{ @page{margin:14mm} }
 
 /* Paginación del directorio comercial: desktop = números + etiquetas; móvil = "Página X de Y". */

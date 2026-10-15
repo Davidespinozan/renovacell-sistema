@@ -11,6 +11,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { driverName } from '../../data/mock/shipments'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
+import { capitalizarNombre } from '../../lib/nombres'
+import { currentCompany } from '../../data/store/companyStore'
 
 export const LEMA_MARCA = 'Tecnologías Antiedad'
 type EnvioRemision = { carrier?: string | null; tracking_number?: string | null; driver_id?: string | null; estimated_delivery_at?: string | null }
@@ -20,7 +22,12 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
   const { data: lots } = useLots()
   const meta = (order.shipping_meta ?? {}) as { customer?: { name?: string } | null }
   const dir = orderAddress(order.shipping_meta, null)
-  const destino = [dir?.line1, dir?.colonia, dir?.city, dir?.state, dir?.cp ? `C.P. ${dir.cp}` : ''].filter(Boolean).join(', ')
+  // Lo capturado en minúsculas se presenta con mayúscula inicial (no se toca lo que ya trae mayúsculas).
+  const destino = [dir?.line1, dir?.colonia, dir?.city, dir?.state].map((x) => capitalizarNombre(x)).concat(dir?.cp ? `C.P. ${dir.cp}` : '').filter(Boolean).join(', ')
+  const para = capitalizarNombre(meta.customer?.name)
+  const empresa = currentCompany()
+  const remitente = [empresa.direccion?.trim(), empresa.telefono?.trim() ? `Tel. ${empresa.telefono.trim()}` : ''].filter(Boolean).join(' · ')
+  const piezas = order.items.filter((it) => it.unit_price != null).reduce((n, it) => n + it.qty, 0)
   const metodo = !envio ? 'Por asignar'
     : envio.driver_id ? `Entrega directa · ${driverName(envio.driver_id)}`
     : `${envio.carrier ?? 'Paquetería'}${envio.tracking_number ? ` · guía ${envio.tracking_number}` : ''}`
@@ -36,9 +43,10 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
       <div className="rmeta">
         <div><div className="k">Pedido</div><div className="v mono">{order.external_ref}</div></div>
         <div><div className="k">Fecha</div><div className="v">{fmtDate(order.created_at)}</div></div>
-        {meta.customer?.name && <div><div className="k">Para</div><div className="v">{meta.customer.name}</div></div>}
+        {para && <div><div className="k">Para</div><div className="v">{para}</div></div>}
         <div><div className="k">Envío</div><div className="v">{metodo}</div></div>
         {destino && <div style={{ gridColumn: '1 / -1' }}><div className="k">Destino</div><div className="v">{destino}</div></div>}
+        {remitente && <div style={{ gridColumn: '1 / -1' }}><div className="k">Remitente</div><div className="v">Renovacell · {remitente}</div></div>}
       </div>
       <div className="rbody">
         <table>
@@ -52,7 +60,13 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
               </tr>
             ))}
           </tbody>
+          <tfoot><tr><td colSpan={2}>Total de piezas</td><td className="mono">{piezas} {piezas === 1 ? 'pza' : 'pzas'}</td></tr></tfoot>
         </table>
+      </div>
+      {/* Acuse: quien recibe confirma que llegó completo (útil ante una reclamación de faltantes). */}
+      <div className="rfirma">
+        <div>Recibí completo y en buen estado · Nombre y firma</div>
+        <div>Fecha</div>
       </div>
       <div className="rfoot">
         <div className="note">Producto regulado · trazabilidad por lote (COFEPRIS). Conserva esta remisión.</div>
@@ -67,14 +81,17 @@ export function BotonRemision({ order, envio, className = 'btn ghost sm' }: { or
   const [imprimiendo, setImprimiendo] = useState(false)
   useEffect(() => {
     if (!imprimiendo) return
-    const fin = () => { document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin); setImprimiendo(false) }
+    // El título de la pestaña es el nombre del PDF al guardarlo: «Remisión S…», nunca el del sistema.
+    const tituloPrevio = document.title
+    const fin = () => { document.title = tituloPrevio; document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin); setImprimiendo(false) }
     // Dos cuadros de espera: la hoja ya debe estar pintada cuando el navegador toma la foto de impresión.
     const cuadro = requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.title = `Remisión ${order.external_ref ?? ''}`.trim()
       document.body.classList.add('printing-remision')
       window.addEventListener('afterprint', fin)
       window.print()
     }))
-    return () => { cancelAnimationFrame(cuadro); document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin) }
+    return () => { cancelAnimationFrame(cuadro); document.title = tituloPrevio; document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin) }
   }, [imprimiendo])
   return (
     <>
