@@ -4,6 +4,8 @@
 //   · su atención (una línea informativa: quién lo atiende; la acción vive en la burbuja),
 //   · su carrito activo (proyección canónica del servidor; nunca se crea uno desde aquí),
 //   · su pedido en curso o "volver a pedir" el último entregado (RLS: solo sus pedidos).
+// 15 oct 2026 (dueño: "se ve vacío"): además, quién lo atiende (la acción sigue en la burbuja), productos DISPONIBLES del
+// catálogo real (foto y precio; nunca promociones inventadas) y, si aún no compra, "Haz tu primer pedido".
 // Sin nada de eso, un Inicio limpio está bien. La composición es una lista de BLOQUES: cuando existan
 // autoridades de promociones, lanzamientos, seguimiento posventa o envíos activos, se agregan como
 // bloques aquí sin rehacer la pantalla. No hay promociones hoy (no hay campañas aprobadas: no se inventan).
@@ -19,6 +21,11 @@ import { isPast, statusView } from '../doctor/orderStatus'
 import { subtituloDe } from '../chat/ChatCanonico'
 import { Bienvenida, Seccion, TarjetaAtencion, Tarjetas } from './primitives'
 import { primerNombre, saludo } from '../../lib/nombres'
+import { usePricing } from '../../data/hooks/usePricing'
+import { useStock } from '../../data/hooks/useStock'
+import { stockInfoFor } from '../../data/ops/stock'
+import { isPortalProduct } from '../../data/hooks/useProducts'
+import { money } from '../../lib/format'
 
 // Solo el estado de la conversación: se pide desde un seq muy alto para no traer el historial.
 const SIN_HISTORIAL = 2_000_000_000
@@ -27,7 +34,9 @@ let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito } = { chat: chatPor
 export function configurarClientesInicioDoctor(c: Partial<{ chat: ClienteChat; carrito: ClienteCarrito }>) { porDefecto = { ...porDefecto, ...c } }
 
 export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito }) {
-  const { user, setScreen } = useRole()
+  const { user, setScreen, verified } = useRole()
+  const { priceFor } = usePricing()
+  const stockMap = useStock()
   const { data: orders } = useOrders()
   const { data: products } = useProducts()
   const nombreProducto = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products])
@@ -70,6 +79,15 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       lineas={[ultimo.items.slice(0, 2).map((it) => `${it.qty} × ${nombreProducto.get(it.product_id ?? '') ?? 'producto'}`).join(' · ') || null]}
       ctas={[{ label: 'Volver a pedir', onClick: () => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') } }]} />
   ) })
+  if (orders.length === 0 && !(cart && cart.n_items > 0)) bloques.push({ key: 'primero', nodo: (
+    <TarjetaAtencion testid="doctor-primer-pedido" tono="neu" titulo="Haz tu primer pedido"
+      lineas={[verified ? 'Elige del catálogo y te lo enviamos a tu consultorio.' : 'Conoce el catálogo; los precios se habilitan al verificar tu cuenta.']}
+      ctas={[{ label: 'Ver catálogo', primaria: true, onClick: () => setScreen('catalogo') }]} />
+  ) })
+  // Productos con existencia del catálogo real (los primeros 4): foto, nombre y su precio si ya está verificado.
+  const destacados = useMemo(() => products
+    .filter((p) => isPortalProduct(p) && !p.parent_product_id && p.image_url && stockInfoFor(stockMap, p.id).qty > 0)
+    .slice(0, 4), [products, stockMap])
   // (futuro) promociones / lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
 
   return (
@@ -78,12 +96,30 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       {conAsesor && conv && (
         // Solo informa: la conversación se abre desde la burbuja flotante (una sola superficie de chat).
         <div className={`rh-context${modo === 'human_active' ? '' : ' rh-context--neu'}`} role="status" data-testid="doctor-atencion">
-          <span><b>Tu atención</b> · {subtituloDe(conv, false)}{modo === 'human_active' ? ' · En conversación' : ''}</span>
+          <span>{primerNombre(conv.asesor_nombre)
+            ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesora{modo === 'human_active' ? ' · en conversación' : ''}</>
+            : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
         </div>
       )}
       {bloques.length > 0 && (
         <Seccion titulo="Continúa donde te quedaste" nivel="continuar" id="continuar">
           <Tarjetas>{bloques.map((b) => <React.Fragment key={b.key}>{b.nodo}</React.Fragment>)}</Tarjetas>
+        </Seccion>
+      )}
+      {destacados.length > 0 && (
+        <Seccion titulo="Disponibles para ti" nivel="info" id="destacados" accion={{ label: 'Ver todo el catálogo', onClick: () => setScreen('catalogo') }}>
+          <div className="rh-productos" data-testid="doctor-destacados">
+            {destacados.map((p) => {
+              const precio = verified ? priceFor(p.id, p.price) : null
+              return (
+                <button key={p.id} type="button" className="rh-producto" onClick={() => setScreen('catalogo')}>
+                  <span className="rh-producto-foto"><img src={p.image_url!} alt="" loading="lazy" /></span>
+                  <span className="rh-producto-nombre">{p.name}</span>
+                  <span className="rh-producto-precio">{precio != null ? money(precio) : 'Ver en catálogo'}</span>
+                </button>
+              )
+            })}
+          </div>
         </Seccion>
       )}
     </div>

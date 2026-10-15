@@ -293,7 +293,7 @@ describe('CHV2-B.1 · Inicio no es un segundo menú', () => {
     configurarClientesInicioDoctor({ chat: doc })
     render(<RoleHome />); await flush()
     expect(screen.getByText(/^(Buenos días|Buenas tardes|Buenas noches), David$/)).toBeTruthy()   // recepción: saludo según la hora del negocio
-    expect(await screen.findByTestId('doctor-atencion')).toHaveTextContent('Lucía · Asesora · En conversación')
+    expect(await screen.findByTestId('doctor-atencion')).toHaveTextContent('Te atiende Lucía · tu asesora · en conversación')
     expect(screen.queryByText('Abrir conversación')).toBeNull()
     expect(screen.queryByText('Accesos')).toBeNull()
     for (const k of ['catalogo', 'chat_cc', 'pedidosdr', 'hist']) expect(screen.queryByTestId(`acceso-${k}`)).toBeNull()
