@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { adoptarVisitante, misDatos as leerPorDefecto, verificarme as enviarPorDefecto, type MisDatos } from '../../data/ops/visitante'
 import { reducirFoto } from '../../data/ops/verificacion'
+import { FotoIne } from '../../app/FotoIne'
 
 async function entrarPorDefecto(email: string, password: string): Promise<boolean> {
   if (!hasSupabase) return false
@@ -23,7 +24,7 @@ export function TarjetaVerificarme({ onCerrar, leer = leerPorDefecto, enviar = e
   const [pass, setPass] = useState(''); const [pass2, setPass2] = useState('')
   const [error, setError] = useState<{ texto: string; cuenta?: boolean } | null>(null); const [enviando, setEnviando] = useState(false); const [lista, setLista] = useState(false)
   useEffect(() => { void leer().then((d) => { if (d) { setDatos(d); setCedula((c) => c || d.cedula || '') } }) }, [leer])
-  const foto = (set: (s: string | null) => void) => async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { set(await reducir(f)); setError(null) } }
+  const foto = (set: (s: string | null) => void) => async (f: File) => { set(await reducir(f)); setError(null) }
   const crear = async (e: React.FormEvent) => {
     e.preventDefault()
     if (enviando) return
@@ -43,10 +44,12 @@ export function TarjetaVerificarme({ onCerrar, leer = leerPorDefecto, enviar = e
       <h1>Verificar mi cuenta</h1>
       <p>{datos ? <>Tu cuenta: <b>{datos.nombre}</b> · {datos.email} · {datos.telefono}. </> : null}Solo nos falta tu cédula, tu INE y una contraseña.</p>
       <div className="rc-campo"><label htmlFor="vm-cedula">Cédula profesional</label><input id="vm-cedula" value={cedula} onChange={(e) => { setCedula(e.target.value); setError(null) }} inputMode="numeric" maxLength={20} placeholder="Solo números" /></div>
-      <div className="rc-campo"><label htmlFor="vm-frente">INE · frente</label><input id="vm-frente" type="file" accept="image/*" capture="environment" onChange={foto(setFrente)} data-testid="vm-frente" /></div>
-      {frente && <img src={frente} alt="INE frente" style={{ width: 150, borderRadius: 8, border: '1px solid var(--line)' }} />}
-      <div className="rc-campo"><label htmlFor="vm-reverso">INE · reverso</label><input id="vm-reverso" type="file" accept="image/*" capture="environment" onChange={foto(setReverso)} data-testid="vm-reverso" /></div>
-      {reverso && <img src={reverso} alt="INE reverso" style={{ width: 150, borderRadius: 8, border: '1px solid var(--line)' }} />}
+      <div className="rc-campo"><span className="rc-campo-titulo">Tu INE</span>
+        <div className="rc-fotos">
+          <FotoIne etiqueta="INE frente" valor={frente} onArchivo={foto(setFrente)} testId="vm-frente" />
+          <FotoIne etiqueta="INE reverso" valor={reverso} onArchivo={foto(setReverso)} testId="vm-reverso" />
+        </div>
+      </div>
       <div className="rc-campo"><label htmlFor="vm-pass">Contraseña</label><input id="vm-pass" type="password" autoComplete="new-password" value={pass} onChange={(e) => { setPass(e.target.value); setError(null) }} placeholder="Mínimo 8 caracteres" maxLength={72} /></div>
       <div className="rc-campo"><label htmlFor="vm-pass2">Repite la contraseña</label><input id="vm-pass2" type="password" autoComplete="new-password" value={pass2} onChange={(e) => { setPass2(e.target.value); setError(null) }} maxLength={72} /></div>
       {error && <div role="alert" className="rc-error rc-error--inline">{error.texto}{error.cuenta && <> <a href="/sistema">Iniciar sesión</a></>}</div>}

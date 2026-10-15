@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { completarVerificacion as completarPorDefecto, miVerificacion as leerPorDefecto, reducirFoto, type MiVerificacion as Estado } from '../../data/ops/verificacion'
 import { textoFaltan } from './AvisoVerificacion'
+import { FotoIne } from '../../app/FotoIne'
 
 const ESTADO: Record<string, string> = { pending: 'En revisión', verified: 'Verificada', rejected: 'No aprobada', revoked: 'Acceso retirado' }
 
@@ -14,7 +15,7 @@ export function MiVerificacion({ leer = leerPorDefecto, completar = completarPor
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [enviando, setEnviando] = useState(false)
   const cargar = useCallback(async () => { const r = await leer(); if (r) { setV(r); setCedula((c) => c || r.cedula || ''); if (r.verificado) actualizarVerificacion(true) } }, [leer, actualizarVerificacion])
   useEffect(() => { void cargar() }, [cargar])
-  const foto = (set: (s: string | null) => void) => async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; set(await reducir(f)); setMsg(null) }
+  const foto = (set: (s: string | null) => void) => async (f: File) => { set(await reducir(f)); setMsg(null) }
   const enviar = async () => {
     if (enviando) return
     setEnviando(true); setMsg(null)
@@ -39,10 +40,10 @@ export function MiVerificacion({ leer = leerPorDefecto, completar = completarPor
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div style={{ fontWeight: 600 }}>{rechazado ? 'Corrige tus datos' : 'Completa o corrige tus datos'}</div>
         <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>Cédula profesional<input style={campo} value={cedula} onChange={(e) => { setCedula(e.target.value); setMsg(null) }} inputMode="numeric" maxLength={40} aria-label="Cédula profesional" /></label>
-        <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>INE · frente<input type="file" accept="image/*" capture="environment" onChange={foto(setFrente)} aria-label="INE frente" data-testid="mi-ine-frente" /></label>
-        {frente && <img src={frente} alt="INE frente" style={{ width: 180, borderRadius: 8, border: '1px solid var(--line)' }} />}
-        <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>INE · reverso<input type="file" accept="image/*" capture="environment" onChange={foto(setReverso)} aria-label="INE reverso" data-testid="mi-ine-reverso" /></label>
-        {reverso && <img src={reverso} alt="INE reverso" style={{ width: 180, borderRadius: 8, border: '1px solid var(--line)' }} />}
+        <div className="rc-fotos">
+          <FotoIne etiqueta="INE frente" valor={frente} onArchivo={foto(setFrente)} testId="mi-ine-frente" />
+          <FotoIne etiqueta="INE reverso" valor={reverso} onArchivo={foto(setReverso)} testId="mi-ine-reverso" />
+        </div>
         {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ color: msg.ok ? 'var(--green-deep)' : 'var(--danger)', fontSize: 13 }}>{msg.texto}</div>}
         <button type="button" className="btn" disabled={enviando || (!cedula.trim() && !frente && !reverso)} onClick={() => void enviar()} data-testid="mi-verificacion-enviar">{enviando ? 'Enviando…' : 'Enviar a revisión'}</button>
         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Tus fotos se guardan de forma privada y solo las ve quien revisa tu verificación.</div>
