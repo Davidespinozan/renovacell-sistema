@@ -8,6 +8,7 @@ import { FiscalFields } from './FiscalFields'
 import { emptyFiscalProfile, normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../data/ops/fiscal'
 import { ETIQUETAS_TELEFONO, lineaDomicilio, type ClienteC360, type EtiquetaTelefono, type PerfilFiscal, type Telefono, type Nota } from '../data/ops/customer360'
 import { TIPOS_DOMICILIO, type DoctorLocation } from '../data/ops/doctorLocation'
+import { ConfirmModal } from './ConfirmModal'
 import { nombreRegimen } from '../data/sat/regimenesFiscales'
 import { nombreUsoCfdi } from '../data/sat/usosCfdi'
 
@@ -87,41 +88,11 @@ export function DomiciliosEditor({ customerId, lista, archivados = 0, alta, edit
 }) {
   const [form, setForm] = useState<{ id: string | null; d: DatosDomicilio; predeterminado: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [quitar, setQuitar] = useState<DoctorLocation | null>(null)   // confirmación antes de quitar un domicilio
   const set = (k: keyof DatosDomicilio) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => form && setForm({ ...form, d: { ...form.d, [k]: e.target.value } })
   const guardar = async () => { if (form && await correr(() => cliente.guardarDomicilio(customerId, form.id, form.d, form.predeterminado), setError, onCambio)) setForm(null) }
-  const altaPendiente = alta?.line1 && !lista.some((l) => (l.line1 ?? '').trim().toLowerCase() === alta.line1!.trim().toLowerCase() && l.postal_code === alta.cp)
-  return (
-    <div data-testid="domicilios">
-      {lista.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Sin domicilios registrados.</div>}
-      <div style={{ display: 'grid', gap: 6 }}>
-        {lista.map((l) => (
-          <div key={l.id} style={fila} data-testid="domicilio">
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{l.name} <span className="pill p-neu" style={{ marginLeft: 4 }}>{etiquetaTipo(l.tipo)}</span>{l.is_default && <span className="pill p-ok" style={{ marginLeft: 4 }}>Predeterminado</span>}{faltanDatos(l) && <span className="pill p-warn" style={{ marginLeft: 4 }} data-testid="domicilio-incompleto">Falta {faltanDatos(l)}</span>}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{lineaDomicilio(l)}</div>
-              {(l.contact_name || l.contact_phone || l.reference_notes) && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{[l.contact_name, l.contact_phone, l.reference_notes].filter(Boolean).join(' · ')}</div>}
-            </div>
-            {editable && (
-              <span style={{ display: 'flex', gap: 4 }}>
-                {!l.is_default && <button type="button" className="btn ghost sm" title="Predeterminado" onClick={() => correr(() => cliente.domicilioPredeterminado(l.id), setError, onCambio)}><Star size={13} /></button>}
-                <button type="button" className="btn ghost sm" title="Editar" onClick={() => setForm({ id: l.id, d: deUbicacion(l), predeterminado: l.is_default })}><Pencil size={13} /></button>
-                <button type="button" className="btn ghost sm" title="Archivar" onClick={() => correr(() => cliente.archivarDomicilio(l.id), setError, onCambio)} data-testid="domicilio-archivar"><Archive size={13} /></button>
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-      {archivados > 0 && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{archivados} domicilio(s) archivado(s): se conservan para el historial de pedidos.</div>}
-      {altaPendiente && (
-        <div style={{ ...fila, marginTop: 8, background: 'var(--surface-2, #fafafa)' }} data-testid="domicilio-alta">
-          <div style={{ flex: 1, fontSize: 12.5 }}><b>Domicilio del registro</b> (aún no es un domicilio de entrega): {[alta!.line1, alta!.colonia, alta!.cp && `C.P. ${alta!.cp}`, alta!.city, alta!.state].filter(Boolean).join(', ')}</div>
-          {puedeAdoptar && <button type="button" className="btn sm" onClick={() => correr(async () => { const r = await cliente.adoptarAlta(customerId); return r.ok && !r.data.adoptado ? { ok: false, error: r.data.motivo === 'incompleto' ? 'El domicilio del registro está incompleto (faltan CP, ciudad o estado): captúralo a mano.' : 'Ya existe un domicilio igual.' } : r }, setError, onCambio)} data-testid="domicilio-adoptar">Usarlo como domicilio</button>}
-        </div>
-      )}
-      <Aviso texto={error} />
-      {editable && !form && <button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => setForm({ id: null, d: { ...VACIO }, predeterminado: lista.length === 0 })} data-testid="domicilio-agregar"><Plus size={13} /> Agregar domicilio</button>}
-      {form && (
-        <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginTop: 8, display: 'grid', gap: 8 }} data-testid="domicilio-form">
+  const formulario = form && (
+        <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginTop: 8, display: 'grid', gap: 8, flexBasis: '100%' }} data-testid="domicilio-form">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
             <label style={{ fontSize: 12 }}>Tipo<select style={campo} value={form.d.tipo} onChange={set('tipo')} aria-label="Tipo">{TIPOS_DOMICILIO.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>
             <label style={{ fontSize: 12 }}>Alias<input style={campo} value={form.d.name} onChange={set('name')} placeholder="Consultorio Chapultepec" aria-label="Alias" /></label>
@@ -144,6 +115,45 @@ export function DomiciliosEditor({ customerId, lista, archivados = 0, alta, edit
             <button type="button" className="btn ghost sm" onClick={() => setForm(null)}>Cancelar</button>
           </div>
         </div>
+  )
+  const altaPendiente = alta?.line1 && !lista.some((l) => (l.line1 ?? '').trim().toLowerCase() === alta.line1!.trim().toLowerCase() && l.postal_code === alta.cp)
+  return (
+    <div data-testid="domicilios">
+      {lista.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Sin domicilios registrados.</div>}
+      <div style={{ display: 'grid', gap: 6 }}>
+        {lista.map((l) => (
+          <div key={l.id} style={fila} data-testid="domicilio">
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{l.name} <span className="pill p-neu" style={{ marginLeft: 4 }}>{etiquetaTipo(l.tipo)}</span>{l.is_default && <span className="pill p-ok" style={{ marginLeft: 4 }}>Predeterminado</span>}{faltanDatos(l) && <span className="pill p-warn" style={{ marginLeft: 4 }} data-testid="domicilio-incompleto">Falta {faltanDatos(l)}</span>}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{lineaDomicilio(l)}</div>
+              {(l.contact_name || l.contact_phone || l.reference_notes) && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{[l.contact_name, l.contact_phone, l.reference_notes].filter(Boolean).join(' · ')}</div>}
+            </div>
+            {editable && form?.id !== l.id && (
+              <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button type="button" className="btn ghost sm" onClick={() => setForm({ id: l.id, d: deUbicacion(l), predeterminado: l.is_default })} data-testid="domicilio-editar"><Pencil size={13} /> {faltanDatos(l) ? 'Completar' : 'Editar'}</button>
+                {!l.is_default && !faltanDatos(l) && <button type="button" className="btn ghost sm" onClick={() => correr(() => cliente.domicilioPredeterminado(l.id), setError, onCambio)}><Star size={13} /> Hacer principal</button>}
+                <button type="button" className="btn ghost sm" onClick={() => setQuitar(l)} data-testid="domicilio-archivar"><Archive size={13} /> Quitar</button>
+              </span>
+            )}
+            {form?.id === l.id && formulario}
+          </div>
+        ))}
+      </div>
+      {archivados > 0 && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{archivados === 1 ? '1 domicilio quitado' : `${archivados} domicilios quitados`}: ya no se muestran ni se pueden elegir para pedidos; los pedidos que los usaron los conservan.</div>}
+      {altaPendiente && (
+        <div style={{ ...fila, marginTop: 8, background: 'var(--surface-2, #fafafa)' }} data-testid="domicilio-alta">
+          <div style={{ flex: 1, fontSize: 12.5 }}><b>Domicilio del registro</b> (aún no es un domicilio de entrega): {[alta!.line1, alta!.colonia, alta!.cp && `C.P. ${alta!.cp}`, alta!.city, alta!.state].filter(Boolean).join(', ')}</div>
+          {puedeAdoptar && <button type="button" className="btn sm" onClick={() => correr(async () => { const r = await cliente.adoptarAlta(customerId); return r.ok && !r.data.adoptado ? { ok: false, error: r.data.motivo === 'incompleto' ? 'El domicilio del registro está incompleto (faltan CP, ciudad o estado): captúralo a mano.' : 'Ya existe un domicilio igual.' } : r }, setError, onCambio)} data-testid="domicilio-adoptar">Usarlo como domicilio</button>}
+        </div>
+      )}
+      <Aviso texto={error} />
+      {editable && !form && <button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => setForm({ id: null, d: { ...VACIO }, predeterminado: lista.length === 0 })} data-testid="domicilio-agregar"><Plus size={13} /> Agregar domicilio</button>}
+      {form && form.id === null && formulario}
+      {quitar && (
+        <ConfirmModal title={`¿Quitar «${quitar.name}»?`} confirmLabel="Sí, quitar"
+          message="Ya no aparecerá en los domicilios ni se podrá elegir para pedidos nuevos. Los pedidos que ya lo usaron lo conservan."
+          onConfirm={() => { const l = quitar; setQuitar(null); void correr(() => cliente.archivarDomicilio(l.id), setError, onCambio) }}
+          onClose={() => setQuitar(null)} />
       )}
     </div>
   )

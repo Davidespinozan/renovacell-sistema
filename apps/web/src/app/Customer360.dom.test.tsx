@@ -71,6 +71,31 @@ describe('Customer360Page', () => {
     expect(marcas[0]).toHaveTextContent('Falta calle, CP, estado')
     expect(screen.getAllByTestId('domicilio')).toHaveLength(2)
   })
+  it('domicilios: botones con texto; editar abre el formulario DEBAJO de ese domicilio; quitar pide confirmación', async () => {
+    const base = { doctor_id: null, customer_id: 'C1', exterior_number: null, interior_number: null, neighborhood: null, municipio: null, country: 'México', reference_notes: null, contact_name: null, contact_phone: null, is_default: false, active: true, created_at: '', updated_at: '' }
+    const { c, llamadas } = falso(ficha({ domicilios: { lista: [
+      { ...base, id: 'd1', name: 'Ocurre DHL Nueva España', tipo: 'OTRO', line1: '', postal_code: '', city: 'Chihuahua', state: '' },
+      { ...base, id: 'd2', name: 'Consultorio', tipo: 'CONSULTORIO', line1: 'Av. Obregón 123', postal_code: '80000', city: 'Culiacán', state: 'Sinaloa' },
+    ], archivados: 6, alta: null } as never }))
+    render(<Customer360Page customerId="C1" onBack={() => {}} cliente={c} atencion={atencionMuda} />)
+    await screen.findByText('Dra. Ruiz')
+    fireEvent.click(screen.getByTestId('tab-domicilios'))
+    const filas = await screen.findAllByTestId('domicilio')
+    expect(filas[0]).toHaveTextContent('Completar'); expect(filas[0]).toHaveTextContent('Quitar'); expect(filas[0]).not.toHaveTextContent('Hacer principal')
+    expect(filas[1]).toHaveTextContent('Editar'); expect(filas[1]).toHaveTextContent('Hacer principal')
+    expect(screen.getByText(/6 domicilios quitados: ya no se muestran/)).toBeTruthy()
+    // editar: el formulario queda dentro de la fila editada, no al final de la lista
+    fireEvent.click(screen.getAllByTestId('domicilio-editar')[0])
+    expect(filas[0].querySelector('[data-testid="domicilio-form"]')).not.toBeNull()
+    expect(screen.queryByTestId('domicilio-agregar')).toBeNull()
+    fireEvent.click(screen.getByText('Cancelar'))
+    // quitar: primero confirma; cancelar no llama al servidor
+    fireEvent.click(screen.getAllByTestId('domicilio-archivar')[0])
+    expect(screen.getByText('¿Quitar «Ocurre DHL Nueva España»?')).toBeTruthy()
+    expect(llamadas.some((l) => l.fn === 'cliente_ubicacion_archivar')).toBe(false)
+    fireEvent.click(screen.getByText('Sí, quitar'))
+    await waitFor(() => expect(llamadas.find((l) => l.fn === 'cliente_ubicacion_archivar')?.args).toEqual({ p_ubicacion: 'd1' }))
+  })
   it('sin permisos de edición no hay botones de alta', async () => {
     const { c } = falso(ficha({ rol: 'facturacion', permisos: { contacto: [], telefonos: false, domicilios: false, fiscal: true, notas: false, cartera: false, adoptar_alta: false } }))
     render(<Customer360Page customerId="C1" onBack={() => {}} cliente={c} atencion={atencionMuda} />)
