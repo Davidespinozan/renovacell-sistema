@@ -18,7 +18,10 @@ begin
   insert into public.product_costs (product_id, unit_cost) values (pA, 333.33) on conflict (product_id) do nothing;
   insert into public.product_volume_prices (product_id, min_quantity, price, active) values (pA, 5, 900, true), (pA, 10, 800, true);
   perform tests.stock(pA, 'L-OK', 7);
-  perform tests.stock(pA, 'L-CAD', 5, current_date - 1);   -- caducado: no cuenta
+  -- caducado: no cuenta. Un lote vencido no se puede RECIBIR (CADUCADO_NO_RECIBIBLE, y `current_date` es UTC mientras la
+  -- regla usa hoy_local): se recibe vigente hoy y se vence después, como pasa en la vida real.
+  perform tests.stock(pA, 'L-CAD', 5, public.hoy_local());
+  perform tests.act_as_owner(); update public.lots set expiry_date = public.hoy_local() - 1 where lot_code = 'L-CAD'; perform tests.act_as_service();
 
   -- ══ contexto del actor ══════════════════════════════════════════════════════
   r := public.cc_ia_contexto_actor(null);
