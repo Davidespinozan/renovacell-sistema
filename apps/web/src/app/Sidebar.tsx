@@ -1,8 +1,8 @@
 // Sidebar del hub: marca + indicador de rol + navegación agrupada por secciones
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
-import React, { useState } from 'react'
-import { LogOut, Pencil, Settings } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { ChevronRight, LogOut, Pencil, Settings } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_KEYS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
@@ -10,6 +10,14 @@ import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
 import { Ajustes } from '../screens/Ajustes'
 import { BrandLogo } from './BrandLogo'
+
+// SECCIONES PLEGABLES (como en CuboPolar): se pica el encabezado y se abre o se cierra; la preferencia se recuerda en
+// este navegador. La sección de la pantalla activa se abre sola. Sin preferencia guardada, Dirección arranca con lo de
+// uso diario abierto (Mi trabajo, Clientes, Conversaciones) y el resto plegado; los demás roles ven todo abierto.
+const CLAVE_SECCIONES = 'rc_sidebar_secciones'
+const ABIERTAS_POR_DEFECTO = new Set(['Mi trabajo', 'Clientes', 'Conversaciones'])
+const leerSecciones = (): Record<string, boolean> | null => { try { const v = localStorage.getItem(CLAVE_SECCIONES); return v ? JSON.parse(v) as Record<string, boolean> : null } catch { return null } }
+const guardarSecciones = (m: Record<string, boolean>) => { try { localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(m)) } catch { /* almacenamiento no disponible: no pasa nada */ } }
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen, user, logout, capabilities } = useRole()
@@ -28,6 +36,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     if (last && last.header === header) last.items.push(m)
     else groups.push({ header, items: [m] })
   })
+
+  // Secciones abiertas: preferencia guardada → defecto por rol. La de la pantalla activa siempre se muestra.
+  const [abiertas, setAbiertas] = useState<Record<string, boolean>>(() => leerSecciones() ?? (role === 'admin' ? Object.fromEntries(groups.map((g) => [g.header, ABIERTAS_POR_DEFECTO.has(g.header)])) : {}))
+  const seccionActiva = modules.find((m) => m.key === screen)?.section ?? null
+  useEffect(() => { if (seccionActiva && abiertas[seccionActiva] === false) setAbiertas((a) => ({ ...a, [seccionActiva]: true })) }, [seccionActiva])   // eslint-disable-line react-hooks/exhaustive-deps
+  const estaAbierta = (h: string) => abiertas[h] !== false
+  const alternar = (h: string) => setAbiertas((a) => { const n = { ...a, [h]: !estaAbierta(h) }; guardarSecciones(n); return n })
 
   const go = (key: string) => { setScreen(key); onNavigate?.() }
 
@@ -70,8 +85,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {groups.map((g) => (
           <React.Fragment key={g.header}>
-            <div className="grp">{g.header}</div>
-            {g.items.map(Link)}
+            <button type="button" className={`grp grp-btn${estaAbierta(g.header) ? ' abierta' : ''}`} aria-expanded={estaAbierta(g.header)} onClick={() => alternar(g.header)} data-testid={`seccion-${g.header}`}>
+              <span>{g.header}</span><ChevronRight size={13} aria-hidden="true" />
+            </button>
+            {estaAbierta(g.header) && g.items.map(Link)}
           </React.Fragment>
         ))}
       </nav>
