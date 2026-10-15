@@ -13,10 +13,22 @@ import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, esSesionDeUsuario } from '../_shared/quien.ts'
 import { limitarTodas, respuestaLimite, sujetoUid } from '../_shared/limite.ts'
 import { rutasDeEvidencia, validarCompletar } from '../_shared/verificacion.ts'
+import { configPush, avisarVerificacion } from '../_shared/push.ts'
+import webpush from 'npm:web-push@3.6.7'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// VERIFICACIÓN · aviso a su vendedora (y a su teléfono) sin bloquear la respuesta.
+// deno-lint-ignore no-explicit-any
+function enSegundoPlano(p: Promise<unknown>) { const er = (globalThis as any).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p.catch(() => {})); else void p.catch(() => {}) }
+// deno-lint-ignore no-explicit-any
+const avisarAVendedora = (admin: any, perfil: string) => {
+  const cfg = configPush((k) => Deno.env.get(k))
+  if (cfg) webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+  enSegundoPlano(avisarVerificacion(admin, perfil, cfg, cfg ? (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 86400, urgency: 'high' }) : null))
+}
 
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
@@ -81,12 +93,8 @@ Deno.serve(conCors(async (req) => {
     meta.verification = { status: 'pending', resubmitted_at: new Date().toISOString() }
     const { error: eMeta } = await admin.from('profiles').update({ meta }).eq('id', uid)
     if (eMeta) return json(503, { error: 'no_disponible', message: 'No se pudo guardar. Intenta de nuevo.' })
-    const nombre = q.quien.full_name || 'Un doctor'
-    const { data: k } = await admin.from('cc_cartera').select('seller_profile_id').eq('profile_id', uid).maybeSingle()
-    await admin.from('notifications').insert([
-      { body: `${nombre} actualizó sus datos de verificación`, roles: ['admin'], screen: 'av_verif', kind: 'verificacion_actualizada' },
-      ...(k?.seller_profile_id ? [{ body: `${nombre} actualizó sus datos de verificación: revísalo en su conversación`, user_ids: [k.seller_profile_id], screen: 'asesorias', kind: 'verificacion_actualizada' }] : []),
-    ]).then(() => {}, () => {})
+    // Aviso a su vendedora (y a su teléfono) para que lo revise; sin vendedora, a Dirección.
+    avisarAVendedora(admin, uid)
     return json(200, { ok: true, estado: 'pending' })
   }
 

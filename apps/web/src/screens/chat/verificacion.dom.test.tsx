@@ -64,3 +64,21 @@ describe('Evidencia: solo lo de ESE doctor, sin abrir el almacenamiento', () => 
     expect(mig).toMatch(/perform set_config\('app\.trusted', 'on', true\);\s*\n\s*update public\.profiles set verified = true/)
   })
 })
+
+describe('Por verificar de la vendedora (163)', () => {
+  it('lista a sus doctores pendientes con el mismo panel para aprobar; sin pendientes no estorba', async () => {
+    const { PorVerificar } = await import('../PorVerificar')
+    const { unmount } = render(<PorVerificar listar={async () => [doc]} />)
+    expect((await screen.findByTestId('por-verificar')).textContent).toMatch(/Doctores por verificar1/)
+    expect(await screen.findByTestId('panel-verificacion')).toBeTruthy()
+    unmount()
+    render(<PorVerificar listar={async () => []} />)
+    await waitFor(() => expect(screen.queryByTestId('por-verificar')).toBeNull())
+  })
+  it('las Edges avisan a la vendedora (base decide a quién) y al teléfono, sin bloquear al doctor', async () => {
+    const reg = (await import('../../../../../supabase/functions/register-doctor/index.ts?raw')).default
+    const vis = (await import('../../../../../supabase/functions/visitor/index.ts?raw')).default
+    const ver = (await import('../../../../../supabase/functions/verificacion/index.ts?raw')).default
+    for (const s of [reg, vis, ver]) { expect(s).toMatch(/avisarAVendedora\(admin, uid\)/); expect(s).toMatch(/enSegundoPlano\(avisarVerificacion\(/) }
+  })
+})

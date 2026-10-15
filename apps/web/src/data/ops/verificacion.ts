@@ -106,3 +106,12 @@ export async function unirEnlace(profile: string, visitor: string, rpc: Rpc = rp
     return { ok: false, mensaje: /NO_COINCIDE/.test(error.message ?? '') ? 'Esa conversación ya no coincide con este doctor.' : mensajeVerificacion(error.message ?? '') }
   } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
 }
+
+// AVISO-VERIF (163) · los doctores pendientes que la vendedora puede verificar (su cartera), aunque no le hayan escrito.
+export async function misPorVerificar(rpc: Rpc = rpcPorDefecto): Promise<DoctorPendiente[]> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return []
+  try {
+    const { data, error } = await rpc('mis_por_verificar', {})
+    return error || !Array.isArray(data) ? [] : (data as DoctorPendiente[])
+  } catch { return [] }
+}

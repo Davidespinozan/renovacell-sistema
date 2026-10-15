@@ -43,3 +43,23 @@ export async function enviarAvisos(admin: any, enviar: EnviarPush, destinos: Arr
   }))
   return ok
 }
+
+/** VERIFICACIÓN · aviso al teléfono de la vendedora: un doctor mandó su verificación (sin datos personales más que el nombre). */
+export function avisoVerificacion(nombre: string): Aviso {
+  return { title: 'Doctor por verificar', body: `${(nombre || 'Un doctor').trim()} mandó su verificación. Revísala y apruébalo.`, url: 'https://sistema.renovacell.mx/sistema', tag: 'rc-verificacion' }
+}
+
+/**
+ * Tras guardar una verificación: la base decide a quién avisar (verificacion_avisar: su vendedora o Dirección) y, si es
+ * una vendedora, se le manda además el aviso al teléfono. Nunca lanza ni bloquea la respuesta al doctor.
+ */
+// deno-lint-ignore no-explicit-any
+export async function avisarVerificacion(admin: any, perfil: string, cfg: ConfigPush | null, enviar: EnviarPush | null): Promise<void> {
+  try {
+    const { data } = await admin.rpc('verificacion_avisar', { p_profile: perfil })
+    const r = data as { seller?: string | null; nombre?: string } | null
+    if (!r?.seller || !cfg || !enviar) return
+    const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: [r.seller], p_visitors: [] })
+    if (destinos?.length) await enviarAvisos(admin, enviar, destinos, avisoVerificacion(r.nombre ?? ''))
+  } catch { /* el aviso nunca rompe el registro */ }
+}

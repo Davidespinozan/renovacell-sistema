@@ -9,6 +9,8 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { observador } from '../_shared/observa.ts'
+import { configPush, avisarVerificacion } from '../_shared/push.ts'
+import webpush from 'npm:web-push@3.6.7'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('register-doctor')
@@ -44,6 +46,16 @@ async function uploadEvidence(admin: any, uid: string, imgs: { ineFront?: string
     if (!error) paths[name] = path
   }
   return paths
+}
+
+// VERIFICACIÓN · aviso a su vendedora (y a su teléfono) sin bloquear la respuesta.
+// deno-lint-ignore no-explicit-any
+function enSegundoPlano(p: Promise<unknown>) { const er = (globalThis as any).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p.catch(() => {})); else void p.catch(() => {}) }
+// deno-lint-ignore no-explicit-any
+const avisarAVendedora = (admin: any, perfil: string) => {
+  const cfg = configPush((k) => Deno.env.get(k))
+  if (cfg) webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+  enSegundoPlano(avisarVerificacion(admin, perfil, cfg, cfg ? (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 86400, urgency: 'high' }) : null))
 }
 
 Deno.serve(conCors(async (req) => {
@@ -130,11 +142,9 @@ Deno.serve(conCors(async (req) => {
   // ya autenticada, confirme la adopción). Posesión probada aquí, confirmación después.
   if (visitorHash) await admin.rpc('cc_visitante_vincular_registro', { p_hash: visitorHash, p_profile: uid }).then(() => {}, () => {})
 
-  // Aviso a Dirección (cola de revisión av_verif).
-  await admin.from('notifications').insert({
-    body: conIne ? `Doctor nuevo por verificar: ${name} — revisa su cédula y su INE` : `Doctor nuevo por verificar: ${name} — falta su INE`,
-    roles: ['admin'], screen: 'av_verif',
-  }).then(() => {}, () => {})
+  // Aviso a su vendedora (cartera, o quien lo atendió por el enlace) para que lo verifique ella; sin vendedora, a Dirección.
+  if (conIne) avisarAVendedora(admin, uid)
+  else await admin.from('notifications').insert({ body: `Doctor nuevo por verificar: ${name} — falta su INE`, roles: ['admin'], screen: 'av_verif' }).then(() => {}, () => {})
 
   return json(200, { decision: 'pending', reasons: conIne ? [] : ['Para terminar tu verificación sube tu INE en "Mi verificación" al entrar.'] })
 }))

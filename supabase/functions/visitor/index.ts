@@ -24,6 +24,8 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { generarToken, hashToken, limpiarAtribucion, limpiarRef, mapearErrorAdopcion, limpiarPrerregistro, mapearErrorPrerregistro, MENSAJE_PRERREGISTRO, validarVerificarme } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
+import { configPush, avisarVerificacion } from '../_shared/push.ts'
+import webpush from 'npm:web-push@3.6.7'
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -31,6 +33,16 @@ const cors = {
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+// VERIFICACIÓN · aviso a su vendedora (y a su teléfono) sin bloquear la respuesta.
+// deno-lint-ignore no-explicit-any
+function enSegundoPlano(p: Promise<unknown>) { const er = (globalThis as any).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p.catch(() => {})); else void p.catch(() => {}) }
+// deno-lint-ignore no-explicit-any
+const avisarAVendedora = (admin: any, perfil: string) => {
+  const cfg = configPush((k) => Deno.env.get(k))
+  if (cfg) webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+  enSegundoPlano(avisarVerificacion(admin, perfil, cfg, cfg ? (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 86400, urgency: 'high' }) : null))
+}
 
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
@@ -138,13 +150,8 @@ Deno.serve(conCors(async (req) => {
     const { error: eP } = await admin.from('profiles').update({ full_name: d.nombre, meta }).eq('id', uid)
     if (eP) { await deshacer(); return json(503, { error: 'no_disponible', message: 'No se pudo crear tu cuenta. Intenta más tarde.' }) }
     await admin.rpc('cc_visitante_vincular_registro', { p_hash: hash, p_profile: uid }).then(() => {}, () => {})
-    // Aviso a quien lo atiende (o a Dirección): ya tiene todo para revisarlo en la conversación.
-    const { data: vis } = await admin.from('cc_visitors').select('id').eq('token_hash', hash).maybeSingle()
-    const { data: conv } = vis ? await admin.from('cc_conversations').select('seller_profile_id').eq('visitor_id', vis.id).eq('estado', 'abierta').maybeSingle() : { data: null }
-    const vendedor = (conv as { seller_profile_id?: string | null } | null)?.seller_profile_id ?? null
-    await admin.from('notifications').insert(vendedor
-      ? { body: `${d.nombre} completó su verificación en el chat: revísala y apruébala ahí mismo`, user_ids: [vendedor], screen: 'asesorias', kind: 'verificacion_actualizada' }
-      : { body: `${d.nombre} completó su verificación en el chat (sin vendedor asignado)`, roles: ['admin'], screen: 'av_verif', kind: 'verificacion_actualizada' }).then(() => {}, () => {})
+    // Aviso a quien lo atiende en el chat (queda en su cartera) y a su teléfono; sin vendedora, a Dirección.
+    avisarAVendedora(admin, uid)
     return json(200, { ok: true, email: d.email })
   }
 

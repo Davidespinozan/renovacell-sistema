@@ -4,7 +4,13 @@
 // DEUDA TÉCNICA: "Mi cartera" usa seller_name (matching por nombre, frágil). El ownership futuro
 // debería basarse en un id estable de vendedor (seller/profile id), no en comparación de nombres.
 import { CustomerDirectory } from '../app/CustomerDirectory'
+import { PorVerificar } from './PorVerificar'   // AVISO-VERIF · los que mandaron su verificación
 
 export function Clientes() {
-  return <CustomerDirectory title="Clientes" scope="all" carteraToggle />
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      <PorVerificar />
+      <CustomerDirectory title="Clientes" scope="all" carteraToggle />
+    </div>
+  )
 }
