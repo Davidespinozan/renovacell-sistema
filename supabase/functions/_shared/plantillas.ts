@@ -160,3 +160,23 @@ export function correoInvitacion(nombre: string, enlace: string): { asunto: stri
     botones: [{ href: enlace, label: 'Crear mi cuenta' }], nota: 'El enlace vence en 14 días.', pie: 'Recibes este correo porque eres cliente de Renovacell.' })
   return { asunto: 'Tu cuenta en Renovacell', texto, html }
 }
+
+/**
+ * CORREOS DE SUPABASE AUTH (recuperar contraseña, invitación, cambio de correo) con el MISMO diseño de marca. Supabase
+ * los envía con sus plantillas (Authentication → Emails → Templates); estas se pegan ahí. {{ .ConfirmationURL }} lo
+ * llena Supabase. Generadas en supabase/templates/auth/ (ver auth-templates.test.ts).
+ */
+export const PLANTILLAS_AUTH: Record<string, { asunto: string; html: string }> = {
+  recovery: { asunto: 'Restablece tu contraseña de Renovacell', html: marcoCorreo({ asunto: 'Restablece tu contraseña de Renovacell', titulo: 'Restablece tu contraseña', saludo: 'Hola:',
+    parrafos: ['Recibimos una solicitud para cambiar la contraseña de tu cuenta Renovacell. Toca el botón para elegir una nueva.', 'Si tú no lo pediste, ignora este correo: tu contraseña no cambia.'],
+    botones: [{ href: '{{ .ConfirmationURL }}', label: 'Elegir nueva contraseña' }], nota: 'Por seguridad, el enlace vence en una hora.', pie: 'Recibes este correo porque se pidió restablecer la contraseña de tu cuenta.' }) },
+  invite: { asunto: 'Te invitamos a Renovacell', html: marcoCorreo({ asunto: 'Te invitamos a Renovacell', titulo: 'Te damos la bienvenida', saludo: 'Hola:',
+    parrafos: ['Te crearon una cuenta en Renovacell. Toca el botón para elegir tu contraseña y entrar.'],
+    botones: [{ href: '{{ .ConfirmationURL }}', label: 'Activar mi cuenta' }], nota: 'Si no esperabas esta invitación, ignora este correo.', pie: 'Recibes este correo porque te invitaron a Renovacell.' }) },
+  email_change: { asunto: 'Confirma tu nuevo correo en Renovacell', html: marcoCorreo({ asunto: 'Confirma tu nuevo correo en Renovacell', titulo: 'Confirma tu nuevo correo', saludo: 'Hola:',
+    parrafos: ['Pediste cambiar el correo de tu cuenta Renovacell. Toca el botón para confirmarlo.'],
+    botones: [{ href: '{{ .ConfirmationURL }}', label: 'Confirmar correo' }], nota: 'Si tú no lo pediste, ignora este correo y tu cuenta sigue igual.', pie: 'Recibes este correo por un cambio en tu cuenta Renovacell.' }) },
+  confirmation: { asunto: 'Confirma tu cuenta de Renovacell', html: marcoCorreo({ asunto: 'Confirma tu cuenta de Renovacell', titulo: 'Confirma tu correo', saludo: 'Hola:',
+    parrafos: ['Toca el botón para confirmar tu correo y activar tu cuenta Renovacell.'],
+    botones: [{ href: '{{ .ConfirmationURL }}', label: 'Confirmar mi correo' }], pie: 'Recibes este correo porque se creó una cuenta con esta dirección.' }) },
+}
