@@ -29,6 +29,7 @@ import { TEXTO_IMAGEN, idImagen, conAdjuntos, conLecturaAjena } from '../_shared
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
+import { despacharMeta } from '../_shared/metaEnvio.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el orquestador de IA vive en _shared/ia/responder.ts (lo comparten el chat y WhatsApp).
 
@@ -133,9 +134,11 @@ Deno.serve(conCors(async (req) => {
         const { data: k } = await q.maybeSingle(); cart_id = (k as { id?: string } | null)?.id ?? null
       }
     } catch { cart_id = null }
-    // WA-2 · ¿es de WhatsApp? (solo para el personal: ventana de 24 h y envíos que no salieron)
-    const whatsapp = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_wa_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) : null
-    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id, whatsapp })
+    // WA-2 / META-CANALES · ¿de qué canal es? (solo para el personal: modo, ventana de 24 h y envíos que no salieron).
+    //   `canal` cubre WhatsApp, Instagram y Messenger; `whatsapp` se conserva para quien ya lo lee.
+    const canal = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_canal_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) as Record<string, unknown> | null : null
+    const whatsapp = canal && canal.canal === 'whatsapp' ? canal : null
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id, canal, whatsapp })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0
@@ -168,14 +171,14 @@ Deno.serve(conCors(async (req) => {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
     if (!r.idempotente) enSegundoPlano(avisarPush(admin, conv, actor.actor, c.texto))   // AVISOS · al teléfono del otro lado
-    if (!r.idempotente && (actor.actor === 'seller' || actor.actor === 'admin')) enSegundoPlano(despacharWhatsApp(admin))   // WA-2 · si es de WhatsApp, sale ya
+    if (!r.idempotente && (actor.actor === 'seller' || actor.actor === 'admin')) enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // WA-2 / META · si es de un canal, sale ya
     enSegundoPlano(Promise.resolve(admin.rpc('cc_escribiendo', { ...base, p_activo: false })))         // CHAT PRO · ya envió: deja de "escribir"
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {
       ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto) : 'silenciada'
     }
-    if (ia === 'respondio') enSegundoPlano(despacharWhatsApp(admin))   // WA-2 · la respuesta de la IA, si la conversación es de WhatsApp
+    if (ia === 'respondio') enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // WA-2 / META · la respuesta de la IA, si la conversación es de un canal
     return json(200, { ...r, ia })
   }
   // ── FOTOS · imagen en la conversación: se sube con service_role al bucket privado `chat` y viaja como un mensaje

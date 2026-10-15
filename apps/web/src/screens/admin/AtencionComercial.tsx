@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { capitalizarNombre } from '../../lib/nombres'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type BandejaWhatsApp, type ChatWhatsApp, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
+import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type BandejaCanales, type CanalBandeja, type ChatCanal, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
 import { chat as chatPorDefecto, ETIQUETA_MODO, type ClienteChat, type ModoConversacion } from '../../data/ops/chat'
 import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, textoEspera, textoIA, tonoAtencion, KINDS_COMERCIALES } from '../../data/ops/atencionComercial'
 import { recargarAtencion } from '../../data/store/atencionStore'
@@ -35,7 +35,7 @@ export function abrirPestanaAtencion(p: 'horario' | 'cartera' | 'vendedores' | '
 export const pantallaDeAtencion = (p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes' | 'whatsapp'): 'av_atencion' | 'av_cartera' => (p === 'solicitudes' || p === 'whatsapp' ? 'av_atencion' : 'av_cartera')
 const PESTANAS_BANDEJA: Pestana[] = ['pendientes', 'whatsapp']
 const PESTANAS_CARTERA: Pestana[] = ['cartera', 'vendedores', 'horario']
-const ETIQUETA: Record<Pestana, string> = { pendientes: 'Solicitudes', whatsapp: 'WhatsApp', cartera: 'Cartera', vendedores: 'Vendedores', horario: 'Horario y alertas' }
+const ETIQUETA: Record<Pestana, string> = { pendientes: 'Solicitudes', whatsapp: 'Canales', cartera: 'Cartera', vendedores: 'Vendedores', horario: 'Horario y alertas' }   // 'whatsapp' = WhatsApp + Instagram + Messenger
 
 export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, onEquipo, onAbrir, pestanas = PESTANAS_BANDEJA, titulo = 'Dirección · Conversaciones · Bandeja', onHorario }: {
   cliente?: ClienteAtencion; chat?: ClienteChat; onEquipo?: () => void; onAbrir?: (conversationId: string) => void
@@ -391,11 +391,10 @@ function PestanaVendedores({ vendedores, onEquipo }: { vendedores: Vendedor[]; o
   )
 }
 
-// ── WhatsApp (169) · Dirección ve los chats del número de la empresa ──────────────────────────────────
+// ── Canales (169/170) · Dirección ve los chats de WhatsApp, Instagram y Messenger ────────────────────
 // En modo espejo solo se leen (Leadsales sigue contestando); en activo, desde aquí mismo se contesta y se asigna.
-// Las listas de Solicitudes/Asesorías no los muestran mientras nadie pida asesor: esta pestaña es la vista del canal.
-// "hace N min" con minutos que manda el servidor (su reloj): aquí no se usa el del navegador.
-const hace = (min: number | null | undefined): string => {
+// Las listas de Solicitudes/Asesorías no los muestran mientras nadie pida asesor: esta pestaña es la vista de los canales.
+const hace = (min: number | null | undefined): string => {   // minutos que manda el servidor (su reloj): aquí no se usa el del navegador
   if (min == null) return ''
   if (min < 1) return 'ahora'
   if (min < 60) return `hace ${min} min`
@@ -404,49 +403,60 @@ const hace = (min: number | null | undefined): string => {
 }
 const telefonoBonito = (wa: string) => { const m = /^521?(\d{3})(\d{3})(\d{4})$/.exec(wa); return m ? `+52 ${m[1]} ${m[2]} ${m[3]}` : `+${wa}` }   // México llega como 52 o 521 + 10 dígitos
 const ACTOR: Record<string, string> = { visitor: 'Cliente', doctor: 'Cliente', ai: 'Asistente', seller: 'Vendedor', admin: 'Dirección' }
+const CANAL: Record<CanalBandeja, { nombre: string; pill: string }> = { whatsapp: { nombre: 'WhatsApp', pill: 'p-ok' }, instagram: { nombre: 'Instagram', pill: 'p-warn' }, messenger: { nombre: 'Facebook', pill: 'p-blue' } }
+const CANALES: CanalBandeja[] = ['whatsapp', 'instagram', 'messenger']
+const contactoDe = (c: ChatCanal) => (c.canal === 'whatsapp' ? telefonoBonito(c.id) : CANAL[c.canal].nombre)
 
 function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: ClienteChat }) {
-  const [bandeja, setBandeja] = useState<BandejaWhatsApp | null>(null)
+  const [bandeja, setBandeja] = useState<BandejaCanales | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [abierta, setAbierta] = useState<ChatWhatsApp | null>(null)
-  const cargar = useCallback(async () => { const r = await cliente.whatsapp(); if (r.ok) { setBandeja(r.data); setError(null) } else setError(r.error) }, [cliente])
+  const [abierta, setAbierta] = useState<ChatCanal | null>(null)
+  const [filtro, setFiltro] = useState<CanalBandeja | 'todos'>('todos')
+  const cargar = useCallback(async () => { const r = await cliente.canales(); if (r.ok) { setBandeja(r.data); setError(null) } else setError(r.error) }, [cliente])
   useEffect(() => { void cargar() }, [cargar])
   useEffect(() => { const t = setInterval(() => { if (!abierta) void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, abierta])
 
   if (abierta?.conversation_id) return (
     <div className="grid" style={{ gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" className="btn ghost sm" onClick={() => { setAbierta(null); void cargar() }} data-testid="wa-volver">← WhatsApp</button>
-        <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{abierta.cliente_nombre ?? abierta.nombre ?? ''} · {telefonoBonito(abierta.wa_id)}{abierta.cliente ? ' · cliente' : ' · sin cuenta'}</span>
+        <button type="button" className="btn ghost sm" onClick={() => { setAbierta(null); void cargar() }} data-testid="wa-volver">← Canales</button>
+        <span className={'pill ' + CANAL[abierta.canal].pill}>{CANAL[abierta.canal].nombre}</span>
+        <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{abierta.cliente_nombre ?? abierta.nombre ?? ''}{abierta.canal === 'whatsapp' ? ` · ${telefonoBonito(abierta.id)}` : ''}{abierta.cliente ? ' · cliente' : ' · sin cuenta'}</span>
       </div>
-      <ChatCanonico embebido asesor puedeEmpresa conversationId={abierta.conversation_id} cliente={chat} nombreCliente={abierta.cliente_nombre ?? abierta.nombre ?? telefonoBonito(abierta.wa_id)}
-        etiquetaSalir="Volver a WhatsApp" onSalir={() => { setAbierta(null); void cargar() }} onFin={() => { setAbierta(null); void cargar() }} />
+      <ChatCanonico embebido asesor puedeEmpresa conversationId={abierta.conversation_id} cliente={chat} nombreCliente={abierta.cliente_nombre ?? abierta.nombre ?? contactoDe(abierta)}
+        etiquetaSalir="Volver a Canales" onSalir={() => { setAbierta(null); void cargar() }} onFin={() => { setAbierta(null); void cargar() }} />
     </div>
   )
-  const espejo = bandeja?.modo === 'espejo'
-  const sinResponder = bandeja?.chats.filter((c) => c.sin_responder).length ?? 0
+  const chats = (bandeja?.chats ?? []).filter((c) => filtro === 'todos' || c.canal === filtro)
+  const sinResponder = chats.filter((c) => c.sin_responder).length
+  const algunoActivo = bandeja ? CANALES.some((k) => bandeja.modos[k] === 'activo') : false
   return (
     <div className="card" data-testid="wa-bandeja">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: 'var(--ink-3)' }}>
-          {bandeja == null ? 'Cargando…' : espejo
-            ? <>WhatsApp en <b>modo espejo</b>: los mensajes del número de la empresa se registran aquí, pero todavía se contestan en Leadsales. Desde aquí solo se leen.</>
-            : <>WhatsApp <b>activo</b>: el asistente contesta primero y avisa a la vendedora; desde aquí Dirección puede leer, contestar y asignar.</>}
+          {bandeja == null ? 'Cargando…' : !algunoActivo
+            ? <>Los canales están en <b>modo espejo</b>: lo que llega por WhatsApp, Instagram y Facebook se registra aquí, pero todavía se contesta en Leadsales. Desde aquí solo se lee.</>
+            : <>Un canal <b>activo</b> lo contesta primero el asistente y avisa a la vendedora; desde aquí Dirección puede leer, contestar y asignar.</>}
         </div>
-        {bandeja && <span className={'pill ' + (espejo ? 'p-warn' : 'p-ok')} data-testid="wa-modo">{espejo ? 'Espejo · solo lectura' : 'Activo'}</span>}
-        {bandeja && <span className="pill p-neu">{bandeja.chats.length} chat(s)</span>}
+        {bandeja && CANALES.map((k) => <span key={k} className={'pill ' + (bandeja.modos[k] === 'activo' ? 'p-ok' : 'p-warn')} data-testid={`canal-modo-${k}`}>{CANAL[k].nombre}: {bandeja.modos[k] === 'activo' ? 'activo' : 'espejo'}</span>)}
         {bandeja && sinResponder > 0 && <span className="pill p-warn">{sinResponder} sin responder</span>}
         <button type="button" className="btn ghost sm" onClick={() => void cargar()}>Actualizar</button>
       </div>
+      {bandeja && (
+        <div className="seg" role="group" aria-label="Canal" style={{ marginBottom: 10 }}>
+          {(['todos', ...CANALES] as const).map((k) => <button key={k} type="button" className={filtro === k ? 'active' : undefined} onClick={() => setFiltro(k)}>{k === 'todos' ? `Todos (${bandeja.chats.length})` : `${CANAL[k].nombre} (${bandeja.chats.filter((c) => c.canal === k).length})`}</button>)}
+        </div>
+      )}
       {error && <div role="alert" style={{ color: 'var(--danger)', marginBottom: 8 }}>{error}</div>}
-      {bandeja && bandeja.chats.length === 0 && <div style={{ color: 'var(--ink-3)' }}>Todavía no ha escrito nadie por WhatsApp.</div>}
+      {bandeja && chats.length === 0 && <div style={{ color: 'var(--ink-3)' }}>Todavía no ha escrito nadie por {filtro === 'todos' ? 'estos canales' : CANAL[filtro].nombre}.</div>}
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-        {bandeja?.chats.map((c) => (
-          <li key={c.wa_id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12 }} data-testid="wa-chat">
+        {chats.map((c) => (
+          <li key={c.canal + ':' + c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12 }} data-testid="wa-chat">
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontWeight: 600, fontSize: 13.5 }}>
-                {c.cliente_nombre ?? c.nombre ?? telefonoBonito(c.wa_id)}
-                <span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 6 }}>{telefonoBonito(c.wa_id)}</span>
+                <span className={'pill ' + CANAL[c.canal].pill} style={{ marginRight: 6 }} data-testid="wa-chat-canal">{CANAL[c.canal].nombre}</span>
+                {c.cliente_nombre ?? c.nombre ?? contactoDe(c)}
+                {c.canal === 'whatsapp' && <span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 6 }}>{telefonoBonito(c.id)}</span>}
                 <span className={'pill ' + (c.cliente ? 'p-ok' : 'p-neu')} style={{ marginLeft: 6 }}>{c.cliente ? 'Cliente' : 'Sin cuenta'}</span>
                 {c.sin_responder && <span className="pill p-warn" style={{ marginLeft: 4 }}>Sin responder</span>}
                 {c.vendedor && <span className="pill p-neu" style={{ marginLeft: 4 }}>{c.vendedor}</span>}
@@ -456,7 +466,7 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
               </div>}
               <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{hace(c.hace_min)}{c.n_mensajes ? ` · ${c.n_mensajes} mensaje(s)` : ''}{c.ventana_abierta === false ? ' · ventana de 24 h cerrada' : ''}</div>
             </div>
-            {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => setAbierta(c)} data-testid="wa-abrir">{espejo ? 'Ver chat' : 'Abrir chat'}</button>}
+            {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => setAbierta(c)} data-testid="wa-abrir">{bandeja?.modos[c.canal] === 'activo' ? 'Abrir chat' : 'Ver chat'}</button>}
           </li>
         ))}
       </ul>

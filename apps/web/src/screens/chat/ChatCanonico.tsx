@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Check, CheckCheck, ChevronDown, History, Send, X, Zap } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
-import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
+import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
@@ -235,8 +235,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const modo: ModoConversacion = conv?.modo ?? 'ai_active'
   const cerrada = conv?.estado === 'cerrada'
   const soyAsesor = asesor && (conv?.rol === 'asesor' || conv?.rol === 'supervisor')
-  // WA · en modo espejo lo que se escribiera aquí NUNCA saldría por WhatsApp (se contesta en Leadsales): el redactor se apaga.
-  const waEspejo = asesor && conv?.whatsapp?.modo === 'espejo'
+  // CANAL (WhatsApp / Instagram / Facebook) · en modo espejo lo que se escribiera aquí NUNCA saldría por el canal (se contesta en
+  // Leadsales): el redactor se apaga.
+  const canal = asesor ? canalDe(conv) : null
+  const waEspejo = !!canal && canal.modo === 'espejo'
   const puedoEscribir = !!conv && !cerrada && !waEspejo && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
@@ -406,7 +408,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           : <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>}
         <div className="rc-title">
           <div className="rc-name">{asesor ? (capitalizarNombre(nombreCliente) || 'Asesoría') : 'Renovacell'}</div>
-          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : `${conv?.whatsapp ? 'WhatsApp · ' : ''}${subtituloDe(conv, asesor)}`}</div>
+          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : `${canal ? NOMBRE_CANAL[canal.canal] + ' · ' : ''}${subtituloDe(conv, asesor)}`}</div>
         </div>
         <div className="rc-actions">
           {conv?.sesion && convId && (
@@ -490,10 +492,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
       {/* WA-2 · el cliente escribe por WhatsApp: qué le llega y qué no (solo lo ve el personal). */}
-      {asesor && conv?.whatsapp && (conv.whatsapp.modo === 'espejo'
-        ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">WhatsApp en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales; desde aquí no se puede escribir.</div>
-        : !conv.whatsapp.ventana_abierta
-          ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por WhatsApp hace más de 24 horas: lo que escribas queda aquí pero no le llega por WhatsApp hasta que vuelva a escribir (regla de Meta).</div>
+      {canal && (canal.modo === 'espejo'
+        ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">{NOMBRE_CANAL[canal.canal]} en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales; desde aquí no se puede escribir.</div>
+        : !canal.ventana_abierta
+          ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por {NOMBRE_CANAL[canal.canal]} hace más de 24 horas: lo que escribas queda aquí pero no le llega por {NOMBRE_CANAL[canal.canal]} hasta que vuelva a escribir (regla de Meta).</div>
           : null)}
 
       {rrAbierto && respuestas && (

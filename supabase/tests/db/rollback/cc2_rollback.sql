@@ -2,6 +2,7 @@
 begin;
 -- CC-4 (cc_ai_turns → cc_conversations) baja primero.
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
+\ir ../../../rollback/meta_canales/99_down.sql   -- META-CANALES (170) se baja antes (usa cc_visitors/cc_messages y cambia _cc_nombre_dueno)
 \ir ../../../rollback/whatsapp_bandeja/99_down.sql   -- WHATSAPP-BANDEJA (169) se baja antes que la 168
 \ir ../../../rollback/whatsapp_salida/99_down.sql   -- WHATSAPP-SALIDA (168) se baja antes que la 167
 \ir ../../../rollback/whatsapp_canal/99_down.sql   -- WHATSAPP (167) se baja primero (cc_wa_mensajes depende de cc_messages; _cc_nombre_dueno)

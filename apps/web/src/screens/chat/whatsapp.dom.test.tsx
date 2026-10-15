@@ -21,6 +21,14 @@ describe('WhatsApp en Conversaciones', () => {
     // 169 · en espejo nadie escribe desde el sistema: lo que se escribiera no saldría por WhatsApp
     expect((screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled).toBe(true)
   })
+  it('Instagram (canal): el aviso nombra el canal; espejo apaga el redactor', async () => {
+    montar({ ...conv(null), canal: { canal: 'instagram', id: '17841400000000001', modo: 'espejo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 } })
+    expect((await screen.findByTestId('wa-espejo')).textContent).toMatch(/^Instagram en modo espejo/)
+    expect(screen.getByTestId('chat-modo').textContent).toMatch(/^Instagram · /)
+    expect((screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled).toBe(true)
+    cleanup(); montar({ ...conv(null), canal: { canal: 'messenger', id: '1234567', modo: 'activo', ventana_abierta: false, ventana_hasta: null, fallidos: 1 } })
+    expect((await screen.findByTestId('wa-ventana')).textContent).toMatch(/por Facebook hace más de 24 horas/)
+  })
   it('activo y ventana de 24 h cerrada: avisa que no le llegará; abierta: sin aviso', async () => {
     montar(conv({ wa_id: '5216671112233', modo: 'activo', ventana_abierta: false, ventana_hasta: null, fallidos: 1 }))
     expect((await screen.findByTestId('wa-ventana')).textContent).toMatch(/más de 24 horas/)

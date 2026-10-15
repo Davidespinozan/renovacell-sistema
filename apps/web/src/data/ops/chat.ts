@@ -19,10 +19,17 @@ export interface Conversacion {
   leido_otro?: number                    // PALOMITAS · hasta dónde leyó el otro lado (azules)
   escribiendo_otro?: boolean             // CHAT PRO · el otro lado está tecleando (vence solo en segundos)
   whatsapp?: InfoWhatsApp | null         // WA-2 · solo para el personal: el cliente escribe por WhatsApp
+  canal?: InfoCanal | null               // META-CANALES · solo para el personal: WhatsApp, Instagram o Messenger (cubre a `whatsapp`)
   leido_hasta?: number                   // UX-1 · cursor de lectura del actor (cc_participants.last_read_seq): el badge del portal no inventa estado
   sesion?: SesionResumen | null          // Chat V2-C1 · la lectura activa es la sesión actual (o la última cerrada si no hay abierta)
 }
 export interface InfoWhatsApp { wa_id: string; modo: 'espejo' | 'activo'; ventana_abierta: boolean; ventana_hasta: string | null; fallidos: number }
+export type TipoCanal = 'whatsapp' | 'instagram' | 'messenger'
+export interface InfoCanal { canal: TipoCanal; id: string; modo: 'espejo' | 'activo'; ventana_abierta: boolean; ventana_hasta: string | null; fallidos: number }
+export const NOMBRE_CANAL: Record<TipoCanal, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook' }
+/** El canal de la conversación: el nuevo `canal` o, si el servidor aún manda solo `whatsapp`, se deriva de él. */
+export const canalDe = (c: { canal?: InfoCanal | null; whatsapp?: InfoWhatsApp | null } | null | undefined): InfoCanal | null =>
+  c?.canal ?? (c?.whatsapp ? { ...c.whatsapp, canal: 'whatsapp', id: c.whatsapp.wa_id } : null)
 // Chat V2-C1 · sesión = interacción temporal dentro de la conversación permanente (rango de mensajes).
 export interface SesionResumen {
   id: string; ordinal: number; estado: 'abierta' | 'cerrada'; origen: string; first_seq?: number; last_seq?: number | null

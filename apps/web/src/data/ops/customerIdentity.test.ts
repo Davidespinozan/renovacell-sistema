@@ -97,9 +97,9 @@ describe('edges usan el resolver (convergencia futura)', () => {
     expect(capSrc).toMatch(/identity_review/)
     expect(capSrc).toMatch(/customer_id: customerId/)
   })
-  it('meta-webhook: idem por teléfono', () => {
-    expect(metaSrc).toMatch(/resolve_customer_identity/)
-    expect(metaSrc).toMatch(/customer_id: customerId/)
+  it('meta-webhook: ya no crea prospectos (los canales entran a Conversaciones; WhatsApp liga por celular en la base)', () => {
+    expect(metaSrc).not.toMatch(/from\('prospects'\)|resolve_customer_identity/)
+    expect(metaSrc).toMatch(/admin\.rpc\('cc_wa_entrante'/); expect(metaSrc).toMatch(/admin\.rpc\('cc_meta_entrante'/)
   })
 })
 

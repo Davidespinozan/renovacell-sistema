@@ -34,6 +34,10 @@ export interface ChatWhatsApp {
   n_mensajes: number; ultimo_texto: string | null; ultimo_actor: string | null; ultimo_at: string | null; hace_min: number | null; sin_responder: boolean | null
 }
 export interface BandejaWhatsApp { modo: 'espejo' | 'activo'; chats: ChatWhatsApp[] }
+// META-CANALES (170) · los tres canales en una bandeja: cada chat trae su `canal` y su `id` (teléfono o PSID).
+export type CanalBandeja = 'whatsapp' | 'instagram' | 'messenger'
+export interface ChatCanal extends Omit<ChatWhatsApp, 'wa_id'> { canal: CanalBandeja; id: string }
+export interface BandejaCanales { modos: Record<CanalBandeja, 'espejo' | 'activo' | null>; chats: ChatCanal[] }
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
@@ -100,6 +104,7 @@ export class ClienteAtencion {
   resumen() { return this.llamar<ResumenRuteo>('cc_ruteo_resumen') }
   pendientes() { return this.llamar<Pendientes>('cc_ruteo_pendientes') }
   whatsapp() { return this.llamar<BandejaWhatsApp>('cc_wa_bandeja') }   // WHATSAPP · solo Dirección
+  canales() { return this.llamar<BandejaCanales>('cc_canales_bandeja') }   // META-CANALES · WhatsApp + Instagram + Messenger, solo Dirección
   // CHV2-A · pasa SOLO esta solicitud a otro vendedor (handler). La cartera NO cambia; motivo obligatorio.
   reasignarSolicitud(conversation_id: string, vendedor: string, motivo: string) {
     return this.llamar<ResultadoReasignacion>('cc_solicitud_reasignar', { p_conv: conversation_id, p_vendedor: vendedor, p_motivo: motivo })

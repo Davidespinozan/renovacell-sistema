@@ -8,7 +8,7 @@ import { Asesorias } from './Asesorias'
 import { AtencionComercial } from '../admin/AtencionComercial'
 import { HorarioAtencion } from '../admin/HorarioAtencion'
 import type { ClienteChat, Conversacion, ColaItem } from '../../data/ops/chat'
-import type { BandejaWhatsApp, ClienteAtencion, Horario, Pendientes } from '../../data/ops/atencion'
+import type { BandejaCanales, ClienteAtencion, Horario, Pendientes } from '../../data/ops/atencion'
 
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'admin', setScreen: vi.fn() }) }))
 beforeEach(cleanup)
@@ -77,14 +77,14 @@ describe('Asesorías', () => {
 })
 
 const horario: Horario = { zona: 'America/Mazatlan', configurado: false, actualizado_at: '', semana: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ dia: d, abierto: false, abre: null, cierra: null })), excepciones: [], estado: { configurado: false, abierto: false, zona: 'America/Mazatlan', motivo: 'sin_configurar' } }
-function atencionFalsa(p: Partial<Pendientes> = {}, wa: BandejaWhatsApp = { modo: 'espejo', chats: [] }) {
+function atencionFalsa(p: Partial<Pendientes> = {}, wa: BandejaCanales = { modos: { whatsapp: 'espejo', instagram: 'espejo', messenger: 'espejo' }, chats: [] }) {
   const llamadas: Array<{ fn: string; args: unknown[] }> = []
   const reg = (fn: string, data: unknown) => vi.fn(async (...args: unknown[]) => { llamadas.push({ fn, args }); return ok(data) })
   const pend: Pendientes = { resumen: { horario: horario.estado, sin_vendedor: 1, reasignacion: 0, handoffs_sin_asignar: 2, handoffs_pendientes: 0, vendedores_elegibles: 1 }, conversaciones: [], carritos_pendientes: [], ...p }
   const c = {
     pendientes: reg('pendientes', pend), resumen: reg('resumen', pend.resumen), cartera: reg('cartera', []), asignar: reg('asignar', { idempotente: false }),
     vendedores: reg('vendedores', [{ id: 'S1', nombre: 'Ana', activo: true, conversaciones: true, nuevos_clientes: true, elegible: true, elegible_nuevos: true, clientes: 0 }]),
-    whatsapp: reg('whatsapp', wa),
+    canales: reg('canales', wa),
     horario: reg('horario', horario), guardarHorario: reg('guardarHorario', { ...horario, configurado: true }), guardarExcepcion: reg('guardarExcepcion', horario), borrarExcepcion: reg('borrarExcepcion', horario),
   } as unknown as ClienteAtencion
   return { c, llamadas }
@@ -107,37 +107,43 @@ describe('Atención comercial (Dirección)', () => {
   })
 })
 
-describe('Atención comercial · pestaña WhatsApp (169)', () => {
-  const chatWa = (x: Partial<BandejaWhatsApp['chats'][number]> = {}): BandejaWhatsApp['chats'][number] => ({ wa_id: '5216671647799', nombre: 'Stryv Studio', ultimo_entrante_at: new Date().toISOString(), ventana_abierta: true, cliente: false, cliente_nombre: null, conversation_id: 'CW1', modo: 'ai_active', estado: 'abierta', vendedor: null, n_mensajes: 1, ultimo_texto: 'Prueba Renovacell', ultimo_actor: 'visitor', ultimo_at: new Date().toISOString(), hace_min: 3, sin_responder: true, ...x })
-  it('espejo: lista los chats de WhatsApp (nombre, número, sin cuenta, sin responder) y abre la conversación en solo lectura', async () => {
-    const a = atencionFalsa({}, { modo: 'espejo', chats: [chatWa(), chatWa({ wa_id: '5216671230002', nombre: 'Dra', cliente: true, cliente_nombre: 'Dra. Wa', conversation_id: 'CW2', sin_responder: false, ultimo_actor: 'ai', ultimo_texto: 'Sí, tenemos.' })] })
-    const ch = chatFalso({ conversation_id: 'CW1', rol: 'supervisor', modo: 'ai_active', whatsapp: { wa_id: '5216671647799', modo: 'espejo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 } })
+describe('Atención comercial · pestaña Canales (169/170)', () => {
+  const chatWa = (x: Partial<BandejaCanales['chats'][number]> = {}): BandejaCanales['chats'][number] => ({ canal: 'whatsapp', id: '5216671647799', nombre: 'Stryv Studio', ultimo_entrante_at: new Date().toISOString(), ventana_abierta: true, cliente: false, cliente_nombre: null, conversation_id: 'CW1', modo: 'ai_active', estado: 'abierta', vendedor: null, n_mensajes: 1, ultimo_texto: 'Prueba Renovacell', ultimo_actor: 'visitor', ultimo_at: new Date().toISOString(), hace_min: 3, sin_responder: true, ...x })
+  const modos = (m: Partial<BandejaCanales['modos']> = {}): BandejaCanales['modos'] => ({ whatsapp: 'espejo', instagram: 'espejo', messenger: 'espejo', ...m })
+  it('espejo: lista los tres canales con su etiqueta, filtra por canal y abre la conversación en solo lectura', async () => {
+    const a = atencionFalsa({}, { modos: modos(), chats: [chatWa(), chatWa({ canal: 'instagram', id: '17841400000000001', nombre: 'Ana IG', conversation_id: 'CW2', sin_responder: false, ultimo_actor: 'ai', ultimo_texto: 'Sí, tenemos.' }), chatWa({ canal: 'messenger', id: '9988776655', nombre: 'Beto FB', conversation_id: 'CW3' })] })
+    const ch = chatFalso({ conversation_id: 'CW1', rol: 'supervisor', modo: 'ai_active', canal: { canal: 'whatsapp', id: '5216671647799', modo: 'espejo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 } })
     render(<AtencionComercial cliente={a.c} chat={ch.c} />)
-    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
-    expect((await screen.findByTestId('wa-modo')).textContent).toMatch(/Espejo/)
+    fireEvent.click(await screen.findByRole('tab', { name: 'Canales' }))
+    expect((await screen.findByTestId('canal-modo-whatsapp')).textContent).toBe('WhatsApp: espejo'); expect(screen.getByTestId('canal-modo-instagram').textContent).toBe('Instagram: espejo'); expect(screen.getByTestId('canal-modo-messenger').textContent).toBe('Facebook: espejo')
     const filas = await screen.findAllByTestId('wa-chat')
-    expect(filas).toHaveLength(2)
+    expect(filas).toHaveLength(3)
     expect(filas[0]).toHaveTextContent('Stryv Studio'); expect(filas[0]).toHaveTextContent('+52 667 164 7799'); expect(filas[0]).toHaveTextContent('Sin cuenta'); expect(filas[0]).toHaveTextContent('Sin responder'); expect(filas[0]).toHaveTextContent('Cliente: Prueba Renovacell'); expect(filas[0]).toHaveTextContent('hace 3 min')
-    expect(filas[1]).toHaveTextContent('Dra. Wa'); expect(filas[1]).toHaveTextContent('Cliente'); expect(filas[1]).not.toHaveTextContent('Sin responder'); expect(filas[1]).toHaveTextContent('Asistente: Sí, tenemos.')
-    expect(a.llamadas.some((l) => l.fn === 'whatsapp')).toBe(true)
-    fireEvent.click(filas[0].querySelector('[data-testid="wa-abrir"]')!)
+    expect(filas[1].querySelector('[data-testid="wa-chat-canal"]')!.textContent).toBe('Instagram'); expect(filas[1]).toHaveTextContent('Ana IG'); expect(filas[1]).not.toHaveTextContent('+52'); expect(filas[1]).toHaveTextContent('Asistente: Sí, tenemos.')
+    expect(filas[2].querySelector('[data-testid="wa-chat-canal"]')!.textContent).toBe('Facebook')
+    expect(a.llamadas.some((l) => l.fn === 'canales')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Instagram (1)' }))
+    expect(screen.getAllByTestId('wa-chat')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Todos (3)' }))
+    fireEvent.click(screen.getAllByTestId('wa-abrir')[0])
     await waitFor(() => expect(ch.llamadas.some((l) => l.fn === 'leer' && l.args[0] === 'CW1')).toBe(true))
     expect((await screen.findByTestId('wa-espejo')).textContent).toMatch(/no se puede escribir/)
     expect((screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByTestId('wa-volver'))
     expect(await screen.findByTestId('wa-bandeja')).toBeTruthy()
   })
-  it('activo: la pestaña lo dice y el botón es "Abrir chat"', async () => {
-    const a = atencionFalsa({}, { modo: 'activo', chats: [chatWa()] })
+  it('un canal activo: lo dice y su botón es "Abrir chat"; los otros siguen en espejo', async () => {
+    const a = atencionFalsa({}, { modos: modos({ instagram: 'activo' }), chats: [chatWa(), chatWa({ canal: 'instagram', id: '17841400000000001', conversation_id: 'CW2' })] })
     render(<AtencionComercial cliente={a.c} chat={chatFalso({}).c} />)
-    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
-    expect((await screen.findByTestId('wa-modo')).textContent).toBe('Activo')
-    expect(screen.getByTestId('wa-abrir')).toHaveTextContent('Abrir chat')
+    fireEvent.click(await screen.findByRole('tab', { name: 'Canales' }))
+    expect((await screen.findByTestId('canal-modo-instagram')).textContent).toBe('Instagram: activo')
+    const botones = screen.getAllByTestId('wa-abrir')
+    expect(botones[0]).toHaveTextContent('Ver chat'); expect(botones[1]).toHaveTextContent('Abrir chat')
   })
-  it('sin chats: lo dice; Ventas no tiene la pestaña (la función del servidor lo exige, aquí solo no se muestra nada roto)', async () => {
-    const a = atencionFalsa({}, { modo: 'espejo', chats: [] })
+  it('sin chats: lo dice', async () => {
+    const a = atencionFalsa({}, { modos: modos(), chats: [] })
     render(<AtencionComercial cliente={a.c} chat={chatFalso({}).c} />)
-    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Canales' }))
     expect(await screen.findByText(/Todavía no ha escrito nadie/)).toBeTruthy()
   })
 })

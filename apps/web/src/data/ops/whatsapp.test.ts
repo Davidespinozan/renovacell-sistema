@@ -31,6 +31,7 @@ describe('Mensajes de WhatsApp entrantes', () => {
     const firma = webhook.indexOf('validSignature(body'); const wa = webhook.indexOf("admin.rpc('cc_wa_entrante'")
     expect(firma).toBeGreaterThan(0); expect(wa).toBeGreaterThan(firma)
     expect(webhook).toMatch(/if \(error\) \{ obs\('whatsapp', 'internal_error'[^\n]*return new Response\('reintentar', \{ status: 500 \}\)/)
-    expect(webhook).toMatch(/if \(objType === 'whatsapp_business_account'\) continue/)
+    expect(webhook).not.toMatch(/prospects|extractMessages/)
+    expect(webhook.indexOf("admin.rpc('cc_meta_entrante'")).toBeGreaterThan(wa)   // META-CANALES · Instagram/Messenger por su mid, después de WhatsApp
   })
 })

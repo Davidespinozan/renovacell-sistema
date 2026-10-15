@@ -1,14 +1,14 @@
 // Edge Function PÚBLICA: WEBHOOK de Meta (WhatsApp Cloud API + Messenger + Instagram).
-// Es el reemplazo DIRECTO de Leadsales: los mensajes de los canales del cliente llegan
-// aquí de la mano de Meta —sin intermediario que cobre suscripción— y entran al MISMO
-// motor de captación que la landing (dedup + auto-asignación + hilo de conversación).
+// Es el reemplazo DIRECTO de Leadsales: los mensajes de los tres canales llegan aquí de la
+// mano de Meta —sin intermediario que cobre suscripción— y entran a Conversaciones (el chat
+// canónico): WhatsApp por cc_wa_entrante (167/168) e Instagram/Messenger por cc_meta_entrante (170).
 //
 // FLUJO
 //   GET  → verificación de suscripción de Meta (hub.challenge). Se hace una vez al
 //          conectar el webhook en el panel de Meta.
-//   POST → un mensaje entrante. Verificamos la firma (X-Hub-Signature-256), extraemos
-//          remitente + texto por canal, deduplicamos contra `prospects`, asignamos al
-//          vendedor con menos carga y agregamos el mensaje al hilo (`meta.messages`).
+//   POST → mensajes entrantes. Verificamos la firma (X-Hub-Signature-256) y cada mensaje entra
+//          por su identificador (wamid / mid): un reintento de Meta nunca duplica. El modo
+//          (espejo | activo) lo decide la base por canal.
 //
 // SEAM (listo-para-credencial, como el resto de integraciones): sin META_VERIFY_TOKEN
 // y META_APP_SECRET la función responde 501. Al pegar los secrets del app de Meta del
@@ -19,15 +19,14 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
 import { extraerWhatsApp, extraerEstados } from '../_shared/whatsapp.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
+import { extraerMeta } from '../_shared/meta.ts'
+import { completarNombreMeta, despacharMeta } from '../_shared/metaEnvio.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { IA_PUEDE } from '../_shared/chat.ts'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('meta-webhook')
-
-const OPEN_EXCLUDED = ['convertido', 'descartado']
-const digits = (s: string): string => (s ?? '').replace(/\D/g, '')
 
 // Firma HMAC-SHA256 del cuerpo con el App Secret. Meta la manda en 'sha256=<hex>'.
 // Comparación en tiempo (casi) constante para no filtrar por temporización.
@@ -41,46 +40,6 @@ async function validSignature(body: string, header: string | null, secret: strin
   let diff = 0
   for (let i = 0; i < header.length; i++) diff |= header.charCodeAt(i) ^ expected.charCodeAt(i)
   return diff === 0
-}
-
-interface Incoming { channel: string; from: string; name: string; text: string; psid?: string }
-
-// Extrae los mensajes ENTRANTES de un payload de Meta, sin importar el canal:
-//   · WhatsApp Cloud API → entry[].changes[].value.messages[]  (from = teléfono)
-//   · Messenger / Instagram → entry[].messaging[]               (sender.id = PSID)
-// Los no-texto (imagen/audio) se registran como marcador para no perder el contacto.
-function extractMessages(payload: Record<string, unknown>): Incoming[] {
-  const out: Incoming[] = []
-  const objType = payload?.object as string | undefined
-  const entries = Array.isArray(payload?.entry) ? (payload.entry as Record<string, unknown>[]) : []
-  for (const entry of entries) {
-    // WhatsApp: WA-1 lo lleva al chat canónico (extraerWhatsApp); aquí ya no entra a la bandeja vieja de prospectos.
-    if (objType === 'whatsapp_business_account') continue
-    for (const change of ((entry.changes as Record<string, unknown>[]) ?? [])) {
-      const value = (change.value ?? {}) as Record<string, unknown>
-      const contacts = (value.contacts as Record<string, unknown>[]) ?? []
-      const nameByWa: Record<string, string> = {}
-      for (const c of contacts) {
-        const wa = c?.wa_id as string | undefined
-        if (wa) nameByWa[wa] = ((c?.profile as Record<string, unknown>)?.name as string) ?? ''
-      }
-      for (const m of ((value.messages as Record<string, unknown>[]) ?? [])) {
-        const from = m.from as string
-        if (!from) continue
-        const type = (m.type as string) ?? 'text'
-        const text = type === 'text' ? (((m.text as Record<string, unknown>)?.body as string) ?? '') : `[${type}]`
-        out.push({ channel: 'WhatsApp', from, name: nameByWa[from] ?? '', text })
-      }
-    }
-    // Messenger / Instagram
-    for (const msg of ((entry.messaging as Record<string, unknown>[]) ?? [])) {
-      const psid = (msg.sender as Record<string, unknown>)?.id as string | undefined
-      const text = ((msg.message as Record<string, unknown>)?.text as string) ?? ''
-      if (!psid || !text) continue
-      out.push({ channel: objType === 'instagram' ? 'Instagram' : 'Facebook', from: psid, name: '', text, psid })
-    }
-  }
-  return out
 }
 
 Deno.serve(async (req) => {
@@ -109,6 +68,7 @@ Deno.serve(async (req) => {
   let payload: Record<string, unknown>
   try { payload = JSON.parse(body) } catch { return new Response('JSON inválido', { status: 400 }) }
 
+  try {
   // ── WA-1 · WhatsApp → conversación canónica (Conversaciones). Cada mensaje por su wamid: un reintento de Meta no
   //    duplica. Si la base falla, 500 para que Meta reintente (antes respondía 200 y el mensaje se perdía).
   //    El modo (espejo | activo) lo decide la base (cc_wa_config). En activo: aviso al teléfono de su vendedora, la IA
@@ -133,73 +93,29 @@ Deno.serve(async (req) => {
     }
   }
 
-  const incomings = extractMessages(payload)
+  // ── META-CANALES (170) · Instagram y Messenger → la misma conversación canónica, por su mid. En activo: aviso al
+  //    teléfono de su vendedora, la IA contesta y la respuesta sale por el mismo canal; todo DESPUÉS de responder a Meta.
+  const mt = extraerMeta(payload)
+  if (mt.length > 0) {
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+    for (const m of mt) {
+      const { data, error } = await admin.rpc('cc_meta_entrante', { p_canal: m.canal, p_psid: m.psid, p_nombre: null, p_mid: m.mid, p_texto: m.texto, p_encolar: false })
+      if (error) { obs('meta', 'internal_error', { code: 'cc_meta_entrante', error }); return new Response('reintentar', { status: 500 }) }
+      const r = data as { duplicado: boolean; conversation_id: string; seq: number; visitor_hash: string | null; nuevo: boolean; activo: boolean; modo: string }
+      if (r.duplicado) continue
+      enSegundoPlano((async () => {
+        if (r.nuevo) await completarNombreMeta(admin, m.canal, m.psid)   // Meta no manda el nombre con el mensaje
+        if (!r.activo) return
+        await avisarPush(admin, r.conversation_id, 'visitor', m.texto)
+        if (IA_PUEDE(r.modo as never)) {
+          const ia = await responderIA(admin, r.conversation_id, r.seq, 'visitor', null, r.visitor_hash, m.texto, 'meta:' + m.psid)
+          if (ia === 'respondio') await despacharMeta(admin)
+        }
+      })())
+    }
+  }
+
   // Meta EXIGE 200 aunque no haya nada que procesar (si no, reintenta y duplica).
-  if (incomings.length === 0) return new Response(JSON.stringify({ received: true }), { status: 200 })
-
-  try {
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-
-  // Cargamos prospectos y vendedores UNA vez; el batch puede traer varios mensajes.
-  const [{ data: existing }, { data: sellers }] = await Promise.all([
-    admin.from('prospects').select('id, name, phone, source, assigned_to, meta'),
-    admin.from('profiles').select('id').eq('role_id', 'pos'),
-  ])
-  const rows = (existing ?? []) as { id: string; name: string | null; phone: string | null; source: string | null; assigned_to: string | null; meta: Record<string, unknown> | null }[]
-  const load: Record<string, number> = {}
-  rows.forEach((r) => { if (r.assigned_to && !OPEN_EXCLUDED.includes(String(r.meta?.status ?? ''))) load[r.assigned_to] = (load[r.assigned_to] ?? 0) + 1 })
-  const pickSeller = (): string | null => {
-    if (!sellers || sellers.length === 0) return null
-    return sellers.map((s) => s.id as string).sort((a, b) => (load[a] ?? 0) - (load[b] ?? 0))[0]
-  }
-
-  for (const inc of incomings) {
-    const now = new Date().toISOString()
-    const message = { dir: 'in', text: inc.text, at: now, channel: inc.channel }
-    const ph = inc.psid ? '' : digits(inc.from)
-
-    // Dedup: WhatsApp por teléfono; Messenger/IG por PSID guardado en meta.
-    const dup = rows.find((p) =>
-      inc.psid ? (p.meta?.psid === inc.psid) : (ph.length >= 7 && digits(p.phone ?? '') === ph))
-
-    if (dup) {
-      const meta = { ...(dup.meta ?? {}) }
-      meta.messages = [...(Array.isArray(meta.messages) ? meta.messages : []), message]
-      await admin.from('prospects').update({ meta }).eq('id', dup.id)
-      if (dup.assigned_to) {
-        await admin.from('notifications').insert({ body: `Nuevo mensaje de ${dup.name ?? inc.channel} por ${inc.channel}`, user_ids: [dup.assigned_to], screen: 'av_prosp' }).then(() => {}, () => {})
-      }
-      continue
-    }
-
-    // Nuevo prospecto: asignación balanceada + hilo abierto con este mensaje.
-    const assigned = pickSeller()
-    if (assigned) load[assigned] = (load[assigned] ?? 0) + 1
-    const meta: Record<string, unknown> = { organization: null, interest: [], notes: [], messages: [message] }
-    if (inc.psid) meta.psid = inc.psid
-    const name = inc.name?.trim() || `Contacto ${inc.channel}`
-    // CUSTOMER 360: liga a un customer existente por teléfono (EXACT/MATCH); AMBIGUOUS → REVIEW.
-    let customerId: string | null = null
-    if (!inc.psid && inc.from) {
-      try {
-        const { data: r } = await admin.rpc('resolve_customer_identity', { p_phone: inc.from, p_name: name })
-        const res = r as { status?: string; customer_id?: string | null } | null
-        if (res?.status === 'EXACT' || res?.status === 'MATCH') customerId = res.customer_id ?? null
-        else if (res?.status === 'AMBIGUOUS') meta.identity_review = true
-      } catch { /* el webhook no debe fallar por el resolver */ }
-    }
-    const { data: created } = await admin.from('prospects').insert({
-      name, email: null, phone: inc.psid ? null : inc.from, cedula: null,
-      source: inc.channel, status: 'nuevo', assigned_to: assigned, customer_id: customerId, meta,
-    }).select('id, name, phone, source, assigned_to, meta').single()
-    if (created) rows.push(created as typeof rows[number]) // que el resto del batch lo dedupe
-
-    await admin.from('notifications').insert({ body: `Lead nuevo por ${inc.channel}: ${name}`, roles: ['admin'], screen: 'av_prosp' }).then(() => {}, () => {})
-    if (assigned) {
-      await admin.from('notifications').insert({ body: `Lead nuevo para ti (${inc.channel}): ${name}`, user_ids: [assigned], screen: 'av_prosp' }).then(() => {}, () => {})
-    }
-  }
-
   return new Response(JSON.stringify({ received: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (e) {
     // Firma válida y fallo interno al procesar: se reporta y se relanza (el runtime
