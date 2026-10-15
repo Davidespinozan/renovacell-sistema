@@ -15,6 +15,7 @@ import limiteSrc from '../../../../../supabase/functions/_shared/limite.ts?raw'
 import assistantSrc from '../../../../../supabase/functions/assistant/index.ts?raw'
 import opsSrc from './chat.ts?raw'
 import pantallaSrc from '../../screens/chat/ChatCanonico.tsx?raw'
+import responderSrc from '../../../../../supabase/functions/_shared/ia/responder.ts?raw'   // CC-4 · la IA vive aquí desde WA-2 (la comparten chat y WhatsApp)
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
@@ -80,7 +81,7 @@ describe('módulos de IA (puros) y Edge chat', () => {
     expect(codigo(orqSrc)).toMatch(/const v = d\.validacion\.validarRespuesta\(r\.texto/)
   })
   it('Edge chat: orquesta con el perfil del servidor; límites CC-0B antes del proveedor; costo diario en tokens; el adaptador legacy por HTTP a `assistant` desapareció', () => {
-    const s = codigo(chatSrc)
+    const s = codigo(chatSrc) + codigo(responderSrc)
     expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? await responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto\) : 'silenciada'/)
     expect(s).toMatch(/profile: actor === 'doctor' \? profile : null/)
     expect(s).not.toMatch(/functions\/v1\/assistant/); expect(s).not.toMatch(/historialParaIA/)

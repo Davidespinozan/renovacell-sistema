@@ -17,7 +17,11 @@
 // IMPORTANTE al desplegar: --no-verify-jwt (Meta no manda JWT de Supabase).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
-import { extraerWhatsApp, modoWhatsApp } from '../_shared/whatsapp.ts'
+import { extraerWhatsApp, extraerEstados } from '../_shared/whatsapp.ts'
+import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
+import { responderIA } from '../_shared/ia/responder.ts'
+import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
+import { IA_PUEDE } from '../_shared/chat.ts'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('meta-webhook')
@@ -107,13 +111,25 @@ Deno.serve(async (req) => {
 
   // ── WA-1 · WhatsApp → conversación canónica (Conversaciones). Cada mensaje por su wamid: un reintento de Meta no
   //    duplica. Si la base falla, 500 para que Meta reintente (antes respondía 200 y el mensaje se perdía).
+  //    El modo (espejo | activo) lo decide la base (cc_wa_config). En activo: aviso al teléfono de su vendedora, la IA
+  //    contesta como en el chat y la respuesta sale por WhatsApp; todo DESPUÉS de responder a Meta (no la hace esperar).
   const wa = extraerWhatsApp(payload)
-  if (wa.length > 0) {
+  const estados = extraerEstados(payload)
+  if (wa.length > 0 || estados.length > 0) {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-    const encolar = modoWhatsApp((k) => Deno.env.get(k)) === 'activo'
+    for (const e of estados) await admin.rpc('cc_wa_estado', { p_wamid: e.wamid, p_estado: e.estado, p_error: e.error }).then(() => {}, () => {})
     for (const m of wa) {
-      const { error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: encolar })
+      const { data, error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: false })
       if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); return new Response('reintentar', { status: 500 }) }
+      const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string }
+      if (r.duplicado || !r.activo) continue
+      enSegundoPlano((async () => {
+        await avisarPush(admin, r.conversation_id, r.actor, m.texto)
+        if (IA_PUEDE(r.modo as never)) {
+          const ia = await responderIA(admin, r.conversation_id, r.seq, r.actor, r.profile_id, r.visitor_hash, m.texto, 'wa:' + m.wa_id)
+          if (ia === 'respondio') await despacharWhatsApp(admin)
+        }
+      })())
     }
   }
 

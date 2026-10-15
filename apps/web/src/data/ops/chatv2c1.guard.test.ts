@@ -4,12 +4,13 @@ import { describe, it, expect } from 'vitest'
 import chatEdge from '../../../../../supabase/functions/chat/index.ts?raw'
 import migracion from '../../../../../supabase/migrations/20261108120000_chatv2c1_sesiones.sql?raw'
 import chatCanonico from '../../screens/chat/ChatCanonico.tsx?raw'
+import responderSrc from '../../../../../supabase/functions/_shared/ia/responder.ts?raw'   // CC-4 · la IA vive aquí desde WA-2 (la comparten chat y WhatsApp)
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 
 describe('Chat V2-C1 · Edge chat', () => {
   it('contexto de IA acotado a la sesión: ya no lee cc_messages directo', () => {
-    const e = codigo(chatEdge)
+    const e = codigo(chatEdge) + codigo(responderSrc)
     expect(e).toMatch(/admin\.rpc\('cc_ia_contexto', \{ p_conv: conv, p_hasta_seq: hastaSeq, p_limite: limite \}\)/)
     expect(e).not.toMatch(/from\('cc_messages'\)/)
   })

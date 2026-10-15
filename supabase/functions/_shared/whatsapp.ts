@@ -45,3 +45,40 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
 export function modoWhatsApp(env: (k: string) => string | undefined): 'espejo' | 'activo' {
   return (env('WA_MODO') ?? '').trim().toLowerCase() === 'activo' ? 'activo' : 'espejo'
 }
+
+// ── WA-2 · salida ─────────────────────────────────────────────────────────────────────────────────
+export interface ConfigWA { token: string; phoneId: string; version: string }
+/** Llaves de envío (WHATSAPP_TOKEN, WHATSAPP_PHONE_ID). Sin ellas no se manda nada (falla cerrado). */
+export function configWA(env: (k: string) => string | undefined): ConfigWA | null {
+  const token = (env('WHATSAPP_TOKEN') ?? '').trim(); const phoneId = (env('WHATSAPP_PHONE_ID') ?? '').trim()
+  return token && /^[0-9]{5,30}$/.test(phoneId) ? { token, phoneId, version: (env('META_GRAPH_VERSION') ?? 'v21.0').trim() } : null
+}
+/** Cuerpo de un mensaje de texto de la Cloud API (vista previa de enlaces activada). */
+export function cuerpoTexto(para: string, texto: string): Record<string, unknown> {
+  return { messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: 'text', text: { preview_url: true, body: texto.slice(0, 4096) } }
+}
+/** Lee la respuesta de Meta: wamid si se aceptó; si no, el error en una línea (sin datos del token). */
+export function leerRespuestaEnvio(status: number, cuerpo: unknown): { ok: true; wamid: string } | { ok: false; error: string } {
+  const c = (cuerpo ?? {}) as { messages?: Array<{ id?: string }>; error?: { message?: string; code?: number } }
+  const wamid = c.messages?.[0]?.id
+  if (status >= 200 && status < 300 && wamid) return { ok: true, wamid }
+  return { ok: false, error: `Meta ${status}${c.error?.code ? ` (${c.error.code})` : ''}: ${(c.error?.message ?? 'sin detalle').slice(0, 200)}` }
+}
+/** Acuses de entrega (statuses): sent | delivered | read | failed de NUESTROS mensajes. */
+export function extraerEstados(payload: unknown): Array<{ wamid: string; estado: string; error: string | null }> {
+  const out: Array<{ wamid: string; estado: string; error: string | null }> = []
+  const p = (payload ?? {}) as Record<string, unknown>
+  if (p.object !== 'whatsapp_business_account') return out
+  for (const entry of (Array.isArray(p.entry) ? p.entry : []) as Record<string, unknown>[]) {
+    for (const change of (Array.isArray(entry.changes) ? entry.changes : []) as Record<string, unknown>[]) {
+      const v = (change.value ?? {}) as Record<string, unknown>
+      for (const s of (Array.isArray(v.statuses) ? v.statuses : []) as Record<string, unknown>[]) {
+        const wamid = String(s.id ?? ''); const estado = String(s.status ?? '')
+        if (wamid.length < 8 || !['sent', 'delivered', 'read', 'failed'].includes(estado)) continue
+        const e = (Array.isArray(s.errors) ? s.errors[0] : null) as { title?: string; message?: string } | null
+        out.push({ wamid, estado, error: e ? String(e.message ?? e.title ?? '').slice(0, 200) : null })
+      }
+    }
+  }
+  return out
+}

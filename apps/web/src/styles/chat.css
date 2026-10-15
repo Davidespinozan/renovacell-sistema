@@ -328,3 +328,6 @@
 .rc-domicilio legend{padding:0;margin-bottom:6px}
 .rc-opcional{font-weight:400;color:var(--ink-3);font-size:12px}
 .rc-domicilio-fila{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:8px}
+/* WA-2 · avisos del canal WhatsApp para el personal (sobre el redactor). */
+.rc-wa-aviso{margin:0;padding:8px 14px;font-size:12.5px;line-height:1.4;background:#e7f5ec;color:#11502a;border-top:1px solid #cfe7d8}
+.rc-wa-aviso--cerrada{background:var(--warn-bg);color:var(--warn);border-top-color:transparent}

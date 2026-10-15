@@ -26,17 +26,11 @@ import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_sha
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
 import { TEXTO_IMAGEN, idImagen, conAdjuntos, conLecturaAjena } from '../_shared/adjuntos.ts'
-import { configPush, destinosDe, armarAviso, enviarAvisos } from '../_shared/push.ts'
-import webpush from 'npm:web-push@3.6.7'
+import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
+import { responderIA } from '../_shared/ia/responder.ts'
+import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
-// CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
-import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
-import * as politica from '../_shared/ia/politica.ts'
-import * as herramientas from '../_shared/ia/herramientas.ts'
-import * as validacion from '../_shared/ia/validacion.ts'
-import { configurar, crearProveedorAnthropic } from '../_shared/ia/proveedor.ts'
-import { REGLAS_IA } from '../_shared/conocimiento.ts'
-import { limitar, tokensEstimados } from '../_shared/limite.ts'
+// CC-4 · el orquestador de IA vive en _shared/ia/responder.ts (lo comparten el chat y WhatsApp).
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -139,7 +133,9 @@ Deno.serve(conCors(async (req) => {
         const { data: k } = await q.maybeSingle(); cart_id = (k as { id?: string } | null)?.id ?? null
       }
     } catch { cart_id = null }
-    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id })
+    // WA-2 · ¿es de WhatsApp? (solo para el personal: ventana de 24 h y envíos que no salieron)
+    const whatsapp = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_wa_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) : null
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id, whatsapp })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0
@@ -172,12 +168,14 @@ Deno.serve(conCors(async (req) => {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
     if (!r.idempotente) enSegundoPlano(avisarPush(admin, conv, actor.actor, c.texto))   // AVISOS · al teléfono del otro lado
+    if (!r.idempotente && (actor.actor === 'seller' || actor.actor === 'admin')) enSegundoPlano(despacharWhatsApp(admin))   // WA-2 · si es de WhatsApp, sale ya
     enSegundoPlano(Promise.resolve(admin.rpc('cc_escribiendo', { ...base, p_activo: false })))         // CHAT PRO · ya envió: deja de "escribir"
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {
       ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto) : 'silenciada'
     }
+    if (ia === 'respondio') enSegundoPlano(despacharWhatsApp(admin))   // WA-2 · la respuesta de la IA, si la conversación es de WhatsApp
     return json(200, { ...r, ia })
   }
   // ── FOTOS · imagen en la conversación: se sube con service_role al bucket privado `chat` y viaja como un mensaje
@@ -257,80 +255,3 @@ Deno.serve(conCors(async (req) => {
   }
   return json(400, { error: 'Acción no reconocida.' })
 }))
-
-// CC-4 · Orquestador comercial de IA. Aquí solo se arma el entorno (proveedor, límites, lectura
-// interna de mensajes) y se traduce el resultado; la lógica vive en _shared/ia/* (pura, probada).
-// deno-lint-ignore no-explicit-any
-async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string): Promise<'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'> {
-  const env = (k: string) => Deno.env.get(k)
-  const cfg = configurar(env)
-  const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }
-  if (!cfg.ok) { await aviso(); return 'no_disponible' }
-  // CC-0B · ráfaga/hora por sujeto y techo global: sin cupo NO se llama al proveedor.
-  const v = await limitarTodas(admin, actor === 'doctor'
-    ? [{ scope: 'ia_turno_uid', sujeto }, { scope: 'ia_turno_hora', sujeto }, { scope: 'ia_turno_global', sujeto: 'global' }]
-    : [{ scope: 'ia_turno', sujeto }, { scope: 'ia_turno_hora', sujeto }, { scope: 'ia_turno_global', sujeto: 'global' }])
-  if (!v.permitido) return 'limitada'
-  // Costo diario en tokens: pre-carga estimada (historial acotado + salida) y ajuste con el consumo real.
-  const estimado = tokensEstimados([texto], cfg.config.maxTokens) + 1500
-  const costo = await limitarTodas(admin, [{ scope: 'ia_tokens_dia', sujeto: 'global', costo: estimado }, ...(actor === 'doctor' ? [{ scope: 'ia_tokens_dia_uid', sujeto, costo: estimado }] : [])])
-  if (!costo.permitido) return 'limitada'
-
-  const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis) })
-  const resultado = await ejecutarTurno(
-    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto },
-    {
-      rpc: (fn, args) => admin.rpc(fn, args),
-      leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
-      proveedor, config: cfg.config, politica, herramientas, validacion, reglasConocimiento: REGLAS_IA,
-    },
-  )
-  const usados = resultado.usage.input + resultado.usage.output
-  if (usados > 0 && usados !== estimado) {
-    await limitar(admin, 'ia_tokens_dia', 'global', { costo: usados - estimado })
-    if (actor === 'doctor') await limitar(admin, 'ia_tokens_dia_uid', sujeto, { costo: usados - estimado })
-  }
-  switch (resultado.estado) {
-    case 'respondio': case 'ya_respondido': return 'respondio'
-    case 'descartada': return 'descartada'
-    case 'en_curso': return 'en_curso'
-    case 'silenciada': return 'silenciada'
-    default: return 'no_disponible'   // fallo del proveedor o de persistencia (el orquestador ya dejó el aviso de sistema)
-  }
-}
-
-// Lectura interna con service_role (el orquestador corre en el servidor, no es un cliente).
-// Chat V2-C1 · la base acota el contexto a la SESIÓN del disparador (nunca el transcript eterno).
-// deno-lint-ignore no-explicit-any
-async function leerInterno(admin: any, conv: string, hastaSeq: number, limite: number): Promise<Array<{ actor: string; content: string }>> {
-  const { data, error } = await admin.rpc('cc_ia_contexto', { p_conv: conv, p_hasta_seq: hastaSeq, p_limite: limite })
-  if (error) throw new Error('contexto_ia')
-  return ((data ?? []) as Array<{ actor: string; content: string }>).map((m) => ({ actor: m.actor, content: m.content }))
-}
-
-// AVISOS PUSH · tras un mensaje humano, avisa al teléfono del otro lado (asesor ↔ cliente). Nunca bloquea ni rompe el
-// envío: sin llaves configuradas no hace nada; un fallo de entrega solo queda registrado en el dispositivo.
-// deno-lint-ignore no-explicit-any
-function enSegundoPlano(p: Promise<unknown>) { const er = (globalThis as any).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p.catch(() => {})); else void p.catch(() => {}) }
-// deno-lint-ignore no-explicit-any
-async function avisarPush(admin: any, conv: string, actor: string, texto: string): Promise<void> {
-  const cfg = configPush((k) => Deno.env.get(k))
-  if (!cfg) return
-  const { data: c } = await admin.from('cc_conversations').select('profile_id, visitor_id, seller_profile_id').eq('id', conv).maybeSingle()
-  if (!c) return
-  const d = destinosDe(actor, c)
-  if (!d) return
-  const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: d.perfiles, p_visitors: d.visitantes })
-  if (!destinos?.length) return
-  let remitente = 'Renovacell'
-  if (d.para === 'personal') {
-    const { data: n } = await admin.rpc('_cc_nombre_dueno', { p_conv: conv })
-    remitente = typeof n === 'string' ? n.replace(/\s*\([^)]*\)\s*$/, '') : 'Tu cliente'
-  } else if (c.seller_profile_id) {
-    const { data: s } = await admin.from('profiles').select('full_name, meta').eq('id', c.seller_profile_id).maybeSingle()
-    remitente = ((s?.meta?.name as string | undefined) ?? s?.full_name ?? 'Tu asesora').split('·')[0].trim()
-  }
-  webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
-  await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 3600, urgency: 'high' }), destinos,
-    armarAviso({ para: d.para, remitente, texto, conv, visitante: !c.profile_id }))
-}

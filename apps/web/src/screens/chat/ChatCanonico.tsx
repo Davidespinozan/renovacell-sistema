@@ -404,7 +404,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           : <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>}
         <div className="rc-title">
           <div className="rc-name">{asesor ? (capitalizarNombre(nombreCliente) || 'Asesoría') : 'Renovacell'}</div>
-          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : subtituloDe(conv, asesor)}</div>
+          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : `${conv?.whatsapp ? 'WhatsApp · ' : ''}${subtituloDe(conv, asesor)}`}</div>
         </div>
         <div className="rc-actions">
           {conv?.sesion && convId && (
@@ -487,6 +487,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       </div>
 
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
+      {/* WA-2 · el cliente escribe por WhatsApp: qué le llega y qué no (solo lo ve el personal). */}
+      {asesor && conv?.whatsapp && (conv.whatsapp.modo === 'espejo'
+        ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">WhatsApp en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales.</div>
+        : !conv.whatsapp.ventana_abierta
+          ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por WhatsApp hace más de 24 horas: lo que escribas queda aquí pero no le llega por WhatsApp hasta que vuelva a escribir (regla de Meta).</div>
+          : null)}
 
       {rrAbierto && respuestas && (
         <RespuestasRapidas lista={rrVisibles} activa={rrActiva} filtro={rrFiltro} onElegir={elegirRespuesta} onCerrar={cerrarRespuestas}

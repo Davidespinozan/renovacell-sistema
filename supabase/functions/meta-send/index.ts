@@ -14,6 +14,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { resolverQuien } from '../_shared/quien.ts'
+import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -23,6 +24,15 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
+
+// Comparación de tiempo constante (por hash) para el secreto de la tarea programada.
+async function iguales(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  const h = async (t: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))
+  const [x, y] = await Promise.all([h(a), h(b)])
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]
+  return d === 0
+}
 
 interface Msg { dir: 'in' | 'out'; text: string; at: string; channel?: string; pending?: boolean }
 
@@ -39,6 +49,13 @@ Deno.serve(conCors(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const authHeader = req.headers.get('Authorization') ?? ''
+
+  // WA-2 · la tarea de cada minuto (con su secreto) entrega lo pendiente de la cola de salida del chat (cc_wa_salida).
+  const secretoCron = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+  if (secretoCron.length >= 32 && await iguales(req.headers.get('x-cron-secret') ?? '', secretoCron)) {
+    const r = await despacharWhatsApp(createClient(url, service, { auth: { persistSession: false } }))
+    return json(200, r)
+  }
 
   // El llamador debe ser staff autenticado (no un doctor).
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })

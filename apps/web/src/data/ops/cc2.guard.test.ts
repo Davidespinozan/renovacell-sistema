@@ -17,6 +17,7 @@ import registrySrc from '../../screens/registry.tsx?raw'
 import netlify from '../../../../../netlify.toml?raw'
 import landingSrc from '../../../public/landing/index.html?raw'
 import legacyChatStore from '../store/chatStore.ts?raw'
+import responderSrc from '../../../../../supabase/functions/_shared/ia/responder.ts?raw'   // CC-4 · la IA vive aquí desde WA-2 (la comparten chat y WhatsApp)
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/|#)/.test(l)).join('\n')
 
@@ -73,7 +74,7 @@ describe('migración CC-2', () => {
 })
 
 describe('Edge chat + módulo compartido', () => {
-  const s = codigo(chatSrc); const sh = codigo(chatShared)
+  const s = codigo(chatSrc) + codigo(responderSrc); const sh = codigo(chatShared)
   it('C7/C8 · el actor sale de derivarActor(JWT|hash); el cliente no manda actor/profile; seller solo se asigna a sí mismo salvo Dirección', () => {
     expect(s).toMatch(/const actor = derivarActor\(quien, hash\)/)
     expect(s).not.toMatch(/p\.actor_type|p\.actor|p\.profile_id|p\.visitor_id/)
