@@ -75,7 +75,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             <Icon name="search" />
             <input
               ref={inputRef}
-              placeholder="Buscar o ir a…  (pedidos, doctores, productos, lotes)"
+              placeholder="Buscar o ir a…  (pedidos, clientes, productos, lotes)"
               value={q}
               onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0) }}
               onFocus={() => setOpen(true)}
