@@ -7,6 +7,7 @@ begin;
 -- inverso al de aplicación. Ese es el orden real de una reversión.
 -- W5 agregó un índice sobre orders (tabla que este archivo compara contra producción
 -- previa a W1): es la capa más reciente, así que baja primero.
+\ir ../../../rollback/pos_sin_interbloqueo/99_down.sql   -- 166 (llave de order_items diferida) baja primero
 \ir ../../../rollback/w5/99_down.sql
 \ir ../../../rollback/w2c/00_w2_snapshot.sql
 \ir ../../../rollback/w2c/99_down.sql
