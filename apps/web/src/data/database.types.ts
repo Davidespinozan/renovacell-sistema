@@ -4331,6 +4331,45 @@ export type Database = {
           },
         ]
       }
+      order_cancel_requests: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          reason: string
+          requested_by: string
+          requester_role: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          reason: string
+          requested_by: string
+          requester_role: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          reason?: string
+          requested_by?: string
+          requester_role?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       order_cancellations: {
         Row: {
           actor_role: string

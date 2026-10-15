@@ -19,6 +19,10 @@ import { cpSugerido, faltantesEntrega, receptorParaGuia } from '../../data/shipp
 import type { LogisticsPackage, Receiver } from '../../data/shipping/model'
 import type { ProductSafe } from '../../data/types'
 import { BotonRemision } from './Remision'
+import { useRole } from '../../auth/RoleContext'
+import { CancelOrderModal } from '../../app/CancelOrderModal'
+import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
+import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -43,6 +47,11 @@ export function Cola() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const [active, setActive] = useState<OrderWithItems | null>(null)
+  // CANCELACIÓN · Dirección cancela directo; los demás la solicitan. Con una solicitud pendiente no se envía.
+  const { role } = useRole()
+  const esDireccion = role === 'admin'
+  const solicitudes = useSolicitudesCancelacion()
+  const [cancelando, setCancelando] = useState<OrderWithItems | null>(null)
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -59,7 +68,7 @@ export function Cola() {
       {queue.length === 0 ? (
         <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
       ) : (
-        queue.map((o) => (
+        queue.map((o) => { const sol = solicitudDe(solicitudes, o.id); return (
           <div key={o.id} className="card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
@@ -72,15 +81,20 @@ export function Cola() {
                 <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}
+            {sol && <AvisoCancelacion solicitud={sol} esDireccion={esDireccion} />}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-              <button className="btn" type="button" onClick={() => setActive(o)}>
+              <button className="btn" type="button" onClick={() => setActive(o)} disabled={!!sol} title={sol ? 'Hay una cancelación por resolver' : undefined}>
                 <Icon name="truck" /> Asignar envío
               </button>
               <BotonRemision order={o} className="btn ghost" />
+              {!sol && (esDireccion
+                ? <button className="btn ghost" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={() => setCancelando(o)} data-testid="btn-cancelar-pedido">Cancelar pedido</button>
+                : <span style={{ marginLeft: 'auto' }}><SolicitarCancelacion orderId={o.id} folio={o.external_ref ?? o.id} className="btn ghost" /></span>)}
             </div>
           </div>
-        ))
+        ) })
       )}
+      {cancelando && <CancelOrderModal orderId={cancelando.id} folio={cancelando.external_ref ?? cancelando.id} requireReason actor="Administración" onClose={() => setCancelando(null)} />}
 
       {active && <AsignarModal order={active} onClose={() => setActive(null)} />}
     </div>

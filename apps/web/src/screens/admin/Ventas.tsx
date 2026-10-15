@@ -22,6 +22,7 @@ import { esteMes, mesPasado, ultimosDias, todoElHistorico, periodoAnterior, enPe
 import { cifra, AvisoKpi } from '../../app/Kpi'
 import type { ProductSafe, Profile } from '../../data/types'
 import { VentasDetalle } from './VentasDetalle'
+import { SolicitudesCancelacionPendientes } from '../../app/Cancelacion'   // CANCELACIÓN · lo que piden cancelar
 
 const GREEN = '#007311'
 const GREEN_SOFT = '#5FB873'
@@ -46,6 +47,7 @@ export function Ventas() {
       <div>
         <div className="eyebrow" style={{ marginBottom: 0 }}>Administración · Ventas</div>
       </div>
+      <SolicitudesCancelacionPendientes />
       <div className="fchips">
         <button type="button" className={'fchip' + (tab === 'detalle' ? ' on' : '')} onClick={() => setTab('detalle')}>Detalle</button>
         <button type="button" className={'fchip' + (tab === 'resumen' ? ' on' : '')} onClick={() => setTab('resumen')}>Resumen</button>

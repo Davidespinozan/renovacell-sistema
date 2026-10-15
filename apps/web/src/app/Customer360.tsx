@@ -15,6 +15,10 @@ import { atencion as atencionPorDefecto, type ClienteAtencion, type Vendedor } f
 import { chat as chatPorDefecto, ETIQUETA_MODO, type ModoConversacion } from '../data/ops/chat'
 import { HistorialConversacion, type CacheSesion, type LectorSesiones } from '../screens/chat/HistorialSesiones'   // Chat V2-C3
 import { TelefonosEditor, DomiciliosEditor, PerfilesFiscalesEditor, ContactoEditor, NotasPanel } from './Cliente360Editores'
+import { AvisoCancelacion, SolicitarCancelacion } from './Cancelacion'
+import { useRole } from '../auth/RoleContext'
+import { CancelOrderModal } from './CancelOrderModal'
+import { solicitudDe, useSolicitudesCancelacion } from '../data/ops/cancelacionSolicitud'
 
 function Section({ icon, title, aside, children }: { icon: React.ReactNode; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -247,11 +251,28 @@ function Tabla({ cols, filas, vacio }: { cols: string[]; filas: React.ReactNode[
     </div>
   )
 }
-const Pedidos = ({ d }: { d: Cliente360 }) => (
-  <Section icon={<ShoppingBag size={15} />} title="Pedidos">
-    <Tabla cols={['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo']} vacio="Sin pedidos." filas={d.pedidos.map((p) => [<span key="f" className="mono">{p.folio ?? '—'}</span>, fmtDate(p.fecha), p.estado ?? '—', money(p.total ?? 0), ESTADO_PAGO[p.estado_pago ?? ''] ?? p.estado_pago ?? '—', p.saldo != null ? money(p.saldo) : '—'])} />
-  </Section>
-)
+// CANCELACIÓN · en los pedidos que aún no salen: Dirección cancela directo; Ventas la solicita.
+const CANCELABLE = new Set(['draft', 'pending_payment', 'paid', 'picking', 'packed'])
+function Pedidos({ d }: { d: Cliente360 }) {
+  const { role } = useRole()
+  const solicitudes = useSolicitudesCancelacion()
+  const [cancelando, setCancelando] = useState<{ id: string; folio: string } | null>(null)
+  const puede = role === 'admin' || role === 'pos'
+  const accion = (p: Cliente360['pedidos'][number]): React.ReactNode => {
+    if (!puede || !CANCELABLE.has(p.estado ?? '')) return null
+    const sol = solicitudDe(solicitudes, p.id)
+    if (sol) return role === 'admin' ? <AvisoCancelacion key="c" solicitud={sol} esDireccion /> : <span key="c" className="pill p-dang">Cancelación solicitada</span>
+    return role === 'admin'
+      ? <button key="c" type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={() => setCancelando({ id: p.id, folio: p.folio ?? p.id })}>Cancelar</button>
+      : <SolicitarCancelacion key="c" orderId={p.id} folio={p.folio ?? p.id} />
+  }
+  return (
+    <Section icon={<ShoppingBag size={15} />} title="Pedidos">
+      <Tabla cols={puede ? ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo', ''] : ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo']} vacio="Sin pedidos." filas={d.pedidos.map((p) => [<span key="f" className="mono">{p.folio ?? '—'}</span>, fmtDate(p.fecha), p.estado ?? '—', money(p.total ?? 0), ESTADO_PAGO[p.estado_pago ?? ''] ?? p.estado_pago ?? '—', p.saldo != null ? money(p.saldo) : '—', ...(puede ? [accion(p)] : [])])} />
+      {cancelando && <CancelOrderModal orderId={cancelando.id} folio={cancelando.folio} requireReason actor="Administración" onClose={() => setCancelando(null)} />}
+    </Section>
+  )
+}
 const Pagos = ({ d }: { d: Cliente360 }) => (
   <>
     <Section icon={<Receipt size={15} />} title="Movimientos de pago (libro W2)">

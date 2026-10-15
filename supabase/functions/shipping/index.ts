@@ -322,6 +322,10 @@ Deno.serve(conCors(async (req) => {
       if (active?.status === 'pending')
         return json(409, { error: 'in_progress', message: 'Ya hay una guía en proceso para este pedido.' })
 
+      // 1b) Cancelación solicitada → Dirección decide antes de enviar (la base también lo bloquea al crear el intento).
+      const { data: cancelacion } = await admin.from('order_cancel_requests').select('id').eq('order_id', orderId).eq('status', 'pendiente').limit(1).maybeSingle()
+      if (cancelacion) return json(409, { error: 'cancelacion_solicitada', message: 'Este pedido tiene una cancelación por resolver. Dirección decide antes de generar la guía.' })
+
       // 2) CLAIM durable PRE-proveedor con exclusión real (índice único parcial). Carrera → 23505.
       const fingerprint = await sha256Hex(JSON.stringify({ shipper, receiver, pkg, productCode }))
       const msgRef = `${orderId}-${idemKey}`.slice(0, 36)
