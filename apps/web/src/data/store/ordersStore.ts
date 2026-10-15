@@ -116,9 +116,22 @@ if (hasSupabase) {
 }
 
 // El pedido solo "se creó" cuando el servidor lo confirmó. `ambiguous` = no se sabe.
+// SEC-C4-FISCAL-3 · con factura, pedido y receptor nacen en UNA transacción (crear_pedido_con_receptor): ya no
+// existe el estado "pedido creado sin receptor". `repetido` = el servidor confirmó un envío anterior del MISMO pedido.
+// `incierto` = el envío salió y no hubo respuesta: quien llama debe reenviar EXACTAMENTE la misma operación (mismo id).
+export type MotivoFallo = 'conflicto' | 'fiscal' | 'autorizacion' | 'rechazo' | 'incierto'
 export type PedidoCreado =
-  | { ok: true; order: OrderWithItems; fiscalPendiente?: boolean }   // fiscalPendiente: el pedido existe, su receptor fiscal NO quedó
-  | { ok: false; error: string; ambiguous: boolean }
+  | { ok: true; order: OrderWithItems; repetido?: boolean }
+  | { ok: false; error: string; ambiguous: boolean; motivo?: MotivoFallo; incierto?: boolean }
+
+// Identidad de UNA operación de alta (la fija quien llama y la reutiliza en cada reintento de lo mismo).
+export interface OperacionPedido { id: string; folio: string }
+export const nuevaOperacionPedido = (): OperacionPedido => ({ id: hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`, folio: `S${Date.now().toString().slice(-6)}` })
+
+export const CONFLICTO_PEDIDO_MSG = 'Ese envío no coincide con el pedido que ya quedó registrado con este identificador. No se creó nada nuevo: cierra y revisa en "Pedidos".'
+export const INCIERTO_PEDIDO_MSG = 'No se pudo confirmar si el pedido quedó registrado. Reintenta: se reenvía el MISMO pedido y el servidor no lo duplica.'
+export const SESION_PEDIDO_MSG = 'Tu sesión expiró o no tiene permiso para esta operación. Vuelve a iniciar sesión y reintenta: el pedido no se duplicará.'
+const esSesion = (e: { message: string; code?: string; status?: number }) => e.status === 401 || /^PGRST30\d$/.test(e.code ?? '') || /JWT/i.test(e.message)
 
 export async function createOrder(input: {
   lines: NewOrderLine[]
@@ -130,10 +143,12 @@ export async function createOrder(input: {
   shipping?: ShippingAddress | null  // dirección de ENTREGA elegida en la venta (base u otra)
   location_id?: string | null       // ref opcional a doctor_locations; el snapshot address sigue siendo autoritativo
   customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
-  receiver?: FiscalProfile | null   // perfil fiscal CONFIRMADO → congela invoice_meta.receiver del pedido
+  receiver?: FiscalProfile | null   // receptor del pedido (solo con factura); el servidor lo valida y lo congela
+  operacion?: OperacionPedido       // id + folio estables entre reintentos de la MISMA solicitud
 }): Promise<PedidoCreado> {
-  const id = hasSupabase ? uuid() : `o-${Math.floor(Math.random() * 1e6)}`
-  const folio = `S${Date.now().toString().slice(-6)}`
+  const op = input.operacion ?? nuevaOperacionPedido()
+  const id = op.id
+  const folio = op.folio
   const now = new Date().toISOString()
   // Identidad del pedido: doctor explícito → ese; customer-only (customer_id sin doctor) → doctor NULL
   // (NO el uid del staff); si no, fallback a la sesión (auto-pedido del doctor) / mock.
@@ -144,7 +159,7 @@ export async function createOrder(input: {
     status: 'pending_payment', payment_method: 'contra_pedido', payment_ref: null,
     payment_status: 'pending', stripe_payment_id: null, invoice_requested: input.invoice_requested,
     // Snapshot fiscal congelado en el momento de confirmar la solicitud (no se recalcula después).
-    invoice_meta: input.receiver ? ({ receiver: normalizeFiscalProfile(input.receiver) } as unknown as Order['invoice_meta']) : null,
+    invoice_meta: input.invoice_requested && input.receiver ? ({ receiver: normalizeFiscalProfile(input.receiver) } as unknown as Order['invoice_meta']) : null,
     // El snapshot COMPLETO de la dirección (address) es autoritativo y viaja con el pedido; el
     // location_id es solo una referencia informativa. Editar/desactivar la ubicación/cliente después
     // NO altera este snapshot histórico. `customer` = snapshot mínimo de nombre/teléfono.
@@ -191,18 +206,21 @@ export async function createOrder(input: {
     if (c?.id) resolvedCustomerId = c.id
   }
 
+  const base = {
+    p_order_id: id,
+    p_folio: folio,
+    p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
+    p_customer_id: resolvedCustomerId as unknown as string,
+    p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
+    p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
+  }
+  // Con factura: UNA llamada, UNA transacción (pedido + receptor). Sin factura: el contrato histórico, sin receptor.
+  if (input.invoice_requested) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar)
+
   let data: unknown = null
   let error: { message: string; code?: string } | null = null
   try {
-    const r = await supabase.rpc('crear_pedido', {
-      p_order_id: id,
-      p_folio: folio,
-      p_doctor_id: (isUuid(doctorId) ? doctorId : null) as unknown as string,
-      p_customer_id: resolvedCustomerId as unknown as string,
-      p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
-      p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
-      p_invoice_requested: input.invoice_requested,
-    })
+    const r = await supabase.rpc('crear_pedido', { ...base, p_invoice_requested: false })
     data = r.data; error = r.error
   } catch {
     error = { message: 'Failed to fetch' }
@@ -223,11 +241,11 @@ export async function createOrder(input: {
       if (!ver.error) {
         const msg = 'El pedido NO se registró. Puedes intentarlo de nuevo.'
         reportarFallo(QUE, msg, false)
-        return { ok: false, error: msg, ambiguous: false }
+        return { ok: false, error: msg, ambiguous: false, motivo: 'incierto', incierto: true }   // reintento: misma operación
       }
       const msg = 'No se pudo confirmar si el pedido quedó registrado. Revisa en "Pedidos" antes de crearlo otra vez.'
       reportarFallo(QUE, msg, true)
-      return { ok: false, error: msg, ambiguous: true }
+      return { ok: false, error: msg, ambiguous: true, motivo: 'incierto', incierto: true }
     }
     // Servidor rechazó (precio inválido, producto inactivo, no autorizado…).
     const msg = mensajeDeError(e, 'comando')
@@ -236,20 +254,61 @@ export async function createOrder(input: {
   }
 
   const creado = asentar(Number((data as { total?: number }).total))
-  // Congela el snapshot fiscal server-side una vez que el pedido ya existe (RPC acotada).
-  if (input.receiver) {
-    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
-    const { error: fErr } = await rpc('set_order_fiscal_snapshot', { p_order_id: id, p_receiver: normalizeFiscalProfile(input.receiver) })
-    // El pedido SÍ existe; lo que no quedó son sus datos fiscales. Se dice tal cual.
-    if (fErr) {
-      reportarFallo(`guardar los datos fiscales del pedido ${folio}`,
-        'El pedido sí se creó, pero sus datos fiscales no quedaron guardados. Captúralos en Facturación antes de solicitar la factura.', false)
-      hydrate()
-      return { ok: true, order: creado, fiscalPendiente: true }   // quien llama NO debe anunciar la factura como lista
-    }
-  }
   hydrate() // trae unit_price/total AUTORITATIVOS del servidor
-  return { ok: true, order: creado }
+  return { ok: true, order: creado, ...((data as { idempotent?: boolean }).idempotent ? { repetido: true } : {}) }
+}
+
+// SEC-C4-FISCAL-3 · pedido CON factura: crear_pedido_con_receptor crea el pedido (vía crear_pedido) y guarda su
+// receptor en la MISMA transacción; si algo falla no queda nada. No hay segunda escritura del receptor.
+// Reintento del mismo pedido (mismo id y misma solicitud) ⇒ el servidor responde `idempotent` con SU folio y total.
+// Cualquier diferencia, u otra persona ⇒ PEDIDO_EXISTENTE_CONFLICTO, sin datos. Resultado desconocido ⇒ NO se
+// consulta ni se adivina: se devuelve `incierto` para que se reenvíe la MISMA operación.
+async function crearConReceptor(
+  base: { p_order_id: string; p_folio: string; p_doctor_id: string; p_customer_id: string; p_lines: Json; p_shipping_meta: Json },
+  receiver: FiscalProfile | null, folio: string, QUE: string, asentar: (total?: number) => OrderWithItems,
+): Promise<PedidoCreado> {
+  let data: unknown = null
+  let error: { message: string; code?: string; status?: number } | null = null
+  try {
+    const r = await supabase.rpc('crear_pedido_con_receptor', {
+      ...base,
+      p_invoice_requested: true,
+      // Exactamente los 6 campos del receptor (normalizados); nada de estados, UUID de CFDI ni datos del proveedor.
+      p_receiver: (receiver ? normalizeFiscalProfile(receiver) : null) as unknown as Json,
+    })
+    data = r.data; error = r.error ? { message: r.error.message, code: r.error.code, status: (r as { status?: number }).status } : null
+  } catch {
+    error = { message: 'Failed to fetch' }
+  }
+  if (!error && data && typeof data === 'object') {
+    const d = data as { total?: number; folio?: string; idempotent?: boolean }
+    const creado = asentar(Number(d.total))
+    const o = d.folio && d.folio !== folio ? { ...creado, external_ref: d.folio } : creado
+    hydrate()
+    return d.idempotent ? { ok: true, order: o, repetido: true } : { ok: true, order: o }
+  }
+  const e = error ?? { message: 'respuesta vacía del servidor' }
+  if (/PEDIDO_EXISTENTE_CONFLICTO/.test(e.message)) {
+    reportarFallo(QUE, CONFLICTO_PEDIDO_MSG, false)
+    return { ok: false, error: CONFLICTO_PEDIDO_MSG, ambiguous: false, motivo: 'conflicto' }
+  }
+  if (/\b(FISCAL_INVALIDO|DATOS_FISCALES_REQUERIDOS)\b/.test(e.message)) {
+    const msg = mensajeDeError(e, 'comando')
+    reportarFallo(QUE, msg, false)
+    return { ok: false, error: msg, ambiguous: false, motivo: 'fiscal' }
+  }
+  if (!codigoConocido(e.message) && isAmbiguous(e)) {
+    reportarFallo(QUE, INCIERTO_PEDIDO_MSG, true)
+    return { ok: false, error: INCIERTO_PEDIDO_MSG, ambiguous: true, motivo: 'incierto', incierto: true }
+  }
+  if (esSesion(e) || /No autorizado|CUENTA_NO_AUTORIZADA|insufficient_privilege|permission denied/i.test(e.message) || e.code === '42501') {
+    const msg = esSesion(e) ? SESION_PEDIDO_MSG : mensajeDeError(e, 'comando')
+    reportarFallo(QUE, msg, false)
+    return { ok: false, error: msg, ambiguous: false, motivo: 'autorizacion' }
+  }
+  const msg = mensajeDeError(e, 'comando')
+  reportarFallo(QUE, msg, false)
+  return { ok: false, error: msg, ambiguous: false, motivo: 'rechazo' }
 }
 
 const CANCELABLE = ['draft', 'pending_payment', 'paid', 'picking', 'packed']

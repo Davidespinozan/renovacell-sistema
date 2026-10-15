@@ -1,7 +1,7 @@
 // Levantar pedido A NOMBRE de un doctor (Ventas sobre su cartera, o Dirección).
 // Crea un pedido contra pedido idéntico a uno del Portal → cae solo en Almacén →
 // Preparar pedidos. Respeta el stock (mismo tope que el catálogo del doctor).
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
 import { hasSupabase, supabase } from '../../lib/supabase'
@@ -19,6 +19,22 @@ import { AddressPicker } from '../../app/AddressPicker'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
+import type { MotivoFallo } from '../../data/store/ordersStore'
+
+// SEC-C4-FISCAL-3-FE · UNA operación de alta = un identificador estable (id + folio) que se reutiliza en cada reintento
+// de la MISMA solicitud. Tras un resultado incierto se reenvía la solicitud ORIGINAL congelada (nunca un id nuevo);
+// un conflicto no se elude con otro id. El servidor decide si el pedido existe (crear_pedido_con_receptor / crear_pedido).
+type Solicitud = Omit<Parameters<ReturnType<typeof useOrders>['createOrder']>[0], 'operacion'>
+interface Intento { op: { id: string; folio: string }; huella: string; solicitud: Solicitud; incierto: boolean }
+const nuevaOperacion = () => ({
+  id: globalThis.crypto?.randomUUID?.() ?? `o-${Math.random().toString(16).slice(2)}`,
+  folio: `S${Date.now().toString().slice(-6)}`,
+})
+// Huella de lo que se pide (sin el texto libre de quien captura): mismos renglones, cuenta, envío, factura y receptor.
+const huellaDe = (s: Solicitud) => JSON.stringify([
+  [...s.lines].map((l) => `${l.product_id}:${l.qty}`).sort(), s.doctor_id ?? null, s.customer_id ?? null, s.location_id ?? null,
+  s.shipping ?? null, s.invoice_requested, s.invoice_requested && s.receiver ? normalizeFiscalProfile(s.receiver) : null,
+])
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
 // Exactamente uno de doctor|customer. Customer-only ⇒ doctor_id NULL + customer_id + snapshot.
@@ -32,7 +48,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   // SEC-C4-B5 · DATOS FISCALES DEL PEDIDO ≠ PERFIL FISCAL PERMANENTE DEL CLIENTE.
   // Solo Dirección consulta y actualiza el perfil permanente desde aquí. Los demás (Ventas) capturan el receptor
   // SOLO para este pedido: no se lee el expediente fiscal de la cuenta ni se escribe en él; el servidor lo congela
-  // en el pedido (set_order_fiscal_snapshot) y lo valida. Elegir una cuenta no da acceso a su perfil fiscal.
+  // en el pedido EN LA MISMA TRANSACCIÓN que lo crea (crear_pedido_con_receptor) y lo valida. Elegir una cuenta no da
+  // acceso a su perfil fiscal.
   const { role } = useRole()
   const fiscalPermanente = role === 'admin'
   const target = customer ?? doctor!
@@ -56,7 +73,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custAddr, setCustAddr] = useState<ShippingAddress | null>(null) // flujo customer (one-off)
   const [folio, setFolio] = useState<string | null>(null)
-  const [fiscalPendiente, setFiscalPendiente] = useState(false)   // el pedido se creó, pero su receptor fiscal no quedó
+  const [repetido, setRepetido] = useState(false)                 // el servidor confirmó un envío anterior del mismo pedido
   const shipping = isCustomer ? custAddr : (choice?.address ?? null)
 
   // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
@@ -69,7 +86,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   // El pedido solo "se creó" cuando el servidor lo confirmó. Mientras tanto el
   // botón queda ocupado, para que un segundo clic no mande otro pedido.
   const [creando, setCreando] = useState(false)
-  const [errorPedido, setErrorPedido] = useState<string | null>(null)
+  const [errorPedido, setErrorPedido] = useState<{ msg: string; motivo: MotivoFallo } | null>(null)
+  const enviando = useRef(false)                 // candado SÍNCRONO: un doble clic no alcanza a mandar dos solicitudes
+  const intento = useRef<Intento | null>(null)   // la operación en curso (su id se conserva entre reintentos)
   const fiscalOk = isFiscalProfileComplete(fiscal)
 
   useEffect(() => {
@@ -114,32 +133,57 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const total = lines.reduce((s, l) => s + (effOf(l.p!, l.qty) ?? l.p!.price ?? 0) * l.qty, 0)
   const savings = lines.reduce((s, l) => s + volumeSavings(l.p!.price, volRules, l.p!.id, l.qty), 0)
 
+  const solicitudActual = (): Solicitud => ({
+    lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
+    total,
+    invoice_requested: invoice,
+    placedBy,
+    shipping,
+    receiver: invoice ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3)
+    ...(isCustomer
+      ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
+      : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
+  })
+  const pendienteIncierto = intento.current?.incierto ?? false
+  const bloqueado = errorPedido?.motivo === 'conflicto'
+
+  const enviar = async (it: Intento) => {
+    intento.current = it
+    setCreando(true); setErrorPedido(null)
+    try {
+      const r = await createOrder({ ...it.solicitud, operacion: it.op })
+      if (r.ok) { intento.current = null; setRepetido(!!r.repetido); setFolio(r.order.external_ref ?? it.op.folio); return }
+      const motivo: MotivoFallo = r.incierto ? 'incierto' : (r.motivo ?? (r.ambiguous ? 'incierto' : 'rechazo'))
+      // Incierto: se congela la solicitud ORIGINAL y su id; el siguiente clic la reenvía tal cual.
+      // Fiscal: el servidor no creó nada; se corrige el receptor y el siguiente envío es una operación nueva.
+      intento.current = motivo === 'fiscal' ? null : { ...it, incierto: motivo === 'incierto' }
+      if (motivo === 'fiscal') { setShowFiscalErr(true); setEditingFiscal(true) }
+      setErrorPedido({ msg: r.error, motivo })
+    } finally {
+      setCreando(false); enviando.current = false
+    }
+  }
+
   const crear = async () => {
+    if (enviando.current || bloqueado) return
+    const previo = intento.current
+    if (previo?.incierto) { enviando.current = true; await enviar(previo); return }   // MISMA operación, mismo contenido
     if (lines.length === 0 || !shipping) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
+    enviando.current = true
     if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
       setSavingFiscal(true)
       const res = await upsertCustomerFiscal(fiscalCustomerId, fiscal)
       setSavingFiscal(false)
-      if (!res.ok) { window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
+      if (!res.ok) { enviando.current = false; window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
     }
-    setCreando(true); setErrorPedido(null)
-    const r = await createOrder({
-      lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
-      total,
-      invoice_requested: invoice,
-      placedBy,
-      shipping,
-      receiver: invoice ? fiscal : null,
-      ...(isCustomer
-        ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
-        : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
-    })
-    setCreando(false)
-    if (!r.ok) { setErrorPedido(r.error); return }
-    setFiscalPendiente(!!r.fiscalPendiente)
-    setFolio(r.order.external_ref ?? '—')
+    const solicitud = solicitudActual()
+    const huella = huellaDe(solicitud)
+    // Mismo contenido que un intento anterior ya resuelto sin pedido (rechazo, sesión) ⇒ mismo id; si cambió ⇒ id nuevo.
+    await enviar({ op: previo && previo.huella === huella ? previo.op : nuevaOperacion(), huella, solicitud, incierto: false })
   }
+  const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
+  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || !shipping || (invoice && !fiscalOk)))
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -148,13 +192,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
           <div className="mbody">
             <div className="success">
               <div className="ck"><Plus size={26} /></div>
-              <h3>Pedido creado</h3>
+              <h3>{repetido ? 'Pedido confirmado' : 'Pedido creado'}</h3>
               <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
-              {fiscalPendiente && (
-                <div role="alert" data-testid="np-fiscal-pendiente" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13, textAlign: 'left' }}>
-                  <b>Los datos fiscales NO quedaron guardados en el pedido.</b> La factura no está solicitada todavía: pide a Facturación que los capture con el folio {folio}.
-                </div>
-              )}
+              {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
@@ -217,13 +257,14 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               )}
 
               {errorPedido && (
-                <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 13 }}>
-                  <b>El pedido no se creó.</b> {errorPedido}
+                <div role="alert" data-testid={`np-error-${errorPedido.motivo}`} style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: errorPedido.motivo === 'incierto' ? 'var(--warn-bg, var(--danger-bg))' : 'var(--danger-bg)', color: errorPedido.motivo === 'incierto' ? 'var(--warn, var(--danger))' : 'var(--danger)', fontSize: 13 }}>
+                  <b>{errorPedido.motivo === 'incierto' ? 'No se pudo confirmar el pedido.' : errorPedido.motivo === 'conflicto' ? 'No se creó un pedido nuevo.' : errorPedido.motivo === 'fiscal' ? 'El pedido no se creó: revisa los datos fiscales.' : 'El pedido no se creó.'}</b> {errorPedido.msg}
+                  {formCambio && <div data-testid="np-reenvio-original" style={{ marginTop: 6 }}>Se reenviará el pedido ORIGINAL; los cambios que hiciste después no se aplican hasta confirmarlo.</div>}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={lines.length === 0 || !shipping || savingFiscal || creando || (invoice && !fiscalOk)} style={(lines.length === 0 || !shipping || savingFiscal || creando || (invoice && !fiscalOk)) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : 'Crear pedido'}</button>
+                <button className="btn" type="button" disabled={deshabilitado} style={deshabilitado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : pendienteIncierto ? 'Reintentar envío' : 'Crear pedido'}</button>
               </div>
             </div>
           </>

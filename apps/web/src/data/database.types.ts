@@ -7727,6 +7727,19 @@ export type Database = {
         }
         Returns: Json
       }
+      crear_pedido_con_receptor: {
+        Args: {
+          p_customer_id: string
+          p_doctor_id: string
+          p_folio: string
+          p_invoice_requested: boolean
+          p_lines: Json
+          p_order_id: string
+          p_receiver: Json
+          p_shipping_meta: Json
+        }
+        Returns: Json
+      }
       custody_held: { Args: { p_lot: string }; Returns: number }
       custody_held_en: {
         Args: { p_custody: string; p_lot: string }

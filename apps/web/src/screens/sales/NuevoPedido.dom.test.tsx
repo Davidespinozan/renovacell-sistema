@@ -14,7 +14,7 @@ const CAPTURA = { rfc: 'XAXX010101000', razon_social: 'CAPTURA DEL PEDIDO', regi
 
 const h = vi.hoisted(() => ({
   role: 'pos', tablas: [] as string[], rpcs: [] as string[], upserts: [] as unknown[][], pedidos: [] as Array<Record<string, unknown>>,
-  respuestaPedido: null as unknown, respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown,
+  respuestaPedido: null as unknown, cola: [] as unknown[], diferido: null as null | { soltar: (v: unknown) => void }, respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown,
 }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, user: { name: 'Lucía' } }) }))
 vi.mock('../../lib/supabase', () => {
@@ -29,7 +29,11 @@ vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [{ 
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useVolumePrices', () => ({ useVolumePrices: () => ({ data: [] }) }))
 vi.mock('../../data/ops/stock', () => ({ stockByProduct: () => ({}), stockInfoFor: () => ({ tracked: true, qty: 10, status: 'ok' }) }))
-vi.mock('../../data/hooks/useOrders', () => ({ useOrders: () => ({ createOrder: async (i: Record<string, unknown>) => { h.pedidos.push(i); return h.respuestaPedido } }) }))
+vi.mock('../../data/hooks/useOrders', () => ({ useOrders: () => ({ createOrder: async (i: Record<string, unknown>) => {
+  h.pedidos.push(i)
+  if (h.diferido) return new Promise((res) => { h.diferido = { soltar: res } })
+  return h.cola.length ? h.cola.shift() : h.respuestaPedido
+} }) }))
 vi.mock('../../app/AddressPicker', () => ({ AddressPicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ line1: 'Calle 1', city: 'Culiacán', phone: '' })}>poner domicilio</button> }))
 vi.mock('../../app/DeliveryLocationPicker', () => ({ DeliveryLocationPicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ address: { line1: 'Consultorio', city: 'Culiacán', phone: '' }, locationId: null })}>poner domicilio</button> }))
 vi.mock('../../app/FiscalFields', () => ({
@@ -41,13 +45,13 @@ import { NuevoPedido } from './NuevoPedido'
 const CLIENTE = { id: '11111111-1111-4111-8111-111111111111', name: 'Ana Prueba', phone: null }
 const exito = (extra: object = {}) => ({ ok: true, order: { external_ref: 'S1001' }, ...extra })
 const montar = (props: Partial<React.ComponentProps<typeof NuevoPedido>> = {}) => render(<NuevoPedido customer={CLIENTE} placedBy="Lucía (Ventas)" onClose={() => {}} {...props} />)
-const boton = () => screen.getByRole('button', { name: /crear pedido|creando|guardando/i }) as HTMLButtonElement
+const boton = () => screen.getByRole('button', { name: /crear pedido|creando|guardando|reintentar envío/i }) as HTMLButtonElement
 const armar = () => { fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0]); fireEvent.click(screen.getByText('poner domicilio')) }
 const pedirFactura = () => fireEvent.click(screen.getByRole('checkbox'))
 const alerta = vi.fn()
 
 beforeEach(() => {
-  cleanup(); h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.respuestaUpsert = { ok: true }
+  cleanup(); h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.cola = []; h.diferido = null; h.respuestaUpsert = { ok: true }
   h.maestro = MAESTRO; h.captura = CAPTURA; alerta.mockReset(); window.alert = alerta
 })
 
@@ -114,14 +118,8 @@ describe('SEC-C4-B5 · Ventas · pedido con factura (captura solo para el pedido
     expect(h.pedidos[0].customer_id).toBe(CLIENTE.id)
     expect(screen.queryByTestId('np-fiscal-pendiente')).toBeNull()
   })
-  it('el servidor creó el pedido pero NO guardó el receptor: se dice, sin anunciar la factura como lista', async () => {
-    h.respuestaPedido = exito({ fiscalPendiente: true })
-    montar(); armar(); pedirFactura()
-    fireEvent.click(await screen.findByTestId('form-fiscal'))
-    await waitFor(() => expect(boton().disabled).toBe(false))
-    fireEvent.click(boton())
-    expect(await screen.findByTestId('np-fiscal-pendiente')).toHaveTextContent('NO quedaron guardados')
-    expect(screen.getByTestId('np-fiscal-pendiente')).toHaveTextContent('S1001')
+  it('FISCAL-3-FE · ya no existe el estado "pedido creado sin receptor" en la pantalla', () => {
+    expect(fuente).not.toMatch(/fiscalPendiente|np-fiscal-pendiente|NO quedaron guardados/)
   })
   it('rechazo del servidor con factura: sin éxito y sin escritura alterna', async () => {
     h.respuestaPedido = { ok: false, error: 'NO_AUTORIZADO', ambiguous: false }
@@ -202,10 +200,137 @@ describe('SEC-C4-B5 · guardas de fuente', () => {
     expect(c.match(/upsertCustomerFiscal\(/g)).toHaveLength(1)
     for (const p of [/useCustomers|listCustomers/, /service_role/, /console\./, /localStorage|sessionStorage/, /cliente_fiscal_guardar|customer_fiscal_profiles/]) expect(c).not.toMatch(p)
   })
-  it('crear el pedido no envía vendedor ni precios autoritativos nuevos; el fallo del receptor se devuelve marcado', () => {
+  it('FISCAL-3 · con factura, pedido y receptor en UNA llamada; sin segunda escritura del receptor', () => {
     const p = codigo(fuentePedidos)
-    expect(p).toMatch(/return \{ ok: true, order: creado, fiscalPendiente: true \}/)
-    expect(p).toMatch(/rpc\('set_order_fiscal_snapshot', \{ p_order_id: id, p_receiver: normalizeFiscalProfile\(input\.receiver\) \}\)/)
+    const alta = p.slice(p.indexOf('export async function createOrder'), p.indexOf('const CANCELABLE'))
+    expect(alta).toMatch(/supabase\.rpc\('crear_pedido_con_receptor'/)
+    expect(alta).not.toMatch(/set_order_fiscal_snapshot|fiscalPendiente/)
     expect(p).not.toMatch(/upsert_customer_fiscal/)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEC-C4-FISCAL-3-FE · una operación = un identificador; reintentos sin duplicar; estados claros.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('SEC-C4-FISCAL-3-FE · operación, reintentos y estados', () => {
+  const conFacturaLista = async () => { montar(); armar(); pedirFactura(); fireEvent.click(await screen.findByTestId('form-fiscal')); await waitFor(() => expect(boton().disabled).toBe(false)) }
+  const op = (i: number) => h.pedidos[i].operacion as { id: string; folio: string }
+  const incierto = { ok: false, error: 'No se pudo confirmar si el pedido quedó registrado. Reintenta: se reenvía el MISMO pedido y el servidor no lo duplica.', ambiguous: true, motivo: 'incierto', incierto: true }
+
+  it('con factura: una sola solicitud con operación estable y el receptor del pedido', async () => {
+    await conFacturaLista()
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos).toHaveLength(1)
+    expect(op(0).id).toMatch(/^[0-9a-f-]{36}$/); expect(op(0).folio).toMatch(/^S\d{6}$/)
+    expect(h.pedidos[0].invoice_requested).toBe(true); expect(h.pedidos[0].receiver).toEqual(CAPTURA)
+    expect(h.rpcs).toEqual([]); expect(h.upserts).toEqual([])
+  })
+  it('doble clic: una sola solicitud', async () => {
+    h.diferido = { soltar: () => {} }
+    await conFacturaLista()
+    fireEvent.click(boton()); fireEvent.click(boton()); fireEvent.click(boton())
+    expect(h.pedidos).toHaveLength(1)
+    await waitFor(() => expect(boton().textContent).toMatch(/Creando pedido/))
+    h.diferido!.soltar(exito()); h.diferido = null
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos).toHaveLength(1)
+  })
+  it('timeout: no afirma que no existe; el reintento reenvía la MISMA operación y el mismo contenido', async () => {
+    h.cola = [incierto, exito({ repetido: true })]
+    await conFacturaLista()
+    fireEvent.click(boton())
+    const a = await screen.findByTestId('np-error-incierto')
+    expect(a).toHaveTextContent('No se pudo confirmar el pedido'); expect(a).not.toHaveTextContent('no se creó')
+    expect(boton().textContent).toBe('Reintentar envío')
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido confirmado')).toBeTruthy())
+    expect(screen.getByTestId('np-repetido')).toHaveTextContent('no se creó otro')
+    expect(h.pedidos).toHaveLength(2)
+    expect(op(1)).toEqual(op(0))
+    const { operacion: _a, ...s0 } = h.pedidos[0]; const { operacion: _b, ...s1 } = h.pedidos[1]
+    expect(s1).toEqual(s0)
+  })
+  it('timeout y luego el usuario cambia productos: se avisa y se reenvía el ORIGINAL (nunca un id nuevo)', async () => {
+    h.cola = [incierto, incierto]
+    await conFacturaLista()
+    fireEvent.click(boton())
+    await screen.findByTestId('np-error-incierto')
+    fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0])   // +1 unidad
+    expect(await screen.findByTestId('np-reenvio-original')).toHaveTextContent('pedido ORIGINAL')
+    fireEvent.click(boton())
+    await waitFor(() => expect(h.pedidos).toHaveLength(2))
+    expect(op(1)).toEqual(op(0)); expect(h.pedidos[1].lines).toEqual(h.pedidos[0].lines)
+  })
+  it('timeout y luego el usuario cambia el receptor: también se reenvía el original', async () => {
+    h.cola = [incierto, exito({ repetido: true })]
+    await conFacturaLista()
+    fireEvent.click(boton())
+    await screen.findByTestId('np-error-incierto')
+    h.captura = { ...CAPTURA, rfc: 'BBB010101BB2' }; fireEvent.click(screen.getByTestId('form-fiscal'))
+    await screen.findByTestId('np-reenvio-original')
+    fireEvent.click(boton())
+    await waitFor(() => expect(h.pedidos).toHaveLength(2))
+    expect(h.pedidos[1].receiver).toEqual(CAPTURA); expect(op(1)).toEqual(op(0))
+  })
+  it('conflicto: se muestra, no es éxito y no se puede eludir con otro identificador', async () => {
+    h.respuestaPedido = { ok: false, error: 'Ese envío no coincide con el pedido que ya quedó registrado con este identificador.', ambiguous: false, motivo: 'conflicto' }
+    await conFacturaLista()
+    fireEvent.click(boton())
+    expect(await screen.findByTestId('np-error-conflicto')).toHaveTextContent('No se creó un pedido nuevo')
+    expect(screen.queryByText('Pedido creado')).toBeNull()
+    expect(boton().disabled).toBe(true)
+    fireEvent.click(boton())
+    expect(h.pedidos).toHaveLength(1)
+  })
+  it('receptor rechazado por el servidor: se reabre el formulario conservando lo capturado; el nuevo envío es otra operación', async () => {
+    h.cola = [{ ok: false, error: 'Los datos fiscales no son válidos.', ambiguous: false, motivo: 'fiscal' }, exito()]
+    await conFacturaLista()
+    fireEvent.click(boton())
+    expect(await screen.findByTestId('np-error-fiscal')).toHaveTextContent('revisa los datos fiscales')
+    expect(screen.getByTestId('form-fiscal')).toBeTruthy()
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos[1].receiver).toEqual(CAPTURA); expect(op(1).id).not.toBe(op(0).id)
+  })
+  it('sesión expirada: mismo identificador al reintentar lo mismo; el carrito y el receptor se conservan', async () => {
+    h.cola = [{ ok: false, error: 'Tu sesión expiró.', ambiguous: false, motivo: 'autorizacion' }, exito()]
+    await conFacturaLista()
+    fireEvent.click(boton())
+    expect(await screen.findByTestId('np-error-autorizacion')).toHaveTextContent('El pedido no se creó')
+    expect(boton().disabled).toBe(false)
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(op(1)).toEqual(op(0)); expect(h.pedidos[1].receiver).toEqual(CAPTURA)
+  })
+  it('rechazo y luego cambio de contenido: operación nueva (no se reutiliza el id para otra solicitud)', async () => {
+    h.cola = [{ ok: false, error: 'Ese producto ya no se vende.', ambiguous: false, motivo: 'rechazo' }, exito()]
+    montar(); armar()
+    fireEvent.click(boton())
+    await screen.findByTestId('np-error-rechazo')
+    fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0])
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(op(1).id).not.toBe(op(0).id)
+  })
+  it('sin factura: sin receptor y con operación propia; activar y desactivar factura no arrastra el receptor', async () => {
+    montar(); armar(); pedirFactura()
+    fireEvent.click(await screen.findByTestId('form-fiscal'))
+    pedirFactura()                                         // la quita
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos[0].invoice_requested).toBe(false); expect(h.pedidos[0].receiver).toBeNull()
+    expect(op(0).id).toBeTruthy()
+  })
+  it('Dirección con varios intentos: el perfil permanente se actualiza una vez; el reenvío incierto no lo vuelve a escribir', async () => {
+    h.role = 'admin'; h.cola = [incierto, exito({ repetido: true })]
+    montar({ placedBy: 'Administración' }); armar(); pedirFactura()
+    await screen.findByTestId('resumen-fiscal')
+    fireEvent.click(screen.getByText('Editar')); fireEvent.click(screen.getByTestId('form-fiscal'))
+    fireEvent.click(boton())
+    await screen.findByTestId('np-error-incierto')
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido confirmado')).toBeTruthy())
+    expect(h.upserts).toEqual([[CLIENTE.id, CAPTURA]]); expect(op(1)).toEqual(op(0))
   })
 })
