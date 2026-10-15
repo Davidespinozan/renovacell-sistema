@@ -27,11 +27,16 @@ const fallos = [];
     const r = await get(`https://graph.facebook.com/${v}/${portfolio}/${edge}?fields=id,name,access_token,instagram_business_account{id,username}`, `páginas (${edge})`);
     for (const p of (r.data || [])) out.push([p.id, p.name, p.access_token || "", (p.instagram_business_account || {}).id || "", (p.instagram_business_account || {}).username || ""].join("\t"));
   }
-  if (!out.length) {
+  const sinToken = out.some((l) => l.split("\t")[2] === "");
+  const sinIg = out.some((l) => l.split("\t")[3] === "");
+  if (!out.length || sinToken || sinIg) {
     const faltan = ["pages_show_list", "pages_manage_metadata", "pages_messaging", "instagram_basic", "instagram_manage_messages"].filter((x) => !permisos.includes(x));
     console.error("DIAGNÓSTICO:");
+    console.error("  token de: " + (dbg.application ? "app " + dbg.application : "?") + (dbg.issued_at ? " · emitido " + new Date(dbg.issued_at * 1000).toLocaleString("es-MX") : ""));
     console.error("  permisos del token: " + (permisos.join(", ") || "(ninguno)"));
     if (faltan.length) console.error("  FALTAN permisos: " + faltan.join(", ") + " → genera el token otra vez marcándolos (después de agregar los casos de uso Messenger e Instagram).");
+    if (out.length && sinToken) console.error("  La página aparece pero sin token de página: suele ser por los permisos que faltan arriba; si no falta ninguno, revisa que renovacell-sistema tenga la página con Control total.");
+    if (out.length && sinIg) console.error("  Sin Instagram vinculado a la página: conéctalo desde la página de Facebook (Configuración → Cuentas vinculadas → Instagram) con una cuenta profesional, o falta instagram_basic en el token.");
     for (const f of fallos) console.error("  Meta dijo (" + f + ")");
   }
   console.log([...new Set(out)].join("\n"));
