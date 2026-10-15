@@ -1,32 +1,16 @@
-# register-doctor — Auto-registro del doctor con verificación SEP instantánea
+# register-doctor — Auto-registro del doctor (verificación manual)
 
-Endpoint PÚBLICO (`--no-verify-jwt`). El doctor se registra (nombre + correo + cédula +
-contraseña) y aquí, del lado servidor:
-1. anti-spam (honeypot `website`) + validación,
-2. verifica la cédula contra el registro (SEP/RENAPO) con el MISMO criterio que
-   `verify-cedula` (match de nombre + profesión médica + score),
-3. según el dictamen:
-   - **auto** → crea la cuenta ya **verificada** con esa contraseña (el doctor entra al
-     instante) + avisa a Dirección,
-   - **review** / **reject** → deja un **prospecto** para Dirección (sin cuenta) y
-     devuelve el motivo,
-   - **exists** → el correo ya tiene cuenta (que inicie sesión).
+Endpoint PÚBLICO (`--no-verify-jwt`). El doctor se registra desde la landing (nombre, correo, cédula, celular,
+domicilio opcional, aviso de privacidad y fotos del INE por ambos lados) y aquí, del lado servidor:
 
-Devuelve `{ decision }` (+ `reasons` en review/reject). El cliente (`useAuth.register`)
-inicia sesión automáticamente cuando el dictamen es `auto`.
+1. anti-spam (honeypot `website`), validación y limitador por IP y global,
+2. si el correo ya tiene cuenta → `exists`,
+3. crea la cuenta **siempre en revisión** (`verified = false`, `verification.status = 'pending'`),
+4. guarda las fotos del INE en el bucket privado `proofs` (`identity/<uid>/ine-front|ine-back.<ext>`),
+5. avisa a Dirección.
 
-## Flujo completo
-Landing "Acceso médico" → sistema (Login) → "Verifica tu cédula y crea tu cuenta" →
-`register-doctor` → **auto: entra al portal** · **review: a revisión de Dirección** ·
-**reject: motivo**.
+Devuelve `{ decision: 'pending', reasons }` o `{ decision: 'exists', message }`.
 
-## Consulta al registro (mismo SEAM que verify-cedula)
-Con `CEDULA_API_URL` + `CEDULA_API_KEY` configurados, consulta el proveedor real
-(RENAPO/KYC); sin ellos, usa el **simulador** (último dígito: 0→no existe, 9→no médico,
-8→a nombre de otro, resto→médico). Ver `../verify-cedula/README.md`.
-
-## Nota de endurecimiento (producción)
-Crea cuentas verificadas desde un endpoint público: el gate es la verificación SEP
-(cédula real + nombre coincide). Para producción conviene sumar **rate-limiting /
-captcha** y, opcionalmente, anti-suplantación (OCR de cédula/INE + selfie). El honeypot
-y la validación cubren lo básico.
+**Sin verificación automática** (decisión del dueño, oct 2026): no se consulta la SEP ni ningún proveedor KYC y no
+se pide selfie. Aprueba una persona: Dirección (Doctores → Revisar / Aprobar) o su vendedor desde el chat
+(`doctor_verificar`). Con la cuenta pendiente el doctor entra al portal sin precios.

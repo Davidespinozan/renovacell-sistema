@@ -3,7 +3,7 @@
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
-import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, Sparkles, ScanSearch, ScanFace, IdCard } from 'lucide-react'
+import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { UserAvatar } from '../../app/UserAvatar'
 import { ConfirmModal } from '../../app/ConfirmModal'
@@ -22,15 +22,10 @@ import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
-import type { VerifyDecision } from '../../data/verification/decide'
 
-const verifyResultOf = (d: Profile): VerifyDecision | null => ((d.meta as Record<string, unknown>)?.verifyResult as VerifyDecision) ?? null
-
-// ---- Verificación de IDENTIDAD (KYC · Nubarium): resultado + evidencia guardada en `proofs`. ----
+// ---- Identificación (INE) que el doctor subió: la revisa una persona (sin verificación automática). ----
 interface IdentityRecord {
-  attempted?: boolean; unavailable?: boolean; status?: 'approved' | 'pending' | 'rejected'
-  live?: boolean; ineValid?: boolean; faceMatch?: number; ineName?: string
-  provider?: string; checkedAt?: string
+  status?: 'approved' | 'pending' | 'rejected'
   evidence?: Record<string, string>
 }
 const identityOf = (d: Profile): IdentityRecord | null => ((d.meta as Record<string, unknown>)?.identity as IdentityRecord) ?? null
@@ -44,17 +39,9 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, approve, reject, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor, autoVerify } = useDoctors()
+  const { data: doctors, approve, reject, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
   const { data: customers } = useCustomers()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [flash, setFlash] = useState<{ name: string; res: VerifyDecision } | null>(null)
-  const runAutoVerify = async (id: string, name: string) => {
-    setBusyId(id)
-    const res = await autoVerify(id)
-    setBusyId(null)
-    if (res) setFlash({ name, res })
-  }
   // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
   const doDeleteDoctor = async (id: string) => {
     const r = await deleteDoctor(id)
@@ -101,7 +88,6 @@ export function Doctores() {
           { key: 'email', label: 'Correo' },
           { key: 'meta', label: 'Cédula', format: (_v, d) => cedulaOf(d) },
           { key: 'verified', label: 'Verificado', format: (v) => (v ? 'Sí' : 'No') },
-          { key: 'meta', label: 'Score IA', format: (_v, d) => verifyResultOf(d)?.score ?? '' },
           { key: 'id', label: 'Pedidos', format: (v) => orderCount[v as string] ?? 0 },
         ]} />
       </div>
@@ -109,22 +95,7 @@ export function Doctores() {
       {pendientes > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>
           <div className="ico"><Clock size={20} /></div>
-          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Usa <b>Validar cédula (IA + SEP)</b> para reunir evidencia; la aprobación (con cliente vinculado) es manual en <b>Revisar / Aprobar</b>.</div>
-        </div>
-      )}
-
-      {flash && (
-        <div className="sysnote" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: flash.res.decision === 'auto' ? 'var(--ok-bg)' : flash.res.decision === 'review' ? 'var(--warn-bg)' : 'var(--danger-bg)', borderColor: 'transparent' }}>
-          {flash.res.decision === 'auto' ? <ShieldCheck size={18} style={{ color: 'var(--green-deep)', flex: 'none' }} /> : <ScanSearch size={18} style={{ color: flash.res.decision === 'review' ? 'var(--warn)' : 'var(--danger)', flex: 'none' }} />}
-          <div style={{ flex: 1 }}>
-            <b>{flash.name} · {flash.res.decision === 'auto' ? 'Validación OK (pendiente de aprobar)' : flash.res.decision === 'review' ? 'Enviado a revisión' : 'Rechazado'}</b>
-            <span style={{ color: 'var(--ink-3)' }}> · score {flash.res.score}% · nombre {flash.res.nameMatch}% · {flash.res.isMedical ? 'profesión médica' : 'no médica'}</span>
-            <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--ink-2)' }}>
-              {flash.res.reasons.map((r, i) => <li key={i}>{r}</li>)}
-            </ul>
-            {flash.res.sep.found && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>Registro SEP: {flash.res.sep.name} · {flash.res.sep.profession}{flash.res.sep.institution ? ` · ${flash.res.sep.institution}` : ''}</div>}
-          </div>
-          <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setFlash(null)}><X size={15} /></button>
+          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Revisa su cédula y las fotos de su INE en <b>Revisar / Aprobar</b> (ahí también se vincula su ficha de cliente).</div>
         </div>
       )}
 
@@ -189,16 +160,10 @@ export function Doctores() {
               </>
             ) : cedulaOf(d) ? (
               <>
-                {identityOf(d)?.attempted && identityOf(d)?.status !== 'approved' && (
-                  <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanFace size={12} /> Identidad por revisar</span>
-                )}
-                {verifyResultOf(d)?.decision === 'review' && (
-                  <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanSearch size={12} /> Revisión IA · {verifyResultOf(d)?.score}%</span>
-                )}
-                <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busyId === d.id} onClick={() => runAutoVerify(d.id, d.full_name ?? 'Doctor')}>
-                  <Sparkles size={14} /> {busyId === d.id ? 'Validando…' : 'Validar cédula (IA + SEP)'}
-                </button>
-                <button className="btn ghost sm" type="button" title="Revisar y aprobar (vincula cliente)" onClick={() => setDetailId(d.id)}>
+                {Object.keys(identityOf(d)?.evidence ?? {}).length > 0
+                  ? <span className="pill p-warn" style={{ display: 'inline-flex', gap: 5 }}><ScanFace size={12} /> INE por revisar</span>
+                  : <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><IdCard size={12} /> Sin INE</span>}
+                <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} title="Revisar y aprobar (vincula cliente)" onClick={() => setDetailId(d.id)}>
                   <UserCheck size={14} /> Revisar / Aprobar
                 </button>
               </>
@@ -272,10 +237,9 @@ function EditDoctorModal({ initial, onClose, onSave }: { initial: { name: string
   )
 }
 
-// Panel de identidad: muestra el dictamen del proveedor KYC (prueba de vida, INE, match
-// biométrico) y la EVIDENCIA (selfie + INE) con URL firmada del bucket privado `proofs`.
-// El botón "Verificar doctor" del modal es el que aprueba tras revisar esto.
-const EVID_LABELS: Record<string, string> = { selfie: 'Selfie', 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso' }
+// Panel de identificación: las fotos del INE que subió el doctor (enlace firmado del bucket privado `proofs`). Una
+// persona coteja nombre y foto con su registro y su cédula; el botón "Verificar doctor" del modal es el que aprueba.
+const EVID_LABELS: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso' }
 function IdentityReview({ doctor }: { doctor: Profile }) {
   const id = identityOf(doctor)
   const [urls, setUrls] = useState<Record<string, string>>({})
@@ -283,7 +247,7 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
   const evidenceKey = JSON.stringify(evidence)
   useEffect(() => {
     let alive = true
-    const entries = Object.entries(evidence)
+    const entries = Object.entries(evidence).filter(([k]) => EVID_LABELS[k])
     if (entries.length === 0) { setUrls({}); return }
     Promise.all(entries.map(([k, path]) =>
       supabase.storage.from('proofs').createSignedUrl(path, 600).then((r) => [k, r.data?.signedUrl ?? ''] as const),
@@ -297,48 +261,31 @@ function IdentityReview({ doctor }: { doctor: Profile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctor.id, evidenceKey])
 
-  if (!id || !id.attempted) return null
-  const fm = Math.round((id.faceMatch ?? 0) * 100)
-  const chip = (ok: boolean | undefined, label: string) => (
-    <span className={'pill ' + (ok === true ? 'p-ok' : ok === false ? 'p-dang' : 'p-warn')} style={{ display: 'inline-flex', gap: 5 }}>
-      {ok === true ? '✓' : ok === false ? '✕' : '—'} {label}
-    </span>
-  )
-  const manual = id.unavailable || id.provider === 'sin-proveedor'
+  const fotos = ['ine-front', 'ine-back'].filter((k) => evidence[k])
   return (
-    <div className="sysnote" style={{ display: 'block', background: '#F7F8F5', color: 'var(--ink-2)', border: '1px solid var(--line)', marginBottom: 14 }}>
+    <div className="sysnote" data-testid="identificacion-ine" style={{ display: 'block', background: '#F7F8F5', color: 'var(--ink-2)', border: '1px solid var(--line)', marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <ScanFace size={16} style={{ color: 'var(--green-deep)' }} />
-        <b style={{ fontSize: 13 }}>Verificación de identidad (KYC)</b>
-        <span className={'pill ' + (id.status === 'approved' ? 'p-ok' : 'p-warn')} style={{ marginLeft: 'auto' }}>
-          {id.status === 'approved' ? 'Aprobada' : 'En revisión'}
-        </span>
+        <IdCard size={16} style={{ color: 'var(--green-deep)' }} />
+        <b style={{ fontSize: 13 }}>Identificación (INE)</b>
       </div>
-      {manual ? (
-        <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 10 }}>
-          <IdCard size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-          Revisión manual: coteja el nombre y la foto del INE con los datos del registro y la cédula antes de aprobar.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          {chip(id.live, 'Prueba de vida')}
-          {chip(id.ineValid, 'INE válido')}
-          {chip((id.faceMatch ?? 0) >= 0.85, `Rostro ${fm}%`)}
-          {id.provider && <span className="pill p-neu">{id.provider}</span>}
+      <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: fotos.length ? 10 : 0 }}>
+        {fotos.length
+          ? 'Coteja el nombre y la foto del INE con los datos del registro y la cédula antes de aprobar.'
+          : 'Sin fotos del INE: pídeselas por el chat o que las suba en "Mi verificación" antes de aprobar.'}
+      </div>
+      {fotos.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+          {fotos.map((k) => (
+            <a key={k} href={urls[k] ?? undefined} target="_blank" rel="noopener" title={`Abrir ${EVID_LABELS[k]}`}
+              style={{ display: 'block', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', background: '#000', aspectRatio: '8/5', position: 'relative' }}>
+              {urls[k]
+                ? <img src={urls[k]} alt={EVID_LABELS[k]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 11 }}>Cargando…</div>}
+              <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10.5, padding: '3px 6px', textAlign: 'center' }}>{EVID_LABELS[k]}</span>
+            </a>
+          ))}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-        {['selfie', 'ine-front', 'ine-back'].filter((k) => evidence[k]).map((k) => (
-          <a key={k} href={urls[k] ?? undefined} target="_blank" rel="noopener" title={`Abrir ${EVID_LABELS[k]}`}
-            style={{ display: 'block', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', background: '#000', aspectRatio: '3/4', position: 'relative' }}>
-            {urls[k]
-              ? <img src={urls[k]} alt={EVID_LABELS[k]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 11 }}>Cargando…</div>}
-            <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10.5, padding: '3px 6px', textAlign: 'center' }}>{EVID_LABELS[k]}</span>
-          </a>
-        ))}
-      </div>
-      {id.ineName && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Nombre en el INE: <b>{id.ineName}</b></div>}
     </div>
   )
 }

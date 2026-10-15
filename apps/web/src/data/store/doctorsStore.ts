@@ -9,11 +9,10 @@ import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
-import { decideVerification, simulateSep, type VerifyDecision } from '../verification/decide'
 import { buildVerificationMeta, type VerificationStatus } from '../ops/verification'
 import type { CustomerFields } from './customersStore'
 import type { Json } from '../database.types'
-import { confirmar, reportarFallo, type Escritura } from './escritura'
+import { confirmar, type Escritura } from './escritura'
 
 // Merge no destructivo del bloque meta.verification (estado legible; la autoridad de
 // acceso sigue siendo profiles.verified). No borra otras llaves de meta.
@@ -95,51 +94,6 @@ export async function setCedula(id: string, cedula: string): Promise<Escritura> 
   }
   live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta } : d)))
   logAudit({ actor: 'Administración', action: 'Cédula registrada', resource: doc.full_name ?? id })
-  return { ok: true }
-}
-
-// VERIFICACIÓN AUTOMÁTICA (IA + SEP). Con backend llama a la Edge Function
-// `verify-cedula` (consulta el registro oficial + OCR vía proveedor y decide); en demo
-// usa el simulador. Aplica la decisión: `auto` verifica; `review`/`reject` guardan el
-// resultado de la IA en meta (cola de revisión de Dirección) sin dar acceso.
-export async function autoVerify(id: string): Promise<VerifyDecision | null> {
-  const doc = live.current().find((d) => d.id === id)
-  if (!doc) return null
-  const cedula = ((doc.meta?.cedula as string) ?? '').trim()
-  const name = doc.full_name ?? ''
-  if (!cedula) return null
-  let result: VerifyDecision
-  if (hasSupabase && isUuid(id)) {
-    const { data, error } = await supabase.functions.invoke('verify-cedula', { body: { cedula, name } })
-    if (error || !data) { reportarFallo(`verificar la cédula de ${name}`, 'El servicio de verificación no respondió. Puedes revisar la cédula manualmente.', true); return null }
-    result = data as VerifyDecision
-  } else {
-    result = decideVerification(name, simulateSep(cedula, name))
-  }
-  await applyVerifyDecision(id, result)
-  return result
-}
-
-async function applyVerifyDecision(id: string, result: VerifyDecision): Promise<Escritura> {
-  const doc = live.current().find((d) => d.id === id)
-  if (!doc) return { ok: false, error: 'Doctor no encontrado.', ambiguous: false }
-  // POLÍTICA Fase 1: la auto-verificación (IA+SEP) es EVIDENCIA, NO concede acceso. El
-  // acceso lo da SOLO la aprobación manual con cliente vinculado (approveDoctor). Aquí se
-  // guarda el dictamen y, si salió verde, se marca auto_ok para que el admin lo vea.
-  const autoOk = result.decision === 'auto'
-  const meta = { ...((doc.meta ?? {}) as Record<string, unknown>), verifyResult: result, verification: { status: 'pending', auto_ok: autoOk } }
-  if (hasSupabase && isUuid(id)) {
-    const r = await confirmar(`guardar el dictamen de verificación de ${doc.full_name ?? 'el doctor'}`,
-      supabase.from('profiles').update({ meta: meta as unknown as Json }).eq('id', id))
-    if (!r.ok) { void live.reload(); return r }
-  }
-  live.setLocal(live.current().map((d) => (d.id === id ? { ...d, meta: meta as unknown as Profile['meta'] } : d)))
-  logAudit({
-    actor: 'Verificación IA',
-    action: autoOk ? 'Validación IA OK (pendiente de aprobación)' : result.decision === 'review' ? 'Verificación enviada a revisión' : 'Verificación rechazada',
-    resource: doc.full_name ?? id, detail: `score ${result.score}`,
-  })
-  notify({ text: autoOk ? `Validación automática OK, pendiente de aprobar: ${doc.full_name}` : `Verificación a revisión: ${doc.full_name}`, roles: ['admin'], screen: 'av_verif' })
   return { ok: true }
 }
 

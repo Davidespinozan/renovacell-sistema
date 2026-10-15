@@ -3,7 +3,6 @@
 import { describe, it, expect } from 'vitest'
 import shippingSrc from '../../../../../supabase/functions/shipping/index.ts?raw'
 import assistantSrc from '../../../../../supabase/functions/assistant/index.ts?raw'
-import cedulaSrc from '../../../../../supabase/functions/verify-cedula/index.ts?raw'
 
 describe('A-03 · shipping exige usuario + rol de logística antes de llamar al agregador', () => {
   it('resuelve al llamante (W6-A1: resolverQuien) y whitelist admin/warehouse/packing', () => {
@@ -33,11 +32,5 @@ describe('A-04 · assistant: modo doctor exige sesión, topa entradas y no filtr
   it('el catch NO devuelve el mensaje interno del error', () => {
     expect(assistantSrc).not.toMatch(/\(e as Error\)\.message/)
     expect(assistantSrc).toMatch(/No se pudo contactar al asistente/)
-  })
-})
-
-describe('A-05 · verify-cedula: el doctor se coteja contra el nombre de SU perfil', () => {
-  it('usa prof.full_name para el doctor, no el name del cliente', () => {
-    expect(cedulaSrc).toMatch(/isDoctor \? \(prof\?\.full_name \?\? ''\) : \(payload\.name \?\? ''\)/)
   })
 })

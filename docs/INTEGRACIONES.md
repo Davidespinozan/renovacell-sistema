@@ -95,7 +95,9 @@ correo con el enlace mágico (el usuario de auth SÍ se crea vía `invite-doctor
 
 ## 6. Verificación de identidad (KYC · Nubarium) — que quien se registra ES el doctor
 
-**Hoy:** el registro valida la **cédula** contra el registro oficial (seam `CEDULA_API_*`
+> RETIRADO el 15 oct 2026: la verificación es manual (ver docs/verificacion-kyc.md). Lo de abajo es historia.
+
+**Antes:** el registro validaba la **cédula** contra el registro oficial (seam `CEDULA_API_*`
 en `register-doctor`) y captura **selfie + INE**, pero la capa **biométrica** (prueba de
 vida + validez del INE + match selfie↔INE) corre en modo *sin proveedor*: toda cuenta
 con identidad adjunta queda **EN REVISIÓN** para que Dirección apruebe viendo la evidencia
@@ -170,7 +172,7 @@ salida requiere **plantillas pre-aprobadas**. Recibir es gratis; WhatsApp cobra 
 | Paquetería | `SHIPPING_API_KEY` |
 | IA | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 | Correo | SMTP en Supabase Auth |
-| Cédula (SEP) | `CEDULA_API_URL`, `CEDULA_API_KEY` |
-| Identidad KYC (Nubarium) | `IDENTITY_API_URL`, `IDENTITY_API_KEY` |
+| ~~Cédula (SEP)~~ | RETIRADO (verificación manual) |
+| ~~Identidad KYC (Nubarium)~~ | RETIRADO (verificación manual) |
 | Multicanal Meta (entrada) | `META_VERIFY_TOKEN`, `META_APP_SECRET` |
 | Multicanal Meta (salida, pendiente) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` |

@@ -104,8 +104,8 @@ supabase secrets set NOMBRE=valor
 
 | Servicio | Secrets | Activa |
 |---|---|---|
-| **Identidad (Nubarium)** | `IDENTITY_API_URL`, `IDENTITY_API_KEY` | Auto-verificación biométrica en `register-doctor` |
-| **Cédula (SEP)** | `CEDULA_API_URL`, `CEDULA_API_KEY` | Validación real de cédula |
+| ~~Identidad (Nubarium)~~ | — | RETIRADO (verificación manual, 15 oct 2026) |
+| ~~Cédula (SEP)~~ | — | RETIRADO (verificación manual, 15 oct 2026) |
 | **Pagos** | (según Conekta/Stripe) | Cobro en línea |
 | **CFDI / Paquetería / SMTP** | — | Factura, guías, correos |
 

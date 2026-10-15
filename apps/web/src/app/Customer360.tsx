@@ -143,8 +143,6 @@ function Resumen({ d, irA }: { d: Cliente360; irA: (t: Pestana) => void }) {
             <Field label="Especialidad" value={d.profesional.especialidad} />
             <Field label="Organización" value={d.profesional.organizacion} />
             <Field label="Verificación" value={estadoVerificacion(d).label} />
-            {d.profesional.sep && <Field label="SEP" value={[d.profesional.sep.decision, d.profesional.sep.score != null ? `score ${d.profesional.sep.score}` : null].filter(Boolean).join(' · ') as string} />}
-            {d.profesional.identidad && <Field label="Identidad" value={String(d.profesional.identidad.status ?? '—')} note="la evidencia vive en Por verificar" />}
             <Field label="Último acceso" value={d.profesional.ultimo_acceso ? new Date(d.profesional.ultimo_acceso).toLocaleString('es-MX') : null} />
           </div>
         </Section>

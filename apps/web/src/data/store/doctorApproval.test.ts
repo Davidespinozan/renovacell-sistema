@@ -12,7 +12,6 @@ import appSrc from '../../App.tsx?raw'
 import doctorsStoreSrc from './doctorsStore.ts?raw'
 import hardeningSrc from '../../../../../supabase/migrations/20260706194143_security_hardening.sql?raw'
 import registerDoctorSrc from '../../../../../supabase/functions/register-doctor/index.ts?raw'
-import verifyCedulaSrc from '../../../../../supabase/functions/verify-cedula/index.ts?raw'
 import approvalRpcSrc from '../../../../../supabase/migrations/20261005120000_doctor_approval_rpc.sql?raw'
 
 const find = (id: string) => getSnapshot().find((d) => d.id === id)
@@ -103,12 +102,10 @@ describe('política — TODO registro queda pending; auto-validación es solo ev
     expect(registerDoctorSrc).not.toMatch(/return json\(200, \{ decision: 'auto' \}\)/)
     expect(registerDoctorSrc).toMatch(/verification: \{ status: 'pending'/)
   })
-  it('verify-cedula ya NO flipa verified server-side (evidencia, no acceso)', () => {
-    expect(verifyCedulaSrc).not.toMatch(/patch\.verified = true/)
-    expect(verifyCedulaSrc).toMatch(/verified NO se toca/)
-  })
-  it('la auto-validación del cockpit NO concede acceso (solo evidencia)', () => {
-    expect(doctorsStoreSrc).toMatch(/es EVIDENCIA, NO concede acceso/)
+  it('sin verificación automática: ni la Edge verify-cedula ni el botón "Validar cédula (IA + SEP)" (decisión del dueño)', () => {
+    expect(doctorsStoreSrc).not.toMatch(/verify-cedula|autoVerify/)
+    expect(doctoresSrc).not.toMatch(/IA \+ SEP|Score IA|autoVerify/)
+    expect(registerDoctorSrc).not.toMatch(/CEDULA_API|IDENTITY_API|p\.selfie|imgs\.selfie/)
   })
   it('el RPC de aprobación es admin-only, security definer y bloquea customer ya vinculado', () => {
     expect(approvalRpcSrc).toMatch(/security definer/)

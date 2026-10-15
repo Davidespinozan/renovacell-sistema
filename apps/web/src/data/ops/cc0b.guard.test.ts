@@ -101,11 +101,12 @@ describe('capture-lead · límite antes de la base, dedupe indexado', () => {
 
 describe('register-doctor · límite antes de Auth/Storage/proveedores', () => {
   const s = codigo(registerSrc)
-  it('H · limitar tras honeypot y validación de forma, antes del pre-chequeo de perfiles, SEP, createUser y Storage; con telemetría A3.3', () => {
+  it('H · limitar tras honeypot y validación de forma, antes del pre-chequeo de perfiles, createUser y Storage (sin SEP: verificación manual); con telemetría A3.3', () => {
     const h = s.indexOf('Deno.serve(conCors(')
-    const hp = s.indexOf('honeypot', h); const lim = s.indexOf('limitarTodas(admin', h); const dup = s.indexOf(".ilike('email', email)", h); const sep = s.indexOf('lookupSep(', h); const cu = s.indexOf('auth.admin.createUser', h)
+    const hp = s.indexOf('honeypot', h); const lim = s.indexOf('limitarTodas(admin', h); const dup = s.indexOf(".ilike('email', email)", h); const cu = s.indexOf('auth.admin.createUser', h)
     expect(h).toBeGreaterThan(0); expect(hp).toBeGreaterThan(h); expect(lim).toBeGreaterThan(hp)
-    for (const x of [dup, sep, cu]) expect(x).toBeGreaterThan(lim)
+    for (const x of [dup, cu]) expect(x).toBeGreaterThan(lim)
+    expect(s).not.toMatch(/lookupSep\(/)
     // La telemetría A3.3 se inyecta cuando el archivo ya la tiene (A3.3 va en su propio rollout).
     if (/_shared\/observa/.test(s)) expect(s).toMatch(/\{ reportar: obs \}/)
     else expect(s).not.toMatch(/reportar/)
@@ -113,7 +114,7 @@ describe('register-doctor · límite antes de Auth/Storage/proveedores', () => {
   })
   it('conserva honeypot, verificación humana (nunca verified: true) y la instrumentación A3.3', () => {
     expect(s).toMatch(/honeypot/); expect(s).not.toMatch(/verified: true/)
-    if (/_shared\/observa/.test(s)) { expect(s).toMatch(/obs\('sep', 'provider_error'/); expect(s).toMatch(/obs\('crear_cuenta', 'internal_error'/) }
+    if (/_shared\/observa/.test(s)) expect(s).toMatch(/obs\('crear_cuenta', 'internal_error'/)
     expect(s).not.toMatch(/'Access-Control-Allow-Origin': '\*'/)
   })
 })
@@ -126,7 +127,7 @@ describe('CORS · inventario y webhooks', () => {
       if (/'Access-Control-Allow-Origin': '\*'/.test(src)) conAsterisco.push(nombre(p))
     }
     // CC-1 añade `visitor` (nace ya con la lista blanca).
-    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invitacion', 'invite-doctor', 'meta-send', 'push', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verificacion', 'verify-cedula', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
+    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invitacion', 'invite-doctor', 'meta-send', 'push', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verificacion', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
     for (const f of conHelper) expect(conAsterisco, f).not.toContain(f)
     expect(conAsterisco).toEqual([])   // CC-0B.2 cerrado en el preflight: ninguna Edge conserva '*'
   })

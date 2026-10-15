@@ -3240,7 +3240,7 @@ document.addEventListener('keydown', e => {
      lenguaje de "cotización/24h". Aditivo, por selector/texto (robusto). -->
 <script>
 (function(){
-  var GO='#contacto'; // el sistema: registro con verificación SEP → portal
+  var GO='#contacto'; // el sistema: registro (verificación manual por Renovacell) → portal
   function T(root,rx){return [].slice.call(document.querySelectorAll(root)).filter(function(e){return rx.test((e.textContent||'').trim())});}
   function run(){
     try{
@@ -3389,8 +3389,8 @@ document.addEventListener('keydown', e => {
     if(d.password.length<6) return say('err','La contraseña debe tener al menos 6 caracteres.');
     if(!d.ineFront || !d.ineBack) return say('err','Sube la foto de tu INE por ambos lados (frente y reverso) para verificar tu identidad.');
 
-    btn.disabled=true; btn.textContent='Verificando…';
-    say('wait','Validando tu cédula e identidad…');
+    btn.disabled=true; btn.textContent='Enviando…';
+    say('wait','Enviando tu registro…');
 
     fetch(U+'/functions/v1/register-doctor',{
       method:'POST',
@@ -3401,10 +3401,6 @@ document.addEventListener('keydown', e => {
     .then(function(r){
       listo();
       if(r && r.error) return say('err', esc(r.error));
-      if(r && r.decision==='auto'){
-        f.reset();
-        return say('ok','<b>Identidad verificada.</b> Tu cuenta ya está activa. <a href="/sistema">Entrar al portal →</a>');
-      }
       if(r && r.decision==='exists'){
         return say('wait', esc(r.message||'Ese correo ya tiene una cuenta.')+' <a href="/sistema">Iniciar sesión →</a>');
       }

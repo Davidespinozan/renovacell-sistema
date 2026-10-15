@@ -10,7 +10,6 @@ import limiteSrc from '../../../../../supabase/functions/_shared/limite.ts?raw'
 import captureSrc from '../../../../../supabase/functions/capture-lead/index.ts?raw'
 import registerSrc from '../../../../../supabase/functions/register-doctor/index.ts?raw'
 import roleSrc from '../../auth/RoleContext.tsx?raw'
-import useAuthSrc from '../../auth/useAuth.ts?raw'
 import opsSrc from './visitante.ts?raw'
 import landingSrc from '../../../public/landing/index.html?raw'
 
@@ -108,10 +107,10 @@ describe('capture-lead / register-doctor · posesión, no correo', () => {
     expect(liga).toBeGreaterThan(dup)
     expect(s).toMatch(/\.select\('id'\)\.single\(\)/)
   })
-  it('register-doctor: liga prospectos por posesión y deja el vínculo del registro con el uid creado; sin tocar verified ni SEP', () => {
+  it('register-doctor: deja el vínculo del registro con el uid creado (posesión); siempre en revisión, sin SEP ni KYC', () => {
     const s = codigo(registerSrc)
     expect(s).toMatch(/cc_visitante_vincular_registro', \{ p_hash: visitorHash, p_profile: uid \}/)
-    expect((s.match(/await ligarProspecto\(pr\?\.id\)/g) ?? []).length).toBe(2)
+    expect(s).not.toMatch(/CEDULA_API|IDENTITY_API|lookupSep|lookupIdentity/)
     expect(s).toMatch(/verified: false/); expect(s).not.toMatch(/verified: true/)
     expect(s).not.toMatch(/p_profile: p\.|p_profile: email/)
   })
@@ -122,10 +121,6 @@ describe('frontend · integración silenciosa', () => {
     const r = codigo(roleSrc)
     expect(r).toMatch(/if \(active\) void \(s \? adoptarVisitante\(\) : abrirVisitante\(\)\)/)
     expect(r).toMatch(/else if \(event === 'SIGNED_IN'\) void adoptarVisitante\(\)/)
-  })
-  it('useAuth.register manda visitor_token (posesión), no un visitor_id', () => {
-    const u = codigo(useAuthSrc)
-    expect(u).toMatch(/visitor_token: leerTokenVisitante\(\)/); expect(u).not.toMatch(/visitor_id/)
   })
   it('ops: nunca manda profile_id/visitor_id; usa localStorage con la llave rc_visitor', () => {
     const o = codigo(opsSrc)

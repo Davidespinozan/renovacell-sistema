@@ -136,7 +136,7 @@ describe('CX-0B · portal.renovacell.mx por alcance', () => {
     const base = new URL('../../../../../supabase/functions/', import.meta.url)
     const LANDING = ['assistant', 'capture-lead']
     const APP = ['cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invite-doctor',
-      'meta-send', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verify-cedula', 'visitor']
+      'meta-send', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'visitor']
     for (const f of [...LANDING, ...APP]) {
       const src = readFileSync(new URL(`${f}/index.ts`, base), 'utf8')
       expect((src.match(/conCors\(/g) ?? []).length, f).toBe(1)

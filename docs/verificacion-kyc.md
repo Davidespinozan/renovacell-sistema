@@ -1,5 +1,8 @@
 # Verificación de identidad del doctor (KYC)
 
+> **RETIRADO (15 oct 2026, decisión del dueño):** no hay verificación automática. Toda verificación de doctores es MANUAL (Dirección o su vendedor, viendo cédula y fotos del INE). Se retiraron la Edge `verify-cedula`, la consulta SEP y el proveedor KYC (Nubarium) del registro, y la selfie. No configurar `CEDULA_API_*` ni `IDENTITY_API_*`: el código ya no los lee.
+
+
 Objetivo: que **quien se registra ES el doctor**, no solo alguien con sus documentos.
 La cédula sola no prueba identidad — cualquiera podría teclear la cédula de un médico
 real. Por eso encadenamos **cédula + identidad biométrica**.

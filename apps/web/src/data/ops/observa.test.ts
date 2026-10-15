@@ -301,7 +301,7 @@ describe('observa.ts · aislamiento', () => {
 // ───────────────────────── instrumentación de las Edge Functions ─────────────────────────
 const INSTRUMENTADAS: Record<string, number> = {
   shipping: 19, 'cfdi-send': 1, 'cfdi-cancel': 4, 'cfdi-cancel-status': 2, 'cfdi-download': 1,
-  'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 3, 'verify-cedula': 2,
+  'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 1,
   'stripe-webhook': 3, 'meta-webhook': 1, 'report-transfer': 1,
 }
 const NO_INSTRUMENTADAS = ['assistant', 'cfdi', 'invite-doctor', 'stripe-checkout', 'meta-send', 'capture-lead']
@@ -386,7 +386,6 @@ describe('Edge Functions · qué reporta y qué no', () => {
     const meta = soloCodigo(edge('meta-webhook'))
     expect(meta).toMatch(/obs\('procesar', 'internal_error', \{ code: 'exception', error: e \}\)\n\s*throw e/)
     expect(soloCodigo(edge('report-transfer'))).toMatch(/else obs\('comprobante', 'internal_error', \{ code: 'proof_upload_failed'/)
-    for (const fn of ['register-doctor', 'verify-cedula']) expect(soloCodigo(edge(fn)), fn).toMatch(/obs\('sep', 'provider_error', \{ code: r\.status \}\)/)
     expect(soloCodigo(edge('register-doctor'))).toMatch(/obs\('crear_cuenta', 'internal_error', \{ code: 'create_user'/)
   })
   it('M · las verdades operativas no cambian: los sitios reportan y luego devuelven/persisten lo mismo que antes', () => {

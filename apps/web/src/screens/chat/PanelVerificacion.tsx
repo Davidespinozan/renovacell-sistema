@@ -1,10 +1,10 @@
 // VERIF-VENDEDOR · panel dentro de Conversaciones: si quien escribe es un doctor con verificación PENDIENTE y quien
-// atiende puede verificarlo, aquí ve su cédula, el dictamen SEP y las fotos del INE, y lo aprueba o rechaza.
+// atiende puede verificarlo, aquí ve su cédula y las fotos del INE, y lo aprueba o rechaza (sin verificación automática).
 import React, { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { candidatosEnlace as candidatosPorDefecto, capturarCedula as capturarPorDefecto, evidenciaDoctor, pendienteDeConversacion, unirEnlace as unirPorDefecto, verificarDoctor, type CandidatoEnlace, type DoctorPendiente } from '../../data/ops/verificacion'
 
-const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso', selfie: 'Selfie' }
+const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso' }
 
 export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, capturar = capturarPorDefecto, candidatos = candidatosPorDefecto, unir = unirPorDefecto, onCambio, onDoctor, version = 0 }: {
   conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; capturar?: typeof capturarPorDefecto; onCambio?: () => void
@@ -64,7 +64,7 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
       )}
       {Object.keys(fotos).length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-          {Object.entries(fotos).map(([k, u]) => <a key={k} href={u} target="_blank" rel="noreferrer" title={ETIQUETA[k] ?? k} data-testid={`evidencia-${k}`}><img src={u} alt={ETIQUETA[k] ?? k} style={{ width: 110, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}
+          {Object.entries(fotos).filter(([k]) => ETIQUETA[k]).map(([k, u]) => <a key={k} href={u} target="_blank" rel="noreferrer" title={ETIQUETA[k] ?? k} data-testid={`evidencia-${k}`}><img src={u} alt={ETIQUETA[k] ?? k} style={{ width: 110, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}
         </div>
       )}
       {/* CHAT PRO · se registró en otro dispositivo: su conversación del enlace se une a su cuenta (lo decide una persona). */}
