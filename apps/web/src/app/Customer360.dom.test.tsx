@@ -57,6 +57,20 @@ describe('Customer360Page', () => {
     expect(g.args).toMatchObject({ p_customer: 'C1', p_numero: '669 333 4444' })
     expect(llamadas.some((l) => /^(rpc_)?update|insert/.test(l.fn))).toBe(false)
   })
+  it('domicilio sin calle ni CP (traído de Odoo): se marca incompleto; uno completo no', async () => {
+    const base = { doctor_id: null, customer_id: 'C1', exterior_number: null, interior_number: null, neighborhood: null, municipio: null, country: 'México', reference_notes: null, contact_name: null, contact_phone: null, is_default: false, active: true, created_at: '', updated_at: '' }
+    const { c } = falso(ficha({ domicilios: { lista: [
+      { ...base, id: 'd1', name: 'Ocurre DHL Nueva España', tipo: 'OTRO', line1: '', postal_code: '', city: 'Chihuahua', state: '' },
+      { ...base, id: 'd2', name: 'Consultorio', tipo: 'CONSULTORIO', line1: 'Av. Obregón 123', postal_code: '80000', city: 'Culiacán', state: 'Sinaloa' },
+    ], archivados: 0, alta: null } as never }))
+    render(<Customer360Page customerId="C1" onBack={() => {}} cliente={c} atencion={atencionMuda} />)
+    await screen.findByText('Dra. Ruiz')
+    fireEvent.click(screen.getByTestId('tab-domicilios'))
+    const marcas = await screen.findAllByTestId('domicilio-incompleto')
+    expect(marcas).toHaveLength(1)
+    expect(marcas[0]).toHaveTextContent('Falta calle, CP, estado')
+    expect(screen.getAllByTestId('domicilio')).toHaveLength(2)
+  })
   it('sin permisos de edición no hay botones de alta', async () => {
     const { c } = falso(ficha({ rol: 'facturacion', permisos: { contacto: [], telefonos: false, domicilios: false, fiscal: true, notas: false, cartera: false, adoptar_alta: false } }))
     render(<Customer360Page customerId="C1" onBack={() => {}} cliente={c} atencion={atencionMuda} />)

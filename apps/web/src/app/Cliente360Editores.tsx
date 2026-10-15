@@ -72,6 +72,10 @@ export function TelefonosEditor({ customerId, telefonos, editable, cliente, onCa
 }
 
 // ── Domicilios ──────────────────────────────────────────────────────────────
+// Un domicilio sin calle o sin CP (p. ej. los traídos de Odoo, que no los tenían) no sirve para enviar: se avisa aquí y el
+// selector del pedido tampoco lo acepta hasta completarlo.
+const faltanDatos = (l: DoctorLocation): string => [!(l.line1 ?? '').trim() && 'calle', !/^\d{5}$/.test(l.postal_code ?? '') && 'CP', !(l.state ?? '').trim() && 'estado']
+  .filter(Boolean).join(', ')
 type DatosDomicilio = { tipo: string; name: string; line1: string; exterior_number: string; interior_number: string; neighborhood: string; postal_code: string; municipio: string; city: string; state: string; country: string; reference_notes: string; contact_name: string; contact_phone: string }
 const VACIO: DatosDomicilio = { tipo: 'CONSULTORIO', name: '', line1: '', exterior_number: '', interior_number: '', neighborhood: '', postal_code: '', municipio: '', city: '', state: '', country: 'México', reference_notes: '', contact_name: '', contact_phone: '' }
 const deUbicacion = (l: DoctorLocation): DatosDomicilio => Object.fromEntries(Object.keys(VACIO).map((k) => [k, ((l as Record<string, unknown>)[k] ?? (k === 'tipo' ? 'OTRO' : '')) as string])) as DatosDomicilio
@@ -93,7 +97,7 @@ export function DomiciliosEditor({ customerId, lista, archivados = 0, alta, edit
         {lista.map((l) => (
           <div key={l.id} style={fila} data-testid="domicilio">
             <div style={{ flex: 1, minWidth: 220 }}>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{l.name} <span className="pill p-neu" style={{ marginLeft: 4 }}>{etiquetaTipo(l.tipo)}</span>{l.is_default && <span className="pill p-ok" style={{ marginLeft: 4 }}>Predeterminado</span>}</div>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{l.name} <span className="pill p-neu" style={{ marginLeft: 4 }}>{etiquetaTipo(l.tipo)}</span>{l.is_default && <span className="pill p-ok" style={{ marginLeft: 4 }}>Predeterminado</span>}{faltanDatos(l) && <span className="pill p-warn" style={{ marginLeft: 4 }} data-testid="domicilio-incompleto">Falta {faltanDatos(l)}</span>}</div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{lineaDomicilio(l)}</div>
               {(l.contact_name || l.contact_phone || l.reference_notes) && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{[l.contact_name, l.contact_phone, l.reference_notes].filter(Boolean).join(' · ')}</div>}
             </div>
