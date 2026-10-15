@@ -120,7 +120,7 @@ describe('frontend', () => {
     const r = codigo(rolesSrc)
     expect(r).toMatch(/'conversaciones'/); expect(r).toMatch(/key: 'conversaciones', label: 'Atender conversaciones'/)
     expect(r).toMatch(/\{ key: 'chat_cc', label: 'Habla con Renovacell', icon: 'chat' \}/)   // UX-1 · un solo módulo conversacional
-    expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido \/>,\n\s+mi_verificacion: \(\) => <MiVerificacion \/>,[^\n]*\n\s+asesorias: \(\) => <AsesoriasPantalla \/>/)   // CC-7 · Dirección vs vendedor
+    expect(codigo(registrySrc)).toMatch(/chat_cc: \(\) => <ChatCanonico embebido barra=\{<BotonAvisos \/>\} \/>,\n\s+mi_verificacion: \(\) => <MiVerificacion \/>,[^\n]*\n\s+asesorias: \(\) => <AsesoriasPantalla \/>/)   // CC-7 · Dirección vs vendedor
     expect(r).toMatch(/key: 'nuevos_clientes', label: 'Recibir clientes nuevos'/); expect(codigo(registrySrc)).toMatch(/av_atencion: \(\) => <AtencionComercialPantalla \/>/)
   })
   // Decisión del dueño (10 oct 2026): en la landing SOLO atiende el agente de orientación. La conversación

@@ -10,6 +10,7 @@ import { supabase, hasSupabase } from '../../lib/supabase'
 import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, type CampoPrerregistro, type DatosPrerregistro } from '../../data/ops/visitante'
 import { ChatCanonico } from './ChatCanonico'
 import { TarjetaVerificarme } from './TarjetaVerificarme'
+import { BotonAvisos } from '../../app/BotonAvisos'
 import { urlEnlaceContacto } from '../../data/ops/contactoEnlace'
 import type { ClienteChat } from '../../data/ops/chat'
 
@@ -60,6 +61,7 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
             {conCuenta
               ? <a href="/sistema" className="rc-barra--fuerte" data-testid="ir-portal"><BadgeCheck size={15} /> Ir a mi portal</a>
               : <button type="button" className="rc-barra--fuerte" onClick={() => setVerificando(true)} data-testid="ir-verificacion"><BadgeCheck size={15} /> Verificar mi cuenta</button>}
+            <BotonAvisos />
             <a href={URL_LANDING} data-testid="ir-landing"><Globe size={15} /> Conocer Renovacell</a>
           </>} />
       ) : (

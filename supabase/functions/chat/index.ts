@@ -26,6 +26,8 @@ import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_sha
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
 import { TEXTO_IMAGEN, idImagen, conAdjuntos, conLecturaAjena } from '../_shared/adjuntos.ts'
+import { configPush, destinosDe, armarAviso, enviarAvisos } from '../_shared/push.ts'
+import webpush from 'npm:web-push@3.6.7'
 import { derivarActor, validarContenido, validarClientId, mapearErrorChat, IA_PUEDE } from '../_shared/chat.ts'
 // CC-4 · el adaptador mínimo de CC-2 se sustituye por el orquestador (módulos puros inyectados).
 import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
@@ -161,6 +163,7 @@ Deno.serve(conCors(async (req) => {
     if (!r.idempotente && actor.actor === 'visitor' && (r.modo === 'ai_active' || r.modo === 'human_offered')) {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
+    if (!r.idempotente) enSegundoPlano(avisarPush(admin, conv, actor.actor, c.texto))   // AVISOS · al teléfono del otro lado
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {
@@ -191,6 +194,7 @@ Deno.serve(conCors(async (req) => {
     if (actor.actor === 'visitor' && (r.modo === 'ai_active' || r.modo === 'human_offered')) {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
+    enSegundoPlano(avisarPush(admin, conv, actor.actor, TEXTO_IMAGEN))
     return json(200, { ...r, ia: 'omitida' })
   }
   if (action === 'solicitar_asesor') {
@@ -293,4 +297,31 @@ async function leerInterno(admin: any, conv: string, hastaSeq: number, limite: n
   const { data, error } = await admin.rpc('cc_ia_contexto', { p_conv: conv, p_hasta_seq: hastaSeq, p_limite: limite })
   if (error) throw new Error('contexto_ia')
   return ((data ?? []) as Array<{ actor: string; content: string }>).map((m) => ({ actor: m.actor, content: m.content }))
+}
+
+// AVISOS PUSH · tras un mensaje humano, avisa al teléfono del otro lado (asesor ↔ cliente). Nunca bloquea ni rompe el
+// envío: sin llaves configuradas no hace nada; un fallo de entrega solo queda registrado en el dispositivo.
+// deno-lint-ignore no-explicit-any
+function enSegundoPlano(p: Promise<unknown>) { const er = (globalThis as any).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p.catch(() => {})); else void p.catch(() => {}) }
+// deno-lint-ignore no-explicit-any
+async function avisarPush(admin: any, conv: string, actor: string, texto: string): Promise<void> {
+  const cfg = configPush((k) => Deno.env.get(k))
+  if (!cfg) return
+  const { data: c } = await admin.from('cc_conversations').select('profile_id, visitor_id, seller_profile_id').eq('id', conv).maybeSingle()
+  if (!c) return
+  const d = destinosDe(actor, c)
+  if (!d) return
+  const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: d.perfiles, p_visitors: d.visitantes })
+  if (!destinos?.length) return
+  let remitente = 'Renovacell'
+  if (d.para === 'personal') {
+    const { data: n } = await admin.rpc('_cc_nombre_dueno', { p_conv: conv })
+    remitente = typeof n === 'string' ? n.replace(/\s*\([^)]*\)\s*$/, '') : 'Tu cliente'
+  } else if (c.seller_profile_id) {
+    const { data: s } = await admin.from('profiles').select('full_name, meta').eq('id', c.seller_profile_id).maybeSingle()
+    remitente = ((s?.meta?.name as string | undefined) ?? s?.full_name ?? 'Tu asesora').split('·')[0].trim()
+  }
+  webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+  await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 3600, urgency: 'high' }), destinos,
+    armarAviso({ para: d.para, remitente, texto, conv, visitante: !c.profile_id }))
 }

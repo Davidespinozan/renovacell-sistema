@@ -95,6 +95,8 @@ export const LIMITES: Record<string, Regla> = {
   chat_adjuntar:             { limite: 20,  ventanaSegs: 3600 },
   chat_adjuntar_uid:         { limite: 60,  ventanaSegs: 3600 },
   chat_adjuntar_global:      { limite: 2000, ventanaSegs: 3600 },
+  // AVISOS PUSH: activar los avisos en un dispositivo.
+  push_suscribir:            { limite: 30,  ventanaSegs: 3600 },
   // ia (CC-4): un turno de IA por mensaje del usuario; ráfaga por sujeto, techo global y costo diario en tokens.
   ia_turno:                  { limite: 20,  ventanaSegs: 60 },
   ia_turno_uid:              { limite: 40,  ventanaSegs: 60 },

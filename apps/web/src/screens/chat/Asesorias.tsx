@@ -18,6 +18,7 @@ import { useRole } from '../../auth/RoleContext'
 import { contactoDe as contactoPorDefecto, urlEnlaceContacto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 import { crearInvitacion } from '../../data/ops/invitacion'
 import { PanelVerificacion } from './PanelVerificacion'
+import { BotonAvisos } from '../../app/BotonAvisos'
 import { usarFotoComoIne } from '../../data/ops/verificacion'
 import type { DoctorPendiente } from '../../data/ops/verificacion'
 import type { Mensaje } from '../../data/ops/chat'
@@ -153,6 +154,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     <div className="card" data-testid="asesorias">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
+        <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><BotonAvisos className="btn ghost sm" /></span>
         <button type="button" className="btn ghost sm" onClick={() => void copiarEnlace()} title="El enlace único para compartir en grupos: quien lo abre deja sus datos y conversa en este mismo chat." data-testid="copiar-enlace">{copiado ? 'Enlace copiado' : 'Copiar enlace de contacto'}</button>
       </div>
       <p style={{ margin: '0 0 12px', color: 'var(--ink-3, #667)', fontSize: 13 }}>

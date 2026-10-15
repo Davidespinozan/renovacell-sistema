@@ -3,6 +3,7 @@
 // portal (página o cajón flotante, JWT) y asesor/Dirección abriendo una conversación asignada.
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
+import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Check, CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
@@ -34,6 +35,7 @@ interface Props {
   barra?: React.ReactNode            // CX-ENLACE · accesos bajo el encabezado (conocer Renovacell, verificarse)
   accionesAdjunto?: (m: Mensaje) => React.ReactNode   // FOTOS · acciones bajo una imagen (p. ej. "Usar como INE" para quien verifica)
   reducir?: (f: File) => Promise<string | null>        // FOTOS · inyectable en pruebas
+  suscribir?: Suscriptor | null                        // INMEDIATO · canal en tiempo real (null en pruebas)
   tarjetaFinal?: React.ReactNode                       // VERIFICARME · tarjeta al final del hilo (p. ej. crear la cuenta en el chat)
 }
 
@@ -101,7 +103,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -188,6 +190,13 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     })()
     return () => { vivo = false }
   }, [cliente, conversationId, cargar])
+
+  // Al instante: con sesión, un mensaje nuevo en ESTA conversación despierta la lectura (Realtime; el RLS decide quién
+  // recibe la señal y el contenido se lee siempre por el servidor). El sondeo de abajo queda como respaldo.
+  useEffect(() => {
+    if (!convId || finAtencion || !suscribir) return
+    return suscribir(convId, () => { void cargar(convId, ultimoSeq.current) })
+  }, [convId, finAtencion, suscribir, cargar])
 
   // Polling acotado, solo con la pestaña visible.
   useEffect(() => {
