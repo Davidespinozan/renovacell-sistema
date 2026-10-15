@@ -16,6 +16,7 @@ export interface ConfigCorreo {
   proveedor: 'resend'
   apiKey: string
   remitente: string // "Renovacell <pedidos@dominio>"
+  responderA?: string // MAIL_REPLY_TO (opcional): a dónde llegan las respuestas del cliente (renovacell.mx no tiene buzón)
 }
 
 export interface Mensaje {
@@ -42,7 +43,8 @@ export function leerConfig(env: (k: string) => string | undefined): ConfigCorreo
   const remitente = (env('MAIL_FROM') ?? '').trim()
   if (!(PROVEEDORES as readonly string[]).includes(proveedor)) return null
   if (!apiKey || !remitente || !/@/.test(remitente)) return null
-  return { proveedor: proveedor as ConfigCorreo['proveedor'], apiKey, remitente }
+  const responderA = (env('MAIL_REPLY_TO') ?? '').trim().toLowerCase()
+  return { proveedor: proveedor as ConfigCorreo['proveedor'], apiKey, remitente, ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(responderA) ? { responderA } : {}) }
 }
 
 /** Quita cualquier rastro de la credencial y acota el texto antes de guardarlo. */
@@ -80,7 +82,7 @@ export async function enviarCorreo(cfg: ConfigCorreo, m: Mensaje, fetchImpl: Fet
         'Content-Type': 'application/json',
         'Idempotency-Key': m.llaveIdempotencia,
       },
-      body: JSON.stringify({ from: cfg.remitente, to: [m.para], subject: m.asunto, text: m.texto, html: m.html }),
+      body: JSON.stringify({ from: cfg.remitente, to: [m.para], subject: m.asunto, text: m.texto, html: m.html, ...(cfg.responderA ? { reply_to: [cfg.responderA] } : {}) }),
     })
     let cuerpo: unknown = null
     try { cuerpo = await res.json() } catch { /* cuerpo no JSON: se clasifica por status */ }

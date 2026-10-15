@@ -198,3 +198,17 @@ describe('comunicar jamás tumba una operación de negocio', () => {
     for (const m of tr) expect(m[2]).toBe('after')
   })
 })
+
+describe('Responder a (MAIL_REPLY_TO)', () => {
+  it('opcional: si es un correo válido, las respuestas del cliente llegan ahí; si no, se ignora', async () => {
+    const base = { MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'k', MAIL_FROM: 'Renovacell <notificaciones@renovacell.mx>' }
+    expect(leerConfig(env({ ...base, MAIL_REPLY_TO: ' Facturacion@goldenplacenta.com ' }))?.responderA).toBe('facturacion@goldenplacenta.com')
+    expect(leerConfig(env({ ...base, MAIL_REPLY_TO: 'no-es-correo' }))?.responderA).toBeUndefined()
+    let cuerpo: Record<string, unknown> = {}
+    const f = async (_u: string, init: RequestInit) => { cuerpo = JSON.parse(String(init.body)); return new Response(JSON.stringify({ id: 'x' }), { status: 200 }) }
+    await enviarCorreo(leerConfig(env({ ...base, MAIL_REPLY_TO: 'facturacion@goldenplacenta.com' }))!, { para: 'a@b.mx', asunto: 's', texto: 't', html: 'h', llaveIdempotencia: 'k1' }, f)
+    expect(cuerpo.reply_to).toEqual(['facturacion@goldenplacenta.com'])
+    await enviarCorreo(leerConfig(env(base))!, { para: 'a@b.mx', asunto: 's', texto: 't', html: 'h', llaveIdempotencia: 'k2' }, f)
+    expect(cuerpo.reply_to).toBeUndefined()
+  })
+})
