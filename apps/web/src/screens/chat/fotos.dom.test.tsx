@@ -68,3 +68,22 @@ describe('Fotos en el chat (servidor)', () => {
     expect(mig).toMatch(/values \('chat', 'chat', false, 3000000/); expect(mig).not.toMatch(/create policy/i)
   })
 })
+
+describe('Mensajes con enlaces y nombre de quien entró por el enlace', () => {
+  it('los enlaces se vuelven clicables (sin la puntuación final) y el resto queda como texto', async () => {
+    const { conEnlaces } = await import('./ChatCanonico')
+    render(<div data-testid="t">{conEnlaces('Llena esto: https://renovacell.mx/#contacto. Gracias')}</div>)
+    const a = screen.getByTestId('t').querySelector('a') as HTMLAnchorElement
+    expect(a.getAttribute('href')).toBe('https://renovacell.mx/#contacto'); expect(a.rel).toMatch(/noopener/); expect(a.target).toBe('_blank')
+    expect(screen.getByTestId('t').textContent).toBe('Llena esto: https://renovacell.mx/#contacto. Gracias')
+    expect(conEnlaces('sin enlaces')).toBe('sin enlaces')
+    render(<div data-testid="u">{conEnlaces('javascript:alert(1) no es enlace')}</div>)
+    expect(screen.getByTestId('u').querySelector('a')).toBeNull()
+  })
+  it('el personal ve el nombre de quien entró por el enlace, no "Visitante"', async () => {
+    const { etiquetaActor } = await import('../../data/ops/sesionesPresentacion')
+    expect(etiquetaActor({ actor: 'visitor', propio: false }, 'personal', { nombreCliente: 'magaly (prerregistro)', etiquetaAsesor: 'Asesora' })).toBe('Magaly')
+    expect(etiquetaActor({ actor: 'visitor', propio: false }, 'personal', { nombreCliente: null, etiquetaAsesor: 'Asesora' })).toBe('Visitante')
+    expect(etiquetaActor({ actor: 'visitor', propio: false }, 'cliente', { nombreCliente: 'magaly', etiquetaAsesor: 'Asesora' })).toBe('Tú')
+  })
+})

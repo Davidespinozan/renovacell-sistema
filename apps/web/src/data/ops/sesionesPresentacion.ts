@@ -64,7 +64,8 @@ export function etiquetaActor(m: Pick<Mensaje, 'actor' | 'propio'>, visor: Visor
   if (m.propio) return null
   switch (m.actor) {
     case 'doctor': return visor === 'cliente' ? 'Tú' : (ctx.nombreCliente ? capitalizarNombre(ctx.nombreCliente) : 'Doctor')
-    case 'visitor': return visor === 'cliente' ? 'Tú' : 'Visitante'
+    // CX-ENLACE · quien entró por el enlace dejó su nombre: el personal lo ve por su nombre, no como "Visitante".
+    case 'visitor': return visor === 'cliente' ? 'Tú' : (ctx.nombreCliente ? capitalizarNombre(ctx.nombreCliente.replace(/\s*\([^)]*\)\s*$/, '')) : 'Visitante')
     case 'seller': return `${nombrePersona(ctx.nombreAsesor) ?? 'Asesor'} · ${ctx.etiquetaAsesor}`
     case 'admin': return 'Renovacell'
     case 'ai': return 'Asistente'

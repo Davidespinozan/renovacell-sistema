@@ -65,7 +65,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     const r = await cliente.enviar(abierta, texto)
     setHerr(r.ok ? listo : r.error.codigo === 'asesoria_no_iniciada' ? 'Inicia la asesoría para poder escribirle.' : r.error.mensaje)
   }
-  const mandarRegistro = () => void mandar(`Para verificar tu cédula y crear tu cuenta, llena este formulario (tus datos ya están prellenados si los dejaste aquí): ${urlVerificacionMedica()}`, 'Le mandaste el enlace de registro.')
+  const mandarRegistro = () => void mandar(`Para crear tu cuenta y verificar tu cédula, llena este formulario: ${urlVerificacionMedica()} Si lo abres en este mismo teléfono, tus datos ya aparecen llenos.`, 'Le mandaste el enlace de registro.')
   const mandarInvitacion = async (customerId: string, nombre: string) => {
     if (!window.confirm(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`)) return
     const inv = await crearInvitacion(customerId)
@@ -137,7 +137,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
           {herr && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="herramienta-aviso">{herr}</div>}
         </div>
       )}
-      <ChatCanonico embebido asesor accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
+      <ChatCanonico embebido asesor accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )

@@ -260,3 +260,8 @@
 .rc-adjuntar:disabled{opacity:.4;cursor:not-allowed}
 .rc-chat--wa .rc-msg .rc-bubble.rc-bubble--img{display:flex}
 .rc-chat--wa .rc-adjuntar{color:var(--mid)}
+
+/* Enlaces dentro de un mensaje: visibles en las dos burbujas (propia verde y ajena clara). */
+.rc-enlace{color:inherit;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+.rc-msg--ai .rc-enlace,.rc-msg--seller .rc-enlace,.rc-msg--admin .rc-enlace,.rc-chat--wa .rc-enlace{color:var(--green-deep);font-weight:500}
+.rc-chat--wa .rc-msg--own .rc-enlace{color:#0b6b1d}

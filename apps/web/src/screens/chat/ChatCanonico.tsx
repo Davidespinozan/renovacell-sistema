@@ -71,6 +71,18 @@ export function textoHandoff(conv: Pick<Conversacion, 'asesor_nombre' | 'handoff
   return { titulo: 'Nuestro equipo comercial ya tiene tu solicitud.', detalle: '' }
 }
 
+// Enlaces en el texto: solo http(s), se abren aparte y sin dar acceso a esta pestaña. El resto queda como texto.
+const URL_EN_TEXTO = /(https?:\/\/[^\s<>"]+)/g
+export function conEnlaces(texto: string): React.ReactNode {
+  const partes = texto.split(URL_EN_TEXTO)
+  if (partes.length === 1) return texto
+  return partes.map((p, i) => {
+    if (i % 2 === 0) return p
+    const limpio = p.replace(/[.,;:!?)\]]+$/, ''); const resto = p.slice(limpio.length)
+    return <React.Fragment key={i}><a href={limpio} target="_blank" rel="noopener noreferrer" className="rc-enlace">{limpio}</a>{resto}</React.Fragment>
+  })
+}
+
 // Separadores de día con el reloj del NEGOCIO (data/periodo.ts): "Hoy"/"Ayer" según el día de Mazatlán, no el del dispositivo.
 const diaDe = (iso: string): string => {
   const d = new Date(iso); if (Number.isNaN(d.getTime())) return ''
@@ -308,7 +320,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               {m.adjunto.uso && <span className="rc-img-uso">Usada como {m.adjunto.uso === 'ine-front' ? 'INE frente' : 'INE reverso'}</span>}
               {accionesAdjunto?.(m)}
             </div>
-          ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{m.content}</div>}
+          ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{conEnlaces(m.content)}</div>}
           <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
         </div>
       </div>,
