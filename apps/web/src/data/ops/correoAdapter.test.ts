@@ -12,6 +12,7 @@ import { renderizar, PLANTILLAS, esPlantilla } from '../../../../../supabase/fun
 import dispatchSrc from '../../../../../supabase/functions/comm-dispatch/index.ts?raw'
 import correoSrc from '../../../../../supabase/functions/_shared/correo.ts?raw'
 import migSrc from '../../../../../supabase/migrations/20261021120000_w4_comunicaciones.sql?raw'
+import mig165 from '../../../../../supabase/migrations/20261218120000_correos_automaticos.sql?raw'
 
 const soloCodigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 const CFG: ConfigCorreo = { proveedor: 'resend', apiKey: 're_SECRETO_123', remitente: 'Renovacell <pedidos@renovacell.mx>' }
@@ -132,9 +133,11 @@ describe('las credenciales no salen del adaptador', () => {
     if (r.resultado !== 'enviado') { expect(r.error).not.toContain('re_SECRETO_123'); expect(r.error).toContain('***') }
   })
   it('sanitiza acota la longitud', () => { expect(sanitiza('x'.repeat(900), CFG).length).toBeLessThanOrEqual(240) })
-  it('el despachador no usa la llave de servicio: actúa con el permiso de quien lo invoca', () => {
-    expect(soloCodigo(dispatchSrc)).not.toMatch(/SERVICE_ROLE/)
-    expect(soloCodigo(dispatchSrc)).toMatch(/Authorization: req\.headers\.get\('Authorization'\)/)
+  it('el despachador actúa con el permiso de quien lo invoca; la llave de servicio SOLO con el secreto de la tarea programada (165)', () => {
+    const c = soloCodigo(dispatchSrc)
+    expect(c).toMatch(/Authorization: req\.headers\.get\('Authorization'\)/)
+    expect(c.match(/SERVICE_ROLE/g)?.length).toBe(1)
+    expect(c).toMatch(/const caller = esCron\s*\? createClient\(url, Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/)
   })
   it('ni registra nada en consola', () => {
     expect(soloCodigo(dispatchSrc) + soloCodigo(correoSrc)).not.toMatch(/console\.(log|warn|error|info)/)
@@ -142,10 +145,10 @@ describe('las credenciales no salen del adaptador', () => {
 })
 
 describe('plantillas: vocabulario cerrado y texto limpio', () => {
-  it('las seis plantillas son exactamente las que la base sabe encolar', () => {
-    const enBase = [...migSrc.matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado)'/g)].map((m) => m[1])
+  it('las plantillas son exactamente las que la base sabe encolar (6 de pedido + 3 de cuenta, 165)', () => {
+    const enBase = [...(migSrc + mig165).matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado|registro_recibido|cuenta_verificada|verificacion_rechazada)'/g)].map((m) => m[1])
     for (const p of PLANTILLAS) expect(enBase).toContain(p)
-    expect(PLANTILLAS).toHaveLength(6)
+    expect(PLANTILLAS).toHaveLength(9)
   })
   it('todas se arman, incluso sin datos, sin dejar "undefined", "null" ni "NaN"', () => {
     for (const p of PLANTILLAS) {
@@ -210,5 +213,21 @@ describe('Responder a (MAIL_REPLY_TO)', () => {
     expect(cuerpo.reply_to).toEqual(['facturacion@goldenplacenta.com'])
     await enviarCorreo(leerConfig(env(base))!, { para: 'a@b.mx', asunto: 's', texto: 't', html: 'h', llaveIdempotencia: 'k2' }, f)
     expect(cuerpo.reply_to).toBeUndefined()
+  })
+})
+
+describe('Correos de la cuenta y envío automático (165)', () => {
+  it('registro recibido, cuenta verificada y verificación por corregir (con motivo), con su propio botón', () => {
+    const reg = renderizar('registro_recibido', {}, 'jose perez')
+    expect(reg.asunto).toBe('Recibimos tu registro en Renovacell'); expect(reg.texto).toMatch(/^Hola, Jose Perez:/); expect(reg.html).toMatch(/Entrar a Renovacell/)
+    const ok = renderizar('cuenta_verificada', {}, 'Dra. Ana')
+    expect(ok.texto).toMatch(/ver precios, hacer tus pedidos/); expect(ok.html).toMatch(/Ver el catálogo/); expect(ok.html).not.toMatch(/Ver mi pedido/)
+    const no = renderizar('verificacion_rechazada', { motivo: 'La foto del INE no se lee' }, 'Dra. Ana')
+    expect(no.texto).toMatch(/Motivo: La foto del INE no se lee/); expect(no.html).toMatch(/Corregir mis datos/)
+  })
+  it('la tarea programada entra con su secreto (comparación de tiempo constante) y actúa el servidor; si no, exige sesión', async () => {
+    const edge = (await import('../../../../../supabase/functions/comm-dispatch/index.ts?raw')).default
+    expect(edge).toMatch(/secretoCron\.length >= 32 && await iguales\(req\.headers\.get\('x-cron-secret'\)/)
+    expect(edge).toMatch(/if \(!esCron\) \{\s*const \{ data: who \} = await caller\.auth\.getUser\(\)/)
   })
 })

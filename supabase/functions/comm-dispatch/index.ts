@@ -23,6 +23,15 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
+// Comparación de tiempo constante (por hash) para el secreto de la tarea programada.
+async function iguales(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  const h = async (t: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))
+  const [x, y] = await Promise.all([h(a), h(b)])
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]
+  return d === 0
+}
+
 interface Reclamado {
   id: string; claim_token: string; idempotency_key: string; plantilla: string
   to_address: string; to_name: string | null; payload: Record<string, unknown>
@@ -40,10 +49,17 @@ Deno.serve(conCors(async (req) => {
 
   const url = Deno.env.get('SUPABASE_URL')!
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!
-  // Cliente con el JWT de quien invoca: los comandos deciden si puede.
-  const caller = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
-  const { data: who } = await caller.auth.getUser()
-  if (!who?.user) return json(401, { error: 'No autenticado.' })
+  // CORREOS-AUTO (165) · la tarea de cada minuto llega con su secreto: entonces actúa el servidor (service_role, que la
+  // base autoriza en _comm_autorizar). Si no, cliente con el JWT de quien invoca: los comandos deciden si puede.
+  const secretoCron = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+  const esCron = secretoCron.length >= 32 && await iguales(req.headers.get('x-cron-secret') ?? '', secretoCron)
+  const caller = esCron
+    ? createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+    : createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
+  if (!esCron) {
+    const { data: who } = await caller.auth.getUser()
+    if (!who?.user) return json(401, { error: 'No autenticado.' })
+  }
 
   const { data: lote, error: eRec } = await caller.rpc('comm_reclamar', { p_limite: 20 })
   if (eRec) {

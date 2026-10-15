@@ -82,6 +82,7 @@ export const ESTADO_MENSAJE: Record<EstadoMensaje, { etiqueta: string; tono: 'p-
 export const PLANTILLA_TEXTO: Record<string, string> = {
   pedido_recibido: 'Pedido recibido', pago_recibido: 'Pago recibido', pedido_enviado: 'Pedido en camino',
   pedido_entregado: 'Pedido entregado', pedido_cancelado: 'Pedido cancelado', reembolso_realizado: 'Reembolso realizado',
+  registro_recibido: 'Registro recibido', cuenta_verificada: 'Cuenta verificada', verificacion_rechazada: 'Verificación por corregir',
 }
 
 /** Los estados que requieren que una persona haga algo. */

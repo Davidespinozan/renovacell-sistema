@@ -6,6 +6,7 @@
 export const PLANTILLAS = [
   'pedido_recibido', 'pago_recibido', 'pedido_enviado', 'pedido_entregado',
   'pedido_cancelado', 'reembolso_realizado',
+  'registro_recibido', 'cuenta_verificada', 'verificacion_rechazada',   // CORREOS-AUTO (165) · su cuenta
 ] as const
 export type Plantilla = (typeof PLANTILLAS)[number]
 
@@ -24,7 +25,8 @@ const METODO: Record<string, string> = {
 }
 
 // Datos para el recuadro del correo (folio, montos, envío) y la acción principal.
-interface Cuerpo { asunto: string; titulo: string; parrafos: string[]; datos: Array<[string, string]>; rastreo?: { paq: string; numero: string; url: string | null } | null }
+interface Cuerpo { asunto: string; titulo: string; parrafos: string[]; datos: Array<[string, string]>; rastreo?: { paq: string; numero: string; url: string | null } | null
+  boton?: { label: string; href: string }; pie?: string }
 
 const URL_SISTEMA = 'https://sistema.renovacell.mx/sistema'
 const URL_LOGO = 'https://sistema.renovacell.mx/brand/logo.png'
@@ -68,6 +70,23 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
       return { asunto: `Tu ${ref} fue cancelado`, titulo: 'Tu pedido fue cancelado', parrafos: [
         'Si ya habías pagado, nos pondremos en contacto contigo para resolver tu reembolso.',
       ], datos: fila('Pedido', folio) }
+    case 'registro_recibido':
+      return { asunto: 'Recibimos tu registro en Renovacell', titulo: 'Recibimos tu registro', parrafos: [
+        'Gracias por registrarte. Estamos revisando tu cédula profesional y tu identificación; normalmente lo resolvemos el mismo día hábil.',
+        'Mientras tanto ya puedes entrar, conocer el catálogo y hablar con tu asesora. Te avisaremos por este medio en cuanto tu cuenta quede verificada.',
+      ], datos: [], boton: { label: 'Entrar a Renovacell', href: URL_SISTEMA }, pie: 'Recibes este correo porque creaste una cuenta en Renovacell.' }
+    case 'cuenta_verificada':
+      return { asunto: 'Tu cuenta Renovacell está verificada', titulo: 'Tu cuenta está verificada', parrafos: [
+        'Listo: revisamos tus datos y tu cuenta quedó verificada.',
+        'Ya puedes ver precios, hacer tus pedidos y dar seguimiento a tus envíos desde Renovacell.',
+      ], datos: [], boton: { label: 'Ver el catálogo', href: URL_SISTEMA }, pie: 'Recibes este correo por tu cuenta en Renovacell.' }
+    case 'verificacion_rechazada': {
+      const motivo = String(d.motivo ?? '').trim()
+      return { asunto: 'Necesitamos un dato más para verificar tu cuenta', titulo: 'Tu verificación necesita una corrección', parrafos: [
+        'Revisamos tus datos pero todavía no pudimos verificar tu cuenta.',
+        'Corrígelo en "Mi verificación" y lo revisamos de nuevo. Si tienes dudas, responde a este correo.',
+      ], datos: motivo ? [['Motivo', motivo]] : [], boton: { label: 'Corregir mis datos', href: URL_SISTEMA }, pie: 'Recibes este correo por tu cuenta en Renovacell.' }
+    }
     case 'reembolso_realizado': {
       const monto = dinero(d.monto)
       return { asunto: `Reembolso realizado · ${ref}`, titulo: 'Realizamos tu reembolso', parrafos: [
@@ -97,10 +116,10 @@ export function renderizar(plantilla: string, datos: Record<string, unknown>, no
   const quien = nombreBonito(nombre)
   const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
   const texto = [saludo, '', c.titulo + '.', ...c.parrafos, '', ...c.datos.map(([k, v]) => `${k}: ${v}`),
-    ...(c.rastreo?.url ? ['', `Rastrea tu envío: ${c.rastreo.url}`] : []), '', `Ver mi pedido: ${URL_SISTEMA}`, '', 'Renovacell · Tecnologías Antiedad'].join('\n')
+    ...(c.rastreo?.url ? ['', `Rastrea tu envío: ${c.rastreo.url}`] : []), '', c.boton ? `${c.boton.label}: ${c.boton.href}` : `Ver mi pedido: ${URL_SISTEMA}`, '', 'Renovacell · Tecnologías Antiedad'].join('\n')
   const html = marcoCorreo({ asunto: c.asunto, titulo: c.titulo, saludo, parrafos: c.parrafos, datos: c.datos,
-    botones: c.rastreo?.url ? [{ href: c.rastreo.url, label: 'Rastrear mi envío' }, { href: URL_SISTEMA, label: 'Ver mi pedido' }] : [{ href: URL_SISTEMA, label: 'Ver mi pedido' }],
-    pie: 'Recibes este correo por un pedido que hiciste en Renovacell.' })
+    botones: c.boton ? [c.boton] : c.rastreo?.url ? [{ href: c.rastreo.url, label: 'Rastrear mi envío' }, { href: URL_SISTEMA, label: 'Ver mi pedido' }] : [{ href: URL_SISTEMA, label: 'Ver mi pedido' }],
+    pie: c.pie ?? 'Recibes este correo por un pedido que hiciste en Renovacell.' })
   return { asunto: c.asunto, texto, html }
 }
 

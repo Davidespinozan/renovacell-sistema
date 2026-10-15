@@ -55,9 +55,9 @@ describe('guarda de repositorio: las edges autenticadas pasan por resolverQuien'
   const autenticadas = Object.entries(edges).filter(([k, s]) => !k.includes('/comm-dispatch/')
     && /Authorization: (req\.headers\.get\('Authorization'\)|authHeader)/.test(soloCodigo(s)))
   it('hay edges autenticadas que auditar', () => { expect(autenticadas.length).toBeGreaterThanOrEqual(13) })
-  it('comm-dispatch traduce CUENTA_SUSPENDIDA de la base a 403 sin llave de servicio', () => {
+  it('comm-dispatch traduce CUENTA_SUSPENDIDA de la base a 403; la llave de servicio solo con el secreto de la tarea (165)', () => {
     const c = soloCodigo(edges[Object.keys(edges).find((k) => k.includes('/comm-dispatch/'))!])
-    expect(c).toMatch(/CUENTA_SUSPENDIDA/); expect(c).not.toMatch(/SERVICE_ROLE/)
+    expect(c).toMatch(/CUENTA_SUSPENDIDA/); expect(c.match(/SERVICE_ROLE/g)?.length).toBe(1); expect(c).toMatch(/esCron\s*\? createClient\(url, Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/)
   })
   for (const [k, s] of autenticadas) {
     it(`${nombre(k)} resuelve al llamante con resolverQuien`, () => {

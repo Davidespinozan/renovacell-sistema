@@ -149,3 +149,17 @@ BEGIN
   RETURN found;
 END $$;
 GRANT SELECT ON cron.job, cron.job_run_details TO PUBLIC;
+
+-- CORREOS-AUTO (165): emulación MÍNIMA de Supabase Vault (secretos legibles por la base) y de pg_net (llamadas HTTP
+-- asíncronas). net.http_post solo deja constancia en net._llamadas para que las pruebas vean qué se llamó.
+CREATE SCHEMA IF NOT EXISTS vault;
+CREATE TABLE IF NOT EXISTS vault.decrypted_secrets (name text PRIMARY KEY, decrypted_secret text);
+CREATE SCHEMA IF NOT EXISTS net;
+CREATE TABLE IF NOT EXISTS net._llamadas (id bigserial PRIMARY KEY, url text, headers jsonb, body jsonb, at timestamptz DEFAULT now());
+CREATE OR REPLACE FUNCTION net.http_post(url text, body jsonb DEFAULT '{}'::jsonb, params jsonb DEFAULT '{}'::jsonb, headers jsonb DEFAULT '{}'::jsonb, timeout_milliseconds int DEFAULT 5000)
+RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE v bigint;
+BEGIN
+  INSERT INTO net._llamadas (url, headers, body) VALUES (url, headers, body) RETURNING id INTO v;
+  RETURN v;
+END $$;
