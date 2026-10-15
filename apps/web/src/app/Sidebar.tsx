@@ -15,7 +15,8 @@ import { BrandLogo } from './BrandLogo'
 // este navegador. La sección de la pantalla activa se abre sola. Sin preferencia guardada, Dirección arranca con lo de
 // uso diario abierto (Mi trabajo, Clientes, Conversaciones) y el resto plegado; los demás roles ven todo abierto.
 const CLAVE_SECCIONES = 'rc_sidebar_secciones'
-const ABIERTAS_POR_DEFECTO = new Set(['Mi trabajo', 'Clientes', 'Conversaciones'])
+const HUB = 'Hub Renovacell'
+const ABIERTAS_POR_DEFECTO = new Set([HUB, 'Mi trabajo', 'Clientes', 'Conversaciones'])
 const leerSecciones = (): Record<string, boolean> | null => { try { const v = localStorage.getItem(CLAVE_SECCIONES); return v ? JSON.parse(v) as Record<string, boolean> : null } catch { return null } }
 const guardarSecciones = (m: Record<string, boolean>) => { try { localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(m)) } catch { /* almacenamiento no disponible: no pasa nada */ } }
 
@@ -38,8 +39,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   })
 
   // Secciones abiertas: preferencia guardada → defecto por rol. La de la pantalla activa siempre se muestra.
-  const [abiertas, setAbiertas] = useState<Record<string, boolean>>(() => leerSecciones() ?? (role === 'admin' ? Object.fromEntries(groups.map((g) => [g.header, ABIERTAS_POR_DEFECTO.has(g.header)])) : {}))
-  const seccionActiva = modules.find((m) => m.key === screen)?.section ?? null
+  const [abiertas, setAbiertas] = useState<Record<string, boolean>>(() => leerSecciones() ?? (role === 'admin' ? Object.fromEntries([HUB, ...groups.map((g) => g.header)].map((h) => [h, ABIERTAS_POR_DEFECTO.has(h)])) : {}))
+  const seccionActiva = hub.some((m) => m.key === screen) ? HUB : (modules.find((m) => m.key === screen)?.section ?? null)
   useEffect(() => { if (seccionActiva && abiertas[seccionActiva] === false) setAbiertas((a) => ({ ...a, [seccionActiva]: true })) }, [seccionActiva])   // eslint-disable-line react-hooks/exhaustive-deps
   const estaAbierta = (h: string) => abiertas[h] !== false
   const alternar = (h: string) => setAbiertas((a) => { const n = { ...a, [h]: !estaAbierta(h) }; guardarSecciones(n); return n })
@@ -79,8 +80,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {/* Inicio + Avisos/Chat del equipo. En móvil el hub del staff vive en el bottom-nav → se oculta aquí. */}
         {hub.length > 0 && (
           <div className="nav-hub">
-            <div className="grp">Hub Renovacell</div>
-            {hub.map(Link)}
+            <button type="button" className={`grp grp-btn${estaAbierta(HUB) ? ' abierta' : ''}`} aria-expanded={estaAbierta(HUB)} onClick={() => alternar(HUB)} data-testid={`seccion-${HUB}`}>
+              <span>{HUB}</span><ChevronRight size={13} aria-hidden="true" />
+            </button>
+            {estaAbierta(HUB) && hub.map(Link)}
           </div>
         )}
         {groups.map((g) => (

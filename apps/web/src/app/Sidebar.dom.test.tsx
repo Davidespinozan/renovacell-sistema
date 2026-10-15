@@ -48,5 +48,8 @@ describe('<Sidebar> · secciones plegables (como en CuboPolar)', () => {
     expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones') ?? '{}').Finanzas).toBe(true)
     fireEvent.click(screen.getByTestId('seccion-Clientes'))
     expect(screen.queryByText('Por verificar')).toBeNull()
+    // el Hub también se pliega (y la pantalla activa, Inicio, lo vuelve a abrir al navegar a él)
+    fireEvent.click(screen.getByTestId('seccion-Hub Renovacell'))
+    expect(screen.queryByText('Chat del equipo')).toBeNull()
   })
 })
