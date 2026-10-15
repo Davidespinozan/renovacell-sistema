@@ -11,7 +11,7 @@ import { PageHead } from '../../app/PageHead'
 import { ConfirmModal } from '../../app/ConfirmModal'
 import { useComunicaciones } from '../../data/hooks/useComunicaciones'
 import {
-  despacharMensajes, reintentarMensaje, requiereAccion, ESTADO_MENSAJE, PLANTILLA_TEXTO,
+  despacharMensajes, reintentarMensaje, requiereAccion, esDescartado, ESTADO_MENSAJE, PLANTILLA_TEXTO,
   MENSAJES_VISIBLES, type EstadoMensaje, type MensajeCliente,
 } from '../../data/ops/comunicaciones'
 
@@ -111,7 +111,9 @@ export function Comunicaciones() {
                       <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{m.to_address ?? 'sin correo registrado'}</div>
                     </td>
                     <td data-label="Estado">
-                      <span className={'pill ' + (e?.tono ?? 'p-neu')} title={e?.explica}>{e?.etiqueta ?? m.status}</span>
+                      {esDescartado(m)
+                        ? <span className="pill p-neu" title="La guía de este aviso se anuló: no se envía. La guía nueva genera su propio aviso.">Descartado · guía anulada</span>
+                        : <span className={'pill ' + (e?.tono ?? 'p-neu')} title={e?.explica}>{e?.etiqueta ?? m.status}</span>}
                       {requiereAccion(m) && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, maxWidth: 260 }}>{e?.explica}</div>}
                     </td>
                     <td data-label="" style={{ textAlign: 'right' }}>

@@ -164,10 +164,19 @@ describe('plantillas: vocabulario cerrado y texto limpio', () => {
     expect(r.html).toContain('&lt;script&gt;')
   })
   it('usa la foto del hecho: folio, monto y rastreo', () => {
-    expect(renderizar('pedido_recibido', { folio: 'S123456', total: 4350 }, 'Dra. Ana').texto).toMatch(/pedido S123456 por \$4,350\.00/)
-    expect(renderizar('pago_recibido', { folio: 'S1', monto: 1000, metodo: 'transferencia' }).texto).toMatch(/pago de \$1,000\.00 por transferencia/)
-    expect(renderizar('pedido_enviado', { folio: 'S1', paqueteria: 'DHL', rastreo: '123' }).texto).toMatch(/Viaja por DHL, con número de rastreo 123/)
+    expect(renderizar('pedido_recibido', { folio: 'S123456', total: 4350 }, 'Dra. Ana').texto).toMatch(/Pedido: S123456\nTotal: \$4,350\.00/)
+    expect(renderizar('pago_recibido', { folio: 'S1', monto: 1000, metodo: 'transferencia' }).texto).toMatch(/Monto: \$1,000\.00\nForma de pago: Transferencia/)
+    const env = renderizar('pedido_enviado', { folio: 'S1', paqueteria: 'DHL', rastreo: '123' })
+    expect(env.texto).toMatch(/Paquetería: DHL\nNúmero de rastreo: 123/)
+    expect(env.html).toMatch(/Rastrear mi envío/); expect(env.html).toMatch(/dhl\.com\/mx-es\/home\/rastreo\.html\?tracking-id=123/)
     expect(renderizar('pedido_enviado', { folio: 'S1', metodo: 'chofer' }).texto).toMatch(/nuestro equipo de entregas/)
+  })
+  it('se ve profesional: logo, marca, botón al pedido y el nombre con mayúsculas (no "david espinoza")', () => {
+    const r = renderizar('pedido_recibido', { folio: 'S1', total: 100 }, 'david espinoza')
+    expect(r.texto).toMatch(/^Hola, David Espinoza:/)
+    expect(r.html).toMatch(/brand\/logo\.png/); expect(r.html).toMatch(/Tecnologías Antiedad/); expect(r.html).toMatch(/Ver mi pedido/)
+    expect(r.html).not.toMatch(/Sistema operativo/i)
+    expect(renderizar('pedido_recibido', { folio: 'S1' }, 'Dra. Ana Ruiz').texto).toMatch(/^Hola, Dra\. Ana Ruiz:/)   // lo que ya trae mayúsculas no se toca
   })
   it('no promete lo que el sistema no sabe: la cancelación no afirma un reembolso hecho', () => {
     expect(renderizar('pedido_cancelado', { folio: 'S1' }).texto).toMatch(/nos pondremos en contacto/)

@@ -61,6 +61,12 @@ Deno.serve(conCors(async (req) => {
     let messageId: string | null = null
     let error: string | null = null
     try {
+      // Un aviso "va en camino" cuya guía se anuló NUNCA sale (el número ya no sirve; la guía nueva trae su aviso).
+      const rastreo = m.plantilla === 'pedido_enviado' ? String((m.payload ?? {}).rastreo ?? '').trim() : ''
+      if (rastreo) {
+        const { data: anulada } = await caller.from('shipments').select('id').eq('provider_meta->anulada->>tracking', rastreo).limit(1).maybeSingle()
+        if (anulada) throw new Error(`GUIA_ANULADA: la guía ${rastreo} de este aviso se anuló, no reenviar`)
+      }
       const r = renderizar(m.plantilla, m.payload ?? {}, m.to_name)
       const env = await enviarCorreo(cfg, {
         para: m.to_address, asunto: r.asunto, texto: r.texto, html: r.html,

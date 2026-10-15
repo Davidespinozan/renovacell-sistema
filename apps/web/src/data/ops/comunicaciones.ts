@@ -85,5 +85,7 @@ export const PLANTILLA_TEXTO: Record<string, string> = {
 }
 
 /** Los estados que requieren que una persona haga algo. */
+/** Aviso de una guía que se anuló: ya no se reenvía (la base lo impide); la guía nueva genera su propio aviso. */
+export const esDescartado = (m: MensajeCliente): boolean => (m.last_error ?? '').startsWith('GUIA_ANULADA')
 export const requiereAccion = (m: MensajeCliente): boolean =>
-  m.status === 'fallido' || m.status === 'incierto' || m.status === 'sin_destinatario'
+  !esDescartado(m) && (m.status === 'fallido' || m.status === 'incierto' || m.status === 'sin_destinatario')

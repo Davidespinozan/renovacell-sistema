@@ -41,10 +41,4 @@ export function mapearErrorInvitacion(mensaje: string | undefined): { status: nu
 }
 
 /** Correo de invitación: texto claro, sin datos sensibles más allá del nombre y el enlace. */
-export function correoInvitacion(nombre: string, enlace: string): { asunto: string; texto: string; html: string } {
-  const n = nombre.trim() || 'Hola'
-  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
-  const texto = `${n}:\n\nTe invitamos a crear tu cuenta en Renovacell. Como ya eres cliente, tu cuenta queda verificada: podrás ver precios, hacer pedidos y hablar con tu asesor.\n\nCrea tu contraseña aquí (el enlace vence en 14 días):\n${enlace}\n\nRenovacell · Tecnologías Antiedad`
-  const html = `<p>${esc(n)}:</p><p>Te invitamos a crear tu cuenta en <b>Renovacell</b>. Como ya eres cliente, tu cuenta queda verificada: podrás ver precios, hacer pedidos y hablar con tu asesor.</p><p><a href="${esc(enlace)}" style="display:inline-block;padding:12px 20px;background:#007311;color:#fff;border-radius:24px;text-decoration:none;font-weight:600">Crear mi cuenta</a></p><p style="color:#667;font-size:13px">El enlace vence en 14 días.</p><p style="color:#667;font-size:13px">Renovacell · Tecnologías Antiedad</p>`
-  return { asunto: 'Tu cuenta en Renovacell', texto, html }
-}
+// El correo de la invitación vive en plantillas.ts (mismo diseño de marca que los avisos de pedido).

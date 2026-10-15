@@ -13,7 +13,8 @@ import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, esSesionDeUsuario } from '../_shared/quien.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
-import { enlaceInvitacion, validarAceptacion, mapearErrorInvitacion, correoInvitacion, MENSAJE_ESTADO, URL_SISTEMA } from '../_shared/invitacion.ts'
+import { enlaceInvitacion, validarAceptacion, mapearErrorInvitacion, MENSAJE_ESTADO, URL_SISTEMA } from '../_shared/invitacion.ts'
+import { correoInvitacion } from '../_shared/plantillas.ts'
 import { enviarCorreo, leerConfig } from '../_shared/correo.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
