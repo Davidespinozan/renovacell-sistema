@@ -170,3 +170,27 @@ describe('estados de carga, vacío y error', () => {
     expect(await screen.findByText('No se pudo cargar el buzón de mensajes.')).toBeInTheDocument()
   })
 })
+
+describe('Correos al cliente · ver lo que se envió', () => {
+  it('"Ver correo" muestra el correo con la misma plantilla: asunto, para quién, cuándo salió y el contenido', async () => {
+    render(<Comunicaciones />)
+    fireEvent.click(await screen.findByText('Enviados'))
+    fireEvent.click((await screen.findAllByTestId('ver-correo'))[0])
+    const v = screen.getByTestId('vista-correo')
+    expect(v.textContent).toMatch(/Recibimos tu pedido S123456/)
+    expect(v.textContent).toMatch(/Para: Dra\. Ana · dra@clinica\.mx/)
+    expect(v.textContent).toMatch(/Enviado el .* confirmado por el servicio de correo/)
+    expect((v.querySelector('iframe') as HTMLIFrameElement).srcdoc).toMatch(/Tecnologías Antiedad/)
+  })
+  it('se llama "Correos al cliente"', async () => {
+    render(<Comunicaciones />)
+    expect(await screen.findByText('Correos al cliente')).toBeTruthy()
+  })
+  it('un aviso de guía anulada se ve descartado y sin Reintentar', async () => {
+    mocks.cargarMensajes.mockResolvedValue({ data: [m({ id: 'z', status: 'fallido', plantilla: 'pedido_enviado', last_error: 'GUIA_ANULADA: la guía 1 de este aviso se anuló, no reenviar' })], error: null })
+    render(<Comunicaciones />)
+    fireEvent.click(await screen.findByText('Todos'))
+    expect(await screen.findByText('Descartado · guía anulada')).toBeTruthy()
+    expect(screen.queryByText('Reintentar')).toBeNull()
+  })
+})

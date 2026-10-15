@@ -5,7 +5,7 @@ import React from 'react'
 export type IconName =
   | 'dashboard' | 'chart' | 'grid' | 'box' | 'usercheck' | 'fingerprint'
   | 'receipt' | 'bag' | 'clock' | 'chat' | 'layers' | 'download' | 'pkg'
-  | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf'
+  | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf' | 'mail'
   | 'chevronRight' | 'chevronLeft' | 'shield'
   | 'home' | 'plus' | 'edit' | 'trash' | 'pin' | 'x' | 'eye' | 'megaphone'
   | 'check' | 'minus' | 'cart'
@@ -29,6 +29,7 @@ const P: Record<IconName, React.ReactNode> = {
   bell: <><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" /><path d="M10.5 20a1.8 1.8 0 0 0 3 0" /></>,
   image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 16l-5-5L5 21" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3.5 6.5l8.5 6 8.5-6" /></>,
   menu: <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>,
   leaf: <><path d="M20 4C9 4 4 10 4 19c7 0 13-4 15-11" /><path d="M4 19c4-7 9-9 13-9" /></>,
   chevronRight: <><path d="M9 6l6 6-6 6" /></>,

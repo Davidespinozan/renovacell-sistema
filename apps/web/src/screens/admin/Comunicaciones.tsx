@@ -1,4 +1,4 @@
-// ADMIN · MENSAJES AL CLIENTE (W4-05)
+// ADMIN · CORREOS AL CLIENTE (W4-05; antes "Mensajes al cliente")
 //
 // El buzón de la comunicación transaccional: qué se le dijo —o se le debe decir— a cada
 // cliente sobre su pedido. Tres cosas que esta pantalla nunca hace:
@@ -6,7 +6,8 @@
 //   · presentar un corte como un fracaso (o como un éxito): "sin confirmar" es su estado;
 //   · reenviar algo que quizá ya llegó sin que una persona acepte el riesgo.
 import React, { useMemo, useState } from 'react'
-import { Mail, RefreshCw, Send } from 'lucide-react'
+import { Eye, Mail, RefreshCw, Send, X } from 'lucide-react'
+import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // la MISMA plantilla con la que se envía
 import { PageHead } from '../../app/PageHead'
 import { ConfirmModal } from '../../app/ConfirmModal'
 import { useComunicaciones } from '../../data/hooks/useComunicaciones'
@@ -24,6 +25,7 @@ export function Comunicaciones() {
   const [aviso, setAviso] = useState<Aviso>(null)
   const [ocupado, setOcupado] = useState(false)
   const [confirmar, setConfirmar] = useState<MensajeCliente | null>(null)
+  const [viendo, setViendo] = useState<MensajeCliente | null>(null)
 
   const lista = useMemo(() => data.filter((m) =>
     filtro === 'todos' ? true
@@ -57,10 +59,10 @@ export function Comunicaciones() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Mensajes al cliente">
-        Los avisos que el sistema le debe a cada cliente sobre su pedido: recibido, pagado, en camino,
-        entregado, cancelado o reembolsado. Un mensaje aparece como <b>enviado</b> solo cuando el servicio
-        de correo confirmó que lo recibió.
+      <PageHead title="Correos al cliente">
+        Los correos que el sistema le manda a cada cliente sobre su pedido: recibido, pagado, en camino,
+        entregado, cancelado o reembolsado. Aparece como <b>enviado</b> solo cuando el servicio de correo confirmó
+        que lo recibió. Con <b>Ver correo</b> ves exactamente lo que le llegó (o le llegará).
       </PageHead>
 
       <div className="card" style={{ padding: 16, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -116,12 +118,13 @@ export function Comunicaciones() {
                         : <span className={'pill ' + (e?.tono ?? 'p-neu')} title={e?.explica}>{e?.etiqueta ?? m.status}</span>}
                       {requiereAccion(m) && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, maxWidth: 260 }}>{e?.explica}</div>}
                     </td>
-                    <td data-label="" style={{ textAlign: 'right' }}>
+                    <td data-label="" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {requiereAccion(m) && (
                         <button className="btn ghost sm" type="button" disabled={ocupado} onClick={() => void reintentar(m)}>
                           {m.status === 'sin_destinatario' ? 'Ya tiene correo' : 'Reintentar'}
                         </button>
-                      )}
+                      )}{' '}
+                      <button className="btn ghost sm" type="button" onClick={() => setViendo(m)} data-testid="ver-correo"><Eye size={13} /> Ver correo</button>
                     </td>
                   </tr>
                 )
@@ -147,6 +150,36 @@ export function Comunicaciones() {
           onConfirm={() => void reintentar(confirmar, true)}
         />
       )}
+      {viendo && <VistaCorreo m={viendo} onCerrar={() => setViendo(null)} />}
+    </div>
+  )
+}
+
+/** El correo tal como lo recibe el cliente: misma plantilla y misma foto del pedido con la que se envía. */
+function VistaCorreo({ m, onCerrar }: { m: MensajeCliente; onCerrar: () => void }) {
+  let r: { asunto: string; html: string } | null = null
+  try { r = renderizar(m.plantilla, m.payload ?? {}, m.to_name) } catch { r = null }
+  const e = ESTADO_MENSAJE[m.status as EstadoMensaje]
+  return (
+    <div className="overlay" onClick={onCerrar}>
+      <div className="modal" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 680 }} data-testid="vista-correo">
+        <div className="mhead">
+          <div>
+            <h3 style={{ margin: 0 }}>{r?.asunto ?? PLANTILLA_TEXTO[m.plantilla] ?? m.plantilla}</h3>
+            <div className="ms">Para: {m.to_name ? `${m.to_name} · ` : ''}{m.to_address ?? 'sin correo registrado'}</div>
+            <div className="ms">
+              {esDescartado(m) ? 'Descartado · no se envía (la guía se anuló)'
+                : m.status === 'enviado' && m.sent_at ? `Enviado el ${new Date(m.sent_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })} · confirmado por el servicio de correo`
+                  : e?.etiqueta ?? m.status}
+            </div>
+          </div>
+          <button className="mclose" type="button" onClick={onCerrar} aria-label="Cerrar"><X size={16} /></button>
+        </div>
+        <div className="mbody" style={{ padding: 0, background: '#f2f4f2' }}>
+          {r ? <iframe title="Vista del correo" srcDoc={r.html} sandbox="" style={{ width: '100%', height: '62vh', border: 0, display: 'block' }} />
+            : <div style={{ padding: 20, color: 'var(--ink-3)' }}>No se pudo armar la vista de este correo.</div>}
+        </div>
+      </div>
     </div>
   )
 }

@@ -124,7 +124,7 @@ describe('Dirección ve lo que espera SU decisión', () => {
   it('mensajes al cliente que no salieron son un pendiente de Dirección', () => {
     srv.mensajes = 3
     render(<Bandeja />)
-    expect(screen.getByText('Mensajes al cliente sin entregar')).toBeInTheDocument()
+    expect(screen.getByText('Correos al cliente sin entregar')).toBeInTheDocument()
     expect(screen.queryByText('Todo al día')).toBeNull()
   })
 

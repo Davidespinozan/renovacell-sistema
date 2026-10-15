@@ -228,13 +228,13 @@ function FuenteFiscal({ onTarea }: { onTarea: Reportar }) {
   return null
 }
 
-// Mensajes al cliente que no salieron y esperan a una persona: rechazados, sin
+// Correos al cliente que no salieron y esperan a una persona: rechazados, sin
 // confirmar o sin correo. También se deriva del servidor (el buzón de salida).
 function FuenteMensajes({ onTarea }: { onTarea: Reportar }) {
   const { cuentas, loading } = useComunicaciones()
   const n = loading ? 0 : cuentas.conProblema
   useEffect(() => {
-    onTarea('mensajes', n > 0 ? { id: 'mensajes', icon: 'chat', title: 'Mensajes al cliente sin entregar', detail: 'No salieron, no se confirmaron o el cliente no tiene correo.', count: n, tone: 'warn', screen: 'av_mensajes' } : null)
+    onTarea('mensajes', n > 0 ? { id: 'mensajes', icon: 'chat', title: 'Correos al cliente sin entregar', detail: 'No salieron, no se confirmaron o el cliente no tiene correo.', count: n, tone: 'warn', screen: 'av_mensajes' } : null)
   }, [n, onTarea])
   return null
 }
