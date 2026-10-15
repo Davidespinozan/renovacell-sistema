@@ -1,7 +1,7 @@
 {
-  "name": "Renovacell · Sistema Operativo",
+  "name": "Renovacell · Tecnologías Antiedad",
   "short_name": "Renovacell",
-  "description": "Sistema operativo de Renovacell: catálogo, pedidos, inventario por lote y entregas.",
+  "description": "Renovacell · Tecnologías Antiedad: catálogo, pedidos y asesoría para médicos.",
   "start_url": "/sistema",
   "scope": "/sistema",
   "display": "standalone",

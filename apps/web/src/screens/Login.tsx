@@ -58,11 +58,11 @@ export function Login() {
           <BrandLogo />
           <div>
             <div className="bn">Renovacell</div>
-            <div className="bs">Sistema operativo</div>
+            <div className="bs">Tecnologías Antiedad</div>
           </div>
         </div>
         <div className="lb-mid">
-          <h2>Sistema operativo Renovacell</h2>
+          <h2>Bienvenido a Renovacell</h2>
           <p>Acceso para el equipo y médicos verificados. Inicia sesión para entrar a tu espacio.</p>
         </div>
         <div className="lb-foot">Acceso seguro</div>
@@ -75,7 +75,7 @@ export function Login() {
             <BrandLogo />
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>Renovacell</div>
-              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Sistema operativo</div>
+              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Tecnologías Antiedad</div>
             </div>
           </div>
 

@@ -10,9 +10,15 @@ import { ChatFlotante } from './ChatFlotante'
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 
+export const tituloPestana = (role: string | null | undefined): string =>
+  role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
+
 export function AppShell() {
   const { role, screen, verified } = useRole()
   const [drawer, setDrawer] = useState(false)
+
+  // La pestaña: "Sistema operativo" es solo del equipo (ERP); el doctor ve la marca del negocio (decisión del dueño).
+  useEffect(() => { document.title = tituloPestana(role) }, [role])
 
   // Drawer móvil: el CSS del demo usa body.drawer-open.
   useEffect(() => {

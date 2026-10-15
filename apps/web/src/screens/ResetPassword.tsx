@@ -44,7 +44,7 @@ export function ResetPassword() {
       <aside className="login-brand">
         <div className="lb-top">
           <BrandLogo />
-          <div><div className="bn">Renovacell</div><div className="bs">Sistema operativo</div></div>
+          <div><div className="bn">Renovacell</div><div className="bs">Tecnologías Antiedad</div></div>
         </div>
         <div className="lb-mid">
           <h2>Restablece tu contraseña</h2>
@@ -59,7 +59,7 @@ export function ResetPassword() {
             <BrandLogo />
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>Renovacell</div>
-              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Sistema operativo</div>
+              <div style={{ fontSize: 11, letterSpacing: '.04em', color: 'rgba(255,255,255,.6)' }}>Tecnologías Antiedad</div>
             </div>
           </div>
 
