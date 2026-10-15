@@ -106,3 +106,8 @@
   from = "/*"
   to = "/landing/index.html"
   status = 200
+# VERSIÓN PUBLICADA · /version.json nunca se cachea: la app abierta y scripts/verificar-despliegue.sh leen la real.
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store"

@@ -693,3 +693,6 @@ body.chat-open{overflow:hidden}
   .dcat-card--agotado .dcat-linea,.dcat-card--agotado .dcat-nodisp,.dcat-card--agotado .dcat-precio{display:none}
   .dcat-barra .seg{width:100%}
 }
+/* VERSIÓN PUBLICADA · aviso discreto de versión nueva (arriba del contenido, no tapa nada). */
+.version-nueva{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 14px;border-radius:var(--r-sm);background:var(--hueso);color:var(--ink);font-size:13.5px}
+.version-nueva span{flex:1;min-width:180px}

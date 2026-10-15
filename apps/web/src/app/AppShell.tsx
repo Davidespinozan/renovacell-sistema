@@ -9,6 +9,7 @@ import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
+import { VersionNueva } from './VersionNueva'
 
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
@@ -37,6 +38,8 @@ export function AppShell() {
         <main className="canvas">
           {/* Fuera de #content: no se desmonta al cambiar de pantalla. */}
           <FallosEscritura />
+          {/* Versión publicada nueva: aviso discreto para actualizar (nunca recarga sola). */}
+          {!import.meta.env.DEV && <VersionNueva />}
           <div id="content" key={`${role}:${screen}`}>
             {role === 'doctor' && !verified && <AvisoVerificacion />}
             {renderScreen(role, screen)}
