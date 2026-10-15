@@ -9,6 +9,7 @@ import { BrandLogo } from '../../app/BrandLogo'
 import { supabase, hasSupabase } from '../../lib/supabase'
 import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, type CampoPrerregistro, type DatosPrerregistro } from '../../data/ops/visitante'
 import { ChatCanonico } from './ChatCanonico'
+import { TarjetaVerificarme } from './TarjetaVerificarme'
 import { urlEnlaceContacto } from '../../data/ops/contactoEnlace'
 import type { ClienteChat } from '../../data/ops/chat'
 
@@ -35,12 +36,14 @@ async function haySesion(): Promise<SesionContacto> {
 
 export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, registrar = prerregistrar, conSesion = haySesion, cliente }: Deps) {
   const [paso, setPaso] = useState<Paso>('cargando')
+  const [conCuenta, setConCuenta] = useState(false)
+  const [verificando, setVerificando] = useState(false)
   useEffect(() => {
     let vivo = true
     void (async () => {
       // Con sesión de doctor manda la cuenta (el servidor decide si puede conversar). El personal ve un aviso.
       const sesion = await conSesion()
-      if (sesion !== 'ninguna') { if (vivo) setPaso(sesion === 'cliente' ? 'chat' : 'personal'); return }
+      if (sesion !== 'ninguna') { if (vivo) { setConCuenta(sesion === 'cliente'); setPaso(sesion === 'cliente' ? 'chat' : 'personal') } return }
       await abrir()
       const e = await estado()
       if (vivo) setPaso(e.prerregistrado ? 'chat' : 'formulario')
@@ -52,8 +55,11 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
     <div className="rc-contacto" data-testid="contacto">
       {paso === 'chat' ? (
         <ChatCanonico estilo="mensajeria" conCarrito={false} cliente={cliente} autoFoco
+          tarjetaFinal={verificando && !conCuenta ? <TarjetaVerificarme onCerrar={() => setVerificando(false)} /> : null}
           barra={<>
-            <a href={URL_VERIFICACION} className="rc-barra--fuerte" data-testid="ir-verificacion"><BadgeCheck size={15} /> Verificar mi cédula</a>
+            {conCuenta
+              ? <a href="/sistema" className="rc-barra--fuerte" data-testid="ir-portal"><BadgeCheck size={15} /> Ir a mi portal</a>
+              : <button type="button" className="rc-barra--fuerte" onClick={() => setVerificando(true)} data-testid="ir-verificacion"><BadgeCheck size={15} /> Verificar mi cuenta</button>}
             <a href={URL_LANDING} data-testid="ir-landing"><Globe size={15} /> Conocer Renovacell</a>
           </>} />
       ) : (

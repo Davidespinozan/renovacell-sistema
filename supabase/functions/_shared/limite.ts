@@ -73,6 +73,9 @@ export const LIMITES: Record<string, Regla> = {
   visitor_prerregistro:        { limite: 8,   ventanaSegs: 3600 },
   visitor_prerregistro_global: { limite: 600, ventanaSegs: 3600 },
   visitor_estado:              { limite: 120, ventanaSegs: 3600 },
+  // VERIFICARME: crear la cuenta desde el chat (crea usuario y sube fotos).
+  visitor_verificarme:         { limite: 5,   ventanaSegs: 3600 },
+  visitor_verificarme_global:  { limite: 200, ventanaSegs: 3600 },
   // INVITACIONES: crear es del personal; ver y aceptar son públicas (con el secreto del enlace).
   invitacion_crear_uid:        { limite: 60,  ventanaSegs: 3600 },
   invitacion_ver:              { limite: 60,  ventanaSegs: 3600 },

@@ -161,3 +161,30 @@ export async function prerregistrar(d: DatosPrerregistro, deps: { invocar?: Invo
     return { ok: true, nombre: r.nombre ?? datos.nombre }
   } catch { return { ok: false, mensaje: sinRed } }
 }
+
+// ── VERIFICARME EN EL CHAT ─────────────────────────────────────────────────────────────────────
+export interface MisDatos { nombre: string; email: string; telefono: string; cedula: string | null }
+export async function misDatos(deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<MisDatos | null> {
+  if (!hasSupabase && !deps.invocar) return null
+  try {
+    const token = leerTokenVisitante(deps.st === undefined ? almacen() : deps.st)
+    if (!token) return null
+    const { data, error } = await (deps.invocar ?? invocarPorDefecto)('visitor', { body: { action: 'mis_datos', token } })
+    return error || !data ? null : data as MisDatos
+  } catch { return null }
+}
+export type ResultadoVerificarme = { ok: true; email: string } | { ok: false; mensaje: string; codigo?: string }
+export async function verificarme(d: { cedula: string; password: string; ineFront: string; ineBack: string }, deps: { invocar?: Invocar; st?: Almacen | null } = {}): Promise<ResultadoVerificarme> {
+  const sinRed = 'No hay conexión con el servidor. Intenta de nuevo.'
+  if (!hasSupabase && !deps.invocar) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+  try {
+    const token = leerTokenVisitante(deps.st === undefined ? almacen() : deps.st)
+    if (!token) return { ok: false, mensaje: 'Tu sesión expiró. Recarga la página.' }
+    const { data, error } = await (deps.invocar ?? invocarPorDefecto)('visitor', { body: { action: 'verificarme', token, ...d } })
+    if (error) {
+      try { const ctx = (error as { context?: Response }).context; if (ctx) { const b = (await ctx.json()) as { message?: string; error?: string }; return { ok: false, mensaje: b.message ?? sinRed, codigo: b.error } } } catch { /* sin detalle */ }
+      return { ok: false, mensaje: sinRed }
+    }
+    return { ok: true, email: (data as { email: string }).email }
+  } catch { return { ok: false, mensaje: sinRed } }
+}

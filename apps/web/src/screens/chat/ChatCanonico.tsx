@@ -34,6 +34,7 @@ interface Props {
   barra?: React.ReactNode            // CX-ENLACE · accesos bajo el encabezado (conocer Renovacell, verificarse)
   accionesAdjunto?: (m: Mensaje) => React.ReactNode   // FOTOS · acciones bajo una imagen (p. ej. "Usar como INE" para quien verifica)
   reducir?: (f: File) => Promise<string | null>        // FOTOS · inyectable en pruebas
+  tarjetaFinal?: React.ReactNode                       // VERIFICARME · tarjeta al final del hilo (p. ej. crear la cuenta en el chat)
 }
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
@@ -100,7 +101,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -408,6 +409,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           </div>
         )}
         {esperandoIA && <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="escribiendo" aria-label="El asistente está escribiendo"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-bubble rc-typing"><i /><i /><i /></div></div></div>}
+        {tarjetaFinal}
         <div ref={fin} />
       </div>
 

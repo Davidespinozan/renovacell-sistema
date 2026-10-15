@@ -65,7 +65,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     const r = await cliente.enviar(abierta, texto)
     setHerr(r.ok ? listo : r.error.codigo === 'asesoria_no_iniciada' ? 'Inicia la asesoría para poder escribirle.' : r.error.mensaje)
   }
-  const mandarRegistro = () => void mandar(`Para crear tu cuenta y verificar tu cédula, llena este formulario: ${urlVerificacionMedica()} Si lo abres en este mismo teléfono, tus datos ya aparecen llenos.`, 'Le mandaste el enlace de registro.')
+  const mandarRegistro = () => void mandar('Para verificarte, toca «Verificar mi cuenta» arriba en este chat: te pedirá tu cédula, las fotos de tu INE y una contraseña. No tienes que salir de aquí.', 'Le mandaste el enlace de registro.')
   const mandarInvitacion = async (customerId: string, nombre: string) => {
     if (!window.confirm(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`)) return
     const inv = await crearInvitacion(customerId)

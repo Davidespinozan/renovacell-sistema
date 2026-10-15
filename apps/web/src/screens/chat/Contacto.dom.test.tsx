@@ -4,7 +4,7 @@
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import { Contacto, URL_LANDING, URL_VERIFICACION } from './Contacto'
+import { Contacto, URL_LANDING } from './Contacto'
 import { ClienteChat, type Conversacion } from '../../data/ops/chat'
 
 afterEach(cleanup)
@@ -50,7 +50,7 @@ describe('Enlace de contacto', () => {
     const chat = await screen.findByTestId('chat-canonico')
     expect(chat.className).toMatch(/rc-chat--wa/); expect(chat.className).toMatch(/rc-chat--pagina/)
     expect(chat.querySelector('.rc-head .rc-mark img')).toBeTruthy()
-    expect((screen.getByTestId('ir-verificacion') as HTMLAnchorElement).getAttribute('href')).toBe(URL_VERIFICACION)
+    expect(screen.getByTestId('ir-verificacion').textContent).toMatch(/Verificar mi cuenta/)   // se verifica DENTRO del chat (ya no manda a la landing)
     expect((screen.getByTestId('ir-landing') as HTMLAnchorElement).getAttribute('href')).toBe(URL_LANDING)
     await screen.findByText('Hola, ¿en qué te ayudo?')
     expect(screen.getByTestId('msg-visitor').querySelector('.rc-tick')).toBeTruthy(); expect(screen.getByTestId('msg-ai').querySelector('.rc-tick')).toBeNull()

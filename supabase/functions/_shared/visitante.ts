@@ -91,3 +91,13 @@ export function mapearErrorPrerregistro(mensaje: string | undefined): { status: 
   if (campo && campo in MENSAJE_PRERREGISTRO) return { status: 400, body: { error: 'prerregistro_invalido', message: MENSAJE_PRERREGISTRO[campo], campo } }
   return { status: 503, body: { error: 'no_disponible', message: 'No se pudo guardar tu registro. Intenta más tarde.' } }
 }
+
+// VERIFICARME EN EL CHAT · lo que se pide dentro de la conversación (el resto ya está en el prerregistro).
+export function validarVerificarme(p: unknown): { ok: true; cedula: string; password: string } | { ok: false; campo: string; mensaje: string } {
+  const o = (p && typeof p === 'object' && !Array.isArray(p) ? p : {}) as Record<string, unknown>
+  const cedula = (typeof o.cedula === 'string' ? o.cedula : '').replace(/\s+/g, '')
+  if (!/^[0-9]{5,12}$/.test(cedula)) return { ok: false, campo: 'cedula', mensaje: 'Escribe solo los números de tu cédula profesional.' }
+  const password = typeof o.password === 'string' ? o.password : ''
+  if (password.length < 8 || password.length > 72) return { ok: false, campo: 'password', mensaje: 'La contraseña debe tener entre 8 y 72 caracteres.' }
+  return { ok: true, cedula, password }
+}

@@ -151,7 +151,8 @@ describe('frontend', () => {
     const iLimpia = v.indexOf('limpiarPrerregistro(p.datos)'); const iLimite = v.indexOf("scope: 'visitor_prerregistro'"); const iRpc = v.indexOf("admin.rpc('cc_visitante_prerregistrar'")
     expect(iLimpia).toBeGreaterThan(0); expect(iLimite).toBeGreaterThan(iLimpia); expect(iRpc).toBeGreaterThan(iLimite)
     expect(v).toMatch(/return json\(200, \{ estado: r\.estado, nombre: r\.nombre \}\)/)
-    expect(v).not.toMatch(/posible_|seller|customer/)
+    const pre = v.slice(v.indexOf("if (action === 'prerregistrar')"), v.indexOf("if (action === 'mis_datos')"))   // la respuesta del prerregistro
+    expect(pre).not.toMatch(/posible_|seller|customer/)
   })
   it('AG · el chat interno de staff (legacy) sigue intacto', () => {
     expect(legacyChatStore).toMatch(/from\('messages'\)/); expect(legacyChatStore).not.toMatch(/cc_messages/)
