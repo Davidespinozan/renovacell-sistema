@@ -12,7 +12,7 @@
 // ============================================================================
 
 // Tipos neutrales (espejo de apps/web/src/data/shipping/model.ts; el server es la autoridad).
-export interface NeutralAddress { line1: string; cp?: string; city?: string; state?: string; phone?: string }
+export interface NeutralAddress { line1: string; colonia?: string; cp?: string; city?: string; state?: string; refs?: string; phone?: string }
 export interface NeutralShipper { name: string; addressLine1: string; cp: string; city: string; state: string; country: string; phone: string; email: string }
 export interface NeutralReceiver { name: string; email?: string | null; address: NeutralAddress }
 export interface NeutralPackage { weightKg: number; lengthCm: number; widthCm: number; heightCm: number; pieces: number }
@@ -26,13 +26,32 @@ function plannedDate(): string {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T10:00:00 GMT+00:00`
 }
 
-function postalAddress(a: NeutralAddress, countryCode = CC) {
+// MyDHL limita cada línea a 45 caracteres (más largo → 422 y no sale la guía). En México la COLONIA es clave para que
+// el repartidor llegue: va en la línea 2 (antes no viajaba); las referencias en la 3. Una calle larga se parte en palabras.
+const MAX_LINEA = 45
+const limpia = (t?: string | null) => String(t ?? '').replace(/\s+/g, ' ').trim()
+function partir(t: string, max = MAX_LINEA): [string, string] {
+  if (t.length <= max) return [t, '']
+  const corte = t.lastIndexOf(' ', max)
+  const i = corte > max * 0.5 ? corte : max
+  return [t.slice(0, i).trim(), t.slice(i).trim()]
+}
+export function lineasDireccion(a: NeutralAddress): { addressLine1: string; addressLine2?: string; addressLine3?: string } {
+  const [l1, resto] = partir(limpia(a.line1))
+  const colonia = limpia(a.colonia)
+  const col = colonia ? (/^col(\.|onia)?\s/i.test(colonia) ? colonia : `Col. ${colonia}`) : ''
+  const l2 = [resto, col].filter(Boolean).join(', ').slice(0, MAX_LINEA)
+  const l3 = limpia(a.refs).slice(0, MAX_LINEA)
+  return { addressLine1: l1, ...(l2 ? { addressLine2: l2 } : {}), ...(l3 ? { addressLine3: l3 } : {}) }
+}
+export function postalAddress(a: NeutralAddress, countryCode = CC) {
+  const estado = limpia(a.state).slice(0, 35)
   return {
-    postalCode: a.cp ?? '',
-    cityName: a.city ?? '',
+    postalCode: limpia(a.cp).replace(/\D/g, ''),
+    cityName: limpia(a.city).slice(0, MAX_LINEA),
     countryCode,
-    addressLine1: a.line1,
-    ...(a.state ? { provinceCode: a.state } : {}),
+    ...lineasDireccion(a),
+    ...(estado ? { provinceCode: estado } : {}),
   }
 }
 function shipperAddress(s: NeutralShipper) {
@@ -93,7 +112,7 @@ export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralR
       receiverDetails: {
         postalAddress: postalAddress(receiver.address),
         contactInformation: {
-          phone: receiver.address.phone ?? '',
+          phone: String(receiver.address.phone ?? '').replace(/[^\d+]/g, ''),
           companyName: receiver.name,
           fullName: receiver.name,
           ...(receiver.email ? { email: receiver.email } : {}),
