@@ -18,12 +18,15 @@ describe('WhatsApp en Conversaciones', () => {
     montar(conv({ wa_id: '5216671112233', modo: 'espejo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 }))
     expect((await screen.findByTestId('wa-espejo')).textContent).toMatch(/Leadsales/)
     expect(screen.getByTestId('chat-modo').textContent).toMatch(/^WhatsApp · /)
+    // 169 · en espejo nadie escribe desde el sistema: lo que se escribiera no saldría por WhatsApp
+    expect((screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled).toBe(true)
   })
   it('activo y ventana de 24 h cerrada: avisa que no le llegará; abierta: sin aviso', async () => {
     montar(conv({ wa_id: '5216671112233', modo: 'activo', ventana_abierta: false, ventana_hasta: null, fallidos: 1 }))
     expect((await screen.findByTestId('wa-ventana')).textContent).toMatch(/más de 24 horas/)
     cleanup(); montar(conv({ wa_id: '5216671112233', modo: 'activo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 }))
     await screen.findByTestId('chat-modo'); expect(screen.queryByTestId('wa-ventana')).toBeNull(); expect(screen.queryByTestId('wa-espejo')).toBeNull()
+    expect(screen.getByTestId('btn-enviar').hasAttribute('disabled') && (screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled && document.querySelector('.rc-composer textarea, .rc-composer input')?.hasAttribute('disabled')).toBeFalsy()
   })
   it('servidor: mensaje de texto de la Cloud API, wamid de la respuesta, acuses y llaves', () => {
     expect(cuerpoTexto('5216671112233', 'Hola')).toEqual({ messaging_product: 'whatsapp', recipient_type: 'individual', to: '5216671112233', type: 'text', text: { preview_url: true, body: 'Hola' } })

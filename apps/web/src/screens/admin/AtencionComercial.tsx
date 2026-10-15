@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { capitalizarNombre } from '../../lib/nombres'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
+import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type BandejaWhatsApp, type ChatWhatsApp, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
 import { chat as chatPorDefecto, ETIQUETA_MODO, type ClienteChat, type ModoConversacion } from '../../data/ops/chat'
 import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, textoEspera, textoIA, tonoAtencion, KINDS_COMERCIALES } from '../../data/ops/atencionComercial'
 import { recargarAtencion } from '../../data/store/atencionStore'
@@ -21,14 +21,15 @@ import { consumirIntento, irAConversacion, useIntento } from '../../data/store/n
 import { HorarioYAlertas } from './HorarioAtencion'
 import { useRole } from '../../auth/RoleContext'
 import { EnlaceContacto } from '../../app/EnlaceContacto'
+import { ChatCanonico } from '../chat/ChatCanonico'
 
-type Pestana = 'pendientes' | 'cartera' | 'vendedores' | 'horario'
+type Pestana = 'pendientes' | 'cartera' | 'vendedores' | 'horario' | 'whatsapp'
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 const campo: React.CSSProperties = { padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', fontFamily: 'inherit', fontSize: 13.5, minHeight: 40 }
 
 // Pestaña inicial pedida desde otra pantalla (p. ej. Inicio → "Configurar horario").
 let pestanaPedida: Pestana | null = null
-export function abrirPestanaAtencion(p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes') { pestanaPedida = p === 'solicitudes' ? 'pendientes' : p }
+export function abrirPestanaAtencion(p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes' | 'whatsapp') { pestanaPedida = p === 'solicitudes' ? 'pendientes' : p }
 
 export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, onEquipo, onAbrir }: { cliente?: ClienteAtencion; chat?: ClienteChat; onEquipo?: () => void; onAbrir?: (conversationId: string) => void }) {
   const [pestana, setPestana] = useState<Pestana>(() => { const p = pestanaPedida ?? 'pendientes'; pestanaPedida = null; return p })
@@ -77,7 +78,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
       </div>
       {error && <div role="alert" className="card" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
       <div className="seg" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }} role="tablist" aria-label="Secciones de atención comercial">
-        {([['pendientes', 'Solicitudes'], ['cartera', 'Cartera'], ['vendedores', 'Vendedores'], ['horario', 'Horario y alertas']] as const).map(([k, l]) => (
+        {([['pendientes', 'Solicitudes'], ['whatsapp', 'WhatsApp'], ['cartera', 'Cartera'], ['vendedores', 'Vendedores'], ['horario', 'Horario y alertas']] as const).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={pestana === k} className={pestana === k ? 'active' : undefined} onClick={() => setPestana(k)}>{l}</button>
         ))}
       </div>
@@ -85,6 +86,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
       {pestana === 'cartera' && <PestanaCartera vendedores={vendedores} cliente={cliente} onCambio={alCambiar} />}
       {pestana === 'vendedores' && <PestanaVendedores vendedores={vendedores} onEquipo={onEquipo} />}
       {pestana === 'horario' && <HorarioYAlertas cliente={cliente} onCambio={alCambiar} />}
+      {pestana === 'whatsapp' && <PestanaWhatsApp cliente={cliente} chat={chat} />}
     </div>
   )
 }
@@ -371,6 +373,79 @@ function PestanaVendedores({ vendedores, onEquipo }: { vendedores: Vendedor[]; o
             <span className={'pill ' + (v.conversaciones ? 'p-neu' : 'p-warn')}>{v.conversaciones ? 'Atiende conversaciones' : 'No atiende conversaciones'}</span>
             <span className={'pill ' + (v.nuevos_clientes ? 'p-neu' : 'p-warn')}>{v.nuevos_clientes ? 'Recibe clientes nuevos' : 'No recibe nuevos'}</span>
             <span className="pill p-neu">{v.clientes} cliente(s)</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ── WhatsApp (169) · Dirección ve los chats del número de la empresa ──────────────────────────────────
+// En modo espejo solo se leen (Leadsales sigue contestando); en activo, desde aquí mismo se contesta y se asigna.
+// Las listas de Solicitudes/Asesorías no los muestran mientras nadie pida asesor: esta pestaña es la vista del canal.
+// "hace N min" con minutos que manda el servidor (su reloj): aquí no se usa el del navegador.
+const hace = (min: number | null | undefined): string => {
+  if (min == null) return ''
+  if (min < 1) return 'ahora'
+  if (min < 60) return `hace ${min} min`
+  if (min < 48 * 60) return `hace ${Math.round(min / 60)} h`
+  return `hace ${Math.round(min / 1440)} días`
+}
+const telefonoBonito = (wa: string) => { const m = /^521?(\d{3})(\d{3})(\d{4})$/.exec(wa); return m ? `+52 ${m[1]} ${m[2]} ${m[3]}` : `+${wa}` }   // México llega como 52 o 521 + 10 dígitos
+const ACTOR: Record<string, string> = { visitor: 'Cliente', doctor: 'Cliente', ai: 'Asistente', seller: 'Vendedor', admin: 'Dirección' }
+
+function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: ClienteChat }) {
+  const [bandeja, setBandeja] = useState<BandejaWhatsApp | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [abierta, setAbierta] = useState<ChatWhatsApp | null>(null)
+  const cargar = useCallback(async () => { const r = await cliente.whatsapp(); if (r.ok) { setBandeja(r.data); setError(null) } else setError(r.error) }, [cliente])
+  useEffect(() => { void cargar() }, [cargar])
+  useEffect(() => { const t = setInterval(() => { if (!abierta) void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, abierta])
+
+  if (abierta?.conversation_id) return (
+    <div className="grid" style={{ gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" className="btn ghost sm" onClick={() => { setAbierta(null); void cargar() }} data-testid="wa-volver">← WhatsApp</button>
+        <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{abierta.cliente_nombre ?? abierta.nombre ?? ''} · {telefonoBonito(abierta.wa_id)}{abierta.cliente ? ' · cliente' : ' · sin cuenta'}</span>
+      </div>
+      <ChatCanonico embebido asesor puedeEmpresa conversationId={abierta.conversation_id} cliente={chat} nombreCliente={abierta.cliente_nombre ?? abierta.nombre ?? telefonoBonito(abierta.wa_id)}
+        etiquetaSalir="Volver a WhatsApp" onSalir={() => { setAbierta(null); void cargar() }} onFin={() => { setAbierta(null); void cargar() }} />
+    </div>
+  )
+  const espejo = bandeja?.modo === 'espejo'
+  const sinResponder = bandeja?.chats.filter((c) => c.sin_responder).length ?? 0
+  return (
+    <div className="card" data-testid="wa-bandeja">
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: 'var(--ink-3)' }}>
+          {bandeja == null ? 'Cargando…' : espejo
+            ? <>WhatsApp en <b>modo espejo</b>: los mensajes del número de la empresa se registran aquí, pero todavía se contestan en Leadsales. Desde aquí solo se leen.</>
+            : <>WhatsApp <b>activo</b>: el asistente contesta primero y avisa a la vendedora; desde aquí Dirección puede leer, contestar y asignar.</>}
+        </div>
+        {bandeja && <span className={'pill ' + (espejo ? 'p-warn' : 'p-ok')} data-testid="wa-modo">{espejo ? 'Espejo · solo lectura' : 'Activo'}</span>}
+        {bandeja && <span className="pill p-neu">{bandeja.chats.length} chat(s)</span>}
+        {bandeja && sinResponder > 0 && <span className="pill p-warn">{sinResponder} sin responder</span>}
+        <button type="button" className="btn ghost sm" onClick={() => void cargar()}>Actualizar</button>
+      </div>
+      {error && <div role="alert" style={{ color: 'var(--danger)', marginBottom: 8 }}>{error}</div>}
+      {bandeja && bandeja.chats.length === 0 && <div style={{ color: 'var(--ink-3)' }}>Todavía no ha escrito nadie por WhatsApp.</div>}
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+        {bandeja?.chats.map((c) => (
+          <li key={c.wa_id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 12 }} data-testid="wa-chat">
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>
+                {c.cliente_nombre ?? c.nombre ?? telefonoBonito(c.wa_id)}
+                <span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 6 }}>{telefonoBonito(c.wa_id)}</span>
+                <span className={'pill ' + (c.cliente ? 'p-ok' : 'p-neu')} style={{ marginLeft: 6 }}>{c.cliente ? 'Cliente' : 'Sin cuenta'}</span>
+                {c.sin_responder && <span className="pill p-warn" style={{ marginLeft: 4 }}>Sin responder</span>}
+                {c.vendedor && <span className="pill p-neu" style={{ marginLeft: 4 }}>{c.vendedor}</span>}
+              </div>
+              {c.ultimo_texto && <div style={{ fontSize: 12.5, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 520 }}>
+                <span style={{ color: 'var(--ink-3)' }}>{ACTOR[c.ultimo_actor ?? ''] ?? ''}{c.ultimo_actor ? ': ' : ''}</span>{c.ultimo_texto}
+              </div>}
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{hace(c.hace_min)}{c.n_mensajes ? ` · ${c.n_mensajes} mensaje(s)` : ''}{c.ventana_abierta === false ? ' · ventana de 24 h cerrada' : ''}</div>
+            </div>
+            {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => setAbierta(c)} data-testid="wa-abrir">{espejo ? 'Ver chat' : 'Abrir chat'}</button>}
           </li>
         ))}
       </ul>

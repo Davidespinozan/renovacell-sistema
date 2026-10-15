@@ -235,7 +235,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const modo: ModoConversacion = conv?.modo ?? 'ai_active'
   const cerrada = conv?.estado === 'cerrada'
   const soyAsesor = asesor && (conv?.rol === 'asesor' || conv?.rol === 'supervisor')
-  const puedoEscribir = !!conv && !cerrada && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
+  // WA · en modo espejo lo que se escribiera aquí NUNCA saldría por WhatsApp (se contesta en Leadsales): el redactor se apaga.
+  const waEspejo = asesor && conv?.whatsapp?.modo === 'espejo'
+  const puedoEscribir = !!conv && !cerrada && !waEspejo && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
 
@@ -489,7 +491,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
       {/* WA-2 · el cliente escribe por WhatsApp: qué le llega y qué no (solo lo ve el personal). */}
       {asesor && conv?.whatsapp && (conv.whatsapp.modo === 'espejo'
-        ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">WhatsApp en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales.</div>
+        ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">WhatsApp en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales; desde aquí no se puede escribir.</div>
         : !conv.whatsapp.ventana_abierta
           ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por WhatsApp hace más de 24 horas: lo que escribas queda aquí pero no le llega por WhatsApp hasta que vuelva a escribir (regla de Meta).</div>
           : null)}

@@ -1,6 +1,7 @@
 -- WHATSAPP EN EL CHAT (167) · el down regresa _cc_nombre_dueno a la 150 y retira lo nuevo; se reaplica igual.
 begin;
 create temp table _wa as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
+\ir ../../../rollback/whatsapp_bandeja/99_down.sql   -- WHATSAPP-BANDEJA (169) se baja antes que la 168
 \ir ../../../rollback/whatsapp_salida/99_down.sql   -- WHATSAPP-SALIDA (168) se baja antes que la 167
 \ir ../../../rollback/whatsapp_canal/99_down.sql
 do $t$ begin
@@ -8,6 +9,7 @@ do $t$ begin
 end $t$;
 \ir ../../../migrations/20261220120000_whatsapp_canal.sql
 \ir ../../../migrations/20261221120000_whatsapp_salida.sql
+\ir ../../../migrations/20261222120000_whatsapp_bandeja.sql
 do $t$ begin
   perform tests.ok((select todas from _wa) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '167 · se reaplica idéntica');
 end $t$;

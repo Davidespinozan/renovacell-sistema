@@ -8,7 +8,7 @@ import { Asesorias } from './Asesorias'
 import { AtencionComercial } from '../admin/AtencionComercial'
 import { HorarioAtencion } from '../admin/HorarioAtencion'
 import type { ClienteChat, Conversacion, ColaItem } from '../../data/ops/chat'
-import type { ClienteAtencion, Horario, Pendientes } from '../../data/ops/atencion'
+import type { BandejaWhatsApp, ClienteAtencion, Horario, Pendientes } from '../../data/ops/atencion'
 
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'admin', setScreen: vi.fn() }) }))
 beforeEach(cleanup)
@@ -77,13 +77,14 @@ describe('Asesorías', () => {
 })
 
 const horario: Horario = { zona: 'America/Mazatlan', configurado: false, actualizado_at: '', semana: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ dia: d, abierto: false, abre: null, cierra: null })), excepciones: [], estado: { configurado: false, abierto: false, zona: 'America/Mazatlan', motivo: 'sin_configurar' } }
-function atencionFalsa(p: Partial<Pendientes> = {}) {
+function atencionFalsa(p: Partial<Pendientes> = {}, wa: BandejaWhatsApp = { modo: 'espejo', chats: [] }) {
   const llamadas: Array<{ fn: string; args: unknown[] }> = []
   const reg = (fn: string, data: unknown) => vi.fn(async (...args: unknown[]) => { llamadas.push({ fn, args }); return ok(data) })
   const pend: Pendientes = { resumen: { horario: horario.estado, sin_vendedor: 1, reasignacion: 0, handoffs_sin_asignar: 2, handoffs_pendientes: 0, vendedores_elegibles: 1 }, conversaciones: [], carritos_pendientes: [], ...p }
   const c = {
     pendientes: reg('pendientes', pend), resumen: reg('resumen', pend.resumen), cartera: reg('cartera', []), asignar: reg('asignar', { idempotente: false }),
     vendedores: reg('vendedores', [{ id: 'S1', nombre: 'Ana', activo: true, conversaciones: true, nuevos_clientes: true, elegible: true, elegible_nuevos: true, clientes: 0 }]),
+    whatsapp: reg('whatsapp', wa),
     horario: reg('horario', horario), guardarHorario: reg('guardarHorario', { ...horario, configurado: true }), guardarExcepcion: reg('guardarExcepcion', horario), borrarExcepcion: reg('borrarExcepcion', horario),
   } as unknown as ClienteAtencion
   return { c, llamadas }
@@ -103,6 +104,41 @@ describe('Atención comercial (Dirección)', () => {
     fireEvent.change(filas[1].querySelector('select')!, { target: { value: 'S1' } })
     fireEvent.click(filas[1].querySelector('[data-testid="btn-asignar-pendiente"]')!)
     await waitFor(() => expect(ch.llamadas.some((l) => l.fn === 'asignar' && l.args[0] === 'C2' && l.args[1] === 'S1')).toBe(true))
+  })
+})
+
+describe('Atención comercial · pestaña WhatsApp (169)', () => {
+  const chatWa = (x: Partial<BandejaWhatsApp['chats'][number]> = {}): BandejaWhatsApp['chats'][number] => ({ wa_id: '5216671647799', nombre: 'Stryv Studio', ultimo_entrante_at: new Date().toISOString(), ventana_abierta: true, cliente: false, cliente_nombre: null, conversation_id: 'CW1', modo: 'ai_active', estado: 'abierta', vendedor: null, n_mensajes: 1, ultimo_texto: 'Prueba Renovacell', ultimo_actor: 'visitor', ultimo_at: new Date().toISOString(), hace_min: 3, sin_responder: true, ...x })
+  it('espejo: lista los chats de WhatsApp (nombre, número, sin cuenta, sin responder) y abre la conversación en solo lectura', async () => {
+    const a = atencionFalsa({}, { modo: 'espejo', chats: [chatWa(), chatWa({ wa_id: '5216671230002', nombre: 'Dra', cliente: true, cliente_nombre: 'Dra. Wa', conversation_id: 'CW2', sin_responder: false, ultimo_actor: 'ai', ultimo_texto: 'Sí, tenemos.' })] })
+    const ch = chatFalso({ conversation_id: 'CW1', rol: 'supervisor', modo: 'ai_active', whatsapp: { wa_id: '5216671647799', modo: 'espejo', ventana_abierta: true, ventana_hasta: null, fallidos: 0 } })
+    render(<AtencionComercial cliente={a.c} chat={ch.c} />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
+    expect((await screen.findByTestId('wa-modo')).textContent).toMatch(/Espejo/)
+    const filas = await screen.findAllByTestId('wa-chat')
+    expect(filas).toHaveLength(2)
+    expect(filas[0]).toHaveTextContent('Stryv Studio'); expect(filas[0]).toHaveTextContent('+52 667 164 7799'); expect(filas[0]).toHaveTextContent('Sin cuenta'); expect(filas[0]).toHaveTextContent('Sin responder'); expect(filas[0]).toHaveTextContent('Cliente: Prueba Renovacell'); expect(filas[0]).toHaveTextContent('hace 3 min')
+    expect(filas[1]).toHaveTextContent('Dra. Wa'); expect(filas[1]).toHaveTextContent('Cliente'); expect(filas[1]).not.toHaveTextContent('Sin responder'); expect(filas[1]).toHaveTextContent('Asistente: Sí, tenemos.')
+    expect(a.llamadas.some((l) => l.fn === 'whatsapp')).toBe(true)
+    fireEvent.click(filas[0].querySelector('[data-testid="wa-abrir"]')!)
+    await waitFor(() => expect(ch.llamadas.some((l) => l.fn === 'leer' && l.args[0] === 'CW1')).toBe(true))
+    expect((await screen.findByTestId('wa-espejo')).textContent).toMatch(/no se puede escribir/)
+    expect((screen.getByTestId('btn-enviar') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByTestId('wa-volver'))
+    expect(await screen.findByTestId('wa-bandeja')).toBeTruthy()
+  })
+  it('activo: la pestaña lo dice y el botón es "Abrir chat"', async () => {
+    const a = atencionFalsa({}, { modo: 'activo', chats: [chatWa()] })
+    render(<AtencionComercial cliente={a.c} chat={chatFalso({}).c} />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
+    expect((await screen.findByTestId('wa-modo')).textContent).toBe('Activo')
+    expect(screen.getByTestId('wa-abrir')).toHaveTextContent('Abrir chat')
+  })
+  it('sin chats: lo dice; Ventas no tiene la pestaña (la función del servidor lo exige, aquí solo no se muestra nada roto)', async () => {
+    const a = atencionFalsa({}, { modo: 'espejo', chats: [] })
+    render(<AtencionComercial cliente={a.c} chat={chatFalso({}).c} />)
+    fireEvent.click(await screen.findByRole('tab', { name: 'WhatsApp' }))
+    expect(await screen.findByText(/Todavía no ha escrito nadie/)).toBeTruthy()
   })
 })
 

@@ -27,6 +27,13 @@ export interface PendienteRuteo {
 export interface ConfigAtencion { aviso_min: number; escalamiento_min: number; pausar_fuera_horario: boolean; updated_at: string | null; horario: EstadoHorario }
 export interface ResultadoReasignacion { cartera_vendedor: string | null; [k: string]: unknown }
 export interface Pendientes { resumen: ResumenRuteo; conversaciones: PendienteRuteo[]; carritos_pendientes: Array<{ cart_id: string; profile_id: string | null; visitante: boolean; desde: string | null; error: string | null; n_items: number }> }
+// WHATSAPP · bandeja de Dirección (169): un renglón por contacto de WhatsApp con su conversación y último mensaje.
+export interface ChatWhatsApp {
+  wa_id: string; nombre: string | null; ultimo_entrante_at: string | null; ventana_abierta: boolean | null
+  cliente: boolean; cliente_nombre: string | null; conversation_id: string | null; modo: string | null; estado: string | null; vendedor: string | null
+  n_mensajes: number; ultimo_texto: string | null; ultimo_actor: string | null; ultimo_at: string | null; hace_min: number | null; sin_responder: boolean | null
+}
+export interface BandejaWhatsApp { modo: 'espejo' | 'activo'; chats: ChatWhatsApp[] }
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
@@ -92,6 +99,7 @@ export class ClienteAtencion {
   asignar(cliente: string, vendedor: string | null, motivo?: string | null) { return this.llamar<{ idempotente: boolean }>('cc_cartera_asignar', { p_cliente: cliente, p_vendedor: vendedor, p_motivo: motivo ?? null }) }
   resumen() { return this.llamar<ResumenRuteo>('cc_ruteo_resumen') }
   pendientes() { return this.llamar<Pendientes>('cc_ruteo_pendientes') }
+  whatsapp() { return this.llamar<BandejaWhatsApp>('cc_wa_bandeja') }   // WHATSAPP · solo Dirección
   // CHV2-A · pasa SOLO esta solicitud a otro vendedor (handler). La cartera NO cambia; motivo obligatorio.
   reasignarSolicitud(conversation_id: string, vendedor: string, motivo: string) {
     return this.llamar<ResultadoReasignacion>('cc_solicitud_reasignar', { p_conv: conversation_id, p_vendedor: vendedor, p_motivo: motivo })
