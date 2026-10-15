@@ -302,7 +302,7 @@ describe('observa.ts · aislamiento', () => {
 const INSTRUMENTADAS: Record<string, number> = {
   shipping: 19, 'cfdi-send': 1, 'cfdi-cancel': 4, 'cfdi-cancel-status': 2, 'cfdi-download': 1,
   'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 1,
-  'stripe-webhook': 3, 'meta-webhook': 1, 'report-transfer': 1,
+  'stripe-webhook': 3, 'meta-webhook': 2, 'report-transfer': 1,
 }
 const NO_INSTRUMENTADAS = ['assistant', 'cfdi', 'invite-doctor', 'stripe-checkout', 'meta-send', 'capture-lead']
 

@@ -17,6 +17,7 @@
 // IMPORTANTE al desplegar: --no-verify-jwt (Meta no manda JWT de Supabase).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
+import { extraerWhatsApp, modoWhatsApp } from '../_shared/whatsapp.ts'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('meta-webhook')
@@ -49,7 +50,8 @@ function extractMessages(payload: Record<string, unknown>): Incoming[] {
   const objType = payload?.object as string | undefined
   const entries = Array.isArray(payload?.entry) ? (payload.entry as Record<string, unknown>[]) : []
   for (const entry of entries) {
-    // WhatsApp
+    // WhatsApp: WA-1 lo lleva al chat canónico (extraerWhatsApp); aquí ya no entra a la bandeja vieja de prospectos.
+    if (objType === 'whatsapp_business_account') continue
     for (const change of ((entry.changes as Record<string, unknown>[]) ?? [])) {
       const value = (change.value ?? {}) as Record<string, unknown>
       const contacts = (value.contacts as Record<string, unknown>[]) ?? []
@@ -102,6 +104,18 @@ Deno.serve(async (req) => {
   }
   let payload: Record<string, unknown>
   try { payload = JSON.parse(body) } catch { return new Response('JSON inválido', { status: 400 }) }
+
+  // ── WA-1 · WhatsApp → conversación canónica (Conversaciones). Cada mensaje por su wamid: un reintento de Meta no
+  //    duplica. Si la base falla, 500 para que Meta reintente (antes respondía 200 y el mensaje se perdía).
+  const wa = extraerWhatsApp(payload)
+  if (wa.length > 0) {
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+    const encolar = modoWhatsApp((k) => Deno.env.get(k)) === 'activo'
+    for (const m of wa) {
+      const { error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: encolar })
+      if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); return new Response('reintentar', { status: 500 }) }
+    }
+  }
 
   const incomings = extractMessages(payload)
   // Meta EXIGE 200 aunque no haya nada que procesar (si no, reintenta y duplica).
