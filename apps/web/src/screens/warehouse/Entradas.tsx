@@ -5,6 +5,7 @@
 // Las ENTRADAS EXCEPCIONALES (sin compra: inventario encontrado, muestra, corrección autorizada)
 // son otra cosa: solo Dirección, con motivo, en su propia sección. La carga inicial de inventario
 // va por "Importar / Migración" (idempotente por lote), no por aquí.
+import { GuiaInventario } from '../../app/GuiaInventario'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
@@ -73,6 +74,7 @@ export function Entradas() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <GuiaInventario paso={2} />
       <PageHead title="Recibir mercancía">
         Cuando llega producto de una <b>compra a proveedor</b>, recíbelo aquí: capturas la cantidad que llegó, el lote
         y la caducidad, y el inventario se actualiza en ese momento. Si llegó menos, la compra queda parcial; si

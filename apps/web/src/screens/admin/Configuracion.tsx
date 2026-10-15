@@ -1,6 +1,7 @@
 // DIRECCIÓN · Configuración de la empresa (emisor). Aquí se capturan los datos fiscales que
 // necesita el CFDI (razón social, RFC, régimen SAT, lugar de expedición) y la identidad que
 // aparece en recibos/manifiestos. Antes no existía dónde capturar al EMISOR del CFDI.
+import { Importar } from './Importar'
 import React, { useMemo, useState, useEffect } from 'react'
 import { Building2, Save, Plus, Star, Trash2, Copy } from 'lucide-react'
 import { useCompany } from '../../data/hooks/useCompany'
@@ -15,6 +16,7 @@ const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight:
 
 export function Configuracion() {
   const { company, saveCompany } = useCompany()
+  const [mostrarImportar, setMostrarImportar] = useState(false)
   const [form, setForm] = useState(company)
   const [saved, setSaved] = useState(false)
 
@@ -43,6 +45,22 @@ export function Configuracion() {
         <Building2 size={18} />
         <div className="eyebrow" style={{ margin: 0 }}>Dirección · Configuración de la empresa</div>
       </div>
+      {/* Herramienta de migración: ya se usó para traer Odoo; se queda aquí (fuera del menú) por si llega otro Excel. */}
+      {!mostrarImportar && (
+        <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }} data-testid="migracion-card">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>Importar / Migración</h4>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Carga por Excel/CSV de catálogo, clientes, inventario por lote y costos. Ya se usó para traer Odoo; sirve si llega otro archivo. No duplica si se repite.</div>
+          </div>
+          <button type="button" className="btn ghost" style={{ minHeight: 40 }} onClick={() => setMostrarImportar(true)} data-testid="importar-abrir">Abrir herramienta</button>
+        </div>
+      )}
+      {mostrarImportar ? (
+        <div className="grid" style={{ gap: 10 }}>
+          <div><button type="button" className="btn ghost sm" onClick={() => setMostrarImportar(false)} data-testid="importar-cerrar">← Volver a Configuración</button></div>
+          <Importar />
+        </div>
+      ) : null}
 
       <div className="card">
         <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>Datos fiscales / empresa</h4>

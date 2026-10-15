@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
 
 const srv = vi.hoisted(() => ({ role: 'pos' as string, capabilities: ['conversaciones'] as string[], setScreen: vi.fn(), user: { name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx' } }))
+vi.mock('../../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, capabilities: srv.capabilities, setScreen: srv.setScreen, user: srv.user, screen: 'inicio' }) }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: [] }), useOrders: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: [] }) }))

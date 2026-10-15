@@ -4,6 +4,7 @@
 //  3) Almacén RECIBE LA MERCANCÍA (cantidad real, lote, caducidad) → lote/kardex → inventario disponible.
 //  4) La compra queda parcial o completa. Pagarla es un hecho de dinero aparte.
 // La orden nace por el comando idempotente `crear_orden_compra` (un doble clic no duplica).
+import { GuiaInventario } from '../../app/GuiaInventario'
 import React, { useMemo, useState } from 'react'
 import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory, Check, DollarSign } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
@@ -58,6 +59,8 @@ export function Reabastecimiento() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <GuiaInventario paso={1} />
+      {!isAdmin && <div className="sysnote" data-testid="compras-solo-lectura">Aquí ves <b>qué viene en camino</b>. Las compras las registra Dirección; lo tuyo es <b>Recibir mercancía</b> cuando llegue.</div>}
       <PageHead title="Compras a proveedores">
         Aquí registras <b>qué le compras a un proveedor</b> (o qué produces): producto, cantidad y costo. La compra
         queda <b>pendiente de recibir</b> y <b>no suma inventario</b>: el inventario entra cuando Almacén <b>recibe la

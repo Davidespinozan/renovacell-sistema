@@ -12,6 +12,7 @@ const srv = vi.hoisted(() => ({
   revision: { estado: 'listo', data: { resumen: { abiertos: 0 } } } as Record<string, unknown>,
   orders: [] as unknown[], claims: [] as unknown[],
 }))
+vi.mock('../../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'admin', setScreen: (s: string) => srv.setScreen(s), user: { email: 'x@y.mx', name: 'Dirección' } }) }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: srv.orders }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: srv.claims }) }))

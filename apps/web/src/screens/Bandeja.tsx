@@ -24,6 +24,7 @@ import { solicitudesVendedor, activasVendedor, intervencionDireccion, TEXTO_HORA
 import { tieneCfdi } from '../data/ops/cfdi'
 import { clasificarDeclaraciones } from '../data/ops/pagosPendientes'
 import { useRevisionEconomica } from '../data/hooks/useRevisionEconomica'
+import { useSolicitudesCancelacion } from '../data/ops/cancelacionSolicitud'
 import { hasSupabase } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
@@ -51,6 +52,7 @@ function useTareasBase(): Task[] {
   const { data: devoluciones } = useStockReturns()
   const { data: compras } = useCompras()
   const { data: custodias } = useCustodies()
+  const cancelaciones = useSolicitudesCancelacion()   // CANCELACIÓN (162) · pendientes de Dirección
 
   // W4-03 · Toda cola de esta bandeja se DERIVA del estado del servidor. Ninguna
   // depende de un aviso ni de memoria del navegador: al recargar o abrir la app en
@@ -82,6 +84,7 @@ function useTareasBase(): Task[] {
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 
+      if (cancelaciones.length) t.push({ id: 'cancelaciones', icon: 'receipt', title: 'Solicitudes de cancelación', detail: 'Alguien del equipo pidió cancelar un pedido: apruébalo o recházalo con nota.', count: cancelaciones.length, tone: 'dang', screen: 'av_ventas' })
       if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
       // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
       // PAY-EXP-01A-3 · MISMO universo que la lista de "Pagos por validar" (los de pedidos cancelados → Revisión económica).
@@ -119,7 +122,7 @@ function useTareasBase(): Task[] {
     // `byOrder` y `claims` FALTABAN aquí: si el dinero o los pagos declarados llegaban
     // después de los pedidos, la bandeja no se recalculaba y "Pagos por validar" o
     // "Por surtir" quedaban invisibles hasta que cambiara otra cosa.
-  }, [role, user, orders, byOrder, claims, shipments, lots, doctors, devoluciones, compras, custodias])
+  }, [role, user, orders, byOrder, claims, shipments, lots, doctors, devoluciones, compras, custodias, cancelaciones])
 }
 
 // CHV2-B · Atención comercial desde el store compartido (la misma lectura que Inicio y la alerta).

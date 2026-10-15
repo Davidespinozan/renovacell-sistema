@@ -58,7 +58,6 @@ export const ROLES: RoleDef[] = [
       { key: 'av_doc', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // directorio comercial (customers)
       { key: 'av_verif', label: 'Por verificar', icon: 'shield', section: 'Clientes' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Clientes' },
-      { key: 'av_comisiones', label: 'Comisiones', icon: 'chart', section: 'Clientes' },
       { key: 'av_atencion', label: 'Bandeja', icon: 'chat', section: 'Conversaciones' },     // solicitudes de asesor + WhatsApp (la key no cambia: avisos y enlaces apuntan aquí)
       { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Conversaciones' },     // CC-2 · las que ya tienen vendedor (la key sigue siendo 'asesorias')
       { key: 'av_mensajes', label: 'Correos al cliente', icon: 'mail', section: 'Conversaciones' },
@@ -73,7 +72,6 @@ export const ROLES: RoleDef[] = [
       { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
-      { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
       { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt', section: 'Finanzas' },
       { key: 'av_revision', label: 'Revisión económica', icon: 'shield', section: 'Finanzas' },   // PAY-EXP-01A-3 · Dirección/Facturación
@@ -82,6 +80,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_cierre', label: 'Cierre de caja', icon: 'store', section: 'Finanzas' },
       { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo' },
       { key: 'av_cartera', label: 'Cartera y horario', icon: 'usercheck', section: 'Equipo' },   // cartera por vendedor, vendedores elegibles, horario y alertas
+      { key: 'av_comisiones', label: 'Metas y comisiones', icon: 'chart', section: 'Equipo' },    // por vendedor (decisión del dueño, 15 oct 2026)
       { key: 'av_config', label: 'Configuración', icon: 'store', section: 'Sistema' },
       { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Sistema' },
     ],
@@ -107,12 +106,14 @@ export const ROLES: RoleDef[] = [
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
       // Orden = el recorrido real. Almacén: lo que hay y lo que entra. Pedidos y envíos: surtir → enviar → guía → salida → rastreo.
       // La remisión del paquete no es una pantalla: se imprime desde "Por enviar" y desde "Guías".
-      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Almacén' },
-      { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Almacén' },   // UX-2 · recepción física de compras
-      { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Almacén' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Almacén' },
-      { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Almacén' },
-      { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Almacén' },
+      // El menú cuenta la historia del inventario (dueño, 15 oct 2026): lo que HAY (Inventario, Por caducar) y lo que
+      // ENTRA (una compra se pide en Compras a proveedores y se vuelve inventario al Recibir mercancía).
+      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
+      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
+      { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
+      { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
+      { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
+      { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Compras y entradas' },
       { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Pedidos y envíos' },
       { key: 'cola', label: 'Por enviar', icon: 'pkg', section: 'Pedidos y envíos' },
       { key: 'guia', label: 'Guías', icon: 'truck', section: 'Pedidos y envíos' },

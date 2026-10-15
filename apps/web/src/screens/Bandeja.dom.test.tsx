@@ -17,6 +17,7 @@ const srv = vi.hoisted(() => ({
   mensajes: 0,
 }))
 
+vi.mock('../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
 vi.mock('../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, setScreen: vi.fn(), user: { email: 'x@y.mx' } }) }))
 vi.mock('../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: srv.orders }) }))
 vi.mock('../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: srv.byOrder }), usePaymentClaims: () => ({ data: srv.claims }) }))

@@ -30,9 +30,11 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
   it('roles.ts declara la entrada av_verif', () => {
     expect(rolesSrc).toMatch(/key: 'av_verif'.*label: 'Por verificar'.*section: 'Clientes'/)
   })
-  it('orden EXACTO del menú Clientes: Clientes→Por verificar→Ventas→Comisiones (REORG CRM)', () => {
+  it('orden EXACTO del menú Clientes: Clientes→Por verificar→Ventas (REORG CRM; Comisiones vive en Equipo)', () => {
     const comercial = getNav(getRole('admin')).filter((s) => s.section === 'Clientes').map((s) => s.label)
-    expect(comercial).toEqual(['Clientes', 'Por verificar', 'Ventas', 'Comisiones'])
+    expect(comercial).toEqual(['Clientes', 'Por verificar', 'Ventas'])
+    expect(getNav(getRole('admin')).find((s) => s.key === 'av_comisiones')?.section).toBe('Equipo')
+    expect(getNav(getRole('admin')).some((s) => s.key === 'av_import')).toBe(false)   // la migración vive en Configuración
   })
 })
 

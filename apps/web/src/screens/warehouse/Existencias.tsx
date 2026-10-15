@@ -1,4 +1,5 @@
 // Existencias: stock por producto y por LOTE (lote + caducidad + cantidad).
+import { GuiaInventario } from '../../app/GuiaInventario'
 import { Vacio } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
@@ -34,6 +35,7 @@ export function Existencias() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <GuiaInventario paso={3} />
       <PageHead title="Inventario">
         Todo el producto guardado, agrupado por tipo y por lote. La etiqueta
         <b> Usar primero</b> marca el lote que debe salir antes, porque es el que caduca más pronto.

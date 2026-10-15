@@ -10,6 +10,7 @@ const srv = vi.hoisted(() => ({
   rpcError: null as string | null,
   llamadas: 0,
 }))
+vi.mock('../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
 vi.mock('../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, setScreen: vi.fn(), user: { email: 'x@y.mx' } }) }))
 vi.mock('../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: [] }) }))
 vi.mock('../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: [] }) }))
