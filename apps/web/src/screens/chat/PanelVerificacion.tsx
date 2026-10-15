@@ -2,12 +2,13 @@
 // atiende puede verificarlo, aquí ve su cédula, el dictamen SEP y las fotos del INE, y lo aprueba o rechaza.
 import React, { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
-import { capturarCedula as capturarPorDefecto, evidenciaDoctor, pendienteDeConversacion, verificarDoctor, type DoctorPendiente } from '../../data/ops/verificacion'
+import { candidatosEnlace as candidatosPorDefecto, capturarCedula as capturarPorDefecto, evidenciaDoctor, pendienteDeConversacion, unirEnlace as unirPorDefecto, verificarDoctor, type CandidatoEnlace, type DoctorPendiente } from '../../data/ops/verificacion'
 
 const ETIQUETA: Record<string, string> = { 'ine-front': 'INE · frente', 'ine-back': 'INE · reverso', selfie: 'Selfie' }
 
-export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, capturar = capturarPorDefecto, onCambio, onDoctor, version = 0 }: {
+export function PanelVerificacion({ conversationId, leer = pendienteDeConversacion, verificar = verificarDoctor, evidencia = evidenciaDoctor, capturar = capturarPorDefecto, candidatos = candidatosPorDefecto, unir = unirPorDefecto, onCambio, onDoctor, version = 0 }: {
   conversationId: string; leer?: typeof pendienteDeConversacion; verificar?: typeof verificarDoctor; evidencia?: typeof evidenciaDoctor; capturar?: typeof capturarPorDefecto; onCambio?: () => void
+  candidatos?: typeof candidatosPorDefecto; unir?: typeof unirPorDefecto   // CHAT PRO · unir la conversación del enlace
   onDoctor?: (d: DoctorPendiente | null) => void   // FOTOS · quien monta sabe si hay un doctor por verificar (para "Usar como INE")
   version?: number                                 // FOTOS · cambiarla recarga la evidencia (tras usar una foto del chat)
 }) {
@@ -16,13 +17,18 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
   const [nota, setNota] = useState(''); const [rechazando, setRechazando] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [ocupado, setOcupado] = useState(false)
   const [cedula, setCedula] = useState(''); const [editCed, setEditCed] = useState(false)
+  const [enlaces, setEnlaces] = useState<CandidatoEnlace[]>([])
   useEffect(() => {
     let vivo = true
-    setD(null); setFotos({}); setMsg(null)
-    void leer(conversationId).then(async (x) => { if (!vivo) return; onDoctor?.(x); if (!x) return; setD(x); const f = await evidencia(x.profile_id); if (vivo) setFotos(f) })
+    setD(null); setFotos({}); setMsg(null); setEnlaces([])
+    void leer(conversationId).then(async (x) => {
+      if (!vivo) return; onDoctor?.(x); if (!x) return; setD(x)
+      const [f, c] = await Promise.all([evidencia(x.profile_id), candidatos(x.profile_id)])
+      if (vivo) { setFotos(f); setEnlaces(c) }
+    })
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, leer, evidencia, version])
+  }, [conversationId, leer, evidencia, candidatos, version])
   if (!d) return msg?.ok ? <div className="rc-contacto-ficha" role="status" data-testid="verificacion-hecha">{msg.texto}</div> : null
   const decidir = async (aprobar: boolean) => {
     if (ocupado) return
@@ -61,6 +67,19 @@ export function PanelVerificacion({ conversationId, leer = pendienteDeConversaci
           {Object.entries(fotos).map(([k, u]) => <a key={k} href={u} target="_blank" rel="noreferrer" title={ETIQUETA[k] ?? k} data-testid={`evidencia-${k}`}><img src={u} alt={ETIQUETA[k] ?? k} style={{ width: 110, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}
         </div>
       )}
+      {/* CHAT PRO · se registró en otro dispositivo: su conversación del enlace se une a su cuenta (lo decide una persona). */}
+      {enlaces.map((e) => (
+        <div key={e.visitor_id} className="rc-enlace-cand" data-testid="candidato-enlace">
+          <span>Escribió por el enlace de contacto como <b>{e.nombre}</b> ({e.mensajes} mensaje{e.mensajes === 1 ? '' : 's'}; coincide por {e.coincide}).</span>
+          <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void (async () => {
+            setOcupado(true); setMsg(null)
+            const r = await unir(d.profile_id, e.visitor_id)
+            setOcupado(false)
+            if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+            setEnlaces((xs) => xs.filter((x) => x.visitor_id !== e.visitor_id)); onCambio?.()
+          })()} data-testid="btn-unir-enlace">Unir a su cuenta</button>
+        </div>
+      ))}
       {Object.keys(d.evidencia ?? {}).length === 0 && <div style={{ fontSize: 12, color: 'var(--mid)' }}>Sin fotos de identificación: pídeselas por el chat antes de aprobar.</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
         <button type="button" className="btn sm" disabled={ocupado} onClick={() => void decidir(true)} data-testid="btn-aprobar-verificacion">Aprobar verificación</button>

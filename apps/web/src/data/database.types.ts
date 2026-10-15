@@ -1821,6 +1821,7 @@ export type Database = {
         Row: {
           actor_type: string
           conversation_id: string
+          escribiendo_hasta: string | null
           id: string
           joined_at: string
           last_read_at: string | null
@@ -1833,6 +1834,7 @@ export type Database = {
         Insert: {
           actor_type: string
           conversation_id: string
+          escribiendo_hasta?: string | null
           id?: string
           joined_at?: string
           last_read_at?: string | null
@@ -1845,6 +1847,7 @@ export type Database = {
         Update: {
           actor_type?: string
           conversation_id?: string
+          escribiendo_hasta?: string | null
           id?: string
           joined_at?: string
           last_read_at?: string | null
@@ -2189,6 +2192,58 @@ export type Database = {
           {
             foreignKeyName: "cc_referral_codes_seller_profile_id_fkey"
             columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cc_respuestas_rapidas: {
+        Row: {
+          created_at: string
+          id: string
+          orden: number
+          profile_id: string | null
+          texto: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          orden?: number
+          profile_id?: string | null
+          texto: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          orden?: number
+          profile_id?: string | null
+          texto?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cc_respuestas_rapidas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_respuestas_rapidas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cc_respuestas_rapidas_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "staff_directory"
             referencedColumns: ["id"]

@@ -6,12 +6,14 @@ import React, { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { useRole } from '../../auth/RoleContext'
 import { miVerificacion as leerPorDefecto, type MiVerificacion } from '../../data/ops/verificacion'
+import { pedirAbrirChat } from '../../data/store/chatUiStore'
+import { PANTALLAS_CHAT } from '../../app/ChatFlotante'
 
 const FALTA: Record<string, string> = { cedula: 'tu cédula profesional', 'ine-front': 'la foto del frente de tu INE', 'ine-back': 'la foto del reverso de tu INE' }
 export const textoFaltan = (f: string[]): string => f.map((x) => FALTA[x] ?? x).join(', ').replace(/, ([^,]*)$/, ' y $1')
 
 export function AvisoVerificacion({ leer = leerPorDefecto, intervaloMs = 45_000 }: { leer?: typeof leerPorDefecto; intervaloMs?: number }) {
-  const { actualizarVerificacion, setScreen } = useRole()
+  const { actualizarVerificacion, setScreen, screen } = useRole()
   const [v, setV] = useState<MiVerificacion | null>(null)
   useEffect(() => {
     let vivo = true
@@ -36,6 +38,8 @@ export function AvisoVerificacion({ leer = leerPorDefecto, intervaloMs = 45_000 
           ? <><b>No pudimos aprobar tu verificación.</b> {v?.motivo ? `Motivo: ${v.motivo}. ` : ''}Corrige tus datos y la revisamos de nuevo.</>
           : <><b>Tu verificación está en revisión.</b> Ya puedes conocer el catálogo y hablar con tu asesor. Los precios y las compras se habilitan en cuanto aprobemos tu cédula{faltan.length ? <>; para avanzar nos falta {textoFaltan(faltan)}</> : null}.</>}
         {(rechazado || faltan.length > 0) && <> <button type="button" className="rc-link" onClick={() => setScreen('mi_verificacion')} data-testid="ir-mi-verificacion">Ir a Mi verificación</button></>}
+        {/* CHAT PRO · mientras lo revisan no se queda sin salida: su asesor le contesta por el chat. */}
+        {!PANTALLAS_CHAT.has(screen) && <>{' '}<button type="button" className="rc-link" onClick={pedirAbrirChat} data-testid="hablar-asesor">Hablar con mi asesor</button></>}
       </span>
     </div>
   )

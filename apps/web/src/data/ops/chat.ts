@@ -17,6 +17,7 @@ export interface Conversacion {
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
   handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
   leido_otro?: number                    // PALOMITAS · hasta dónde leyó el otro lado (azules)
+  escribiendo_otro?: boolean             // CHAT PRO · el otro lado está tecleando (vence solo en segundos)
   leido_hasta?: number                   // UX-1 · cursor de lectura del actor (cc_participants.last_read_seq): el badge del portal no inventa estado
   sesion?: SesionResumen | null          // Chat V2-C1 · la lectura activa es la sesión actual (o la última cerrada si no hay abierta)
 }
@@ -77,6 +78,8 @@ export class ClienteChat {
     return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'adjuntar', conversation_id, imagen, client_message_id })
   }
   leido(conversation_id: string, seq: number) { return this.llamar<{ ok: true }>({ action: 'leido', conversation_id, seq }) }
+  // CHAT PRO · "escribiendo…": solo la señal (unos segundos), nunca el texto.
+  escribiendo(conversation_id: string, activo = true) { return this.llamar<{ ok: boolean }>({ action: 'escribiendo', conversation_id, activo }) }
   solicitarAsesor(conversation_id: string) { return this.llamar<{ modo: ModoConversacion; asesor: boolean }>({ action: 'solicitar_asesor', conversation_id }) }
   rechazarAsesor(conversation_id: string) { return this.llamar<{ rechazado: boolean; modo: ModoConversacion; motivo?: string }>({ action: 'rechazar_asesor', conversation_id }) }   // CC-7
   // CC-7 · solo Dirección asigna (la base rechaza a cualquier otro); para doctores la asignación persistente es la cartera.

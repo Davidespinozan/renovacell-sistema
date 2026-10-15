@@ -5,7 +5,7 @@
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, Check, CheckCheck, ChevronDown, History, Send, X } from 'lucide-react'
+import { Camera, Check, CheckCheck, ChevronDown, History, Send, X, Zap } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../../data/ops/chat'
@@ -15,6 +15,8 @@ import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/peri
 import { diaEtiqueta, etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
 import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
 import { primerNombre } from '../../lib/nombres'
+import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
+import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 
 interface Props {
   embebido?: boolean                 // dentro del portal (tarjeta a página completa)
@@ -37,7 +39,13 @@ interface Props {
   reducir?: (f: File) => Promise<string | null>        // FOTOS · inyectable en pruebas
   suscribir?: Suscriptor | null                        // INMEDIATO · canal en tiempo real (null en pruebas)
   tarjetaFinal?: React.ReactNode                       // VERIFICARME · tarjeta al final del hilo (p. ej. crear la cuenta en el chat)
+  respuestas?: ClienteRespuestas | null                // CHAT PRO · respuestas rápidas (solo personal; null las apaga)
+  puedeEmpresa?: boolean                               // CHAT PRO · Dirección administra las de la empresa
 }
+
+// CHAT PRO · "escribiendo…": se avisa al servidor como mucho cada 3 s mientras se teclea; la marca vence sola en 6 s.
+const PING_ESCRIBIENDO_MS = 3000
+const SONDEO_ESCRIBIENDO_MS = 1500
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
 export const ETIQUETA_ASESOR = 'Asesora'
@@ -103,7 +111,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, estilo, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -207,13 +215,21 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
   }, [convId, cargar, intervaloMs, finAtencion])
 
+  // CHAT PRO · mientras el otro lado escribe, se lee más seguido: su mensaje aparece en cuanto lo manda.
+  const otroEscribiendo = !!conv?.escribiendo_otro
+  useEffect(() => {
+    if (!convId || finAtencion || !otroEscribiendo) return
+    const t = setInterval(() => { void cargar(convId, ultimoSeq.current) }, SONDEO_ESCRIBIENDO_MS)
+    return () => clearInterval(t)
+  }, [convId, finAtencion, otroEscribiendo, cargar])
+
   // Al final del hilo tras cada cambio (y de nuevo tras el layout/fuentes): el último elemento siempre visible.
   const alFinal = useCallback(() => { fin.current?.scrollIntoView?.({ block: 'end' }) }, [])
   useEffect(() => {
     alFinal()
     const raf = requestAnimationFrame(alFinal); const t = window.setTimeout(alFinal, 180)
     return () => { cancelAnimationFrame(raf); window.clearTimeout(t) }
-  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal, vista])
+  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal, vista, otroEscribiendo])
   useEffect(() => { if (autoFoco && !cargando) area.current?.focus() }, [autoFoco, cargando])
 
   const modo: ModoConversacion = conv?.modo ?? 'ai_active'
@@ -222,6 +238,33 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const puedoEscribir = !!conv && !cerrada && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
+
+  // CHAT PRO · avisar "escribiendo…" (sin texto). Las pruebas pueden usar clientes sin este método.
+  const ultimoPing = useRef(0)
+  const avisarEscribiendo = (t: string) => {
+    if (!convId || !puedoEscribir || !t.trim() || t.startsWith('/') || typeof cliente.escribiendo !== 'function') return
+    const ahora = Date.now()
+    if (ahora - ultimoPing.current < PING_ESCRIBIENDO_MS) return
+    ultimoPing.current = ahora
+    void cliente.escribiendo(convId, true)
+  }
+  // CHAT PRO · respuestas rápidas: solo para el personal que atiende.
+  const conRespuestas = asesor && !!respuestas
+  const [rrLista, setRrLista] = useState<RespuestaRapida[]>([])
+  const [rrBoton, setRrBoton] = useState(false)
+  const [rrActiva, setRrActiva] = useState(0)
+  const cargarRespuestas = useCallback(() => { if (respuestas) void respuestas.listar().then(setRrLista) }, [respuestas])
+  useEffect(() => { if (conRespuestas) cargarRespuestas() }, [conRespuestas, cargarRespuestas])
+  const rrFiltro = texto.startsWith('/') ? texto.slice(1) : ''
+  const rrAbierto = conRespuestas && puedoEscribir && (rrBoton || texto.startsWith('/'))
+  const rrVisibles = useMemo(() => filtrar(rrLista, rrFiltro), [rrLista, rrFiltro])
+  useEffect(() => { setRrActiva(0) }, [rrFiltro, rrAbierto])
+  const cerrarRespuestas = () => { setRrBoton(false); if (texto.startsWith('/')) setTexto('') }
+  const elegirRespuesta = (r: RespuestaRapida) => {
+    const t = aplicarNombre(r.texto, nombreCliente)
+    setRrBoton(false); setTexto(t)
+    window.setTimeout(() => { const el = area.current; if (el) { el.focus(); autoAlto(el); el.setSelectionRange?.(t.length, t.length) } }, 0)
+  }
 
   // Enviar con idempotencia: el MISMO client_message_id en cada reintento → nunca se duplica.
   const enviarTexto = async (t: string, clientId: string) => {
@@ -274,6 +317,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     onFin?.('terminada')
   }
   const alTeclear = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (rrAbierto) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setRrActiva((i) => Math.min(i + 1, Math.max(rrVisibles.length - 1, 0))); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setRrActiva((i) => Math.max(i - 1, 0)); return }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarRespuestas(); return }
+      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && rrVisibles[rrActiva]) { e.preventDefault(); elegirRespuesta(rrVisibles[rrActiva]); return }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void enviar() }
   }
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
@@ -287,6 +336,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // handoff): así no hay banner + aviso duplicados. Si no hubiera aviso, la tarjeta va al final del hilo.
   const seqTarjeta = useMemo(() => (handoffVivo ? mensajes.filter((m) => m.actor === 'system').reduce((s, m) => Math.max(s, m.seq), 0) : 0), [handoffVivo, mensajes])
   const esperandoIA = enviando && !pendiente?.error && !asesor && IA_PUEDE(modo)
+  const quienEscribe = (asesor ? primerNombre(nombreCliente) : primerNombre(nombreAsesor)) ?? (asesor ? 'Cliente' : ETIQUETA_ASESOR)
 
   const tarjetaHandoff = conv && handoffVivo ? (() => {
     const t = textoHandoff(conv)
@@ -351,7 +401,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>
         <div className="rc-title">
           <div className="rc-name">{asesor ? 'Asesoría' : 'Renovacell'}</div>
-          <div className="rc-state" data-testid="chat-modo">{subtituloDe(conv, asesor)}</div>
+          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : subtituloDe(conv, asesor)}</div>
         </div>
         <div className="rc-actions">
           {conv?.sesion && convId && (
@@ -423,18 +473,32 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           </div>
         )}
         {esperandoIA && <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="escribiendo" aria-label="El asistente está escribiendo"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-bubble rc-typing"><i /><i /><i /></div></div></div>}
+        {otroEscribiendo && !esperandoIA && (
+          <div className={`rc-msg rc-msg--${asesor ? 'doctor' : 'seller'} rc-msg--inicio`} data-testid="otro-escribiendo" aria-label={`${quienEscribe} está escribiendo`}>
+            <span className="rc-avatar rc-avatar--persona" aria-hidden>{quienEscribe.slice(0, 1).toUpperCase()}</span>
+            <div className="rc-bubble-wrap"><div className="rc-bubble rc-typing"><i /><i /><i /></div></div>
+          </div>
+        )}
         {tarjetaFinal}
         <div ref={fin} />
       </div>
 
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
 
+      {rrAbierto && respuestas && (
+        <RespuestasRapidas lista={rrVisibles} activa={rrActiva} filtro={rrFiltro} onElegir={elegirRespuesta} onCerrar={cerrarRespuestas}
+          onCambio={cargarRespuestas} cliente={respuestas} puedeEmpresa={puedeEmpresa} nombre={nombreCliente} />
+      )}
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
         <input ref={archivo} type="file" accept="image/jpeg,image/png,image/*" hidden onChange={(e) => void mandarImagen(e.target.files?.[0])} data-testid="input-imagen" />
+        {conRespuestas && (
+          <button type="button" className={`rc-ico rc-adjuntar${rrBoton ? ' rc-ico--on' : ''}`} onClick={() => setRrBoton((v) => !v)} disabled={!puedoEscribir}
+            aria-label="Respuestas rápidas" aria-expanded={rrAbierto} title="Respuestas rápidas (o escribe /)" data-testid="btn-respuestas"><Zap size={19} /></button>
+        )}
         <button type="button" className="rc-ico rc-adjuntar" onClick={() => archivo.current?.click()} disabled={!puedoEscribir || subiendo} aria-label={subiendo ? 'Subiendo imagen' : 'Mandar una foto'} title="Mandar una foto" data-testid="btn-imagen"><Camera size={20} /></button>
         <textarea
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
-          onChange={(e) => { setTexto(e.target.value); autoAlto(e.target) }} onKeyDown={alTeclear}
+          onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}
           disabled={!puedoEscribir || enviando || !!pendiente?.error}
           placeholder={cerrada ? 'La conversación está cerrada' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
           enterKeyHint="send" autoComplete="off" autoCapitalize="sentences" inputMode="text"

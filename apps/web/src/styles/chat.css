@@ -287,3 +287,26 @@
 
 .rc-avisos-msg{font-size:12px;color:var(--ink-2);align-self:center;max-width:320px}
 .rc-barra .rc-avisos-msg{white-space:normal}
+
+/* CHAT PRO · "escribiendo…" en el encabezado y respuestas rápidas del personal (sobre el redactor). */
+.rc-state--escribiendo{color:var(--green-deep);font-style:italic}
+.rc-chat--wa .rc-state--escribiendo{color:#fff}
+.rc-rr{border-top:1px solid var(--line);background:var(--bg);max-height:min(320px,45vh);display:flex;flex-direction:column}
+.rc-rr-head{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px;font-size:13px}
+.rc-rr-lista{list-style:none;margin:0;padding:2px 8px;overflow-y:auto;flex:1}
+.rc-rr-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:8px 10px;cursor:pointer;min-height:44px;color:var(--ink)}
+.rc-rr-item:hover,.rc-rr-item--on{background:var(--hueso)}
+.rc-rr-titulo{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+.rc-rr-texto{font-size:12.5px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-rr-tag{font-weight:500;font-size:10.5px;color:var(--mid);border:1px solid var(--line);border-radius:999px;padding:0 6px}
+.rc-rr-vacio{padding:10px;font-size:12.5px;color:var(--mid)}
+.rc-rr-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 14px 8px;font-size:12px;color:var(--mid)}
+.rc-rr-pie kbd{font-family:inherit;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.rc-rr-fila{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 10px;min-height:40px}
+.rc-rr-btns{display:flex;gap:2px}
+.rc-rr-form{display:flex;flex-direction:column;gap:6px;padding:4px 14px}
+.rc-rr-form input,.rc-rr-form textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--line);font:inherit;font-size:13px;resize:vertical;background:var(--bg);color:var(--ink)}
+.rc-rr-check{display:flex;align-items:center;gap:6px;font-size:12.5px}
+.rc-rr-acciones{display:flex;gap:6px}
+.rc-rr-error{color:var(--danger);font-size:12.5px;padding:0 14px 6px}
+.rc-enlace-cand{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;background:var(--hueso);border-radius:8px;padding:6px 10px}

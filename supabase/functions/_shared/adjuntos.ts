@@ -29,17 +29,24 @@ export async function conAdjuntos(admin: any, data: unknown): Promise<unknown> {
   } catch { return data }   // sin enlaces el mensaje sigue ahí ("Envió una imagen."): nunca se rompe la lectura
 }
 
+/** CHAT PRO · ¿el otro lado está escribiendo? (su marca vence sola en unos segundos). */
+export function escribiendoAhora(hastas: Array<string | null>, ahora = Date.now()): boolean {
+  return hastas.some((h) => { const t = h ? Date.parse(h) : NaN; return Number.isFinite(t) && t > ahora })
+}
+
 /**
  * PALOMITAS · hasta qué mensaje leyó EL OTRO LADO de la conversación. Para el dueño (doctor o visitante) cuenta lo
  * que leyó su asesor; para el personal, lo que leyó el dueño (que Dirección lo lea no es que el cliente lo vio).
- * Se calcula después de que la base autorizó la lectura; nunca dice quién leyó, solo hasta dónde.
+ * Se calcula después de que la base autorizó la lectura; nunca dice quién leyó, solo hasta dónde. Igual con
+ * "escribiendo…": solo si el otro lado está tecleando, nunca qué.
  */
 // deno-lint-ignore no-explicit-any
 export async function conLecturaAjena(admin: any, conv: string, actor: string, data: unknown): Promise<unknown> {
   try {
     const roles = actor === 'visitor' || actor === 'doctor' ? ['asesor', 'supervisor'] : ['dueno']
-    const { data: ps } = await admin.from('cc_participants').select('last_read_seq, rol').eq('conversation_id', conv).in('rol', roles)
-    const leido = ((ps ?? []) as Array<{ last_read_seq: number | null }>).reduce((m, p) => Math.max(m, Number(p.last_read_seq ?? 0)), 0)
-    return { ...(data as Record<string, unknown>), leido_otro: leido }
+    const { data: ps } = await admin.from('cc_participants').select('last_read_seq, rol, escribiendo_hasta').eq('conversation_id', conv).in('rol', roles)
+    const filas = (ps ?? []) as Array<{ last_read_seq: number | null; escribiendo_hasta?: string | null }>
+    const leido = filas.reduce((m, p) => Math.max(m, Number(p.last_read_seq ?? 0)), 0)
+    return { ...(data as Record<string, unknown>), leido_otro: leido, escribiendo_otro: escribiendoAhora(filas.map((f) => f.escribiendo_hasta ?? null)) }
   } catch { return data }
 }

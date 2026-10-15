@@ -45,7 +45,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['adjuntar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion'])   // + Chat V2-C1
+const ACCIONES = new Set(['adjuntar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo'])   // + Chat V2-C1
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(conCors(async (req) => {
@@ -147,6 +147,14 @@ Deno.serve(conCors(async (req) => {
     if (error) return falla(error)
     return json(200, { ok: true })
   }
+  // ── CHAT PRO · "escribiendo…": unos segundos, con la misma autoridad que leer; nunca viaja el texto ──
+  if (action === 'escribiendo') {
+    const v = await limitarTodas(admin, [{ scope: 'chat_escribiendo', sujeto }, { scope: 'chat_escribiendo_global', sujeto: 'global' }])
+    if (!v.permitido) return json(200, { ok: false })   // sin cupo no es un error para quien teclea
+    const { error } = await admin.rpc('cc_escribiendo', { ...base, p_activo: p.activo !== false })
+    if (error) return falla(error)
+    return json(200, { ok: true })
+  }
   if (action === 'enviar') {
     const v = await limitarTodas(admin, quien
       ? [{ scope: 'chat_enviar_uid', sujeto }, { scope: 'chat_enviar_global', sujeto: 'global' }]
@@ -164,6 +172,7 @@ Deno.serve(conCors(async (req) => {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
     if (!r.idempotente) enSegundoPlano(avisarPush(admin, conv, actor.actor, c.texto))   // AVISOS · al teléfono del otro lado
+    enSegundoPlano(Promise.resolve(admin.rpc('cc_escribiendo', { ...base, p_activo: false })))         // CHAT PRO · ya envió: deja de "escribir"
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {

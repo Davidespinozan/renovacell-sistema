@@ -138,7 +138,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
           {herr && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="herramienta-aviso">{herr}</div>}
         </div>
       )}
-      <ChatCanonico embebido asesor accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
+      <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )

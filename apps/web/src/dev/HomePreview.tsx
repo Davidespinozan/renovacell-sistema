@@ -52,7 +52,7 @@ function chatFalso(cola: ColaItem[], conv?: Conversacion) {
     if (a === 'cola') return ok({ cola: lista })
     if (a === 'iniciar') { lista = lista.map((c) => (c.conversation_id === body.conversation_id ? { ...c, modo: 'human_active', iniciada: true, atencion: at('activo') } : c)); return ok({ modo: 'human_active' }) }
     if (a === 'abrir') return ok({ conversation_id: 'C1', estado: 'abierta', modo: conv?.modo ?? 'ai_active', nuevo: false })
-    if (a === 'leer') return ok(conv ?? { conversation_id: body.conversation_id, estado: 'abierta', modo: 'human_active', rol: 'asesor', asesor_soy_yo: true, asesor_nombre: 'Lucía', ultimo_seq: 3, mensajes: MENSAJES, handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: false } })
+    if (a === 'leer') return ok(conv ?? { conversation_id: body.conversation_id, estado: 'abierta', modo: 'human_active', rol: 'asesor', asesor_soy_yo: true, asesor_nombre: 'Lucía', ultimo_seq: 3, mensajes: MENSAJES, handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: true, puede_rechazar: false }, escribiendo_otro: new URLSearchParams(window.location.search).get('escribe') === '1' })
     return ok({ ok: true })
   }, () => null)
 }

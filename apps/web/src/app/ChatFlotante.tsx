@@ -23,7 +23,7 @@ import { Icon } from './icons'
 import { useRole } from '../auth/RoleContext'
 import { hasSupabase } from '../lib/supabase'
 import { chat as clientePorDefecto, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion } from '../data/ops/chat'
-import { chatUi, marcarAbiertoPara, useSolicitudApertura } from '../data/store/chatUiStore'
+import { chatUi, EVENTO_ABRIR_CHAT, marcarAbiertoPara, useSolicitudApertura } from '../data/store/chatUiStore'
 import { ChatCanonico } from '../screens/chat/ChatCanonico'
 import { debeDiferir, decidir, esElegible, guardarFrontera, leerFrontera } from '../data/ops/autoapertura'
 import { suscribirMensajes, type Suscriptor } from '../data/ops/chatRealtime'
@@ -263,6 +263,13 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
     abiertoRef.current = true
     setSinLeer(0); setAbierto(true)
   }, [dejarDeVigilar, ocultarVista])
+  // CHAT PRO · "Hablar con mi asesor" desde el portal: un clic de la persona abre el cajón (apertura manual).
+  useEffect(() => {
+    if (!visible) return
+    const abrir = () => abrirManual()
+    window.addEventListener(EVENTO_ABRIR_CHAT, abrir)
+    return () => window.removeEventListener(EVENTO_ABRIR_CHAT, abrir)
+  }, [visible, abrirManual])
   // C4 · cierre MANUAL explícito (X, flecha, botón flotante, fondo, Escape): absorbe lo existente (no se re-anuncia).
   const cerrarManual = useCallback(() => {
     descartar.current = true

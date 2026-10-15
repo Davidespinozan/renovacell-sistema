@@ -87,3 +87,22 @@ export async function capturarCedula(profile: string, cedula: string, rpc: Rpc =
     return { ok: false, mensaje: /CEDULA_INVALIDA/.test(m) ? 'Escribe solo los números de la cédula (5 a 12 dígitos).' : mensajeVerificacion(m) }
   } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
 }
+
+// CHAT PRO · el doctor se registró en OTRO dispositivo con otro correo: quien lo atiende ve la conversación del enlace
+// que coincide por correo o celular y la une a su cuenta (con su historial). La base solo acepta las que coinciden.
+export interface CandidatoEnlace { visitor_id: string; nombre: string; telefono: string; email: string; creado: string; coincide: string; mensajes: number }
+export async function candidatosEnlace(profile: string, rpc: Rpc = rpcPorDefecto): Promise<CandidatoEnlace[]> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return []
+  try {
+    const { data, error } = await rpc('cc_enlace_candidatos', { p_profile: profile })
+    return error || !Array.isArray(data) ? [] : (data as CandidatoEnlace[])
+  } catch { return [] }
+}
+export async function unirEnlace(profile: string, visitor: string, rpc: Rpc = rpcPorDefecto): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+  try {
+    const { error } = await rpc('cc_enlace_unir', { p_profile: profile, p_visitor: visitor })
+    if (!error) return { ok: true }
+    return { ok: false, mensaje: /NO_COINCIDE/.test(error.message ?? '') ? 'Esa conversación ya no coincide con este doctor.' : mensajeVerificacion(error.message ?? '') }
+  } catch { return { ok: false, mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }
+}
