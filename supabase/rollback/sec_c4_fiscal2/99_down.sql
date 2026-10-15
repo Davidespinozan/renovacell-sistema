@@ -3,7 +3,18 @@
 -- ⚠️ REABRE LOS HALLAZGOS: vender_pos vuelve a guardar invoice_meta sin validar (claves y estados arbitrarios) y un
 -- receptor capturado inválido vuelve a sustituirse en silencio por el perfil del cliente. Los pedidos creados con la
 -- 146 conservan su invoice_meta canónico (no se modifica ningún dato).
+-- Orden: si SEC-C4-FISCAL-3 (147) está aplicada, bajarla ANTES (supabase/rollback/sec_c4_fiscal3/99_down.sql); este down lo exige.
 do $pre$ begin
+  -- SEC-C4-FISCAL-3 (147) valida el receptor con las funciones de la 146: si sigue activa, este down la dejaría rota
+  -- (todo pedido con factura fallaría). Se baja primero la 147 (o cualquier otra función que las use).
+  if exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace
+               and p.proname not in ('_fiscal_entrada_error', '_fiscal_entrada_pos', 'vender_pos')
+               and (p.proname = 'crear_pedido_con_receptor' or p.prosrc ~ '_fiscal_entrada_(error|pos)')) then
+    raise exception 'SEC-C4-FISCAL-2 down: % usa la validación de la 146; revierte primero SEC-C4-FISCAL-3 (147)',
+      (select string_agg(p.oid::regprocedure::text, ', ' order by 1) from pg_proc p where p.pronamespace = 'public'::regnamespace
+         and p.proname not in ('_fiscal_entrada_error', '_fiscal_entrada_pos', 'vender_pos')
+         and (p.proname = 'crear_pedido_con_receptor' or p.prosrc ~ '_fiscal_entrada_(error|pos)'));
+  end if;
   if md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) <> '643cda22dcd76283ae8225ebb6afd188'
      or md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) <> 'bb7b1d1a51edd1cbf4e8427045fb0dcb'
      or md5(pg_get_functiondef('public._fiscal_entrada_error(jsonb)'::regprocedure)) <> 'b651a11fd4cd94040473a1aa503986c0'

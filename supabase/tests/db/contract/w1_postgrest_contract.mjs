@@ -740,4 +740,79 @@ expect('almacén no concilia custodia', /NO_AUTORIZADO/.test(r.error?.message ??
   expect('SEC-C4-FISCAL-2 · las funciones auxiliares no se exponen por la API', !!r.error && r.data == null, r.error ?? r.data)
 }
 
+// SEC-C4-FISCAL-3 (147) · por HTTP real: pedido + receptor en una transacción; crear_pedido intacta; reintentos seguros
+{
+  const rec = { rfc: 'XAXX010101000', razon_social: 'Cliente Contrato SA', regimen: '601', cp: '80000', uso_cfdi: 'G03', email_facturacion: 'factura@test.local' }
+  const envio = { address: { line1: 'Calle 1', city: 'Culiacán' } }
+  const sol = (id, extra = {}) => ({ p_order_id: id, p_folio: null, p_doctor_id: null, p_customer_id: ids.custB, p_lines: [{ product_id: ids.prod, qty: 1 }], p_shipping_meta: envio, p_invoice_requested: true, p_receiver: rec, ...extra })
+  const vieja = (id, extra = {}) => { const o = sol(id, extra); delete o.p_receiver; return o }
+  const pedido = async (id) => (await admin.from('orders').select('id, external_ref, total, invoice_requested, invoice_meta').eq('id', id).maybeSingle()).data
+  const sinDatos = (e) => !/S\d{3,}|total|folio|\d{3,}\.\d|Contrato/.test(e?.message ?? '') && e?.details == null && e?.hint == null
+  // firmas
+  let id = uuid()
+  r = await pos.rpc('crear_pedido', vieja(id, { p_invoice_requested: false }))
+  expect('SEC-C4-FISCAL-3 · crear_pedido con las 7 claves de hoy sigue resolviendo y creando', r.status === 200 && r.data?.order_id === id && !r.data?.idempotent, r.error ?? r.data)
+  id = uuid(); const corto = vieja(id); delete corto.p_shipping_meta; delete corto.p_invoice_requested
+  r = await pos.rpc('crear_pedido', corto)
+  expect('SEC-C4-FISCAL-3 · crear_pedido con opcionales omitidos sigue resolviendo (sin ambigüedad)', r.status === 200 && r.data?.order_id === id, r.error ?? r.data)
+  r = await pos.rpc('crear_pedido', sol(uuid()))
+  expect('SEC-C4-FISCAL-3 · crear_pedido NO acepta p_receiver (no hay sobrecarga) ⇒ PGRST202', r.error?.code === 'PGRST202', r.error ?? r.data)
+  const incompleta = sol(uuid()); delete incompleta.p_shipping_meta
+  r = await pos.rpc('crear_pedido_con_receptor', incompleta)
+  expect('SEC-C4-FISCAL-3 · la función nueva exige sus 8 claves ⇒ PGRST202', r.error?.code === 'PGRST202', r.error ?? r.data)
+  // creación atómica
+  const f1 = uuid()
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f1, { p_receiver: { ...rec, status: 'timbrada' } }))
+  expect('SEC-C4-FISCAL-3 · estado inventado en el receptor ⇒ 400 FISCAL_INVALIDO', r.status === 400 && /FISCAL_INVALIDO/.test(r.error?.message ?? ''), [r.status, r.error?.message])
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f1, { p_receiver: null }))
+  expect('SEC-C4-FISCAL-3 · factura sin receptor ⇒ 400 DATOS_FISCALES_REQUERIDOS', r.status === 400 && /DATOS_FISCALES_REQUERIDOS/.test(r.error?.message ?? ''), [r.status, r.error?.message])
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f1, { p_lines: [{ product_id: uuid(), qty: 1 }] }))
+  expect('SEC-C4-FISCAL-3 · receptor válido + producto inexistente ⇒ error', r.status === 400, [r.status, r.error?.message])
+  expect('SEC-C4-FISCAL-3 · ninguna de las tres dejó pedido', (await pedido(f1)) == null, await pedido(f1))
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f1, { p_receiver: { ...rec, rfc: ' xaxx010101000 ' } }))
+  expect('SEC-C4-FISCAL-3 · creación válida ⇒ 200 con pedido, folio y total del servidor', r.status === 200 && r.data?.order_id === f1 && r.data?.total === 150 && !!r.data?.folio && !r.data?.idempotent, r.error ?? r.data)
+  const creado = await pedido(f1)
+  expect('SEC-C4-FISCAL-3 · el pedido nace con su receptor canónico', creado?.invoice_requested === true && JSON.stringify(Object.keys(creado.invoice_meta)) === '["receiver"]' && creado.invoice_meta.receiver.rfc === 'XAXX010101000', creado)
+  // reintentos
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f1))
+  expect('SEC-C4-FISCAL-3 · reintento idéntico del creador ⇒ 200 repetido con SU folio y total', r.status === 200 && r.data?.idempotent === true && r.data?.folio === creado.external_ref && r.data?.total === 150, r.error ?? r.data)
+  for (const [nombre, cli, extra] of [
+    ['otro receptor', pos, { p_receiver: { ...rec, rfc: 'BBB010101BB2' } }], ['otra cantidad', pos, { p_lines: [{ product_id: ids.prod, qty: 2 }] }],
+    ['otro domicilio', pos, { p_shipping_meta: { address: { line1: 'Otra' } } }], ['otra cuenta', pos, { p_customer_id: ids.cust }], ['sin factura', pos, { p_invoice_requested: false }],
+    ['OTRO vendedor con la solicitud idéntica', otroPos, {}], ['Dirección con la solicitud idéntica', admin, {}]]) {
+    r = await cli.rpc('crear_pedido_con_receptor', sol(f1, extra))
+    expect(`SEC-C4-FISCAL-3 · reintento · ${nombre} ⇒ 400 conflicto genérico, sin folio ni total`, r.status === 400 && /^PEDIDO_EXISTENTE_CONFLICTO: ese identificador ya corresponde a otra solicitud de pedido$/.test(r.error?.message ?? '') && sinDatos(r.error), [r.status, r.error])
+  }
+  const tras = await pedido(f1)
+  expect('SEC-C4-FISCAL-3 · tras los conflictos el pedido y su receptor siguen idénticos', JSON.stringify(tras) === JSON.stringify(creado), tras)
+  r = await otroPos.rpc('crear_pedido', vieja(f1, { p_invoice_requested: false }))
+  expect('SEC-C4-FISCAL-3 · (referencia) crear_pedido conserva su respuesta histórica por UUID: la función nueva no la hereda', r.status === 200 && r.data?.idempotent === true, r.error ?? r.data)
+  // pedido creado por el flujo anterior en DOS llamadas (dos transacciones reales)
+  const f2 = uuid()
+  r = await pos.rpc('crear_pedido', vieja(f2)); const r2 = await pos.rpc('set_order_fiscal_snapshot', { p_order_id: f2, p_receiver: rec })
+  expect('SEC-C4-FISCAL-3 · flujo anterior en dos llamadas sigue funcionando', r.status === 200 && !r2.error, [r.error, r2.error])
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f2))
+  expect('SEC-C4-FISCAL-3 · ese pedido (dos transacciones) no se confirma por la función nueva ⇒ conflicto', r.status === 400 && /PEDIDO_EXISTENTE_CONFLICTO/.test(r.error?.message ?? ''), [r.status, r.error?.message])
+  // sin factura y autorización
+  const f3 = uuid()
+  r = await pos.rpc('crear_pedido_con_receptor', sol(f3, { p_invoice_requested: false, p_receiver: { ...rec, status: 'timbrada' } }))
+  const p3 = await pedido(f3)
+  expect('SEC-C4-FISCAL-3 · sin factura, el receptor recibido se ignora y no se guarda', r.status === 200 && p3?.invoice_requested === false && p3?.invoice_meta === null, [r.error ?? r.data, p3])
+  for (const [rol, cli] of [['Almacén', wh], ['Facturación', as(ids.bill)], ['Empaque', as(ids.pk)], ['chofer', as(ids.drv)]]) {
+    r = await cli.rpc('crear_pedido_con_receptor', sol(uuid()))
+    expect(`SEC-C4-FISCAL-3 · ${rol} ⇒ No autorizado (sin permiso nuevo)`, r.status === 400 && /No autorizado/.test(r.error?.message ?? ''), [r.status, r.error?.message])
+  }
+  r = await as(ids.susp).rpc('crear_pedido_con_receptor', sol(uuid()))
+  expect('SEC-C4-FISCAL-3 · cuenta suspendida ⇒ rechazada', !!r.error && r.status >= 400 && r.status < 500, [r.status, r.error?.message])
+  r = await anon.rpc('crear_pedido_con_receptor', sol(uuid()))
+  expect('SEC-C4-FISCAL-3 · anónimo ⇒ 401/403 (sin EXECUTE)', r.status === 401 || r.status === 403, [r.status, r.error?.message])
+  r = await doc.rpc('crear_pedido_con_receptor', sol(uuid(), { p_doctor_id: ids.doc, p_customer_id: ids.custB }))
+  expect('SEC-C4-FISCAL-3 · doctor con una cuenta ajena ⇒ 403 CUENTA_NO_AUTORIZADA', r.status === 403 && /CUENTA_NO_AUTORIZADA/.test(r.error?.message ?? ''), [r.status, r.error?.message])
+  const f4 = uuid()
+  r = await doc.rpc('crear_pedido_con_receptor', sol(f4, { p_doctor_id: ids.doc, p_customer_id: ids.cust }))
+  expect('SEC-C4-FISCAL-3 · doctor verificado en SU cuenta ⇒ 200', r.status === 200 && r.data?.order_id === f4, r.error ?? r.data)
+  r = await as(ids.doc3).rpc('crear_pedido_con_receptor', sol(f4, { p_doctor_id: ids.doc3, p_customer_id: null }))
+  expect('SEC-C4-FISCAL-3 · otro doctor con ese UUID ⇒ conflicto genérico, sin datos', r.status === 400 && /PEDIDO_EXISTENTE_CONFLICTO/.test(r.error?.message ?? '') && sinDatos(r.error), [r.status, r.error])
+}
+
 process.exit(failed)

@@ -4,6 +4,7 @@
 begin;
 create temp table _f2 as select (select count(*) from public.orders) n_o, (select count(*) from public.fiscal_documents) n_f, (select count(*) from public.customer_fiscal_profiles) n_p,
   md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) vp, md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) wr;
+\ir ../../../rollback/sec_c4_fiscal3/99_down.sql   -- SEC-C4-FISCAL-3 (147) se baja primero (su función usa la validación de la 146)
 \ir ../../../rollback/sec_c4_fiscal2/99_down.sql
 do $t$
 declare v_admin uuid := tests.fixture_admin(); posA uuid := tests.user('pos'); p uuid := tests.product(100); lot uuid; cP uuid; v_o uuid := gen_random_uuid();
