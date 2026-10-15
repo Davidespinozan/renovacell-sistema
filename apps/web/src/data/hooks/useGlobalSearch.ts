@@ -10,7 +10,6 @@ import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { useProducts } from './useProducts'
 import { useAllOrders, useOrders } from './useOrders'
 import { useDoctors } from './useDoctors'
-import { useProspects } from './useProspects'
 import { useShipments } from './useShipments'
 import { useLots } from './useLots'
 import { driverIdByEmail } from '../mock/shipments'
@@ -26,7 +25,6 @@ export function useGlobalSearch() {
   const { data: allOrders } = useAllOrders()
   const { data: myOrders } = useOrders()
   const { data: doctors } = useDoctors()
-  const { data: prospects } = useProspects()
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
 
@@ -65,12 +63,10 @@ export function useGlobalSearch() {
     }
 
     if (role === 'pos') {
-      // Vendedor: busca en SU cartera (prospectos y clientes propios). Con backend la
+      // Vendedor: busca en SU cartera (clientes propios). Con backend la
       // propiedad es el UUID de auth (RLS), no el email — mismo fix que la Bandeja; antes
       // el buscador comparaba contra el email y en producción no encontraba a nadie.
       const me = hasSupabase ? currentUserId() : user?.email
-      prospects.filter((p) => p.assigned_to === me && hit(p.name, p.email)).slice(0, 5)
-        .forEach((p) => out.push({ id: p.id, type: 'Prospecto', label: p.name ?? '—', sub: p.source ?? '', screen: 'av_prosp' }))
       doctors.filter((d) => ((d.meta as Record<string, unknown>)?.owner as string) === me && hit(d.full_name, d.organization, d.email)).slice(0, 5)
         .forEach((d) => out.push({ id: d.id, type: 'Cliente', label: d.full_name ?? '—', sub: d.organization ?? '', screen: 'clientes' }))
       return [...screenHits, ...out]
@@ -85,17 +81,15 @@ export function useGlobalSearch() {
       return [...screenHits, ...out]
     }
 
-    // admin: visión completa (pedidos, doctores, prospectos, productos, lotes)
+    // admin: visión completa (pedidos, clientes, productos, lotes)
     allOrders.filter((o) => hit(o.external_ref)).slice(0, 4)
       .forEach((o) => out.push({ id: o.id, type: 'Pedido', label: o.external_ref ?? o.id, sub: money(o.total), screen: 'av_ventas' }))
     doctors.filter((d) => hit(d.full_name, d.organization, d.email)).slice(0, 4)
-      .forEach((d) => out.push({ id: d.id, type: 'Doctor', label: d.full_name ?? '—', sub: d.organization ?? '', screen: 'av_doc' }))
-    prospects.filter((p) => hit(p.name, p.email)).slice(0, 4)
-      .forEach((p) => out.push({ id: p.id, type: 'Prospecto', label: p.name ?? '—', sub: p.source ?? '', screen: 'av_prosp' }))
+      .forEach((d) => out.push({ id: d.id, type: 'Cliente', label: d.full_name ?? '—', sub: d.organization ?? '', screen: 'av_doc' }))
     products.filter((p) => hit(p.name, p.category)).slice(0, 3)
       .forEach((p) => out.push({ id: p.id, type: 'Producto', label: p.name, sub: p.category ?? '', screen: 'av_catalogo' }))
     lots.filter((l) => hit(l.lot_code)).slice(0, 3)
       .forEach((l) => out.push({ id: l.id, type: 'Lote', label: l.lot_code ?? l.id, sub: `${prodName(l.product_id)} · caduca ${fmtDate(l.expiry_date ?? '')}`, screen: 'av_traza' }))
     return [...screenHits, ...out]
-  }, [role, user, capabilities, products, allOrders, myOrders, doctors, prospects, shipments, lots])
+  }, [role, user, capabilities, products, allOrders, myOrders, doctors, shipments, lots])
 }

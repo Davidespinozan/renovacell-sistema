@@ -80,7 +80,7 @@ export function Doctores() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Administración · Doctores</div>
+        <div className="eyebrow">Administración · Por verificar</div>
         <ExportButton name="doctores" rows={sorted} style={{ marginLeft: 'auto' }} columns={[
           { key: 'full_name', label: 'Nombre' },
           { key: 'organization', label: 'Consultorio' },
@@ -105,7 +105,7 @@ export function Doctores() {
             <ScanFace size={15} /> {orphans.length} doctor(es) verificado(s) SIN cliente vinculado
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 8 }}>
-            Están verificados pero no aparecen en <b>Doctores</b> (que se alimenta de clientes). Vincula su ficha comercial para completarlos.
+            Están verificados pero no aparecen en <b>Clientes</b> (que se alimenta de clientes). Vincula su ficha comercial para completarlos.
           </div>
           {orphans.map((d) => (
             <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--line)' }}>

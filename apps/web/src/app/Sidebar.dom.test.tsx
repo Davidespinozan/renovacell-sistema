@@ -8,24 +8,25 @@ import { screen, within } from '@testing-library/react'
 import { renderWithRole } from '../test/utils'
 import { Sidebar } from './Sidebar'
 
-describe('<Sidebar> admin — navegación Comercial', () => {
-  it('renderiza "Por verificar" (av_verif) y conserva "Doctores" (av_doc)', () => {
+describe('<Sidebar> admin — navegación Clientes', () => {
+  it('renderiza "Por verificar" (av_verif) y conserva el directorio "Clientes" (av_doc)', () => {
     renderWithRole(<Sidebar />)
     // RoleProvider arranca en rol admin → el nav de Administración se dibuja.
     const porVerificar = screen.getByText('Por verificar')
     expect(porVerificar).toBeTruthy()
-    // Debe seguir existiendo el directorio comercial "Doctores" como entrada aparte.
-    expect(screen.getByText('Doctores')).toBeTruthy()
+    // Debe seguir existiendo el directorio comercial "Clientes" como enlace aparte (la sección también se llama así).
+    const clientes = screen.getAllByText('Clientes').map((el) => el.closest('a')).filter(Boolean)
+    expect(clientes).toHaveLength(1)
     // Son dos enlaces distintos (no se fusionó ni se duplicó la navegación).
-    expect(screen.getByText('Por verificar')).not.toBe(screen.getByText('Doctores'))
+    expect(screen.getByText('Por verificar').closest('a')).not.toBe(clientes[0])
   })
 
-  it('"Por verificar" vive bajo el encabezado de sección Comercial', () => {
+  it('"Por verificar" vive bajo el encabezado de sección Clientes', () => {
     const { container } = renderWithRole(<Sidebar />)
     const nav = container.querySelector('nav.nav') as HTMLElement
     expect(nav).toBeTruthy()
     const headers = Array.from(nav.querySelectorAll('.grp')).map((el) => el.textContent)
-    expect(headers).toContain('Comercial')
+    expect(headers).toContain('Clientes')
     // El enlace es un <a role="button"> con su etiqueta (patrón del Sidebar).
     const link = within(nav).getByText('Por verificar').closest('a')
     expect(link).toBeTruthy()

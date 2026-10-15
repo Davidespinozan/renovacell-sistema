@@ -23,7 +23,6 @@ vi.mock('../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: srv.
 vi.mock('../data/hooks/useShipments', () => ({ useShipments: () => ({ data: srv.shipments }) }))
 vi.mock('../data/hooks/useLots', () => ({ useLots: () => ({ data: srv.lots }) }))
 vi.mock('../data/hooks/useDoctors', () => ({ useDoctors: () => ({ data: srv.doctors }) }))
-vi.mock('../data/hooks/useProspects', () => ({ useProspects: () => ({ data: srv.prospects }) }))
 vi.mock('../data/hooks/useStockReturns', () => ({ useStockReturns: () => ({ data: srv.devoluciones }) }))
 vi.mock('../data/hooks/useCompras', () => ({ useCompras: () => ({ data: srv.compras }) }))
 vi.mock('../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: srv.custodias }) }))

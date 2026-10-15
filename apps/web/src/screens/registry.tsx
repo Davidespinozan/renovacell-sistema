@@ -31,7 +31,6 @@ const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default:
 import { Trazabilidad } from './admin/Trazabilidad'
 import { DoctoresDirectorio } from './admin/DoctoresDirectorio'
 import { Doctores } from './admin/Doctores' // cockpit de verificación (av_verif); av_doc queda como directorio comercial
-import { Prospectos } from './admin/Prospectos'
 import { Facturacion } from './admin/Facturacion'
 import { PagosPorValidar } from './admin/PagosPorValidar'
 import { RevisionEconomica } from './admin/RevisionEconomica'   // PAY-EXP-01A-3
@@ -48,7 +47,7 @@ import { Comunicaciones } from './admin/Comunicaciones'
 import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
 import { Conocimiento } from './admin/Conocimiento' // CC-3
-import { AtencionComercialPantalla } from './admin/AtencionComercial' // CC-7
+import { AtencionComercialPantalla, CarteraHorarioPantalla } from './admin/AtencionComercial' // CC-7
 import { Mermas } from './admin/Mermas'
 import { Importar } from './admin/Importar'
 import { Eventos } from './pos/Eventos'
@@ -90,7 +89,6 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_traza: () => <Trazabilidad />,
   av_doc: () => <DoctoresDirectorio />,
   av_verif: () => <Doctores />, // "Por verificar": gate del canal comercial (profiles.verified)
-  av_prosp: () => <Prospectos />,
   av_fin: () => <Facturacion />,
   av_fiscal: () => <RevisionFiscal />,
   av_mensajes: () => <Comunicaciones />,
@@ -106,7 +104,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_precios: () => <Precios />,
   av_comisiones: () => <Comisiones />,
   av_conocimiento: () => <Conocimiento />,
-  av_atencion: () => <AtencionComercialPantalla />,   // CC-7
+  av_atencion: () => <AtencionComercialPantalla />,   // CC-7 · Conversaciones → Bandeja
+  av_cartera: () => <CarteraHorarioPantalla />,       // REORG CRM · Equipo → Cartera y horario
   av_config: () => <Configuracion />,
   av_mermas: () => <Mermas />,
   av_control_inv: () => <ControlInventario />,

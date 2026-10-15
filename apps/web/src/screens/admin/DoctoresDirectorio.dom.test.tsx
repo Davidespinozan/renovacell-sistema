@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Admin "Doctores" = directorio comercial (customers), población completa (scope all).
+// Admin "Clientes" (antes "Doctores") = directorio comercial (customers), población completa (scope all).
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { screen, cleanup } from '@testing-library/react'
 import { renderWithRole } from '../../test/utils'
@@ -25,9 +25,9 @@ import { DoctoresDirectorio } from './DoctoresDirectorio'
 afterEach(cleanup)
 
 describe('<DoctoresDirectorio> (admin)', () => {
-  it('muestra la población completa de customers con título Doctores y badge de portal', () => {
+  it('muestra la población completa de customers con título Clientes y badge de portal', () => {
     renderWithRole(<DoctoresDirectorio />)
-    expect(screen.getByText(/Doctores · Directorio comercial/)).toBeTruthy()
+    expect(screen.getByText(/Clientes · Directorio comercial/)).toBeTruthy()
     expect(screen.getByText('Dra. Ana')).toBeTruthy()
     expect(screen.getByText('Dr. Beto')).toBeTruthy()
     expect(screen.getByText(/2 · 1 con portal/)).toBeTruthy()

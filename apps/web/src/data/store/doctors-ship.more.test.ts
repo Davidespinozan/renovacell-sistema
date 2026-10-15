@@ -1,7 +1,6 @@
-// Lógica de doctores (gate de cédula), prospectos y envíos (modo mock).
+// Lógica de doctores (gate de cédula) y envíos (modo mock).
 import { describe, it, expect } from 'vitest'
 import * as doctors from './doctorsStore'
-import * as prospects from './prospectsStore'
 import * as ship from './shipmentsStore'
 
 // W4: un envío solo "existe" cuando el store lo confirmó.
@@ -23,18 +22,6 @@ describe('doctorsStore — verificación con cédula', () => {
     await doctors.setCedula(d.id!, '1234567')
     expect(await doctors.setVerified(d.id!, true)).toBe(true)
     expect(doctors.getSnapshot().find((x) => x.id === d.id)?.verified).toBe(true)
-  })
-})
-
-describe('prospectsStore', () => {
-  it('addProspect lo agrega al pipeline', () => {
-    const p = prospects.addProspect({ name: 'Dr. Prospecto QA', email: 'prosp@x.mx', phone: null, clinic: null, interest: null, source: 'landing' } as never)
-    expect(prospects.getSnapshot().some((x) => x.id === p.id)).toBe(true)
-  })
-  it('setStatus cambia el estatus del prospecto', () => {
-    const p = prospects.addProspect({ name: 'Dr. Estatus QA', email: 'est@x.mx', phone: null, clinic: null, interest: null, source: 'landing' } as never)
-    prospects.setStatus(p.id, 'contactado')
-    expect(prospects.getSnapshot().find((x) => x.id === p.id)?.status).toBe('contactado')
   })
 })
 

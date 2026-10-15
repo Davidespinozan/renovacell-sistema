@@ -158,7 +158,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
         <button type="button" className="btn ghost sm" onClick={() => void copiarEnlace()} title="El enlace único para compartir en grupos: quien lo abre deja sus datos y conversa en este mismo chat." data-testid="copiar-enlace">{copiado ? 'Enlace copiado' : 'Copiar enlace de contacto'}</button>
       </div>
       <p style={{ margin: '0 0 12px', color: 'var(--ink-3, #667)', fontSize: 13 }}>
-        {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Atención comercial.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
+        {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Conversaciones → Solicitudes.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
       </p>
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}

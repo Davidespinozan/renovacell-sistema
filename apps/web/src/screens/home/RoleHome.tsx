@@ -135,7 +135,7 @@ export function HomeDireccion() {
   const interv = est.pendientes ? intervencionDireccion(est.pendientes.conversaciones) : []
   const horario = est.pendientes?.resumen.horario
   const atajos = useAccesos([
-    { key: 'av_atencion', label: 'Atención comercial', icon: 'chat' },
+    { key: 'av_atencion', label: 'Conversaciones', icon: 'chat' },
     { key: 'bandeja', label: 'Mi bandeja', icon: 'check' },
     { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt' },
   ])
@@ -145,11 +145,11 @@ export function HomeDireccion() {
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta="Dirección"
         detalle={interv.length ? `${interv.length} solicitud${interv.length === 1 ? '' : 'es'} comercial${interv.length === 1 ? '' : 'es'} requiere${interv.length === 1 ? '' : 'n'} tu intervención.` : urgentes ? 'Hay pendientes críticos en tu bandeja.' : 'Nada comercial requiere tu intervención ahora.'} />
-      <Seccion titulo="Requiere tu intervención" nivel="atencion" conteo={interv.length} id="atencion" accion={{ label: 'Atención comercial', onClick: () => setScreen('av_atencion') }}>
+      <Seccion titulo="Requiere tu intervención" nivel="atencion" conteo={interv.length} id="atencion" accion={{ label: 'Ver solicitudes', onClick: () => setScreen('av_atencion') }}>
         {est.error && <ErrorLectura texto={`No se pudo actualizar la atención comercial. ${est.error}`} onReintentar={() => void recargarAtencion()} />}
         {horario && !horario.configurado && (
           <Nota tono="warn"><span><b>{TEXTO_HORARIO_PENDIENTE}.</b> Las alertas por tiempo de espera están en pausa hasta configurarlo.</span>
-            <button type="button" className="btn rh-btn" onClick={() => { abrirPestanaAtencion('horario'); setScreen('av_atencion') }} data-testid="btn-configurar-horario">Configurar horario</button></Nota>
+            <button type="button" className="btn rh-btn" onClick={() => { abrirPestanaAtencion('horario'); setScreen('av_cartera') }} data-testid="btn-configurar-horario">Configurar horario</button></Nota>
         )}
         {!est.listo ? <Cargando /> : interv.length === 0 ? (
           !est.error && <Vacio titulo="No hay solicitudes comerciales que requieran intervención." detalle="Las solicitudes sin vendedor o escaladas aparecerán aquí." testid="vacio-intervencion" />

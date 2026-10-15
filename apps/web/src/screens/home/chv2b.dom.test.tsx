@@ -20,7 +20,6 @@ vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {
 vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useDoctors', () => ({ useDoctors: () => ({ data: [] }) }))
-vi.mock('../../data/hooks/useProspects', () => ({ useProspects: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useStockReturns', () => ({ useStockReturns: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useCompras', () => ({ useCompras: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: [] }) }))
@@ -162,7 +161,7 @@ describe('Inicio de Dirección', () => {
   })
   it('D · Mi bandeja cuenta lo mismo (sin vendedor + escaladas) desde la misma lectura', async () => {
     render(<Bandeja />); await flush()
-    const fila = (await screen.findByText('Atención comercial pendiente')).closest('button')!
+    const fila = (await screen.findByText('Conversaciones pendientes')).closest('button')!
     expect(fila).toHaveTextContent('1 conversación(es) sin vendedor'); expect(fila).toHaveTextContent('1 solicitud(es) escalada(s) por espera')
     expect(fila.querySelector('.pill')?.textContent).toBe('2')
   })

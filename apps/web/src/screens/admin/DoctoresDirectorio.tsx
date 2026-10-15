@@ -5,5 +5,5 @@
 import { CustomerDirectory } from '../../app/CustomerDirectory'
 
 export function DoctoresDirectorio() {
-  return <CustomerDirectory title="Doctores" scope="all" />
+  return <CustomerDirectory title="Clientes" scope="all" />
 }

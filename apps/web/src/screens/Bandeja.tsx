@@ -13,7 +13,6 @@ import { useOrderMoney, usePaymentClaims } from '../data/hooks/useMoney'
 import { useShipments } from '../data/hooks/useShipments'
 import { useLots } from '../data/hooks/useLots'
 import { useDoctors } from '../data/hooks/useDoctors'
-import { useProspects } from '../data/hooks/useProspects'
 import { useStockReturns } from '../data/hooks/useStockReturns'
 import { useCompras } from '../data/hooks/useCompras'
 import { useCustodies } from '../data/hooks/useCustody'
@@ -25,7 +24,7 @@ import { solicitudesVendedor, activasVendedor, intervencionDireccion, TEXTO_HORA
 import { tieneCfdi } from '../data/ops/cfdi'
 import { clasificarDeclaraciones } from '../data/ops/pagosPendientes'
 import { useRevisionEconomica } from '../data/hooks/useRevisionEconomica'
-import { hasSupabase, currentUserId } from '../lib/supabase'
+import { hasSupabase } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
 import { daysUntil, severity } from './warehouse/expiry'
 import { hoyNegocio } from '../data/periodo'
@@ -49,7 +48,6 @@ function useTareasBase(): Task[] {
   const { data: shipments } = useShipments()
   const { data: lots } = useLots()
   const { data: doctors } = useDoctors()
-  const { data: prospects } = useProspects()
   const { data: devoluciones } = useStockReturns()
   const { data: compras } = useCompras()
   const { data: custodias } = useCustodies()
@@ -80,13 +78,11 @@ function useTareasBase(): Task[] {
 
     if (role === 'admin') {
       const docsPend = doctors.filter((d) => !d.verified)
-      const prospNuevos = prospects.filter((p) => (p.status ?? 'nuevo') === 'nuevo')
       const atorados = orders.filter((o) => ['packed', 'shipped'].includes(o.status ?? '') && diagnoseShipment(o, shipments.find((s) => s.order_id === o.id)).stuck)
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 
       if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
-      if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos y muévelos por el pipeline.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
       // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
       // PAY-EXP-01A-3 · MISMO universo que la lista de "Pagos por validar" (los de pedidos cancelados → Revisión económica).
       const transferPend = clasificarDeclaraciones(claims, orders).vigentes
@@ -117,18 +113,13 @@ function useTareasBase(): Task[] {
     }
 
     if (role === 'pos') {
-      // `assigned_to` es UUID con backend (email en demo). Antes se comparaba SIEMPRE
-      // contra el email → en producción nunca coincidía y el vendedor veía "todo al día".
-      const mineId = hasSupabase ? currentUserId() : user?.email
-      const prospNuevos = prospects.filter((p) => p.assigned_to === mineId && (p.status ?? 'nuevo') === 'nuevo')
-      if (prospNuevos.length) t.push({ id: 'prosp', icon: 'grid', title: 'Prospectos nuevos', detail: 'Contáctalos.', count: prospNuevos.length, tone: 'warn', screen: 'av_prosp' })
     }
 
     return t
     // `byOrder` y `claims` FALTABAN aquí: si el dinero o los pagos declarados llegaban
     // después de los pedidos, la bandeja no se recalculaba y "Pagos por validar" o
     // "Por surtir" quedaban invisibles hasta que cambiara otra cosa.
-  }, [role, user, orders, byOrder, claims, shipments, lots, doctors, prospects, devoluciones, compras, custodias])
+  }, [role, user, orders, byOrder, claims, shipments, lots, doctors, devoluciones, compras, custodias])
 }
 
 // CHV2-B · Atención comercial desde el store compartido (la misma lectura que Inicio y la alerta).
@@ -160,7 +151,7 @@ export function tareasComerciales(est: EstadoAtencionComercial): Task[] {
         r.handoffs_pendientes ? `${r.handoffs_pendientes} carrito(s) sin rutear` : '',
         sinHorario ? TEXTO_HORARIO_PENDIENTE.toLowerCase() : '',
       ].filter(Boolean)
-      t.push({ id: 'comercial', icon: 'chat', title: 'Atención comercial pendiente', detail: partes.join(' · ') + '.', count: n || 1, tone: r.handoffs_pendientes || escaladas || r.handoffs_sin_asignar ? 'dang' : 'warn', screen: 'av_atencion' })
+      t.push({ id: 'comercial', icon: 'chat', title: 'Conversaciones pendientes', detail: partes.join(' · ') + '.', count: n || 1, tone: r.handoffs_pendientes || escaladas || r.handoffs_sin_asignar ? 'dang' : 'warn', screen: 'av_atencion' })
     }
   }
   return t

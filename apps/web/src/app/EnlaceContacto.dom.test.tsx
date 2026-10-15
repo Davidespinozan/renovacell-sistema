@@ -24,7 +24,7 @@ describe('Enlace de contacto (Dirección)', () => {
     expect(href).toBe('https://wa.me/?text=Renovacell · Tecnologías Antiedad. Chatea con un asesor: https://renovacell.mx/contacto')
     expect(href).not.toMatch(/sistema operativo/i)
   })
-  it('vive en Atención comercial, la pantalla de Dirección donde se asigna vendedor', () => {
-    expect(atencionSrc).toMatch(/Dirección · Atención comercial<\/div>\s*\n\s*<EnlaceContacto \/>/)
+  it('vive en la Bandeja de Conversaciones, la pantalla de Dirección donde se asigna vendedor', () => {
+    expect(atencionSrc).toMatch(/\{titulo\}<\/div>\s*\n\s*\{pestanas\.includes\('pendientes'\) && <EnlaceContacto \/>\}/)   // REORG CRM · vive en la Bandeja de Conversaciones (solicitudes)
   })
 })

@@ -30,9 +30,19 @@ const campo: React.CSSProperties = { padding: '8px 10px', borderRadius: 8, borde
 // Pestaña inicial pedida desde otra pantalla (p. ej. Inicio → "Configurar horario").
 let pestanaPedida: Pestana | null = null
 export function abrirPestanaAtencion(p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes' | 'whatsapp') { pestanaPedida = p === 'solicitudes' ? 'pendientes' : p }
+// REORG CRM · la consola se parte en dos pantallas: Conversaciones → Bandeja (solicitudes y WhatsApp, key 'av_atencion')
+// y Equipo → Cartera y horario (cartera, vendedores, horario, key 'av_cartera'). Quien abre una pestaña a fondo usa esto.
+export const pantallaDeAtencion = (p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes' | 'whatsapp'): 'av_atencion' | 'av_cartera' => (p === 'solicitudes' || p === 'whatsapp' ? 'av_atencion' : 'av_cartera')
+const PESTANAS_BANDEJA: Pestana[] = ['pendientes', 'whatsapp']
+const PESTANAS_CARTERA: Pestana[] = ['cartera', 'vendedores', 'horario']
+const ETIQUETA: Record<Pestana, string> = { pendientes: 'Solicitudes', whatsapp: 'WhatsApp', cartera: 'Cartera', vendedores: 'Vendedores', horario: 'Horario y alertas' }
 
-export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, onEquipo, onAbrir }: { cliente?: ClienteAtencion; chat?: ClienteChat; onEquipo?: () => void; onAbrir?: (conversationId: string) => void }) {
-  const [pestana, setPestana] = useState<Pestana>(() => { const p = pestanaPedida ?? 'pendientes'; pestanaPedida = null; return p })
+export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, onEquipo, onAbrir, pestanas = PESTANAS_BANDEJA, titulo = 'Dirección · Conversaciones · Bandeja', onHorario }: {
+  cliente?: ClienteAtencion; chat?: ClienteChat; onEquipo?: () => void; onAbrir?: (conversationId: string) => void
+  pestanas?: Pestana[]; titulo?: string; onHorario?: () => void   // onHorario: desde la Bandeja, el horario vive en Cartera y horario
+}) {
+  const [pestana, setPestana] = useState<Pestana>(() => { const p = pestanaPedida && pestanas.includes(pestanaPedida) ? pestanaPedida : pestanas[0]; if (pestanaPedida && pestanas.includes(pestanaPedida)) pestanaPedida = null; return p })
+  const irHorario = () => { if (pestanas.includes('horario')) setPestana('horario'); else onHorario?.() }
   const [pend, setPend] = useState<Pendientes | null>(null)
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +60,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
   // Llegada desde Inicio / alerta / campana: solo un id; se muestra si el servidor lo devuelve.
   useEffect(() => {
     if (!intento) return
+    if (!pestanas.includes('pendientes')) return
     setPestana('pendientes'); setFoco({ id: intento.conversationId, reasignar: !!intento.reasignar }); consumirIntento(intento.id)
   }, [intento])
   const alCambiar = useCallback(async () => { await cargar(); void recargarAtencion() }, [cargar])
@@ -57,8 +68,8 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
   const r = pend?.resumen
   return (
     <div className="grid" style={{ gap: 14, maxWidth: 1040, minWidth: 0 }} data-testid="atencion-comercial">
-      <div className="eyebrow" style={{ margin: 0 }}>Dirección · Atención comercial</div>
-      <EnlaceContacto />
+      <div className="eyebrow" style={{ margin: 0 }}>{titulo}</div>
+      {pestanas.includes('pendientes') && <EnlaceContacto />}
       <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontWeight: 600 }} data-testid="estado-horario">{textoEstadoHorario(r?.horario)}</div>
@@ -66,7 +77,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
             {r && !r.horario.configurado ? 'Sin horario no se miden minutos hábiles: los avisos y escalamientos por espera están en pausa.' : 'El servidor mide la espera del asesor en minutos hábiles con este horario.'}
           </div>
         </div>
-        <button type="button" className="btn ghost" onClick={() => setPestana('horario')} style={{ minHeight: 40 }}>{r?.horario.configurado ? 'Horario y alertas' : 'Configurar horario'}</button>
+        <button type="button" className="btn ghost" onClick={irHorario} style={{ minHeight: 40 }}>{r?.horario.configurado ? 'Horario y alertas' : 'Configurar horario'}</button>
         {r && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span className={'pill ' + (r.handoffs_sin_asignar ? 'p-warn' : 'p-neu')} data-testid="n-sin-asignar">{r.handoffs_sin_asignar} sin vendedor</span>
@@ -78,8 +89,8 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
       </div>
       {error && <div role="alert" className="card" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
       <div className="seg" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }} role="tablist" aria-label="Secciones de atención comercial">
-        {([['pendientes', 'Solicitudes'], ['whatsapp', 'WhatsApp'], ['cartera', 'Cartera'], ['vendedores', 'Vendedores'], ['horario', 'Horario y alertas']] as const).map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={pestana === k} className={pestana === k ? 'active' : undefined} onClick={() => setPestana(k)}>{l}</button>
+        {pestanas.map((k) => (
+          <button key={k} type="button" role="tab" aria-selected={pestana === k} className={pestana === k ? 'active' : undefined} onClick={() => setPestana(k)}>{ETIQUETA[k]}</button>
         ))}
       </div>
       {pestana === 'pendientes' && pend && <PestanaPendientes pend={pend} vendedores={vendedores} cliente={cliente} chat={chat} onCambio={alCambiar} foco={foco} onFocoUsado={() => setFoco(null)} onAbrir={onAbrir} />}
@@ -453,8 +464,14 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
   )
 }
 
-/** Montaje en el registro: Abrir lleva a Conversaciones (la conversación exacta) y Equipo a permisos. */
+/** Conversaciones → Bandeja: solicitudes de asesor y WhatsApp. Abrir lleva a Asesorías (la conversación exacta). */
 export function AtencionComercialPantalla() {
   const { setScreen } = useRole()
-  return <AtencionComercial onEquipo={() => setScreen('av_equipo')} onAbrir={(id) => irAConversacion(setScreen, id, { origen: 'atencion' })} />
+  return <AtencionComercial pestanas={PESTANAS_BANDEJA} titulo="Dirección · Conversaciones · Bandeja" onEquipo={() => setScreen('av_equipo')}
+    onAbrir={(id) => irAConversacion(setScreen, id, { origen: 'atencion' })} onHorario={() => { abrirPestanaAtencion('horario'); setScreen('av_cartera') }} />
+}
+/** Equipo → Cartera y horario: cartera por vendedor, vendedores elegibles, horario y alertas. */
+export function CarteraHorarioPantalla() {
+  const { setScreen } = useRole()
+  return <AtencionComercial pestanas={PESTANAS_CARTERA} titulo="Dirección · Equipo · Cartera y horario" onEquipo={() => setScreen('av_equipo')} />
 }

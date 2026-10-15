@@ -49,38 +49,41 @@ export const ROLES: RoleDef[] = [
     key: 'admin', label: 'Administración', group: 'Administración · Dirección',
     icon: 'dashboard', isStaff: true, ready: true,
     modules: [
+      // REORG CRM (15 oct 2026, decisión del dueño): secciones por intención. Clientes (quién compra), Conversaciones
+      // (todo lo que entra por chat/WhatsApp/enlace y lo que se le escribe al cliente), Catálogo y web, Operación,
+      // Finanzas, Equipo (personas y su atención) y Sistema. "Prospectos" (CRM de maquetas, vacío en prod) se retiró:
+      // los leads reales viven en Conversaciones.
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
-      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Mi trabajo' },
-      { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Comercial' },
-      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Comercial' },
-      // Flujo natural: Prospecto → Por verificar → Doctor. Comisiones no interrumpe.
-      { key: 'av_verif', label: 'Por verificar', icon: 'shield', section: 'Comercial' },
-      { key: 'av_doc', label: 'Doctores', icon: 'usercheck', section: 'Comercial' },
-      { key: 'av_comisiones', label: 'Comisiones', icon: 'chart', section: 'Comercial' },
-      { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Comercial' },
-      { key: 'av_precios', label: 'Precios', icon: 'receipt', section: 'Comercial' },
-      { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Comercial' },
+      { key: 'av_doc', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // directorio comercial (customers)
+      { key: 'av_verif', label: 'Por verificar', icon: 'shield', section: 'Clientes' },
+      { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Clientes' },
+      { key: 'av_comisiones', label: 'Comisiones', icon: 'chart', section: 'Clientes' },
+      { key: 'av_atencion', label: 'Bandeja', icon: 'chat', section: 'Conversaciones' },     // solicitudes de asesor + WhatsApp (la key no cambia: avisos y enlaces apuntan aquí)
+      { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Conversaciones' },     // CC-2 · las que ya tienen vendedor (la key sigue siendo 'asesorias')
+      { key: 'av_mensajes', label: 'Correos al cliente', icon: 'mail', section: 'Conversaciones' },
+      { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },
+      { key: 'av_precios', label: 'Precios', icon: 'receipt', section: 'Catálogo y web' },
+      { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Catálogo y web' },
+      { key: 'av_conocimiento', label: 'Conocimiento de producto', icon: 'grid', section: 'Catálogo y web' },   // CC-3
       { key: 'av_inv', label: 'Compras a proveedores', icon: 'cart', section: 'Operación' },   // UX-2 · mismo nombre que en Almacén
       { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
       { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
       { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
       { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
-      { key: 'asesorias', label: 'Conversaciones', icon: 'chat', section: 'Operación' },   // CC-2 · CHV2-B: etiqueta visible "Conversaciones" (la key sigue siendo 'asesorias')
-      { key: 'av_atencion', label: 'Atención comercial', icon: 'chat', section: 'Operación' },   // CC-7 · cartera, ruteo y pendientes
-      { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
-      { key: 'av_mensajes', label: 'Correos al cliente', icon: 'mail', section: 'Operación' },
+      { key: 'av_import', label: 'Importar / Migración', icon: 'download', section: 'Operación' },
       { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
       { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt', section: 'Finanzas' },
       { key: 'av_revision', label: 'Revisión económica', icon: 'shield', section: 'Finanzas' },   // PAY-EXP-01A-3 · Dirección/Facturación
       { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
       { key: 'av_fiscal', label: 'Revisión fiscal', icon: 'shield', section: 'Finanzas' },
       { key: 'av_cierre', label: 'Cierre de caja', icon: 'store', section: 'Finanzas' },
-      { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Finanzas' },
-      { key: 'av_conocimiento', label: 'Conocimiento de producto', icon: 'grid', section: 'Sistema' },   // CC-3
+      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo' },
+      { key: 'av_cartera', label: 'Cartera y horario', icon: 'usercheck', section: 'Equipo' },   // cartera por vendedor, vendedores elegibles, horario y alertas
       { key: 'av_config', label: 'Configuración', icon: 'store', section: 'Sistema' },
+      { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Sistema' },
     ],
   },
   {
@@ -124,7 +127,6 @@ export const ROLES: RoleDef[] = [
     modules: [
       { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
-      { key: 'av_prosp', label: 'Prospectos', icon: 'grid', section: 'Mi cartera' },
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Mi cartera' },

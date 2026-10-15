@@ -23,16 +23,16 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
     const entry = nav.find((s) => s.key === 'av_verif')
     expect(entry).toBeTruthy()
     expect(entry?.label).toBe('Por verificar')
-    expect(entry?.section).toBe('Comercial')
-    // y el directorio "Doctores" (av_doc) se conserva como entrada aparte
-    expect(nav.some((s) => s.key === 'av_doc' && s.label === 'Doctores')).toBe(true)
+    expect(entry?.section).toBe('Clientes')
+    // y el directorio "Clientes" (av_doc) se conserva como entrada aparte
+    expect(nav.some((s) => s.key === 'av_doc' && s.label === 'Clientes')).toBe(true)
   })
   it('roles.ts declara la entrada av_verif', () => {
-    expect(rolesSrc).toMatch(/key: 'av_verif'.*label: 'Por verificar'.*section: 'Comercial'/)
+    expect(rolesSrc).toMatch(/key: 'av_verif'.*label: 'Por verificar'.*section: 'Clientes'/)
   })
-  it('orden EXACTO del menú Comercial: Ventas→Prospectos→Por verificar→Doctores→Comisiones→Catálogo→Precios→Sitio web', () => {
-    const comercial = getNav(getRole('admin')).filter((s) => s.section === 'Comercial').map((s) => s.label)
-    expect(comercial).toEqual(['Ventas', 'Prospectos', 'Por verificar', 'Doctores', 'Comisiones', 'Catálogo', 'Precios', 'Sitio web'])
+  it('orden EXACTO del menú Clientes: Clientes→Por verificar→Ventas→Comisiones (REORG CRM)', () => {
+    const comercial = getNav(getRole('admin')).filter((s) => s.section === 'Clientes').map((s) => s.label)
+    expect(comercial).toEqual(['Clientes', 'Por verificar', 'Ventas', 'Comisiones'])
   })
 })
 

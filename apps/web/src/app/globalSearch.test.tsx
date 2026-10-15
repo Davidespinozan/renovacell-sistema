@@ -11,7 +11,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => <RoleProvider>{
 describe('búsqueda global', () => {
   it('indexa pantallas como comandos "Ir a"', () => {
     const { result } = renderHook(() => useGlobalSearch(), { wrapper })
-    const hits = result.current('Doctores')
+    const hits = result.current('Clientes')
     expect(hits.some((r) => r.type === 'Ir a' && r.screen === 'av_doc')).toBe(true)
   })
 

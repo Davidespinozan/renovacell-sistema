@@ -18,7 +18,6 @@ vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {
 vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useDoctors', () => ({ useDoctors: () => ({ data: [] }) }))
-vi.mock('../../data/hooks/useProspects', () => ({ useProspects: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useStockReturns', () => ({ useStockReturns: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useCompras', () => ({ useCompras: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: [] }) }))

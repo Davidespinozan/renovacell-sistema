@@ -21,8 +21,8 @@ describe('navegación por rol', () => {
     const admin = getNav(getRole('admin')).map((s) => [s.key, s.label])
     expect(admin).toContainEqual(['comun', 'Avisos del equipo'])
     expect(admin).toContainEqual(['chat', 'Chat del equipo'])
-    expect(admin).toContainEqual(['asesorias', 'Conversaciones'])
-    expect(admin).toContainEqual(['av_atencion', 'Atención comercial'])
+    expect(admin).toContainEqual(['asesorias', 'Asesorías'])   // REORG CRM · la key no cambia; para Ventas sigue diciendo "Conversaciones"
+    expect(admin).toContainEqual(['av_atencion', 'Bandeja'])   // REORG CRM · Conversaciones → Bandeja
     expect(getNav(getRole('doctor')).map((s) => s.key)).toEqual(['inicio', 'catalogo', 'pedidosdr', 'hist', 'chat_cc', 'mi_verificacion'])
     expect(getNav(getRole('doctor')).some((s) => s.key === 'comun' || s.key === 'chat')).toBe(false)
   })

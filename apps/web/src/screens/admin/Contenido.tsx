@@ -33,7 +33,7 @@ export function SitioWeb() {
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Sitio web">
         La página pública (landing): <b>captación e información</b>, no venta. Edítala completa abajo;
-        el embudo es landing → Prospectos → verificación → Portal.
+        el embudo es landing → Conversaciones → verificación → Portal.
       </PageHead>
       <LandingTab />
     </div>
