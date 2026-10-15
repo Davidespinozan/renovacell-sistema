@@ -5,6 +5,7 @@ import { recibirLote, getSnapshotLots } from './lotsStore'
 import { createReplenishment, markPaid, getSnapshot as getCompras } from './comprasStore'
 import { stockByProduct } from '../ops/stock'
 import type { Lot } from '../types'
+import { hoyNegocio, sumarDias } from '../periodo'
 
 // W4: una orden solo "existe" cuando el store la confirmó.
 const orden = async (p: ReturnType<typeof createReplenishment>) => {
@@ -68,7 +69,7 @@ describe('compra ≠ recepción (no aumenta stock)', () => {
 
 describe('caducado: existe físicamente pero NO disponible para venta', () => {
   it('stockByProduct excluye lotes caducados', () => {
-    const ayer = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    const ayer = sumarDias(hoyNegocio(), -1)   // "ayer" del NEGOCIO (Culiacán), como lo calcula stockByProduct; en UTC fallaba de 00:00 a 07:00
     const lots: Lot[] = [
       { id: 'x1', product_id: 'EXP', lot_code: 'VIGENTE', manufacture_date: null, expiry_date: null, quantity: 8, location: null, unit_cost: 0, metadata: null },
       { id: 'x2', product_id: 'EXP', lot_code: 'CADUCO', manufacture_date: null, expiry_date: ayer, quantity: 5, location: null, unit_cost: 0, metadata: null },
