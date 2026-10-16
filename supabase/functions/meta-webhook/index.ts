@@ -115,6 +115,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  // DIAGNÓSTICO (solo forma, sin datos de la persona): un paquete con firma válida que no trae nada reconocible se anota
+  // en el Log para saber qué manda Meta (objeto, llaves de cada entrada, campos de changes y llaves de messaging).
+  if (wa.length === 0 && estados.length === 0 && mt.length === 0) {
+    const forma = (Array.isArray(payload.entry) ? payload.entry : []).slice(0, 3).map((e: Record<string, unknown>) => ({
+      id: String(e.id ?? ''), llaves: Object.keys(e),
+      messaging: (Array.isArray(e.messaging) ? e.messaging : []).slice(0, 3).map((x: Record<string, unknown>) => ({ llaves: Object.keys(x), message: x.message && typeof x.message === 'object' ? Object.keys(x.message as object) : null })),
+      changes: (Array.isArray(e.changes) ? e.changes : []).slice(0, 3).map((c: Record<string, unknown>) => ({ field: c.field, value: c.value && typeof c.value === 'object' ? Object.keys(c.value as object) : typeof c.value })),
+    }))
+    console.log('meta-webhook: paquete sin mensajes reconocidos', JSON.stringify({ object: payload.object, entry: forma }))
+  }
   // Meta EXIGE 200 aunque no haya nada que procesar (si no, reintenta y duplica).
   return new Response(JSON.stringify({ received: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (e) {
