@@ -16,6 +16,10 @@ describe('Mensajes de Instagram y Messenger entrantes', () => {
     const fb = extraerMeta({ object: 'page', entry: [{ id: '1', messaging: [ev({}, { mid: 'mid.FB000001', attachments: [{ type: 'file' }] })] }] })
     expect(fb[0]).toMatchObject({ canal: 'messenger', texto: 'Envió un archivo por Facebook.' })
   })
+  it('también lee el formato de la prueba del panel de Meta (entry[].changes[] con field messages)', () => {
+    const r = extraerMeta({ object: 'instagram', entry: [{ id: '0', time: 1, changes: [{ field: 'messages', value: { sender: { id: '12334' }, recipient: { id: '23245' }, timestamp: '1527459824', message: { mid: 'random_mid', text: 'random_text' } } }, { field: 'comments', value: { id: 'x' } }] }] })
+    expect(r).toEqual([{ canal: 'instagram', psid: '12334', mid: 'random_mid', texto: 'random_text', destino: '23245' }])
+  })
   it('ignora ecos (lo que mandó la página), lecturas/entregas, otros objetos y lo que no trae PSID o mid', () => {
     expect(extraerMeta({ object: 'page', entry: [{ messaging: [ev({}, { mid: 'mid.E', text: 'eco', is_echo: true }), ev({}, { mid: 'short', text: 'x' }), { sender: { id: 'abc' }, message: { mid: 'mid.X000001', text: 'x' } }, { sender: { id: '1234567' }, read: { watermark: 1 } }, { sender: { id: '1234567' }, delivery: { mids: [] } }] }] })).toEqual([])
     expect(extraerMeta({ object: 'whatsapp_business_account', entry: [{ messaging: [ev({}, { mid: 'mid.X000001', text: 'x' })] }] })).toEqual([])

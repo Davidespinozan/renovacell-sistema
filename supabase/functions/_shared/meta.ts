@@ -20,7 +20,13 @@ export function extraerMeta(payload: unknown): EntranteMeta[] {
   const canal: CanalMeta | null = p.object === 'instagram' ? 'instagram' : p.object === 'page' ? 'messenger' : null
   if (!canal) return out
   for (const entry of (Array.isArray(p.entry) ? p.entry : []) as Record<string, unknown>[]) {
-    for (const ev of (Array.isArray(entry.messaging) ? entry.messaging : []) as Record<string, unknown>[]) {
+    // Un DM real llega en entry[].messaging[]; la prueba del panel de Meta (y algún producto) lo manda como
+    // entry[].changes[] con field "messages" y el mismo contenido en value. Se aceptan los dos.
+    const eventos: Record<string, unknown>[] = [...((Array.isArray(entry.messaging) ? entry.messaging : []) as Record<string, unknown>[])]
+    for (const ch of (Array.isArray(entry.changes) ? entry.changes : []) as Record<string, unknown>[]) {
+      if (ch.field === 'messages' && ch.value && typeof ch.value === 'object') eventos.push(ch.value as Record<string, unknown>)
+    }
+    for (const ev of eventos) {
       const m = ev.message as Record<string, unknown> | undefined
       if (!m || m.is_echo === true) continue
       const psid = String((ev.sender as Record<string, unknown>)?.id ?? '').trim()
