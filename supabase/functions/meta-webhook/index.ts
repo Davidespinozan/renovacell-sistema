@@ -30,21 +30,28 @@ const obs = observador('meta-webhook')
 
 // Firma HMAC-SHA256 del cuerpo con el App Secret. Meta la manda en 'sha256=<hex>'.
 // Comparación en tiempo (casi) constante para no filtrar por temporización.
-async function validSignature(body: string, header: string | null, secret: string): Promise<boolean> {
+// META-CANALES · Instagram por "inicio de sesión de Instagram" firma con la clave de SU app (META_APP_SECRET_IG), distinta
+// a la de la app de Facebook (META_APP_SECRET) que firma WhatsApp y Messenger: se aceptan las dos.
+async function validSignature(body: string, header: string | null, secrets: string[]): Promise<boolean> {
   if (!header) return false
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
-  const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('')
-  const expected = `sha256=${hex}`
-  if (header.length !== expected.length) return false
-  let diff = 0
-  for (let i = 0; i < header.length; i++) diff |= header.charCodeAt(i) ^ expected.charCodeAt(i)
-  return diff === 0
+  for (const secret of secrets) {
+    if (!secret) continue
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
+    const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('')
+    const expected = `sha256=${hex}`
+    if (header.length !== expected.length) continue
+    let diff = 0
+    for (let i = 0; i < header.length; i++) diff |= header.charCodeAt(i) ^ expected.charCodeAt(i)
+    if (diff === 0) return true
+  }
+  return false
 }
 
 Deno.serve(async (req) => {
   const verifyToken = Deno.env.get('META_VERIFY_TOKEN')
   const appSecret = Deno.env.get('META_APP_SECRET')
+  const appSecretIG = (Deno.env.get('META_APP_SECRET_IG') ?? '').trim()   // opcional: app de Instagram (inicio de sesión de Instagram)
   // Seam: sin credenciales del app de Meta, dormida (inofensiva).
   if (!verifyToken || !appSecret) return new Response('Meta no configurado', { status: 501 })
 
@@ -62,7 +69,7 @@ Deno.serve(async (req) => {
 
   // ── Mensaje entrante: firma + parseo ──
   const body = await req.text()
-  if (!(await validSignature(body, req.headers.get('x-hub-signature-256'), appSecret))) {
+  if (!(await validSignature(body, req.headers.get('x-hub-signature-256'), [appSecret, appSecretIG]))) {
     return new Response('Firma inválida', { status: 401 })
   }
   let payload: Record<string, unknown>
