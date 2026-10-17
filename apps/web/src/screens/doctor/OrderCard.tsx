@@ -11,6 +11,7 @@ import { trackingUrl } from '../../data/shipping/provider'
 import { etiquetaLiberacion } from '../../data/ops/moneyView'
 import type { OrderMoney } from '../../data/ops/money'
 import type { ProductSafe } from '../../data/types'
+import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 
 export function OrderCard({
   order,
@@ -65,6 +66,13 @@ export function OrderCard({
         })}
       </div>
 
+      {(() => {
+        // ENT-0 · el flete va dentro del total; se desglosa para que el cliente vea productos + envío.
+        const envio = Number((order as { shipping_cost?: number | null }).shipping_cost ?? 0)
+        return envio > 0 ? (
+          <div className="coitem" data-testid="pedido-envio"><span>Envío</span><span className="mono">{money(envio)}</span></div>
+        ) : null
+      })()}
       <div className="cototal">
         <span>Total</span>
         <b>{money(order.total)}</b>
@@ -87,6 +95,7 @@ export function OrderCard({
 
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 
+      <EntregaLine meta={order.shipping_meta} />
       <ShippingLine meta={order.shipping_meta} />
       <RastreoCliente order={order} />
 
@@ -130,6 +139,17 @@ function RastreoCliente({ order }: { order: OrderWithItems }) {
   const { rastreo, cargando } = useRastreo(activo ? order.id : null, activo)
   if (!activo) return null
   return <RastreoEnvio rastreo={rastreo} cargando={cargando} vista="cliente" />
+}
+
+// ENT-0 · La promesa de entrega que se fijó al crear el pedido (tipo, paquetería y fechas): el cliente SIEMPRE la ve.
+function EntregaLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
+  const e = (meta && typeof meta === 'object' ? (meta as { entrega?: EntregaPedido | null }).entrega : null) ?? null
+  if (!e) return null
+  return (
+    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega">
+      <b style={{ color: 'var(--ink-2)' }}>{e.texto}</b> · {promesaDe(e)}
+    </div>
+  )
 }
 
 function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {

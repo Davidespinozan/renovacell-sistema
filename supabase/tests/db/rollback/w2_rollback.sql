@@ -3,6 +3,8 @@
 -- Hashes capturados de un cluster con las migraciones hasta W1 inclusive.
 begin;
 -- W2-C se apoya en v_order_money, así que primero baja W2-C.
+set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/w2c/00_w2_snapshot.sql
 \ir ../../../rollback/w2c/99_down.sql
 \ir ../../../rollback/w2/99_down.sql

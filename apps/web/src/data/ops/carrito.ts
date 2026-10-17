@@ -3,6 +3,7 @@
 // lista, profile_id ni seller. Cada mutación lleva un operation_id generado aquí (idempotencia).
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { leerTokenVisitante } from './visitante'
+import type { EntregaPedido, OpcionesEntrega } from './entrega'
 
 export type EstadoPrecio = 'autorizado' | 'requiere_verificacion' | 'sin_precio'
 export interface ItemCarrito {
@@ -24,11 +25,14 @@ export interface RevisionCheckout {
   lineas?: Array<{ product_id: string; qty: number; nombre: string; precio_unitario: number; subtotal: number }>
   direccion?: { location_id: string; nombre?: string; address: { line1: string; colonia?: string; cp?: string; city?: string; state?: string } } | null
   problemas: Array<string | { product_id: string; problema: string }>; proyeccion?: Carrito; order_id?: string
+  // ENT-0 · entrega: las opciones que el servidor permite (con flete y promesa), la elegida ya normalizada, y el total con flete.
+  entrega?: EntregaPedido | null; entrega_opciones?: OpcionesEntrega; envio?: number; total_con_envio?: number
 }
 export interface ResultadoCheckout {
   confirmado: boolean; idempotente?: boolean; motivo?: string; cart_id: string; order_id?: string; folio?: string; status?: string; total?: number; moneda?: string
   estado_pago?: string; saldo?: number; acciones_pago?: string[]; created_at?: string; total_revisado?: number; total_actual?: number
   problemas?: Array<string | { product_id: string; problema: string }>; proyeccion?: Carrito; cart_rev?: number
+  envio?: number; entrega?: EntregaPedido | null   // ENT-0
 }
 export type ErrorCarrito = { codigo: string; mensaje: string }
 export interface DireccionSnapshot { line1: string; colonia?: string; cp?: string; city?: string; state?: string; refs?: string; phone?: string }
@@ -65,7 +69,8 @@ export class ClienteCarrito {
   prepararCheckout(cart_id: string) { return this.llamar<Preparacion>({ action: 'preparar_checkout', cart_id }) }
   // CC-6 · el cliente manda SOLO cart_id/location_id para revisar y review_id/operation_id/expected_cart_rev para confirmar.
   // CC-7 · el Catálogo puede mandar el snapshot de dirección elegido (sin location registrada) y la intención de factura.
-  revisarCheckout(cart_id: string, location_id?: string | null, direccion?: DireccionSnapshot | null) { return this.llamar<RevisionCheckout>({ action: 'revisar_checkout', cart_id, location_id: location_id ?? null, direccion: location_id ? null : direccion ?? null }) }
+  // ENT-0 · la entrega elegida viaja SOLO como el id de la opción (el flete y la promesa los decide el servidor).
+  revisarCheckout(cart_id: string, location_id?: string | null, direccion?: DireccionSnapshot | null, entrega?: string | null) { return this.llamar<RevisionCheckout>({ action: 'revisar_checkout', cart_id, location_id: location_id ?? null, direccion: location_id ? null : direccion ?? null, ...(entrega ? { entrega } : {}) }) }
   // C360-F3 · con factura viaja SOLO el id del perfil fiscal elegido; el servidor valida que sea del cliente y lo congela.
   confirmarCheckout(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion(), factura = false, perfil_fiscal_id: string | null = null) { return this.llamar<ResultadoCheckout>({ action: 'confirmar_checkout', review_id, operation_id, expected_cart_rev, factura, ...(factura && perfil_fiscal_id ? { perfil_fiscal_id } : {}) }) }
 }
@@ -74,7 +79,7 @@ export const carrito = new ClienteCarrito()
 export const ETIQUETA_DISPONIBILIDAD: Record<string, string> = { disponible: 'Disponible', no_disponible: 'Sin disponibilidad', no_vendible: 'No disponible', requiere_verificacion: 'Al verificar tu cuenta' }
 export const formatoMXN = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 // Etiquetas de problemas/rechazos del checkout (compartidas por el panel del chat y el Catálogo).
-export const ETIQUETA_PROBLEMA: Record<string, string> = { REQUIERE_CUENTA: 'crea tu cuenta', REQUIERE_VERIFICACION: 'verifica tu cédula', CARRITO_VACIO: 'el carrito está vacío', CARRITO_CERRADO: 'carrito cerrado', NO_VENDIBLE: 'ya no está disponible', SIN_PRECIO: 'precio por confirmar', SIN_DISPONIBILIDAD: 'sin existencia ahora', REQUIERE_DIRECCION: 'registra una dirección de entrega en tu perfil', CLIENTE_NO_VINCULADO: 'tu cuenta aún no está ligada a tu expediente de cliente (Renovacell lo completa)', PERFIL_FISCAL_INVALIDO: 'ese perfil fiscal ya no está disponible', YA_CONVERTIDO: 'este carrito ya es un pedido', CANTIDAD_INVALIDA: 'cantidad no válida' }
+export const ETIQUETA_PROBLEMA: Record<string, string> = { REQUIERE_CUENTA: 'crea tu cuenta', REQUIERE_VERIFICACION: 'verifica tu cédula', CARRITO_VACIO: 'el carrito está vacío', CARRITO_CERRADO: 'carrito cerrado', NO_VENDIBLE: 'ya no está disponible', SIN_PRECIO: 'precio por confirmar', SIN_DISPONIBILIDAD: 'sin existencia ahora', REQUIERE_DIRECCION: 'registra una dirección de entrega en tu perfil', CLIENTE_NO_VINCULADO: 'tu cuenta aún no está ligada a tu expediente de cliente (Renovacell lo completa)', PERFIL_FISCAL_INVALIDO: 'ese perfil fiscal ya no está disponible', YA_CONVERTIDO: 'este carrito ya es un pedido', CANTIDAD_INVALIDA: 'cantidad no válida', REQUIERE_ENTREGA: 'elige cómo quieres recibir tu pedido', ENTREGA_NO_PERMITIDA: 'esa forma de entrega no aplica para tu pedido', ENTREGA_INVALIDA: 'esa forma de entrega no existe', ENTREGA_NO_DISPONIBLE: 'esa paquetería aún no está disponible' }
 export const ETIQUETA_MOTIVO: Record<string, string> = { CARRITO_CAMBIO: 'Tu carrito cambió después de revisarlo.', PRECIO_CAMBIO: 'El precio cambió después de revisarlo.', REVISION_EXPIRADA: 'La revisión venció.', REVISION_CONSUMIDA: 'Esa revisión ya se usó.', NO_LISTO: 'Algo cambió en la disponibilidad o en los productos.' }
 /** Texto legible de los problemas de una revisión (sin códigos internos). */
 export function textoProblemas(problemas: Array<string | { product_id: string; problema: string }>, nombre: (id: string) => string = () => 'producto'): string {

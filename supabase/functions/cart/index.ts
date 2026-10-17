@@ -71,7 +71,9 @@ Deno.serve(conCors(async (req) => {
       const loc = typeof p.location_id === 'string' && UUID.test(p.location_id) ? p.location_id : null
       // CC-7 · el Catálogo puede mandar el snapshot de dirección elegido (forma acotada; la base lo valida de nuevo).
       const dir = !loc ? direccionSnapshot(p.direccion) : null
-      const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc, p_direccion: dir })
+      // ENT-0 · la entrega ELEGIDA viaja solo como el id de la opción (recoge, local_chofer, foraneo_dhl…); nunca el flete.
+      const ent = typeof p.entrega === 'string' && /^[a-z_]{3,30}$/.test(p.entrega) ? { opcion: p.entrega } : null
+      const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc, p_direccion: dir, p_entrega: ent })
       if (error) return falla(error)
       return json(200, data)
     }

@@ -1,6 +1,7 @@
 -- CC-7 · Canal permanente + handoff comercial automático por carrito + cartera canónica + horario.
 -- Escenarios del dueño (numerados como en el bloque): 1–35. Horario determinista: semana 00:00–23:59:59.999999
 -- (siempre "en horario") y excepción "cerrado" del día local para "fuera de horario".
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -108,7 +109,7 @@ begin
   -- ══ 11/24/33 · compra y carrito futuro sobre la MISMA conversación ═════════
   insert into public.doctor_locations (doctor_id, name, line1, postal_code, city, state, is_default) values (d1, 'Consultorio', 'Av. del Mar 1', '82000', 'Mazatlán', 'Sinaloa', true);
   perform tests.act_as(d1);
-  r := public.cc_checkout_revisar(k1);
+  r := public.cc_checkout_revisar(k1, null, null, '{"opcion":"recoge"}');
   perform tests.eq((r ->> 'listo')::boolean, true, 'revisión lista');
   r := public.cc_checkout_confirmar((r ->> 'review_id')::uuid, 'op-k1', (r ->> 'cart_rev')::int);
   ord := (r ->> 'order_id')::uuid;
@@ -238,7 +239,7 @@ begin
 
   -- ══ checkout del Catálogo: snapshot de dirección + factura (convergencia) ═══
   perform tests.act_as(d4);
-  r := public.cc_checkout_revisar(k4, null, '{"line1":"Calle 5 #20","cp":"82010","city":"Mazatlán","state":"Sinaloa","phone":"6690000000"}'::jsonb);
+  r := public.cc_checkout_revisar(k4, null, '{"line1":"Calle 5 #20","cp":"82010","city":"Mazatlán","state":"Sinaloa","phone":"6690000000"}'::jsonb, '{"opcion":"recoge"}');
   perform tests.ok((r ->> 'listo')::boolean and r -> 'direccion' ->> 'location_id' is null and r -> 'direccion' -> 'address' ->> 'line1' = 'Calle 5 #20', 'Catálogo: revisión con snapshot de dirección validado');
   rv := (r ->> 'review_id')::uuid;
   perform tests.ok(public.cc_checkout_revisar(k4, null, '{"line1":"Calle 5","cp":"ABC"}'::jsonb) -> 'problemas' @> '["REQUIERE_DIRECCION"]', 'snapshot inválido → REQUIERE_DIRECCION');

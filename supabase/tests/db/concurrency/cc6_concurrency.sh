@@ -27,7 +27,7 @@ DOC="select tests.act_as(tests.id('cc6_doc'));"
   perform public.cc_carrito_agregar(c, 'doctor', null, d, px, 2, 'a1');
 end \$\$;" >/dev/null
 CART=$("${P[@]}" -c "select tests.id('cc6_cart')" | tail -n1)
-RV=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$CART') ->> 'review_id'" | tail -n1)
+RV=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$CART', null, null, '{\"opcion\":\"recoge\"}') ->> 'review_id'" | tail -n1)
 O0=$("${P[@]}" -c "select count(*) from public.orders" | tail -n1)
 
 # ── 1/8) misma revisión, 10 workers, operaciones distintas
@@ -51,8 +51,8 @@ C2=$(cat "$T"/c1.out | tail -n1)
 "${P[@]}" -c "$SVC select public.cc_carrito_agregar('$C2', 'doctor', null, tests.id('cc6_doc'), tests.id('cc6_px'), 1, 'b1')" >/dev/null
 
 # ── 3) dos revisiones vigentes del mismo carrito confirmadas a la vez → 1 pedido
-R1=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C2') ->> 'review_id'" | tail -n1)
-R2=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C2') ->> 'review_id'" | tail -n1)
+R1=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C2', null, null, '{\"opcion\":\"recoge\"}') ->> 'review_id'" | tail -n1)
+R2=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C2', null, null, '{\"opcion\":\"recoge\"}') ->> 'review_id'" | tail -n1)
 ("${P[@]}" -c "$DOC select public.cc_checkout_confirmar('$R1', 'x1') ->> 'order_id'" > "$T/d1.out" 2>&1) &
 ("${P[@]}" -c "$DOC select public.cc_checkout_confirmar('$R2', 'x2') ->> 'order_id'" > "$T/d2.out" 2>&1) &
 wait
@@ -62,7 +62,7 @@ check "3 · dos revisiones vigentes → un solo pedido" "select count(*) = $O0 +
 # ── 4) mutación vs confirmación
 C3=$("${P[@]}" -c "$SVC select public.cc_carrito_abrir('doctor', null, tests.id('cc6_doc')) ->> 'cart_id'" | tail -n1)
 "${P[@]}" -c "$SVC select public.cc_carrito_agregar('$C3', 'doctor', null, tests.id('cc6_doc'), tests.id('cc6_px'), 1, 'e1')" >/dev/null
-R3=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C3') ->> 'review_id'" | tail -n1)
+R3=$("${P[@]}" -c "$DOC select public.cc_checkout_revisar('$C3', null, null, '{\"opcion\":\"recoge\"}') ->> 'review_id'" | tail -n1)
 ("${P[@]}" -c "$SVC select public.cc_carrito_agregar('$C3', 'doctor', null, tests.id('cc6_doc'), tests.id('cc6_px'), 5, 'e2') ->> 'qty_despues'" > "$T/e1.out" 2>&1) &
 ("${P[@]}" -c "$DOC select coalesce(public.cc_checkout_confirmar('$R3', 'y1') ->> 'motivo', 'OK')" > "$T/e2.out" 2>&1) &
 wait

@@ -10,9 +10,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { carrito as clientePorDefecto, nuevaOperacion, ETIQUETA_MOTIVO, textoProblemas, type ClienteCarrito, type RevisionCheckout } from '../../data/ops/carrito'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
+import type { EntregaPedido } from '../../data/ops/entrega'
 
-export interface EleccionEntrega { address: ShippingAddress | null; locationId?: string }
-export interface PedidoMin { id: string; external_ref: string | null; total: number | null }
+/** Dirección elegida + (ENT-0) la opción de entrega elegida (id del servidor: recoge, local_chofer, foraneo_dhl…). */
+export interface EleccionEntrega { address: ShippingAddress | null; locationId?: string; opcion?: string | null }
+export interface PedidoMin { id: string; external_ref: string | null; total: number | null; entrega?: EntregaPedido | null }
 export type ResultadoPedido = { ok: true; order: PedidoMin; aviso?: string } | { ok: false; error: string }
 export interface LineaVista { product_id: string; nombre: string; qty: number; unitario: number | null; subtotal: number | null; por_volumen?: boolean }
 
@@ -30,13 +32,14 @@ const MARGEN_VENCIMIENTO_MS = 30_000
 
 /** Identidad de la dirección revisada: una revisión solo sirve para la MISMA dirección. */
 export function claveEntrega(e: EleccionEntrega | null): string {
-  if (!e?.address && !e?.locationId) return 'ninguna'
-  return e.locationId ? `loc:${e.locationId}` : `dir:${JSON.stringify(e.address)}`
+  const op = e?.opcion ? `|op:${e.opcion}` : ''
+  if (!e?.address && !e?.locationId) return 'ninguna' + op
+  return (e.locationId ? `loc:${e.locationId}` : `dir:${JSON.stringify(e.address)}`) + op
 }
 
-/** Argumentos de revisión: ubicación guardada por id; dirección nueva o de legado como snapshot. */
-export function argsRevision(e: EleccionEntrega | null): [string | null, ShippingAddress | null] {
-  return [e?.locationId ?? null, e?.locationId ? null : e?.address ?? null]
+/** Argumentos de revisión: ubicación guardada por id; dirección nueva o de legado como snapshot; la opción de entrega. */
+export function argsRevision(e: EleccionEntrega | null): [string | null, ShippingAddress | null, string | null] {
+  return [e?.locationId ?? null, e?.locationId ? null : e?.address ?? null, e?.opcion ?? null]
 }
 
 /** Líneas e importe a mostrar: SIEMPRE los de la revisión del servidor (nunca precios de lista locales). */
@@ -56,6 +59,7 @@ export function vistaDe(r: RevisionCheckout | null): { lineas: LineaVista[]; tot
 export function textoProblemasCheckout(problemas: RevisionCheckout['problemas'], nombre?: (id: string) => string, conDireccion = true): string {
   return (problemas ?? [])
     .filter((p) => conDireccion || p !== 'REQUIERE_DIRECCION')
+    .filter((p) => conDireccion || p !== 'REQUIERE_ENTREGA')   // ENT-0 · la entrega también se elige AQUÍ
     .map((p) => (p === 'REQUIERE_DIRECCION' ? 'revisa la dirección de entrega (calle y número, código postal de 5 dígitos)' : textoProblemas([p], nombre)))
     .join(' · ')
 }
@@ -120,7 +124,7 @@ export function useCheckoutCanonico(cfg: ConfigServidor | null) {
     if (!cf.ok) return { ok: false, error: cf.error.mensaje }   // misma revisión y misma clave en el reintento
     if (cf.data.confirmado && cf.data.order_id) {
       c.onPedido?.()
-      return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null } }
+      return { ok: true, order: { id: cf.data.order_id, external_ref: cf.data.folio ?? null, total: cf.data.total ?? null, entrega: cf.data.entrega ?? null } }
     }
     // Rechazo con motivo (carrito/precio cambió, revisión vencida o consumida): se descarta la revisión y se
     // vuelve a revisar para mostrar los importes vigentes. El siguiente intento lleva clave nueva.

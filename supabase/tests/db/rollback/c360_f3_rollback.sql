@@ -1,6 +1,8 @@
 -- C360-F3 · El rollback devuelve EXACTAMENTE las funciones de 120, la firma de 4 argumentos del checkout y las
 -- escrituras directas a doctor_locations; retira tablas, columnas y comandos nuevos.
 begin;
+set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/c360_f3/99_down.sql
 do $t$
 begin

@@ -90,7 +90,7 @@ describe('Edge cart + IA + frontend', () => {
     // MC-1 · el Catálogo monta el checkout CANÓNICO compartido; la revisión manda id de ubicación o snapshot de
     // dirección, y la confirmación lleva la clave del INTENTO (revisión + factura + perfil), no una nueva por clic.
     expect(catalogoLegacy).toMatch(/<CheckoutCanonico[\s\S]*servidor=\{servidor\}/)
-    expect(motorSrc).toMatch(/return \[e\?\.locationId \?\? null, e\?\.locationId \? null : e\?\.address \?\? null\]/)
+    expect(motorSrc).toMatch(/return \[e\?\.locationId \?\? null, e\?\.locationId \? null : e\?\.address \?\? null, e\?\.opcion \?\? null\]/)   // ENT-0 · + id de la opción de entrega (nunca el flete)
     expect(motorSrc).toMatch(/await cliente\.revisarCheckout\(cartId, \.\.\.argsRevision\(e\)\)/)
     expect(motorSrc).toMatch(/await cliente\.confirmarCheckout\(rv\.review_id, rv\.cart_rev, op, factura, factura \? perfilFiscalId : null\)/)
     expect(codigo(motorSrc)).not.toMatch(/cc_checkout_|supabase\.|crear_pedido/)

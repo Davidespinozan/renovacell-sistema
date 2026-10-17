@@ -1,4 +1,5 @@
 -- PREFLIGHT CC · E2E NEGATIVO transversal: cada frontera de autoridad desde la base.
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -18,12 +19,12 @@ begin
 
   -- 1/2/3 · checkout: visitante, no verificado, otro doctor
   perform tests.act_as_anon();
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cart), 'permission denied', '1 · visitante no hace checkout');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cart), 'permission denied', '1 · visitante no hace checkout');
   perform tests.act_as_service(); perform public.cc_visitante_adoptar(hA, v_nov); perform tests.act_as(v_nov);
-  r := public.cc_checkout_revisar(cart);
+  r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}');
   perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["REQUIERE_VERIFICACION"]', '2 · doctor no verificado: bloqueado');
   perform tests.act_as(v_doc2);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cart), 'NO_AUTORIZADO', '3 · otro doctor: denegado');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cart), 'NO_AUTORIZADO', '3 · otro doctor: denegado');
   -- 4/5/6 · token viejo, otra conversación, otro carrito
   perform tests.act_as_service();
   perform tests.throws(format('select public.cc_enviar_mensaje(%L, ''visitor'', %L, null, ''x'', ''hola'')', conv, hA), 'SESION_INVALIDA', '4 · token revocado tras adopción');
@@ -56,7 +57,7 @@ begin
   perform tests.eq(public.cc_carrito_ver(cart2, 'seller', null, v_pos) ->> 'rol', 'asesor', '16 · asesor asignado lee');
   perform tests.throws(format('select public.cc_carrito_agregar(%L, ''seller'', null, %L, %L, 1, ''s'')', cart2, v_pos, pA), 'NO_AUTORIZADO', '16 · asesor no muta el carrito');
   perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cart2), 'NO_AUTORIZADO', '17 · asesor no confirma checkout por el cliente');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cart2), 'NO_AUTORIZADO', '17 · asesor no confirma checkout por el cliente');
   perform tests.act_as_service();
   update public.profiles set active = false where id = v_pos;
   perform tests.throws(format('select public.cc_carrito_ver(%L, ''seller'', null, %L)', cart2, v_pos), 'CUENTA_SUSPENDIDA', '15 · vendedor suspendido: acceso revocado de inmediato');
@@ -64,7 +65,7 @@ begin
   -- 13/18 · duplicado de checkout y reintento de pago → un solo pedido
   update public.profiles set verified = true where id = v_nov;
   perform tests.act_as(v_nov);
-  r := public.cc_checkout_revisar(cart); rv := (r ->> 'review_id')::uuid;
+  r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid;
   r := public.cc_checkout_confirmar(rv, 'op-neg', null);
   perform tests.ok((r ->> 'confirmado')::boolean, '18 · pedido creado');
   perform tests.eq((public.cc_checkout_confirmar(rv, 'op-neg-2', null) ->> 'order_id')::uuid, (r ->> 'order_id')::uuid, '18 · cualquier reintento → el mismo pedido (el pago se hace contra ese id)');

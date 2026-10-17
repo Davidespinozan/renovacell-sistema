@@ -20,6 +20,7 @@ import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
+import { MOTIVO_ENTREGA, fleteTexto, opcionDe, promesaDe, requiereDireccion, type OpcionEntrega } from '../../data/ops/entrega'
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
 export interface MotorLocal {
@@ -91,6 +92,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const motor = useCheckoutCanonico(servidor)
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<EleccionEntrega | null>(null)
+  const [opcion, setOpcion] = useState<string | null>(null)   // ENT-0 · id de la opción de entrega elegida (servidor)
   const [order, setOrder] = useState<PedidoMin | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [payNow, setPayNow] = useState(false)
@@ -122,15 +124,31 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const avisoRevision = conServidor && motor.revision && !motor.revision.listo && !motor.revision.order_id
     ? textoProblemasCheckout(motor.revision.problemas, servidor?.nombreDe, false) : ''
 
-  const bloqueado = !choice?.address || creando || (invoice && !fiscalOk)
+  // ENT-0 · ENTREGA: el servidor manda las opciones permitidas (flete por regla, promesa con el corte de las 15:30) y la
+  // sugerida; aquí solo se elige. El flete que se muestra es el de la opción del servidor; al confirmar se revisa de nuevo.
+  const ops = conServidor ? motor.revision?.entrega_opciones ?? null : null
+  const hoy = ops?.corte.hoy ?? null
+  const sel: OpcionEntrega | null = opcionDe(ops, opcion)
+  useEffect(() => {
+    if (!ops) return
+    if (sel && sel.permitido && sel.disponible) return
+    setOpcion(ops.sugerida ?? ops.opciones.find((o) => o.permitido && o.disponible)?.id ?? null)
+  }, [ops])   // eslint-disable-line react-hooks/exhaustive-deps
+  const necesitaDireccion = ops ? requiereDireccion(sel?.tipo) : true   // sin opciones (demo/fixtures) se exige dirección como antes
+  const envio = ops ? (sel?.flete ?? null) : null
+  const totalConEnvio = total != null && envio != null ? total + envio : total
+  const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null }
+
+  const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || creando || (invoice && !fiscalOk)
   const confirm = async () => {
-    if (!choice?.address) return // el pedido es a domicilio: exige dirección de entrega
+    if (necesitaDireccion && !choice?.address) return // a domicilio: exige dirección de entrega (recoger no)
+    if (ops && !sel) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); return } // HARD GATE
     if (creando || yaPedido) return
     setCreando(true); setErrorPedido(null)
     const r = conServidor
-      ? await motor.confirmar(choice, invoice, invoice ? perfilSel : null)
-      : local ? await local.confirmar(invoice, choice, invoice ? fiscal : null) : { ok: false as const, error: 'El checkout no está disponible.' }
+      ? await motor.confirmar(eleccion, invoice, invoice ? perfilSel : null)
+      : local ? await local.confirmar(invoice, choice ?? { address: null }, invoice ? fiscal : null) : { ok: false as const, error: 'El checkout no está disponible.' }
     setCreando(false)
     // Si el servidor NO creó el pedido, el carrito se conserva: vaciarlo aquí
     // haría que el doctor pierda su selección por un pedido que no existe.
@@ -175,6 +193,12 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 Tu pedido <b>{order.external_ref ?? 'nuevo'}</b> quedó registrado. Págalo ahora para que
                 entre a preparación, o más tarde desde <b>Mis pedidos</b>.
               </p>
+              {order.entrega && (
+                <p data-testid="checkout-promesa" style={{ fontSize: 13.5 }}>
+                  <b>{order.entrega.texto}</b>{order.entrega.flete > 0 ? ` · envío ${money(order.entrega.flete)}` : ' · sin costo de envío'}<br />
+                  {promesaDe(order.entrega, hoy)}
+                </p>
+              )}
               {aviso && <p role="alert" style={{ color: 'var(--warn)', fontSize: 13 }}>{aviso}</p>}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Pagar después</button>
@@ -200,15 +224,49 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 </div>
               ))}
 
+              {ops && sel && (
+                <div className="coitem" data-testid="checkout-envio">
+                  <span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.texto}</span></span>
+                  <span className="mono">{fleteTexto(sel.flete, money)}</span>
+                </div>
+              )}
               <div className="cototal">
                 <span>Total</span>
-                <b data-testid="checkout-total">{total != null ? money(total) : motor.revisando ? 'Calculando…' : '—'}</b>
+                <b data-testid="checkout-total">{totalConEnvio != null ? money(totalConEnvio) : motor.revisando ? 'Calculando…' : '—'}</b>
               </div>
               {conServidor && motor.errorRevision && <div role="alert" className="ms" style={{ color: 'var(--danger)', marginTop: 6 }} data-testid="checkout-error-revision">{motor.errorRevision}</div>}
               {avisoRevision && <div role="status" className="ms" style={{ color: 'var(--warn)', marginTop: 6 }} data-testid="checkout-aviso">Antes de pedir: {avisoRevision}.</div>}
 
               <div className="eyebrow" style={{ marginTop: 16 }}>Dirección de entrega</div>
               <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
+
+              {ops && (
+                <div data-testid="checkout-entrega">
+                  <div className="eyebrow" style={{ marginTop: 16 }}>¿Cómo lo recibes?</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {ops.opciones.filter((o) => o.permitido || o.motivo !== 'SOLO_PERSONAL').map((o) => {
+                      const on = opcion === o.id
+                      const puede = o.permitido && o.disponible
+                      return (
+                        <label key={o.id} className="addr-opt" data-testid={`entrega-${o.id}`} aria-disabled={!puede}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid ' + (on ? 'var(--green-deep)' : 'var(--line)'), borderRadius: 11, background: on ? 'var(--ok-bg, #EAF4EC)' : '#fff', cursor: puede ? 'pointer' : 'not-allowed', opacity: puede ? 1 : 0.55 }}
+                          onClick={() => { if (puede) setOpcion(o.id) }}>
+                          <input type="radio" name="entrega" checked={on} disabled={!puede} onChange={() => setOpcion(o.id)} />
+                          <span style={{ flex: 1 }}>
+                            <b style={{ display: 'block', fontSize: 13 }}>{o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
+                            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                              {puede ? promesaDe(o, hoy) : !o.disponible ? 'Próximamente' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica para este pedido'}
+                            </span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="checkout-corte">
+                    {sel?.tipo === 'recoge' ? `${ops.recoge.lugar} · ${ops.recoge.horario}` : ops.corte.antes_de_corte ? `Los pedidos que entran antes de las ${ops.corte.hora} salen el mismo día.` : `Después de las ${ops.corte.hora} los pedidos salen el siguiente día hábil.`}
+                  </div>
+                </div>
+              )}
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} data-testid="checkout-factura" /> Solicitar factura (CFDI)

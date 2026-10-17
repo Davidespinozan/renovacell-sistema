@@ -3,6 +3,7 @@
 -- pedido por crear_pedido (W1) en la misma transacción que convierte el carrito; idempotencia
 -- end-to-end; rechazos por carrito/precio/stock cambiados; fallos inyectados no dejan nada a
 -- medias; sin pagos, CFDI ni inventario; el pedido nuevo es visible por la herramienta de CC-4.
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -25,32 +26,32 @@ begin
 
   -- ══ autoridad (A–E, AB) ═════════════════════════════════════════════════════
   perform tests.act_as_anon();
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cD), 'permission denied', 'A · visitante (anon) no revisa ni confirma');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cD), 'permission denied', 'A · visitante (anon) no revisa ni confirma');
   perform tests.act_as(v_nov);
-  r := public.cc_checkout_revisar(cN);
+  r := public.cc_checkout_revisar(cN, null, null, '{"opcion":"recoge"}');
   perform tests.eq((r ->> 'listo')::boolean, false, 'B · doctor no verificado: no listo');
   perform tests.ok(r -> 'problemas' @> '["REQUIERE_VERIFICACION"]', 'B · motivo REQUIERE_VERIFICACION (sin bypass)');
   perform tests.ok(r ->> 'review_id' is null, 'B · no se emite revisión');
   perform tests.act_as(v_doc2);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cD), 'NO_AUTORIZADO', 'C/D · doctor 2 no revisa el carrito de doctor 1 (uuid conocido)');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cD), 'NO_AUTORIZADO', 'C/D · doctor 2 no revisa el carrito de doctor 1 (uuid conocido)');
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op'')', gen_random_uuid()), 'NO_AUTORIZADO', 'E · review uuid inventado → no autorizado');
   perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cD), 'NO_AUTORIZADO', 'AB · el personal no usa el checkout del cliente (tiene su flujo W1)');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cD), 'NO_AUTORIZADO', 'AB · el personal no usa el checkout del cliente (tiene su flujo W1)');
   perform tests.act_as(v_admin);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', cD), 'NO_AUTORIZADO', 'AB · ni Dirección confirma por el cliente');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', cD), 'NO_AUTORIZADO', 'AB · ni Dirección confirma por el cliente');
 
   -- ══ revisar (G/H/I/R) ═══════════════════════════════════════════════════════
   perform tests.act_as(v_doc);
-  r := public.cc_checkout_revisar(cD);
+  r := public.cc_checkout_revisar(cD, null, null, '{"opcion":"recoge"}');
   perform tests.eq((r ->> 'listo')::boolean, true, 'G · verificado con dirección default, stock y precio: listo');
   perform tests.eq((r ->> 'total')::numeric, 2500::numeric, 'G · total actual 2×1000 + 500');
   perform tests.ok((r ->> 'review_id') is not null and (r ->> 'expires_at')::timestamptz > now() + interval '14 minutes', 'I · revisión emitida, vence en ~15 min');
   perform tests.eq(r -> 'direccion' -> 'address' ->> 'cp', '82000', 'R · dirección desde doctor_locations (default)');
   perform tests.eq(jsonb_array_length(r -> 'lineas'), 2, 'G · líneas revalidadas');
   rv := (r ->> 'review_id')::uuid;
-  r := public.cc_checkout_revisar(cD, loc2);
+  r := public.cc_checkout_revisar(cD, loc2, null, '{"opcion":"recoge"}');
   perform tests.eq(r -> 'direccion' -> 'address' ->> 'cp', '82100', 'R · ubicación elegida (propia y activa)');
-  r := public.cc_checkout_revisar(cD, gen_random_uuid());
+  r := public.cc_checkout_revisar(cD, gen_random_uuid(), null, '{"opcion":"foraneo_dhl"}');   -- ENT-0: un envío a domicilio exige dirección (recoger no)
   perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["REQUIERE_DIRECCION"]', 'R · ubicación ajena/inexistente → REQUIERE_DIRECCION (no se inventa)');
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op 1'')', rv), 'OPERACION_INVALIDA', 'AO · operation_id malformado falla cerrado');
 
@@ -115,7 +116,7 @@ begin
   r := public.cc_checkout_confirmar(rv, 'op-2');
   perform tests.ok((r ->> 'idempotente')::boolean and (r ->> 'order_id')::uuid = ord and r ->> 'motivo' = 'YA_CONVERTIDO', 'S/AD · otra operación sobre carrito convertido → el pedido existente, nunca otro');
   perform tests.eq((select count(*) from public.orders), o0 + 1, 'V · exactamente un pedido');
-  r := public.cc_checkout_revisar(cD);
+  r := public.cc_checkout_revisar(cD, null, null, '{"opcion":"recoge"}');
   perform tests.ok(r -> 'problemas' @> '["YA_CONVERTIDO"]' and (r ->> 'order_id')::uuid = ord, 'AD · revisar un convertido devuelve el pedido');
   -- nuevo carrito activo tras conversión
   perform tests.act_as_service();
@@ -123,7 +124,7 @@ begin
   perform tests.ok(c2 <> cD and (select count(*) from public.cc_carts where profile_id = v_doc and estado = 'active') = 1, 'W · abrir tras convertir crea exactamente un carrito activo nuevo');
   perform public.cc_carrito_agregar(c2, 'doctor', null, v_doc, pA, 1, 'b1');
   perform tests.act_as(v_doc);
-  rv2 := (public.cc_checkout_revisar(c2) ->> 'review_id')::uuid;
+  rv2 := (public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}') ->> 'review_id')::uuid;
   r := public.cc_checkout_confirmar(rv2, 'op-1');
   perform tests.ok((r ->> 'confirmado')::boolean and not (r ->> 'idempotente')::boolean, 'U · el libro de operaciones es por carrito: op-1 en otro carrito es una operación nueva');
   -- Q · vendedor derivado del servidor: CC-7 · cartera canónica (cc_cartera, la asigna Dirección) → metadata compatible con comisiones
@@ -138,7 +139,7 @@ begin
   c2 := (public.cc_carrito_abrir('doctor', null, v_doc) ->> 'cart_id')::uuid;
   perform public.cc_carrito_agregar(c2, 'doctor', null, v_doc, pA, 1, 'c1');
   perform tests.act_as(v_doc);
-  r := public.cc_checkout_revisar(c2); rv := (r ->> 'review_id')::uuid;
+  r := public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid;
   perform tests.act_as_service();
   perform public.cc_carrito_agregar(c2, 'doctor', null, v_doc, pB, 3, 'c2');   -- el usuario (u otra pestaña) cambió el carrito
   perform tests.act_as(v_doc);
@@ -147,7 +148,7 @@ begin
   perform tests.eq((r -> 'proyeccion' ->> 'n_items')::int, 2, 'M · devuelve la proyección fresca para re-revisar');
   perform tests.eq((select count(*) from public.orders), o0 + 2, 'M · sin pedido nuevo');
   rv2 := rv;   -- la revisión vieja (rev desactualizada)
-  r := public.cc_checkout_revisar(c2); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
+  r := public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
   r := public.cc_checkout_confirmar(rv, 'op-c2', n - 1);
   perform tests.eq(r ->> 'motivo', 'CARRITO_CAMBIO', 'L · expected_cart_rev del cliente desactualizado → rechazo');
   r := public.cc_checkout_confirmar(rv2, 'op-c1');
@@ -160,7 +161,7 @@ begin
   r := public.cc_checkout_confirmar(rv, 'op-c3');
   perform tests.eq(r ->> 'motivo', 'PRECIO_CAMBIO', 'N · el precio cambió entre revisar y confirmar → no se compra en silencio');
   perform tests.ok((r ->> 'total_revisado')::numeric = 2500 and (r ->> 'total_actual')::numeric = 2700, 'N · informa total revisado vs actual');
-  r := public.cc_checkout_revisar(c2); rv := (r ->> 'review_id')::uuid;
+  r := public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid;
   perform tests.eq((r ->> 'total')::numeric, 2700::numeric, 'N · nueva revisión al precio actual');
 
   -- ══ stock perdido tras revisar (O/P) ════════════════════════════════════════
@@ -186,8 +187,8 @@ begin
   perform tests.act_as(v_doc);
   r := public.cc_checkout_confirmar(rv, 'op-c6');
   perform tests.eq(r ->> 'motivo', 'REVISION_EXPIRADA', 'R · revisión vencida → volver a revisar');
-  r := public.cc_checkout_revisar(c2); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
-  rv2 := (public.cc_checkout_revisar(c2) ->> 'review_id')::uuid;   -- segunda revisión vigente del mismo carrito
+  r := public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
+  rv2 := (public.cc_checkout_revisar(c2, null, null, '{"opcion":"recoge"}') ->> 'review_id')::uuid;   -- segunda revisión vigente del mismo carrito
   r := public.cc_checkout_confirmar(rv, 'op-c7', n);
   perform tests.ok((r ->> 'confirmado')::boolean and (r ->> 'total')::numeric = 2700, 'K · con revisión fresca y rev correcta confirma al precio actual');
   ord := (r ->> 'order_id')::uuid;

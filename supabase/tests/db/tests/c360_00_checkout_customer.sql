@@ -1,6 +1,7 @@
 -- C360-0 · El checkout canónico persiste la identidad comercial: perfil autenticado → customers.id
 -- (uq_customers_profile). Sin cliente vinculado y activo: falla cerrado, sin pedido. La identidad NO
 -- viene del cliente, del correo ni de seller_name. Snapshots, atribución, idempotencia y autoridad intactos.
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -26,7 +27,7 @@ begin
 
   -- ══ 1 · doctor con cliente vinculado → order.customer_id correcto ══════════════
   perform tests.act_as(dA);
-  r := public.cc_checkout_revisar(kA);
+  r := public.cc_checkout_revisar(kA, null, null, '{"opcion":"recoge"}');
   perform tests.eq((r ->> 'listo')::boolean, true, '1 · revisión lista con cliente vinculado');
   rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
   r := public.cc_checkout_confirmar(rv, 'op-A', n, true);
@@ -62,12 +63,12 @@ begin
 
   -- ══ 3 · perfil SIN cliente → falla cerrado ═════════════════════════════════════
   perform tests.act_as(dB);
-  r := public.cc_checkout_revisar(kB);
+  r := public.cc_checkout_revisar(kB, null, null, '{"opcion":"recoge"}');
   perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["CLIENTE_NO_VINCULADO"]' and r ->> 'review_id' is null, '3 · sin cliente: revisión NO lista (CLIENTE_NO_VINCULADO), sin revisión');
   -- revisión emitida con cliente, que luego se desvincula: confirmar FALLA CERRADO sin pedido
   perform tests.act_as_service(); cuB := tests.cliente(dB);
   perform tests.act_as(dB);
-  r := public.cc_checkout_revisar(kB); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
+  r := public.cc_checkout_revisar(kB, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
   perform tests.act_as_service(); update public.customers set profile_id = null where id = cuB;
   perform tests.act_as(dB);
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op-B'', %s)', rv, n), 'CLIENTE_NO_VINCULADO', '3 · confirmar sin cliente vinculado: falla cerrado');
@@ -77,11 +78,11 @@ begin
                and not exists (select 1 from public.cc_checkout_operations where cart_id = kB), '3 · carrito, revisión y libro intactos (transacción revertida)');
   -- cliente INACTIVO → tampoco
   perform tests.act_as(dC);
-  perform tests.ok(public.cc_checkout_revisar(kC) -> 'problemas' @> '["CLIENTE_NO_VINCULADO"]', '3 · cliente inactivo = no vinculado');
+  perform tests.ok(public.cc_checkout_revisar(kC, null, null, '{"opcion":"recoge"}') -> 'problemas' @> '["CLIENTE_NO_VINCULADO"]', '3 · cliente inactivo = no vinculado');
 
   -- ══ 4 · la identidad NO sale del correo ════════════════════════════════════════
   perform tests.act_as(dE);
-  r := public.cc_checkout_revisar(kE);
+  r := public.cc_checkout_revisar(kE, null, null, '{"opcion":"recoge"}');
   r := public.cc_checkout_confirmar((r ->> 'review_id')::uuid, 'op-E', (r ->> 'cart_rev')::int);
   ord2 := (r ->> 'order_id')::uuid;
   perform tests.act_as_service();
@@ -94,9 +95,9 @@ begin
   perform tests.act_as(dE);
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op-x'')', rv), 'NO_AUTORIZADO', '10 · otro doctor no confirma una revisión ajena');
   perform tests.act_as(v_admin);
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', kB), 'NO_AUTORIZADO', '10 · Dirección no usa el checkout del cliente');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', kB), 'NO_AUTORIZADO', '10 · Dirección no usa el checkout del cliente');
   perform tests.act_as_anon();
-  perform tests.throws(format('select public.cc_checkout_revisar(%L)', kB), 'permission denied', '10 · anon sin acceso');
+  perform tests.throws(format('select public.cc_checkout_revisar(%L, null, null, ''{"opcion":"recoge"}'')', kB), 'permission denied', '10 · anon sin acceso');
   perform tests.throws(format('select public._cc_chk_customer(%L)', dA), 'permission denied', '5 · el helper de identidad no es invocable por clientes');
   perform tests.act_as_owner();
   perform tests.eq((select count(*) from public.orders) - o0, 2::bigint, 'solo los dos pedidos esperados');

@@ -2,6 +2,7 @@
 -- del navegador cuenta; D3 en POS (cartera > cajero autenticado; no resoluble → sin vendedor); «Checkout canónico
 -- (CC-6)» solo para el pedido que marcó el checkout; todo congelado para todos; visibilidad POS por vendedor (id),
 -- histórico solo-email o cajero que registró el cobro.
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -36,7 +37,7 @@ begin
   perform tests.act_as_service();
   cart := (public.cc_carrito_abrir('doctor', null, dA) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(cart, 'doctor', null, dA, p, 1, 'a1');
   perform tests.act_as(dA);
-  rv := (public.cc_checkout_revisar(cart) ->> 'review_id')::uuid;
+  rv := (public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}') ->> 'review_id')::uuid;
   r := public.cc_checkout_confirmar(rv, 'op-cx0c-1');
   oA := (r ->> 'order_id')::uuid;
   perform tests.ok(coalesce(current_setting('app.cc_checkout_pedido', true), '') = '', 'A1 · tras el checkout la marca de canal queda vacía (sin residuo)');
@@ -49,7 +50,7 @@ begin
   perform tests.act_as_service();
   cart := (public.cc_carrito_abrir('doctor', null, dB) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(cart, 'doctor', null, dB, p, 1, 'b1');
   perform tests.act_as(dB);
-  rv := (public.cc_checkout_revisar(cart) ->> 'review_id')::uuid;
+  rv := (public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}') ->> 'review_id')::uuid;
   o := (public.cc_checkout_confirmar(rv, 'op-cx0c-2') ->> 'order_id')::uuid;
   perform tests.act_as_owner();
   select shipping_meta into m from public.orders where id = o;
@@ -76,7 +77,7 @@ begin
   perform tests.act_as_service();
   cart := (public.cc_carrito_abrir('doctor', null, dA) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(cart, 'doctor', null, dA, p, 1, 'a2');
   perform tests.act_as(dA);
-  rv := (public.cc_checkout_revisar(cart) ->> 'review_id')::uuid;
+  rv := (public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}') ->> 'review_id')::uuid;
   perform set_config('app.cc_checkout_fallar', 'despues_w1', true);
   begin perform public.cc_checkout_confirmar(rv, 'op-cx0c-f'); exception when others then e := sqlerrm; end;
   perform set_config('app.cc_checkout_fallar', '', true);

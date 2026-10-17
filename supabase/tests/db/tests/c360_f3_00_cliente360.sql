@@ -1,6 +1,7 @@
 -- C360-F3 · Customer 360 canónico: lectura por rol, teléfonos/domicilios/perfiles fiscales con comandos
 -- autoritativos, checkout con perfil fiscal elegido, snapshots inmutables, cartera de CC-7, legados sin
 -- autoridad, cierre de escrituras genéricas. (Números = matriz del dueño.)
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -83,7 +84,7 @@ begin
   perform tests.act_as_service();
   k := (public.cc_carrito_abrir('doctor', null, dA) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(k, 'doctor', null, dA, p, 1, 'f3-1');
   perform tests.act_as(dA);
-  r := public.cc_checkout_revisar(k); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
+  r := public.cc_checkout_revisar(k, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid; n := (r ->> 'cart_rev')::int;
   perform tests.throws(format('select public.cc_checkout_confirmar(%L, ''op-f3x'', %s, true, %L)', rv, n, fB), 'PERFIL_FISCAL_INVALIDO', '21 · el doctor no usa el perfil fiscal de otro cliente');
   r := public.cc_checkout_confirmar(rv, 'op-f3', n, true, f1);
   ord := (r ->> 'order_id')::uuid;

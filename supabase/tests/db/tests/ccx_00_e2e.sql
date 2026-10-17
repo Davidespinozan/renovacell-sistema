@@ -3,6 +3,7 @@
 -- registro/adopción → MISMA conversación y MISMO carrito del doctor verificado → precio/disponibilidad
 -- → revisión → confirmación explícita → exactamente un pedido W1 → carrito converted → estado de
 -- pedido → acciones de pago expuestas → sin pago realizado.
+-- ENT-0 (171): las revisiones de esta prueba eligen 'recoge' (sin flete) para conservar sus importes; la entrega se prueba en ent_00_entrega.sql.
 begin;
 do $t$
 declare
@@ -47,7 +48,7 @@ begin
   -- 6) revisión + confirmación explícita (como el doctor autenticado) → exactamente un pedido W1
   insert into public.doctor_locations (doctor_id, name, line1, postal_code, city, state, is_default) values (v_doc, 'Consultorio', 'Calle 1', '82000', 'Mazatlán', 'Sinaloa', true);
   perform tests.act_as(v_doc);
-  r := public.cc_checkout_revisar(cart); rv := (r ->> 'review_id')::uuid;
+  r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"recoge"}'); rv := (r ->> 'review_id')::uuid;
   perform tests.ok((r ->> 'listo')::boolean and (r ->> 'total')::numeric = 2000, '6 · revisión lista con total actual');
   r := public.cc_checkout_confirmar(rv, 'op-e2e', (r ->> 'cart_rev')::int); ord := (r ->> 'order_id')::uuid;
   perform tests.ok((r ->> 'confirmado')::boolean and r ->> 'status' = 'pending_payment' and r ->> 'folio' ~ '^S[0-9]{6,}$', '6 · pedido W1 creado (folio del servidor)');

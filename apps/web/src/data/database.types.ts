@@ -1099,6 +1099,7 @@ export type Database = {
           created_at: string
           currency: string
           direccion: Json | null
+          entrega: Json | null
           expires_at: string
           fingerprint: string
           id: string
@@ -1115,6 +1116,7 @@ export type Database = {
           created_at?: string
           currency?: string
           direccion?: Json | null
+          entrega?: Json | null
           expires_at: string
           fingerprint: string
           id?: string
@@ -1131,6 +1133,7 @@ export type Database = {
           created_at?: string
           currency?: string
           direccion?: Json | null
+          entrega?: Json | null
           expires_at?: string
           fingerprint?: string
           id?: string
@@ -3470,6 +3473,100 @@ export type Database = {
           },
         ]
       }
+      entrega_config: {
+        Row: {
+          corte: string
+          cp_local_desde: string
+          cp_local_hasta: string
+          dhl_transito_max: number
+          dhl_transito_min: number
+          dias_chofer: number[]
+          dias_entrega_foranea: number[]
+          dias_paqueteria: number[]
+          foraneo_costo: number
+          foraneo_gratis_desde: number
+          id: number
+          local_costo: number
+          local_gratis_desde: number
+          local_mismo_dia: boolean
+          recoge_horario: string
+          recoge_lugar: string
+          t1_activo: boolean
+          t1_transito_max: number
+          t1_transito_min: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          corte?: string
+          cp_local_desde?: string
+          cp_local_hasta?: string
+          dhl_transito_max?: number
+          dhl_transito_min?: number
+          dias_chofer?: number[]
+          dias_entrega_foranea?: number[]
+          dias_paqueteria?: number[]
+          foraneo_costo?: number
+          foraneo_gratis_desde?: number
+          id?: number
+          local_costo?: number
+          local_gratis_desde?: number
+          local_mismo_dia?: boolean
+          recoge_horario?: string
+          recoge_lugar?: string
+          t1_activo?: boolean
+          t1_transito_max?: number
+          t1_transito_min?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          corte?: string
+          cp_local_desde?: string
+          cp_local_hasta?: string
+          dhl_transito_max?: number
+          dhl_transito_min?: number
+          dias_chofer?: number[]
+          dias_entrega_foranea?: number[]
+          dias_paqueteria?: number[]
+          foraneo_costo?: number
+          foraneo_gratis_desde?: number
+          id?: number
+          local_costo?: number
+          local_gratis_desde?: number
+          local_mismo_dia?: boolean
+          recoge_horario?: string
+          recoge_lugar?: string
+          t1_activo?: boolean
+          t1_transito_max?: number
+          t1_transito_min?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entrega_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entrega_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entrega_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           categoria: string
@@ -4525,6 +4622,7 @@ export type Database = {
           payment_method: string | null
           payment_ref: string | null
           payment_status: string | null
+          shipping_cost: number
           shipping_meta: Json | null
           status: string | null
           stripe_payment_id: string | null
@@ -4543,6 +4641,7 @@ export type Database = {
           payment_method?: string | null
           payment_ref?: string | null
           payment_status?: string | null
+          shipping_cost?: number
           shipping_meta?: Json | null
           status?: string | null
           stripe_payment_id?: string | null
@@ -4561,6 +4660,7 @@ export type Database = {
           payment_method?: string | null
           payment_ref?: string | null
           payment_status?: string | null
+          shipping_cost?: number
           shipping_meta?: Json | null
           status?: string | null
           stripe_payment_id?: string | null
@@ -7203,7 +7303,12 @@ export type Database = {
         Returns: Json
       }
       cc_checkout_revisar: {
-        Args: { p_cart: string; p_direccion?: Json; p_location_id?: string }
+        Args: {
+          p_cart: string
+          p_direccion?: Json
+          p_entrega?: Json
+          p_location_id?: string
+        }
         Returns: Json
       }
       cc_cobertura: {
@@ -7727,6 +7832,20 @@ export type Database = {
         }
         Returns: Json
       }
+      crear_pedido_con_entrega: {
+        Args: {
+          p_customer_id: string
+          p_doctor_id: string
+          p_entrega: Json
+          p_folio: string
+          p_invoice_requested: boolean
+          p_lines: Json
+          p_order_id: string
+          p_receiver: Json
+          p_shipping_meta: Json
+        }
+        Returns: Json
+      }
       crear_pedido_con_receptor: {
         Args: {
           p_customer_id: string
@@ -7737,6 +7856,17 @@ export type Database = {
           p_order_id: string
           p_receiver: Json
           p_shipping_meta: Json
+        }
+        Returns: Json
+      }
+      entrega_config_guardar: { Args: { p: Json }; Returns: Json }
+      entrega_config_ver: { Args: never; Returns: Json }
+      entrega_opciones: {
+        Args: {
+          p_actor: string
+          p_ahora?: string
+          p_cp: string
+          p_subtotal: number
         }
         Returns: Json
       }
