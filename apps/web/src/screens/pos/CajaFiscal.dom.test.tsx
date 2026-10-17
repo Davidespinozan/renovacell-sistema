@@ -43,6 +43,7 @@ vi.mock('./ventaRecibo', () => ({ enviarReciboWhatsApp: () => {}, imprimirVenta:
 vi.mock('./BarraVenta', () => ({ BarraVenta: () => null }))
 vi.mock('../../app/FiscalFields', () => ({ FiscalFields: ({ value, onChange }: { value: { rfc: string }; onChange: (f: unknown) => void }) => <button type="button" data-testid="form-fiscal" onClick={() => onChange(h.captura)}>fiscal:{value.rfc || 'vacío'}</button> }))
 vi.mock('./SelectorCliente', () => ({ SelectorClienteVentas: ({ onPick }: { onPick: (c: unknown) => void }) => <button type="button" data-testid="selector-seguro" onClick={() => onPick(h.elegir)}>elegir</button> }))
+vi.mock('../sales/NuevoPedido', () => ({ NuevoPedido: ({ customer, initialCart }: { customer: { id: string; name: string }; initialCart?: Record<string, number> }) => <div data-testid="nuevo-pedido">pedido para {customer.name} · {JSON.stringify(initialCart)}</div> }))
 import { Caja } from './Caja'
 
 const exito = () => ({ ok: true, order: { id: 'OP-1', external_ref: 'POS-1', total: 100, payment_method: 'efectivo', doctor_id: null, customer_id: null, shipping_meta: {}, items: [] } })
@@ -227,5 +228,22 @@ describe('SEC-C4-B5b · guardas de fuente', () => {
   it('la huella de idempotencia no cambió', () => {
     expect(c).toContain("const fp = JSON.stringify({ posLines, total, method, client: client?.id ?? null, invoiceReq, invoiceMeta })")
     expect(c).toContain('const op = posOpRef.current?.op ?? newPosOp()')
+  })
+})
+
+describe('ENT-POS · pedidos con entrega desde el Punto de venta (dueño, 17 oct 2026)', () => {
+  it('"Se lo lleva ahora" es la venta de mostrador de siempre; "Enviar o recoger" exige cliente y abre el pedido con el carrito', async () => {
+    render(<Caja />); agregar()
+    expect(cobrar()).toBeTruthy()                                           // mostrador por defecto
+    fireEvent.click(screen.getByTestId('pos-entrega-envio'))
+    expect(screen.queryByRole('button', { name: /Cobrar/ })).toBeNull()    // en modo entrega no se cobra aquí
+    const continuar = screen.getByTestId('pos-continuar-entrega') as HTMLButtonElement
+    expect(continuar.disabled).toBe(true)                                    // sin cliente no hay pedido con entrega
+    expect(screen.getByTestId('pos-pedido-entrega')).toHaveTextContent(/Primero elige el cliente/)
+    await elegirCliente()
+    expect((screen.getByTestId('pos-continuar-entrega') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByTestId('pos-continuar-entrega'))
+    expect(screen.getByTestId('nuevo-pedido')).toHaveTextContent(/pedido para Ana Prueba · \{"P1":1\}/)   // el carrito viaja al pedido
+    expect(h.ventas).toHaveLength(0)                                         // no se vendió por mostrador
   })
 })

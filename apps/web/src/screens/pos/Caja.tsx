@@ -23,6 +23,7 @@ import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { SelectorClienteVentas } from './SelectorCliente'
+import { NuevoPedido } from '../sales/NuevoPedido'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
 import { venderPOS, newPosOp, type PosOp, type PosResult } from '../../data/ops/pos'
 import { estadoOperacion } from '../../data/ops/w1Command'
@@ -92,6 +93,10 @@ export function Caja() {
 
   const [cart, setCart] = useState<Record<string, number>>({})
   const [method, setMethod] = useState<PayMethod>('efectivo')
+  // ENT-POS (dueño, 17 oct 2026): desde el Punto de venta también se levantan pedidos CON ENTREGA (domicilio del cliente,
+  // local/foráneo/recoger, flete y fecha). 'ahora' = venta de mostrador (cobro inmediato, como siempre); 'entrega' = pedido.
+  const [entrega, setEntrega] = useState<'ahora' | 'entrega'>('ahora')
+  const [pedidoAbierto, setPedidoAbierto] = useState(false)
   const [client, setClient] = useState<Client | null>(null) // opcional: null = mostrador
   const [pickOpen, setPickOpen] = useState(false)
   const [done, setDone] = useState<OrderWithItems | null>(null)
@@ -346,6 +351,21 @@ export function Caja() {
               <span>Total</span><b>{money(total)}</b>
             </div>
 
+            <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '14px 0 6px' }}>¿Cómo se entrega?</div>
+            <div className="seg" data-testid="pos-entrega">
+              <button type="button" className={entrega === 'ahora' ? 'active' : undefined} onClick={() => setEntrega('ahora')} data-testid="pos-entrega-ahora">Se lo lleva ahora</button>
+              <button type="button" className={entrega === 'entrega' ? 'active' : undefined} onClick={() => setEntrega('entrega')} data-testid="pos-entrega-envio">Enviar o recoger</button>
+            </div>
+            {entrega === 'entrega' ? (
+              <div style={{ marginTop: 12 }} data-testid="pos-pedido-entrega">
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
+                  {client ? <>Pedido para <b>{client.name}</b>: eliges su domicilio, el tipo de entrega (chofer, DHL o recoger) con el flete y la fecha, y queda <b>contra pedido</b> para Almacén.</> : <>Primero elige el <b>cliente</b> arriba: el pedido con entrega va a su nombre y usa sus domicilios.</>}
+                </div>
+                <button className="btn" type="button" style={{ width: '100%' }} disabled={!client} onClick={() => setPedidoAbierto(true)} data-testid="pos-continuar-entrega">
+                  <Icon name="truck" /> Continuar con la entrega
+                </button>
+              </div>
+            ) : (<>
             <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '14px 0 6px' }}>Pago</div>
             <div className="seg">
               <button type="button" className={method === 'efectivo' ? 'active' : undefined} onClick={() => setMethod('efectivo')}>Efectivo</button>
@@ -395,6 +415,7 @@ export function Caja() {
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Pago inmediato · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
               </>)
             })()}
+            </>)}
           </>
         )}
 
@@ -420,6 +441,10 @@ export function Caja() {
         <VentaTicketPrint order={reprint.order} productName={productName} pago={reprint.pago} clientName={reprint.clientName} />
       )}
 
+      {pedidoAbierto && client && (
+        <NuevoPedido customer={{ id: client.id, name: client.name, phone: client.phone ?? null }} placedBy={`${user?.name ?? 'Ventas'} (${role === 'admin' ? 'Administración' : 'Ventas'})`} initialCart={cart}
+          onCreado={() => { setCart({}); setEntrega('ahora') }} onClose={() => setPedidoAbierto(false)} />
+      )}
       {pickOpen && !esDireccion && (
         <SelectorClienteVentas
           buscador={buscadorRef.current}

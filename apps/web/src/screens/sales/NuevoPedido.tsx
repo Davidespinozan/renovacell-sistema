@@ -41,11 +41,14 @@ const huellaDe = (s: Solicitud) => JSON.stringify([
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
 // Exactamente uno de doctor|customer. Customer-only ⇒ doctor_id NULL + customer_id + snapshot.
-export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
+export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, onCreado }: {
   doctor?: { id: string; name: string }
   customer?: { id: string; name: string; phone?: string | null }
   placedBy: string
   onClose: () => void
+  /** ENT-POS · carrito que ya armó el Punto de venta (product_id → cantidad): el pedido con entrega arranca con él. */
+  initialCart?: Record<string, number>
+  onCreado?: () => void
 }) {
   const isCustomer = !!customer
   // SEC-C4-B5 · DATOS FISCALES DEL PEDIDO ≠ PERFIL FISCAL PERMANENTE DEL CLIENTE.
@@ -71,7 +74,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  const [cart, setCart] = useState<Record<string, number>>({})
+  const [cart, setCart] = useState<Record<string, number>>(() => initialCart ?? {})
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo
@@ -168,7 +171,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
         intento.current = null; setRepetido(!!r.repetido)
         const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string } } } | null)?.entrega
         if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge }, opsEntrega?.corte.hoy) })
-        setFolio(r.order.external_ref ?? it.op.folio); return
+        setFolio(r.order.external_ref ?? it.op.folio); onCreado?.(); return
       }
       const motivo: MotivoFallo = r.incierto ? 'incierto' : (r.motivo ?? (r.ambiguous ? 'incierto' : 'rechazo'))
       // Incierto: se congela la solicitud ORIGINAL y su id; el siguiente clic la reenvía tal cual.
