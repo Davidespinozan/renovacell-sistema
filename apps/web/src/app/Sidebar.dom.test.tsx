@@ -11,26 +11,23 @@ import { Sidebar } from './Sidebar'
 beforeEach(() => { try { localStorage.clear() } catch { /* sin almacenamiento */ } })
 
 describe('<Sidebar> admin — navegación Clientes', () => {
-  it('renderiza "Por verificar" (av_verif) y conserva el directorio "Clientes" (av_doc)', () => {
+  // MENÚ AGRUPADO (dueño, 17 oct 2026): "Por verificar" ya no es entrada del menú: es pestaña dentro de "Clientes"
+  // (g_clientes); Clientes y Ventas NO van en la misma sección (Ventas vive en Mi trabajo).
+  it('renderiza UNA entrada "Clientes" (g_clientes) y ninguna "Por verificar" suelta', () => {
     renderWithRole(<Sidebar />)
-    // RoleProvider arranca en rol admin → el nav de Administración se dibuja.
-    const porVerificar = screen.getByText('Por verificar')
-    expect(porVerificar).toBeTruthy()
-    // Debe seguir existiendo el directorio comercial "Clientes" como enlace aparte (la sección también se llama así).
+    expect(screen.queryByText('Por verificar')).toBeNull()
     const clientes = screen.getAllByText('Clientes').map((el) => el.closest('a')).filter(Boolean)
     expect(clientes).toHaveLength(1)
-    // Son dos enlaces distintos (no se fusionó ni se duplicó la navegación).
-    expect(screen.getByText('Por verificar').closest('a')).not.toBe(clientes[0])
+    expect(screen.getByText('Ventas').closest('a')).toBeTruthy()
   })
 
-  it('"Por verificar" vive bajo el encabezado de sección Clientes', () => {
+  it('"Clientes" vive bajo el encabezado de sección Clientes y "Ventas" bajo Mi trabajo', () => {
     const { container } = renderWithRole(<Sidebar />)
     const nav = container.querySelector('nav.nav') as HTMLElement
     expect(nav).toBeTruthy()
     const headers = Array.from(nav.querySelectorAll('.grp')).map((el) => el.textContent)
-    expect(headers).toContain('Clientes')
-    // El enlace es un <a role="button"> con su etiqueta (patrón del Sidebar).
-    const link = within(nav).getByText('Por verificar').closest('a')
+    expect(headers).toContain('Clientes'); expect(headers).toContain('Mi trabajo')
+    const link = within(nav).getByText('Ventas').closest('a')
     expect(link).toBeTruthy()
     expect(link?.getAttribute('role')).toBe('button')
   })
@@ -39,15 +36,15 @@ describe('<Sidebar> admin — navegación Clientes', () => {
 describe('<Sidebar> · secciones plegables (como en CuboPolar)', () => {
   it('Dirección arranca con Mi trabajo, Clientes y Conversaciones abiertas y Finanzas plegada; picar el encabezado la abre y se recuerda', () => {
     renderWithRole(<Sidebar />)
-    expect(screen.getByText('Mi bandeja')).toBeTruthy(); expect(screen.getByText('Bandeja')).toBeTruthy()
-    expect(screen.queryByText('Pagos por validar')).toBeNull()
+    expect(screen.getByText('Tablero')).toBeTruthy(); expect(screen.getByText('Conversaciones', { selector: 'a *' })).toBeTruthy()
+    expect(screen.queryByText('Cobros')).toBeNull()
     const fin = screen.getByTestId('seccion-Finanzas')
     expect(fin.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(fin)
-    expect(screen.getByText('Pagos por validar')).toBeTruthy(); expect(fin.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Cobros')).toBeTruthy(); expect(fin.getAttribute('aria-expanded')).toBe('true')
     expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones') ?? '{}').Finanzas).toBe(true)
     fireEvent.click(screen.getByTestId('seccion-Clientes'))
-    expect(screen.queryByText('Por verificar')).toBeNull()
+    expect(screen.queryAllByText('Clientes').filter((el) => el.closest('a'))).toHaveLength(0)
     // el Hub también se pliega (y la pantalla activa, Inicio, lo vuelve a abrir al navegar a él)
     fireEvent.click(screen.getByTestId('seccion-Hub Renovacell'))
     expect(screen.queryByText('Chat del equipo')).toBeNull()

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 // @ts-expect-error tipos de node no incluidos en el tsconfig del front (vitest corre en Node)
 import { readdirSync, readFileSync } from 'node:fs'
-import { getNav, getRole, getEntryScreen } from '../../app/roles'
+import { getNav, getRole, getEntryScreen, SUBPANTALLAS, resolverDestino } from '../../app/roles'
 import comercialSrc from './atencionComercial.ts?raw'
 import homeSrc from '../../screens/home/RoleHome.tsx?raw'
 import doctorSrc from '../../screens/home/HomeDoctor.tsx?raw'
@@ -21,8 +21,10 @@ describe('navegación por rol', () => {
     const admin = getNav(getRole('admin')).map((s) => [s.key, s.label])
     expect(admin).toContainEqual(['comun', 'Avisos del equipo'])
     expect(admin).toContainEqual(['chat', 'Chat del equipo'])
-    expect(admin).toContainEqual(['asesorias', 'Asesorías'])   // REORG CRM · la key no cambia; para Ventas sigue diciendo "Conversaciones"
-    expect(admin).toContainEqual(['av_atencion', 'Bandeja'])   // REORG CRM · Conversaciones → Bandeja
+    expect(admin).toContainEqual(['g_conversaciones', 'Conversaciones'])   // MENÚ AGRUPADO · Bandeja · Asignadas · Correos en una entrada
+    expect(SUBPANTALLAS.g_conversaciones.map((x) => x.key)).toEqual(['av_atencion', 'asesorias', 'av_mensajes'])   // las keys no cambian (avisos y enlaces)
+    expect(resolverDestino(getNav(getRole('admin')), 'av_atencion')).toEqual({ screen: 'g_conversaciones', pestana: 'av_atencion' })
+    expect(resolverDestino(getNav(getRole('admin')), 'bandeja')).toEqual({ screen: 'inicio' })   // Inicio ES la bandeja
     expect(getNav(getRole('doctor')).map((s) => s.key)).toEqual(['inicio', 'catalogo', 'pedidosdr', 'hist', 'chat_cc', 'mi_verificacion'])
     expect(getNav(getRole('doctor')).some((s) => s.key === 'comun' || s.key === 'chat')).toBe(false)
   })

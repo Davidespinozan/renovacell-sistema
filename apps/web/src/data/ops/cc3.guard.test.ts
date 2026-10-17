@@ -94,7 +94,7 @@ describe('costura compartida y frontend', () => {
     expect(o).toMatch(/p_audiencia: null/)
     expect(o).not.toMatch(/p_nivel|p_estado:/)
     expect(codigo(pantallaSrc)).not.toMatch(/\bprice\b|unit_cost|product_stock|supabase\.|\.from\(/)   // la pantalla solo habla por el cliente RPC
-    expect(codigo(rolesSrc)).toMatch(/\{ key: 'av_conocimiento', label: 'Conocimiento de producto', icon: 'grid', section: 'Catálogo y web' \}/)   // REORG CRM · vive con Catálogo, Precios y Sitio web
+    expect(codigo(rolesSrc)).toMatch(/g_catalogo: \[\{ key: 'av_catalogo'.*\{ key: 'av_conocimiento', label: 'Conocimiento de producto' \}/)   // MENÚ AGRUPADO · pestaña de Catálogo (Catálogo y web)
     expect(codigo(registrySrc)).toMatch(/av_conocimiento: \(\) => <Conocimiento \/>/)
   })
   it('T2 e importación exigen confirmación explícita en la UI', () => {

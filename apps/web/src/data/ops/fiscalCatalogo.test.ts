@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import opsSrc from './fiscalCatalogo.ts?raw'
 import uiSrc from '../../screens/admin/RevisionFiscal.tsx?raw'
 import hookSrc from '../hooks/useRevisionFiscal.ts?raw'
-import { ROLES } from '../../app/roles'
+import { ROLES, GRUPOS } from '../../app/roles'
 
 const soloCodigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/|\*|\/\*)/.test(l)).join('\n')
 const CODIGO = soloCodigo(opsSrc) + '\n' + soloCodigo(uiSrc) + '\n' + soloCodigo(hookSrc)
@@ -119,8 +119,10 @@ describe('T14 · fuente y notas no son datos materiales', () => {
 // ─────────── 18 · la UI no inventa autoridad ───────────
 describe('T18 · solo Dirección tiene el módulo de revisión fiscal', () => {
   it('av_fiscal existe únicamente en los módulos de admin', () => {
-    const conModulo = ROLES.filter((r) => r.modules.some((m) => m.key === 'av_fiscal')).map((r) => r.key)
-    expect(conModulo).toEqual(['admin'])
+    // MENÚ AGRUPADO: av_fiscal es pestaña de g_facturacion; solo Dirección tiene ese grupo (y nadie tiene av_fiscal suelto).
+    const conGrupo = ROLES.filter((r) => r.modules.some((m) => m.key === 'g_facturacion' || m.key === 'av_fiscal')).map((r) => r.key)
+    expect(conGrupo).toEqual(['admin'])
+    expect(GRUPOS.g_facturacion).toContain('av_fiscal')
   })
   it('la pantalla no decide permisos por su cuenta: no hay lista de roles embebida', () => {
     expect(soloCodigo(uiSrc)).not.toMatch(/auth_role|role === 'admin'|RoleKey/)

@@ -2,8 +2,9 @@
 // MODO de la app (público=landing, login, app). Hoy el rol/usuario vienen del
 // login mock; al conectar Supabase Auth vendrán del perfil y los componentes que
 // usan useRole() no cambian.
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { getRole, getEntryScreen, type RoleKey } from '../app/roles'
+import React, { useCallback, createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { getRole, getEntryScreen, type RoleKey, getNav, resolverDestino } from '../app/roles'
+import { pedirPestana } from '../app/Pestanas'
 import { FEATURES } from '../app/config'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
@@ -125,9 +126,16 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // MENÚ AGRUPADO: una clave que vive dentro de un grupo (o que ya no tiene entrada) se traduce a su pantalla real;
+  // la pestaña pedida la toma el grupo al montarse. Así los avisos, tareas y enlaces profundos siguen funcionando.
+  const irA = useCallback((s: string) => {
+    const d = resolverDestino(getNav(getRole(role), FEATURES, capabilities), s)
+    if (d.pestana) pedirPestana(d.screen, d.pestana)
+    setScreen(d.screen)
+  }, [role, capabilities])
   const value = useMemo(
-    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified }),
-    [role, screen, mode, verified, user, capabilities],
+    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen: irA, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified }),
+    [role, screen, mode, verified, user, capabilities, irA],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>
 }

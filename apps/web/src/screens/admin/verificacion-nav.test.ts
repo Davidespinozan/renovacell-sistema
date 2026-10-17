@@ -3,7 +3,7 @@
 // sigue siendo el directorio comercial (customers) read-only; (3) NINGUNA señal
 // "por verificar" aterriza ya en el directorio read-only — todas van a av_verif.
 import { describe, it, expect } from 'vitest'
-import { getNav, getRole } from '../../app/roles'
+import { getNav, getRole, SUBPANTALLAS, GRUPOS, resolverDestino, pantallasAlcanzables } from '../../app/roles'
 import registrySrc from '../registry.tsx?raw'
 import rolesSrc from '../../app/roles.ts?raw'
 import bandejaSrc from '../Bandeja.tsx?raw'
@@ -18,23 +18,26 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
   it('av_doc SIGUE siendo el directorio comercial (customers), no el cockpit', () => {
     expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio \/>/)
   })
-  it('la navegación admin incluye "Por verificar" en Comercial', () => {
+  it('la navegación admin abre "Por verificar" como pestaña de Clientes (g_clientes)', () => {
     const nav = getNav(getRole('admin'))
-    const entry = nav.find((s) => s.key === 'av_verif')
-    expect(entry).toBeTruthy()
-    expect(entry?.label).toBe('Por verificar')
-    expect(entry?.section).toBe('Clientes')
-    // y el directorio "Clientes" (av_doc) se conserva como entrada aparte
-    expect(nav.some((s) => s.key === 'av_doc' && s.label === 'Clientes')).toBe(true)
+    const entry = nav.find((s) => s.key === 'g_clientes')
+    expect(entry).toBeTruthy(); expect(entry?.label).toBe('Clientes'); expect(entry?.section).toBe('Clientes')
+    expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }])
+    // un aviso "por verificar" (screen av_verif) abre el grupo con esa pestaña pedida
+    expect(resolverDestino(nav, 'av_verif')).toEqual({ screen: 'g_clientes', pestana: 'av_verif' })
+    expect(pantallasAlcanzables(nav).has('av_verif')).toBe(true)
   })
-  it('roles.ts declara la entrada av_verif', () => {
-    expect(rolesSrc).toMatch(/key: 'av_verif'.*label: 'Por verificar'.*section: 'Clientes'/)
+  it('roles.ts declara la pestaña av_verif dentro de g_clientes y el registro la monta', () => {
+    expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'av_verif', label: 'Por verificar' \}\]/)
+    expect(registrySrc).toMatch(/g_clientes: \(\) => <Pestanas grupo="g_clientes"[\s\S]*key: 'av_verif', label: 'Por verificar', render: \(\) => <Doctores \/>/)
   })
-  it('orden EXACTO del menú Clientes: Clientes→Por verificar→Ventas (REORG CRM; Comisiones vive en Equipo)', () => {
-    const comercial = getNav(getRole('admin')).filter((s) => s.section === 'Clientes').map((s) => s.label)
-    expect(comercial).toEqual(['Clientes', 'Por verificar', 'Ventas'])
-    expect(getNav(getRole('admin')).find((s) => s.key === 'av_comisiones')?.section).toBe('Equipo')
-    expect(getNav(getRole('admin')).some((s) => s.key === 'av_import')).toBe(false)   // la migración vive en Configuración
+  it('menú de Dirección: Clientes solo con Clientes; Ventas en Mi trabajo (no con Clientes); Comisiones dentro de Equipo', () => {
+    const nav = getNav(getRole('admin'))
+    expect(nav.filter((s) => s.section === 'Clientes').map((s) => s.label)).toEqual(['Clientes'])
+    expect(nav.find((s) => s.key === 'av_ventas')?.section).toBe('Mi trabajo')
+    expect(GRUPOS.g_equipo).toContain('av_comisiones')
+    expect(nav.some((s) => s.key === 'av_import')).toBe(false)   // la migración vive en Configuración
+    expect(nav.length).toBeLessThanOrEqual(17)   // 31 → 14 módulos (+ Inicio, Avisos, Chat)
   })
 })
 

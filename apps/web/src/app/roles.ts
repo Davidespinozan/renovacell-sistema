@@ -53,36 +53,22 @@ export const ROLES: RoleDef[] = [
       // (todo lo que entra por chat/WhatsApp/enlace y lo que se le escribe al cliente), Catálogo y web, Operación,
       // Finanzas, Equipo (personas y su atención) y Sistema. "Prospectos" (CRM de maquetas, vacío en prod) se retiró:
       // los leads reales viven en Conversaciones.
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
+      // MENÚ AGRUPADO (dueño, 17 oct 2026): 31 entradas → 14. Inicio ES la bandeja; cada grupo abre una pantalla con pestañas
+      // internas (registry g_*) que renderizan las pantallas de siempre. Clientes y Ventas NO van juntas (decisión del dueño).
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
-      { key: 'av_doc', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // directorio comercial (customers)
-      { key: 'av_verif', label: 'Por verificar', icon: 'shield', section: 'Clientes' },
-      { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Clientes' },
-      { key: 'av_atencion', label: 'Bandeja', icon: 'chat', section: 'Conversaciones' },     // solicitudes de asesor + WhatsApp (la key no cambia: avisos y enlaces apuntan aquí)
-      { key: 'asesorias', label: 'Asesorías', icon: 'chat', section: 'Conversaciones' },     // CC-2 · las que ya tienen vendedor (la key sigue siendo 'asesorias')
-      { key: 'av_mensajes', label: 'Correos al cliente', icon: 'mail', section: 'Conversaciones' },
-      { key: 'av_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },
-      { key: 'av_precios', label: 'Precios', icon: 'receipt', section: 'Catálogo y web' },
+      { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Mi trabajo' },
+      { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // Clientes · Por verificar
+      { key: 'g_conversaciones', label: 'Conversaciones', icon: 'chat', section: 'Conversaciones' },   // Bandeja · Asignadas · Correos
+      { key: 'g_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },           // Productos · Precios · Conocimiento
       { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Catálogo y web' },
-      { key: 'av_conocimiento', label: 'Conocimiento de producto', icon: 'grid', section: 'Catálogo y web' },   // CC-3
-      { key: 'av_inv', label: 'Compras a proveedores', icon: 'cart', section: 'Operación' },   // UX-2 · mismo nombre que en Almacén
-      { key: 'av_traza', label: 'Trazabilidad', icon: 'fingerprint', section: 'Operación' },
-      { key: 'av_mermas', label: 'Mermas', icon: 'box', section: 'Operación' },
-      { key: 'av_control_inv', label: 'Control de inventario', icon: 'shield', section: 'Operación' },
-      { key: 'av_custodias', label: 'Custodias', icon: 'box', section: 'Operación' },
-      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Operación' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Operación' },
-      { key: 'av_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },
-      { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt', section: 'Finanzas' },
-      { key: 'av_revision', label: 'Revisión económica', icon: 'shield', section: 'Finanzas' },   // PAY-EXP-01A-3 · Dirección/Facturación
-      { key: 'av_fin', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },
-      { key: 'av_fiscal', label: 'Revisión fiscal', icon: 'shield', section: 'Finanzas' },
-      { key: 'av_cierre', label: 'Cierre de caja', icon: 'store', section: 'Finanzas' },
-      { key: 'av_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo' },
-      { key: 'av_cartera', label: 'Cartera y horario', icon: 'usercheck', section: 'Equipo' },   // cartera por vendedor, vendedores elegibles, horario y alertas
-      { key: 'av_comisiones', label: 'Metas y comisiones', icon: 'chart', section: 'Equipo' },    // por vendedor (decisión del dueño, 15 oct 2026)
-      { key: 'av_config', label: 'Configuración', icon: 'store', section: 'Sistema' },
-      { key: 'av_audit', label: 'Bitácora', icon: 'shield', section: 'Sistema' },
+      { key: 'av_inv', label: 'Compras a proveedores', icon: 'cart', section: 'Operación' },
+      { key: 'g_inventario', label: 'Control de inventario', icon: 'box', section: 'Operación' },   // Trazabilidad · Mermas · Control · Custodias ("Inventario" a secas = existencias, decisión 13 oct)
+      { key: 'g_envios', label: 'Envíos', icon: 'truck', section: 'Operación' },                 // Despacho · Seguimiento
+      { key: 'g_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },          // Finanzas · Cierre de caja
+      { key: 'g_cobros', label: 'Cobros', icon: 'receipt', section: 'Finanzas' },                // Pagos por validar · Revisión económica
+      { key: 'g_facturacion', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },      // Facturación · Revisión fiscal
+      { key: 'g_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo' },                // Personas · Cartera y horario · Metas
+      { key: 'g_sistema', label: 'Configuración', icon: 'store', section: 'Sistema' },           // Configuración · Bitácora
     ],
   },
   {
@@ -126,11 +112,10 @@ export const ROLES: RoleDef[] = [
     key: 'pos', label: 'Ventas', group: 'Ventas · Campo',
     icon: 'bag', isStaff: true, ready: true,
     modules: [
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
+      // MENÚ (dueño, 17 oct 2026): Inicio ES la bandeja y el seguimiento de su cartera; menos pestañas.
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Mi cartera' },
     ],
   },
   {
@@ -214,3 +199,37 @@ export const getScreenDef = (role: RoleDef, key: string, features: Features = FE
 // Quién puede gestionar la vista común (crear/editar anuncios/avisos/assets):
 // Administración. El resto del staff la ve en modo lectura.
 export const canManageHub = (key: RoleKey): boolean => key === 'admin'
+
+// ── MENÚ AGRUPADO (dueño, 17 oct 2026) ─────────────────────────────────────────────────────────────────
+// Varias pantallas viven dentro de UNA entrada del menú con pestañas internas (registry g_*). Las claves sueltas
+// siguen existiendo (avisos, tareas, búsqueda y enlaces profundos las usan): `resolverDestino` las traduce al grupo y
+// deja pedida la pestaña. Lo que ya no tiene entrada propia (bandeja, seguimiento del vendedor, hoy de Almacén) cae en Inicio.
+export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>> = {
+  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }],
+  g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }],
+  g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }],
+  g_inventario: [{ key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }],
+  g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }],
+  g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],
+  g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_revision', label: 'Revisión económica' }],
+  g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
+  g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
+  g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }],
+}
+export const GRUPOS: Record<string, string[]> = Object.fromEntries(Object.entries(SUBPANTALLAS).map(([g, xs]) => [g, xs.map((x) => x.key)]))
+export const GRUPO_DE: Record<string, string> = Object.fromEntries(Object.entries(GRUPOS).flatMap(([g, ks]) => ks.map((k) => [k, g])))
+const ALIAS_INICIO: ReadonlySet<string> = new Set(['bandeja', 'alm_hoy', 'seguimiento'])
+/** Claves que el rol puede abrir: las del menú más las pestañas de los grupos que tiene en el menú. */
+export function pantallasAlcanzables(nav: ScreenDef[]): Set<string> {
+  const s = new Set(nav.map((x) => x.key))
+  for (const x of nav) for (const k of GRUPOS[x.key] ?? []) s.add(k)
+  return s
+}
+/** A qué pantalla ir cuando se pide `key`: ella misma, su grupo (con la pestaña pedida) o Inicio si ya no tiene entrada. */
+export function resolverDestino(nav: ScreenDef[], key: string): { screen: string; pestana?: string } {
+  if (nav.some((x) => x.key === key)) return { screen: key }
+  const g = GRUPO_DE[key]
+  if (g && nav.some((x) => x.key === g)) return { screen: g, pestana: key }
+  if (ALIAS_INICIO.has(key) && nav.some((x) => x.key === INICIO_SCREEN.key)) return { screen: INICIO_SCREEN.key }
+  return { screen: key }
+}

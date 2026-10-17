@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './icons'
 import { BrandLogo } from './BrandLogo'
-import { getRole, getScreenDef, getNav, COMMON_SCREEN, CHAT_SCREEN } from './roles'
+import { getRole, getScreenDef, getNav, pantallasAlcanzables, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
 import { useNotifications, type Notif } from '../data/hooks/useNotifications'
@@ -117,7 +117,7 @@ function NotifBell() {
   const { data, markAllRead, markRead } = useNotifications()
   const [open, setOpen] = useState(false)
 
-  const navKeys = useMemo(() => new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key)), [role, capabilities])
+  const navKeys = useMemo(() => pantallasAlcanzables(getNav(getRole(role), undefined, capabilities)), [role, capabilities])   // incluye las pestañas de los grupos
   const visible = useMemo(
     () => data.filter((n) => {
       // Si la notificación va dirigida a personas (avisos de chat), MANDA sobre el

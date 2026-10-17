@@ -15,6 +15,7 @@ import { useRole } from '../../auth/RoleContext'
 import { getNav, getRole, type RoleKey } from '../../app/roles'
 import { useBandeja, ListaTareas, porUrgencia, type Task } from '../Bandeja'
 import { HoyAlmacen } from '../warehouse/HoyAlmacen'
+import { Seguimiento } from '../logistics/Seguimiento'
 import { useAtencionComercial, fuenteComercial, recargarAtencion } from '../../data/store/atencionStore'
 import { activasVendedor, intervencionDireccion, lineasSolicitud, solicitudesVendedor, ETIQUETA_ATENCION, tonoAtencion, estadoDe, TEXTO_HORARIO_PENDIENTE } from '../../data/ops/atencionComercial'
 import { MOTIVO_RUTEO } from '../../data/ops/atencion'
@@ -42,34 +43,6 @@ function useAccesos(defs: Array<Omit<Acceso, 'onClick'>>): Acceso[] {
   const { role, capabilities, setScreen } = useRole()
   const nav = useMemo(() => new Set(getNav(getRole(role as RoleKey), undefined, capabilities).map((s) => s.key)), [role, capabilities])
   return defs.filter((d) => nav.has(d.key)).map((d) => ({ ...d, onClick: () => setScreen(d.key) }))
-}
-
-/**
- * Resumen de la bandeja en Inicio, separado por la urgencia CANÓNICA de cada tarea (su tono en la cola):
- *   · atención operativa (crítico/advertencia) — cuenta y se destaca;
- *   · rezago administrativo (informativo, p. ej. validación fiscal de catálogo) — visible con su conteo
- *     real, pero sin el peso de una emergencia.
- */
-function BandejaResumen({ tareas, excluir = [], limite = 5, vacio }: { tareas: Task[]; excluir?: string[]; limite?: number; vacio: string }) {
-  const { setScreen } = useRole()
-  const lista = tareas.filter((t) => !excluir.includes(t.id))
-  const urgentes = lista.filter((t) => t.tone !== 'neu')
-  const rezago = lista.filter((t) => t.tone === 'neu')
-  const total = urgentes.reduce((s, t) => s + t.count, 0)
-  return (
-    <>
-      <Seccion titulo="Pendientes de tu bandeja" nivel="continuar" conteo={total} id="bandeja" accion={{ label: 'Ver toda mi bandeja', onClick: () => setScreen('bandeja') }}>
-        {urgentes.length === 0 ? <Vacio titulo={vacio} /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={urgentes} limite={limite} onGo={setScreen} /></div>}
-      </Seccion>
-      {rezago.length > 0 && (
-        <section className="rh-sec rh-sec--rezago" aria-labelledby="rh-rezago" data-testid="rh-sec-rezago">
-          <div className="rh-sec-h"><h3 id="rh-rezago">Por preparar · no urgente</h3></div>
-          <p className="rh-rezago-nota">Trabajo administrativo pendiente. No bloquea la operación de hoy.</p>
-          <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={rezago} limite={3} onGo={setScreen} /></div>
-        </section>
-      )}
-    </>
-  )
 }
 
 // ── VENTAS ────────────────────────────────────────────────────────────────────────────────────────────
@@ -122,7 +95,14 @@ export function HomeVendedor() {
           </Tarjetas>
         </Seccion>
       )}
-      <BandejaResumen tareas={tareas} excluir={['comercial', 'asesorias_activas']} vacio="Sin otros pendientes en tu bandeja." />
+      {/* MENÚ (dueño, 17 oct 2026): Inicio = Mi bandeja + Seguimiento. La bandeja completa va aquí (sin "ver toda"),
+          y los envíos de su cartera en una sección propia; esas dos entradas ya no están en el menú de Ventas. */}
+      {(() => { const resto = tareas.filter((t) => !['comercial', 'asesorias_activas'].includes(t.id)); return (
+        <Seccion titulo="Pendientes" nivel="continuar" conteo={resto.reduce((s, t) => s + t.count, 0)} id="bandeja">
+          {resto.length === 0 ? <Vacio titulo="Sin otros pendientes." /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>}
+        </Seccion>
+      ) })()}
+      <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento /></Seccion>
       <AtajosMovil items={atajos} />
     </div>
   )
@@ -173,7 +153,12 @@ export function HomeDireccion() {
           </Tarjetas>
         )}
       </Seccion>
-      <BandejaResumen tareas={[...tareas].sort(porUrgencia)} excluir={['comercial']} vacio="El resto de tu bandeja está al día." />
+      {/* MENÚ (dueño, 17 oct 2026): Inicio ES Mi bandeja: la lista completa, sin "ver toda". */}
+      {(() => { const resto = [...tareas].sort(porUrgencia).filter((t) => t.id !== 'comercial'); return (
+        <Seccion titulo="Pendientes" nivel="continuar" conteo={resto.reduce((s, t) => s + t.count, 0)} id="bandeja">
+          {resto.length === 0 ? <Vacio titulo="El resto de tu bandeja está al día." /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>}
+        </Seccion>
+      ) })()}
       <AtajosMovil items={atajos} />
     </div>
   )

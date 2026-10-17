@@ -5,7 +5,7 @@
 // queries server-side bajo RLS.
 import { useCallback } from 'react'
 import { useRole } from '../../auth/RoleContext'
-import { getRole, getNav } from '../../app/roles'
+import { getRole, getNav, SUBPANTALLAS } from '../../app/roles'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { useProducts } from './useProducts'
 import { useAllOrders, useOrders } from './useOrders'
@@ -38,10 +38,12 @@ export function useGlobalSearch() {
     // "Ir a" \u2014 cualquier pantalla de la navegaci\u00f3n del rol se vuelve un comando
     // (paleta de comandos). Va primero: navegar es la acci\u00f3n m\u00e1s frecuente.
     const nav = getNav(getRole(role), undefined, capabilities)
-    const screenHits: SearchResult[] = nav
-      .filter((s) => hit(s.label))
+    // MENÚ AGRUPADO: las pestañas de un grupo también se buscan ("Clientes · Por verificar" abre esa pestaña).
+    const entradas = nav.flatMap((s) => [{ key: s.key, label: s.label }, ...(SUBPANTALLAS[s.key] ?? []).map((x) => ({ key: x.key, label: `${s.label} · ${x.label}` }))])
+    const screenHits: SearchResult[] = entradas
+      .filter((e) => hit(e.label))
       .slice(0, 4)
-      .map((s) => ({ id: `nav-${s.key}`, type: 'Ir a', label: s.label, sub: '', screen: s.key }))
+      .map((e) => ({ id: `nav-${e.key}`, type: 'Ir a', label: e.label, sub: '', screen: e.key }))
 
     if (role === 'doctor') {
       products.filter((p) => hit(p.name, p.category)).slice(0, 5)
