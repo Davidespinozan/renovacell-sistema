@@ -103,8 +103,7 @@ export const ROLES: RoleDef[] = [
     key: 'warehouse', label: 'Almacén / Empaque', group: 'Almacén y Empaque · Alberto',
     icon: 'box', isStaff: true, ready: true,
     modules: [
-      { key: 'alm_hoy', label: 'Hoy', icon: 'layers', section: 'Mi trabajo' },   // ALM-1 · el día en una pantalla (preparar → enviar, guías y recolección)
-      { key: 'bandeja', label: 'Mi bandeja', icon: 'check', section: 'Mi trabajo' },
+      // ALM-1 · Inicio ES la pantalla del día (Hoy + Mi bandeja en una); por eso aquí no hay 'bandeja' ni 'hoy'.
       // Orden = el recorrido real. Almacén: lo que hay y lo que entra. Pedidos y envíos: surtir → enviar → guía → salida → rastreo.
       // La remisión del paquete no es una pantalla: se imprime desde "Por enviar" y desde "Guías".
       // El menú cuenta la historia del inventario (dueño, 15 oct 2026): lo que HAY (Inventario, Por caducar) y lo que

@@ -14,6 +14,7 @@ import React, { useMemo } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { getNav, getRole, type RoleKey } from '../../app/roles'
 import { useBandeja, ListaTareas, porUrgencia, type Task } from '../Bandeja'
+import { HoyAlmacen } from '../warehouse/HoyAlmacen'
 import { useAtencionComercial, fuenteComercial, recargarAtencion } from '../../data/store/atencionStore'
 import { activasVendedor, intervencionDireccion, lineasSolicitud, solicitudesVendedor, ETIQUETA_ATENCION, tonoAtencion, estadoDe, TEXTO_HORARIO_PENDIENTE } from '../../data/ops/atencionComercial'
 import { MOTIVO_RUTEO } from '../../data/ops/atencion'
@@ -179,11 +180,13 @@ export function HomeDireccion() {
 }
 
 // ── ALMACÉN / EMPAQUE ─────────────────────────────────────────────────────────────────────────────────
+// ALM-1 · Inicio = Hoy = Mi bandeja (dueño, 17 oct 2026: "pudieran unirse en uno mismo"). Una sola pantalla: el saludo,
+// las tarjetas del día, los casos que esperan decisión con su botón (preparar → enviar) y, debajo, lo demás pendiente
+// (despachar, recibir, inspeccionar, caducidades). Las pestañas de detalle siguen en el menú; "Hoy" y "Mi bandeja" no.
 export function HomeAlmacen() {
   const { user, setScreen } = useRole()
   const { tareas, fuentes } = useBandeja()
-  const urgentes = tareas.filter((t) => t.tone !== 'neu')
-  const otras = tareas.filter((t) => t.tone === 'neu')
+  const resto = tareas.filter((t) => !['surtir', 'empacar'].includes(t.id))   // esos dos ya están como casos con botón
   const atajos = useAccesos([
     { key: 'entradas', label: 'Recibir mercancía', icon: 'download' },
     { key: 'surtido', label: 'Preparar pedidos', icon: 'layers' },
@@ -193,13 +196,12 @@ export function HomeAlmacen() {
     <div className="rh" data-testid="home-almacen">
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta="Almacén y empaque"
-        detalle={urgentes.length ? 'Esto es lo que requiere tu atención en almacén.' : 'No hay trabajo urgente en almacén.'} />
-      <Seccion titulo="Requiere tu atención" nivel="atencion" conteo={urgentes.reduce((s, t) => s + t.count, 0)} id="atencion" accion={{ label: 'Ver toda mi bandeja', onClick: () => setScreen('bandeja') }}>
-        {urgentes.length === 0 ? <Vacio titulo="No hay trabajo urgente en almacén." detalle="Pedidos por surtir, empacar o despachar aparecerán aquí." testid="vacio-almacen" />
-          : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={urgentes} limite={6} onGo={setScreen} /></div>}
-      </Seccion>
-      {otras.length > 0 && (
-        <Seccion titulo="Para hoy" nivel="continuar" id="hoy"><div className="grid" style={{ gap: 10 }}><ListaTareas tareas={otras} limite={4} onGo={setScreen} /></div></Seccion>
+        detalle="Lo de hoy, en una sola pantalla: prepara, envía y lo demás pendiente." />
+      <HoyAlmacen />
+      {resto.length > 0 && (
+        <Seccion titulo="Otros pendientes" nivel="continuar" conteo={resto.reduce((s, t) => s + t.count, 0)} id="otros">
+          <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>
+        </Seccion>
       )}
       <AtajosMovil items={atajos} />
     </div>

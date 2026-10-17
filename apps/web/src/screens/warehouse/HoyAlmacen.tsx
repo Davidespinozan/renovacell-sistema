@@ -59,7 +59,6 @@ export function HoyAlmacen() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Almacén · Hoy</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
         <Tarjeta titulo="Esperan tu decisión" valor={casos.length} pie={`${nPreparar} por preparar · ${nEnviar} por enviar`} icono="layers" alerta={casos.length > 0} testid="hoy-decision" />
         <Tarjeta titulo="Guías DHL hoy" valor={guiasHoy.length} pie={guiasHoy.length ? 'generadas y con número de rastreo' : 'ninguna todavía'} icono="truck" testid="hoy-guias" />

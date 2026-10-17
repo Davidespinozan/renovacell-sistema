@@ -76,7 +76,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   hist: () => <Historial />,
   asist: () => <RedirigirChat />,   // UX-1 · alias heredado ('Asistente IA') → la conversación canónica
   stock: () => <Existencias />,
-  alm_hoy: () => <HoyAlmacen />,
+  alm_hoy: () => <HoyAlmacen />,   // ALM-1 · sin entrada de menú: Inicio de Almacén la incluye
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
   entradas: () => <Entradas />,
