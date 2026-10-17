@@ -13,6 +13,7 @@ import type { Order, OrderItem } from '../types'
 import type { ShippingAddress } from '../ops/shippingAddress'
 import { decideTransferReview } from '../ops/transferReview'
 import { normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../ops/fiscal'
+import type { EleccionEntregaServidor } from '../ops/entrega'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -145,6 +146,7 @@ export async function createOrder(input: {
   customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
   receiver?: FiscalProfile | null   // receptor del pedido (solo con factura); el servidor lo valida y lo congela
   operacion?: OperacionPedido       // id + folio estables entre reintentos de la MISMA solicitud
+  entrega?: EleccionEntregaServidor | null   // ENT-2 · cómo se entrega (id de la opción; el personal puede ajustar el flete con motivo)
 }): Promise<PedidoCreado> {
   const op = input.operacion ?? nuevaOperacionPedido()
   const id = op.id
@@ -214,6 +216,8 @@ export async function createOrder(input: {
     p_lines: input.lines.map((l) => ({ product_id: l.product_id, qty: l.qty })) as unknown as Json,
     p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
   }
+  // ENT-2 · Con entrega: UNA llamada (crear_pedido_con_entrega = pedido + receptor + entrega en una transacción).
+  if (input.entrega) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar, { entrega: input.entrega, factura: input.invoice_requested })
   // Con factura: UNA llamada, UNA transacción (pedido + receptor). Sin factura: el contrato histórico, sin receptor.
   if (input.invoice_requested) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar)
 
@@ -266,16 +270,18 @@ export async function createOrder(input: {
 async function crearConReceptor(
   base: { p_order_id: string; p_folio: string; p_doctor_id: string; p_customer_id: string; p_lines: Json; p_shipping_meta: Json },
   receiver: FiscalProfile | null, folio: string, QUE: string, asentar: (total?: number) => OrderWithItems,
+  conEntrega?: { entrega: EleccionEntregaServidor; factura: boolean },
 ): Promise<PedidoCreado> {
   let data: unknown = null
   let error: { message: string; code?: string; status?: number } | null = null
   try {
-    const r = await supabase.rpc('crear_pedido_con_receptor', {
-      ...base,
-      p_invoice_requested: true,
-      // Exactamente los 6 campos del receptor (normalizados); nada de estados, UUID de CFDI ni datos del proveedor.
-      p_receiver: (receiver ? normalizeFiscalProfile(receiver) : null) as unknown as Json,
-    })
+    // Exactamente los 6 campos del receptor (normalizados); nada de estados, UUID de CFDI ni datos del proveedor.
+    const p_receiver = ((conEntrega ? conEntrega.factura : true) && receiver ? normalizeFiscalProfile(receiver) : null) as unknown as Json
+    const r = conEntrega
+      // ENT-2 · pedido + receptor + ENTREGA en una transacción. Viaja el id de la opción y, solo si el vendedor lo
+      // cambió, el flete con su motivo; el servidor valida contra su regla (ENTREGA_*).
+      ? await supabase.rpc('crear_pedido_con_entrega', { ...base, p_invoice_requested: conEntrega.factura, p_receiver, p_entrega: conEntrega.entrega as unknown as Json })
+      : await supabase.rpc('crear_pedido_con_receptor', { ...base, p_invoice_requested: true, p_receiver })
     data = r.data; error = r.error ? { message: r.error.message, code: r.error.code, status: (r as { status?: number }).status } : null
   } catch {
     error = { message: 'Failed to fetch' }
@@ -296,6 +302,11 @@ async function crearConReceptor(
     const msg = mensajeDeError(e, 'comando')
     reportarFallo(QUE, msg, false)
     return { ok: false, error: msg, ambiguous: false, motivo: 'fiscal' }
+  }
+  if (/\bENTREGA_[A-Z_]+\b/.test(e.message)) {   // ENT-2 · la regla de entrega rechazó la elección: se corrige y se vuelve a mandar
+    const msg = mensajeDeError(e, 'comando')
+    reportarFallo(QUE, msg, false)
+    return { ok: false, error: msg, ambiguous: false, motivo: 'rechazo' }
   }
   if (!codigoConocido(e.message) && isAmbiguous(e)) {
     reportarFallo(QUE, INCIERTO_PEDIDO_MSG, true)

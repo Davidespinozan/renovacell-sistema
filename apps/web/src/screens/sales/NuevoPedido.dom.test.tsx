@@ -34,7 +34,13 @@ vi.mock('../../data/hooks/useOrders', () => ({ useOrders: () => ({ createOrder: 
   if (h.diferido) return new Promise((res) => { h.diferido = { soltar: res } })
   return h.cola.length ? h.cola.shift() : h.respuestaPedido
 } }) }))
-vi.mock('../../app/AddressPicker', () => ({ AddressPicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ line1: 'Calle 1', city: 'Culiacán', phone: '' })}>poner domicilio</button> }))
+// ENT-2 · el domicilio del cliente comercial y la entrega tienen sus propias pruebas (DomicilioClientePicker / SelectorEntrega);
+// aquí se simulan: un domicilio elegido y la opción de entrega sugerida por el servidor.
+vi.mock('../../app/DomicilioClientePicker', () => ({ DomicilioClientePicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ address: { line1: 'Calle 1', city: 'Culiacán', cp: '82000', phone: '6690000000' } })}>poner domicilio</button> }))
+vi.mock('../../app/SelectorEntrega', () => ({
+  SelectorEntrega: ({ onChange }: { onChange: (e: unknown, ops: unknown) => void }) => { React.useEffect(() => { onChange({ opcion: 'foraneo_dhl' }, { corte: { hoy: '2026-10-21' }, opciones: [{ id: 'foraneo_dhl', tipo: 'foraneo', flete: 600, permitido: true, disponible: true }] }) }, []); return <div data-testid="sel-entrega" /> },   // eslint-disable-line react-hooks/exhaustive-deps
+  eleccionCompleta: (v: unknown) => !!v,
+}))
 vi.mock('../../app/DeliveryLocationPicker', () => ({ DeliveryLocationPicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ address: { line1: 'Consultorio', city: 'Culiacán', phone: '' }, locationId: null })}>poner domicilio</button> }))
 vi.mock('../../app/FiscalFields', () => ({
   FiscalFields: ({ onChange }: { onChange: (f: unknown) => void }) => <button type="button" data-testid="form-fiscal" onClick={() => onChange(h.captura)}>llenar fiscal</button>,
@@ -58,6 +64,7 @@ beforeEach(() => {
 describe('SEC-C4-B5 · Ventas · pedido sin factura', () => {
   it('crea el pedido con identificador y nombre de la cuenta; sin lecturas ni escrituras del expediente', async () => {
     montar(); armar()
+    expect(screen.getByTestId('np-total')).toHaveTextContent(/700/)   // ENT-2 · 100 + flete 600 que propone el servidor
     fireEvent.click(boton())
     await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
     expect(h.pedidos).toHaveLength(1)
@@ -66,6 +73,7 @@ describe('SEC-C4-B5 · Ventas · pedido sin factura', () => {
     expect(p.invoice_requested).toBe(false); expect(p.receiver).toBeNull(); expect(p.placedBy).toBe('Lucía (Ventas)')
     expect(p).not.toHaveProperty('doctor_id'); expect(p).not.toHaveProperty('seller'); expect(p).not.toHaveProperty('seller_id')
     expect(p.lines).toEqual([{ product_id: 'P1', qty: 1, unit_price: 100 }])
+    expect(p.entrega).toEqual({ opcion: 'foraneo_dhl' })   // ENT-2 · la entrega viaja con el pedido (solo el id de la opción)
     expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([]); expect(h.upserts).toEqual([])
   })
   it('rechazo del servidor: se muestra y NO se anuncia éxito', async () => {

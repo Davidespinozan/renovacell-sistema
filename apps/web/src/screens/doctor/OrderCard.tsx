@@ -143,8 +143,9 @@ function RastreoCliente({ order }: { order: OrderWithItems }) {
 
 // ENT-0 · La promesa de entrega que se fijó al crear el pedido (tipo, paquetería y fechas): el cliente SIEMPRE la ve.
 function EntregaLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
-  const e = (meta && typeof meta === 'object' ? (meta as { entrega?: EntregaPedido | null }).entrega : null) ?? null
-  if (!e) return null
+  const m = meta && typeof meta === 'object' ? (meta as { entrega?: EntregaPedido | null; channel?: string }) : null
+  const e = m?.entrega ?? null
+  if (!e) return m?.channel === 'pos' ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega"><b style={{ color: 'var(--ink-2)' }}>Entrega en mostrador</b></div> : null
   return (
     <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega">
       <b style={{ color: 'var(--ink-2)' }}>{e.texto}</b> · {promesaDe(e)}

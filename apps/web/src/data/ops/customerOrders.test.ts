@@ -99,9 +99,9 @@ describe('data layer / UI pasan customer_id a las RPC', () => {
   it('pos.ts pasa p_customer_id a vender_pos', () => {
     expect(posSrc).toMatch(/p_customer_id: \(isUuid\(opts\.customerId\)/)
   })
-  it('NuevoPedido soporta customer (prop customer + AddressPicker one-off)', () => {
+  it('NuevoPedido soporta customer (prop customer + domicilios del cliente: guardados, otro para el pedido o nuevo)', () => {
     expect(nuevoPedidoSrc).toMatch(/customer\?: \{ id: string; name: string/)
-    expect(nuevoPedidoSrc).toMatch(/AddressPicker/)
+    expect(nuevoPedidoSrc).toMatch(/DomicilioClientePicker/)   // ENT-2 · sustituye al AddressPicker suelto
   })
   it('Caja ClientPicker usa customers (directorio comercial)', () => {
     expect(cajaSrc).toMatch(/useCustomers/)

@@ -15,7 +15,9 @@ import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
-import { AddressPicker } from '../../app/AddressPicker'
+import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
+import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
+import { promesaDe, requiereDireccion, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
@@ -34,6 +36,7 @@ const nuevaOperacion = () => ({
 const huellaDe = (s: Solicitud) => JSON.stringify([
   [...s.lines].map((l) => `${l.product_id}:${l.qty}`).sort(), s.doctor_id ?? null, s.customer_id ?? null, s.location_id ?? null,
   s.shipping ?? null, s.invoice_requested, s.invoice_requested && s.receiver ? normalizeFiscalProfile(s.receiver) : null,
+  s.entrega ?? null,   // ENT-2 · cómo se entrega (opción, flete ajustado y motivo)
 ])
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
@@ -71,10 +74,18 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
   const [cart, setCart] = useState<Record<string, number>>({})
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
-  const [custAddr, setCustAddr] = useState<ShippingAddress | null>(null) // flujo customer (one-off)
+  const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo
+  // ENT-2 · entrega elegida por el vendedor (id de la opción del servidor; flete ajustado con motivo si lo cambia).
+  const [entrega, setEntrega] = useState<EleccionEntregaServidor | null>(null)
+  const [opsEntrega, setOpsEntrega] = useState<OpcionesEntrega | null>(null)
+  const [promesa, setPromesa] = useState<{ texto: string; promesa: string; flete: number } | null>(null)
   const [folio, setFolio] = useState<string | null>(null)
   const [repetido, setRepetido] = useState(false)                 // el servidor confirmó un envío anterior del mismo pedido
-  const shipping = isCustomer ? custAddr : (choice?.address ?? null)
+  const shipping = isCustomer ? (custDom?.address ?? null) : (choice?.address ?? null)
+  const locationId = isCustomer ? custDom?.locationId ?? null : choice?.locationId ?? null
+  const tipoEntrega = opcionDe(opsEntrega, entrega?.opcion)?.tipo ?? null
+  const entregaNecesitaDireccion = opsEntrega ? requiereDireccion(tipoEntrega) : true   // sin opciones (demo) se exige dirección como antes
+  const entregaLista = hasSupabase ? eleccionCompleta(entrega, opsEntrega) : true
 
   // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
@@ -140,9 +151,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     placedBy,
     shipping,
     receiver: invoice ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3)
+    ...(hasSupabase && entrega ? { entrega } : {}),   // ENT-2 · la entrega viaja con el pedido (una transacción)
     ...(isCustomer
-      ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null } }
-      : { doctor_id: doctor!.id, location_id: choice?.locationId ?? null }),
+      ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null }, location_id: locationId }
+      : { doctor_id: doctor!.id, location_id: locationId }),
   })
   const pendienteIncierto = intento.current?.incierto ?? false
   const bloqueado = errorPedido?.motivo === 'conflicto'
@@ -152,7 +164,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     setCreando(true); setErrorPedido(null)
     try {
       const r = await createOrder({ ...it.solicitud, operacion: it.op })
-      if (r.ok) { intento.current = null; setRepetido(!!r.repetido); setFolio(r.order.external_ref ?? it.op.folio); return }
+      if (r.ok) {
+        intento.current = null; setRepetido(!!r.repetido)
+        const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string } } } | null)?.entrega
+        if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge }, opsEntrega?.corte.hoy) })
+        setFolio(r.order.external_ref ?? it.op.folio); return
+      }
       const motivo: MotivoFallo = r.incierto ? 'incierto' : (r.motivo ?? (r.ambiguous ? 'incierto' : 'rechazo'))
       // Incierto: se congela la solicitud ORIGINAL y su id; el siguiente clic la reenvía tal cual.
       // Fiscal: el servidor no creó nada; se corrige el receptor y el siguiente envío es una operación nueva.
@@ -168,7 +185,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     if (enviando.current || bloqueado) return
     const previo = intento.current
     if (previo?.incierto) { enviando.current = true; await enviar(previo); return }   // MISMA operación, mismo contenido
-    if (lines.length === 0 || !shipping) return
+    if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
     enviando.current = true
     if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
@@ -183,7 +200,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
     await enviar({ op: previo && previo.huella === huella ? previo.op : nuevaOperacion(), huella, solicitud, incierto: false })
   }
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
-  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || !shipping || (invoice && !fiscalOk)))
+  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || (invoice && !fiscalOk)))
+  const flete = hasSupabase && entrega ? (entrega.flete ?? opcionDe(opsEntrega, entrega.opcion)?.flete ?? 0) : 0
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -194,6 +212,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               <div className="ck"><Plus size={26} /></div>
               <h3>{repetido ? 'Pedido confirmado' : 'Pedido creado'}</h3>
               <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
+              {promesa && <p data-testid="np-promesa" style={{ fontSize: 13.5 }}><b>{promesa.texto}</b>{promesa.flete > 0 ? ` · flete ${money(promesa.flete)}` : ' · sin flete'}<br />{promesa.promesa}</p>}
               {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
@@ -228,12 +247,20 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose }: {
               </div>
 
               {savings > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}><span>Descuento por volumen</span><span>−{money(savings)}</span></div>}
-              <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b>{money(total)}</b></div>
+              {flete > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-flete"><span>Flete</span><span className="mono">{money(flete)}</span></div>}
+              <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b data-testid="np-total">{money(total + flete)}</b></div>
 
-              <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega</div>
+              <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega{opsEntrega && !entregaNecesitaDireccion ? <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}> · opcional para esta entrega</span> : null}</div>
               {isCustomer
-                ? <AddressPicker base={null} value={custAddr} onChange={setCustAddr} />
+                ? <DomicilioClientePicker customerId={customer!.id} onChange={setCustDom} />
                 : <DeliveryLocationPicker doctorId={doctor!.id} legacyBase={baseAddr} allowManage={false} onChange={setChoice} />}
+
+              {hasSupabase && (
+                <>
+                  <div className="eyebrow" style={{ marginTop: 14 }}>Entrega</div>
+                  <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                </>
+              )}
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} /> Solicitar factura (CFDI)

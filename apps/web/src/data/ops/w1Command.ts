@@ -172,6 +172,16 @@ const MENSAJES: Record<string, string> = {
   // el estado es incierto NO se ofrece reintentar, se pide conciliar.
   FISCAL_SOLO_POR_COMANDO: 'La factura se solicita y se timbra con los comandos del sistema; no se edita a mano en el pedido.',
   DATOS_FISCALES_REQUERIDOS: 'Faltan datos fiscales completos del cliente: RFC, razón social, régimen, CP, uso de CFDI y correo. Complétalos antes de solicitar la factura.',
+  // ENT-0/ENT-2 · entrega del pedido (la regla vive en el servidor)
+  ENTREGA_REQUERIDA: 'Elige cómo se entrega el pedido.',
+  ENTREGA_INVALIDA: 'Esa forma de entrega no existe.',
+  ENTREGA_NO_PERMITIDA: 'Esa forma de entrega no aplica para este pedido',
+  ENTREGA_NO_DISPONIBLE: 'Esa paquetería aún no está activa.',
+  ENTREGA_SIN_DIRECCION: 'Ese tipo de entrega necesita calle y código postal de 5 dígitos.',
+  ENTREGA_AJUSTE_SIN_MOTIVO: 'Para cambiar el flete escribe el motivo.',
+  ENTREGA_FLETE_INVALIDO: 'El flete no es válido (de $0 a $99,999).',
+  ENTREGA_YA_FIJADA: 'La entrega de ese pedido ya quedó registrada.',
+  FLETE_SOLO_POR_COMANDO: 'El flete del pedido lo fija el servidor al crearlo; no se edita a mano.',
   FISCAL_INVALIDO: 'Los datos fiscales no son válidos. Revísalos y vuelve a guardarlos.',
   CFDI_EN_PROCESO: 'Ya hay un timbrado en curso para este pedido. Espera a que termine; no lo vuelvas a enviar.',
   CFDI_INCIERTO: 'No se sabe si el SAT ya timbró este pedido. Dirección debe conciliarlo antes de volver a intentar: un segundo intento podría generar una factura duplicada.',
@@ -255,7 +265,7 @@ const MENSAJES: Record<string, string> = {
 // distintas (reembolso, tipo de custodia, tipo de pérdida) y el detalle es lo que
 // distingue cuál. En los demás casos el mensaje base ya enumera las opciones en español,
 // y el detalle del servidor traería tokens internos ("staff", "correccion_recepcion").
-const DETALLE_VOCABULARIO = new Set(['TIPO_INVALIDO'])
+const DETALLE_VOCABULARIO = new Set(['TIPO_INVALIDO', 'ENTREGA_NO_PERMITIDA'])
 
 // Un identificador interno (uuid) no le dice NADA al operador y no debe salir a pantalla.
 // Se quita del detalle antes de mostrarlo; si al quitarlo el detalle deja de aportar,
