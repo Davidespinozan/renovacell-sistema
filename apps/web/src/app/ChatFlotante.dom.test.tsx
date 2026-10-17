@@ -76,7 +76,7 @@ describe('ChatFlotante', () => {
   })
   it('Escape cierra el cajón', async () => {
     const { c } = clienteFalso(0, [])
-    render(<RoleProvider><Como rol="doctor" pantalla="pedidosdr"><ChatFlotante cliente={c} /></Como></RoleProvider>)
+    render(<RoleProvider><Como rol="doctor" pantalla="g_pedidosdr"><ChatFlotante cliente={c} /></Como></RoleProvider>)   // MENÚ · Mis pedidos es el grupo g_pedidosdr
     fireEvent.click(await screen.findByTestId('chat-fab'))
     await screen.findByTestId('chat-drawer')
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })

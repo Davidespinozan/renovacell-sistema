@@ -76,8 +76,7 @@ export const ROLES: RoleDef[] = [
     icon: 'bag', isStaff: false, ready: true,
     modules: [
       { key: 'catalogo', label: 'Catálogo', icon: 'grid' },
-      { key: 'pedidosdr', label: 'Mis pedidos', icon: 'bag' },
-      { key: 'hist', label: 'Historial', icon: 'clock' },
+      { key: 'g_pedidosdr', label: 'Mis pedidos', icon: 'bag' },   // MENÚ (dueño, 17 oct 2026): En curso · Historial en una entrada
       // UX-1 · UNA sola conversación con Renovacell (IA + asesor humano en el mismo hilo). El antiguo
       // 'asist' (Asistente IA) ya no es módulo: su clave sigue resolviendo a esta pantalla (alias).
       { key: 'chat_cc', label: 'Habla con Renovacell', icon: 'chat' },
@@ -215,6 +214,7 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
   g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }],
+  g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }
 export const GRUPOS: Record<string, string[]> = Object.fromEntries(Object.entries(SUBPANTALLAS).map(([g, xs]) => [g, xs.map((x) => x.key)]))
 export const GRUPO_DE: Record<string, string> = Object.fromEntries(Object.entries(GRUPOS).flatMap(([g, ks]) => ks.map((k) => [k, g])))

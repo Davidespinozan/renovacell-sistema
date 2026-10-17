@@ -75,6 +75,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   catalogo: () => <CatalogoPantalla />,
   pedidosdr: () => <MisPedidos />,
   hist: () => <Historial />,
+  g_pedidosdr: () => <Pestanas grupo="g_pedidosdr" pestanas={[{ key: 'pedidosdr', label: 'En curso', render: () => <MisPedidos /> }, { key: 'hist', label: 'Historial', render: () => <Historial /> }]} />,
   asist: () => <RedirigirChat />,   // UX-1 · alias heredado ('Asistente IA') → la conversación canónica
   stock: () => <Existencias />,
   alm_hoy: () => <HoyAlmacen />,   // ALM-1 · sin entrada de menú: Inicio de Almacén la incluye

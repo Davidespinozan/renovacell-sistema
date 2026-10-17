@@ -1,6 +1,6 @@
 // Navegación por rol y detalles de estatus/pills (cierre de cobertura).
 import { describe, it, expect } from 'vitest'
-import { getRole, getNav } from './roles'
+import { getRole, getNav, resolverDestino } from './roles'
 import { statusView } from '../screens/doctor/orderStatus'
 
 describe('getNav — contenido por rol', () => {
@@ -12,8 +12,8 @@ describe('getNav — contenido por rol', () => {
   it('el doctor incluye catálogo, mis pedidos e historial', () => {
     const keys = getNav(getRole('doctor')).map((s) => s.key)
     expect(keys).toContain('catalogo')
-    expect(keys).toContain('pedidosdr')
-    expect(keys).toContain('hist')
+    expect(keys).toContain('g_pedidosdr')   // MENÚ (17 oct 2026): Mis pedidos = En curso · Historial en una entrada
+    expect(resolverDestino(getNav(getRole('doctor')), 'pedidosdr')).toEqual({ screen: 'g_pedidosdr', pestana: 'pedidosdr' })
   })
   it('cada rol tiene navegación no vacía', () => {
     ;(['admin', 'warehouse', 'pos', 'driver', 'doctor'] as const).forEach((k) =>

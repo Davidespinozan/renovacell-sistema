@@ -25,7 +25,8 @@ describe('navegación por rol', () => {
     expect(SUBPANTALLAS.g_conversaciones.map((x) => x.key)).toEqual(['av_atencion', 'asesorias', 'av_mensajes'])   // las keys no cambian (avisos y enlaces)
     expect(resolverDestino(getNav(getRole('admin')), 'av_atencion')).toEqual({ screen: 'g_conversaciones', pestana: 'av_atencion' })
     expect(resolverDestino(getNav(getRole('admin')), 'bandeja')).toEqual({ screen: 'inicio' })   // Inicio ES la bandeja
-    expect(getNav(getRole('doctor')).map((s) => s.key)).toEqual(['inicio', 'catalogo', 'pedidosdr', 'hist', 'chat_cc', 'mi_verificacion'])
+    expect(getNav(getRole('doctor')).map((s) => s.key)).toEqual(['inicio', 'catalogo', 'g_pedidosdr', 'chat_cc', 'mi_verificacion'])   // MENÚ · Mis pedidos = En curso · Historial
+    expect(resolverDestino(getNav(getRole('doctor')), 'hist')).toEqual({ screen: 'g_pedidosdr', pestana: 'hist' })
     expect(getNav(getRole('doctor')).some((s) => s.key === 'comun' || s.key === 'chat')).toBe(false)
   })
 })
