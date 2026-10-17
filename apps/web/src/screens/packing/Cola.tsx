@@ -54,7 +54,7 @@ export function metodoSugerido(e: EntregaPedido | null): Method {
 }
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 
-function EntregaPill({ e }: { e: EntregaPedido | null }) {
+export function EntregaPill({ e }: { e: EntregaPedido | null }) {
   if (!e) return null
   const hoy = hoyLocal()
   const atrasado = e.salida < hoy
@@ -137,7 +137,7 @@ export function Cola() {
 
 type Method = 'paqueteria' | 'chofer' | 'recoge'
 
-function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
+export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
   const { createShipment } = useShipments()
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)

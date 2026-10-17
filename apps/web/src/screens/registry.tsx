@@ -17,6 +17,7 @@ import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
 import { Existencias } from './warehouse/Existencias'
 import { Surtido } from './warehouse/Surtido'
+import { HoyAlmacen } from './warehouse/HoyAlmacen'
 import { Caducidades } from './warehouse/Caducidades'
 import { Entradas } from './warehouse/Entradas'
 import { Devoluciones } from './warehouse/Devoluciones'
@@ -75,6 +76,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   hist: () => <Historial />,
   asist: () => <RedirigirChat />,   // UX-1 · alias heredado ('Asistente IA') → la conversación canónica
   stock: () => <Existencias />,
+  alm_hoy: () => <HoyAlmacen />,
   surtido: () => <Surtido />,
   caduc: () => <Caducidades />,
   entradas: () => <Entradas />,

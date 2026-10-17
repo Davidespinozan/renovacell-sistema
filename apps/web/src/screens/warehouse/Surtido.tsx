@@ -167,7 +167,7 @@ export function Surtido() {
   )
 }
 
-function SurtirModal({
+export function SurtirModal({
   order, productsById, onClose,
 }: {
   order: OrderWithItems
