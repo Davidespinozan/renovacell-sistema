@@ -155,7 +155,8 @@ function EntregaLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
 
 function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
   if (!meta || typeof meta !== 'object') return null
-  const m = meta as { carrier?: string; tracking?: string; driver?: string }
+  const m = meta as { carrier?: string; tracking?: string; driver?: string; method?: string }
+  if (m.method === 'recoge') return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Listo para recoger en sucursal.</div>   // ENT-3
   if (m.driver) {
     return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Entrega: chofer propio · {m.driver}</div>
   }

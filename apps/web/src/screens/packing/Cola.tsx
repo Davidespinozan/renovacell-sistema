@@ -23,6 +23,7 @@ import { useRole } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
+import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -32,6 +33,37 @@ function receiverOf(order: OrderWithItems): Receiver {
   const address = orderAddress(order.shipping_meta, null) ?? { line1: '' }
   const name = meta.customer?.name ?? ''
   return { name, address: { ...address, phone: address.phone ?? meta.customer?.phone ?? '' } }
+}
+
+// ENT-3 · La entrega que se prometió al crear el pedido (tipo, paquetería, salida y llegada) manda en Empaque:
+// ordena la cola por el día de salida y preselecciona el método; nunca se inventa otra fecha.
+export function entregaDe(order: OrderWithItems): EntregaPedido | null {
+  const m = order.shipping_meta && typeof order.shipping_meta === 'object' ? (order.shipping_meta as { entrega?: EntregaPedido | null }) : null
+  return m?.entrega ?? null
+}
+export function ordenarPorSalida<T extends OrderWithItems>(lista: T[]): T[] {
+  return [...lista].sort((a, b) => {
+    const ea = entregaDe(a)?.salida ?? '9999-12-31', eb = entregaDe(b)?.salida ?? '9999-12-31'
+    return ea < eb ? -1 : ea > eb ? 1 : (a.created_at ?? '') < (b.created_at ?? '') ? -1 : 1
+  })
+}
+export function metodoSugerido(e: EntregaPedido | null): Method {
+  if (!e) return 'paqueteria'
+  return e.tipo === 'recoge' || e.tipo === 'mostrador' ? 'recoge' : e.paqueteria === 'chofer' ? 'chofer' : 'paqueteria'
+}
+const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+
+function EntregaPill({ e }: { e: EntregaPedido | null }) {
+  if (!e) return null
+  const hoy = hoyLocal()
+  const atrasado = e.salida < hoy
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px', fontSize: 12.5 }} data-testid="cola-entrega">
+      <span className={'pill ' + (atrasado ? 'p-dang' : e.salida === hoy ? 'p-warn' : 'p-neu')}>{atrasado ? 'Debió salir el ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7) : e.salida === hoy ? 'Sale hoy' : 'Sale ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7)}</span>
+      <b>{e.texto}</b>
+      <span style={{ color: 'var(--ink-3)' }}>· {promesaDe(e, hoy)}{e.flete ? ` · flete ${money(e.flete)}` : ''}</span>
+    </div>
+  )
 }
 
 const inputStyle: React.CSSProperties = {
@@ -59,7 +91,7 @@ export function Cola() {
     return m
   }, [products])
 
-  const queue = orders.filter((o) => o.status === 'packed')
+  const queue = ordenarPorSalida(orders.filter((o) => o.status === 'packed'))   // ENT-3 · primero lo que debe salir antes
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -75,6 +107,7 @@ export function Cola() {
               <span className="pill p-blue"><span className="d" /> Empacado</span>
               <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
             </div>
+            <EntregaPill e={entregaDe(o)} />
             {o.items.map((it) => (
               <div key={it.id} className="coitem">
                 <span>{byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span></span>
@@ -101,11 +134,14 @@ export function Cola() {
   )
 }
 
-type Method = 'paqueteria' | 'chofer'
+type Method = 'paqueteria' | 'chofer' | 'recoge'
 
 function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
   const { createShipment } = useShipments()
-  const [method, setMethod] = useState<Method>('paqueteria')
+  const entregaPedido = useMemo(() => entregaDe(order), [order])
+  const sugerido = metodoSugerido(entregaPedido)
+  const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
+  const [doneRecoge, setDoneRecoge] = useState(false)
   const [driverId, setDriverId] = useState('')
 
   // Paquetería: datos reales del pedido/empresa → validar → cotizar → guía.
@@ -191,6 +227,15 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
     setDoneChofer(true)
   }
 
+  // ENT-3 · Recoger en sucursal / mostrador: no hay guía ni chofer; el pedido queda "listo para recoger" (enviado) y se
+  // entrega al cliente desde Seguimiento cuando pase por él.
+  const listoParaRecoger = async () => {
+    setBusy('chofer'); setError(null)
+    const r = await markShipped(order.id, { method: 'recoge', carrier: null, tracking: null })
+    setBusy(false)
+    if (!r.ok) { setError(`No se marcó como listo para recoger. ${r.error}`); return }
+    setDoneRecoge(true)
+  }
   const f2: React.CSSProperties = { ...inputStyle }
 
   return (
@@ -212,6 +257,15 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
               </div>
             </div>
           </div>
+        ) : doneRecoge ? (
+          <div className="mbody">
+            <div className="success">
+              <div className="ck"><Icon name="check" /></div>
+              <h3>Listo para recoger</h3>
+              <p><b>{order.external_ref}</b> queda listo en sucursal. Cuando el cliente pase por él, márcalo como entregado en <b>Seguimiento</b>.</p>
+              <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
+            </div>
+          </div>
         ) : doneChofer ? (
           <div className="mbody">
             <div className="success">
@@ -231,6 +285,13 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
             <div className="mbody">
+              {entregaPedido && (
+                <div className="sysnote" style={{ marginBottom: 12, alignItems: 'flex-start' }} data-testid="asignar-entrega">
+                  <Icon name="pkg" />
+                  <span><b>Se vendió como:</b> {entregaPedido.texto} · {promesaDe(entregaPedido, hoyLocal())}{entregaPedido.flete ? ` · flete cobrado ${money(entregaPedido.flete)}` : ''}.
+                    {method !== sugerido && <span style={{ color: 'var(--warn)' }}> Estás eligiendo otro método: el cliente espera lo prometido.</span>}</span>
+                </div>
+              )}
               <div className="seg" style={{ marginBottom: 16 }}>
                 <button type="button" className={method === 'paqueteria' ? 'active' : undefined} onClick={() => setMethod('paqueteria')}>
                   <Icon name="truck" /> Paquetería
@@ -238,9 +299,21 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                 <button type="button" className={method === 'chofer' ? 'active' : undefined} onClick={() => setMethod('chofer')}>
                   <Icon name="usercheck" /> Chofer propio
                 </button>
+                <button type="button" className={method === 'recoge' ? 'active' : undefined} onClick={() => setMethod('recoge')} data-testid="metodo-recoge">
+                  <Icon name="pkg" /> Recoge en sucursal
+                </button>
               </div>
 
-              {method === 'paqueteria' ? (
+              {method === 'recoge' ? (
+                <>
+                  <p style={{ fontSize: 13.5 }}>El cliente pasa por su pedido: no se genera guía ni se asigna chofer. Al marcarlo queda <b>listo para recoger</b>.</p>
+                  {error && <div style={{ fontSize: 12.5, color: 'var(--dang, #dc2626)', marginTop: 10 }}>{error}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+                    <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+                    <button className="btn" type="button" onClick={listoParaRecoger} disabled={busy !== false} data-testid="btn-listo-recoger"><Icon name="check" /> Listo para recoger</button>
+                  </div>
+                </>
+              ) : method === 'paqueteria' ? (
                 <>
                   {/* Destino/Origen REALES (snapshot del pedido + config de empresa) */}
                   <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
