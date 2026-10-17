@@ -3473,6 +3473,79 @@ export type Database = {
           },
         ]
       }
+      empaques: {
+        Row: {
+          activo: boolean
+          alto_cm: number
+          ancho_cm: number
+          created_at: string
+          frecuente: boolean
+          id: string
+          largo_cm: number
+          nombre: string
+          nota: string | null
+          orden: number
+          peso_kg: number | null
+          tipo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          alto_cm: number
+          ancho_cm: number
+          created_at?: string
+          frecuente?: boolean
+          id?: string
+          largo_cm: number
+          nombre: string
+          nota?: string | null
+          orden?: number
+          peso_kg?: number | null
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          alto_cm?: number
+          ancho_cm?: number
+          created_at?: string
+          frecuente?: boolean
+          id?: string
+          largo_cm?: number
+          nombre?: string
+          nota?: string | null
+          orden?: number
+          peso_kg?: number | null
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empaques_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "doctor_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empaques_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empaques_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entrega_config: {
         Row: {
           corte: string
@@ -7859,6 +7932,8 @@ export type Database = {
         }
         Returns: Json
       }
+      empaque_guardar: { Args: { p: Json }; Returns: Json }
+      empaques_lista: { Args: { p_todos?: boolean }; Returns: Json }
       entrega_config_guardar: { Args: { p: Json }; Returns: Json }
       entrega_config_ver: { Args: never; Returns: Json }
       entrega_opciones: {

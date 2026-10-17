@@ -18,6 +18,7 @@ vi.mock('../../data/store/ordersStore', () => ({ markShipped: h.markShipped }))
 vi.mock('../../data/store/companyStore', () => ({ currentCompany: () => ({}) }))
 vi.mock('../../data/shipping/shipper', () => ({ shipperFromCompany: () => ({ config: { city: 'Culiacán', cp: '80000' } }) }))
 vi.mock('./Remision', () => ({ BotonRemision: () => null }))
+vi.mock('../../data/ops/empaques', async (orig) => ({ ...(await orig<typeof import('../../data/ops/empaques')>()), listarEmpaques: async () => ({ ok: true, data: [{ id: 'h4', nombre: 'Hielera chica #4', tipo: 'hielera', largo_cm: 20, ancho_cm: 23, alto_cm: 22, peso_kg: 0.5, nota: 'La que se utiliza más', frecuente: true, activo: true, orden: 1 }] }) }))
 import { Cola, ordenarPorSalida, metodoSugerido } from './Cola'
 beforeEach(() => { cleanup(); h.markShipped.mockClear() })
 
@@ -56,5 +57,17 @@ describe('ENT-3 · Empaque', () => {
     expect(screen.getByTestId('asignar-entrega')).not.toHaveTextContent(/Estás eligiendo otro método/)
     fireEvent.click(screen.getByText('Chofer propio'))
     expect(screen.getByTestId('asignar-entrega')).toHaveTextContent(/Estás eligiendo otro método/)
+  })
+  it('EMP-1 · elegir un empaque del catálogo llena las medidas (y el peso vacío si se conoce) para cotizar', async () => {
+    h.orders = [pedido('S3', '2026-10-20T10:00Z', ent({}))]
+    render(<Cola />)
+    fireEvent.click(screen.getByText('Asignar envío'))
+    const sel = await screen.findByTestId('empaque-select')
+    expect(sel).toHaveTextContent(/Hielera chica #4 · 20×23×22 cm · La que se utiliza más/)
+    fireEvent.change(sel, { target: { value: 'h4' } })
+    expect((screen.getByLabelText('Largo en centímetros') as HTMLInputElement).value).toBe('20')
+    expect((screen.getByLabelText('Ancho en centímetros') as HTMLInputElement).value).toBe('23')
+    expect((screen.getByLabelText('Alto en centímetros') as HTMLInputElement).value).toBe('22')
+    expect((screen.getByLabelText('Peso en kilogramos') as HTMLInputElement).value).toBe('0.5')
   })
 })

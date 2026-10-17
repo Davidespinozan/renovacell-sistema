@@ -2,7 +2,7 @@
 // para enviar. Asignar envío por paquetería (carrier+guía) o chofer propio.
 // Al asignar se crea el shipment y el pedido pasa a "En camino".
 import { Vacio } from '../../app/EmptyState'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -24,6 +24,7 @@ import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
 import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
+import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -156,6 +157,15 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
   // Paquete FÍSICO final: se captura en empaque. SIN defaults silenciosos (vacío
   // hasta que el operador lo mida). pieces por defecto 1 (bulto único).
   const [parcel, setParcel] = useState({ weightKg: '', lengthCm: '', widthCm: '', heightCm: '', pieces: '1' })
+  // EMP-1 · empaque del catálogo: elegirlo llena las medidas (el peso final se captura siempre). "Otra medida" = a mano.
+  const [empaques, setEmpaques] = useState<Empaque[] | null>(null)
+  const [empaqueId, setEmpaqueId] = useState<string>('')
+  useEffect(() => { let vivo = true; (async () => { const r = await listarEmpaques(); if (vivo) setEmpaques(r.ok ? r.data : []) })(); return () => { vivo = false } }, [])
+  const elegirEmpaque = (id: string) => {
+    setEmpaqueId(id); setRates(null)
+    const e = empaques?.find((x) => x.id === id)
+    if (e) setParcel((p) => ({ ...p, lengthCm: String(e.largo_cm), widthCm: String(e.ancho_cm), heightCm: String(e.alto_cm), weightKg: p.weightKg || (e.peso_kg ? String(e.peso_kg) : '') }))
+  }
   const [rates, setRates] = useState<RateQuote[] | null>(null)
   const [rateId, setRateId] = useState('')
   const [busy, setBusy] = useState<false | 'quote' | 'label' | 'chofer'>(false)
@@ -355,6 +365,17 @@ function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () =
                     </div>
                   )}
 
+                  {empaques && empaques.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={labelStyle}>Empaque</label>
+                      <select style={inputStyle} value={empaqueId} onChange={(e) => elegirEmpaque(e.target.value)} data-testid="empaque-select" aria-label="Empaque">
+                        <option value="">Elige la hielera o caja…</option>
+                        {empaques.map((e) => <option key={e.id} value={e.id}>{e.nombre} · {medidasTexto(e)}{e.nota ? ` · ${e.nota}` : ''}</option>)}
+                        <option value="otro">Otra medida (a mano)</option>
+                      </select>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>Al elegirlo se llenan las medidas; pesa la caja final y captura el peso.</div>
+                    </div>
+                  )}
                   <label style={labelStyle}>Paquete final (medido en empaque)</label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 600, marginBottom: 3 }}>
                     <span>Peso (kg)</span><span>Largo (cm)</span><span>Ancho (cm)</span><span>Alto (cm)</span><span>Piezas</span>

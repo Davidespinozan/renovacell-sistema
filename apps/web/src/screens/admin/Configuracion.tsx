@@ -9,6 +9,7 @@ import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { clabeValida, type BankAccount } from '../../data/store/companyBankStore'
 import { REGIMENES_OPTIONS, esRegimenValido } from '../../data/sat/regimenesFiscales'
 import { HorarioYAlertas } from './HorarioAtencion'   // CC-7 + CHV2-B (umbrales de alerta)
+import { EmpaquesEditor } from './EmpaquesEditor'   // EMP-1 · catálogo de hieleras y cajas
 import { hasSupabase } from '../../lib/supabase'
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
@@ -163,6 +164,7 @@ export function Configuracion() {
       </div>
 
       <BankAccountsEditor />
+      <EmpaquesEditor />
       {hasSupabase && <HorarioYAlertas />}   {/* CC-7 · horario de atención comercial + CHV2-A umbrales (autoridad del servidor) */}
     </div>
   )
