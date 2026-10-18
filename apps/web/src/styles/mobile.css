@@ -64,6 +64,9 @@ button.taskrow:focus-visible { outline: 2px solid rgba(0, 115, 17, .6); outline-
   .top-logo img { position: relative; width: 38px; height: 38px; border-radius: 50%; object-fit: contain; }
   .top .screen-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; overflow-wrap: anywhere; }
   .top .screen-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* El lienzo NO es contenedor de desplazamiento en teléfono: el documento es el que se desplaza. Con overflow:auto, iOS
+     "atrapa" el gesto vertical que empieza sobre una tira horizontal (flyers, productos) y la página no avanza. */
+  .canvas { overflow: visible; overflow-x: clip; }
   /* Cabecera compacta */
   .top { padding: 10px 14px; }
   .screen-title { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }

@@ -151,9 +151,10 @@
 .rh-fila-ic{background:var(--ok-bg);color:var(--green-deep)}
 .rh-fila .pill{flex:none;white-space:nowrap}
 /* Flyers (9:16) en tira deslizable tipo historias; se abren completos en el visor. */
-.rh-flyers{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+/* Sin scroll-snap ni -webkit-overflow-scrolling: en iOS un carrusel con snap dentro de la página traba el desplazamiento vertical. */
+.rh-flyers{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;padding:2px 2px 6px;scrollbar-width:none}
 .rh-flyers::-webkit-scrollbar{display:none}
-.rh-flyer{flex:0 0 164px;aspect-ratio:9/16;scroll-snap-align:start;border:1px solid var(--line);border-radius:14px;overflow:hidden;padding:0;background:var(--cp-surface);cursor:pointer;box-shadow:var(--sh-sm);transition:transform .16s,box-shadow .16s}
+.rh-flyer{flex:0 0 164px;aspect-ratio:9/16;border:1px solid var(--line);border-radius:14px;overflow:hidden;padding:0;background:var(--cp-surface);cursor:pointer;box-shadow:var(--sh-sm);transition:transform .16s,box-shadow .16s}
 .rh-flyer:hover{transform:translateY(-2px);box-shadow:var(--sh-card-h)}
 .rh-flyer img{width:100%;height:100%;object-fit:cover;display:block}
 .rh-promos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px}
@@ -174,7 +175,7 @@
   .rh--doctor .rh-av{width:42px;height:42px;font-size:14px}
   .rh-flyer{flex-basis:148px}
   /* Productos disponibles: tira deslizable de tarjetas chicas, no una cuadrícula de tarjetas enormes. */
-  .rh--doctor .rh-productos{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;-webkit-overflow-scrolling:touch}
+  .rh--doctor .rh-productos{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;padding:2px 2px 6px}
   .rh--doctor .rh-productos::-webkit-scrollbar{display:none}
   .rh--doctor .rh-producto{flex:0 0 150px;box-shadow:var(--sh-sm);padding-bottom:10px}
   .rh--doctor .rh-producto-foto{aspect-ratio:1/1}
