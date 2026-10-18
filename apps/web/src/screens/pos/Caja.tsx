@@ -18,7 +18,7 @@ import { useCustomers, useCustomerSearch } from '../../data/hooks/useCustomers'
 import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
 import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodyStore'
 import { currentUserId } from '../../lib/supabase'
-import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
@@ -46,7 +46,7 @@ export function Caja() {
   // Las dos venden por la misma ruta (venderPOS); la custodia solo añade de qué saldo sale.
   const { data: custodias } = useCustodies()
   const { data: custodyStock } = useCustodyStock()
-  const { data: volRules } = useVolumePrices()
+  const volRules = useReglasPrecio()
   const { user, role, logout } = useRole()
   // SEC-C4-B3 · Solo Dirección conserva el directorio completo en el selector. Ventas (y cualquier otro rol que llegue
   // a la Caja) NO lo precarga: elige de su cartera o con la búsqueda segura (nombre y últimos 4 dígitos).

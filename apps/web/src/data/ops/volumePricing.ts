@@ -12,29 +12,41 @@ export interface VolumeRule {
   price: number            // precio UNITARIO desde min_quantity
   discount_percent?: number | null
   active: boolean
+  promo?: { nombre: string; hasta: string }   // PROMO-1 · escalón de una promoción vigente (no es regla de volumen)
 }
 
-// Tiers ACTIVOS de un producto, ordenados asc por min_quantity (para mostrar la escalera).
+// Tiers ACTIVOS de VOLUMEN de un producto, ordenados asc por min_quantity (para mostrar la escalera).
 export function volumeTiers(rules: readonly VolumeRule[], productId: string): VolumeRule[] {
-  return rules.filter((r) => r.product_id === productId && r.active).sort((a, b) => a.min_quantity - b.min_quantity)
+  return rules.filter((r) => r.product_id === productId && r.active && !r.promo).sort((a, b) => a.min_quantity - b.min_quantity)
+}
+// PROMO-1 · escalones de promoción vigente del producto (asc por cantidad).
+export function promoTiers(rules: readonly VolumeRule[], productId: string): VolumeRule[] {
+  return rules.filter((r) => r.product_id === productId && r.active && !!r.promo).sort((a, b) => a.min_quantity - b.min_quantity)
 }
 
-// Mejor regla activa aplicable a `qty`: la de mayor min_quantity que sea <= qty.
-export function bestVolumeRule(rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null {
+// Mejor regla aplicable a `qty` dentro de un grupo: la de mayor min_quantity que sea <= qty.
+function mejor(rules: readonly VolumeRule[], productId: string, qty: number, promo: boolean): VolumeRule | null {
   let best: VolumeRule | null = null
   for (const r of rules) {
-    if (r.product_id !== productId || !r.active) continue
+    if (r.product_id !== productId || !r.active || !!r.promo !== promo) continue
     if (r.min_quantity <= qty && (!best || r.min_quantity > best.min_quantity)) best = r
   }
   return best
 }
+export function bestVolumeRule(rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null { return mejor(rules, productId, qty, false) }
+export function bestPromoRule(rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null { return mejor(rules, productId, qty, true) }
 
-// Precio UNITARIO efectivo = LEAST(base, volumen aplicable). Espeja precio_de (interim).
+// Precio UNITARIO efectivo = LEAST(base, volumen aplicable, promoción vigente aplicable). Espeja precio_de/3.
 export function effectiveUnitPrice(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): number | null {
-  const vr = bestVolumeRule(rules, productId, qty)
-  if (base == null) return vr ? vr.price : null
-  if (!vr) return base
-  return Math.min(base, vr.price)
+  const candidatos = [base, bestVolumeRule(rules, productId, qty)?.price ?? null, bestPromoRule(rules, productId, qty)?.price ?? null].filter((x): x is number => x != null)
+  return candidatos.length ? Math.min(...candidatos) : null
+}
+/** PROMO-1 · si para `qty` el precio efectivo viene de una promoción, cuál (para la etiqueta "Promo X · hasta el…"). */
+export function promoAplicada(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null {
+  const pr = bestPromoRule(rules, productId, qty)
+  if (!pr) return null
+  const eff = effectiveUnitPrice(base, rules, productId, qty)
+  return eff != null && pr.price <= eff ? pr : null
 }
 
 // % de descuento de un precio respecto al base (redondeado). null si no hay base o no baja.
@@ -67,11 +79,18 @@ export function validateVolumeRule(
   return null
 }
 
-// Etiqueta corta de promo para el catálogo ("5% menos desde 5 pzas" / "Desde 10 pzas · $900 c/u").
+// Etiqueta corta de promo para el catálogo ("Promo Allergan · hasta el 25 oct" / "5% menos desde 5 pzas").
 export function volumePromoLabel(base: number | null, rules: readonly VolumeRule[], productId: string): string | null {
+  const pt = promoTiers(rules, productId)
+  if (pt.length && pt[0].promo) {   // PROMO-1 · la promoción vigente manda sobre la escalera de volumen
+    const [, m, d] = pt[0].promo.hasta.slice(0, 10).split('-').map(Number)
+    const escalones = pt.length > 1 ? ` · desde ${pt[pt.length - 1].min_quantity} pzas ${money0(pt[pt.length - 1].price)}` : ''
+    return `${pt[0].promo.nombre} · hasta el ${d} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][m - 1]}${escalones}`
+  }
   const tiers = volumeTiers(rules, productId)
   if (!tiers.length) return null
   const t = tiers[0]
   const pct = tierDiscountPct(base, t.price)
   return pct ? `${pct}% menos desde ${t.min_quantity} pzas` : `Desde ${t.min_quantity} pzas · precio especial`
 }
+const money0 = (n: number) => '$' + Math.round(n).toLocaleString('es-MX')

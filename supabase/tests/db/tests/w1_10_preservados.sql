@@ -27,8 +27,9 @@ begin
     ('pay_order(uuid,text,text)',                             '3717294aa7b93a4322f5c378f6db9e38'),
     ('precio_de(uuid,uuid)',                                  'b256810a5e089355712bdeffcb423832'),
     -- CX-0A (autorizado): precio_de/3 recibe la barrera de autorización (mismo alcance que la RLS de product_prices);
+    -- PROMO-1 (173, autorizado por el dueño 18 oct 2026): + promoción vigente (LEAST); la barrera no cambia.
     -- el cálculo no cambia. Hash re-anclado; el de producción previo (9efe1950…) lo restaura supabase/rollback/cx0.
-    ('precio_de(uuid,uuid,integer)',                          '349176d8415cc46db01f1eaf887c9255'),
+    ('precio_de(uuid,uuid,integer)',                          'bde4fe6598efe8d5eee2540ec4fbc52e'),
     -- CC-0A (autorizado): profiles_guard protege además la evidencia de verificación y la
     -- autoridad comercial en meta (META_PROTEGIDA). Hash re-anclado; el resto sigue intacto.
     ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),

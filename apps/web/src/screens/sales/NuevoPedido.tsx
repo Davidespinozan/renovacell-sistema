@@ -11,7 +11,7 @@ import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, ty
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
-import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
@@ -62,7 +62,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const { createOrder } = useOrders()
-  const { data: volRules } = useVolumePrices()
+  const volRules = useReglasPrecio()
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
   // Precio unitario efectivo previsto = LEAST(base, volumen). El servidor (crear_pedido) es la autoridad.

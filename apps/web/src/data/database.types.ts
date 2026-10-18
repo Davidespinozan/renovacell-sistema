@@ -5422,6 +5422,72 @@ export type Database = {
           },
         ]
       }
+      promocion_lineas: {
+        Row: {
+          id: string
+          min_qty: number
+          precio: number
+          product_id: string
+          promocion_id: string
+        }
+        Insert: {
+          id?: string
+          min_qty?: number
+          precio: number
+          product_id: string
+          promocion_id: string
+        }
+        Update: {
+          id?: string
+          min_qty?: number
+          precio?: number
+          product_id?: string
+          promocion_id?: string
+        }
+        Relationships: []
+      }
+      promociones: {
+        Row: {
+          activa: boolean
+          created_at: string
+          created_by: string | null
+          desde: string
+          descripcion: string | null
+          hasta: string
+          id: string
+          listas: string[] | null
+          nombre: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          created_by?: string | null
+          desde: string
+          descripcion?: string | null
+          hasta: string
+          id?: string
+          listas?: string[] | null
+          nombre: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          created_by?: string | null
+          desde?: string
+          descripcion?: string | null
+          hasta?: string
+          id?: string
+          listas?: string[] | null
+          nombre?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       prospects: {
         Row: {
           assigned_to: string | null
@@ -7934,6 +8000,10 @@ export type Database = {
       }
       empaque_guardar: { Args: { p: Json }; Returns: Json }
       empaques_lista: { Args: { p_todos?: boolean }; Returns: Json }
+      promocion_estado: { Args: { p_activa: boolean; p_id: string }; Returns: Json }
+      promocion_guardar: { Args: { p: Json }; Returns: Json }
+      promociones_lista: { Args: { p_todas?: boolean }; Returns: Json }
+      promos_vigentes: { Args: never; Returns: Json }
       entrega_config_guardar: { Args: { p: Json }; Returns: Json }
       entrega_config_ver: { Args: never; Returns: Json }
       entrega_opciones: {

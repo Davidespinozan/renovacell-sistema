@@ -13,7 +13,7 @@ import { useProducts, isActiveProduct, isPortalProduct } from '../../data/hooks/
 import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data/ops/productVariants'
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
-import { useVolumePrices } from '../../data/hooks/useVolumePrices'
+import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { effectiveUnitPrice, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
@@ -44,7 +44,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
   const { priceFor } = usePricing()
-  const { data: volRules } = useVolumePrices()
+  const volRules = useReglasPrecio(null)
   // Precio de LISTA del doctor (su tarifa/base). El descuento por VOLUMEN se previsualiza
   // aparte con `effOf(qty)`; el servidor (precio_de) es la autoridad del cobro final.
   const priceOf = (p: ProductSafe): number | null => (verified ? priceFor(p.id, p.price) : null)
