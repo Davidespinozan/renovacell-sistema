@@ -40,4 +40,19 @@ describe('PROMO-6 · tarjeta en el chat', () => {
     expect(r.html).toContain('Ver el catálogo y pedir'); expect(r.html).toContain('Hola, Dra. Ana:'); expect(r.html).not.toMatch(/undefined|NaN/)
     expect(r.texto).toContain('Botox 100 UI: $4,000 · desde 5 pzas $3,800 · desde 10 pzas $3,600 (antes $4,600)')
   })
+  // PROMO-9 · el flyer de la promo va completo en la tarjeta del chat y en el correo; sin flyer no hay hueco; solo https.
+  it('con flyer: la tarjeta del chat y el correo lo llevan; sin flyer o con una URL que no es https, no', async () => {
+    const CON = { ...DATOS, flyer_url: 'https://img.test/flyer.jpg' }
+    render(<TarjetaPromoChat content={CONTENIDO} cargar={async () => CON} />)
+    const f = await screen.findByTestId('tarjeta-promo-flyer')
+    expect(f.getAttribute('src')).toBe('https://img.test/flyer.jpg'); expect(f.getAttribute('alt')).toMatch(/Flyer: Promo Allergan/)
+    const r = renderizar('promocion', CON as unknown as Record<string, unknown>, 'Dra. Ana')
+    expect(r.html).toContain('src="https://img.test/flyer.jpg"'); expect(r.html).toContain('max-width:360px')
+    expect(r.html.indexOf('flyer.jpg')).toBeLessThan(r.html.indexOf('botox.png'))   // el flyer va arriba, antes de las tarjetas de producto
+    const sin = renderizar('promocion', DATOS as unknown as Record<string, unknown>, 'Dra. Ana'); expect(sin.html).not.toContain('flyer')
+    const mala = renderizar('promocion', { ...DATOS, flyer_url: 'javascript:alert(1)' } as unknown as Record<string, unknown>, 'Dra. Ana'); expect(mala.html).not.toContain('javascript:')
+    cleanup(); limpiarCachePromos()
+    render(<TarjetaPromoChat content={CONTENIDO} cargar={async () => DATOS} />)
+    await screen.findByTestId('msg-promo'); expect(screen.queryByTestId('tarjeta-promo-flyer')).toBeNull()
+  })
 })

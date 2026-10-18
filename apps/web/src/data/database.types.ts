@@ -8003,6 +8003,11 @@ export type Database = {
       promocion_eliminar: { Args: { p_id: string }; Returns: Json }
       promocion_avisos_marcar: { Args: { p_id: string; p_profiles: string[] }; Returns: number }
       promocion_avisos_pendientes: { Args: { p_id: string }; Returns: Json }
+      flyers_vigentes: { Args: never; Returns: Json }
+      flyers_lista: { Args: { p_todos?: boolean }; Returns: Json }
+      flyer_guardar: { Args: { p: Json }; Returns: Json }
+      flyer_estado: { Args: { p_activo: boolean; p_id: string }; Returns: Json }
+      flyer_eliminar: { Args: { p_id: string }; Returns: boolean }
       promocion_estado: { Args: { p_activa: boolean; p_id: string }; Returns: Json }
       promocion_prueba_correo: { Args: { p_email: string; p_id: string }; Returns: Json }
       promo_tarjeta: { Args: { p_id: string }; Returns: Json }

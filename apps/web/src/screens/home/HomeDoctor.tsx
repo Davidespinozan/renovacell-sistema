@@ -6,11 +6,13 @@
 //   · su pedido en curso o "volver a pedir" el último entregado (RLS: solo sus pedidos).
 // 15 oct 2026 (dueño: "se ve vacío"): además, quién lo atiende (la acción sigue en la burbuja), productos DISPONIBLES del
 // catálogo real (foto y precio; nunca promociones inventadas) y, si aún no compra, "Haz tu primer pedido".
+// 18 oct 2026 (dueño: "se ve muy triste"): flyers (las piezas que mandan por WhatsApp e historias, PROMO-9) y las promociones
+// vigentes con fotos y precios, las mismas que aplica el servidor.
 // Sin nada de eso, un Inicio limpio está bien. La composición es una lista de BLOQUES: cuando existan
 // autoridades de promociones, lanzamientos, seguimiento posventa o envíos activos, se agregan como
 // bloques aquí sin rehacer la pantalla. No hay promociones hoy (no hay campañas aprobadas: no se inventan).
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { BotonAvisos } from '../../app/BotonAvisos'   // PROMO-8 · el doctor puede activar avisos (promos y respuestas del chat)
 import { useRole } from '../../auth/RoleContext'
 import { chat as chatPorDefecto, type ClienteChat, type Conversacion } from '../../data/ops/chat'
@@ -27,14 +29,18 @@ import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor } from '../../data/ops/stock'
 import { isPortalProduct } from '../../data/hooks/useProducts'
 import { money } from '../../lib/format'
+import { flyersVigentes as flyersPorDefecto, type Flyer } from '../../data/ops/flyers'   // PROMO-9 · flyers del portal
+import { subscribePromos, getPromosSnapshot } from '../../data/store/promosStore'
+import { promoTarjeta as promoTarjetaPorDefecto, type DatosPromoDifusion } from '../../data/ops/promociones'
+import { TarjetaPromo } from '../../app/TarjetaPromo'
 
 // Solo el estado de la conversación: se pide desde un seq muy alto para no traer el historial.
 const SIN_HISTORIAL = 2_000_000_000
 // Pruebas / vista previa local: clientes por defecto inyectables (en producción, los reales).
-let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito } = { chat: chatPorDefecto, carrito: carritoPorDefecto }
-export function configurarClientesInicioDoctor(c: Partial<{ chat: ClienteChat; carrito: ClienteCarrito }>) { porDefecto = { ...porDefecto, ...c } }
+let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito; flyers: typeof flyersPorDefecto; promoTarjeta: typeof promoTarjetaPorDefecto } = { chat: chatPorDefecto, carrito: carritoPorDefecto, flyers: flyersPorDefecto, promoTarjeta: promoTarjetaPorDefecto }
+export function configurarClientesInicioDoctor(c: Partial<typeof porDefecto>) { porDefecto = { ...porDefecto, ...c } }
 
-export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito }) {
+export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito, flyers = porDefecto.flyers, promoTarjeta = porDefecto.promoTarjeta }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito; flyers?: typeof flyersPorDefecto; promoTarjeta?: typeof promoTarjetaPorDefecto }) {
   const { user, setScreen, verified } = useRole()
   const { priceFor } = usePricing()
   const stockMap = useStock()
@@ -43,6 +49,25 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   const nombreProducto = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products])
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [cart, setCart] = useState<Carrito | null>(null)
+  // PROMO-9 · flyers vigentes para este doctor (el servidor filtra por lista y vigencia) y el visor a pantalla completa.
+  const [lista, setLista] = useState<Flyer[]>([])
+  const [abierto, setAbierto] = useState<Flyer | null>(null)
+  useEffect(() => { let vivo = true; void flyers().then((f) => { if (vivo) setLista(f) }); return () => { vivo = false } }, [flyers])
+  useEffect(() => {
+    if (!abierto) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(null) }
+    window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc)
+  }, [abierto])
+  // PROMO-9 · promociones vigentes (las mismas que aplica el servidor) como tarjetas con fotos y precios.
+  const promos = useSyncExternalStore(subscribePromos, getPromosSnapshot)
+  const promoIds = useMemo(() => [...new Set(promos.map((p) => p.promocion_id))], [promos])
+  const [tarjetas, setTarjetas] = useState<DatosPromoDifusion[]>([])
+  useEffect(() => {
+    let vivo = true
+    if (promoIds.length === 0) { setTarjetas([]); return }
+    void Promise.all(promoIds.map((id) => promoTarjeta(id).catch(() => null))).then((ts) => { if (vivo) setTarjetas(ts.filter((t): t is DatosPromoDifusion => !!t)) })
+    return () => { vivo = false }
+  }, [promoIds, promoTarjeta])
 
   useEffect(() => {
     let vivo = true
@@ -89,7 +114,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   const destacados = useMemo(() => products
     .filter((p) => isPortalProduct(p) && !p.parent_product_id && p.image_url && stockInfoFor(stockMap, p.id).qty > 0)
     .slice(0, 4), [products, stockMap])
-  // (futuro) promociones / lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
+  // (futuro) lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
 
   return (
     <div className="rh" data-testid="home-doctor">
@@ -104,9 +129,38 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
             : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
         </div>
       )}
+      {lista.length > 0 && (
+        <Seccion titulo="Novedades y promociones" nivel="info" id="flyers">
+          <div className="rh-flyers" data-testid="doctor-flyers">
+            {lista.map((f) => (
+              <button key={f.id} type="button" className="rh-flyer" onClick={() => setAbierto(f)} aria-label={`Ver flyer: ${f.titulo}`} data-testid={`doctor-flyer-${f.id}`}>
+                <img src={f.imagen_url} alt={f.titulo} loading="lazy" />
+              </button>
+            ))}
+          </div>
+        </Seccion>
+      )}
+      {abierto && (
+        <div className="rh-visor" role="dialog" aria-modal="true" aria-label={abierto.titulo} onClick={() => setAbierto(null)} data-testid="doctor-flyer-visor">
+          <div className="rh-visor-cuerpo" onClick={(e) => e.stopPropagation()}>
+            <img src={abierto.imagen_url} alt={abierto.titulo} />
+            <div className="rh-visor-acciones">
+              <button type="button" className="btn" onClick={() => { setAbierto(null); setScreen('catalogo') }} data-testid="doctor-flyer-catalogo">Ver en el catálogo y pedir</button>
+              <button type="button" className="btn ghost" onClick={() => setAbierto(null)} data-testid="doctor-flyer-cerrar">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {bloques.length > 0 && (
         <Seccion titulo="Continúa donde te quedaste" nivel="continuar" id="continuar">
           <Tarjetas>{bloques.map((b) => <React.Fragment key={b.key}>{b.nodo}</React.Fragment>)}</Tarjetas>
+        </Seccion>
+      )}
+      {tarjetas.length > 0 && (
+        <Seccion titulo="Promociones vigentes" nivel="info" id="promos" accion={{ label: 'Ver todo el catálogo', onClick: () => setScreen('catalogo') }}>
+          <div className="rh-promos" data-testid="doctor-promos">
+            {tarjetas.map((t, i) => <TarjetaPromo key={promoIds[i] ?? i} datos={{ ...t, flyer_url: null }} onCatalogo={() => setScreen('catalogo')} compacta />)}
+          </div>
         </Seccion>
       )}
       {destacados.length > 0 && (

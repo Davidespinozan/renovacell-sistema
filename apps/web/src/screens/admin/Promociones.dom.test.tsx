@@ -11,6 +11,7 @@ vi.mock('../../lib/supabase', () => ({ hasSupabase: true, supabase: { rpc: vi.fn
 vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [{ id: 'B', name: 'Botox 100 UI', price: 4600, active: true }, { id: 'S', name: 'SkinVive', price: 4500, active: true }, { id: 'H', name: 'HArmonyCa', price: 8000, active: true }, { id: 'M', name: 'Mascarilla GP', price: 890, active: true }] }), isActiveProduct: () => true }))
 vi.mock('../../data/hooks/usePricing', () => ({ usePricing: () => ({ lists: [{ id: 'L1', name: 'General', is_default: true, sort: 1 }, { id: 'L2', name: 'Mayoreo', is_default: false, sort: 2 }], prices: [], priceFor: () => null }) }))
 vi.mock('../../data/store/promosStore', () => ({ recargarPromos: vi.fn(async () => {}) }))
+vi.mock('./Flyers', () => ({ Flyers: () => null }))   // PROMO-9 · los flyers tienen su propia prueba (Flyers.dom.test)
 beforeEach(cleanup)
 
 const TEXTO = 'Precios de promo allergan\nBotox\n1 pieza $4,000\n5 a 9 piezas $3,800\n10 piezas $3,600\nSkinvive $3,600\nHarmonyCa $6,100\ndel 16 al 25 de octubre'

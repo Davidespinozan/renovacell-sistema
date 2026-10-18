@@ -9,7 +9,7 @@ export type EstadoPromo = 'vigente' | 'proxima' | 'vencida' | 'inactiva'
 export interface VentasPromo { pedidos: number; piezas: number; importe: number }
 export interface DifusionPromo { correo: number; chat: number; sin_correo: number; avisados?: number; sin_avisar?: number; ultimo: string | null }
 export type CanalDifusion = 'correo' | 'chat'
-export interface DatosPromoDifusion { promocion_id?: string; nombre: string; descripcion?: string | null; vigencia: string; desde: string; hasta: string; lineas: string[]; productos: Array<{ product_id: string; nombre: string; imagen_url: string | null; presentacion: string | null; precio_normal: number | null; escalones: Array<{ desde: number; precio: number }> }>; texto?: string }
+export interface DatosPromoDifusion { promocion_id?: string; nombre: string; descripcion?: string | null; vigencia: string; desde: string; hasta: string; lineas: string[]; productos: Array<{ product_id: string; nombre: string; imagen_url: string | null; presentacion: string | null; precio_normal: number | null; escalones: Array<{ desde: number; precio: number }> }>; flyer_url?: string | null; texto?: string }
 export interface PreviaDifusion { texto: string; chat_texto?: string; datos?: DatosPromoDifusion; audiencia: number; sin_correo: number; enviados: { correo: number; chat: number } }
 export interface ResultadoDifusion { audiencia: number; correo: number; chat: number; sin_correo: number; ya_enviados: number; texto: string }
 export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; ventas?: VentasPromo; difusion?: DifusionPromo; updated_at?: string }

@@ -136,13 +136,14 @@ export function renderizar(plantilla: string, datos: Record<string, unknown>, no
 // ── PROMO-6 · correo de PROMOCIÓN: portada con nombre y vigencia, una tarjeta por producto (foto, precio normal tachado,
 //    precio promo grande, escalones por cantidad) y botón al portal. Mismo encabezado y pie de marca que los avisos.
 export interface ProductoPromoCorreo { nombre: string; imagen_url?: string | null; presentacion?: string | null; precio_normal?: number | null; escalones: Array<{ desde: number; precio: number }> }
-export interface DatosPromoCorreo { nombre?: string; descripcion?: string | null; vigencia?: string; hasta?: string; productos?: ProductoPromoCorreo[]; lineas?: string[] }
+export interface DatosPromoCorreo { nombre?: string; descripcion?: string | null; vigencia?: string; hasta?: string; productos?: ProductoPromoCorreo[]; lineas?: string[]; flyer_url?: string | null }
 const dineroEntero = (v: unknown): string => { const n = Number(v); return Number.isFinite(n) ? '$' + Math.round(n).toLocaleString('es-MX') : '' }
 export function correoPromocion(datos: Record<string, unknown>, nombre?: string | null): Render {
   const d = datos as DatosPromoCorreo
   const promo = String(d.nombre ?? 'Promoción').trim() || 'Promoción'; const vig = String(d.vigencia ?? '').trim(); const desc = String(d.descripcion ?? '').trim()
   const productos: ProductoPromoCorreo[] = Array.isArray(d.productos) ? d.productos.filter((x) => x && typeof x === 'object' && x.nombre) : []
   const quien = nombreBonito(nombre); const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
+  const flyer = typeof d.flyer_url === 'string' && /^https:\/\//.test(d.flyer_url) ? d.flyer_url : null
   const asunto = `${promo}${vig ? ' · ' + vig : ''}`
   const intro = `Tenemos una promoción para ti${vig ? ' ' + vig : ''}. Los precios se aplican solos en tu portal al hacer tu pedido; sin códigos ni cupones.`
   const escalonesTexto = (p: ProductoPromoCorreo) => p.escalones.map((e) => `${e.desde > 1 ? `desde ${e.desde} pzas ` : ''}${dineroEntero(e.precio)}`).join(' · ')
@@ -169,6 +170,8 @@ export function correoPromocion(datos: Record<string, unknown>, nombre?: string 
     + `</tr></table></td></tr>`
     + `<tr><td style="background:linear-gradient(135deg,#0f3d1d,#007311);padding:26px 28px"><div style="display:inline-block;background:#ffffff;color:#005a0d;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;border-radius:999px">Promoción</div>`
     + `<div style="font-size:26px;font-weight:800;color:#ffffff;margin-top:10px;line-height:1.2">${esc(promo)}</div>${vig ? `<div style="font-size:14px;color:#d7f0dc;margin-top:6px">Válida ${esc(vig)}</div>` : ''}</td></tr>`
+    // PROMO-9 · el flyer de la promoción (pieza vertical), completo y centrado; el enlace lleva al portal
+    + (flyer ? `<tr><td align="center" style="background:#0a2412;padding:0 0 18px"><a href="${URL_SISTEMA}" style="display:inline-block"><img src="${esc(flyer)}" width="360" alt="${esc(promo)}" style="display:block;width:100%;max-width:360px;height:auto;border-radius:12px"></a></td></tr>` : '')
     + `<tr><td style="padding:22px 28px 6px"><p style="margin:0 0 6px;font-size:15px;line-height:1.55;color:#344054">${esc(saludo)}</p><p style="margin:0;font-size:15px;line-height:1.55;color:#344054">${esc(intro)}</p>${desc ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.5;color:#667085">${esc(desc)}</p>` : ''}</td></tr>`
     + productos.map(tarjeta).join('')
     + `<tr><td style="padding:18px 28px 8px"><a href="${URL_SISTEMA}" style="display:inline-block;padding:13px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;background:#007311;color:#ffffff">Ver el catálogo y pedir</a></td></tr>`

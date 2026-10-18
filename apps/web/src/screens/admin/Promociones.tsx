@@ -9,6 +9,7 @@ import { usePricing } from '../../data/hooks/usePricing'
 import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
 import { TarjetaPromo } from '../../app/TarjetaPromo'
+import { Flyers } from './Flyers'   // PROMO-9 · flyers del portal
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
 import { ETIQUETA_ESTADO, PILL_ESTADO, avisarPromoPush, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
@@ -31,7 +32,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion, avisar = avisarPromoPush }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion; avisar?: typeof avisarPromoPush }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion, avisar = avisarPromoPush, flyers = true }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion; avisar?: typeof avisarPromoPush; flyers?: boolean }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -283,6 +284,8 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
           </div>
         </div>
       ))}
+      {/* PROMO-9 · las piezas visuales que el doctor ve en su Inicio (ligadas a una promo o sueltas) */}
+      {flyers && <Flyers promociones={lista ?? []} />}
     </div>
   )
 }

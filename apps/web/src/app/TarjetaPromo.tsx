@@ -5,7 +5,7 @@ import { money } from '../lib/format'
 import { Icon } from './icons'
 
 export interface ProductoTarjeta { product_id?: string; nombre: string; imagen_url?: string | null; presentacion?: string | null; precio_normal?: number | null; escalones: Array<{ desde: number; precio: number }> }
-export interface DatosTarjeta { nombre: string; descripcion?: string | null; vigencia?: string; hasta?: string; productos: ProductoTarjeta[] }
+export interface DatosTarjeta { nombre: string; descripcion?: string | null; vigencia?: string; hasta?: string; productos: ProductoTarjeta[]; flyer_url?: string | null }
 
 export function TarjetaPromo({ datos, onCatalogo, compacta = false }: { datos: DatosTarjeta; onCatalogo?: () => void; compacta?: boolean }) {
   return (
@@ -15,6 +15,8 @@ export function TarjetaPromo({ datos, onCatalogo, compacta = false }: { datos: D
         <div style={{ fontSize: compacta ? 18 : 22, fontWeight: 800, marginTop: 6, lineHeight: 1.2 }}>{datos.nombre}</div>
         {datos.vigencia && <div style={{ fontSize: 12.5, color: '#d7f0dc', marginTop: 4 }}>Válida {datos.vigencia}</div>}
       </div>
+      {/* PROMO-9 · el flyer de la promo (pieza vertical) completo, sin recortar */}
+      {datos.flyer_url && <div style={{ background: '#0a2412', display: 'grid', placeItems: 'center' }}><img src={datos.flyer_url} alt={`Flyer: ${datos.nombre}`} loading="lazy" style={{ width: '100%', maxHeight: compacta ? 440 : 560, objectFit: 'contain', display: 'block' }} data-testid="tarjeta-promo-flyer" /></div>}
       {datos.descripcion && <div style={{ padding: '10px 14px 0', fontSize: 13, color: 'var(--ink-3)' }}>{datos.descripcion}</div>}
       <div style={{ display: 'grid', gap: 8, padding: compacta ? 10 : 14 }}>
         {datos.productos.map((p, i) => {

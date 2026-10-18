@@ -2,6 +2,7 @@
 begin;
 create temp table _pd as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
+\ir ../../../rollback/flyers/99_down.sql   -- FLYERS (180) se baja primero
 \ir ../../../rollback/promocion_avisos/99_down.sql   -- PROMO-AVISOS (179) se baja primero
 \ir ../../../rollback/promocion_prueba_correo/99_down.sql   -- PROMO-PRUEBA (178) se baja primero
 \ir ../../../rollback/promociones_marketing/99_down.sql   -- PROMO-MARKETING (177) se baja primero
@@ -9,7 +10,7 @@ create temp table _pd as select (select md5(string_agg(p.oid::regprocedure::text
 \ir ../../../rollback/promociones_difusion/99_down.sql
 do $t$ begin
   perform tests.ok(to_regclass('public.promocion_envios') is null and to_regprocedure('public.promocion_difundir(uuid,text[],uuid)') is null
-               and (select n_tablas from _pd) = (select count(*) + 1 from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'), '175 down · sin difusión');
+               and (select n_tablas from _pd) = (select count(*) + 2 from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'), '175 down · sin difusión');
   perform tests.ok(pg_get_constraintdef((select oid from pg_constraint where conname = 'ck_comm_plantilla')) not like '%promocion%', '175 down · la plantilla promocion ya no se acepta');
 end $t$;
 \ir ../../../migrations/20261228120000_promociones_difusion.sql
@@ -17,6 +18,7 @@ end $t$;
 \ir ../../../migrations/20261230120000_promociones_marketing.sql
 \ir ../../../migrations/20261231120000_promocion_prueba_correo.sql
 \ir ../../../migrations/20270101120000_promocion_avisos.sql
+\ir ../../../migrations/20270102120000_flyers.sql
 do $t$ begin
   perform tests.ok((select todas from _pd) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '175 · se reaplica idéntica');
 end $t$;
