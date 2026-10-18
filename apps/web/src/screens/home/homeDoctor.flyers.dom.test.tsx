@@ -44,6 +44,7 @@ describe('PROMO-9 · flyers y promociones en el Inicio del doctor', () => {
     const v = screen.getByTestId('doctor-flyer-visor')
     expect(v.getAttribute('aria-label')).toBe('¡Nuevo lote! Nabota'); expect(v.querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/f2.jpg')
     fireEvent.click(screen.getByTestId('doctor-flyer-cerrar')); expect(screen.queryByTestId('doctor-flyer-visor')).toBeNull()
+    fireEvent.click(screen.getByTestId('doctor-flyer-F2')); fireEvent.click(screen.getByTestId('doctor-flyer-x')); expect(screen.queryByTestId('doctor-flyer-visor')).toBeNull()   // la X de la esquina
     fireEvent.click(screen.getByTestId('doctor-flyer-F1'))
     fireEvent.keyDown(window, { key: 'Escape' }); expect(screen.queryByTestId('doctor-flyer-visor')).toBeNull()
     fireEvent.click(screen.getByTestId('doctor-flyer-F1'))

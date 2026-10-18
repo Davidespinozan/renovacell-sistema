@@ -141,5 +141,8 @@
 .rh-visor-cuerpo{display:grid;gap:12px;justify-items:center;max-width:min(92vw,520px)}
 .rh-visor-cuerpo img{max-height:min(80vh,920px);max-width:100%;width:auto;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .rh-visor-acciones{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.rh-visor-acciones .btn.ghost{color:#fff;border-color:rgba(255,255,255,.4)}
+.rh-visor-acciones .btn.ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.45);box-shadow:none}
+.rh-visor-acciones .btn.ghost:hover{background:rgba(255,255,255,.22)}
+.rh-visor-x{position:fixed;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:#fff;font-size:22px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
+.rh-visor-x:hover{background:rgba(255,255,255,.22)}
 @media (max-width:700px){.rh-flyer{flex-basis:min(68vw,260px)}.rh-promos{grid-template-columns:1fr}}

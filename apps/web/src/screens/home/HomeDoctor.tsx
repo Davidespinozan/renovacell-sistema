@@ -142,6 +142,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       )}
       {abierto && (
         <div className="rh-visor" role="dialog" aria-modal="true" aria-label={abierto.titulo} onClick={() => setAbierto(null)} data-testid="doctor-flyer-visor">
+          <button type="button" className="rh-visor-x" aria-label="Cerrar" onClick={() => setAbierto(null)} data-testid="doctor-flyer-x">×</button>
           <div className="rh-visor-cuerpo" onClick={(e) => e.stopPropagation()}>
             <img src={abierto.imagen_url} alt={abierto.titulo} />
             <div className="rh-visor-acciones">
