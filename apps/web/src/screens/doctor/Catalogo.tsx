@@ -44,7 +44,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const { data: products, loading } = useProducts()
   const { createOrder, payOrder } = useOrders()
   const { priceFor } = usePricing()
-  const volRules = useReglasPrecio(null)
+  const volRules = useReglasPrecio()   // PROMO-3 · el servidor ya devuelve solo las promos de SU lista
   // Precio de LISTA del doctor (su tarifa/base). El descuento por VOLUMEN se previsualiza
   // aparte con `effOf(qty)`; el servidor (precio_de) es la autoridad del cobro final.
   const priceOf = (p: ProductSafe): number | null => (verified ? priceFor(p.id, p.price) : null)

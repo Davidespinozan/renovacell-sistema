@@ -6,7 +6,8 @@ import { hoyNegocio } from '../periodo'
 
 export interface LineaPromo { id?: string; product_id: string; producto?: string; precio_normal?: number | null; min_qty: number; precio: number }
 export type EstadoPromo = 'vigente' | 'proxima' | 'vencida' | 'inactiva'
-export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; updated_at?: string }
+export interface VentasPromo { pedidos: number; piezas: number; importe: number }
+export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; ventas?: VentasPromo; updated_at?: string }
 export interface PromoVigente { promocion_id: string; nombre: string; desde: string; hasta: string; listas: string[] | null; product_id: string; min_qty: number; precio: number }
 export interface PromoDatos { id?: string; nombre: string; descripcion?: string | null; desde: string; hasta: string; activa?: boolean; listas?: string[] | null; lineas: Array<{ product_id: string; min_qty: number; precio: number }> }
 type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }

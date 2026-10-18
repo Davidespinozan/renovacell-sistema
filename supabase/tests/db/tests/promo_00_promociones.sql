@@ -94,6 +94,22 @@ begin
   o := gen_random_uuid();
   ord := public.crear_pedido(o, null, v_doc, jsonb_build_array(jsonb_build_object('product_id', botox, 'qty', 5)), '{"address":{"line1":"Calle 1","cp":"82000"}}'::jsonb, false, null);
   perform tests.eq((ord ->> 'total')::numeric, 20500::numeric, '7 · 5 Botox en promo = 5 × $4,100 (el servidor, no la pantalla)');
+
+  -- ══ 8 · PROMO-PRO (174): la IA lo sabe, el doctor ve solo las de su lista, la promo mide sus ventas ═══════
+  perform tests.act_as_service();
+  r := public.cc_ia_precio(v_doc, botox, 5);
+  perform tests.ok((r ->> 'en_promocion')::boolean and (r ->> 'precio_unitario')::numeric = 4100 and (r ->> 'precio_normal')::numeric = 4600
+               and r -> 'promocion' ->> 'nombre' = 'Promo Allergan octubre' and (r -> 'promocion' ->> 'hasta')::date = hoy + 3 and jsonb_array_length(r -> 'promocion' -> 'escalones') = 1,
+    '8 · la IA recibe la promoción (nombre, hasta, escalones) y el precio normal');
+  r := public.cc_ia_precio(v_doc, otro, 1);
+  perform tests.ok(not (r ->> 'en_promocion')::boolean and r ->> 'promocion' is null, '8 · sin promo vigente para el doctor (la de Mayoreo no es suya): nada que inventar');
+  perform tests.act_as(v_doc);
+  perform tests.ok(not exists (select 1 from jsonb_array_elements(public.promos_vigentes()) x where x ->> 'nombre' = 'Solo Mayoreo'), '8 · el doctor de General no ve la promo de Mayoreo');
+  perform tests.act_as(v_pos);
+  perform tests.ok(exists (select 1 from jsonb_array_elements(public.promos_vigentes()) x where x ->> 'nombre' = 'Solo Mayoreo'), '8 · el personal ve todas (con sus listas)');
+  perform tests.act_as(v_admin);
+  r := (select x from jsonb_array_elements(public.promociones_lista()) x where (x ->> 'id')::uuid = pid);
+  perform tests.ok((r -> 'ventas' ->> 'pedidos')::int = 1 and (r -> 'ventas' ->> 'piezas')::int = 5 and (r -> 'ventas' ->> 'importe')::numeric = 20500, '8 · la promoción reporta lo vendido con su precio durante su vigencia');
   perform tests.act_as_owner();
 end $t$;
 rollback;

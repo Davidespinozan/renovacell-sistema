@@ -159,6 +159,11 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
             </div>
           </div>
           {p.descripcion && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{p.descripcion}</div>}
+          {p.ventas && (p.estado === 'vigente' || p.estado === 'vencida' || p.ventas.pedidos > 0) && (
+            <div style={{ fontSize: 12.5, marginTop: 6 }} data-testid={`promo-ventas-${p.id}`}>
+              <b>Vendido con esta promo:</b> {p.ventas.pedidos} pedido{p.ventas.pedidos === 1 ? '' : 's'} · {p.ventas.piezas} pza{p.ventas.piezas === 1 ? '' : 's'} · {money(Number(p.ventas.importe))}
+            </div>
+          )}
           <div style={{ display: 'grid', gap: 3, marginTop: 8 }}>
             {p.lineas.map((l) => (
               <div key={l.id ?? `${l.product_id}-${l.min_qty}`} style={{ display: 'flex', gap: 8, fontSize: 13, alignItems: 'baseline' }}>

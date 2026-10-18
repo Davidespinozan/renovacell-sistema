@@ -14,7 +14,7 @@ vi.mock('../../data/store/promosStore', () => ({ recargarPromos: vi.fn(async () 
 beforeEach(cleanup)
 
 const TEXTO = 'Precios de promo allergan\nBotox\n1 pieza $4,000\n5 a 9 piezas $3,800\n10 piezas $3,600\nSkinvive $3,600\nHarmonyCa $6,100\ndel 16 al 25 de octubre'
-const PROMO: Promocion = { id: 'P1', nombre: 'Promo allergan', descripcion: null, desde: '2026-10-16', hasta: '2026-10-25', activa: true, listas: null, estado: 'vigente', lineas: [{ product_id: 'B', producto: 'Botox 100 UI', precio_normal: 4600, min_qty: 1, precio: 4000 }] }
+const PROMO: Promocion = { id: 'P1', nombre: 'Promo allergan', descripcion: null, desde: '2026-10-16', hasta: '2026-10-25', activa: true, listas: null, estado: 'vigente', lineas: [{ product_id: 'B', producto: 'Botox 100 UI', precio_normal: 4600, min_qty: 1, precio: 4000 }], ventas: { pedidos: 3, piezas: 12, importe: 46800 } }
 
 describe('PROMO-2 · Promociones', () => {
   it('empareja nombres del proveedor con el catálogo', () => {
@@ -57,6 +57,7 @@ describe('PROMO-2 · Promociones', () => {
     await waitFor(() => expect(screen.getByTestId('promo-P1')).toBeInTheDocument())
     expect(screen.getByTestId('promo-P1')).toHaveTextContent(/Vigente/); expect(screen.getByTestId('promo-P1')).toHaveTextContent(/del 16 al 25 de oct · todas las listas/)
     expect(screen.getByTestId('promo-P1')).toHaveTextContent(/Botox 100 UI/); expect(screen.getByTestId('promo-P1')).toHaveTextContent(/\$4,000/)
+    expect(screen.getByTestId('promo-ventas-P1')).toHaveTextContent(/3 pedidos · 12 pzas · \$46,800/)   // PROMO-3 · lo vendido con la promo
     fireEvent.click(screen.getByTestId('promo-pausar-P1'))
     await waitFor(() => expect(cambiarEstado).toHaveBeenCalledWith('P1', false))
   })
