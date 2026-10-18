@@ -2,7 +2,7 @@
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
 import React, { useEffect, useState } from 'react'
-import { ChevronRight, LogOut, Pencil, Settings } from 'lucide-react'
+import { ChevronRight, LogOut, Settings } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_KEYS, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
@@ -97,8 +97,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="side-foot">
+        {/* 18 oct 2026 (dueño: "roba demasiado espacio"): una sola fila: avatar + nombre (abre el perfil) y dos íconos. */}
         {user && (
-          <div className="side-user">
+          <div className="side-user side-user--compacto">
             <button type="button" className="su-open" title="Editar mi perfil" onClick={() => setProfileOpen(true)}>
               {user.avatarUrl
                 ? <img className="su-av" src={user.avatarUrl} alt="" />
@@ -107,13 +108,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <span className="su-name">{user.name.split('·')[0].trim()}</span>
                 <span className="su-role">Editar perfil</span>
               </span>
-              <Pencil size={14} className="su-edit" />
             </button>
-            <button className="side-logout" type="button" onClick={() => setAjustesOpen(true)}>
-              <Settings size={15} /> Ajustes
+            <button className="su-ic" type="button" aria-label="Ajustes" title="Ajustes" onClick={() => setAjustesOpen(true)}>
+              <Settings size={16} />
             </button>
-            <button className="side-logout" type="button" onClick={() => { if (window.confirm('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).')) logout() }}>
-              <LogOut size={15} /> Cerrar sesión
+            <button className="su-ic" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { if (window.confirm('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).')) logout() }}>
+              <LogOut size={16} />
             </button>
           </div>
         )}

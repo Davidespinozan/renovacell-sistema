@@ -19,7 +19,18 @@ button { color: inherit; }
 /* "Agregar" del catálogo es un <button>: sin esto conserva el borde biselado del navegador. */
 .pcard .addb { border: 0; font-family: inherit; cursor: pointer; }
 
-/* ── Lista de tareas: una tarjeta, filas con divisor ───────────────────────── */
+/* ── Tarjeta de usuario del menú: UNA fila (avatar · nombre · ajustes · salir), no tres botones apilados ── */
+.side .side-user.side-user--compacto { display: flex; flex-direction: row; align-items: center; gap: 3px; margin: 0 0 10px; padding: 5px 5px 5px 8px; }
+.side-user--compacto .su-open { flex: 1; min-width: 0; gap: 8px; }
+.side-user--compacto .su-av { width: 28px; height: 28px; font-size: 11px; }
+.side-user--compacto .su-name { font-size: 13px; }
+.side-user--compacto .su-role { font-size: 11px; }
+.su-ic { width: 32px; height: 32px; flex: none; display: grid; place-items: center; padding: 0; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .85); cursor: pointer; transition: .15s; }
+.su-ic:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+.su-ic:focus-visible { outline: 2px solid rgba(255, 255, 255, .6); outline-offset: 1px; }
+.su-ic svg { width: 16px; height: 16px; }
+
+
 .tasklist { background: var(--cp-surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-card); overflow: hidden; min-width: 0; }
 .taskrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 14px; text-align: left; font-family: inherit; background: none; border: 0; border-top: 1px solid var(--line); color: var(--ink); }
 .taskrow:first-child { border-top: 0; }
