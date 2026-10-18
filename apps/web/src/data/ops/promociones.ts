@@ -7,7 +7,7 @@ import { hoyNegocio } from '../periodo'
 export interface LineaPromo { id?: string; product_id: string; producto?: string; precio_normal?: number | null; min_qty: number; precio: number }
 export type EstadoPromo = 'vigente' | 'proxima' | 'vencida' | 'inactiva'
 export interface VentasPromo { pedidos: number; piezas: number; importe: number }
-export interface DifusionPromo { correo: number; chat: number; sin_correo: number; ultimo: string | null }
+export interface DifusionPromo { correo: number; chat: number; sin_correo: number; avisados?: number; sin_avisar?: number; ultimo: string | null }
 export type CanalDifusion = 'correo' | 'chat'
 export interface DatosPromoDifusion { promocion_id?: string; nombre: string; descripcion?: string | null; vigencia: string; desde: string; hasta: string; lineas: string[]; productos: Array<{ product_id: string; nombre: string; imagen_url: string | null; presentacion: string | null; precio_normal: number | null; escalones: Array<{ desde: number; precio: number }> }>; texto?: string }
 export interface PreviaDifusion { texto: string; chat_texto?: string; datos?: DatosPromoDifusion; audiencia: number; sin_correo: number; enviados: { correo: number; chat: number } }
@@ -92,6 +92,16 @@ export async function pruebaCorreoPromocion(id: string, email: string): Promise<
   const { data, error } = await supabase.rpc('promocion_prueba_correo', { p_id: id, p_email: email })
   if (error) return { ok: false, error: /CORREO_INVALIDO/.test(error.message) ? 'Escribe un correo válido.' : /PRUEBAS_EXCEDIDAS/.test(error.message) ? 'Ya mandaste 5 pruebas; espera unos minutos.' : traducir(error.message) }
   return { ok: true, data: data as unknown as { encolado: boolean; para: string; asunto: string } }
+}
+// PROMO-8 · aviso push a los doctores que recibieron la promo por chat (Edge `push`, acción promo). Una vez por doctor.
+export interface ResultadoAvisos { pendientes: number; con_avisos: number; enviados: number; configurado: boolean }
+export async function avisarPromoPush(id: string): Promise<Resultado<ResultadoAvisos>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  try {
+    const { data, error } = await supabase.functions.invoke('push', { body: { action: 'promo', promocion_id: id } })
+    if (error) { let msg = 'No se pudieron mandar los avisos.'; try { const b = await (error as { context?: Response }).context?.json(); if (b?.message) msg = String(b.message) } catch { /* sin detalle */ } return { ok: false, error: msg } }
+    return { ok: true, data: data as ResultadoAvisos }
+  } catch { return { ok: false, error: 'No hay conexión con el servidor.' } }
 }
 export async function promosVigentes(): Promise<PromoVigente[]> {
   if (!hasSupabase) return []

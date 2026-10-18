@@ -10,7 +10,7 @@ import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
 import { TarjetaPromo } from '../../app/TarjetaPromo'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
-import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
+import { ETIQUETA_ESTADO, PILL_ESTADO, avisarPromoPush, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
 const input: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', width: '100%' }
 interface Renglon { product_id: string; min_qty: number; precio: number | '' ; texto?: string }
@@ -31,7 +31,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion, avisar = avisarPromoPush }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion; avisar?: typeof avisarPromoPush }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -60,13 +60,19 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
     const r = await previa(p.id)
     setEnvio((e) => e && e.promo.id === p.id ? { ...e, previa: r.ok ? r.data : null, error: r.ok ? null : r.error } : e)
   }
+  const [avisos, setAvisos] = useState<Record<string, string>>({})   // PROMO-8 · resultado del aviso push por promoción
+  const avisarChat = async (id: string) => {
+    const a = await avisar(id)
+    setAvisos((m) => ({ ...m, [id]: a.ok ? (!a.data.configurado ? 'Los avisos push aún no están configurados en el servidor.' : a.data.pendientes === 0 ? 'Nadie pendiente de aviso.' : `Aviso push: ${a.data.enviados} enviado${a.data.enviados === 1 ? '' : 's'} de ${a.data.pendientes} doctores (solo llega a quien activó avisos en su dispositivo).`) : a.error }))
+    await cargar()
+  }
   const enviar = async () => {
     if (!envio || ocupado || envio.canales.length === 0) return
     setOcupado(true)
     const r = await difundir(envio.promo.id, envio.canales)
     setOcupado(false)
     setEnvio((e) => e && ({ ...e, resultado: r.ok ? r.data : null, error: r.ok ? null : r.error }))
-    if (r.ok) await cargar()
+    if (r.ok) { await cargar(); if (envio.canales.includes('chat') && r.data.chat > 0) void avisarChat(envio.promo.id) }
   }
   const borrar = async (p: Promocion) => {
     if (!window.confirm(`¿Eliminar "${p.nombre}"? Solo se puede si nunca se envió ni vendió.`)) return
@@ -199,8 +205,10 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
           </div>
           {p.descripcion && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{p.descripcion}</div>}
           {p.difusion && (p.difusion.correo > 0 || p.difusion.chat > 0) && (
-            <div style={{ fontSize: 12.5, marginTop: 6, color: 'var(--ink-3)' }} data-testid={`promo-difusion-${p.id}`}>
-              Enviada a {p.difusion.correo} por correo y {p.difusion.chat} por chat{p.difusion.sin_correo ? ` · ${p.difusion.sin_correo} sin correo registrado` : ''}.
+            <div style={{ fontSize: 12.5, marginTop: 6, color: 'var(--ink-3)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-testid={`promo-difusion-${p.id}`}>
+              <span>Enviada a {p.difusion.correo} por correo y {p.difusion.chat} por chat{p.difusion.sin_correo ? ` · ${p.difusion.sin_correo} sin correo registrado` : ''}{p.difusion.avisados ? ` · ${p.difusion.avisados} avisados` : ''}.</span>
+              {(p.difusion.sin_avisar ?? 0) > 0 && p.activa && p.estado === 'vigente' && <button className="btn ghost sm" type="button" onClick={() => avisarChat(p.id)} data-testid={`promo-avisar-${p.id}`}>Avisar por push a {p.difusion.sin_avisar}</button>}
+              {avisos[p.id] && <span role="status" data-testid={`promo-avisos-msg-${p.id}`}>{avisos[p.id]}</span>}
             </div>
           )}
           {envio && envio.promo.id === p.id && (

@@ -175,6 +175,17 @@ begin
   perform tests.act_as(v_admin);
   perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test');
   perform tests.throws(format('select public.promocion_prueba_correo(%L, ''a@b.test'')', pid), 'PRUEBAS_EXCEDIDAS', '12 · tope de 5 pruebas cada 10 minutos');
+
+  -- ══ 13 · PROMO-8 (179): avisos push del envío por chat, una vez por doctor ═══════════════════════════════
+  perform tests.throws_any(format('select public.promocion_avisos_pendientes(%L)', pid), array['NO_AUTORIZADO', 'permission denied'], '13 · solo el servidor lista pendientes');
+  perform tests.act_as_service();
+  r := public.promocion_avisos_pendientes(pid);
+  perform tests.ok((r ->> 'vigente')::boolean and jsonb_array_length(r -> 'perfiles') = 1 and (r -> 'perfiles' ->> 0)::uuid = v_doc and r ->> 'nombre' = 'Promo Allergan octubre', '13 · el doctor que recibió el chat está pendiente de aviso');
+  perform tests.eq(public.promocion_avisos_marcar(pid, array[v_doc]), 1, '13 · se marca avisado');
+  perform tests.eq(jsonb_array_length(public.promocion_avisos_pendientes(pid) -> 'perfiles'), 0, '13 · ya no está pendiente');
+  perform tests.act_as(v_admin);
+  r := (select x from jsonb_array_elements(public.promociones_lista()) x where (x ->> 'id')::uuid = pid);
+  perform tests.ok((r -> 'difusion' ->> 'avisados')::int = 1 and (r -> 'difusion' ->> 'sin_avisar')::int = 0, '13 · la lista muestra avisados / sin avisar');
   perform tests.act_as_owner();
 end $t$;
 rollback;

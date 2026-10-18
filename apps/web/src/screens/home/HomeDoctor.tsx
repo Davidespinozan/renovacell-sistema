@@ -11,6 +11,7 @@
 // bloques aquí sin rehacer la pantalla. No hay promociones hoy (no hay campañas aprobadas: no se inventan).
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
 import React, { useEffect, useMemo, useState } from 'react'
+import { BotonAvisos } from '../../app/BotonAvisos'   // PROMO-8 · el doctor puede activar avisos (promos y respuestas del chat)
 import { useRole } from '../../auth/RoleContext'
 import { chat as chatPorDefecto, type ClienteChat, type Conversacion } from '../../data/ops/chat'
 import { carrito as carritoPorDefecto, formatoMXN, type Carrito, type ClienteCarrito } from '../../data/ops/carrito'
@@ -93,6 +94,8 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   return (
     <div className="rh" data-testid="home-doctor">
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={nombre ? '¿Qué necesitas hoy?' : 'Bienvenido a Renovacell. ¿Qué necesitas hoy?'} />
+      {/* PROMO-8 · avisos en este dispositivo: promociones y respuestas de su asesora, aunque la pestaña esté cerrada. Ya activos, no se muestra. */}
+      <div data-testid="home-doctor-avisos" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><BotonAvisos className="btn ghost sm" /></div>
       {conAsesor && conv && (
         // Solo informa: la conversación se abre desde la burbuja flotante (una sola superficie de chat).
         <div className={`rh-context${modo === 'human_active' ? '' : ' rh-context--neu'}`} role="status" data-testid="doctor-atencion">
