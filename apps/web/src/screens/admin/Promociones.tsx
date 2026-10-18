@@ -8,6 +8,8 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
 import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
+import { TarjetaPromo } from '../../app/TarjetaPromo'
+import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
 import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, eliminarPromocion, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
 const input: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', width: '100%' }
@@ -42,6 +44,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   const [ocupado, setOcupado] = useState(false)
   // PROMO-4 · difusión: vista previa (texto + audiencia) → canales → enviar → resultado.
   const [envio, setEnvio] = useState<{ promo: Promocion; previa: PreviaDifusion | null; canales: CanalDifusion[]; resultado: ResultadoDifusion | null; error: string | null } | null>(null)
+  const [vista, setVista] = useState<'correo' | 'chat'>('correo')   // PROMO-6 · qué se previsualiza
   const abrirEnvio = async (p: Promocion) => {
     setEnvio({ promo: p, previa: null, canales: ['correo', 'chat'], resultado: null, error: null })
     const r = await previa(p.id)
@@ -202,7 +205,28 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
                   <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
                     Se manda a los doctores verificados con cuenta{envio.previa ? <> (<b>{envio.previa.audiencia}</b>{envio.previa.sin_correo ? `, ${envio.previa.sin_correo} sin correo registrado` : ''}). {envio.previa.enviados.correo || envio.previa.enviados.chat ? `Ya se envió a ${envio.previa.enviados.correo} por correo y ${envio.previa.enviados.chat} por chat; a ellos no se repite.` : ''}</> : '…'}
                   </div>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, background: 'var(--surface-2, #fafafa)', padding: 10, borderRadius: 10, margin: 0 }} data-testid="promo-envio-texto">{envio.previa?.texto ?? 'Cargando vista previa…'}</pre>
+                  {/* PROMO-6 · vista previa real: el correo como llega (mismo generador que el servidor) y la tarjeta del chat */}
+                  <div className="seg" style={{ alignSelf: 'flex-start' }}>
+                    <button type="button" className={vista === 'correo' ? 'active' : undefined} onClick={() => setVista('correo')} data-testid="promo-vista-correo">Correo</button>
+                    <button type="button" className={vista === 'chat' ? 'active' : undefined} onClick={() => setVista('chat')} data-testid="promo-vista-chat">Chat del sistema</button>
+                  </div>
+                  {!envio.previa?.datos ? (
+                    <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, background: 'var(--surface-2, #fafafa)', padding: 10, borderRadius: 10, margin: 0 }} data-testid="promo-envio-texto">{envio.previa?.texto ?? 'Cargando vista previa…'}</pre>
+                  ) : vista === 'correo' ? (() => {
+                    const r = renderizar('promocion', envio.previa.datos as unknown as Record<string, unknown>, 'Dra. Ejemplo')
+                    return (
+                      <div data-testid="promo-previa-correo">
+                        <div style={{ fontSize: 12.5, marginBottom: 6 }}><b>Asunto:</b> {r.asunto}</div>
+                        <iframe title="Vista previa del correo" srcDoc={r.html} sandbox="" style={{ width: '100%', height: 560, border: '1px solid var(--line)', borderRadius: 12, background: '#f2f4f2' }} data-testid="promo-previa-correo-iframe" />
+                        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>Así llega al correo de cada doctor (con su nombre en el saludo).</div>
+                      </div>
+                    )
+                  })() : (
+                    <div data-testid="promo-previa-chat" style={{ background: 'var(--surface-2, #f6f8f6)', padding: 12, borderRadius: 12 }}>
+                      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 8 }}>Así se ve en "Habla con Renovacell" de cada doctor:</div>
+                      <TarjetaPromo datos={envio.previa.datos} onCatalogo={() => {}} compacta />
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 14, fontSize: 13, flexWrap: 'wrap' }}>
                     {(['correo', 'chat'] as CanalDifusion[]).map((c) => (
                       <label key={c}><input type="checkbox" checked={envio.canales.includes(c)} onChange={(e) => setEnvio({ ...envio, canales: e.target.checked ? [...envio.canales, c] : envio.canales.filter((x) => x !== c) })} data-testid={`promo-canal-${c}`} /> {c === 'correo' ? 'Correo' : 'Chat del sistema (Habla con Renovacell)'}</label>

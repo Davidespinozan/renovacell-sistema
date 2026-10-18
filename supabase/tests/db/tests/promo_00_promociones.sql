@@ -124,7 +124,7 @@ begin
   perform tests.ok((r ->> 'audiencia')::int = 1 and (r ->> 'correo')::int = 1 and (r ->> 'chat')::int = 1 and (r ->> 'ya_enviados')::int = 0, '9 · se manda a 1 doctor por los dos canales');
   perform tests.act_as_owner();
   perform tests.ok(exists (select 1 from public.comm_outbox o where o.plantilla = 'promocion' and o.profile_id = v_doc and o.status = 'pendiente' and o.payload ->> 'nombre' = 'Promo Allergan octubre' and jsonb_array_length(o.payload -> 'lineas') = 1), '9 · el correo queda en la cola con la plantilla promocion y sus renglones');
-  perform tests.ok(exists (select 1 from public.cc_messages m join public.cc_conversations c on c.id = m.conversation_id where c.profile_id = v_doc and m.actor_type = 'system' and m.client_message_id = 'promo:' || pid::text and m.content like 'Promo Allergan octubre%'), '9 · el chat del doctor recibe el mensaje de la promoción');
+  perform tests.ok(exists (select 1 from public.cc_messages m join public.cc_conversations c on c.id = m.conversation_id where c.profile_id = v_doc and m.actor_type = 'system' and m.client_message_id = 'promo:' || pid::text and m.content like '[promo:' || pid::text || ']' || E'\n' || 'Promo Allergan octubre%'), '9 · el chat del doctor recibe el mensaje de la promoción (con la marca de tarjeta, 177)');
   perform tests.act_as(v_admin);
   r := public.promocion_difundir(pid, array['correo', 'chat']);
   perform tests.ok((r ->> 'correo')::int = 0 and (r ->> 'chat')::int = 0 and (r ->> 'ya_enviados')::int = 2, '9 · repetir no duplica: ya lo tenían');
@@ -146,6 +146,21 @@ begin
   perform tests.ok(not exists (select 1 from jsonb_array_elements(public.promociones_lista()) x where x ->> 'nombre' = 'Duplicada'), '10 · una capturada dos veces se borra limpio (ya no está en la lista)');
   perform tests.throws(format('select public.promocion_eliminar(%L)', gen_random_uuid()), 'PROMO_INEXISTENTE', '10 · inexistente');
   perform tests.ok(exists (select 1 from public.audit_logs where action = 'Promoción eliminada' and resource_id = 'Duplicada'), '10 · bitácora');
+
+  -- ══ 11 · PROMO-6 (177): fotos y precios en los datos; marca en el chat; tarjeta para el doctor ══════════
+  perform tests.act_as_service(); update public.products set image_url = 'https://img.test/botox.png', unit = 'Vial 100 UI' where id = botox; perform tests.act_as(v_admin);
+  r := public.promocion_difusion_previa(pid);
+  perform tests.ok(jsonb_array_length(r -> 'datos' -> 'productos') = 1 and r -> 'datos' -> 'productos' -> 0 ->> 'imagen_url' = 'https://img.test/botox.png' and (r -> 'datos' -> 'productos' -> 0 ->> 'precio_normal')::numeric = 4600
+               and (r -> 'datos' -> 'productos' -> 0 -> 'escalones' -> 0 ->> 'precio')::numeric = 4100 and r ->> 'chat_texto' like '[promo:' || pid::text || ']%', '11 · la vista previa trae los productos con foto, precio normal y escalones, y el texto del chat con su marca');
+  perform tests.ok(exists (select 1 from public.cc_messages m join public.cc_conversations c on c.id = m.conversation_id where c.profile_id = v_doc and m.client_message_id = 'promo:' || pid::text), '11 · (el envío anterior sigue; con la 177 los nuevos llevan la marca)');
+  perform tests.act_as(v_doc);
+  r := public.promo_tarjeta(pid);
+  perform tests.ok(r ->> 'nombre' = 'Promo Allergan octubre' and jsonb_array_length(r -> 'productos') = 1 and r ->> 'texto' is null, '11 · el doctor obtiene la tarjeta de una promo vigente que le aplica');
+  perform tests.act_as(v_nov);
+  perform tests.ok(public.promo_tarjeta(pid) is null, '11 · sin verificar: nada');
+  perform tests.act_as(v_admin); perform public.promocion_estado(pid, false); perform tests.act_as(v_doc);
+  perform tests.ok(public.promo_tarjeta(pid) is null, '11 · pausada o terminada: la tarjeta desaparece (queda el texto)');
+  perform tests.act_as(v_admin); perform public.promocion_estado(pid, true);
   perform tests.act_as_owner();
 end $t$;
 rollback;

@@ -9,7 +9,8 @@ export type EstadoPromo = 'vigente' | 'proxima' | 'vencida' | 'inactiva'
 export interface VentasPromo { pedidos: number; piezas: number; importe: number }
 export interface DifusionPromo { correo: number; chat: number; sin_correo: number; ultimo: string | null }
 export type CanalDifusion = 'correo' | 'chat'
-export interface PreviaDifusion { texto: string; audiencia: number; sin_correo: number; enviados: { correo: number; chat: number } }
+export interface DatosPromoDifusion { promocion_id?: string; nombre: string; descripcion?: string | null; vigencia: string; desde: string; hasta: string; lineas: string[]; productos: Array<{ product_id: string; nombre: string; imagen_url: string | null; presentacion: string | null; precio_normal: number | null; escalones: Array<{ desde: number; precio: number }> }>; texto?: string }
+export interface PreviaDifusion { texto: string; chat_texto?: string; datos?: DatosPromoDifusion; audiencia: number; sin_correo: number; enviados: { correo: number; chat: number } }
 export interface ResultadoDifusion { audiencia: number; correo: number; chat: number; sin_correo: number; ya_enviados: number; texto: string }
 export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; ventas?: VentasPromo; difusion?: DifusionPromo; updated_at?: string }
 export interface PromoVigente { promocion_id: string; nombre: string; desde: string; hasta: string; listas: string[] | null; product_id: string; min_qty: number; precio: number }
@@ -76,6 +77,14 @@ export async function eliminarPromocion(id: string): Promise<Resultado<{ elimina
   const { data, error } = await supabase.rpc('promocion_eliminar', { p_id: id })
   if (error) return { ok: false, error: /PROMO_CON_ENVIOS/.test(error.message) ? 'Esta promoción ya se mandó a doctores: pásala a pausada en lugar de borrarla.' : /PROMO_CON_VENTAS/.test(error.message) ? 'Esta promoción ya tiene pedidos: pásala a pausada en lugar de borrarla.' : traducir(error.message) }
   return { ok: true, data: data as unknown as { eliminada: boolean; nombre: string } }
+}
+// PROMO-6 · tarjeta de una promoción para el chat del doctor (null si ya no está vigente o no aplica a su lista).
+export const MARCA_PROMO = /^\[promo:([0-9a-f-]{36})\]\n?/
+export async function promoTarjeta(id: string): Promise<DatosPromoDifusion | null> {
+  if (!hasSupabase) return null
+  const { data, error } = await supabase.rpc('promo_tarjeta', { p_id: id })
+  if (error || !data) return null
+  return data as unknown as DatosPromoDifusion
 }
 export async function promosVigentes(): Promise<PromoVigente[]> {
   if (!hasSupabase) return []

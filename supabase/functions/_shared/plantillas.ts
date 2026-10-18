@@ -121,6 +121,7 @@ export function nombreBonito(n?: string | null): string {
 
 export function renderizar(plantilla: string, datos: Record<string, unknown>, nombre?: string | null): Render {
   if (!esPlantilla(plantilla)) throw new Error(`PLANTILLA_DESCONOCIDA: ${plantilla}`)
+  if (plantilla === 'promocion') return correoPromocion(datos ?? {}, nombre)   // PROMO-6 · diseño propio (fotos y precios)
   const c = cuerpo(plantilla, datos ?? {})
   const quien = nombreBonito(nombre)
   const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
@@ -130,6 +131,51 @@ export function renderizar(plantilla: string, datos: Record<string, unknown>, no
     botones: c.boton ? [c.boton] : c.rastreo?.url ? [{ href: c.rastreo.url, label: 'Rastrear mi envío' }, { href: URL_SISTEMA, label: 'Ver mi pedido' }] : [{ href: URL_SISTEMA, label: 'Ver mi pedido' }],
     pie: c.pie ?? 'Recibes este correo por un pedido que hiciste en Renovacell.' })
   return { asunto: c.asunto, texto, html }
+}
+
+// ── PROMO-6 · correo de PROMOCIÓN: portada con nombre y vigencia, una tarjeta por producto (foto, precio normal tachado,
+//    precio promo grande, escalones por cantidad) y botón al portal. Mismo encabezado y pie de marca que los avisos.
+export interface ProductoPromoCorreo { nombre: string; imagen_url?: string | null; presentacion?: string | null; precio_normal?: number | null; escalones: Array<{ desde: number; precio: number }> }
+export interface DatosPromoCorreo { nombre?: string; descripcion?: string | null; vigencia?: string; hasta?: string; productos?: ProductoPromoCorreo[]; lineas?: string[] }
+const dineroEntero = (v: unknown): string => { const n = Number(v); return Number.isFinite(n) ? '$' + Math.round(n).toLocaleString('es-MX') : '' }
+export function correoPromocion(datos: Record<string, unknown>, nombre?: string | null): Render {
+  const d = datos as DatosPromoCorreo
+  const promo = String(d.nombre ?? 'Promoción').trim() || 'Promoción'; const vig = String(d.vigencia ?? '').trim(); const desc = String(d.descripcion ?? '').trim()
+  const productos: ProductoPromoCorreo[] = Array.isArray(d.productos) ? d.productos.filter((x) => x && typeof x === 'object' && x.nombre) : []
+  const quien = nombreBonito(nombre); const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
+  const asunto = `${promo}${vig ? ' · ' + vig : ''}`
+  const intro = `Tenemos una promoción para ti${vig ? ' ' + vig : ''}. Los precios se aplican solos en tu portal al hacer tu pedido; sin códigos ni cupones.`
+  const escalonesTexto = (p: ProductoPromoCorreo) => p.escalones.map((e) => `${e.desde > 1 ? `desde ${e.desde} pzas ` : ''}${dineroEntero(e.precio)}`).join(' · ')
+  const lineasTexto = productos.length ? productos.map((p) => `${p.nombre}: ${escalonesTexto(p)}${p.precio_normal != null ? ` (antes ${dineroEntero(p.precio_normal)})` : ''}`)
+    : Array.isArray(d.lineas) ? d.lineas.map((x) => String(x)) : []
+  const texto = [saludo, '', `${promo}${vig ? ' · ' + vig : ''}`, intro, '', ...lineasTexto, '', `Ver el catálogo: ${URL_SISTEMA}`, '', 'Precios para profesionales de la salud verificados.', 'Renovacell · Tecnologías Antiedad'].join('\n')
+  const tarjeta = (p: ProductoPromoCorreo) => {
+    const base = p.escalones[0]; const resto = p.escalones.slice(1)
+    const img = p.imagen_url ? `<td width="96" valign="top" style="padding-right:14px"><img src="${esc(p.imagen_url)}" width="96" height="96" alt="${esc(p.nombre)}" style="display:block;width:96px;height:96px;object-fit:contain;border-radius:12px;background:#f6f8f6"></td>` : ''
+    return `<tr><td style="padding:8px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e6ebe7;border-radius:14px;padding:14px 16px"><tr>${img}<td valign="top">`
+      + `<div style="font-size:16px;font-weight:700;color:#111b21">${esc(p.nombre)}</div>${p.presentacion ? `<div style="font-size:12px;color:#667085;margin-top:2px">${esc(p.presentacion)}</div>` : ''}`
+      + `<div style="margin-top:8px">${p.precio_normal != null && base && Number(p.precio_normal) > Number(base.precio) ? `<span style="font-size:13px;color:#98a2b3;text-decoration:line-through;margin-right:8px">${dineroEntero(p.precio_normal)}</span>` : ''}`
+      + `<span style="font-size:22px;font-weight:800;color:#007311">${base ? dineroEntero(base.precio) : ''}</span>${base && base.desde > 1 ? `<span style="font-size:12px;color:#667085"> desde ${base.desde} pzas</span>` : ''}</div>`
+      + (resto.length ? `<div style="font-size:12.5px;color:#344054;margin-top:6px">${resto.map((e) => `Desde ${e.desde} pzas: <b>${dineroEntero(e.precio)}</b>`).join(' &nbsp;·&nbsp; ')}</div>` : '')
+      + `</td></tr></table></td></tr>`
+  }
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(asunto)}</title></head>`
+    + `<body style="margin:0;padding:0;background:#f2f4f2"><div style="display:none;max-height:0;overflow:hidden">${esc(intro)}</div>`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f4f2;padding:24px 12px"><tr><td align="center">`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">`
+    + `<tr><td style="background:#0a2412;padding:20px 28px"><table role="presentation" cellpadding="0" cellspacing="0"><tr>`
+    + `<td><img src="${URL_LOGO}" width="40" height="40" alt="Renovacell" style="display:block;border-radius:50%;background:#ffffff"></td>`
+    + `<td style="padding-left:12px"><div style="color:#ffffff;font-size:17px;font-weight:700">Renovacell</div><div style="color:#9fd3ab;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:600">Tecnologías Antiedad</div></td>`
+    + `</tr></table></td></tr>`
+    + `<tr><td style="background:linear-gradient(135deg,#0f3d1d,#007311);padding:26px 28px"><div style="display:inline-block;background:#ffffff;color:#005a0d;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;border-radius:999px">Promoción</div>`
+    + `<div style="font-size:26px;font-weight:800;color:#ffffff;margin-top:10px;line-height:1.2">${esc(promo)}</div>${vig ? `<div style="font-size:14px;color:#d7f0dc;margin-top:6px">Válida ${esc(vig)}</div>` : ''}</td></tr>`
+    + `<tr><td style="padding:22px 28px 6px"><p style="margin:0 0 6px;font-size:15px;line-height:1.55;color:#344054">${esc(saludo)}</p><p style="margin:0;font-size:15px;line-height:1.55;color:#344054">${esc(intro)}</p>${desc ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.5;color:#667085">${esc(desc)}</p>` : ''}</td></tr>`
+    + productos.map(tarjeta).join('')
+    + `<tr><td style="padding:18px 28px 8px"><a href="${URL_SISTEMA}" style="display:inline-block;padding:13px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;background:#007311;color:#ffffff">Ver el catálogo y pedir</a></td></tr>`
+    + `<tr><td style="padding:4px 28px 22px;font-size:12.5px;color:#667085">Los precios se aplican solos al hacer tu pedido${vig ? ' ' + esc(vig) : ''}. Precios para profesionales de la salud verificados.</td></tr>`
+    + `<tr><td style="padding:16px 28px 24px;border-top:1px solid #eef1ee;font-size:12px;line-height:1.5;color:#98a2b3">Renovacell · Tecnologías Antiedad<br>Recibes este correo por tu cuenta en Renovacell.</td></tr>`
+    + `</table></td></tr></table></body></html>`
+  return { asunto, texto, html }
 }
 
 /**

@@ -62,12 +62,18 @@ describe('PROMO-2 · Promociones', () => {
     await waitFor(() => expect(cambiarEstado).toHaveBeenCalledWith('P1', false))
   })
   it('PROMO-4 · Enviar a doctores: vista previa (texto y audiencia), canales y envío por el comando; el resultado se muestra', async () => {
-    const previa = vi.fn(async () => ({ ok: true as const, data: { texto: 'Promo allergan (del 16 al 25 de octubre)\nBotox 100 UI: $4,000', audiencia: 42, sin_correo: 3, enviados: { correo: 0, chat: 0 } } }))
+    const datos = { promocion_id: 'P1', nombre: 'Promo allergan', vigencia: 'del 16 al 25 de octubre', desde: '2026-10-16', hasta: '2026-10-25', lineas: ['Botox 100 UI: $4,000'], productos: [{ product_id: 'B', nombre: 'Botox 100 UI', imagen_url: 'https://img.test/botox.png', presentacion: null, precio_normal: 4600, escalones: [{ desde: 1, precio: 4000 }] }] }
+    const previa = vi.fn(async () => ({ ok: true as const, data: { texto: 'Promo allergan (del 16 al 25 de octubre)\nBotox 100 UI: $4,000', datos, audiencia: 42, sin_correo: 3, enviados: { correo: 0, chat: 0 } } }))
     const difundir = vi.fn(async () => ({ ok: true as const, data: { audiencia: 42, correo: 39, chat: 42, sin_correo: 3, ya_enviados: 0, texto: '' } }))
     render(<Promociones listar={async () => ({ ok: true, data: [PROMO] })} previa={previa} difundir={difundir} />)
     await waitFor(() => expect(screen.getByTestId('promo-enviar-P1')).toBeInTheDocument())
     fireEvent.click(screen.getByTestId('promo-enviar-P1'))
-    await waitFor(() => expect(screen.getByTestId('promo-envio-texto')).toHaveTextContent(/Botox 100 UI: \$4,000/))
+    // PROMO-6 · vista previa REAL: el correo (mismo generador que el servidor) y la tarjeta del chat
+    const iframe = await screen.findByTestId('promo-previa-correo-iframe') as HTMLIFrameElement
+    expect(iframe.getAttribute('srcdoc')).toContain('https://img.test/botox.png'); expect(iframe.getAttribute('srcdoc')).toContain('$4,000'); expect(iframe.getAttribute('srcdoc')).toContain('line-through')
+    expect(screen.getByTestId('promo-previa-correo')).toHaveTextContent(/Asunto: Promo allergan · del 16 al 25 de octubre/)
+    fireEvent.click(screen.getByTestId('promo-vista-chat'))
+    expect(screen.getByTestId('promo-previa-chat')).toHaveTextContent(/Promo allergan/); expect(screen.getByTestId('tarjeta-promo')).toHaveTextContent(/\$4,600/)
     expect(screen.getByTestId('promo-envio')).toHaveTextContent(/42/); expect(screen.getByTestId('promo-envio')).toHaveTextContent(/3 sin correo registrado/)
     fireEvent.click(screen.getByTestId('promo-canal-chat'))   // solo correo
     fireEvent.click(screen.getByTestId('promo-envio-confirmar'))

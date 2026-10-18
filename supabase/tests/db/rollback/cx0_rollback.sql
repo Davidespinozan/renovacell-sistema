@@ -3,6 +3,7 @@
 begin;
 create temp table _cx0 as select (select count(*) from public.product_prices) pp, (select count(*) from public.products) p;
 set app.promociones_rollback_forzado = 'on';   -- prueba estructural de la cadena
+\ir ../../../rollback/promociones_marketing/99_down.sql   -- PROMO-MARKETING (177) se baja primero
 \ir ../../../rollback/promocion_eliminar/99_down.sql   -- PROMO-ELIMINAR (176) se baja primero
 \ir ../../../rollback/promociones_difusion/99_down.sql   -- PROMO-DIFUSION (175) se baja primero
 \ir ../../../rollback/promociones_pro/99_down.sql   -- PROMO-PRO (174) se baja primero

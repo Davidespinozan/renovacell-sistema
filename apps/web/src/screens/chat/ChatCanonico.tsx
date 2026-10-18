@@ -4,6 +4,8 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
+import { TarjetaPromoChat } from './TarjetaPromoChat'
+import { MARCA_PROMO } from '../../data/ops/promociones'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Check, CheckCheck, ChevronDown, History, Send, X, Zap } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
@@ -19,6 +21,8 @@ import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos 
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 
 interface Props {
+  /** PROMO-6 · la tarjeta de una promoción puede llevar al catálogo (lo define quien monta el chat del doctor). */
+  onIrCatalogo?: () => void
   embebido?: boolean                 // dentro del portal (tarjeta a página completa)
   conversationId?: string           // modo asesor: abrir una conversación concreta
   asesor?: boolean                  // controles de asesor (iniciar/terminar/liberar)
@@ -111,7 +115,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria' }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -365,6 +369,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (dia && dia !== diaPrevio) { hilo.push(<div key={`d-${m.seq}`} className="rc-day"><span>{dia}</span></div>); diaPrevio = dia; actorPrevio = null }
     if (m.actor === 'system') {
       if (handoffVivo && m.seq === seqTarjeta) hilo.push(<React.Fragment key={m.id}>{tarjetaHandoff}</React.Fragment>)
+      else if (MARCA_PROMO.test(m.content)) hilo.push(<TarjetaPromoChat key={m.id} content={m.content} onCatalogo={!asesor ? onIrCatalogo : undefined} />)   // PROMO-6
       else hilo.push(<div key={m.id} className="rc-sys" data-testid="msg-system">{m.content}</div>)
       actorPrevio = null
       continue

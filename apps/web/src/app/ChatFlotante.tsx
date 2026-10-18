@@ -70,7 +70,7 @@ let suscriptorShell: Suscriptor = suscribirMensajes
 export function _configurarSuscriptorLanzador(s: Suscriptor) { suscriptorShell = s }
 
 export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, suscribir = suscriptorShell }: { cliente?: ClienteChat; intervaloMs?: number; suscribir?: Suscriptor }) {
-  const { role, screen } = useRole()
+  const { role, screen, setScreen } = useRole()
   const [abierto, setAbierto] = useState(false)
   const abiertoRef = useRef(false)
   abiertoRef.current = abierto
@@ -307,7 +307,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
         <div className="chat-drawer-wrap" onClick={cerrarManual} data-testid="chat-drawer">
           <aside className="chat-drawer" role="dialog" aria-modal="true" aria-label={ETIQUETA_LANZADOR} onClick={(e) => e.stopPropagation()}>
             {/* C4 · conversación conocida → solo `leer` (sin un `abrir` adicional que pueda recuperar un handoff) */}
-            <ChatCanonico embebido panel autoFoco conversationId={convId ?? undefined} cliente={cliente} onSalir={cerrarManual} etiquetaSalir="Cerrar" onLeido={onLeido} />
+            <ChatCanonico embebido panel autoFoco conversationId={convId ?? undefined} cliente={cliente} onSalir={cerrarManual} etiquetaSalir="Cerrar" onLeido={onLeido} onIrCatalogo={() => { setScreen('catalogo'); cerrarManual() }} />
           </aside>
         </div>
       )}
