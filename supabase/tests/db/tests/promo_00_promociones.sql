@@ -5,7 +5,7 @@ begin;
 do $t$
 declare
   v_admin uuid := tests.fixture_admin(); v_bill uuid := tests.user('billing'); v_pos uuid := tests.user('pos'); v_doc uuid := tests.user('doctor'); v_nov uuid := tests.user('doctor');
-  botox uuid; skin uuid; harm uuid; otro uuid; hoy date; r jsonb; pid uuid; v_may uuid; n int; v_cust uuid; o uuid; lin jsonb; ord jsonb;
+  botox uuid; skin uuid; harm uuid; otro uuid; hoy date; r jsonb; r2 jsonb; pid uuid; v_may uuid; n int; v_cust uuid; o uuid; lin jsonb; ord jsonb;
 begin
   hoy := public._promo_hoy();   -- como dueño de la base (la función es interna)
   perform tests.act_as_service();
@@ -134,6 +134,18 @@ begin
   perform tests.throws(format('select public.promocion_difundir(%L, array[''chat''])', pid), 'PROMO_NO_VIGENTE', '9 · una promo pausada no se manda');
   perform public.promocion_estado(pid, true);
   perform tests.ok(exists (select 1 from public.audit_logs where action = 'Promoción enviada'), '9 · bitácora del envío');
+
+  -- ══ 10 · PROMO-5 (176): eliminar solo lo que nunca se envió ni vendió ═════════════════════════════════
+  perform tests.throws(format('select public.promocion_eliminar(%L)', pid), 'PROMO_CON_ENVIOS', '10 · una promo ya enviada no se borra (se pausa)');
+  r := public.promocion_guardar(jsonb_build_object('nombre', 'Duplicada', 'desde', hoy, 'hasta', hoy + 1, 'lineas', jsonb_build_array(jsonb_build_object('product_id', otro, 'precio', 900))));
+  perform tests.act_as(v_pos);
+  perform tests.throws(format('select public.promocion_eliminar(%L)', r ->> 'id'), 'NO_AUTORIZADO', '10 · Ventas no borra');
+  perform tests.act_as(v_admin);
+  r2 := public.promocion_eliminar((r ->> 'id')::uuid);
+  perform tests.ok((r2 ->> 'eliminada')::boolean, '10 · se borra');
+  perform tests.ok(not exists (select 1 from jsonb_array_elements(public.promociones_lista()) x where x ->> 'nombre' = 'Duplicada'), '10 · una capturada dos veces se borra limpio (ya no está en la lista)');
+  perform tests.throws(format('select public.promocion_eliminar(%L)', gen_random_uuid()), 'PROMO_INEXISTENTE', '10 · inexistente');
+  perform tests.ok(exists (select 1 from public.audit_logs where action = 'Promoción eliminada' and resource_id = 'Duplicada'), '10 · bitácora');
   perform tests.act_as_owner();
 end $t$;
 rollback;

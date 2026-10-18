@@ -71,6 +71,12 @@ export async function difundirPromocion(id: string, canales: CanalDifusion[]): P
   if (error) return { ok: false, error: /PROMO_NO_VIGENTE/.test(error.message) ? 'Solo se manda una promoción activa y que no haya terminado.' : /CANAL_INVALIDO/.test(error.message) ? 'Elige correo, chat o los dos.' : traducir(error.message) }
   return { ok: true, data: data as unknown as ResultadoDifusion }
 }
+export async function eliminarPromocion(id: string): Promise<Resultado<{ eliminada: boolean; nombre: string }>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('promocion_eliminar', { p_id: id })
+  if (error) return { ok: false, error: /PROMO_CON_ENVIOS/.test(error.message) ? 'Esta promoción ya se mandó a doctores: pásala a pausada en lugar de borrarla.' : /PROMO_CON_VENTAS/.test(error.message) ? 'Esta promoción ya tiene pedidos: pásala a pausada en lugar de borrarla.' : traducir(error.message) }
+  return { ok: true, data: data as unknown as { eliminada: boolean; nombre: string } }
+}
 export async function promosVigentes(): Promise<PromoVigente[]> {
   if (!hasSupabase) return []
   const { data, error } = await supabase.rpc('promos_vigentes')

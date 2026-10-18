@@ -4,6 +4,7 @@ begin;
 create temp table _pr as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 set app.promociones_rollback_forzado = 'on';
+\ir ../../../rollback/promocion_eliminar/99_down.sql   -- PROMO-ELIMINAR (176) se baja primero
 \ir ../../../rollback/promociones_difusion/99_down.sql   -- PROMO-DIFUSION (175) se baja primero
 \ir ../../../rollback/promociones_pro/99_down.sql   -- PROMO-PRO (174) se baja primero
 \ir ../../../rollback/promociones/99_down.sql
@@ -15,6 +16,7 @@ end $t$;
 \ir ../../../migrations/20261226120000_promociones.sql
 \ir ../../../migrations/20261227120000_promociones_pro.sql
 \ir ../../../migrations/20261228120000_promociones_difusion.sql
+\ir ../../../migrations/20261229120000_promocion_eliminar.sql
 do $t$ begin
   perform tests.ok((select todas from _pr) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '173 · se reaplica idéntica');
 end $t$;

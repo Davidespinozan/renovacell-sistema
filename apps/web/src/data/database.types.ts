@@ -8000,6 +8000,7 @@ export type Database = {
       }
       empaque_guardar: { Args: { p: Json }; Returns: Json }
       empaques_lista: { Args: { p_todos?: boolean }; Returns: Json }
+      promocion_eliminar: { Args: { p_id: string }; Returns: Json }
       promocion_estado: { Args: { p_activa: boolean; p_id: string }; Returns: Json }
       promocion_difundir: { Args: { p_canales: string[]; p_id: string; p_vendedor?: string }; Returns: Json }
       promocion_difusion_previa: { Args: { p_id: string; p_vendedor?: string }; Returns: Json }

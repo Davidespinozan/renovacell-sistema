@@ -8,7 +8,7 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
 import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
-import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
+import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, eliminarPromocion, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
 const input: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', width: '100%' }
 interface Renglon { product_id: string; min_qty: number; precio: number | '' ; texto?: string }
@@ -29,7 +29,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -54,6 +54,13 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
     setOcupado(false)
     setEnvio((e) => e && ({ ...e, resultado: r.ok ? r.data : null, error: r.ok ? null : r.error }))
     if (r.ok) await cargar()
+  }
+  const borrar = async (p: Promocion) => {
+    if (!window.confirm(`¿Eliminar "${p.nombre}"? Solo se puede si nunca se envió ni vendió.`)) return
+    setError(null)
+    const r = await eliminar(p.id)
+    if (!r.ok) { setError(r.error); return }
+    setAviso(`"${p.nombre}" eliminada.`); await cargar(); void recargarPromos()
   }
   const cargar = async () => { const r = await listar(true); if (r.ok) setLista(r.data); else setError(r.error) }
   useEffect(() => { void cargar() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -172,6 +179,9 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
               {p.activa && p.estado !== 'vencida' && <button className="btn sm" type="button" onClick={() => abrirEnvio(p)} data-testid={`promo-enviar-${p.id}`}>Enviar a doctores</button>}
               <button className="btn ghost sm" type="button" onClick={() => editar(p)}>Editar</button>
               {p.estado !== 'vencida' && <button className="btn ghost sm" type="button" onClick={() => pausar(p)} data-testid={`promo-pausar-${p.id}`}>{p.activa ? 'Pausar' : 'Activar'}</button>}
+              {!(p.difusion && (p.difusion.correo > 0 || p.difusion.chat > 0)) && !(p.ventas && p.ventas.pedidos > 0) && (
+                <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => borrar(p)} data-testid={`promo-eliminar-${p.id}`}>Eliminar</button>
+              )}
             </div>
           </div>
           {p.descripcion && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{p.descripcion}</div>}
