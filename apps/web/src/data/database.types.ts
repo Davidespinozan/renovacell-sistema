@@ -8002,6 +8002,7 @@ export type Database = {
       empaques_lista: { Args: { p_todos?: boolean }; Returns: Json }
       promocion_eliminar: { Args: { p_id: string }; Returns: Json }
       promocion_estado: { Args: { p_activa: boolean; p_id: string }; Returns: Json }
+      promocion_prueba_correo: { Args: { p_email: string; p_id: string }; Returns: Json }
       promo_tarjeta: { Args: { p_id: string }; Returns: Json }
       promocion_difundir: { Args: { p_canales: string[]; p_id: string; p_vendedor?: string }; Returns: Json }
       promocion_difusion_previa: { Args: { p_id: string; p_vendedor?: string }; Returns: Json }

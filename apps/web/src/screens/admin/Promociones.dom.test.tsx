@@ -80,4 +80,17 @@ describe('PROMO-2 · Promociones', () => {
     await waitFor(() => expect(difundir).toHaveBeenCalledWith('P1', ['correo']))
     expect(await screen.findByTestId('promo-envio-resultado')).toHaveTextContent(/Audiencia: 42 doctores · correo: 39 en cola · chat: 42 entregados · 3 sin correo/)
   })
+  it('PROMO-7 · "Enviarme una prueba": manda el correo real a la dirección escrita por el comando y lo confirma', async () => {
+    const datos = { promocion_id: 'P1', nombre: 'Promo allergan', vigencia: 'del 16 al 25 de octubre', desde: '2026-10-16', hasta: '2026-10-25', lineas: [], productos: [{ product_id: 'B', nombre: 'Botox 100 UI', imagen_url: null, presentacion: null, precio_normal: 4600, escalones: [{ desde: 1, precio: 4000 }] }] }
+    const prueba = vi.fn(async (_id: string, email: string) => ({ ok: true as const, data: { encolado: true, para: email, asunto: 'Promo allergan · del 16 al 25 de octubre' } }))
+    render(<Promociones listar={async () => ({ ok: true, data: [PROMO] })} previa={async () => ({ ok: true, data: { texto: 'x', datos, audiencia: 1, sin_correo: 0, enviados: { correo: 0, chat: 0 } } })} prueba={prueba} />)
+    await waitFor(() => expect(screen.getByTestId('promo-enviar-P1')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('promo-enviar-P1'))
+    await screen.findByTestId('promo-prueba')
+    expect((screen.getByTestId('promo-prueba-enviar') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('Correo de prueba'), { target: { value: 'dueno@correo.test' } })
+    fireEvent.click(screen.getByTestId('promo-prueba-enviar'))
+    await waitFor(() => expect(prueba).toHaveBeenCalledWith('P1', 'dueno@correo.test'))
+    expect(await screen.findByTestId('promo-prueba-msg')).toHaveTextContent(/Prueba en camino a dueno@correo.test/)
+  })
 })

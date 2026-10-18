@@ -86,6 +86,13 @@ export async function promoTarjeta(id: string): Promise<DatosPromoDifusion | nul
   if (error || !data) return null
   return data as unknown as DatosPromoDifusion
 }
+// PROMO-7 · el correo real de la promoción a una dirección de prueba (Dirección o Facturación).
+export async function pruebaCorreoPromocion(id: string, email: string): Promise<Resultado<{ encolado: boolean; para: string; asunto: string }>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('promocion_prueba_correo', { p_id: id, p_email: email })
+  if (error) return { ok: false, error: /CORREO_INVALIDO/.test(error.message) ? 'Escribe un correo válido.' : /PRUEBAS_EXCEDIDAS/.test(error.message) ? 'Ya mandaste 5 pruebas; espera unos minutos.' : traducir(error.message) }
+  return { ok: true, data: data as unknown as { encolado: boolean; para: string; asunto: string } }
+}
 export async function promosVigentes(): Promise<PromoVigente[]> {
   if (!hasSupabase) return []
   const { data, error } = await supabase.rpc('promos_vigentes')

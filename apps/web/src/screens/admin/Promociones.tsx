@@ -10,7 +10,7 @@ import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
 import { TarjetaPromo } from '../../app/TarjetaPromo'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
-import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, eliminarPromocion, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
+import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
 const input: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', width: '100%' }
 interface Renglon { product_id: string; min_qty: number; precio: number | '' ; texto?: string }
@@ -31,7 +31,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -45,6 +45,16 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   // PROMO-4 · difusión: vista previa (texto + audiencia) → canales → enviar → resultado.
   const [envio, setEnvio] = useState<{ promo: Promocion; previa: PreviaDifusion | null; canales: CanalDifusion[]; resultado: ResultadoDifusion | null; error: string | null } | null>(null)
   const [vista, setVista] = useState<'correo' | 'chat'>('correo')   // PROMO-6 · qué se previsualiza
+  // PROMO-7 · correo de prueba a una dirección (la mía) antes de mandarlo a los doctores
+  const [pruebaEmail, setPruebaEmail] = useState('')
+  const [pruebaMsg, setPruebaMsg] = useState<string | null>(null)
+  const mandarPrueba = async () => {
+    if (!envio || ocupado) return
+    setOcupado(true); setPruebaMsg(null)
+    const r = await prueba(envio.promo.id, pruebaEmail)
+    setOcupado(false)
+    setPruebaMsg(r.ok ? `Prueba en camino a ${r.data.para} (asunto: ${r.data.asunto}). Llega en un par de minutos; revisa también "no deseados".` : r.error)
+  }
   const abrirEnvio = async (p: Promocion) => {
     setEnvio({ promo: p, previa: null, canales: ['correo', 'chat'], resultado: null, error: null })
     const r = await previa(p.id)
@@ -225,6 +235,14 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
                     <div data-testid="promo-previa-chat" style={{ background: 'var(--surface-2, #f6f8f6)', padding: 12, borderRadius: 12 }}>
                       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 8 }}>Así se ve en "Habla con Renovacell" de cada doctor:</div>
                       <TarjetaPromo datos={envio.previa.datos} onCatalogo={() => {}} compacta />
+                    </div>
+                  )}
+                  {vista === 'correo' && envio.previa?.datos && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5 }} data-testid="promo-prueba">
+                      <span style={{ color: 'var(--ink-3)' }}>Mándate una prueba:</span>
+                      <input type="email" value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} placeholder="tu@correo.com" aria-label="Correo de prueba" style={{ ...input, width: 240 }} />
+                      <button className="btn ghost sm" type="button" disabled={ocupado || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pruebaEmail)} onClick={mandarPrueba} data-testid="promo-prueba-enviar">Enviarme una prueba</button>
+                      {pruebaMsg && <span role="status" data-testid="promo-prueba-msg" style={{ color: pruebaMsg.startsWith('Prueba en camino') ? 'var(--green-deep)' : 'var(--danger)' }}>{pruebaMsg}</span>}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 14, fontSize: 13, flexWrap: 'wrap' }}>

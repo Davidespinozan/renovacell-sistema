@@ -161,6 +161,20 @@ begin
   perform tests.act_as(v_admin); perform public.promocion_estado(pid, false); perform tests.act_as(v_doc);
   perform tests.ok(public.promo_tarjeta(pid) is null, '11 · pausada o terminada: la tarjeta desaparece (queda el texto)');
   perform tests.act_as(v_admin); perform public.promocion_estado(pid, true);
+
+  -- ══ 12 · PROMO-7 (178): correo de prueba a la dirección que yo diga ═══════════════════════════════════
+  perform tests.act_as(v_pos);
+  perform tests.throws(format('select public.promocion_prueba_correo(%L, ''yo@correo.test'')', pid), 'NO_AUTORIZADO', '12 · Ventas no manda pruebas');
+  perform tests.act_as(v_admin);
+  perform tests.throws(format('select public.promocion_prueba_correo(%L, ''no-es-correo'')', pid), 'CORREO_INVALIDO', '12 · correo inválido');
+  r := public.promocion_prueba_correo(pid, ' Dueno@Correo.Test ');
+  perform tests.ok((r ->> 'encolado')::boolean and r ->> 'para' = 'dueno@correo.test' and r ->> 'asunto' like 'Promo Allergan octubre · del %', '12 · se encola la prueba a mi correo (normalizado) con el asunto real');
+  perform tests.act_as_owner();
+  perform tests.ok(exists (select 1 from public.comm_outbox o where o.plantilla = 'promocion' and o.to_address = 'dueno@correo.test' and o.status = 'pendiente' and (o.payload ->> 'prueba')::boolean and jsonb_array_length(o.payload -> 'productos') = 1), '12 · en la cola con la misma plantilla y los mismos datos (fotos y precios) que el envío real');
+  perform tests.eq((select count(*)::int from public.promocion_envios where promocion_id = pid and canal = 'correo'), 1, '12 · la prueba no cuenta como envío a doctores');
+  perform tests.act_as(v_admin);
+  perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test'); perform public.promocion_prueba_correo(pid, 'a@b.test');
+  perform tests.throws(format('select public.promocion_prueba_correo(%L, ''a@b.test'')', pid), 'PRUEBAS_EXCEDIDAS', '12 · tope de 5 pruebas cada 10 minutos');
   perform tests.act_as_owner();
 end $t$;
 rollback;
