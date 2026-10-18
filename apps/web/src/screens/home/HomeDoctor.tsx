@@ -6,13 +6,15 @@
 //   · su pedido en curso o "volver a pedir" el último entregado (RLS: solo sus pedidos).
 // 15 oct 2026 (dueño: "se ve vacío"): además, quién lo atiende (la acción sigue en la burbuja), productos DISPONIBLES del
 // catálogo real (foto y precio; nunca promociones inventadas) y, si aún no compra, "Haz tu primer pedido".
-// 18 oct 2026 (dueño: "se ve muy triste"): flyers (las piezas que mandan por WhatsApp e historias, PROMO-9) y las promociones
-// vigentes con fotos y precios, las mismas que aplica el servidor.
+// 18 oct 2026 (dueño: "se ve muy triste" / "buen diseño estamos muy lejos"): composición tipo CuboPolar en móvil:
+//   recepción (saludo + quién lo atiende + avisos como chip), tira de flyers (PROMO-9, piezas 9:16), "Continúa" como
+//   LISTA en una tarjeta (filas con ícono, chevron; sin botones gigantes), promociones vigentes densas y productos
+//   disponibles en tira deslizable. Todo con los verdes de marca y los tokens cp.
 // Sin nada de eso, un Inicio limpio está bien. La composición es una lista de BLOQUES: cuando existan
-// autoridades de promociones, lanzamientos, seguimiento posventa o envíos activos, se agregan como
-// bloques aquí sin rehacer la pantalla. No hay promociones hoy (no hay campañas aprobadas: no se inventan).
+// autoridades de lanzamientos, seguimiento posventa o envíos activos, se agregan como bloques aquí sin rehacer la pantalla.
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { ChevronRight, Package, RotateCcw, ShoppingBag, Sparkles } from 'lucide-react'
 import { BotonAvisos } from '../../app/BotonAvisos'   // PROMO-8 · el doctor puede activar avisos (promos y respuestas del chat)
 import { useRole } from '../../auth/RoleContext'
 import { chat as chatPorDefecto, type ClienteChat, type Conversacion } from '../../data/ops/chat'
@@ -22,7 +24,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { seedReorder } from '../../data/store/reorderStore'
 import { isPast, statusView } from '../doctor/orderStatus'
 import { subtituloDe } from '../chat/ChatCanonico'
-import { Bienvenida, Seccion, TarjetaAtencion, Tarjetas } from './primitives'
+import { Bienvenida, Seccion } from './primitives'
 import { primerNombre, saludo } from '../../lib/nombres'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useStock } from '../../data/hooks/useStock'
@@ -39,6 +41,21 @@ const SIN_HISTORIAL = 2_000_000_000
 // Pruebas / vista previa local: clientes por defecto inyectables (en producción, los reales).
 let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito; flyers: typeof flyersPorDefecto; promoTarjeta: typeof promoTarjetaPorDefecto } = { chat: chatPorDefecto, carrito: carritoPorDefecto, flyers: flyersPorDefecto, promoTarjeta: promoTarjetaPorDefecto }
 export function configurarClientesInicioDoctor(c: Partial<typeof porDefecto>) { porDefecto = { ...porDefecto, ...c } }
+
+/** Fila de "Continúa donde te quedaste": ícono, título, detalle, estado opcional y chevron; toda la fila navega. */
+function Fila({ icono, titulo, detalle, estado, pill, onClick, testid }: { icono: React.ReactNode; titulo: string; detalle?: string | null; estado?: string; pill?: string; onClick: () => void; testid?: string }) {
+  return (
+    <button type="button" className="taskrow rh-fila" onClick={onClick} data-testid={testid}>
+      <span className="taskrow-ic rh-fila-ic" aria-hidden>{icono}</span>
+      <span className="taskrow-tx">
+        <span className="taskrow-t">{titulo}</span>
+        {detalle && <span className="taskrow-d">{detalle}</span>}
+      </span>
+      {estado && <span className={`pill ${pill ?? 'p-neu'}`}>{estado}</span>}
+      <span className="taskrow-ch" aria-hidden><ChevronRight /></span>
+    </button>
+  )
+}
 
 export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito, flyers = porDefecto.flyers, promoTarjeta = porDefecto.promoTarjeta }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito; flyers?: typeof flyersPorDefecto; promoTarjeta?: typeof promoTarjetaPorDefecto }) {
   const { user, setScreen, verified } = useRole()
@@ -88,47 +105,42 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   const conAsesor = modo === 'human_requested' || modo === 'human_assigned' || modo === 'human_active'
   const nombre = primerNombre(user?.name)
 
-  // Bloques de contexto, en orden de relevancia. Cada uno aparece solo si hay un dato real que lo respalde.
-  const bloques: Array<{ key: string; nodo: React.ReactNode }> = []
-  if (cart && cart.n_items > 0) bloques.push({ key: 'carrito', nodo: (
-    <TarjetaAtencion testid="doctor-carrito" tono="neu" titulo="Tu carrito"
-      lineas={[`${cart.n_items} producto${cart.n_items === 1 ? '' : 's'}${cart.total.estado === 'completo' && cart.total.monto != null ? ` · ${formatoMXN(cart.total.monto)}` : ''}`, cart.items[0]?.nombre]}
-      ctas={[{ label: 'Continuar compra', primaria: true, onClick: () => setScreen('catalogo') }]} />
-  ) })
-  enCurso.slice(0, 1).forEach((o) => bloques.push({ key: 'pedido', nodo: (
-    <TarjetaAtencion testid="doctor-pedido" tono="neu" titulo={`Pedido ${o.external_ref ?? ''}`.trim()} estado={statusView(o.status).label}
-      lineas={[enCurso.length > 1 ? `Y ${enCurso.length - 1} pedido${enCurso.length - 1 === 1 ? '' : 's'} más en curso` : null]}
-      ctas={[{ label: 'Ver seguimiento', onClick: () => setScreen('pedidosdr') }]} />
-  ) }))
-  if (ultimo && enCurso.length === 0) bloques.push({ key: 'reorden', nodo: (
-    <TarjetaAtencion testid="doctor-ultimo" tono="neu" titulo="Tu último pedido" estado="Entregado"
-      lineas={[ultimo.items.slice(0, 2).map((it) => `${it.qty} × ${nombreProducto.get(it.product_id ?? '') ?? 'producto'}`).join(' · ') || null]}
-      ctas={[{ label: 'Volver a pedir', onClick: () => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') } }]} />
-  ) })
-  if (orders.length === 0 && !(cart && cart.n_items > 0)) bloques.push({ key: 'primero', nodo: (
-    <TarjetaAtencion testid="doctor-primer-pedido" tono="neu" titulo="Haz tu primer pedido"
-      lineas={[verified ? 'Elige del catálogo y te lo enviamos a tu consultorio.' : 'Conoce el catálogo; los precios se habilitan al verificar tu cuenta.']}
-      ctas={[{ label: 'Ver catálogo', primaria: true, onClick: () => setScreen('catalogo') }]} />
-  ) })
-  // Productos con existencia del catálogo real (los primeros 4): foto, nombre y su precio si ya está verificado.
+  // Filas de contexto, en orden de relevancia. Cada una aparece solo si hay un dato real que la respalde.
+  const filas: React.ReactNode[] = []
+  if (cart && cart.n_items > 0) filas.push(
+    <Fila key="carrito" testid="doctor-carrito" icono={<ShoppingBag />} titulo={`Tu carrito${cart.total.estado === 'completo' && cart.total.monto != null ? ` · ${formatoMXN(cart.total.monto)}` : ''}`}
+      detalle={`${cart.n_items} producto${cart.n_items === 1 ? '' : 's'}${cart.items[0]?.nombre ? ` · ${cart.items[0].nombre}` : ''} · Continuar compra`} onClick={() => setScreen('catalogo')} />)
+  enCurso.slice(0, 1).forEach((o) => filas.push(
+    <Fila key="pedido" testid="doctor-pedido" icono={<Package />} titulo={`Pedido ${o.external_ref ?? ''}`.trim()} estado={statusView(o.status).label} pill={statusView(o.status).pill}
+      detalle={enCurso.length > 1 ? `Ver seguimiento · ${enCurso.length - 1} más en curso` : 'Ver seguimiento'} onClick={() => setScreen('pedidosdr')} />))
+  if (ultimo && enCurso.length === 0) filas.push(
+    <Fila key="reorden" testid="doctor-ultimo" icono={<RotateCcw />} titulo="Volver a pedir tu último pedido"
+      detalle={ultimo.items.slice(0, 2).map((it) => `${it.qty} × ${nombreProducto.get(it.product_id ?? '') ?? 'producto'}`).join(' · ') || null}
+      onClick={() => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') }} />)
+  if (orders.length === 0 && !(cart && cart.n_items > 0)) filas.push(
+    <Fila key="primero" testid="doctor-primer-pedido" icono={<Sparkles />} titulo="Haz tu primer pedido"
+      detalle={verified ? 'Elige del catálogo y te lo enviamos a tu consultorio.' : 'Conoce el catálogo; los precios se habilitan al verificar tu cuenta.'} onClick={() => setScreen('catalogo')} />)
+  // Productos con existencia del catálogo real (los primeros 6): foto, nombre y su precio si ya está verificado.
   const destacados = useMemo(() => products
     .filter((p) => isPortalProduct(p) && !p.parent_product_id && p.image_url && stockInfoFor(stockMap, p.id).qty > 0)
-    .slice(0, 4), [products, stockMap])
+    .slice(0, 6), [products, stockMap])
   // (futuro) lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
 
   return (
-    <div className="rh" data-testid="home-doctor">
-      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={nombre ? '¿Qué necesitas hoy?' : 'Bienvenido a Renovacell. ¿Qué necesitas hoy?'} />
-      {/* PROMO-8 · avisos en este dispositivo: promociones y respuestas de su asesora, aunque la pestaña esté cerrada. Ya activos, no se muestra. */}
-      <div data-testid="home-doctor-avisos" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><BotonAvisos className="btn ghost sm" /></div>
-      {conAsesor && conv && (
-        // Solo informa: la conversación se abre desde la burbuja flotante (una sola superficie de chat).
-        <div className={`rh-context${modo === 'human_active' ? '' : ' rh-context--neu'}`} role="status" data-testid="doctor-atencion">
-          <span>{primerNombre(conv.asesor_nombre)
-            ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesora{modo === 'human_active' ? ' · en conversación' : ''}</>
-            : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
-        </div>
-      )}
+    <div className="rh rh--doctor" data-testid="home-doctor">
+      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={nombre ? '¿Qué necesitas hoy?' : 'Bienvenido a Renovacell. ¿Qué necesitas hoy?'}>
+        {/* Quién lo atiende (solo informa: la conversación se abre desde la burbuja) y los avisos, como chips de la recepción. */}
+        {conAsesor && conv && (
+          <span className="rh-chip rh-chip--estado" role="status" data-testid="doctor-atencion">
+            <span className={`rh-chip-dot${modo === 'human_active' ? ' rh-chip-dot--on' : ''}`} aria-hidden />
+            <span>{primerNombre(conv.asesor_nombre)
+              ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesora{modo === 'human_active' ? ' · en conversación' : ''}</>
+              : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
+          </span>
+        )}
+        {/* PROMO-8 · avisos en este dispositivo: promociones y respuestas de su asesora, aunque la pestaña esté cerrada. Ya activos, no se muestra. */}
+        <span data-testid="home-doctor-avisos" className="rh-chip-slot"><BotonAvisos className="rh-chip rh-chip--btn" /></span>
+      </Bienvenida>
       {lista.length > 0 && (
         <Seccion titulo="Novedades y promociones" nivel="info" id="flyers">
           <div className="rh-flyers" data-testid="doctor-flyers">
@@ -152,15 +164,15 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           </div>
         </div>
       )}
-      {bloques.length > 0 && (
+      {filas.length > 0 && (
         <Seccion titulo="Continúa donde te quedaste" nivel="continuar" id="continuar">
-          <Tarjetas>{bloques.map((b) => <React.Fragment key={b.key}>{b.nodo}</React.Fragment>)}</Tarjetas>
+          <div className="tasklist" data-testid="doctor-continuar">{filas}</div>
         </Seccion>
       )}
       {tarjetas.length > 0 && (
-        <Seccion titulo="Promociones vigentes" nivel="info" id="promos" accion={{ label: 'Ver todo el catálogo', onClick: () => setScreen('catalogo') }}>
+        <Seccion titulo="Promociones vigentes" nivel="info" id="promos">
           <div className="rh-promos" data-testid="doctor-promos">
-            {tarjetas.map((t, i) => <TarjetaPromo key={promoIds[i] ?? i} datos={{ ...t, flyer_url: null }} onCatalogo={() => setScreen('catalogo')} compacta />)}
+            {tarjetas.map((t, i) => <TarjetaPromo key={promoIds[i] ?? i} datos={{ ...t, flyer_url: null }} onCatalogo={() => setScreen('catalogo')} compacta densa />)}
           </div>
         </Seccion>
       )}

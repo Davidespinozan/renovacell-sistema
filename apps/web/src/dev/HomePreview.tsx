@@ -12,6 +12,9 @@ import { ClienteAtencion, type Pendientes, type PendienteRuteo } from '../data/o
 import type { Atencion, EstadoAtencion } from '../data/ops/atencionComercial'
 import { configurarClientesAtencion } from '../data/store/atencionStore'
 import { configurarClientesInicioDoctor } from '../screens/home/HomeDoctor'
+import { _fijarPromosLocal } from '../data/store/promosStore'
+import type { Flyer } from '../data/ops/flyers'
+import type { DatosPromoDifusion } from '../data/ops/promociones'
 import { _configurarClienteLanzador } from '../app/ChatFlotante'
 import { chatUi } from '../data/store/chatUiStore'
 import { _simularLlegada } from '../data/store/notificationsStore'
@@ -121,6 +124,19 @@ export function HomePreview() {
         : { conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', ultimo_seq: 0, mensajes: [], cart_id: null }
     const chatDoctor = chatFalso([], vista === 'autoapertura' || vista === 'cerrado' ? { conversation_id: 'C1', estado: 'abierta', modo: 'human_requested', ultimo_seq: 2, leido_hasta: 0, mensajes: MENSAJES.slice(0, 2).map((m) => (m.actor === 'doctor' ? { ...m, propio: true } : m)), handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: null, asignado: false, puede_rechazar: true }, cart_id: 'K' } : doctorConv)
     configurarClientesInicioDoctor({ chat: chatDoctor, carrito: new ClienteCarrito(async () => ok(cartDoctor(estado === 'asesoria' ? 1 : estado === 'carrito' ? 2 : 0)), () => null) })
+    // PROMO-9 · ?flyers=N (0..4) y ?promos=1: flyers y promociones de muestra en el Inicio del doctor (las imágenes las sirve el
+    // script de capturas; aquí solo son URLs). Sin los parámetros, el Inicio queda como en mock: sin flyers ni promos.
+    const nFlyers = Number(q.get('flyers') ?? 0)
+    const flyer = (i: number, titulo: string): Flyer => ({ id: `F${i}`, titulo, imagen_url: `https://flyers.test/f${i}.jpg`, promocion_id: i === 1 ? 'P1' : null, product_id: null, desde: '2026-10-18', hasta: null, activo: true, orden: i, listas: null, estado: 'vigente' })
+    const FLYERS = [flyer(1, 'Hoy último día · Botox'), flyer(2, '¡Nuevo lote! Nabota'), flyer(3, 'Implantes · 40 variedades'), flyer(4, 'PE Plus')].slice(0, Math.max(0, Math.min(4, nFlyers)))
+    const TARJETA: DatosPromoDifusion = { promocion_id: 'P1', nombre: 'Promo Allergan', vigencia: 'del 16 al 25 de octubre', desde: '2026-10-16', hasta: '2026-10-25', lineas: [], flyer_url: FLYERS[0]?.imagen_url ?? null,
+      productos: [
+        { product_id: 'B', nombre: 'Botox 100 UI', imagen_url: '/products/golden-v.webp', presentacion: 'Frasco 100 U', precio_normal: 4600, escalones: [{ desde: 1, precio: 4000 }, { desde: 5, precio: 3800 }, { desde: 10, precio: 3600 }] },
+        { product_id: 'H', nombre: 'HArmonyCa', imagen_url: '/products/golden-serum.webp', presentacion: null, precio_normal: 8000, escalones: [{ desde: 1, precio: 6100 }] },
+        { product_id: 'S', nombre: 'SkinVive', imagen_url: '/products/antiaging-booster.webp', presentacion: null, precio_normal: 4500, escalones: [{ desde: 1, precio: 3600 }] },
+      ] }
+    configurarClientesInicioDoctor({ flyers: async () => FLYERS, promoTarjeta: async () => TARJETA })
+    if (q.get('promos') === '1') _fijarPromosLocal([{ promocion_id: 'P1', nombre: 'Promo Allergan', desde: '2026-10-16', hasta: '2026-10-25', listas: null, product_id: 'B', min_qty: 1, precio: 4000 }])
     _configurarClienteLanzador(vista === 'c4' ? C4.cliente : chatDoctor)
     login(perfil.role, true, { name: perfil.name, email: perfil.email }, perfil.caps)
     setListo(true)

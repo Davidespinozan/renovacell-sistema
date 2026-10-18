@@ -8,6 +8,8 @@ const live = makeLive<PromoVigente>(promosVigentes, [])
 export const subscribePromos = live.subscribe
 export const getPromosSnapshot = live.getSnapshot
 export const recargarPromos = live.reload
+/** Solo vista previa de desarrollo (HomePreview): fija promos sin servidor. */
+export const _fijarPromosLocal = live.setLocal
 
 /** Las promos como reglas de precio (min_quantity/price) marcadas con `promo`, para los helpers de previsualización. */
 export function promosComoReglas(promos: readonly PromoVigente[], listaId?: string | null): VolumeRule[] {
