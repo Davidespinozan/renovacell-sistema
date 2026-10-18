@@ -7,6 +7,7 @@ export const PLANTILLAS = [
   'pedido_recibido', 'pago_recibido', 'pedido_enviado', 'pedido_entregado',
   'pedido_cancelado', 'reembolso_realizado',
   'registro_recibido', 'cuenta_verificada', 'verificacion_rechazada',   // CORREOS-AUTO (165) · su cuenta
+  'promocion',   // PROMO-4 (175) · difusión de una promoción a los doctores
 ] as const
 export type Plantilla = (typeof PLANTILLAS)[number]
 
@@ -75,6 +76,14 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
         'Gracias por registrarte. Estamos revisando tu cédula profesional y tu identificación; normalmente lo resolvemos el mismo día hábil.',
         'Mientras tanto ya puedes entrar, conocer el catálogo y hablar con tu asesora. Te avisaremos por este medio en cuanto tu cuenta quede verificada.',
       ], datos: [], boton: { label: 'Entrar a Renovacell', href: URL_SISTEMA }, pie: 'Recibes este correo porque creaste una cuenta en Renovacell.' }
+    case 'promocion': {   // PROMO-4 · datos: nombre, vigencia, lineas[] (texto por producto), promocion_id
+      const lineas = Array.isArray(d.lineas) ? (d.lineas as unknown[]).map((x) => String(x ?? '')).filter(Boolean) : []
+      const nombre = String(d.nombre ?? 'Promoción').trim(); const vig = String(d.vigencia ?? '').trim()
+      return { asunto: `${nombre}${vig ? ' · ' + vig : ''}`, titulo: nombre, parrafos: [
+        `Tenemos una promoción para ti${vig ? ' ' + vig : ''}. Los precios se aplican solos en tu portal al hacer tu pedido; no necesitas códigos.`,
+      ], datos: lineas.map((l): [string, string] => { const i = l.indexOf(': '); return i > 0 ? [l.slice(0, i), l.slice(i + 2)] : [l, ''] }),
+        boton: { label: 'Ver el catálogo', href: URL_SISTEMA }, pie: 'Precios para profesionales de la salud verificados. Recibes este correo por tu cuenta en Renovacell.' }
+    }
     case 'cuenta_verificada':
       return { asunto: 'Tu cuenta Renovacell está verificada', titulo: 'Tu cuenta está verificada', parrafos: [
         'Listo: revisamos tus datos y tu cuenta quedó verificada.',

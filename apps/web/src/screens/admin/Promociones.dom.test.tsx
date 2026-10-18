@@ -61,4 +61,17 @@ describe('PROMO-2 · Promociones', () => {
     fireEvent.click(screen.getByTestId('promo-pausar-P1'))
     await waitFor(() => expect(cambiarEstado).toHaveBeenCalledWith('P1', false))
   })
+  it('PROMO-4 · Enviar a doctores: vista previa (texto y audiencia), canales y envío por el comando; el resultado se muestra', async () => {
+    const previa = vi.fn(async () => ({ ok: true as const, data: { texto: 'Promo allergan (del 16 al 25 de octubre)\nBotox 100 UI: $4,000', audiencia: 42, sin_correo: 3, enviados: { correo: 0, chat: 0 } } }))
+    const difundir = vi.fn(async () => ({ ok: true as const, data: { audiencia: 42, correo: 39, chat: 42, sin_correo: 3, ya_enviados: 0, texto: '' } }))
+    render(<Promociones listar={async () => ({ ok: true, data: [PROMO] })} previa={previa} difundir={difundir} />)
+    await waitFor(() => expect(screen.getByTestId('promo-enviar-P1')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('promo-enviar-P1'))
+    await waitFor(() => expect(screen.getByTestId('promo-envio-texto')).toHaveTextContent(/Botox 100 UI: \$4,000/))
+    expect(screen.getByTestId('promo-envio')).toHaveTextContent(/42/); expect(screen.getByTestId('promo-envio')).toHaveTextContent(/3 sin correo registrado/)
+    fireEvent.click(screen.getByTestId('promo-canal-chat'))   // solo correo
+    fireEvent.click(screen.getByTestId('promo-envio-confirmar'))
+    await waitFor(() => expect(difundir).toHaveBeenCalledWith('P1', ['correo']))
+    expect(await screen.findByTestId('promo-envio-resultado')).toHaveTextContent(/Audiencia: 42 doctores · correo: 39 en cola · chat: 42 entregados · 3 sin correo/)
+  })
 })

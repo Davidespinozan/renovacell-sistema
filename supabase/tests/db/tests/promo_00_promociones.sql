@@ -110,6 +110,30 @@ begin
   perform tests.act_as(v_admin);
   r := (select x from jsonb_array_elements(public.promociones_lista()) x where (x ->> 'id')::uuid = pid);
   perform tests.ok((r -> 'ventas' ->> 'pedidos')::int = 1 and (r -> 'ventas' ->> 'piezas')::int = 5 and (r -> 'ventas' ->> 'importe')::numeric = 20500, '8 · la promoción reporta lo vendido con su precio durante su vigencia');
+
+  -- ══ 9 · PROMO-4 (175): mandarla por correo y por el chat del sistema ═══════════════════════════════════
+  perform tests.act_as_service();
+  update public.profiles set email = null where id = v_nov;   -- (sin verificar: no entra a la audiencia de todos modos)
+  perform tests.act_as(v_pos);
+  perform tests.throws(format('select public.promocion_difundir(%L, array[''correo''])', pid), 'NO_AUTORIZADO', '9 · Ventas no manda promociones');
+  perform tests.act_as(v_admin);
+  r := public.promocion_difusion_previa(pid);
+  perform tests.ok((r ->> 'audiencia')::int = 1 and r ->> 'texto' like 'Promo Allergan octubre (del % al % de %)%Botox 100 UI: $4,100%profesionales verificados%', '9 · vista previa: audiencia (doctores verificados con expediente) y el texto');
+  perform tests.throws(format('select public.promocion_difundir(%L, array[''sms''])', pid), 'CANAL_INVALIDO', '9 · canal desconocido');
+  r := public.promocion_difundir(pid, array['correo', 'chat']);
+  perform tests.ok((r ->> 'audiencia')::int = 1 and (r ->> 'correo')::int = 1 and (r ->> 'chat')::int = 1 and (r ->> 'ya_enviados')::int = 0, '9 · se manda a 1 doctor por los dos canales');
+  perform tests.act_as_owner();
+  perform tests.ok(exists (select 1 from public.comm_outbox o where o.plantilla = 'promocion' and o.profile_id = v_doc and o.status = 'pendiente' and o.payload ->> 'nombre' = 'Promo Allergan octubre' and jsonb_array_length(o.payload -> 'lineas') = 1), '9 · el correo queda en la cola con la plantilla promocion y sus renglones');
+  perform tests.ok(exists (select 1 from public.cc_messages m join public.cc_conversations c on c.id = m.conversation_id where c.profile_id = v_doc and m.actor_type = 'system' and m.client_message_id = 'promo:' || pid::text and m.content like 'Promo Allergan octubre%'), '9 · el chat del doctor recibe el mensaje de la promoción');
+  perform tests.act_as(v_admin);
+  r := public.promocion_difundir(pid, array['correo', 'chat']);
+  perform tests.ok((r ->> 'correo')::int = 0 and (r ->> 'chat')::int = 0 and (r ->> 'ya_enviados')::int = 2, '9 · repetir no duplica: ya lo tenían');
+  r := (select x from jsonb_array_elements(public.promociones_lista()) x where (x ->> 'id')::uuid = pid);
+  perform tests.ok((r -> 'difusion' ->> 'correo')::int = 1 and (r -> 'difusion' ->> 'chat')::int = 1, '9 · la lista muestra a cuántos se envió');
+  perform public.promocion_estado(pid, false);
+  perform tests.throws(format('select public.promocion_difundir(%L, array[''chat''])', pid), 'PROMO_NO_VIGENTE', '9 · una promo pausada no se manda');
+  perform public.promocion_estado(pid, true);
+  perform tests.ok(exists (select 1 from public.audit_logs where action = 'Promoción enviada'), '9 · bitácora del envío');
   perform tests.act_as_owner();
 end $t$;
 rollback;

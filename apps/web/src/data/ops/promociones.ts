@@ -7,7 +7,11 @@ import { hoyNegocio } from '../periodo'
 export interface LineaPromo { id?: string; product_id: string; producto?: string; precio_normal?: number | null; min_qty: number; precio: number }
 export type EstadoPromo = 'vigente' | 'proxima' | 'vencida' | 'inactiva'
 export interface VentasPromo { pedidos: number; piezas: number; importe: number }
-export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; ventas?: VentasPromo; updated_at?: string }
+export interface DifusionPromo { correo: number; chat: number; sin_correo: number; ultimo: string | null }
+export type CanalDifusion = 'correo' | 'chat'
+export interface PreviaDifusion { texto: string; audiencia: number; sin_correo: number; enviados: { correo: number; chat: number } }
+export interface ResultadoDifusion { audiencia: number; correo: number; chat: number; sin_correo: number; ya_enviados: number; texto: string }
+export interface Promocion { id: string; nombre: string; descripcion: string | null; desde: string; hasta: string; activa: boolean; listas: string[] | null; estado: EstadoPromo; lineas: LineaPromo[]; ventas?: VentasPromo; difusion?: DifusionPromo; updated_at?: string }
 export interface PromoVigente { promocion_id: string; nombre: string; desde: string; hasta: string; listas: string[] | null; product_id: string; min_qty: number; precio: number }
 export interface PromoDatos { id?: string; nombre: string; descripcion?: string | null; desde: string; hasta: string; activa?: boolean; listas?: string[] | null; lineas: Array<{ product_id: string; min_qty: number; precio: number }> }
 type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -53,6 +57,19 @@ export async function estadoPromocion(id: string, activa: boolean): Promise<Resu
   const { data, error } = await supabase.rpc('promocion_estado', { p_id: id, p_activa: activa })
   if (error) return { ok: false, error: traducir(error.message) }
   return { ok: true, data: data as unknown as Promocion }
+}
+// PROMO-4 · difusión por correo y por el chat del sistema (Dirección o Facturación).
+export async function previaDifusion(id: string): Promise<Resultado<PreviaDifusion>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('promocion_difusion_previa', { p_id: id })
+  if (error) return { ok: false, error: traducir(error.message) }
+  return { ok: true, data: data as unknown as PreviaDifusion }
+}
+export async function difundirPromocion(id: string, canales: CanalDifusion[]): Promise<Resultado<ResultadoDifusion>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('promocion_difundir', { p_id: id, p_canales: canales })
+  if (error) return { ok: false, error: /PROMO_NO_VIGENTE/.test(error.message) ? 'Solo se manda una promoción activa y que no haya terminado.' : /CANAL_INVALIDO/.test(error.message) ? 'Elige correo, chat o los dos.' : traducir(error.message) }
+  return { ok: true, data: data as unknown as ResultadoDifusion }
 }
 export async function promosVigentes(): Promise<PromoVigente[]> {
   if (!hasSupabase) return []

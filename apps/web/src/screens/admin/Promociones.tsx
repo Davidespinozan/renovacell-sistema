@@ -8,7 +8,7 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
 import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
-import { ETIQUETA_ESTADO, PILL_ESTADO, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, vigenciaTexto, type Promocion, type PromoDatos } from '../../data/ops/promociones'
+import { ETIQUETA_ESTADO, PILL_ESTADO, difundirPromocion, estadoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
 const input: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', width: '100%' }
 interface Renglon { product_id: string; min_qty: number; precio: number | '' ; texto?: string }
@@ -29,7 +29,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -40,6 +40,21 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  // PROMO-4 · difusión: vista previa (texto + audiencia) → canales → enviar → resultado.
+  const [envio, setEnvio] = useState<{ promo: Promocion; previa: PreviaDifusion | null; canales: CanalDifusion[]; resultado: ResultadoDifusion | null; error: string | null } | null>(null)
+  const abrirEnvio = async (p: Promocion) => {
+    setEnvio({ promo: p, previa: null, canales: ['correo', 'chat'], resultado: null, error: null })
+    const r = await previa(p.id)
+    setEnvio((e) => e && e.promo.id === p.id ? { ...e, previa: r.ok ? r.data : null, error: r.ok ? null : r.error } : e)
+  }
+  const enviar = async () => {
+    if (!envio || ocupado || envio.canales.length === 0) return
+    setOcupado(true)
+    const r = await difundir(envio.promo.id, envio.canales)
+    setOcupado(false)
+    setEnvio((e) => e && ({ ...e, resultado: r.ok ? r.data : null, error: r.ok ? null : r.error }))
+    if (r.ok) await cargar()
+  }
   const cargar = async () => { const r = await listar(true); if (r.ok) setLista(r.data); else setError(r.error) }
   useEffect(() => { void cargar() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -154,11 +169,44 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
             <span className={'pill ' + PILL_ESTADO[p.estado]}>{ETIQUETA_ESTADO[p.estado]}</span>
             <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{vigenciaTexto(p)}{p.listas ? ` · solo ${p.listas.map((id) => listas.find((l) => l.id === id)?.name ?? 'lista').join(', ')}` : ' · todas las listas'}</span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              {p.activa && p.estado !== 'vencida' && <button className="btn sm" type="button" onClick={() => abrirEnvio(p)} data-testid={`promo-enviar-${p.id}`}>Enviar a doctores</button>}
               <button className="btn ghost sm" type="button" onClick={() => editar(p)}>Editar</button>
               {p.estado !== 'vencida' && <button className="btn ghost sm" type="button" onClick={() => pausar(p)} data-testid={`promo-pausar-${p.id}`}>{p.activa ? 'Pausar' : 'Activar'}</button>}
             </div>
           </div>
           {p.descripcion && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{p.descripcion}</div>}
+          {p.difusion && (p.difusion.correo > 0 || p.difusion.chat > 0) && (
+            <div style={{ fontSize: 12.5, marginTop: 6, color: 'var(--ink-3)' }} data-testid={`promo-difusion-${p.id}`}>
+              Enviada a {p.difusion.correo} por correo y {p.difusion.chat} por chat{p.difusion.sin_correo ? ` · ${p.difusion.sin_correo} sin correo registrado` : ''}.
+            </div>
+          )}
+          {envio && envio.promo.id === p.id && (
+            <div style={{ marginTop: 10, border: '1px solid var(--line)', borderRadius: 12, padding: 12, display: 'grid', gap: 8 }} data-testid="promo-envio">
+              {envio.resultado ? (
+                <div role="status" data-testid="promo-envio-resultado" style={{ fontSize: 13 }}>
+                  <b>Listo.</b> Audiencia: {envio.resultado.audiencia} doctores · correo: {envio.resultado.correo} en cola · chat: {envio.resultado.chat} entregados{envio.resultado.sin_correo ? ` · ${envio.resultado.sin_correo} sin correo` : ''}{envio.resultado.ya_enviados ? ` · ${envio.resultado.ya_enviados} ya lo tenían` : ''}.
+                  <div><button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={() => setEnvio(null)}>Cerrar</button></div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+                    Se manda a los doctores verificados con cuenta{envio.previa ? <> (<b>{envio.previa.audiencia}</b>{envio.previa.sin_correo ? `, ${envio.previa.sin_correo} sin correo registrado` : ''}). {envio.previa.enviados.correo || envio.previa.enviados.chat ? `Ya se envió a ${envio.previa.enviados.correo} por correo y ${envio.previa.enviados.chat} por chat; a ellos no se repite.` : ''}</> : '…'}
+                  </div>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, background: 'var(--surface-2, #fafafa)', padding: 10, borderRadius: 10, margin: 0 }} data-testid="promo-envio-texto">{envio.previa?.texto ?? 'Cargando vista previa…'}</pre>
+                  <div style={{ display: 'flex', gap: 14, fontSize: 13, flexWrap: 'wrap' }}>
+                    {(['correo', 'chat'] as CanalDifusion[]).map((c) => (
+                      <label key={c}><input type="checkbox" checked={envio.canales.includes(c)} onChange={(e) => setEnvio({ ...envio, canales: e.target.checked ? [...envio.canales, c] : envio.canales.filter((x) => x !== c) })} data-testid={`promo-canal-${c}`} /> {c === 'correo' ? 'Correo' : 'Chat del sistema (Habla con Renovacell)'}</label>
+                    ))}
+                  </div>
+                  {envio.error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)' }}>{envio.error}</div>}
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button className="btn ghost sm" type="button" onClick={() => setEnvio(null)}>Cancelar</button>
+                    <button className="btn sm" type="button" disabled={ocupado || envio.canales.length === 0 || !envio.previa} onClick={enviar} data-testid="promo-envio-confirmar">{ocupado ? 'Enviando…' : 'Enviar ahora'}</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {p.ventas && (p.estado === 'vigente' || p.estado === 'vencida' || p.ventas.pedidos > 0) && (
             <div style={{ fontSize: 12.5, marginTop: 6 }} data-testid={`promo-ventas-${p.id}`}>
               <b>Vendido con esta promo:</b> {p.ventas.pedidos} pedido{p.ventas.pedidos === 1 ? '' : 's'} · {p.ventas.piezas} pza{p.ventas.piezas === 1 ? '' : 's'} · {money(Number(p.ventas.importe))}
