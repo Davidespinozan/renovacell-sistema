@@ -63,11 +63,11 @@ describe('HORARIO-P1 · éxito refresca la tarjeta de alertas', () => {
     const f = falso(({ p_semana }) => ({ data: horario(true, p_semana as typeof semanaVacia), error: null }))
     render(<HorarioYAlertas cliente={f.c} />)
     expect(await screen.findByTestId('config-sin-horario')).toHaveTextContent('Horario comercial pendiente de configurar')
-    expect(f.de('cc_atencion_config_ver')).toHaveLength(1)
+    expect(f.de('cc_atencion_config_ver')).toHaveLength(2)   // alertas + reparto (181) leen la misma configuración
     capturarLaS()
     fireEvent.click(screen.getByTestId('horario-guardar'))
     expect(await screen.findByText('Horario guardado.')).toBeInTheDocument()
-    await waitFor(() => expect(f.de('cc_atencion_config_ver')).toHaveLength(2))
+    await waitFor(() => expect(f.de('cc_atencion_config_ver')).toHaveLength(4))   // ambas tarjetas se releen
     await waitFor(() => expect(screen.queryByTestId('config-sin-horario')).toBeNull())
     expect(screen.getByTestId('horario-estado').textContent).not.toMatch(/SIN CONFIGURAR/)
   })
@@ -88,7 +88,7 @@ describe('HORARIO-P1 · errores', () => {
     const [err, ctx] = f.reportar.mock.calls[0]
     expect(ctx).toEqual({ pantalla: 'atencion', clasificacion: 'rpc_no_reconocido', code: ref })
     expect(String((err as Error).message)).toMatch(/^atencion:cc_horario_guardar · /)
-    expect(f.de('cc_atencion_config_ver')).toHaveLength(1)   // sin éxito no hay refresco
+    expect(f.de('cc_atencion_config_ver')).toHaveLength(2)   // sin éxito no hay refresco (alertas + reparto)
     expect(screen.getByTestId('config-sin-horario')).toBeInTheDocument()
     expect(screen.getByTestId('horario-estado')).toHaveTextContent('SIN CONFIGURAR')
   })

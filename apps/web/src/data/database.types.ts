@@ -7281,6 +7281,7 @@ export type Database = {
         Returns: Json
       }
       cc_atencion_config_ver: { Args: never; Returns: Json }
+      cc_atencion_reparto_guardar: { Args: { p_activo: boolean; p_fija: boolean; p_min: number }; Returns: Json }
       cc_atencion_evaluar: { Args: never; Returns: Json }
       cc_audiencia_actual: { Args: never; Returns: string }
       cc_buscar_conocimiento: {

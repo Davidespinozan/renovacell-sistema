@@ -12,6 +12,7 @@ import type { PendienteRuteo } from './atencion'
 export type EstadoAtencion =
   | 'ia' | 'rechazado' | 'solicitado_sin_vendedor' | 'horario_sin_configurar' | 'escalado' | 'aviso'
   | 'fuera_de_horario' | 'asignado_esperando' | 'activo' | 'terminado' | 'cerrada'
+  | 'reparto'   // REPARTO (181): repartida al azar, esperando que un vendedor la tome (la rota el evaluador)
 
 /** Espejo de `_cc_atencion(conv)` (migración 123). */
 export interface Atencion {
@@ -20,6 +21,7 @@ export interface Atencion {
   espera_total_min: number | null; espera_total_habil_min: number | null; espera_handler_min: number | null; espera_handler_habil_min: number | null
   reloj_sla_min: number | null; horario_configurado: boolean; en_horario: boolean | null; pausa_fuera_horario: boolean
   umbral_aviso_min: number; umbral_escalamiento_min: number; ia_activa: boolean
+  reparto?: { activo: boolean; umbral_min: number; intento: number; en_reparto: boolean }   // REPARTO (181)
 }
 
 /** Tipos de aviso comercial que emite CHV2-A. */
@@ -28,7 +30,7 @@ export const KINDS_VENDEDOR: ReadonlySet<string> = new Set(['handoff_asignado', 
 export const KINDS_DIRECCION: ReadonlySet<string> = new Set(['handoff_escalado', 'handoff_sin_vendedor'])
 
 /** Estados en los que el vendedor asignado todavía no inicia (la solicitud le espera). */
-export const ESPERANDO_VENDEDOR: ReadonlySet<EstadoAtencion> = new Set(['asignado_esperando', 'aviso', 'escalado', 'fuera_de_horario', 'horario_sin_configurar'])
+export const ESPERANDO_VENDEDOR: ReadonlySet<EstadoAtencion> = new Set(['asignado_esperando', 'aviso', 'escalado', 'fuera_de_horario', 'horario_sin_configurar', 'reparto'])
 
 export const ETIQUETA_ATENCION: Record<EstadoAtencion, string> = {
   ia: 'Atiende el asistente',
@@ -39,6 +41,7 @@ export const ETIQUETA_ATENCION: Record<EstadoAtencion, string> = {
   aviso: 'Esperando asesor · recordatorio enviado',
   fuera_de_horario: 'Fuera de horario',
   asignado_esperando: 'Esperando asesor',
+  reparto: 'Repartida · esperando que la tomen',
   activo: 'Asesoría en curso',
   terminado: 'Asesoría terminada',
   cerrada: 'Cerrada',
@@ -47,11 +50,11 @@ export const ETIQUETA_ATENCION: Record<EstadoAtencion, string> = {
 export type TonoAtencion = 'dang' | 'warn' | 'neu' | 'ok'
 export function tonoAtencion(e: EstadoAtencion | null | undefined): TonoAtencion {
   if (e === 'escalado' || e === 'solicitado_sin_vendedor') return 'dang'
-  if (e === 'aviso' || e === 'asignado_esperando' || e === 'horario_sin_configurar') return 'warn'
+  if (e === 'aviso' || e === 'asignado_esperando' || e === 'horario_sin_configurar' || e === 'reparto') return 'warn'
   if (e === 'activo') return 'ok'
   return 'neu'
 }
-const PRIORIDAD: Partial<Record<EstadoAtencion, number>> = { escalado: 0, solicitado_sin_vendedor: 0, aviso: 1, asignado_esperando: 2, horario_sin_configurar: 2, fuera_de_horario: 3, activo: 4 }
+const PRIORIDAD: Partial<Record<EstadoAtencion, number>> = { escalado: 0, solicitado_sin_vendedor: 0, aviso: 1, reparto: 1, asignado_esperando: 2, horario_sin_configurar: 2, fuera_de_horario: 3, activo: 4 }
 const prioridad = (e: EstadoAtencion | undefined) => (e && PRIORIDAD[e] != null ? PRIORIDAD[e]! : 9)
 
 /** Minutos (del servidor) en texto corto. */
@@ -72,7 +75,10 @@ export function textoEspera(a: Atencion | null | undefined): string | null {
   if (a.pausa_fuera_horario && !a.horario_configurado) return TEXTO_HORARIO_PENDIENTE
   if (a.horario_configurado && a.en_horario === false) return 'Fuera de horario · la espera está en pausa'
   if (a.reloj_sla_min == null) return null
-  return `${formatoMinutos(a.reloj_sla_min)}${a.pausa_fuera_horario ? ' hábiles' : ''} esperando`
+  const base = `${formatoMinutos(a.reloj_sla_min)}${a.pausa_fuera_horario ? ' hábiles' : ''} esperando`
+  // REPARTO (181) · el vendedor sabe cuánto tiene antes de que pase a otro; el intento lo dice el servidor.
+  if (a.estado === 'reparto' && a.reparto) return `${base} · si nadie la inicia en ${a.reparto.umbral_min} min pasa a otro asesor${a.reparto.intento > 1 ? ` (intento ${a.reparto.intento})` : ''}`
+  return base
 }
 
 /** Antigüedad real de la solicitud (minutos del servidor; no es SLA). */

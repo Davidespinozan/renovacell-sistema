@@ -119,7 +119,7 @@ export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio,
     <div className="card" data-testid="config-atencion">
       <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>Alertas por tiempo de espera</h4>
       <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        Se mide la espera del asesor que tiene la solicitud, en minutos hábiles. Con el aviso, el vendedor recibe un recordatorio; con el escalamiento, Dirección recibe la alerta. Nadie se reasigna solo.
+        Se mide la espera del asesor que tiene la solicitud, en minutos hábiles. Con el aviso, el vendedor recibe un recordatorio; con el escalamiento, Dirección recibe la alerta. Las solicitudes de clientes CON vendedor no se reasignan solas; las repartidas se rigen por el reparto de abajo.
       </div>
       {sinHorario && pausar && (
         <div className="rh-note rh-note--warn" style={{ marginBottom: 10 }} data-testid="config-sin-horario">
@@ -143,13 +143,66 @@ export function ConfigAtencionComercial({ cliente = clientePorDefecto, onCambio,
   )
 }
 
-/** Horario (CC-7) + umbrales (CHV2-A) en un solo lugar. */
+/** REPARTO (181) · sin vendedor de cartera: la solicitud se reparte al azar entre los vendedores que reciben clientes nuevos;
+ *  si nadie la inicia en N minutos hábiles pasa a otro; agotados, a Dirección. Quien la toma puede quedarse con la cartera. */
+export function ConfigReparto({ cliente = clientePorDefecto, onCambio, version = 0 }: { cliente?: ClienteAtencion; onCambio?: () => void; version?: number }) {
+  const [cfg, setCfg] = useState<ConfigAtencion | null>(null)
+  const [activo, setActivo] = useState(false)
+  const [min, setMin] = useState('5')
+  const [fija, setFija] = useState(true)
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
+  const [ocupado, setOcupado] = useState(false)
+  const aplicar = (c: ConfigAtencion) => { setCfg(c); if (c.reparto) { setActivo(c.reparto.activo); setMin(String(c.reparto.min)); setFija(c.reparto.fija_cartera) } }
+  useEffect(() => { let vivo = true; void cliente.configAtencion().then((r) => { if (!vivo) return; if (r.ok) aplicar(r.data); else setMsg({ ok: false, texto: r.error }) }); return () => { vivo = false } }, [cliente, version])
+  const m = Number(min)
+  const invalido = !Number.isInteger(m) || m < 1 || m > 1440
+  const guardar = async () => {
+    if (invalido) { setMsg({ ok: false, texto: 'Los minutos deben ser enteros de 1 a 1440.' }); return }
+    setOcupado(true); setMsg(null)
+    const r = await cliente.guardarReparto(activo, m, fija)
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.error }); return }
+    aplicar(r.data); setMsg({ ok: true, texto: activo ? 'Reparto activo.' : 'Reparto apagado: las solicitudes sin vendedor llegan a Dirección.' }); onCambio?.()
+  }
+  if (cfg && !cfg.reparto) return null   // servidor sin la 181: no se inventa la tarjeta
+  const elegibles = cfg?.reparto?.vendedores_elegibles ?? 0
+  return (
+    <div className="card" data-testid="config-reparto">
+      <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>Reparto de solicitudes sin vendedor</h4>
+      <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
+        Cuando un doctor o visitante sin vendedor pide asesor, la solicitud se reparte al azar entre los vendedores que reciben clientes nuevos. Si nadie la inicia en el plazo, pasa a otro; agotados, llega a Dirección.
+      </div>
+      {cfg && activo && elegibles === 0 && (
+        <div className="rh-note rh-note--warn" style={{ marginBottom: 10 }} data-testid="reparto-sin-vendedores">
+          <span><b>Ningún vendedor recibe clientes nuevos.</b> Activa "Recibir clientes nuevos" en Equipo; mientras tanto, las solicitudes llegan a Dirección.</span>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}>
+          <input type="checkbox" checked={activo} onChange={(ev) => setActivo(ev.target.checked)} data-testid="rep-activo" /> Repartir al azar
+        </label>
+        <label style={{ display: 'grid', gap: 4, fontSize: 12.5 }}>Pasa a otro vendedor a los (min hábiles)
+          <input type="number" min={1} max={1440} step={1} inputMode="numeric" value={min} onChange={(ev) => setMin(ev.target.value)} style={{ ...campo, width: 120, minHeight: 40 }} data-testid="rep-min" />
+        </label>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}>
+          <input type="checkbox" checked={fija} onChange={(ev) => setFija(ev.target.checked)} data-testid="rep-fija" /> Quien la toma se queda con el cliente en su cartera
+        </label>
+        <button type="button" className="btn" style={{ minHeight: 40 }} onClick={guardar} disabled={ocupado || !cfg} data-testid="rep-guardar">Guardar reparto</button>
+      </div>
+      {cfg?.reparto && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }} data-testid="rep-elegibles">{elegibles} vendedor{elegibles === 1 ? '' : 'es'} recibe{elegibles === 1 ? '' : 'n'} clientes nuevos.</div>}
+      {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ marginTop: 8, fontSize: 12.5, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.texto}</div>}
+    </div>
+  )
+}
+
+/** Horario (CC-7) + umbrales (CHV2-A) + reparto (181) en un solo lugar. */
 export function HorarioYAlertas({ cliente = clientePorDefecto, onCambio }: { cliente?: ClienteAtencion; onCambio?: () => void }) {
   const [version, setVersion] = useState(0)   // HORARIO-P1 · cada guardado exitoso del horario refresca la tarjeta de alertas
   return (
     <div className="grid" style={{ gap: 14 }} data-testid="horario-y-alertas">
       <HorarioAtencion cliente={cliente} onCambio={() => { setVersion((v) => v + 1); onCambio?.() }} />
       <ConfigAtencionComercial cliente={cliente} onCambio={onCambio} version={version} />
+      <ConfigReparto cliente={cliente} onCambio={onCambio} version={version} />
     </div>
   )
 }

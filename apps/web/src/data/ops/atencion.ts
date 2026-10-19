@@ -16,15 +16,17 @@ export interface ClienteCartera {
   profile_id: string; nombre: string; verificado: boolean; activo: boolean; vendedor_id: string | null; vendedor_nombre: string | null
   vendedor_elegible: boolean; requiere_reasignacion: boolean; asignado_at: string | null; vendedor_historico: string | null
 }
-export interface ResumenRuteo { horario: EstadoHorario; sin_vendedor: number; reasignacion: number; handoffs_sin_asignar: number; handoffs_pendientes: number; vendedores_elegibles: number }
+export interface ResumenRuteo { horario: EstadoHorario; sin_vendedor: number; reasignacion: number; handoffs_sin_asignar: number; handoffs_pendientes: number; vendedores_elegibles: number; reparto_activo?: boolean; reparto_en_curso?: number; vendedores_elegibles_nuevos?: number }
 export interface PendienteRuteo {
   conversation_id: string; dueno: 'doctor' | 'visitante'; profile_id: string | null; nombre: string; modo: string; seller_id: string | null; seller_nombre: string | null
-  ruteo_motivo: 'sin_vendedor' | 'vendedor_no_elegible' | 'visitante' | null; origen: 'carrito' | 'manual' | null; fuera_horario: boolean | null
+  ruteo_motivo: 'sin_vendedor' | 'vendedor_no_elegible' | 'visitante' | 'reparto' | null; origen: 'carrito' | 'manual' | null; fuera_horario: boolean | null
   solicitado_at: string | null; edad_min: number | null; iniciada: boolean; cart_id: string | null; n_items: number
   atencion?: Atencion | null   // CHV2-A · estado derivado del servidor
 }
 // CHV2-A · umbrales del SLA comercial (minutos hábiles) — Dirección.
-export interface ConfigAtencion { aviso_min: number; escalamiento_min: number; pausar_fuera_horario: boolean; updated_at: string | null; horario: EstadoHorario }
+export interface ConfigAtencion { aviso_min: number; escalamiento_min: number; pausar_fuera_horario: boolean; updated_at: string | null; horario: EstadoHorario; reparto?: ConfigReparto }
+// REPARTO (181) · sin vendedor de cartera, la solicitud se reparte al azar; si nadie la inicia en `min` minutos hábiles pasa a otro.
+export interface ConfigReparto { activo: boolean; min: number; fija_cartera: boolean; vendedores_elegibles: number }
 export interface ResultadoReasignacion { cartera_vendedor: string | null; [k: string]: unknown }
 export interface Pendientes { resumen: ResumenRuteo; conversaciones: PendienteRuteo[]; carritos_pendientes: Array<{ cart_id: string; profile_id: string | null; visitante: boolean; desde: string | null; error: string | null; n_items: number }> }
 // WHATSAPP · bandeja de Dirección (169): un renglón por contacto de WhatsApp con su conversación y último mensaje.
@@ -44,7 +46,7 @@ type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: u
 const rpcPorDefecto: Rpc = (fn, args) => (supabase.rpc as unknown as Rpc)(fn, args)
 
 export const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as const   // ISO 1..7
-export const MOTIVO_RUTEO: Record<string, string> = { sin_vendedor: 'Cliente sin vendedor', vendedor_no_elegible: 'Su vendedor ya no puede atender', visitante: 'Visitante (aún sin cuenta)' }
+export const MOTIVO_RUTEO: Record<string, string> = { sin_vendedor: 'Cliente sin vendedor', vendedor_no_elegible: 'Su vendedor ya no puede atender', visitante: 'Visitante (aún sin cuenta)', reparto: 'Repartida al azar' }
 
 // HORARIO-P1 · un error que no reconocemos NO se muestra crudo (puede traer detalles internos): el usuario ve el
 // genérico + una referencia corta, y el error real (sanitizado) se reporta a observabilidad con esa referencia.
@@ -110,6 +112,10 @@ export class ClienteAtencion {
     return this.llamar<ResultadoReasignacion>('cc_solicitud_reasignar', { p_conv: conversation_id, p_vendedor: vendedor, p_motivo: motivo })
   }
   configAtencion() { return this.llamar<ConfigAtencion>('cc_atencion_config_ver') }
+  // REPARTO (181) · Dirección: activar/apagar, minutos antes de pasar a otro vendedor y si quien la toma se queda con la cartera.
+  guardarReparto(activo: boolean, min: number, fijaCartera: boolean) {
+    return this.llamar<ConfigAtencion>('cc_atencion_reparto_guardar', { p_activo: activo, p_min: min, p_fija: fijaCartera })
+  }
   guardarConfigAtencion(aviso: number, escalamiento: number, pausar: boolean) {
     return this.llamar<ConfigAtencion>('cc_atencion_config_guardar', { p_aviso: aviso, p_escalamiento: escalamiento, p_pausar: pausar })
   }
