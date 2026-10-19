@@ -72,3 +72,25 @@ export async function opcionesEntrega(actor: 'doctor' | 'staff', subtotal: numbe
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data as unknown as OpcionesEntrega }
 }
+
+// ── ENT-CFG · la regla de entrega, editable por Dirección (Configuración). El servidor valida y audita (entrega_config_guardar). ──
+export interface EntregaConfig {
+  corte: string; foraneo_gratis_desde: number; foraneo_costo: number; local_gratis_desde: number; local_costo: number
+  cp_local_desde: string; cp_local_hasta: string; dias_paqueteria: number[]; dias_chofer: number[]; dias_entrega_foranea: number[]
+  dhl_transito_min: number; dhl_transito_max: number; t1_activo: boolean; t1_transito_min: number; t1_transito_max: number
+  local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string; updated_at?: string
+}
+type ResultadoCfg<T> = { ok: true; data: T } | { ok: false; error: string }
+export async function verConfigEntrega(): Promise<ResultadoCfg<EntregaConfig>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('entrega_config_ver')
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'No se pudo leer la regla de entrega.' }
+  return { ok: true, data: data as unknown as EntregaConfig }
+}
+export async function guardarConfigEntrega(d: Partial<EntregaConfig>): Promise<ResultadoCfg<EntregaConfig>> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('entrega_config_guardar', { p: d as never })
+  if (error) return { ok: false, error: /NO_AUTORIZADO/.test(error.message) ? 'Solo Dirección cambia la regla de entrega.' : /ck_entcfg_cp_rango/.test(error.message) ? 'El C.P. "hasta" debe ser mayor o igual que el "desde".' : /check constraint|invalid input/.test(error.message) ? 'Revisa los valores: montos de 0 en adelante, C.P. de 5 dígitos, tránsito de 0 a 30 días.' : error.message }
+  return { ok: true, data: data as unknown as EntregaConfig }
+}
