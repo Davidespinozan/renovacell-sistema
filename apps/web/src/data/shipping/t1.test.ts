@@ -14,6 +14,8 @@ describe('T1 · configuración (seam)', () => {
   it('sin alguna llave indispensable → null (la Edge responde 501); con todas → base sin barra final y comercio_id = shop_id si no se da', () => {
     expect(t1Config(env({}))).toBeNull()
     for (const k of T1_SECRETOS) expect(t1Config(env({ ...FULL, [k]: '' }))).toBeNull()
+    expect(t1Config(env({ ...FULL, T1_API_URL: '...' }))).toBeNull()   // relleno pegado tal cual → sigue siendo 501
+    expect(t1Config(env({ T1_API_URL: '...', T1_AUTH_URL: '...', T1_CLIENT_SECRET: '...', T1_USERNAME: '...', T1_PASSWORD: '...', T1_SHOP_ID: '...' }))).toBeNull()
     const c = t1Config(env(FULL))!
     expect(c.base).toBe('https://api.t1.test'); expect(c.clientId).toBe('t1envios'); expect(c.comercioId).toBe('77'); expect(c.shopId).toBe('77')
     expect(t1Config(env({ ...FULL, T1_COMERCIO_ID: 'c9' }))!.comercioId).toBe('c9')

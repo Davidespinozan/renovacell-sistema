@@ -23,6 +23,8 @@ export function t1Config(env: (k: string) => string | undefined): T1Config | nul
     username: g('T1_USERNAME'), password: g('T1_PASSWORD'), shopId: g('T1_SHOP_ID'), comercioId: g('T1_COMERCIO_ID') || g('T1_SHOP_ID'),
   }
   if (!cfg.base || !cfg.authUrl || !cfg.clientSecret || !cfg.username || !cfg.password || !cfg.shopId) return null
+  // Valores de relleno ("...", "<host>") no cuentan como configuración: mejor 501 claro que un error de red confuso.
+  if (!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(cfg.base) || !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(cfg.authUrl) || /^\.{2,}$|^<.*>$/.test(cfg.clientSecret + cfg.username + cfg.password + cfg.shopId)) return null
   return cfg
 }
 export const T1_SECRETOS = ['T1_API_URL', 'T1_AUTH_URL', 'T1_CLIENT_SECRET', 'T1_USERNAME', 'T1_PASSWORD', 'T1_SHOP_ID']
