@@ -47,12 +47,16 @@ describe('T1 v2.0 · configuración por ambiente', () => {
 
 describe('T1 v2.0 · cotización (contrato oficial)', () => {
   it('request documentado + valor_paquete (T1 lo exige aunque insurance sea false): cp, medidas enteras, package_type 2, valor de la mercancía del pedido', () => {
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350)).toEqual({ home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, valor_paquete: 350, package_type: 2, packages: 1 })
-    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG, 350))).toEqual(['C.P. de destino (5 dígitos)'])
+    // comercio_id (string) = shop_id: HIPÓTESIS contractual pendiente de validar en sandbox (doc pública lo exige en el cuerpo)
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '7781')).toEqual({ comercio_id: '7781', home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, valor_paquete: 350, package_type: 2, packages: 1 })
+    expect(typeof buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '338714').comercio_id).toBe('string')
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '7781')).not.toHaveProperty('business_id')   // la guía tiene su propio contrato
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG, 350, '7781'))).toEqual(['C.P. de destino (5 dígitos)'])
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, ''))).toEqual(['identificador de la tienda (T1_SHOP_ID)'])
     // pedido sin valor válido: no se manda 0 ni un fijo; se reporta
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0).valor_paquete).toBe(0)
-    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
-    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, NaN))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0, '7781').valor_paquete).toBe(0)
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0, '7781'))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, NaN, '7781'))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
   })
   it('valorMercancia: Σ cantidad × precio vendido de los renglones; sin renglones con precio → null (nunca se inventa)', () => {
     expect(valorMercancia([{ qty: 1, unit_price: 350 }])).toBe(350)   // S100002 real: 1 × $350
@@ -92,6 +96,7 @@ describe('T1 v2.0 · cotización (contrato oficial)', () => {
     expect(mensajeT1({ detail: { error: 'Error en el campo valor_paquete con valor None: Campo requerido no proporcionado.' } })).toMatch(/valor_paquete/)
     expect(mensajeT1({ errors: [{ message: 'a' }, 'b'] })).toBe('a; b'); expect(mensajeT1(null)).toBe('')
     expect(diagnosticoT1('cotizar', 500, { success: false, message: 'Internal' })).toBe('[t1] cotizar · HTTP 500 · Internal · forma {success:boolean,message:string}')
+    expect(diagnosticoT1('cotizar', 500, { success: false, error: 'ERR-QUOTE-STORE', message: 'No fue posible registrar la cotización.', errorType: 'StoreError' })).toBe('[t1] cotizar · HTTP 500 · No fue posible registrar la cotización. · ERR-QUOTE-STORE / StoreError · forma {success:boolean,error:string,message:string,errorType:string}')
     // depuración: correos, teléfonos/números largos y tokens no se muestran ni se registran; 200 máximo
     expect(depurarTexto('Contacto ana@clinica.mx tel 55 1234 5678 token abcdefghijklmnopqrstuvwxyz0123 calle ok')).toBe('Contacto [correo] tel [número] token [token] calle ok')
     expect(mensajeT1({ message: 'Error destination_phone 5512345678 inválido' })).toBe('Error destination_phone [número] inválido')
@@ -133,7 +138,7 @@ describe('T1 v2.0 · guía (contrato oficial)', () => {
     // Un solo nombre (hoy prod: shipping_name = "Renovacell"): el apellido no se repite ni se inventa → solo la GUÍA se detiene; cotizar no usa nombres.
     expect(partirNombre('Renovacell')).toEqual({ nombre: 'Renovacell', apellidos: '' })
     expect(faltantesGuia(datosOrigenT1({ ...SHIPPER, name: 'Renovacell' }), datosDestinoT1(RECEIVER))).toEqual(['origen: apellidos'])
-    expect(buildQuoteT1({ ...SHIPPER, name: 'Renovacell' }, RECEIVER, PKG, 350).origin_postal_code).toBe('80197')
+    expect(buildQuoteT1({ ...SHIPPER, name: 'Renovacell' }, RECEIVER, PKG, 350, '7781').origin_postal_code).toBe('80197')
   })
   it('respuesta oficial: tracking_number, order_number, carrier, cost, guide_link como URL y file como PDF base64', () => {
     expect(CONTRATO_T1.guia_response).toBe(true)

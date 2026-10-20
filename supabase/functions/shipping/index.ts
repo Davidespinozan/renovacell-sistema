@@ -302,7 +302,7 @@ Deno.serve(conCors(async (req) => {
       const { data: renglones } = await admin.from('order_items').select('qty, unit_price').eq('order_id', orderIdQ)
       const valorPedido = valorMercancia((renglones ?? []) as Array<{ qty: unknown; unit_price: unknown }>)
       if (valorPedido == null) return json(422, { error: 'missing_data', message: 'El pedido no tiene renglones con precio: T1 exige declarar el valor de la mercancía y no se inventa.', missing: ['valor de la mercancía del pedido (renglones con precio)'] })
-      const cuerpo = buildQuoteT1(shipper, receiver, pkg, valorPedido)
+      const cuerpo = buildQuoteT1(shipper, receiver, pkg, valorPedido, cfg.shopId)   // comercio_id = shop_id (hipótesis contractual, ver t1.ts)
       const faltaQ = faltantesCotizacion(cuerpo)
       if (faltaQ.length) return json(422, { error: 'missing_data', missing: faltaQ })
       // Cotizar es idempotente: 429/5xx se reintenta con espera exponencial (máx. 3 intentos). Nada más se reintenta solo.

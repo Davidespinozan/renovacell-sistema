@@ -23,7 +23,7 @@ describe('T1 v2.0 · fuente de la Edge', () => {
   })
   it('valor_paquete sale de los renglones del pedido (order_items) en cotización y re-cotización, nunca del cliente ni fijo; sin pedido o sin valor → 422', () => {
     expect(bloqueT1).toMatch(/from\('order_items'\)\.select\('qty, unit_price'\)\.eq\('order_id', orderIdQ\)/)
-    expect(bloqueT1).toMatch(/buildQuoteT1\(shipper, receiver, pkg, valorPedido\)/)
+    expect(bloqueT1).toMatch(/buildQuoteT1\(shipper, receiver, pkg, valorPedido, cfg\.shopId\)/)   // comercio_id = shop_id, una sola construcción (cotizar y re-cotizar)
     expect((bloqueT1.match(/buildQuoteT1\(/g) ?? []).length).toBe(1)   // una sola construcción del cuerpo → cotizar y re-cotizar declaran el mismo valor
     expect(bloqueT1).toMatch(/valorPedido == null\) return json\(422/); expect(bloqueT1).toMatch(/!orderIdQ\) return json\(422/)
     expect(bloqueT1).not.toMatch(/p\.(valor|value|valor_paquete|package_value)\b/)

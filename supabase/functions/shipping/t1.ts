@@ -79,10 +79,15 @@ const correo = (e?: string | null) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpia(
 // `valor_paquete`: valor declarado de la mercancía (decimal, MXN). T1 lo exige en el sandbox aunque `insurance` sea false
 // (su documentación lo define como "valor de la factura"). Sale del PEDIDO: suma de renglones (cantidad × precio vendido, IVA
 // incluido porque los precios lo incluyen), sin flete ni descuentos adicionales. Nunca un valor fijo ni un costo interno.
-export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; valor_paquete: number; package_type: number; packages: number }
-export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, valorMercancia: number, diasEmbarque = 0): QuoteV2Request {
+// HIPÓTESIS CONTRACTUAL (pendiente de validar con una cotización real en sandbox): la doc pública de cotización exige en el
+// CUERPO `comercio_id` (string, "Identificador único de la tienda"); el ejemplo v2.0 de T1 Cuenta no lo lista, pero el sandbox
+// ya demostró exigir nombres de esa familia (`valor_paquete`) y el error ERR-QUOTE-STORE ocurre al "registrar" la cotización.
+// Se manda el mismo identificador de la cabecera `shop_id`. Si T1 lo rechaza o no cambia nada, se retira (un solo campo).
+export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; valor_paquete: number; package_type: number; packages: number; comercio_id: string }
+export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, valorMercancia: number, comercioId: string, diasEmbarque = 0): QuoteV2Request {
   const valor = Number(valorMercancia)
   return {
+    comercio_id: String(limpia(comercioId)),
     home: false, origin_postal_code: limpia(shipper.cp).replace(/\D/g, ''), destination_postal_code: limpia(receiver.address.cp).replace(/\D/g, ''),
     weight: entero(pkg.weightKg), length: entero(pkg.lengthCm), width: entero(pkg.widthCm), height: entero(pkg.heightCm),
     shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, valor_paquete: Number.isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : 0, package_type: 2, packages: entero(pkg.pieces),
@@ -94,6 +99,7 @@ export function faltantesCotizacion(q: QuoteV2Request): string[] {
   if (!/^\d{5}$/.test(q.destination_postal_code)) f.push('C.P. de destino (5 dígitos)')
   if (!(q.weight > 0 && q.length > 0 && q.width > 0 && q.height > 0)) f.push('peso y medidas del paquete')
   if (!(q.valor_paquete > 0)) f.push('valor de la mercancía del pedido (renglones con precio)')
+  if (!q.comercio_id) f.push('identificador de la tienda (T1_SHOP_ID)')
   return f
 }
 /** Valor declarado de la mercancía desde los renglones del pedido: Σ cantidad × precio vendido. null si no hay renglones con precio. */
@@ -231,7 +237,9 @@ export function mensajeT1(data: any): string {
 /** Línea de diagnóstico para los logs de la Edge: código, texto de T1 y FORMA de la respuesta (solo llaves). Sin datos enviados ni cabeceras. */
 // deno-lint-ignore no-explicit-any
 export function diagnosticoT1(etapa: string, status: number, data: any): string {
-  return `[t1] ${etapa} · HTTP ${status} · ${mensajeT1(data) || 'sin mensaje'} · forma ${formaDe(data)}`
+  // error/errorType de T1 (códigos y tipos, no datos personales) ayudan a distinguir validación, configuración de tienda o falla interna.
+  const extra = [data?.error, data?.errorType].map((x) => (typeof x === 'string' ? depurarTexto(x).slice(0, 80) : '')).filter(Boolean).join(' / ')
+  return `[t1] ${etapa} · HTTP ${status} · ${mensajeT1(data) || 'sin mensaje'}${extra ? ` · ${extra}` : ''} · forma ${formaDe(data)}`
 }
 export type ClaseErrorT1 = 'credenciales' | 'sin_saldo' | 'limite' | 'proveedor' | 'cotizacion' | 'token_vencido'
 /** Clasifica y redacta sin exponer cabeceras ni la respuesta completa (errores documentados: 400, 401, 402, 409, 500). */
