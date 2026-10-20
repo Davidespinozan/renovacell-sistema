@@ -2,7 +2,7 @@
 // cotización (request documentado; respuesta {success, detail[]} con total_cost y token), guía (request origin_/destination_,
 // respuesta detail.tracking_number/order_number/carrier/cost/guide_link/file), errores 400/401/402/409/500, reintentos.
 import { describe, it, expect } from 'vitest'
-import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
+import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, mensajeT1, diagnosticoT1, depurarTexto, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
 
 // Origen = bloque "Origen de envíos" de Configuración (misma fuente que DHL), con los campos estructurados de la 183.
 const SHIPPER = { name: 'Renovacell SA de CV', addressLine1: 'Nuevo Mundo 1045 17', cp: '80197', city: 'Culiacán', state: 'Sinaloa', country: 'MX', phone: '667 164 7799', email: 'envios@renovacell.mx', calle: 'Nuevo Mundo', numeroExt: '1045', numeroInt: '17', colonia: 'Las Quintas', referencias: 'Local 17, frente al parque' }
@@ -87,7 +87,15 @@ describe('T1 v2.0 · cotización (contrato oficial)', () => {
     expect(errorT1(401, { message: 'Unauthorized' })).toMatchObject({ clase: 'credenciales' }); expect(errorT1(401, {}).mensaje).not.toContain(KEY)
     expect(errorT1(402, {})).toMatchObject({ clase: 'sin_saldo' })
     expect(errorT1(409, { message: 'quote_token expired' })).toMatchObject({ clase: 'token_vencido' })
-    expect(errorT1(500, { message: 'x'.repeat(500) }).mensaje).toBe('T1 no está disponible (500).')
+    expect(errorT1(500, {}).mensaje).toBe('T1 no está disponible (500).')
+    expect(errorT1(500, { message: 'Error interno al calcular el servicio ' + 'detalle '.repeat(60) }).mensaje).toMatch(/^T1 respondió 500: Error interno al calcular el servicio/)   // el texto de T1 se conserva (recortado) también en 5xx
+    expect(mensajeT1({ detail: { error: 'Error en el campo valor_paquete con valor None: Campo requerido no proporcionado.' } })).toMatch(/valor_paquete/)
+    expect(mensajeT1({ errors: [{ message: 'a' }, 'b'] })).toBe('a; b'); expect(mensajeT1(null)).toBe('')
+    expect(diagnosticoT1('cotizar', 500, { success: false, message: 'Internal' })).toBe('[t1] cotizar · HTTP 500 · Internal · forma {success:boolean,message:string}')
+    // depuración: correos, teléfonos/números largos y tokens no se muestran ni se registran; 200 máximo
+    expect(depurarTexto('Contacto ana@clinica.mx tel 55 1234 5678 token abcdefghijklmnopqrstuvwxyz0123 calle ok')).toBe('Contacto [correo] tel [número] token [token] calle ok')
+    expect(mensajeT1({ message: 'Error destination_phone 5512345678 inválido' })).toBe('Error destination_phone [número] inválido')
+    expect(errorT1(500, { message: 'Internal: ' + 'detalle '.repeat(80) }).mensaje.length).toBeLessThanOrEqual(220)
     for (const st of [400, 401, 402, 409]) expect(reintentableCotizacion(st)).toBe(false)
     for (const st of [429, 500, 502, 503]) expect(reintentableCotizacion(st)).toBe(true)
     expect([0, 1, 2, 3, 6].map((i) => esperaReintentoMs(i))).toEqual([600, 1200, 2400, 4800, 8000])

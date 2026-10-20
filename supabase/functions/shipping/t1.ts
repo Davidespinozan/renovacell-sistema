@@ -212,17 +212,39 @@ export function parseGuideT1(data: any): LecturaGuia {
 }
 
 // ── Errores y reintentos ───────────────────────────────────────────────────────────────────────────
+/** Depura un texto antes de mostrarlo o registrarlo: correos, teléfonos/números largos y tokens largos se ocultan; máximo 200. */
+export function depurarTexto(t: string): string {
+  return limpia(t)
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[correo]')
+    .replace(/\b[A-Za-z0-9_\-]{24,}\b/g, '[token]')
+    .replace(/\b\d[\d\s().-]{6,}\d\b/g, '[número]')
+    .slice(0, 200)
+}
+/** Texto de error de T1 (message / error / detail.message / detail.error / errors[]), depurado y recortado; nunca cabeceras ni lo que enviamos. */
+// deno-lint-ignore no-explicit-any
+export function mensajeT1(data: any): string {
+  const d = data?.detail
+  const cand = [data?.message, data?.error, d?.message, d?.error, Array.isArray(data?.errors) ? data.errors.map((e: unknown) => typeof e === 'string' ? e : (e as { message?: string })?.message ?? '').filter(Boolean).join('; ') : '', typeof d === 'string' ? d : '']
+  const m = cand.map((x) => limpia(typeof x === 'string' ? x : x == null ? '' : JSON.stringify(x))).find(Boolean) ?? ''
+  return depurarTexto(m)
+}
+/** Línea de diagnóstico para los logs de la Edge: código, texto de T1 y FORMA de la respuesta (solo llaves). Sin datos enviados ni cabeceras. */
+// deno-lint-ignore no-explicit-any
+export function diagnosticoT1(etapa: string, status: number, data: any): string {
+  return `[t1] ${etapa} · HTTP ${status} · ${mensajeT1(data) || 'sin mensaje'} · forma ${formaDe(data)}`
+}
 export type ClaseErrorT1 = 'credenciales' | 'sin_saldo' | 'limite' | 'proveedor' | 'cotizacion' | 'token_vencido'
 /** Clasifica y redacta sin exponer cabeceras ni la respuesta completa (errores documentados: 400, 401, 402, 409, 500). */
 // deno-lint-ignore no-explicit-any
 export function errorT1(status: number, data: any): { clase: ClaseErrorT1; mensaje: string } {
-  const m = limpia(String(data?.message ?? data?.error ?? data?.detail?.message ?? '')).slice(0, 160)
+  const m = mensajeT1(data)   // ya depurado (sin correos, números largos ni tokens) y recortado
   if (status === 401 || status === 403) return { clase: 'credenciales', mensaje: 'T1 rechazó la llave o el shop_id, o la llave expiró (revisa el ambiente y las credenciales).' }
   if (status === 402) return { clase: 'sin_saldo', mensaje: 'T1: saldo insuficiente en la cuenta para generar la guía.' }
   if (status === 409) return { clase: 'token_vencido', mensaje: 'T1: la cotización ya se usó o venció. Vuelve a cotizar y confirma el servicio y el precio.' }
   if (status === 429) return { clase: 'limite', mensaje: 'T1: demasiadas solicitudes; espera un momento y vuelve a intentar.' }
   if (status === 400 || status === 422) return { clase: 'cotizacion', mensaje: m ? `T1: ${m}` : 'T1 no aceptó los datos enviados.' }
-  if (status >= 500) return { clase: 'proveedor', mensaje: `T1 no está disponible (${status}).` }
+  // 5xx: se conserva el texto de T1 (su sandbox explica errores de validación también con 500); sin texto, solo el código.
+  if (status >= 500) return { clase: 'proveedor', mensaje: m ? `T1 respondió ${status}: ${m}` : `T1 no está disponible (${status}).` }
   return { clase: 'proveedor', mensaje: m ? `T1: ${m}` : `T1 respondió ${status}.` }
 }
 /** Solo las consultas idempotentes (cotizar) se reintentan: 429 y 5xx, con espera exponencial; la guía NUNCA se reintenta sola. */

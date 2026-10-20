@@ -25,7 +25,7 @@ import {
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
-import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
+import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, diagnosticoT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -318,8 +318,9 @@ Deno.serve(conCors(async (req) => {
       }
       if (action === 'rate') {
         const q = await cotizar()
-        if (!q.ok) { const e = errorT1(q.status, q.data); obs('rate', 'provider_error', { code: q.status, mensaje: `T1 cotización: ${e.clase}` }); return json(502, { error: e.mensaje, clase: e.clase }) }
+        if (!q.ok) { const e = errorT1(q.status, q.data); console.warn(diagnosticoT1('cotizar', q.status, q.data)); obs('rate', 'provider_error', { code: q.status, mensaje: `T1 cotización: ${e.clase}` }); return json(502, { error: e.mensaje, clase: e.clase }) }
         if (!q.lectura.ok) {
+          console.warn(diagnosticoT1(`cotizar/${q.lectura.motivo}`, q.status, q.data))
           obs('rate', 'provider_error', { code: q.lectura.motivo, mensaje: `T1 cotización ${q.lectura.motivo}: ${q.lectura.forma}` })
           return json(502, { error: q.lectura.motivo === 'sin_servicios' ? 'T1 no devolvió servicios para estos datos.' : q.lectura.motivo === 'respuesta_incompleta' ? 'T1 devolvió servicios incompletos (sin total o sin token); no se puede cotizar.' : 'T1 respondió en un formato no reconocido; se registró la forma para revisarlo.', clase: 'contrato', forma: q.lectura.forma })
         }
@@ -365,12 +366,12 @@ Deno.serve(conCors(async (req) => {
       let serverRate: TarifaT1 | undefined
       try {
         const q = await cotizar()
-        if (!q.ok || !q.lectura.ok) { const msg = q.ok ? (q.lectura.ok ? '' : q.lectura.motivo === 'sin_servicios' ? 'T1 ya no ofrece servicios para estos datos.' : 'T1 respondió una cotización incompleta.') : errorT1(q.status, q.data).mensaje; obs('create_shipment', 'provider_error', { code: q.status, mensaje: 'T1 cotización previa a la guía' }); await failAttempt(admin, attemptId, msg); return json(502, { error: msg }) }
+        if (!q.ok || !q.lectura.ok) { const msg = q.ok ? (q.lectura.ok ? '' : q.lectura.motivo === 'sin_servicios' ? 'T1 ya no ofrece servicios para estos datos.' : 'T1 respondió una cotización incompleta.') : errorT1(q.status, q.data).mensaje; console.warn(diagnosticoT1('re-cotizar', q.status, q.data)); obs('create_shipment', 'provider_error', { code: q.status, mensaje: 'T1 cotización previa a la guía' }); await failAttempt(admin, attemptId, msg); return json(502, { error: msg }) }
         serverRate = q.lectura.tarifas.find((x) => x.serviceCode === serviceCode)
       } catch (e) {
         obs('create_shipment', 'provider_error', { code: 'rate_exception', error: e })
         await failAttempt(admin, attemptId, `rate: ${(e as Error).message}`)
-        return json(502, { error: `Error con T1 (cotización): ${(e as Error).message}` })
+        return json(502, { error: 'No se pudo re-cotizar con T1 (sin respuesta de la red). Vuelve a cotizar.', clase: 'edge' })
       }
       if (!serverRate) { await failAttempt(admin, attemptId, 'service_not_available'); return json(422, { error: 'service_not_available', message: 'El servicio elegido ya no está disponible para estos datos. Vuelve a cotizar.' }) }
       if (Math.abs(serverRate.amount - montoVisto) > 0.005) {
@@ -388,7 +389,7 @@ Deno.serve(conCors(async (req) => {
       }
       const shipData = await shipResp.json().catch(() => ({}))
       // 4xx/5xx documentados (400 datos, 401 llave, 402 saldo, 409 token usado/vencido, 500): sin efecto comprobable → intento fallido, el operador decide.
-      if (!shipResp.ok) { const e = errorT1(shipResp.status, shipData); obs('create_shipment', 'provider_error', { code: shipResp.status, mensaje: `T1 rechazó la guía: ${e.clase}` }); await failAttempt(admin, attemptId, e.mensaje); return json(shipResp.status === 409 ? 409 : 502, { error: e.mensaje, clase: e.clase }) }
+      if (!shipResp.ok) { const e = errorT1(shipResp.status, shipData); console.warn(diagnosticoT1('guia', shipResp.status, shipData)); obs('create_shipment', 'provider_error', { code: shipResp.status, mensaje: `T1 rechazó la guía: ${e.clase}` }); await failAttempt(admin, attemptId, e.mensaje); return json(shipResp.status === 409 ? 409 : 502, { error: e.mensaje, clase: e.clase }) }
       const lg = parseGuideT1(shipData)
       if (!lg.ok) {
         if (lg.motivo === 'rechazada') { obs('create_shipment', 'provider_error', { code: 'rechazada', mensaje: 'T1 2xx con success=false' }); await failAttempt(admin, attemptId, lg.mensaje); return json(502, { error: `T1: ${lg.mensaje}` }) }
@@ -426,8 +427,11 @@ Deno.serve(conCors(async (req) => {
       if (labelPath) { const { data: sg } = await admin.storage.from(LABELS_BUCKET).createSignedUrl(labelPath, SIGNED_TTL); labelUrl = sg?.signedUrl ?? labelUrl }
       return json(200, { label: { provider: 't1', ambiente, carrier, service: serverRate.service, serviceCode, tracking: g.tracking, labelUrl, amount, currency: serverRate.currency, etaDays, estimatedDeliveryAt } })
     } catch (e) {
+      // Excepción de NUESTRA Edge (red, timeout, lectura): se distingue de un 5xx del proveedor por la clase y el texto; sin traza interna.
+      const razon = /abort/i.test(String((e as Error)?.name ?? '') + String((e as Error)?.message ?? '')) ? 'se agotó el tiempo de espera' : 'sin respuesta de la red'
+      console.warn(`[t1] excepcion · ${describirT1(cfg)} · ${razon}`)
       obs('t1', 'provider_error', { code: 'exception', mensaje: describirT1(cfg) })
-      return json(502, { error: `Error con T1: ${(e as Error).message}` })
+      return json(502, { error: `No se pudo hablar con T1 (${razon}). Intenta de nuevo en un momento.`, clase: 'edge' })
     }
   }
 

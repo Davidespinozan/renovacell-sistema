@@ -31,6 +31,10 @@ describe('T1 v2.0 · fuente de la Edge', () => {
   })
   it('la llave y el PDF no se registran: ningún obs()/json() lleva cabeceras ni cfg.apiKey; provider_meta no lleva file/base64; el token no sale al navegador', () => {
     for (const m of bloqueT1.match(/obs\([^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bH\b|apiKey|cabeceras|labelBase64|\.file\b/)
+    for (const m of bloqueT1.match(/console\.warn\([^\n]*\)/g) ?? []) { expect(m).toMatch(/diagnosticoT1\(|describirT1\(cfg\)/); expect(m).not.toMatch(/\bH\b|apiKey|cabeceras|cuerpo|receiver|shipper|\(e as Error\)\.message/) }   // solo diagnóstico depurado; nunca cabeceras, lo enviado ni trazas
+    expect((bloqueT1.match(/console\.warn\(diagnosticoT1\(/g) ?? []).length).toBe(4)
+    expect(bloqueT1).not.toMatch(/json\(\d+, \{ error: `[^`]*\$\{\(e as Error\)\.message\}/)   // sin trazas internas al usuario
+    expect(bloqueT1).toMatch(/clase: 'edge'/)   // excepción nuestra ≠ 5xx del proveedor (clase 'proveedor')
     for (const m of bloqueT1.match(/json\(\d+, [^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bH\b|apiKey|cabeceras|labelBase64/)
     const meta = bloqueT1.match(/provider_meta: \{[^\n]*\}/)![0]
     expect(meta).not.toMatch(/labelBase64|file|base64/); expect(meta).toMatch(/ambiente/); expect(meta).toMatch(/order_number: g\.orderNumber/); expect(meta).toMatch(/guide_link: g\.labelUrl/)
