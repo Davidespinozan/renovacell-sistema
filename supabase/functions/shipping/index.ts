@@ -9,6 +9,7 @@
 //
 // Secrets (solo aquí, nunca en el cliente / VITE / repo):
 //   DHL_API_USERNAME, DHL_API_PASSWORD, DHL_ACCOUNT_NUMBER, DHL_API_ENV(test|production)
+//   T1_API_URL, T1_AUTH_URL, T1_CLIENT_ID, T1_CLIENT_SECRET, T1_USERNAME, T1_PASSWORD, T1_SHOP_ID, T1_COMERCIO_ID, T1_ORIGEN_COLONIA (T1 Envíos; `provider: 't1'`)
 //   (legado) SHIPPING_API_KEY, SHIPPING_API_URL, SHIPPING_RATE_PATH, SHIPPING_LABEL_PATH
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
@@ -24,6 +25,8 @@ import {
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
+import { t1Config, t1Token, cabecerasT1, buildQuoteT1, parseQuoteT1, buildGuideT1, parseGuideT1, parseTrackingT1, buildPickupT1, parsePickupT1, t1ErrorMessage, T1_SECRETOS } from './t1.ts'   // T1 · segundo proveedor
+import { resumenT1 } from './rastreo.ts'
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -90,7 +93,7 @@ async function sha256Hex(str: string): Promise<string> {
 async function labelPayload(admin: any, sh: any) {
   let labelUrl = ''
   if (sh.label_path) { const { data: sg } = await admin.storage.from(LABELS_BUCKET).createSignedUrl(sh.label_path, SIGNED_TTL); labelUrl = sg?.signedUrl ?? '' }
-  return { provider: 'dhl', carrier: sh.carrier ?? 'DHL', service: 'DHL Express', serviceCode: sh.service_code, tracking: sh.tracking_number, labelUrl, amount: Number(sh.provider_cost ?? 0), currency: sh.currency ?? 'MXN', estimatedDeliveryAt: sh.estimated_delivery_at ?? '' }
+  return { provider: s(sh.provider) || 'dhl', carrier: sh.carrier ?? 'DHL', service: (s(sh.provider) || 'dhl') === 't1' ? `T1 · ${sh.carrier ?? ''}`.trim() : 'DHL Express', serviceCode: sh.service_code, tracking: sh.tracking_number, labelUrl, amount: Number(sh.provider_cost ?? 0), currency: sh.currency ?? 'MXN', estimatedDeliveryAt: sh.estimated_delivery_at ?? '' }
 }
 
 Deno.serve(conCors(async (req) => {
@@ -128,7 +131,35 @@ Deno.serve(conCors(async (req) => {
     const cerrado = sh.status === 'delivered' || sh.status === 'cancelado'
     let consultado = false, cierre: 'cerrado' | 'pendiente' | null = null, aviso: string | null = null
     if (!cerrado && debeConsultar(prev, Date.now(), p.force === true && esLogistica)) {
-      if (proveedor !== 'dhl') {
+      if (proveedor === 't1') {
+        // T1 · GET /webhook-maestro/query/estado-guia/:guia → familia_externa → estado neutral.
+        const cfg = t1Config(Deno.env.get)
+        if (!cfg) return json(501, { error: 'not_configured', message: 'T1 no habilitado.' })
+        try {
+          const tk = await t1Token(cfg)
+          const r = await fetch(`${cfg.base}/webhook-maestro/query/estado-guia/${encodeURIComponent(s(sh.tracking_number))}`, { headers: cabecerasT1(cfg, tk) })
+          const data = await r.json().catch(() => ({}))
+          consultado = true
+          if (!r.ok) {
+            obs('sync_tracking', 'provider_error', { code: r.status, mensaje: 'T1 respondió error en rastreo' })
+            await admin.rpc('registrar_rastreo', { p_shipment: sh.id, p_provider: proveedor, p_estado: null, p_error: `T1 ${r.status}` })
+          } else {
+            const res = resumenT1(data)
+            const { error: regErr } = await admin.rpc('registrar_rastreo', {
+              p_shipment: sh.id, p_provider: proveedor, p_estado: res.estado, p_descripcion: res.descripcion,
+              p_firmado_por: res.firmadoPor, p_entregado_at: res.entregadoAt, p_eventos: res.eventos, p_error: null,
+            })
+            if (regErr) return json(500, { error: 'No se pudo guardar el rastreo.' })
+            if (res.estado === 'entregado' && esLogistica) {
+              const { error: ceErr } = await caller.rpc('confirmar_entrega', { p_shipment_id: sh.id, p_proof_path: null, p_received_by: recibioSegunPaqueteria(res, 't1') })
+              cierre = ceErr ? 'pendiente' : 'cerrado'
+            } else if (res.estado === 'entregado') cierre = 'pendiente'
+          }
+        } catch (e) {
+          obs('sync_tracking', 'provider_error', { code: 'red', mensaje: 'sin respuesta de T1 en rastreo', error: e })
+          await admin.rpc('registrar_rastreo', { p_shipment: sh.id, p_provider: proveedor, p_estado: null, p_error: 'sin respuesta de la paquetería' })
+        }
+      } else if (proveedor !== 'dhl') {
         aviso = 'El rastreo automático aún no está disponible para esta paquetería.'
       } else {
         const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD')
@@ -202,6 +233,39 @@ Deno.serve(conCors(async (req) => {
     if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
     if (!sh?.tracking_number) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería.' })
     if (sh.status === 'delivered' || sh.status === 'cancelado') return json(409, { error: 'envio_cerrado', message: 'Ese envío ya está cerrado.' })
+    if ((s(sh.provider) || 'dhl') === 't1') {
+      // T1 · POST /pickup/create con la paquetería de la guía; T1 no documenta cancelación → se avisa tal cual.
+      if (action === 'cancel_pickup') return json(422, { error: 'proveedor_sin_cancelacion', message: 'T1 no permite cancelar la recolección desde el sistema; cancélala en t1envios.com.' })
+      const cfg = t1Config(Deno.env.get)
+      if (!cfg) return json(501, { error: 'not_configured', message: 'T1 no habilitado.' })
+      // deno-lint-ignore no-explicit-any
+      const metaT1 = ((sh.provider_meta ?? {}) as Record<string, any>)
+      const vigenteT1 = s(sh.pickup_confirmation)
+      if (vigenteT1) return json(200, { idempotent: true, pickup: metaT1.pickup ?? { confirmation: vigenteT1 } })
+      const { hoy, ahoraMin } = ahoraLocalOrigen(Date.now())
+      const pedido = limpiarRecoleccion(p.pickup as RecoleccionSolicitada)
+      const errRec = errorRecoleccion(pedido, hoy, ahoraMin)
+      if (errRec) return json(422, { error: 'recoleccion_invalida', message: errRec })
+      // Mismo origen y paquete con que se generó la guía (guardados en el envío); si no, el de la empresa.
+      const shipper = (sh.ship_from as NeutralShipper | null) ?? (await companyShipper(admin)).shipper
+      const pkgT1 = (sh.package as NeutralPackage | null) ?? { weightKg: 1, lengthCm: 10, widthCm: 10, heightCm: 10, pieces: 1 }
+      const mensajeria = s(metaT1.paqueteria) || s(sh.service_code).split('|')[0] || 'DHL'
+      try {
+        const tk = await t1Token(cfg)
+        const r = await fetch(`${cfg.base}/pickup/create`, { method: 'POST', headers: cabecerasT1(cfg, tk), body: JSON.stringify(buildPickupT1(shipper, pkgT1, mensajeria, { date: pedido.date, ready: pedido.ready, close: pedido.close, instructions: pedido.instructions }, cfg.comercioId, Deno.env.get('T1_ORIGEN_COLONIA'))) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok || d?.success === false) { obs('schedule_pickup', 'provider_error', { code: r.status, mensaje: 'T1 respondió error al agendar la recolección' }); return json(502, { error: t1ErrorMessage(r.status, d) }) }
+        const { confirmation } = parsePickupT1(d)
+        if (!confirmation) { obs('schedule_pickup', 'provider_error', { code: 'sin_confirmacion', mensaje: 'T1 2xx sin pick_up' }); return json(502, { error: 'T1 no devolvió número de recolección.' }) }
+        const pickup = { confirmation, date: pedido.date, ready: pedido.ready, close: pedido.close, location: pedido.location, instructions: pedido.instructions ?? null, mensajeria, agendada_at: new Date().toISOString() }
+        const { error: upErr } = await caller.from('shipments').update({ pickup_confirmation: confirmation, provider_meta: { ...metaT1, pickup } }).eq('id', sh.id)
+        if (upErr) return json(500, { error: 'no_guardada', message: `T1 agendó la recolección ${confirmation} pero no se pudo guardar. Anótala.` })
+        return json(200, { pickup })
+      } catch (e) {
+        obs('schedule_pickup', 'unknown', { code: 'red', error: e })
+        return json(504, { error: 'resultado_desconocido', message: 'T1 no respondió. Puede que la recolección SÍ haya quedado agendada: confírmalo en t1envios.com antes de volver a intentar.' })
+      }
+    }
     if ((s(sh.provider) || 'dhl') !== 'dhl') return json(422, { error: 'proveedor_sin_recoleccion', message: 'La recolección desde el sistema aún no está disponible para esta paquetería.' })
     const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD'), account = Deno.env.get('DHL_ACCOUNT_NUMBER')
     if (!user || !pass || !account) return json(501, { error: 'not_configured', message: 'DHL no habilitado.' })
@@ -254,6 +318,121 @@ Deno.serve(conCors(async (req) => {
     const { error: upErr } = await caller.from('shipments').update({ pickup_confirmation: null, provider_meta: { ...meta, pickup: null, pickup_cancelada: pickupAnterior } }).eq('id', sh.id)
     if (upErr) return json(500, { error: 'no_guardada', message: 'DHL canceló la recolección pero no se pudo actualizar el sistema. Vuelve a intentar.' })
     return json(200, { cancelled: true })
+  }
+
+  // ===================== PROVIDER T1 ENVÍOS (acciones neutras, `provider: 't1'`) =====================
+  // Mismo contrato que DHL: cotizar → el cliente elige SERVICIO (serviceCode "PAQUETERIA|SERVICIO") → el servidor re-cotiza
+  // (precio y token de T1 autoritativos) → guía con token_quote → etiqueta al bucket privado → finalize_shipment atómico.
+  if (action === 'rate' || action === 'create_shipment' || action === 'track') if (s(p.provider) === 't1') {
+    const cfg = t1Config(Deno.env.get)
+    if (!cfg) return json(501, { error: 'not_configured', message: `T1 no habilitado. Carga ${T1_SECRETOS.join(', ')}.` })
+    try {
+      const tk = await t1Token(cfg)
+      const H = cabecerasT1(cfg, tk)
+      if (action === 'track') {
+        const tn = s(p.tracking)
+        if (!tn) return json(400, { error: 'Falta tracking.' })
+        const r = await fetch(`${cfg.base}/webhook-maestro/query/estado-guia/${encodeURIComponent(tn)}`, { headers: H })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) { if (r.status === 400 || r.status === 404) return json(200, emptyTrackingResult(tn)); obs('track', 'provider_error', { code: r.status, mensaje: 'T1 respondió error en rastreo' }); return json(502, { error: t1ErrorMessage(r.status, data) }) }
+        return json(200, { tracking: tn, ...parseTrackingT1(data) })
+      }
+      const { shipper, missing: originMiss } = await companyShipper(admin)
+      if (originMiss.length) return json(422, { error: 'shipping_origin_not_configured', message: 'Configura el origen de envíos en Configuración antes de operar paquetería.', missing: originMiss })
+      const receiver = p.receiver as NeutralReceiver
+      const pkg = p.pkg as NeutralPackage
+      const miss = missingReceiverPkg(receiver, pkg)
+      if (miss.length) return json(422, { error: 'missing_data', missing: miss })
+      const cotizar = async () => {
+        const r = await fetch(`${cfg.base}/quote/create`, { method: 'POST', headers: H, body: JSON.stringify(buildQuoteT1(shipper, receiver, pkg, cfg.comercioId)) })
+        const data = await r.json().catch(() => ({}))
+        return { ok: r.ok && data?.success !== false, status: r.status, data, rates: parseQuoteT1(data) }
+      }
+      if (action === 'rate') {
+        const q = await cotizar()
+        if (!q.ok) { obs('rate', 'provider_error', { code: q.status, mensaje: 'T1 respondió error en cotización' }); return json(502, { error: t1ErrorMessage(q.status, q.data) }) }
+        if (!q.rates.length) { obs('rate', 'provider_error', { code: 'sin_tarifas', mensaje: 'T1 no devolvió tarifas' }); return json(502, { error: 'T1 no devolvió tarifas para estos datos.' }) }
+        // El token de cada servicio se queda en el servidor: el cliente solo ve y elige el servicio.
+        return json(200, { rates: q.rates.map(({ token: _t, ...r }) => ({ ...r, provider: 't1' })) })
+      }
+      // create_shipment
+      const orderId = s(p.order_id)
+      const orderRef = s(p.orderRef) || orderId
+      const serviceCode = s(p.rate?.serviceCode) || s(p.serviceCode)
+      const idemKey = s(p.idempotencyKey) || `${orderId}:${serviceCode}`
+      if (!orderId) return json(400, { error: 'Falta order_id.' })
+      if (!serviceCode) return json(400, { error: 'Falta el servicio (elige una tarifa).' })
+      const { data: existing } = await admin.from('shipments')
+        .select('tracking_number, label_path, carrier, service_code, estimated_delivery_at, provider_cost, currency, provider')
+        .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+      if (existing?.tracking_number) return json(200, { idempotent: true, label: await labelPayload(admin, existing) })
+      const { data: active } = await admin.from('shipping_attempts')
+        .select('status').eq('order_id', orderId).in('status', ['pending', 'succeeded', 'unknown_requires_reconciliation']).limit(1).maybeSingle()
+      if (active?.status === 'unknown_requires_reconciliation') return json(409, { error: 'unknown_requires_reconciliation', message: 'Un intento anterior quedó en estado desconocido; requiere reconciliación antes de reintentar.' })
+      if (active?.status === 'pending') return json(409, { error: 'in_progress', message: 'Ya hay una guía en proceso para este pedido.' })
+      const { data: cancelacion } = await admin.from('order_cancel_requests').select('id').eq('order_id', orderId).eq('status', 'pendiente').limit(1).maybeSingle()
+      if (cancelacion) return json(409, { error: 'cancelacion_solicitada', message: 'Este pedido tiene una cancelación por resolver. Dirección decide antes de generar la guía.' })
+      const fingerprint = await sha256Hex(JSON.stringify({ shipper, receiver, pkg, serviceCode, provider: 't1' }))
+      const msgRef = `${orderId}-${idemKey}`.slice(0, 36)
+      const { data: claim, error: claimErr } = await admin.from('shipping_attempts')
+        .insert({ order_id: orderId, provider: 't1', idempotency_key: idemKey, service_code: serviceCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending' })
+        .select('id').single()
+      if (claimErr || !claim) return json(409, { error: 'in_progress', message: 'Otra solicitud está creando la guía de este pedido.' })
+      const attemptId = claim.id as string
+      // Re-cotización server-side: el token de T1 se obtiene aquí; el precio es el del servidor.
+      let serverRate: ReturnType<typeof parseQuoteT1>[number] | undefined
+      try {
+        const q = await cotizar()
+        if (!q.ok) { obs('create_shipment', 'provider_error', { code: q.status, mensaje: 'T1 respondió error en cotización previa a la guía' }); await failAttempt(admin, attemptId, t1ErrorMessage(q.status, q.data)); return json(502, { error: t1ErrorMessage(q.status, q.data) }) }
+        serverRate = q.rates.find((x) => x.serviceCode === serviceCode)
+      } catch (e) {
+        obs('create_shipment', 'provider_error', { code: 'rate_exception', error: e })
+        await failAttempt(admin, attemptId, `rate: ${(e as Error).message}`)
+        return json(502, { error: `Error con T1 (cotización): ${(e as Error).message}` })
+      }
+      if (!serverRate) { await failAttempt(admin, attemptId, 'service_not_available'); return json(422, { error: 'service_not_available', message: 'El servicio elegido ya no está disponible para estos datos. Vuelve a cotizar.' }) }
+      let shipResp: Response
+      try {
+        shipResp = await fetch(`${cfg.base}/guide/create`, { method: 'POST', headers: H, body: JSON.stringify(buildGuideT1(shipper, receiver, serverRate.token, orderRef, cfg.comercioId, Deno.env.get('T1_ORIGEN_COLONIA'))) })
+      } catch (e) {
+        obs('create_shipment', 'unknown', { code: 'create_timeout', error: e })
+        await markUnknown(admin, attemptId, `create timeout/network: ${(e as Error).message}`)
+        return json(409, { error: 'unknown_requires_reconciliation', message: 'No se pudo confirmar el resultado con T1; la guía pudo crearse. Requiere reconciliación (no se reintenta automáticamente).' })
+      }
+      const shipData = await shipResp.json().catch(() => ({}))
+      if (!shipResp.ok || shipData?.success === false) { obs('create_shipment', 'provider_error', { code: shipResp.status, mensaje: 'T1 rechazó la creación de la guía' }); await failAttempt(admin, attemptId, t1ErrorMessage(shipResp.status, shipData)); return json(502, { error: t1ErrorMessage(shipResp.status, shipData) }) }
+      const g = parseGuideT1(shipData)
+      if (!g.tracking) { obs('create_shipment', 'unknown', { code: 'sin_tracking', mensaje: 'T1 2xx sin guía' }); await markUnknown(admin, attemptId, 'T1 2xx sin guía'); return json(409, { error: 'unknown_requires_reconciliation', message: 'T1 respondió sin número de guía; requiere reconciliación.' }) }
+      const amount = g.cost ?? serverRate.amount
+      const etaDays = Number(serverRate.etaDays ?? 2)
+      const estimatedDeliveryAt = new Date(Date.now() + etaDays * 86_400_000).toISOString()
+      await admin.from('shipping_attempts').update({ tracking_number: g.tracking, provider_cost: amount, currency: serverRate.currency, quote_ref: serviceCode, updated_at: new Date().toISOString() }).eq('id', attemptId)
+      let labelPath: string | null = null
+      if (g.labelBase64) {
+        try {
+          const bytes = Uint8Array.from(atob(g.labelBase64), (c) => c.charCodeAt(0))
+          const path = `${orderId}/${g.tracking}.pdf`
+          const { error: upErr } = await admin.storage.from(LABELS_BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: true })
+          if (!upErr) labelPath = path
+        } catch { /* etiqueta recuperable después (link_guia); no bloquea ni recompra */ }
+      }
+      const carrier = g.carrier || serverRate.carrier
+      const shipmentRow = {
+        order_id: orderId, carrier, tracking_number: g.tracking, status: 'in_transit',
+        estimated_delivery_at: estimatedDeliveryAt, provider: 't1', service_code: serviceCode,
+        label_path: labelPath, label_url: labelPath ? null : g.labelUrl, package: pkg, ship_from: shipper, ship_to: receiver,
+        provider_meta: { trackingNumber: g.tracking, labelFormat: 'PDF', paqueteria: serviceCode.split('|')[0], servicio: serverRate.service, num_orden: g.numOrden, link_guia: g.labelUrl }, provider_cost: amount,
+        currency: serverRate.currency, quote_ref: serviceCode,
+      }
+      const { error: finErr } = await admin.rpc('finalize_shipment', { p_attempt_id: attemptId, p_shipment: shipmentRow as unknown as never })
+      if (finErr) { obs('create_shipment', 'unknown', { code: 'finalize_failed', error: finErr }); await markUnknown(admin, attemptId, `finalize: ${finErr.message}`); return json(409, { error: 'unknown_requires_reconciliation', message: 'La guía de T1 existe pero no se pudo registrar; requiere reconciliación (no se reintenta automáticamente).' }) }
+      let labelUrl = g.labelUrl ?? ''
+      if (labelPath) { const { data: sg } = await admin.storage.from(LABELS_BUCKET).createSignedUrl(labelPath, SIGNED_TTL); labelUrl = sg?.signedUrl ?? labelUrl }
+      return json(200, { label: { provider: 't1', carrier, service: serverRate.service, serviceCode, tracking: g.tracking, labelUrl, amount, currency: serverRate.currency, etaDays, estimatedDeliveryAt } })
+    } catch (e) {
+      obs('t1', 'provider_error', { code: 'exception', error: e })
+      return json(502, { error: `Error con T1: ${(e as Error).message}` })
+    }
   }
 
   // ===================== PROVIDER DHL (acciones neutras) =====================

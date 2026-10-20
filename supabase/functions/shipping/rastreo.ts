@@ -97,3 +97,25 @@ export function debeConsultar(prev: { estado?: string | null; synced_at?: string
   const t = prev?.synced_at ? Date.parse(prev.synced_at) : NaN
   return Number.isNaN(t) || ahora - t >= CACHE_RASTREO_MS
 }
+
+// ── T1 Envíos (GET /webhook-maestro/query/estado-guia/:guia) ─────────────────
+// T1 resume la guía en una familia externa (inglés) y una interna (español). Se traduce la externa; la interna va en la
+// descripción. Lo no reconocido cuenta como "en tránsito" (nunca entregado ni incidencia por adivinar).
+const T1_FAMILIA: Record<string, EstadoRastreo> = {
+  'in process': 'sin_eventos', 'collected': 'recolectado', 'transit': 'en_transito', 'in transit': 'en_transito', 'out for delivery': 'en_reparto',
+  'delivered': 'entregado', 'cancelled': 'incidencia', 'canceled': 'incidencia', 'exception of delivery': 'incidencia', 'exception': 'incidencia', 'returned': 'incidencia',
+}
+const T1_INTERNA: Record<string, EstadoRastreo> = { 'guia generada': 'sin_eventos', 'recolectado': 'recolectado', 'en camino': 'en_transito', 'en reparto': 'en_reparto', 'entregado': 'entregado', 'cancelado': 'incidencia', 'entrega fallida': 'incidencia', 'direccion incorrecta': 'incidencia', 'dirección incorrecta': 'incidencia', 'retornado a remitente': 'incidencia' }
+// deno-lint-ignore no-explicit-any
+export function resumenT1(data: any): ResumenRastreo {
+  const d = data?.detail ?? {}
+  const externa = txt(d.familia_externa).toLowerCase(), interna = txt(d.familia_interna).toLowerCase()
+  const estado: EstadoRastreo = T1_FAMILIA[externa] ?? T1_INTERNA[interna] ?? (externa || interna ? 'en_transito' : 'sin_eventos')
+  const fecha = txt(d.fecha).replace(' ', 'T')
+  const iso = fecha && !/[zZ]|[+-]\d{2}:\d{2}$/.test(fecha) ? `${fecha}-06:00` : fecha   // hora del centro de México (UTC-6 fijo)
+  const at = iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso).toISOString() : ''
+  const descripcion = [txt(d.descripcion), txt(d.familia_interna)].filter(Boolean).join(' · ').slice(0, 300) || null
+  const eventos: EventoRastreo[] = at ? [{ at, code: txt(d.codigo).slice(0, 20) || estado, description: descripcion ?? '' }] : []
+  if (estado === 'sin_eventos' && !eventos.length) return { estado: 'sin_eventos', descripcion: null, firmadoPor: null, entregadoAt: null, eventos: [] }
+  return { estado, descripcion, firmadoPor: estado === 'entregado' ? (txt(d.recibe).slice(0, 120) || null) : null, entregadoAt: estado === 'entregado' ? (at || new Date().toISOString()) : null, eventos }
+}

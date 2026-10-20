@@ -92,11 +92,11 @@ describe('servidor: guardas de fuente de la recolección', () => {
   it('usa el paquete, servicio y origen guardados en el envío; la escritura va con la identidad de quien agenda', () => {
     expect(b).toMatch(/sh\.package as NeutralPackage/); expect(b).toMatch(/sh\.ship_from as NeutralShipper/)
     expect(b).not.toMatch(/p\.(pkg|shipper|receiver)\b/)
-    expect((b.match(/caller\.from\('shipments'\)\.update\(/g) ?? [])).toHaveLength(2)
+    expect((b.match(/caller\.from\('shipments'\)\.update\(/g) ?? [])).toHaveLength(3)   // DHL agendar + DHL cancelar + T1 agendar (T1 no cancela desde el sistema)
     expect(b).not.toMatch(/admin\.from\('shipments'\)\.update/)
     expect(b).not.toMatch(/\.from\('orders'\)/)
   })
   it('sin respuesta de la paquetería ⇒ resultado desconocido (no se afirma éxito ni fracaso)', () => {
-    expect((b.match(/resultado_desconocido/g) ?? []).length).toBe(2)
+    expect((b.match(/resultado_desconocido/g) ?? []).length).toBe(3)   // + T1 agendar
   })
 })

@@ -10,7 +10,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useShipments } from '../../data/hooks/useShipments'
 import { markShipped } from '../../data/store/ordersStore'
 import { getDrivers } from '../../data/mock/shipments'
-import { quoteShipment, createShipmentReal, type RateQuote, type LabelResult } from '../../data/shipping/provider'
+import { quoteShipment, createShipmentReal, NOMBRE_PROVEEDOR, type RateQuote, type LabelResult, type ProveedorPaqueteria } from '../../data/shipping/provider'
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
 import { currentCompany } from '../../data/store/companyStore'
@@ -136,12 +136,20 @@ export function Cola() {
 }
 
 type Method = 'paqueteria' | 'chofer' | 'recoge'
+/** Errores del seam (proveedor sin llaves) en palabras; lo demás pasa tal cual. */
+export function mensajeProveedor(m: string): string {
+  if (m === 't1_not_configured') return 'T1 Envíos no está configurado en el servidor (faltan las llaves de la API). Cotiza con DHL o pide a Dirección activar T1.'
+  if (m === 'shipping_not_configured') return 'DHL no está configurado en el servidor (faltan las llaves). Pide a Dirección activarlo.'
+  return m
+}
 
 export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
   const { createShipment } = useShipments()
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)
   const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
+  // T1 · proveedor de la guía: lo que se vendió (DHL o T1) sugiere; Empaque puede cambiarlo. T1 cotiza varias paqueterías a la vez.
+  const [proveedor, setProveedor] = useState<ProveedorPaqueteria>(entregaPedido?.paqueteria === 't1' ? 't1' : 'dhl')
   const [doneRecoge, setDoneRecoge] = useState(false)
   const [driverId, setDriverId] = useState('')
 
@@ -186,9 +194,9 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     if (missing.length) return
     setBusy('quote'); setRates(null); setRateId('')
     try {
-      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef)
+      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor)
       setRates(r); setRateId(r[0]?.id ?? '')
-    } catch (e) { setError((e as Error).message || 'No se pudo cotizar.') }
+    } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo cotizar.') }
     setBusy(false)
   }
 
@@ -200,7 +208,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     try {
       const { label } = await createShipmentReal({
         order_id: order.id, orderRef, idempotencyKey: `${order.id}:${rate.id}`,
-        shipper: shipperInfo.config, receiver, pkg, rate,
+        shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor,
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
@@ -215,7 +223,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
       // exactamente qué fue lo que no quedó.
       setResult(label)
       if (!enviado.ok) setError(`La guía ${label.tracking} sí se generó, pero el pedido NO se marcó como enviado. ${enviado.error}`)
-    } catch (e) { setError((e as Error).message || 'No se pudo generar la guía. El pedido NO se marcó como enviado.') }
+    } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo generar la guía. El pedido NO se marcó como enviado.') }
     setBusy(false)
   }
 
@@ -325,6 +333,18 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                 </>
               ) : method === 'paqueteria' ? (
                 <>
+                  {/* T1 · con qué se genera la guía: DHL directo o T1 Envíos (varias paqueterías en una cotización) */}
+                  <div style={{ marginBottom: 12 }} data-testid="proveedor-guia">
+                    <label style={labelStyle}>Generar la guía con</label>
+                    <div className="seg">
+                      {(['dhl', 't1'] as ProveedorPaqueteria[]).map((pv) => (
+                        <button key={pv} type="button" className={proveedor === pv ? 'active' : undefined} onClick={() => { setProveedor(pv); setRates(null); setError(null) }} data-testid={`proveedor-${pv}`}>{NOMBRE_PROVEEDOR[pv]}</button>
+                      ))}
+                    </div>
+                    {entregaPedido?.paqueteria && entregaPedido.paqueteria !== 'chofer' && entregaPedido.paqueteria !== proveedor && (
+                      <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 4 }}>Se vendió con {NOMBRE_PROVEEDOR[entregaPedido.paqueteria]}; estás generando con otro proveedor.</div>
+                    )}
+                  </div>
                   {/* Destino/Origen REALES (snapshot del pedido + config de empresa) */}
                   <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
                     <Icon name="truck" />

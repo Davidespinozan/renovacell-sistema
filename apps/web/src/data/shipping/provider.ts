@@ -112,12 +112,14 @@ export interface TrackResult { tracking: string; status: string; events: Array<{
 const NOT_CONFIGURED = Symbol('not_configured')
 
 // COTIZAR (neutral). Devuelve tarifas del provider; si no está configurado → mock.
-export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string): Promise<RateQuote[]> {
+export type ProveedorPaqueteria = 'dhl' | 't1'   // T1 · segundo proveedor (agregador); DHL directo sigue siendo el default
+export const NOMBRE_PROVEEDOR: Record<ProveedorPaqueteria, string> = { dhl: 'DHL directo', t1: 'T1 Envíos' }
+export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string, provider: ProveedorPaqueteria = 'dhl'): Promise<RateQuote[]> {
   if (hasSupabase) {
-    const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', shipper, receiver, pkg, orderRef })
+    const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', provider, shipper, receiver, pkg, orderRef })
     // FAIL-CLOSED (#18): con backend conectado, "no configurado" NO cae a mock silencioso; es un
     // bloqueo operativo explícito. El mock solo aplica en demo sin backend.
-    if (r === NOT_CONFIGURED) throw new Error('shipping_not_configured')
+    if (r === NOT_CONFIGURED) throw new Error(provider === 't1' ? 't1_not_configured' : 'shipping_not_configured')
     if (Array.isArray(r?.rates) && r.rates.length) return r.rates
     return []
   }
@@ -125,11 +127,11 @@ export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, 
 }
 
 // CREAR GUÍA (neutral, idempotente server-side). Devuelve la etiqueta o cae al mock.
-export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote }): Promise<{ label: LabelResult; idempotent?: boolean }> {
+export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote; provider?: ProveedorPaqueteria }): Promise<{ label: LabelResult; idempotent?: boolean }> {
   if (hasSupabase) {
-    const r = await callShipping<{ label: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', ...args })
-    // FAIL-CLOSED (#18): con backend, DHL no configurado NO genera guía mock silenciosa.
-    if (r === NOT_CONFIGURED) throw new Error('shipping_not_configured')
+    const r = await callShipping<{ label: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', provider: args.provider ?? 'dhl', ...args })
+    // FAIL-CLOSED (#18): con backend, un proveedor no configurado NO genera guía mock silenciosa.
+    if (r === NOT_CONFIGURED) throw new Error(args.provider === 't1' ? 't1_not_configured' : 'shipping_not_configured')
     if (r?.label?.tracking) return { label: r.label, idempotent: r.idempotent }
     // Sin tracking y sin error lanzado (no debería pasar): trata como fallo, no como guía.
     throw new Error('shipping_no_label')
@@ -245,7 +247,12 @@ function buildLabelBlob({ rate, req, tracking, eta }: { rate: RateQuote; req: Sh
 // Link público de rastreo de la paquetería (para el doctor / seguimiento).
 export function trackingUrl(carrier: string | null, tracking: string | null): string | null {
   if (!tracking) return null
-  if (carrier === 'DHL') return `https://www.dhl.com/mx-es/home/rastreo.html?tracking-id=${tracking}`
-  if (carrier === 'Estafeta') return `https://www.estafeta.com/Herramientas/Rastreo?guias=${tracking}`
+  const c = (carrier ?? '').toLowerCase()
+  if (c === 'dhl') return `https://www.dhl.com/mx-es/home/rastreo.html?tracking-id=${tracking}`
+  if (c === 'estafeta') return `https://www.estafeta.com/Herramientas/Rastreo?guias=${tracking}`
+  if (c === 'fedex') return `https://www.fedex.com/fedextrack/?trknbr=${tracking}`
+  if (c === 'ups') return `https://www.ups.com/track?loc=es_MX&tracknum=${tracking}`
+  if (c === 'redpack') return `https://www.redpack.com.mx/es/rastreo/?guias=${tracking}`
+  if (c === 'paquetexpress') return `https://www.paquetexpress.com.mx/rastreo?guia=${tracking}`
   return null
 }
