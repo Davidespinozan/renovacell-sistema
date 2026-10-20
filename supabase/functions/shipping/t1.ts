@@ -6,7 +6,7 @@
 //   production → SIN CONFIRMAR: hasta que T1 publique el host productivo, production falla de forma segura.
 // Endpoints documentados:
 //   POST /t1-shipping/quote/create-with-quote   cotización (home, origin_postal_code, destination_postal_code, weight, length,
-//                                               width, height, shipping_days, insurance, package_type, packages)
+//                                               width, height, shipping_days, insurance, valor_paquete, package_type, packages)
 //   POST /t1-shipping/guide/create-guide        guía (quote_token, content, business_id, remitente, destinatario,
 //                                               generate_pickup, has_notification)
 // Contratos oficiales (T1 Cuenta, 20 oct 2026): cotización → {success, detail[]: {service_id, service_name, service_type,
@@ -76,12 +76,16 @@ const telefono = (t?: string | null) => limpia(t).replace(/\D/g, '').slice(-10)
 const correo = (e?: string | null) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpia(e)) ? limpia(e) : '')
 
 // ── Cotización (request documentado) ───────────────────────────────────────────────────────────────
-export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; package_type: number; packages: number }
-export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, diasEmbarque = 0): QuoteV2Request {
+// `valor_paquete`: valor declarado de la mercancía (decimal, MXN). T1 lo exige en el sandbox aunque `insurance` sea false
+// (su documentación lo define como "valor de la factura"). Sale del PEDIDO: suma de renglones (cantidad × precio vendido, IVA
+// incluido porque los precios lo incluyen), sin flete ni descuentos adicionales. Nunca un valor fijo ni un costo interno.
+export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; valor_paquete: number; package_type: number; packages: number }
+export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, valorMercancia: number, diasEmbarque = 0): QuoteV2Request {
+  const valor = Number(valorMercancia)
   return {
     home: false, origin_postal_code: limpia(shipper.cp).replace(/\D/g, ''), destination_postal_code: limpia(receiver.address.cp).replace(/\D/g, ''),
     weight: entero(pkg.weightKg), length: entero(pkg.lengthCm), width: entero(pkg.widthCm), height: entero(pkg.heightCm),
-    shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, package_type: 2, packages: entero(pkg.pieces),
+    shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, valor_paquete: Number.isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : 0, package_type: 2, packages: entero(pkg.pieces),
   }
 }
 export function faltantesCotizacion(q: QuoteV2Request): string[] {
@@ -89,7 +93,18 @@ export function faltantesCotizacion(q: QuoteV2Request): string[] {
   if (!/^\d{5}$/.test(q.origin_postal_code)) f.push('C.P. de origen (5 dígitos)')
   if (!/^\d{5}$/.test(q.destination_postal_code)) f.push('C.P. de destino (5 dígitos)')
   if (!(q.weight > 0 && q.length > 0 && q.width > 0 && q.height > 0)) f.push('peso y medidas del paquete')
+  if (!(q.valor_paquete > 0)) f.push('valor de la mercancía del pedido (renglones con precio)')
   return f
+}
+/** Valor declarado de la mercancía desde los renglones del pedido: Σ cantidad × precio vendido. null si no hay renglones con precio. */
+export function valorMercancia(renglones: Array<{ qty: unknown; unit_price: unknown }>): number | null {
+  let total = 0, n = 0
+  for (const r of renglones) {
+    const q = Number(r.qty), p = Number(r.unit_price)
+    if (!Number.isFinite(q) || !Number.isFinite(p) || q <= 0 || p < 0) continue
+    total += q * p; n++
+  }
+  return n > 0 && total > 0 ? Math.round(total * 100) / 100 : null
 }
 
 const NOMBRE_PAQUETERIA: Record<string, string> = { FEDEX: 'FedEx', DHL: 'DHL', UPS: 'UPS', ESTAFETA: 'Estafeta', EXPRESS: 'Express', '99MIN': '99 Minutos', '99MINUTOS': '99 Minutos', AMPM: 'AM PM', T1ENVIOS: 'T1 Envíos', REDPACK: 'Redpack', PAQUETEXPRESS: 'Paquetexpress', JTEXPRESS: 'J&T Express' }

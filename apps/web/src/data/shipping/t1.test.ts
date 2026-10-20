@@ -2,7 +2,7 @@
 // cotización (request documentado; respuesta {success, detail[]} con total_cost y token), guía (request origin_/destination_,
 // respuesta detail.tracking_number/order_number/carrier/cost/guide_link/file), errores 400/401/402/409/500, reintentos.
 import { describe, it, expect } from 'vitest'
-import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, parseQuoteT1, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
+import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
 
 // Origen = bloque "Origen de envíos" de Configuración (misma fuente que DHL), con los campos estructurados de la 183.
 const SHIPPER = { name: 'Renovacell SA de CV', addressLine1: 'Nuevo Mundo 1045 17', cp: '80197', city: 'Culiacán', state: 'Sinaloa', country: 'MX', phone: '667 164 7799', email: 'envios@renovacell.mx', calle: 'Nuevo Mundo', numeroExt: '1045', numeroInt: '17', colonia: 'Las Quintas', referencias: 'Local 17, frente al parque' }
@@ -46,9 +46,19 @@ describe('T1 v2.0 · configuración por ambiente', () => {
 })
 
 describe('T1 v2.0 · cotización (contrato oficial)', () => {
-  it('request documentado: cp, medidas enteras hacia arriba, package_type 2, insurance false, home false', () => {
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG)).toEqual({ home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, package_type: 2, packages: 1 })
-    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG))).toEqual(['C.P. de destino (5 dígitos)'])
+  it('request documentado + valor_paquete (T1 lo exige aunque insurance sea false): cp, medidas enteras, package_type 2, valor de la mercancía del pedido', () => {
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350)).toEqual({ home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, valor_paquete: 350, package_type: 2, packages: 1 })
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG, 350))).toEqual(['C.P. de destino (5 dígitos)'])
+    // pedido sin valor válido: no se manda 0 ni un fijo; se reporta
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0).valor_paquete).toBe(0)
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, NaN))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
+  })
+  it('valorMercancia: Σ cantidad × precio vendido de los renglones; sin renglones con precio → null (nunca se inventa)', () => {
+    expect(valorMercancia([{ qty: 1, unit_price: 350 }])).toBe(350)   // S100002 real: 1 × $350
+    expect(valorMercancia([{ qty: 2, unit_price: '4000.00' }, { qty: 1, unit_price: 3600 }, { qty: 0, unit_price: 99 }])).toBe(11600)
+    expect(valorMercancia([])).toBeNull(); expect(valorMercancia([{ qty: 1, unit_price: 0 }])).toBeNull(); expect(valorMercancia([{ qty: 1, unit_price: null }])).toBeNull()
+    expect(valorMercancia([{ qty: 3, unit_price: 33.333 }])).toBe(100)
   })
   it('respuesta oficial: valida success y detail[], usa total_cost (no cost), conserva token, distingue t1 del transportista, ordena por total', () => {
     expect(CONTRATO_T1.cotizacion_response).toBe(true)
@@ -115,7 +125,7 @@ describe('T1 v2.0 · guía (contrato oficial)', () => {
     // Un solo nombre (hoy prod: shipping_name = "Renovacell"): el apellido no se repite ni se inventa → solo la GUÍA se detiene; cotizar no usa nombres.
     expect(partirNombre('Renovacell')).toEqual({ nombre: 'Renovacell', apellidos: '' })
     expect(faltantesGuia(datosOrigenT1({ ...SHIPPER, name: 'Renovacell' }), datosDestinoT1(RECEIVER))).toEqual(['origen: apellidos'])
-    expect(buildQuoteT1({ ...SHIPPER, name: 'Renovacell' }, RECEIVER, PKG).origin_postal_code).toBe('80197')
+    expect(buildQuoteT1({ ...SHIPPER, name: 'Renovacell' }, RECEIVER, PKG, 350).origin_postal_code).toBe('80197')
   })
   it('respuesta oficial: tracking_number, order_number, carrier, cost, guide_link como URL y file como PDF base64', () => {
     expect(CONTRATO_T1.guia_response).toBe(true)

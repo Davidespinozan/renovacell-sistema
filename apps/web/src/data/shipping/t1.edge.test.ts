@@ -21,6 +21,14 @@ describe('T1 v2.0 · fuente de la Edge', () => {
     expect(bloqueT1).not.toMatch(/p\.(ambiente|env|host|base|url)\b/)
     expect(bloqueT1).toMatch(/urlT1\(cfg, RUTAS_T1\.cotizar\)/); expect(bloqueT1).toMatch(/urlT1\(cfg, RUTAS_T1\.guia\)/)
   })
+  it('valor_paquete sale de los renglones del pedido (order_items) en cotización y re-cotización, nunca del cliente ni fijo; sin pedido o sin valor → 422', () => {
+    expect(bloqueT1).toMatch(/from\('order_items'\)\.select\('qty, unit_price'\)\.eq\('order_id', orderIdQ\)/)
+    expect(bloqueT1).toMatch(/buildQuoteT1\(shipper, receiver, pkg, valorPedido\)/)
+    expect((bloqueT1.match(/buildQuoteT1\(/g) ?? []).length).toBe(1)   // una sola construcción del cuerpo → cotizar y re-cotizar declaran el mismo valor
+    expect(bloqueT1).toMatch(/valorPedido == null\) return json\(422/); expect(bloqueT1).toMatch(/!orderIdQ\) return json\(422/)
+    expect(bloqueT1).not.toMatch(/p\.(valor|value|valor_paquete|package_value)\b/)
+    expect(bloqueDhl).not.toMatch(/valor_paquete|valorMercancia|order_items/)
+  })
   it('la llave y el PDF no se registran: ningún obs()/json() lleva cabeceras ni cfg.apiKey; provider_meta no lleva file/base64; el token no sale al navegador', () => {
     for (const m of bloqueT1.match(/obs\([^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bH\b|apiKey|cabeceras|labelBase64|\.file\b/)
     for (const m of bloqueT1.match(/json\(\d+, [^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bH\b|apiKey|cabeceras|labelBase64/)

@@ -26,7 +26,7 @@ describe('T1 · proveedor de la guía en Empaque', () => {
     for (const [l, v] of [['Peso en kilogramos', '1'], ['Largo en centímetros', '30'], ['Ancho en centímetros', '20'], ['Alto en centímetros', '10']]) fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
     fireEvent.click(screen.getByRole('button', { name: /Cotizar envío/ }))
     await waitFor(() => expect(srv.quote).toHaveBeenCalledTimes(1))
-    expect(srv.quote.mock.calls[0][4]).toBe('t1')
+    expect(srv.quote.mock.calls[0][4]).toBe('t1'); expect(srv.quote.mock.calls[0][5]).toBe('o1')   // el pedido viaja: el servidor toma de ahí el valor de la mercancía
     expect(await screen.findByText(/FedEx/)).toBeTruthy()
     fireEvent.click(screen.getByTestId('proveedor-dhl'))
     expect(screen.getByTestId('proveedor-guia')).toHaveTextContent(/Se vendió con T1 Envíos; estás generando con otro proveedor/)

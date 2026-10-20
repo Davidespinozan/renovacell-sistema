@@ -53,7 +53,10 @@ supabase secrets set T1_API_ENV="test" T1_API_KEY="$T1_API_KEY" T1_SHOP_ID="<sho
 unset T1_API_KEY
 ```
 
-Endpoints: `POST /t1-shipping/quote/create-with-quote` (cotizar: cp origen/destino, peso y medidas enteras, package_type 2) y
+Endpoints: `POST /t1-shipping/quote/create-with-quote` (cotizar: cp origen/destino, peso y medidas enteras, package_type 2,
+`valor_paquete` = valor de la mercancía del pedido, Σ renglones, obligatorio en el sandbox aunque `insurance` sea false; sin
+renglones con precio no se cotiza; CASO PENDIENTE: pedidos con descuentos deben declarar el valor real de la mercancía conforme
+al contrato de T1, sin inventar importes; hoy se declara Σ cantidad × precio vendido de los renglones) y
 `POST /t1-shipping/guide/create-guide` (guía con `quote_token`). Flujo igual que DHL: cotizar → el operador elige el servicio
 (`serviceCode` = `PAQUETERIA|SERVICIO`) → `create_shipment` re-cotiza en el servidor, usa el token y guarda la guía/etiqueta
 (`shipments.provider = 't1'`, `provider_meta.ambiente` = `test` | `production`; Empaque y Guías marcan "ambiente de pruebas").

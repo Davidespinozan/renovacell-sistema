@@ -115,9 +115,10 @@ const NOT_CONFIGURED = Symbol('not_configured')
 // COTIZAR (neutral). Devuelve tarifas del provider; si no está configurado → mock.
 export type ProveedorPaqueteria = 'dhl' | 't1'   // T1 · segundo proveedor (agregador); DHL directo sigue siendo el default
 export const NOMBRE_PROVEEDOR: Record<ProveedorPaqueteria, string> = { dhl: 'DHL directo', t1: 'T1 Envíos' }
-export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string, provider: ProveedorPaqueteria = 'dhl'): Promise<RateQuote[]> {
+export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, pkg: LogisticsPackage, orderRef: string, provider: ProveedorPaqueteria = 'dhl', orderId?: string): Promise<RateQuote[]> {
   if (hasSupabase) {
-    const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', provider, shipper, receiver, pkg, orderRef })
+    // order_id: T1 exige declarar el valor de la mercancía y el servidor lo toma del pedido (DHL lo ignora).
+    const r = await callShipping<{ rates: RateQuote[] }>({ action: 'rate', provider, shipper, receiver, pkg, orderRef, ...(orderId ? { order_id: orderId } : {}) })
     // FAIL-CLOSED (#18): con backend conectado, "no configurado" NO cae a mock silencioso; es un
     // bloqueo operativo explícito. El mock solo aplica en demo sin backend.
     if (r === NOT_CONFIGURED) throw new Error(provider === 't1' ? 't1_not_configured' : 'shipping_not_configured')

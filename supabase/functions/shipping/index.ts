@@ -25,7 +25,7 @@ import {
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
-import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
+import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -296,7 +296,13 @@ Deno.serve(conCors(async (req) => {
       const pkg = p.pkg as NeutralPackage
       const miss = missingReceiverPkg(receiver, pkg)
       if (miss.length) return json(422, { error: 'missing_data', missing: miss })
-      const cuerpo = buildQuoteT1(shipper, receiver, pkg)
+      // valor_paquete (obligatorio en T1): valor de la mercancía del PEDIDO (renglones), nunca fijo ni inventado.
+      const orderIdQ = s(p.order_id)
+      if (!orderIdQ) return json(422, { error: 'missing_data', message: 'Para cotizar con T1 hace falta el pedido: T1 exige declarar el valor de la mercancía.', missing: ['pedido (valor de la mercancía)'] })
+      const { data: renglones } = await admin.from('order_items').select('qty, unit_price').eq('order_id', orderIdQ)
+      const valorPedido = valorMercancia((renglones ?? []) as Array<{ qty: unknown; unit_price: unknown }>)
+      if (valorPedido == null) return json(422, { error: 'missing_data', message: 'El pedido no tiene renglones con precio: T1 exige declarar el valor de la mercancía y no se inventa.', missing: ['valor de la mercancía del pedido (renglones con precio)'] })
+      const cuerpo = buildQuoteT1(shipper, receiver, pkg, valorPedido)
       const faltaQ = faltantesCotizacion(cuerpo)
       if (faltaQ.length) return json(422, { error: 'missing_data', missing: faltaQ })
       // Cotizar es idempotente: 429/5xx se reintenta con espera exponencial (máx. 3 intentos). Nada más se reintenta solo.

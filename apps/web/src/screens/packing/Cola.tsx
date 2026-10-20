@@ -194,7 +194,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     if (missing.length) return
     setBusy('quote'); setRates(null); setRateId('')
     try {
-      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor)
+      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor, order.id)
       setRates(r); setRateId(r[0]?.id ?? '')
     } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo cotizar.') }
     setBusy(false)
