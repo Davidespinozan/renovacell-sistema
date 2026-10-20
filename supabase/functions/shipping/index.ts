@@ -25,7 +25,7 @@ import {
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
-import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, diagnosticoT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
+import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, diagnosticoT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, cabecerasWalletT1, resumenWalletT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -263,6 +263,29 @@ Deno.serve(conCors(async (req) => {
     const { error: upErr } = await caller.from('shipments').update({ pickup_confirmation: null, provider_meta: { ...meta, pickup: null, pickup_cancelada: pickupAnterior } }).eq('id', sh.id)
     if (upErr) return json(500, { error: 'no_guardada', message: 'DHL canceló la recolección pero no se pudo actualizar el sistema. Vuelve a intentar.' })
     return json(200, { cancelled: true })
+  }
+
+  // ===================== DIAGNÓSTICO TEMPORAL T1 (retirar tras la comprobación) =====================
+  // Solo Dirección, solo sandbox: una lectura GET /t1-shipping/wallet/movements con la llave y el seller_id de los secretos
+  // (nada viene del cliente). Devuelve un resumen mínimo; no registra ni devuelve el cuerpo del proveedor.
+  if (action === 't1_diagnostico_wallet') {
+    if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'solo_direccion' })
+    const conf = t1Config(Deno.env.get)
+    if (!conf.ok) return json(503, { error: 't1_config_invalida', message: conf.detalle })
+    if (conf.cfg.ambiente !== 'test') return json(409, { error: 'solo_sandbox', message: 'El diagnóstico solo corre en ambiente de pruebas.' })
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)
+      let r: Response
+      try { r = await fetch(urlT1(conf.cfg, RUTAS_T1.wallet), { method: 'GET', headers: cabecerasWalletT1(conf.cfg), signal: ctl.signal }) } finally { clearTimeout(t) }
+      const data = await r.json().catch(() => ({}))
+      const res = resumenWalletT1(r.status, data, conf.cfg.shopId)
+      console.warn(`[t1] wallet · HTTP ${res.http} · success ${res.success} · seller_coincide ${res.seller_coincide} · ${res.errorType ?? ''} ${res.error ?? ''}`.trim())
+      return json(200, res)
+    } catch (e) {
+      const razon = /abort/i.test(String((e as Error)?.name ?? '') + String((e as Error)?.message ?? '')) ? 'se agotó el tiempo de espera' : 'sin respuesta de la red'
+      console.warn(`[t1] wallet · excepcion · ${razon}`)
+      return json(502, { error: `No se pudo consultar a T1 (${razon}).` })
+    }
   }
 
   // ===================== PROVIDER T1 ENVÍOS · API v2.0 (acciones neutras, `provider: 't1'`) =====================

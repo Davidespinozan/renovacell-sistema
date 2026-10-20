@@ -2,7 +2,7 @@
 // cotización (request documentado; respuesta {success, detail[]} con total_cost y token), guía (request origin_/destination_,
 // respuesta detail.tracking_number/order_number/carrier/cost/guide_link/file), errores 400/401/402/409/500, reintentos.
 import { describe, it, expect } from 'vitest'
-import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, mensajeT1, diagnosticoT1, depurarTexto, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
+import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, mensajeT1, diagnosticoT1, depurarTexto, cabecerasWalletT1, resumenWalletT1, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
 
 // Origen = bloque "Origen de envíos" de Configuración (misma fuente que DHL), con los campos estructurados de la 183.
 const SHIPPER = { name: 'Renovacell SA de CV', addressLine1: 'Nuevo Mundo 1045 17', cp: '80197', city: 'Culiacán', state: 'Sinaloa', country: 'MX', phone: '667 164 7799', email: 'envios@renovacell.mx', calle: 'Nuevo Mundo', numeroExt: '1045', numeroInt: '17', colonia: 'Las Quintas', referencias: 'Local 17, frente al parque' }
@@ -154,5 +154,19 @@ describe('T1 v2.0 · guía (contrato oficial)', () => {
     expect(parseGuideT1({ success: false, message: 'Insufficient balance' })).toMatchObject({ ok: false, motivo: 'rechazada', mensaje: 'Insufficient balance' })
     expect(parseGuideT1({ success: true, detail: { order_number: 1, carrier: 'DHL' } })).toMatchObject({ ok: false, motivo: 'sin_guia' })
     const x = parseGuideT1({ ok: true, guide: '1' }); expect(x).toMatchObject({ ok: false, motivo: 'forma_no_reconocida' }); if (x.ok) return; expect(x.forma).toBe('{ok:boolean,guide:string}')
+  })
+})
+
+describe('TEMPORAL · diagnóstico de billetera T1 (sandbox)', () => {
+  it('cabeceras con seller_id (no shop_id) y ruta documentada; resumen mínimo sin cuerpo, límites ni datos bancarios', () => {
+    const c = t1Config(env(OK)); if (!c.ok) throw new Error('config')
+    expect(cabecerasWalletT1(c.cfg)).toEqual({ 'X-Api-Key': KEY, seller_id: '7781' }); expect(RUTAS_T1.wallet).toBe('/t1-shipping/wallet/movements')
+    const r = resumenWalletT1(200, { success: true, message: 'ok', detail: { seller_id: 7781, current_balance: 5000.5, balance_limits: { max: 99 }, bank: { clabe: '123456789012345678' }, movements: [{ amount: 1, email: 'x@y.mx' }] } }, '7781')
+    expect(r).toEqual({ http: 200, success: true, seller_coincide: true, current_balance: 5000.5, error: null, errorType: null })
+    expect(JSON.stringify(r)).not.toMatch(/balance_limits|clabe|movements|x@y\.mx|123456789012345678/)
+    expect(resumenWalletT1(200, { success: true, detail: { seller_id: '999', current_balance: 10 } }, '7781').seller_coincide).toBe(false)
+    expect(resumenWalletT1(400, { success: false, message: 'Error al procesar petición', error: 'No existe en recurso con id: 338714', errorType: 'NotFound' }, '338714')).toEqual({ http: 400, success: false, seller_coincide: null, current_balance: null, error: 'No existe en recurso con id: 338714', errorType: 'NotFound' })   // el id de comercio (6 dígitos) no es dato personal; teléfonos (≥8) sí se ocultan
+    expect(resumenWalletT1(401, {}, '1')).toEqual({ http: 401, success: null, seller_coincide: null, current_balance: null, error: null, errorType: null })
+    expect(resumenWalletT1(200, { success: false, detail: { current_balance: 7 } }, '1').current_balance).toBeNull()   // saldo solo con éxito
   })
 })

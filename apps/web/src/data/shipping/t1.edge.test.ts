@@ -69,3 +69,16 @@ describe('T1 v2.0 · fuente de la Edge', () => {
     expect(bloqueDhl).toMatch(/DHL_API_USERNAME/); expect(bloqueDhl).toMatch(/'Basic ' \+ btoa/); expect(bloqueDhl).toMatch(/\$\{base\}\/rates/); expect(bloqueDhl).toMatch(/\$\{base\}\/shipments/)
   })
 })
+
+describe('TEMPORAL · acción de diagnóstico de billetera', () => {
+  const diag = c.slice(c.indexOf("if (action === 't1_diagnostico_wallet') {"), c.indexOf("if (s(p.provider) === 't1') {"))
+  it('solo Dirección, solo sandbox, un GET a wallet/movements con cabeceras del servidor; nada del cliente; sin cuerpo en logs ni respuesta', () => {
+    expect(diag).toMatch(/tieneRol\(q\.quien, \['admin'\]\)/)
+    expect(diag).toMatch(/conf\.cfg\.ambiente !== 'test'\) return json\(409/)
+    expect(diag).toMatch(/method: 'GET', headers: cabecerasWalletT1\(conf\.cfg\)/); expect(diag).toMatch(/RUTAS_T1\.wallet/)
+    expect((diag.match(/fetch\(/g) ?? []).length).toBe(1)
+    expect(diag).not.toMatch(/p\.(seller_id|shop_id|api_key|apiKey|key)\b/)
+    expect(diag).toMatch(/return json\(200, res\)/); expect(diag).not.toMatch(/json\(200, data\)|JSON\.stringify\(data\)/)
+    for (const m of diag.match(/console\.warn\([^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bdata\b|apiKey|cabeceras|current_balance/)
+  })
+})

@@ -25,7 +25,7 @@ import type { NeutralPackage, NeutralReceiver, NeutralShipper } from './dhl.ts'
 export type AmbienteT1 = 'test' | 'production'
 /** Registro de ambientes: el host productivo se agrega aquí cuando T1 lo confirme; mientras, production no opera. */
 export const HOSTS_T1: Record<AmbienteT1, string | null> = { test: 'https://sandbox.t1api.com', production: null }
-export const RUTAS_T1 = { cotizar: '/t1-shipping/quote/create-with-quote', guia: '/t1-shipping/guide/create-guide' } as const
+export const RUTAS_T1 = { cotizar: '/t1-shipping/quote/create-with-quote', guia: '/t1-shipping/guide/create-guide', wallet: '/t1-shipping/wallet/movements' } as const
 /** Evidencia de contrato: false = no se opera esa parte hasta tener el esquema oficial o un fixture real sanitizado. */
 export const CONTRATO_T1 = { cotizacion_request: true, cotizacion_response: true, guia_request_campos_direccion: true, guia_response: true, rastreo: false, recoleccion: false } as const
 export const T1_SECRETOS = ['T1_API_ENV', 'T1_API_KEY', 'T1_SHOP_ID'] as const
@@ -262,3 +262,31 @@ export function errorT1(status: number, data: any): { clase: ClaseErrorT1; mensa
 export const reintentableCotizacion = (status: number) => status === 429 || status >= 500
 export const esperaReintentoMs = (intento: number, base = 600) => Math.min(8000, base * 2 ** intento)
 export const TIMEOUT_MS = { cotizar: 20_000, guia: 30_000 } as const
+
+// ── DIAGNÓSTICO TEMPORAL (sandbox) · GET /t1-shipping/wallet/movements con `seller_id` (NO shop_id) ──────────────────
+// Una sola lectura, solo Dirección, solo ambiente test, para saber si la llave y el seller_id (candidato = T1_SHOP_ID) son
+// reconocidos por T1. Se devuelve un resumen mínimo; nunca el cuerpo completo, límites, datos bancarios ni movimientos.
+export function cabecerasWalletT1(cfg: T1Config): Record<string, string> {
+  return { 'X-Api-Key': cfg.apiKey, seller_id: cfg.shopId }
+}
+export interface ResumenWallet { http: number; success: boolean | null; seller_coincide: boolean | null; current_balance: number | null; error: string | null; errorType: string | null }
+const buscarSeller = (o: unknown, nivel = 0): string | null => {
+  if (!o || typeof o !== 'object' || nivel > 3) return null
+  const r = o as Record<string, unknown>
+  for (const k of ['seller_id', 'sellerId', 'id_seller']) { const v = r[k]; if (typeof v === 'string' || typeof v === 'number') return String(v) }
+  for (const v of Object.values(r)) { const h = buscarSeller(Array.isArray(v) ? v[0] : v, nivel + 1); if (h) return h }
+  return null
+}
+// deno-lint-ignore no-explicit-any
+export function resumenWalletT1(status: number, data: any, sellerEsperado: string): ResumenWallet {
+  const ok = status >= 200 && status < 300 && data?.success === true
+  const seller = buscarSeller(data)
+  const bal = ok ? n(data?.detail?.current_balance ?? data?.current_balance ?? data?.detail?.balance ?? data?.balance) : NaN
+  const err = ok ? '' : depurarTexto(String(data?.error ?? data?.message ?? '')).slice(0, 120)
+  return {
+    http: status, success: typeof data?.success === 'boolean' ? data.success : null,
+    seller_coincide: seller == null ? null : seller === String(sellerEsperado),
+    current_balance: ok && Number.isFinite(bal) ? bal : null,
+    error: err || null, errorType: typeof data?.errorType === 'string' ? depurarTexto(data.errorType).slice(0, 60) : null,
+  }
+}
