@@ -37,24 +37,41 @@ respuesta es **tolerante** (busca `carrier`, `service`, `totalPrice`, `deliveryE
 - El rastreo público lo arma `trackingUrl()` (Estafeta/DHL); amplíalo con las paqueterías
   que uses.
 
-## T1 Envíos (segundo proveedor, `provider: 't1'`)
+## T1 Envíos · API v2.0 (segundo proveedor, `provider: 't1'`)
 
-Agregador de Grupo Carso (FedEx, DHL, UPS, Estafeta, 99 Minutos, AMPM…). Mismo contrato neutral que DHL: `rate` →
-el operador elige el servicio (`serviceCode` = `PAQUETERIA|SERVICIO`) → `create_shipment` re-cotiza en el servidor, usa el
-`token_quote` de T1 y guarda la guía/etiqueta igual que DHL (`shipments.provider = 't1'`, `carrier` = la paquetería real).
-`sync_tracking` consulta `/webhook-maestro/query/estado-guia/:guia`; `schedule_pickup` usa `/pickup/create`
-(`cancel_pickup` no existe en T1: se cancela en t1envios.com). Contrato: https://t1docs.dev.plataformat1.com/docs/T1Envios/t-1-envios/
+Autenticación por cabeceras `X-Api-Key` + `shop_id`, solo dentro de la Edge. El host sale del AMBIENTE, nunca del cliente:
 
-Sin estas llaves la Edge responde **501** y Empaque lo dice en palabras ("T1 Envíos no está configurado"):
+| `T1_API_ENV` | Host | Estado |
+|---|---|---|
+| `test` | `https://sandbox.t1api.com` | documentado en T1 Cuenta (sandbox: sin cargos ni envíos físicos según T1; verificar la cuenta) |
+| `production` | *(sin confirmar)* | `production` NO opera hasta registrar el host en `HOSTS_T1` (t1.ts) |
 
 ```bash
-supabase secrets set \
-  T1_API_URL="https://<host-de-la-api-que-entrega-T1>" \
-  T1_AUTH_URL="https://<keycloak-de-T1>/auth/realms/<realm>/protocol/openid-connect/token" \
-  T1_CLIENT_ID="t1envios" T1_CLIENT_SECRET="<client_secret>" \
-  T1_USERNAME="<correo de la cuenta t1envios.com>" T1_PASSWORD="<contraseña>" \
-  T1_SHOP_ID="<shop_id>" T1_COMERCIO_ID="<comercio_id (si es distinto)>" \
-  T1_ORIGEN_COLONIA="<colonia de la sucursal>"   # T1 exige colonia del origen; la config de empresa no la tiene
+# La llave nunca va en archivos ni en el chat; se escribe en la terminal sin eco:
+read -s -p "T1 API key: " T1_API_KEY; echo
+supabase secrets set T1_API_ENV="test" T1_API_KEY="$T1_API_KEY" T1_SHOP_ID="<shop_id>"
+unset T1_API_KEY
 ```
 
-Fecha/hora de T1: "YYYY-MM-DD HH:MM:SS" en hora del centro de México (UTC-6 fijo); el adaptador la convierte a ISO.
+Endpoints: `POST /t1-shipping/quote/create-with-quote` (cotizar: cp origen/destino, peso y medidas enteras, package_type 2) y
+`POST /t1-shipping/guide/create-guide` (guía con `quote_token`). Flujo igual que DHL: cotizar → el operador elige el servicio
+(`serviceCode` = `PAQUETERIA|SERVICIO`) → `create_shipment` re-cotiza en el servidor, usa el token y guarda la guía/etiqueta
+(`shipments.provider = 't1'`, `provider_meta.ambiente` = `test` | `production`; Empaque y Guías marcan "ambiente de pruebas").
+
+**Contratos oficiales (T1 Cuenta, 20 oct 2026) ya implementados:** cotización `{success, detail[]}` (por servicio: carrier,
+service_name, service_type, `total_cost` = total de T1, delivery_days, currency, token; opcionales insurance/extended_zone/
+recommended sin inventar); guía con `quote_token`, `content`, `business_id` (= shop_id) y `origin_…`/`destination_…`
+(first_name, last_name, email, phone, street, number, neighborhood, municipality, state, references), sin `generate_pickup`,
+`has_notification` ni `guide_origin`; respuesta `detail.tracking_number`, `order_number`, `carrier`, `cost`, `guide_link`
+(S3, no permanente: la etiqueta se sirve desde el bucket) y `file` (PDF base64, nunca en metadatos ni logs).
+**Origen (migración 183):** la misma fuente que DHL (Configuración → Origen de envíos, nunca el domicilio fiscal), por campos:
+calle, número exterior, interior/local, colonia, referencias (+ CP, ciudad, estado, país, teléfono y correo ya existentes).
+Con calle y número capturados, el servidor arma `shipping_address` ("Calle Número Interior", máx. 45 = límite DHL) y es lo
+que DHL recibe; con los campos vacíos, DHL sigue usando el texto legado. T1 exige los campos estructurados: sin ellos no hay guía.
+**Identidad del servicio y precio:** al generar, el servidor re-cotiza, exige el mismo `serviceCode` y el mismo `total_cost` que
+vio el operador; si cambian → 409 `precio_cambio` y hay que recotizar y confirmar. 409 de T1 (token usado/vencido) = intento
+fallido sin reintento. **Pendientes (sin red):** rastreo y recolección v2.0 (endpoints no documentados) y el host productivo.
+
+**Activación a producción (configuración, no programación):** host productivo confirmado y registrado → `T1_API_ENV=production`
+con llave y shop_id productivos → saldo y permisos de la cuenta → pruebas completas en sandbox → alertas/observabilidad →
+autorización explícita → una guía productiva controlada.

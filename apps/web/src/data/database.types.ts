@@ -2562,6 +2562,11 @@ export type Database = {
           shipping_name: string | null
           shipping_phone: string | null
           shipping_state: string | null
+          shipping_street: string | null
+          shipping_ext_number: string | null
+          shipping_int_number: string | null
+          shipping_colonia: string | null
+          shipping_references: string | null
           telefono: string | null
           titular: string | null
           updated_at: string
@@ -2589,6 +2594,11 @@ export type Database = {
           shipping_name?: string | null
           shipping_phone?: string | null
           shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_ext_number?: string | null
+          shipping_int_number?: string | null
+          shipping_colonia?: string | null
+          shipping_references?: string | null
           telefono?: string | null
           titular?: string | null
           updated_at?: string
@@ -2616,6 +2626,11 @@ export type Database = {
           shipping_name?: string | null
           shipping_phone?: string | null
           shipping_state?: string | null
+          shipping_street?: string | null
+          shipping_ext_number?: string | null
+          shipping_int_number?: string | null
+          shipping_colonia?: string | null
+          shipping_references?: string | null
           telefono?: string | null
           titular?: string | null
           updated_at?: string

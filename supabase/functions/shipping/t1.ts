@@ -1,179 +1,216 @@
 // ============================================================================
-// Adaptador T1 Envíos (agregador de Grupo Carso: FedEx, DHL, UPS, Estafeta, 99 Minutos, AMPM…) — NEUTRAL→T1 y T1→NEUTRAL.
-// Contrato según la documentación oficial (t1docs.dev.plataformat1.com/docs/T1Envios):
-//   Auth: Keycloak OpenID, POST <T1_AUTH_URL> (x-www-form-urlencoded) grant_type=password, client_id, client_secret,
-//         username, password → access_token (expira en `expires_in` s; se cachea en memoria con margen).
-//   Cabeceras de la API: Authorization: Bearer <token> · shop_id: <T1_SHOP_ID>
-//   POST /quote/create            → cotización por paquetería/servicio con un `token` por servicio (vale para crear la guía)
-//   POST /guide/create            → guía a partir de `token_quote`; devuelve `guia`, `file` (PDF), `link_guia`, `paqueteria`, `costo`
-//   GET  /webhook-maestro/query/estado-guia/:guia → estado (familia_externa / familia_interna)
-//   POST /pickup/create           → recolección (devuelve pick_up)
-// El HOST de la API (T1_API_URL) y las credenciales los entrega T1 al abrir la cuenta de API; sin ellos la Edge responde 501.
-// Módulo PURO salvo `t1Token` (recibe fetch): las funciones de armado/lectura las prueba vitest desde el frontend.
+// Adaptador T1 Envíos · API v2.0 (T1 Cuenta) — NEUTRAL→T1 y T1→NEUTRAL.
+// Autenticación: cabeceras `X-Api-Key: <llave>` y `shop_id: <tienda>`; NO hay Keycloak ni usuario/contraseña en la v2.0.
+// Ambientes (registro explícito; el host sale del ambiente, nunca del cliente ni de una URL libre):
+//   test       → https://sandbox.t1api.com              (documentado en T1 Cuenta)
+//   production → SIN CONFIRMAR: hasta que T1 publique el host productivo, production falla de forma segura.
+// Endpoints documentados:
+//   POST /t1-shipping/quote/create-with-quote   cotización (home, origin_postal_code, destination_postal_code, weight, length,
+//                                               width, height, shipping_days, insurance, package_type, packages)
+//   POST /t1-shipping/guide/create-guide        guía (quote_token, content, business_id, remitente, destinatario,
+//                                               generate_pickup, has_notification)
+// Contratos oficiales (T1 Cuenta, 20 oct 2026): cotización → {success, detail[]: {service_id, service_name, service_type,
+// carrier, total_cost (TOTAL de T1), cost, delivery_days, currency, token, recommended, insurance, extended_zone, …}};
+// guía → request con origin_*/destination_* (first_name, last_name, email, phone, street, number, neighborhood, municipality,
+// state, references) + quote_token, content, business_id (= shop_id); respuesta {success, detail: {tracking_number,
+// order_number, carrier, cost, guide_link (PDF en S3, no permanente), file (PDF base64), current_balance, …}}.
+// Rastreo y recolección v2.0: endpoints no documentados aún → se reportan como no disponibles (sin red).
+// Secretos: T1_API_ENV (test|production), T1_API_KEY, T1_SHOP_ID. La llave nunca sale de la Edge ni va a logs.
+// Origen: la MISMA fuente que DHL (company_settings → bloque "Origen de envíos", nunca el domicilio fiscal), por campos
+// estructurados (migración 183: calle, número exterior/interior, colonia, referencias). Nada se divide ni se inventa.
+// Módulo PURO (sin red ni Deno): todas las funciones las prueba vitest desde el frontend.
 // ============================================================================
 import type { NeutralPackage, NeutralReceiver, NeutralShipper } from './dhl.ts'
 
-export interface T1Config { base: string; authUrl: string; clientId: string; clientSecret: string; username: string; password: string; shopId: string; comercioId: string }
+export type AmbienteT1 = 'test' | 'production'
+/** Registro de ambientes: el host productivo se agrega aquí cuando T1 lo confirme; mientras, production no opera. */
+export const HOSTS_T1: Record<AmbienteT1, string | null> = { test: 'https://sandbox.t1api.com', production: null }
+export const RUTAS_T1 = { cotizar: '/t1-shipping/quote/create-with-quote', guia: '/t1-shipping/guide/create-guide' } as const
+/** Evidencia de contrato: false = no se opera esa parte hasta tener el esquema oficial o un fixture real sanitizado. */
+export const CONTRATO_T1 = { cotizacion_request: true, cotizacion_response: true, guia_request_campos_direccion: true, guia_response: true, rastreo: false, recoleccion: false } as const
+export const T1_SECRETOS = ['T1_API_ENV', 'T1_API_KEY', 'T1_SHOP_ID'] as const
 
-/** Lee la configuración de los secretos. Devuelve null (→ 501) si falta algo indispensable. */
-export function t1Config(env: (k: string) => string | undefined): T1Config | null {
+export interface T1Config { ambiente: AmbienteT1; base: string; apiKey: string; shopId: string }
+export type ConfigT1 = { ok: true; cfg: T1Config } | { ok: false; motivo: 'sin_configurar' | 'ambiente_invalido' | 'relleno' | 'produccion_sin_host'; detalle: string }
+
+const RELLENO = /^\s*$|^\.{2,}$|^<.*>$|^cambiar|^xxx+$|^tu[_ -]|^your[_ -]/i
+/** Lee y valida la configuración desde los secretos. Nunca devuelve ni registra la llave fuera de `cfg`. */
+export function t1Config(env: (k: string) => string | undefined): ConfigT1 {
   const g = (k: string) => (env(k) ?? '').trim()
-  const cfg: T1Config = {
-    base: g('T1_API_URL').replace(/\/+$/, ''), authUrl: g('T1_AUTH_URL'), clientId: g('T1_CLIENT_ID') || 't1envios', clientSecret: g('T1_CLIENT_SECRET'),
-    username: g('T1_USERNAME'), password: g('T1_PASSWORD'), shopId: g('T1_SHOP_ID'), comercioId: g('T1_COMERCIO_ID') || g('T1_SHOP_ID'),
-  }
-  if (!cfg.base || !cfg.authUrl || !cfg.clientSecret || !cfg.username || !cfg.password || !cfg.shopId) return null
-  // Valores de relleno ("...", "<host>") no cuentan como configuración: mejor 501 claro que un error de red confuso.
-  if (!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(cfg.base) || !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(cfg.authUrl) || /^\.{2,}$|^<.*>$/.test(cfg.clientSecret + cfg.username + cfg.password + cfg.shopId)) return null
-  return cfg
+  const ambiente = g('T1_API_ENV').toLowerCase(), apiKey = g('T1_API_KEY'), shopId = g('T1_SHOP_ID')
+  if (!ambiente && !apiKey && !shopId) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${T1_SECRETOS.join(', ')}.` }
+  if (ambiente !== 'test' && ambiente !== 'production') return { ok: false, motivo: 'ambiente_invalido', detalle: 'T1_API_ENV debe ser test o production.' }
+  if (!apiKey || !shopId) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${[!apiKey && 'T1_API_KEY', !shopId && 'T1_SHOP_ID'].filter(Boolean).join(' y ')}.` }
+  if (RELLENO.test(apiKey) || RELLENO.test(shopId) || apiKey.length < 16) return { ok: false, motivo: 'relleno', detalle: 'La llave o el shop_id parecen de relleno.' }
+  const base = HOSTS_T1[ambiente]
+  if (!base) return { ok: false, motivo: 'produccion_sin_host', detalle: 'El host productivo de T1 no está confirmado; production no opera hasta registrarlo.' }
+  return { ok: true, cfg: { ambiente, base, apiKey, shopId } }
 }
-export const T1_SECRETOS = ['T1_API_URL', 'T1_AUTH_URL', 'T1_CLIENT_SECRET', 'T1_USERNAME', 'T1_PASSWORD', 'T1_SHOP_ID']
-
-// ── Token (cache en memoria del aislado; margen de 60 s) ─────────────────────────────────────────────
-let cache: { token: string; hasta: number; clave: string } | null = null
-export async function t1Token(cfg: T1Config, fetchFn: typeof fetch = fetch, ahora = Date.now()): Promise<string> {
-  const clave = `${cfg.authUrl}|${cfg.username}`
-  if (cache && cache.clave === clave && cache.hasta > ahora) return cache.token
-  const body = new URLSearchParams({ grant_type: 'password', client_id: cfg.clientId, client_secret: cfg.clientSecret, username: cfg.username, password: cfg.password })
-  const r = await fetchFn(cfg.authUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
-  const d = await r.json().catch(() => ({})) as { access_token?: string; expires_in?: number; error_description?: string }
-  if (!r.ok || !d.access_token) throw new Error(`T1 no aceptó las credenciales (${r.status}${d.error_description ? ': ' + d.error_description : ''})`)
-  const vida = Math.max(60, Number(d.expires_in ?? 1800))
-  cache = { token: d.access_token, hasta: ahora + (vida - 60) * 1000, clave }
-  return d.access_token
+export function cabecerasT1(cfg: T1Config): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'X-Api-Key': cfg.apiKey, shop_id: cfg.shopId }
 }
-export function _olvidarTokenT1() { cache = null }
-export function cabecerasT1(cfg: T1Config, token: string): Record<string, string> {
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, shop_id: cfg.shopId }
-}
+export const urlT1 = (cfg: T1Config, ruta: string) => `${cfg.base}${ruta}`
+/** Texto seguro para logs/UI: nunca la llave. */
+export const describirT1 = (cfg: T1Config) => `T1 ${cfg.ambiente === 'test' ? 'sandbox' : 'producción'} · shop ${cfg.shopId.slice(0, 2)}…`
 
 // ── Utilería de datos ───────────────────────────────────────────────────────────────────────────────
 const limpia = (t?: string | null) => String(t ?? '').replace(/\s+/g, ' ').trim()
 const entero = (n: number, min = 1) => Math.max(min, Math.ceil(Number(n) || 0))
-/** "Dra. Ana María Ruiz Pérez" → nombre "Ana María", apellidos "Ruiz Pérez" (T1 exige ambos; sin apellido se repite el nombre). */
 export function partirNombre(completo: string): { nombre: string; apellidos: string } {
   const partes = limpia(completo).replace(/^(dr|dra|lic|ing|sr|sra|srta)\.?\s+/i, '').split(' ').filter(Boolean)
   if (partes.length === 0) return { nombre: '', apellidos: '' }
-  if (partes.length === 1) return { nombre: partes[0], apellidos: partes[0] }
+  if (partes.length === 1) return { nombre: partes[0], apellidos: '' }   // un solo nombre: el apellido NO se inventa ni se repite (la guía se detiene y lo pide)
   if (partes.length === 2) return { nombre: partes[0], apellidos: partes[1] }
   const corte = partes.length >= 4 ? partes.length - 2 : partes.length - 1
   return { nombre: partes.slice(0, corte).join(' '), apellidos: partes.slice(corte).join(' ') }
 }
-/** "Blvd. Pedro Infante 2911 int. 4" → calle "Blvd. Pedro Infante", número "2911 int. 4"; sin número → "S/N". */
 export function partirCalle(line1: string): { calle: string; numero: string } {
   const t = limpia(line1)
   const m = /^(.*?[a-záéíóúñ.)])\s+(#?\s*\d[\w\-/]*(?:\s*(?:int|interior|depto|local|piso|no\.?|num\.?)[\s.]*[\w\-/]+)*)\s*$/i.exec(t)
   if (m && m[1].length >= 3) return { calle: m[1].trim().slice(0, 100), numero: m[2].replace(/^#\s*/, '').trim().slice(0, 30) }
   const m2 = /^(.*?)\s+(\d[\w\-/]*)\s*,?\s*(.*)$/.exec(t)
   if (m2 && m2[1].length >= 3) return { calle: m2[1].trim().slice(0, 100), numero: [m2[2], m2[3]].filter(Boolean).join(' ').trim().slice(0, 30) }
-  return { calle: t.slice(0, 100) || 'Domicilio conocido', numero: 'S/N' }
+  return { calle: t.slice(0, 100), numero: 'S/N' }
 }
 const telefono = (t?: string | null) => limpia(t).replace(/\D/g, '').slice(-10)
-const municipioDe = (city?: string | null) => limpia(city).slice(0, 60)
 const correo = (e?: string | null) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpia(e)) ? limpia(e) : '')
 
-// ── Cotización ─────────────────────────────────────────────────────────────────────────────────────
-export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, comercioId: string, diasEmbarque = 1, valorPaquete = 0) {
+// ── Cotización (request documentado) ───────────────────────────────────────────────────────────────
+export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; package_type: number; packages: number }
+export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, diasEmbarque = 0): QuoteV2Request {
   return {
-    codigo_postal_origen: limpia(shipper.cp).replace(/\D/g, ''), codigo_postal_destino: limpia(receiver.address.cp).replace(/\D/g, ''),
-    peso: entero(pkg.weightKg), largo: entero(pkg.lengthCm), ancho: entero(pkg.widthCm), alto: entero(pkg.heightCm),
-    dias_embarque: diasEmbarque, seguro: valorPaquete > 0 ? 1 : 0, valor_paquete: valorPaquete, tipo_paquete: 2, comercio_id: comercioId,
-    paquetes: entero(pkg.pieces), generar_recoleccion: false,
+    home: false, origin_postal_code: limpia(shipper.cp).replace(/\D/g, ''), destination_postal_code: limpia(receiver.address.cp).replace(/\D/g, ''),
+    weight: entero(pkg.weightKg), length: entero(pkg.lengthCm), width: entero(pkg.widthCm), height: entero(pkg.heightCm),
+    shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, package_type: 2, packages: entero(pkg.pieces),
   }
 }
-const NOMBRE_PAQUETERIA: Record<string, string> = { FEDEX: 'FedEx', DHL: 'DHL', UPS: 'UPS', ESTAFETA: 'Estafeta', EXPRESS: 'Express', '99MIN': '99 Minutos', AMPM: 'AM PM', T1ENVIOS: 'T1 Envíos', REDPACK: 'Redpack', PAQUETEXPRESS: 'Paquetexpress' }
-export const carrierT1 = (clave: string) => NOMBRE_PAQUETERIA[limpia(clave).toUpperCase()] ?? limpia(clave)
-const NOMBRE_SERVICIO: Record<string, string> = { EXPRESSDOMESTIC: 'Express', STANDARD: 'Estándar', ECONOMY: 'Económico', GROUND: 'Terrestre', TERRESTRE: 'Terrestre', DIASIGUIENTE: 'Día siguiente', NEXTDAY: 'Día siguiente', SAVER: 'Saver' }
+export function faltantesCotizacion(q: QuoteV2Request): string[] {
+  const f: string[] = []
+  if (!/^\d{5}$/.test(q.origin_postal_code)) f.push('C.P. de origen (5 dígitos)')
+  if (!/^\d{5}$/.test(q.destination_postal_code)) f.push('C.P. de destino (5 dígitos)')
+  if (!(q.weight > 0 && q.length > 0 && q.width > 0 && q.height > 0)) f.push('peso y medidas del paquete')
+  return f
+}
+
+const NOMBRE_PAQUETERIA: Record<string, string> = { FEDEX: 'FedEx', DHL: 'DHL', UPS: 'UPS', ESTAFETA: 'Estafeta', EXPRESS: 'Express', '99MIN': '99 Minutos', '99MINUTOS': '99 Minutos', AMPM: 'AM PM', T1ENVIOS: 'T1 Envíos', REDPACK: 'Redpack', PAQUETEXPRESS: 'Paquetexpress', JTEXPRESS: 'J&T Express' }
+export const carrierT1 = (clave: string) => NOMBRE_PAQUETERIA[limpia(clave).toUpperCase().replace(/[^A-Z0-9]/g, '')] ?? limpia(clave)
+const NOMBRE_SERVICIO: Record<string, string> = { EXPRESSDOMESTIC: 'Express', EXPRESS: 'Express', STANDARD: 'Estándar', ECONOMY: 'Económico', ECONOMICO: 'Económico', GROUND: 'Terrestre', TERRESTRE: 'Terrestre', DIASIGUIENTE: 'Día siguiente', NEXTDAY: 'Día siguiente', SAVER: 'Saver' }
 const servicioBonito = (clave: string) => NOMBRE_SERVICIO[limpia(clave).toUpperCase().replace(/[^A-Z0-9]/g, '')] ?? limpia(clave).replace(/_/g, ' ')
 
-export interface TarifaT1 { id: string; carrier: string; service: string; serviceCode: string; amount: number; currency: string; etaDays: number; token: string }
-/** serviceCode = "<PAQUETERIA>|<SERVICIO>": estable entre cotizaciones; el `token` cambia en cada una y solo vive en el servidor. */
+export interface TarifaT1 {
+  id: string; serviceCode: string; carrier: string; service: string; amount: number; currency: string; etaDays: number; token: string
+  detalle: { service_id: string; service_name: string; service_type: string | null; cost: number | null; insurance: boolean | null; insurance_cost: number | null; extended_zone: boolean | null; extended_zone_cost: number | null; recommended: boolean | null; total_packages: number | null }
+}
+export type LecturaCotizacion = { ok: true; tarifas: TarifaT1[] } | { ok: false; motivo: 'sin_servicios' | 'respuesta_incompleta' | 'forma_no_reconocida'; forma: string }
+const n = (v: unknown) => { const x = Number(typeof v === 'string' ? v.replace(/[^0-9.]/g, '') : v); return Number.isFinite(x) ? x : NaN }
+const bool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : v === 'true' ? true : v === 'false' ? false : null)
+const numONull = (v: unknown): number | null => (v == null || v === '' ? null : Number.isFinite(n(v)) ? n(v) : null)
+/** Forma de un JSON sin valores (solo llaves): sirve para diagnosticar un contrato distinto sin filtrar datos. */
+export function formaDe(v: unknown, nivel = 0): string {
+  if (nivel > 4) return '…'
+  if (Array.isArray(v)) return `[${v.length ? formaDe(v[0], nivel + 1) : ''}]`
+  if (v && typeof v === 'object') return `{${Object.keys(v as object).slice(0, 25).map((k) => `${k}:${formaDe((v as Record<string, unknown>)[k], nivel + 1)}`).join(',')}}`
+  return typeof v
+}
+export const claveServicio = (carrier: string, serviceName: string) => `${limpia(carrier).toUpperCase().replace(/[^A-Z0-9]/g, '')}|${limpia(serviceName).toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`
+/**
+ * Contrato OFICIAL de cotización: `success === true` y `detail[]`. Por servicio se exigen carrier, service_name, total_cost (> 0)
+ * y token; lo demás es opcional y se conserva tal cual (nunca se inventa). Un servicio incompleto se descarta; si todos lo son,
+ * `respuesta_incompleta`. El TOTAL de T1 es `total_cost` (no `cost`): es el costo del proveedor, NO el precio comercial al cliente.
+ */
 // deno-lint-ignore no-explicit-any
-export function parseQuoteT1(data: any): TarifaT1[] {
+export function parseQuoteT1(data: any): LecturaCotizacion {
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !('success' in data) || !('detail' in data)) return { ok: false, motivo: 'forma_no_reconocida', forma: formaDe(data) }
+  if (data.success !== true || !Array.isArray(data.detail)) return { ok: false, motivo: 'forma_no_reconocida', forma: formaDe(data) }
+  if (data.detail.length === 0) return { ok: false, motivo: 'sin_servicios', forma: formaDe(data) }
   const out: TarifaT1[] = []
-  const lista = Array.isArray(data?.result) ? data.result : []
-  for (const r of lista) {
-    const paq = limpia(r?.clave ?? r?.paqueteria ?? r?.comercio).toUpperCase()
-    const servicios = r?.cotizacion?.servicios
-    if (!paq || !servicios || typeof servicios !== 'object') continue
-    for (const [clave, v] of Object.entries(servicios as Record<string, { costo_total?: unknown; dias_entrega?: unknown; moneda?: unknown; token?: unknown }>)) {
-      const amount = Number(v?.costo_total), token = limpia(String(v?.token ?? ''))
-      if (!Number.isFinite(amount) || amount <= 0 || !token) continue
-      const serviceCode = `${paq}|${limpia(clave).toUpperCase()}`
-      out.push({ id: serviceCode, serviceCode, carrier: carrierT1(paq), service: servicioBonito(clave), amount, currency: limpia(String(v?.moneda ?? 'MXN')) || 'MXN', etaDays: Math.max(1, Number(v?.dias_entrega) || 2), token })
-    }
+  for (const r of data.detail as Record<string, unknown>[]) {
+    if (!r || typeof r !== 'object') continue
+    const carrier = limpia(String(r.carrier ?? r.service_id ?? '')), serviceName = limpia(String(r.service_name ?? '')), token = limpia(String(r.token ?? ''))
+    const total = n(r.total_cost)
+    if (!carrier || !serviceName || !token || !Number.isFinite(total) || total <= 0) continue
+    const serviceCode = claveServicio(carrier, serviceName)
+    out.push({
+      id: serviceCode, serviceCode, carrier: carrierT1(carrier), service: limpia(String(r.service_type ?? '')) ? `${servicioBonito(serviceName)} · ${limpia(String(r.service_type))}` : servicioBonito(serviceName),
+      amount: total, currency: limpia(String(r.currency ?? '')) || 'MXN', etaDays: Math.max(1, Math.floor(n(r.delivery_days)) || 1), token,
+      detalle: { service_id: limpia(String(r.service_id ?? carrier)), service_name: serviceName, service_type: limpia(String(r.service_type ?? '')) || null, cost: numONull(r.cost), insurance: bool(r.insurance), insurance_cost: numONull(r.insurance_cost), extended_zone: bool(r.extended_zone), extended_zone_cost: numONull(r.extended_zone_cost), recommended: bool(r.recommended), total_packages: numONull(r.total_packages) },
+    })
   }
-  return out.sort((a, b) => a.amount - b.amount)
+  if (!out.length) return { ok: false, motivo: 'respuesta_incompleta', forma: formaDe(data) }
+  return { ok: true, tarifas: out.sort((a, b) => a.amount - b.amount) }
 }
 
 // ── Guía ───────────────────────────────────────────────────────────────────────────────────────────
-export function buildGuideT1(shipper: NeutralShipper, receiver: NeutralReceiver, token: string, orderRef: string, comercioId: string, origenColonia = '') {
-  const o = partirNombre(shipper.name), oc = partirCalle(shipper.addressLine1)
-  const d = partirNombre(receiver.name), dc = partirCalle(receiver.address.line1)
-  return {
-    contenido: `Pedido ${orderRef}`.slice(0, 25), token_quote: token, generar_recoleccion: false, tiene_notificacion: false, origen_guia: 't1envios', comercio_id: comercioId,
-    nombre_origen: o.nombre || shipper.name, apellidos_origen: o.apellidos || shipper.name, email_origen: correo(shipper.email), nombre_comercio_origen: limpia(shipper.name).slice(0, 60),
-    calle_origen: oc.calle, numero_origen: oc.numero, colonia_origen: limpia(origenColonia) || 'Centro', municipio_origen: municipioDe(shipper.city), estado_origen: limpia(shipper.state).slice(0, 40),
-    telefono_origen: telefono(shipper.phone), referencias_origen: 'Sucursal',
-    nombre_destino: d.nombre || receiver.name, apellidos_destino: d.apellidos || receiver.name, email_destino: correo(receiver.email) || correo(shipper.email),
-    calle_destino: dc.calle, numero_destino: dc.numero, colonia_destino: limpia(receiver.address.colonia) || 'Centro', municipio_destino: municipioDe(receiver.address.city), estado_destino: limpia(receiver.address.state).slice(0, 40),
-    telefono_destino: telefono(receiver.address.phone), referencias_destino: limpia(receiver.address.refs).slice(0, 200) || 'Sin referencias',
-  }
+export interface DatosDireccionT1 { nombre: string; apellidos: string; correo: string; telefono: string; calle: string; numero: string; colonia: string; municipio: string; estado: string; cp: string; referencias: string }
+/** Origen de envíos del ERP (company_settings, Configuración → Origen de envíos) con los campos estructurados de la 183. */
+export type OrigenEnvios = NeutralShipper & { calle?: string | null; numeroExt?: string | null; numeroInt?: string | null; colonia?: string | null; referencias?: string | null }
+/** Datos del remitente para la guía, SOLO desde los campos estructurados (sin dividir textos): lo que falte se reporta. */
+export function datosOrigenT1(shipper: OrigenEnvios): DatosDireccionT1 {
+  const o = partirNombre(shipper.name)
+  const numero = [limpia(shipper.numeroExt), limpia(shipper.numeroInt)].filter(Boolean).join(' ')
+  return { nombre: o.nombre, apellidos: o.apellidos, correo: correo(shipper.email), telefono: telefono(shipper.phone), calle: limpia(shipper.calle).slice(0, 100), numero: numero.slice(0, 30), colonia: limpia(shipper.colonia).slice(0, 80), municipio: limpia(shipper.city).slice(0, 60), estado: limpia(shipper.state).slice(0, 40), cp: limpia(shipper.cp).replace(/\D/g, ''), referencias: limpia(shipper.referencias).slice(0, 200) }
 }
-export interface GuiaT1 { tracking: string; labelBase64: string | null; labelUrl: string | null; carrier: string; cost: number | null; numOrden: string | null }
+export function datosDestinoT1(receiver: NeutralReceiver): DatosDireccionT1 {
+  const d = partirNombre(receiver.name), c = partirCalle(receiver.address.line1)
+  return { nombre: d.nombre, apellidos: d.apellidos, correo: correo(receiver.email), telefono: telefono(receiver.address.phone), calle: c.calle, numero: c.numero, colonia: limpia(receiver.address.colonia), municipio: limpia(receiver.address.city).slice(0, 60), estado: limpia(receiver.address.state).slice(0, 40), cp: limpia(receiver.address.cp).replace(/\D/g, ''), referencias: limpia(receiver.address.refs).slice(0, 200) || 'Sin referencias' }
+}
+/** Qué falta para una guía (sin inventar nada): los campos obligatorios del contrato, en palabras y por lado. */
+export function faltantesGuia(origen: DatosDireccionT1, destino: DatosDireccionT1): string[] {
+  const rev = (d: DatosDireccionT1, lado: string) => ([['nombre', 'nombre'], ['apellidos', 'apellidos'], ['correo', 'correo'], ['telefono', 'teléfono (10 dígitos)'], ['calle', 'calle'], ['numero', 'número'], ['colonia', 'colonia'], ['municipio', 'municipio'], ['estado', 'estado'], ['referencias', 'referencias']] as Array<[keyof DatosDireccionT1, string]>)
+    .filter(([k]) => !d[k] || (k === 'telefono' && !/^\d{10}$/.test(d.telefono))).map(([, l]) => `${lado}: ${l}`)
+  return [...rev(origen, 'origen'), ...rev(destino, 'destino')]
+}
+/** Dónde se corrige cada faltante (el origen vive en Configuración → Origen de envíos; el destino en el pedido). */
+export const PISTA_ORIGEN_T1 = 'El origen sale de Configuración → Origen de envíos: captura calle, número exterior, colonia, referencias, teléfono, correo y, en "Nombre / remitente", nombre y apellido de la persona de contacto (T1 exige nombre y apellido).'
+/** Contrato OFICIAL de la guía: nombres de campo por lado (prefijos origin_ y destination_). */
+export const CAMPOS_GUIA_V2: Record<keyof DatosDireccionT1, string | null> = { nombre: 'first_name', apellidos: 'last_name', correo: 'email', telefono: 'phone', calle: 'street', numero: 'number', colonia: 'neighborhood', municipio: 'municipality', estado: 'state', referencias: 'references', cp: null }
+export interface GuiaV2Request extends Record<string, unknown> { quote_token: string; content: string; business_id: string; generate_pickup: false; has_notification: false }
+/**
+ * Request oficial: quote_token, content (≤ 25), business_id = shop_id del header, origin_… y destination_… obligatorios,
+ * origin_business_name opcional (razón social), generate_pickup y has_notification en false (T1-A), y SIN `guide_origin`
+ * (se omite: el transportista lo fija el token del servicio elegido). Lanza si falta un obligatorio: nunca se inventa.
+ */
+export function buildGuideT1(quoteToken: string, orderRef: string, shopId: string, origen: DatosDireccionT1, destino: DatosDireccionT1, razonSocial?: string): GuiaV2Request {
+  const falta = faltantesGuia(origen, destino)
+  if (!limpia(quoteToken)) falta.unshift('token de cotización')
+  if (falta.length) throw new Error(`faltan: ${falta.join(', ')}`)
+  const lado = (prefijo: 'origin' | 'destination', d: DatosDireccionT1) => Object.fromEntries((Object.keys(CAMPOS_GUIA_V2) as Array<keyof DatosDireccionT1>).filter((k) => CAMPOS_GUIA_V2[k]).map((k) => [`${prefijo}_${CAMPOS_GUIA_V2[k]}`, d[k]]))
+  return { quote_token: limpia(quoteToken), content: `Pedido ${orderRef}`.slice(0, 25), business_id: shopId, ...(limpia(razonSocial) ? { origin_business_name: limpia(razonSocial).slice(0, 60) } : {}), ...lado('origin', origen), ...lado('destination', destino), generate_pickup: false, has_notification: false }
+}
+export interface GuiaT1 { tracking: string; orderNumber: string | null; carrier: string; cost: number | null; labelUrl: string | null; labelBase64: string | null; extendedZone: boolean | null; currentBalance: number | null }
+export type LecturaGuia = { ok: true; guia: GuiaT1 } | { ok: false; motivo: 'rechazada' | 'sin_guia' | 'forma_no_reconocida'; mensaje: string; forma: string }
+/** Respuesta OFICIAL de la guía: `success === true` y `detail.tracking_number`. `file` = PDF base64 (nunca a logs); `guide_link` = PDF en S3 (no permanente). */
 // deno-lint-ignore no-explicit-any
-export function parseGuideT1(data: any): GuiaT1 {
-  const d = data?.detail ?? data ?? {}
-  const tracking = limpia(String(d?.guia ?? d?.numero_guia ?? ''))
-  const raw = typeof d?.file === 'string' ? d.file : ''
-  let labelBase64: string | null = null
-  if (raw.startsWith('%PDF')) labelBase64 = btoa(Array.from(raw as string, (ch: string) => String.fromCharCode(ch.charCodeAt(0) & 0xff)).join(''))   // PDF crudo → base64
-  else if (/^(data:application\/pdf;base64,)?[A-Za-z0-9+/=\s]{100,}$/.test(raw)) labelBase64 = raw.replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '')
-  const link = limpia(String(d?.link_guia ?? ''))
-  const cost = Number(d?.costo)
-  return { tracking, labelBase64, labelUrl: /^https?:\/\//.test(link) ? link : null, carrier: carrierT1(String(d?.paqueteria ?? '')) || 'T1 Envíos', cost: Number.isFinite(cost) ? cost : null, numOrden: d?.num_orden != null ? String(d.num_orden) : null }
+export function parseGuideT1(data: any): LecturaGuia {
+  if (!data || typeof data !== 'object' || !('success' in data)) return { ok: false, motivo: 'forma_no_reconocida', mensaje: 'T1 respondió en un formato no reconocido.', forma: formaDe(data) }
+  const d = (data.detail && typeof data.detail === 'object' ? data.detail : {}) as Record<string, unknown>
+  if (data.success !== true) return { ok: false, motivo: 'rechazada', mensaje: limpia(String(data.message ?? '')).slice(0, 160) || 'T1 no generó la guía.', forma: formaDe(data) }
+  const tracking = limpia(String(d.tracking_number ?? ''))
+  if (!tracking) return { ok: false, motivo: 'sin_guia', mensaje: 'T1 respondió éxito sin número de guía.', forma: formaDe(data) }
+  const raw = typeof d.file === 'string' ? d.file.replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '') : ''
+  const link = limpia(String(d.guide_link ?? ''))
+  return { ok: true, guia: {
+    tracking, orderNumber: d.order_number != null ? String(d.order_number) : null, carrier: carrierT1(String(d.carrier ?? '')) || 'T1 Envíos',
+    cost: numONull(d.cost), labelUrl: /^https?:\/\//.test(link) ? link : null, labelBase64: /^[A-Za-z0-9+/=]{100,}$/.test(raw) ? raw : null,
+    extendedZone: bool(d.extended_zone), currentBalance: numONull(d.current_balance),
+  } }
 }
 
-// ── Rastreo ────────────────────────────────────────────────────────────────────────────────────────
-/** T1 reporta "YYYY-MM-DD HH:MM:SS" en hora del centro de México (UTC-6 fijo desde 2022); se convierte a ISO sin depender de la zona del proceso. */
-export function fechaT1(f: string): string {
-  const t = limpia(f).replace(' ', 'T')
-  if (!t) return ''
-  const iso = /[zZ]|[+-]\d{2}:\d{2}$/.test(t) ? t : `${t}-06:00`
-  return Number.isNaN(Date.parse(iso)) ? '' : new Date(iso).toISOString()
-}
+// ── Errores y reintentos ───────────────────────────────────────────────────────────────────────────
+export type ClaseErrorT1 = 'credenciales' | 'sin_saldo' | 'limite' | 'proveedor' | 'cotizacion' | 'token_vencido'
+/** Clasifica y redacta sin exponer cabeceras ni la respuesta completa (errores documentados: 400, 401, 402, 409, 500). */
 // deno-lint-ignore no-explicit-any
-export function parseTrackingT1(data: any): { status: string; events: Array<{ at: string; status: string; description: string; location?: string }> } {
-  const d = data?.detail ?? {}
-  const status = limpia(String(d?.familia_externa ?? d?.familia_interna ?? '')) || 'unknown'
-  const fecha = limpia(String(d?.fecha ?? ''))
-  const at = fechaT1(fecha)
-  const description = [limpia(String(d?.descripcion ?? '')), limpia(String(d?.familia_interna ?? ''))].filter(Boolean).join(' · ')
-  return { status, events: at ? [{ at, status: limpia(String(d?.codigo ?? '')) || status, description }] : [] }
+export function errorT1(status: number, data: any): { clase: ClaseErrorT1; mensaje: string } {
+  const m = limpia(String(data?.message ?? data?.error ?? data?.detail?.message ?? '')).slice(0, 160)
+  if (status === 401 || status === 403) return { clase: 'credenciales', mensaje: 'T1 rechazó la llave o el shop_id, o la llave expiró (revisa el ambiente y las credenciales).' }
+  if (status === 402) return { clase: 'sin_saldo', mensaje: 'T1: saldo insuficiente en la cuenta para generar la guía.' }
+  if (status === 409) return { clase: 'token_vencido', mensaje: 'T1: la cotización ya se usó o venció. Vuelve a cotizar y confirma el servicio y el precio.' }
+  if (status === 429) return { clase: 'limite', mensaje: 'T1: demasiadas solicitudes; espera un momento y vuelve a intentar.' }
+  if (status === 400 || status === 422) return { clase: 'cotizacion', mensaje: m ? `T1: ${m}` : 'T1 no aceptó los datos enviados.' }
+  if (status >= 500) return { clase: 'proveedor', mensaje: `T1 no está disponible (${status}).` }
+  return { clase: 'proveedor', mensaje: m ? `T1: ${m}` : `T1 respondió ${status}.` }
 }
-
-// ── Recolección ────────────────────────────────────────────────────────────────────────────────────
-export interface PickupT1Input { date: string; ready: string; close: string; instructions?: string }
-export function buildPickupT1(shipper: NeutralShipper, pkg: NeutralPackage, mensajeria: string, i: PickupT1Input, comercioId: string, origenColonia = '') {
-  const o = partirNombre(shipper.name), oc = partirCalle(shipper.addressLine1)
-  return {
-    mensajeria: limpia(mensajeria).toUpperCase(), nombre_contacto: o.nombre || shipper.name, apellidos_contacto: o.apellidos || shipper.name, email: correo(shipper.email),
-    calle: oc.calle, numero: oc.numero, colonia: limpia(origenColonia) || 'Centro', telefono: telefono(shipper.phone), estado: limpia(shipper.state).slice(0, 40), municipio: municipioDe(shipper.city),
-    codigo_postal: limpia(shipper.cp).replace(/\D/g, ''), referencias: limpia(i.instructions).slice(0, 200) || 'Recepción', cantidad_piezas: entero(pkg.pieces), peso: entero(pkg.weightKg),
-    largo: entero(pkg.lengthCm), ancho: entero(pkg.widthCm), alto: entero(pkg.heightCm), fecha: i.date, hora_inicio: i.ready, horario_cierre: i.close, comercio_id: comercioId,
-  }
-}
-// deno-lint-ignore no-explicit-any
-export function parsePickupT1(data: any): { confirmation: string } {
-  const r = data?.detail?.recoleccion ?? data?.detail ?? {}
-  return { confirmation: limpia(String(r?.pick_up ?? r?.confirmacion ?? r?.id ?? '')) }
-}
-
-// ── Errores ────────────────────────────────────────────────────────────────────────────────────────
-// deno-lint-ignore no-explicit-any
-export function t1ErrorMessage(status: number, data: any): string {
-  const m = limpia(String(data?.message ?? data?.error ?? data?.detail?.recoleccion?.mensaje ?? ''))
-  if (status === 401 || status === 403) return 'T1 rechazó las credenciales o el shop_id.'
-  if (m) return `T1: ${m.slice(0, 200)}`
-  return `T1 respondió ${status}.`
-}
+/** Solo las consultas idempotentes (cotizar) se reintentan: 429 y 5xx, con espera exponencial; la guía NUNCA se reintenta sola. */
+export const reintentableCotizacion = (status: number) => status === 429 || status >= 500
+export const esperaReintentoMs = (intento: number, base = 600) => Math.min(8000, base * 2 ** intento)
+export const TIMEOUT_MS = { cotizar: 20_000, guia: 30_000 } as const

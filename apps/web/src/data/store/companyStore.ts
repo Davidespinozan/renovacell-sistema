@@ -31,6 +31,13 @@ export interface CompanySettings {
   shipping_country: string
   shipping_phone: string
   shipping_email: string
+  // ORIGEN ESTRUCTURADO (183): calle, número exterior, interior/local, colonia y referencias. T1 los exige; DHL usa la línea
+  // `shipping_address`, que el servidor arma a partir de ellos cuando existen (una sola verdad).
+  shipping_street: string
+  shipping_ext_number: string
+  shipping_int_number: string
+  shipping_colonia: string
+  shipping_references: string
 }
 
 export const EMPTY_COMPANY: CompanySettings = {
@@ -38,6 +45,7 @@ export const EMPTY_COMPANY: CompanySettings = {
   banco: '', clabe: '', cuenta: '', titular: '',
   shipping_name: '', shipping_address: '', shipping_cp: '', shipping_city: '',
   shipping_state: '', shipping_country: 'MX', shipping_phone: '', shipping_email: '',
+  shipping_street: '', shipping_ext_number: '', shipping_int_number: '', shipping_colonia: '', shipping_references: '',
 }
 
 // Mock: sin datos capturados (el cliente los llena en Configuración antes del go-live).
@@ -69,13 +77,18 @@ export function normalizeCompany(row: Partial<Record<keyof CompanySettings, stri
     shipping_country: r.shipping_country ?? '', // default 'MX' lo aplica shipperFromCompany
     shipping_phone: r.shipping_phone ?? '',
     shipping_email: r.shipping_email ?? '',
+    shipping_street: r.shipping_street ?? '',
+    shipping_ext_number: r.shipping_ext_number ?? '',
+    shipping_int_number: r.shipping_int_number ?? '',
+    shipping_colonia: r.shipping_colonia ?? '',
+    shipping_references: r.shipping_references ?? '',
   }
 }
 
 const live = makeLive<CompanySettings>(async () => {
   const { data, error } = await supabase
     .from('company_settings')
-    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular, shipping_name, shipping_address, shipping_cp, shipping_city, shipping_state, shipping_country, shipping_phone, shipping_email')
+    .select('razon_social, rfc, regimen_fiscal, cp, direccion, telefono, email, logo_url, banco, clabe, cuenta, titular, shipping_name, shipping_address, shipping_cp, shipping_city, shipping_state, shipping_country, shipping_phone, shipping_email, shipping_street, shipping_ext_number, shipping_int_number, shipping_colonia, shipping_references')
     .eq('id', 'default')
     .maybeSingle()
   if (error) throw error

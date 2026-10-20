@@ -1,96 +1,131 @@
-// T1 Envíos · adaptador puro (supabase/functions/shipping/t1.ts): configuración (seam 501), armado de cotización y guía con el
-// contrato documentado, lectura de tarifas (token se queda en el servidor), guía (PDF crudo o base64), rastreo y recolección.
+// T1 Envíos · API v2.0 · adaptador puro con los CONTRATOS OFICIALES (T1 Cuenta): configuración por ambiente, cabeceras,
+// cotización (request documentado; respuesta {success, detail[]} con total_cost y token), guía (request origin_/destination_,
+// respuesta detail.tracking_number/order_number/carrier/cost/guide_link/file), errores 400/401/402/409/500, reintentos.
 import { describe, it, expect } from 'vitest'
-import { t1Config, buildQuoteT1, parseQuoteT1, buildGuideT1, parseGuideT1, parseTrackingT1, buildPickupT1, parsePickupT1, partirNombre, partirCalle, t1ErrorMessage, t1Token, _olvidarTokenT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
-import { resumenT1 } from '../../../../../supabase/functions/shipping/rastreo'
+import { t1Config, cabecerasT1, urlT1, HOSTS_T1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, parseQuoteT1, claveServicio, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, CAMPOS_GUIA_V2, parseGuideT1, errorT1, reintentableCotizacion, esperaReintentoMs, partirNombre, partirCalle, formaDe, describirT1, T1_SECRETOS } from '../../../../../supabase/functions/shipping/t1'
 
-const SHIPPER = { name: 'Renovacell SA de CV', addressLine1: 'Blvd. Pedro Infante 2911', cp: '80100', city: 'Culiacán', state: 'Sinaloa', country: 'MX', phone: '667 164 7799', email: 'envios@renovacell.mx' }
+// Origen = bloque "Origen de envíos" de Configuración (misma fuente que DHL), con los campos estructurados de la 183.
+const SHIPPER = { name: 'Renovacell SA de CV', addressLine1: 'Nuevo Mundo 1045 17', cp: '80197', city: 'Culiacán', state: 'Sinaloa', country: 'MX', phone: '667 164 7799', email: 'envios@renovacell.mx', calle: 'Nuevo Mundo', numeroExt: '1045', numeroInt: '17', colonia: 'Las Quintas', referencias: 'Local 17, frente al parque' }
 const RECEIVER = { name: 'Dra. Ana María Ruiz Pérez', email: 'ana@clinica.mx', address: { line1: 'Av. Reforma 123 int. 4', colonia: 'Centro', cp: '06600', city: 'Ciudad de México', state: 'CDMX', refs: 'Edificio azul', phone: '(55) 1234-5678' } }
 const PKG = { weightKg: 1.4, lengthCm: 30, widthCm: 20, heightCm: 15, pieces: 1 }
 const env = (o: Record<string, string>) => (k: string) => o[k]
-const FULL = { T1_API_URL: 'https://api.t1.test/', T1_AUTH_URL: 'https://keycloak.t1.test/token', T1_CLIENT_SECRET: 'sec', T1_USERNAME: 'u@x.mx', T1_PASSWORD: 'p', T1_SHOP_ID: '77' }
+const KEY = 'k1k2k3k4k5k6k7k8k9k0abcd'
+const OK = { T1_API_ENV: 'test', T1_API_KEY: KEY, T1_SHOP_ID: '7781' }
+// Fixture OFICIAL de cotización (valores de ejemplo de la documentación).
+const COTIZACION = { success: true, message: 'Successful Search!', carriers: '', detail: [
+  { service_id: 'DHL', service_name: 'EXPRESS DOMESTIC', service_type: 'Dia Siguiente', total_packages: 1, cost: 298.04, total_cost: 376.16, delivery_days: 1, currency: 'MXN', carrier: 'DHL', token: 'TOKEN_DHL', recommended: true, insurance: true, package_value: 3000, shipment_cost: 118.49, insurance_cost: 45, extended_zone: true, extended_zone_cost: 212.67 },
+  { service_id: 'FEDEX', service_name: 'GROUND', service_type: 'Terrestre', total_packages: 1, cost: 140, total_cost: 162.4, delivery_days: 4, currency: 'MXN', carrier: 'FEDEX', token: 'TOKEN_FX', recommended: false, insurance: false },
+] }
+// Fixture OFICIAL de guía.
+const B64 = 'JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PAov'.repeat(4)
+const GUIA = { success: true, message: 'Guide Generated!', detail: { packages: 1, order_number: 6039298, carrier: 'DHL', creation_date: '2026-07-09 16:21:38', cost: 374.11, destination: 'Maria Calle 5 200 Reforma Coatzacoalcos', current_balance: 8709760.27, tracking_number: '6232915371', extended_zone: false, guide_link: 'https://shipping-guides-storage-dev.s3.us-east-1.amazonaws.com/labels/ejemplo.pdf', file: B64 } }
 
-describe('T1 · configuración (seam)', () => {
-  it('sin alguna llave indispensable → null (la Edge responde 501); con todas → base sin barra final y comercio_id = shop_id si no se da', () => {
-    expect(t1Config(env({}))).toBeNull()
-    for (const k of T1_SECRETOS) expect(t1Config(env({ ...FULL, [k]: '' }))).toBeNull()
-    expect(t1Config(env({ ...FULL, T1_API_URL: '...' }))).toBeNull()   // relleno pegado tal cual → sigue siendo 501
-    expect(t1Config(env({ T1_API_URL: '...', T1_AUTH_URL: '...', T1_CLIENT_SECRET: '...', T1_USERNAME: '...', T1_PASSWORD: '...', T1_SHOP_ID: '...' }))).toBeNull()
-    const c = t1Config(env(FULL))!
-    expect(c.base).toBe('https://api.t1.test'); expect(c.clientId).toBe('t1envios'); expect(c.comercioId).toBe('77'); expect(c.shopId).toBe('77')
-    expect(t1Config(env({ ...FULL, T1_COMERCIO_ID: 'c9' }))!.comercioId).toBe('c9')
+describe('T1 v2.0 · configuración por ambiente', () => {
+  it('sandbox: host del registro, cabeceras X-Api-Key + shop_id, rutas oficiales; la llave nunca aparece en la descripción', () => {
+    const c = t1Config(env(OK)); expect(c.ok).toBe(true); if (!c.ok) return
+    expect(c.cfg).toEqual({ base: 'https://sandbox.t1api.com', ambiente: 'test', apiKey: KEY, shopId: '7781' })
+    expect(T1_SECRETOS).toEqual(['T1_API_ENV', 'T1_API_KEY', 'T1_SHOP_ID'])   // sin T1_ORIGEN_COLONIA: el origen sale del ERP
+    expect(cabecerasT1(c.cfg)).toEqual({ 'Content-Type': 'application/json', 'X-Api-Key': KEY, shop_id: '7781' })
+    expect(urlT1(c.cfg, RUTAS_T1.cotizar)).toBe('https://sandbox.t1api.com/t1-shipping/quote/create-with-quote')
+    expect(urlT1(c.cfg, RUTAS_T1.guia)).toBe('https://sandbox.t1api.com/t1-shipping/guide/create-guide')
+    expect(describirT1(c.cfg)).not.toContain(KEY)
   })
-  it('token: pide con grant password y lo cachea hasta antes de que expire', async () => {
-    _olvidarTokenT1()
-    const llamadas: Array<{ url: string; body: string }> = []
-    const fetchFalso = (async (url: string, init: RequestInit) => { llamadas.push({ url, body: String(init.body) }); return new Response(JSON.stringify({ access_token: 'tok1', expires_in: 1800 }), { status: 200 }) }) as unknown as typeof fetch
-    const c = t1Config(env(FULL))!
-    expect(await t1Token(c, fetchFalso, 1000)).toBe('tok1')
-    expect(llamadas[0].url).toBe('https://keycloak.t1.test/token'); expect(llamadas[0].body).toContain('grant_type=password'); expect(llamadas[0].body).toContain('client_id=t1envios'); expect(llamadas[0].body).toContain('username=u%40x.mx')
-    expect(await t1Token(c, fetchFalso, 1000 + 1700 * 1000)).toBe('tok1'); expect(llamadas).toHaveLength(1)   // sigue vigente
-    expect(await t1Token(c, fetchFalso, 1000 + 1750 * 1000)).toBe('tok1'); expect(llamadas).toHaveLength(2)   // renovó (margen de 60 s)
-    const fetchMalo = (async () => new Response(JSON.stringify({ error_description: 'Invalid user credentials' }), { status: 401 })) as unknown as typeof fetch
-    _olvidarTokenT1()
-    await expect(t1Token(c, fetchMalo, 1)).rejects.toThrow(/credenciales \(401: Invalid user credentials\)/)
+  it('producción sin host confirmado NO opera (bloqueo de producción); el registro no tiene host productivo', () => {
+    expect(HOSTS_T1.production).toBeNull()
+    expect(t1Config(env({ ...OK, T1_API_ENV: 'production' }))).toMatchObject({ ok: false, motivo: 'produccion_sin_host' })
+  })
+  it('ausente, relleno, shop_id faltante y ambiente inválido fallan de forma segura; las variables de Keycloak ya no configuran nada', () => {
+    expect(t1Config(env({}))).toMatchObject({ ok: false, motivo: 'sin_configurar' })
+    expect(t1Config(env({ ...OK, T1_API_KEY: '' }))).toMatchObject({ ok: false, motivo: 'sin_configurar' })
+    expect(t1Config(env({ ...OK, T1_SHOP_ID: '' }))).toMatchObject({ ok: false, motivo: 'sin_configurar' })
+    for (const r of ['...', '<API_KEY>', 'cambiar', 'xxxxxxxxxxxxxxxxxx', 'corta']) expect(t1Config(env({ ...OK, T1_API_KEY: r })), r).toMatchObject({ ok: false, motivo: 'relleno' })
+    expect(t1Config(env({ ...OK, T1_API_ENV: 'sandbox' }))).toMatchObject({ ok: false, motivo: 'ambiente_invalido' })
+    expect(t1Config(env({ T1_API_URL: 'https://x', T1_AUTH_URL: 'https://y', T1_CLIENT_SECRET: 's', T1_USERNAME: 'u', T1_PASSWORD: 'p', T1_SHOP_ID: '1' }))).toMatchObject({ ok: false, motivo: 'ambiente_invalido' })
+    expect(t1Config.length).toBe(1)   // una sola fuente (secretos): el cliente no elige ambiente ni host
   })
 })
 
-describe('T1 · datos', () => {
-  it('parte nombre y calle como exige T1', () => {
-    expect(partirNombre('Dra. Ana María Ruiz Pérez')).toEqual({ nombre: 'Ana María', apellidos: 'Ruiz Pérez' })
-    expect(partirNombre('Carlos López')).toEqual({ nombre: 'Carlos', apellidos: 'López' })
-    expect(partirNombre('Renovacell')).toEqual({ nombre: 'Renovacell', apellidos: 'Renovacell' })
-    expect(partirCalle('Blvd. Pedro Infante 2911')).toEqual({ calle: 'Blvd. Pedro Infante', numero: '2911' })
-    expect(partirCalle('Av. Reforma 123 int. 4')).toEqual({ calle: 'Av. Reforma', numero: '123 int. 4' })
-    expect(partirCalle('Calle sin número')).toEqual({ calle: 'Calle sin número', numero: 'S/N' })
+describe('T1 v2.0 · cotización (contrato oficial)', () => {
+  it('request documentado: cp, medidas enteras hacia arriba, package_type 2, insurance false, home false', () => {
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG)).toEqual({ home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, package_type: 2, packages: 1 })
+    expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG))).toEqual(['C.P. de destino (5 dígitos)'])
   })
-  it('cotización: C.P., medidas enteras hacia arriba, paquete tipo 2, sin seguro', () => {
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, '77')).toEqual({ codigo_postal_origen: '80100', codigo_postal_destino: '06600', peso: 2, largo: 30, ancho: 20, alto: 15, dias_embarque: 1, seguro: 0, valor_paquete: 0, tipo_paquete: 2, comercio_id: '77', paquetes: 1, generar_recoleccion: false })
-  })
-  it('tarifas: una por paquetería y servicio, ordenadas por precio, con el token aparte y nombres bonitos', () => {
-    const data = { success: true, result: [
-      { id: 1, clave: 'FEDEX', cotizacion: { success: true, servicios: { EXPRESSDOMESTIC: { costo_total: 210.5, dias_entrega: 2, moneda: 'MXN', token: 'tk-fx' }, GROUND: { costo_total: 140, dias_entrega: 4, moneda: 'MXN', token: 'tk-fg' } } } },
-      { id: 2, clave: 'DHL', cotizacion: { success: true, servicios: { EXPRESSDOMESTIC: { costo_total: 199, dias_entrega: 1, moneda: 'MXN', token: 'tk-dh' }, MALO: { costo_total: 0, token: 'x' } } } },
-      { id: 3, clave: 'UPS', cotizacion: { success: false } },
-    ] }
-    const r = parseQuoteT1(data)
-    expect(r.map((x) => [x.serviceCode, x.carrier, x.service, x.amount, x.etaDays, x.token])).toEqual([
-      ['FEDEX|GROUND', 'FedEx', 'Terrestre', 140, 4, 'tk-fg'], ['DHL|EXPRESSDOMESTIC', 'DHL', 'Express', 199, 1, 'tk-dh'], ['FEDEX|EXPRESSDOMESTIC', 'FedEx', 'Express', 210.5, 2, 'tk-fx'],
+  it('respuesta oficial: valida success y detail[], usa total_cost (no cost), conserva token, distingue t1 del transportista, ordena por total', () => {
+    expect(CONTRATO_T1.cotizacion_response).toBe(true)
+    const r = parseQuoteT1(COTIZACION); expect(r.ok).toBe(true); if (!r.ok) return
+    expect(r.tarifas.map((t) => [t.serviceCode, t.carrier, t.service, t.amount, t.etaDays, t.token, t.currency])).toEqual([
+      ['FEDEX|GROUND', 'FedEx', 'Terrestre · Terrestre', 162.4, 4, 'TOKEN_FX', 'MXN'],
+      ['DHL|EXPRESS_DOMESTIC', 'DHL', 'Express · Dia Siguiente', 376.16, 1, 'TOKEN_DHL', 'MXN'],
     ])
-    expect(parseQuoteT1({ success: false })).toEqual([])
+    const dhl = r.tarifas[1]
+    expect(dhl.detalle).toEqual({ service_id: 'DHL', service_name: 'EXPRESS DOMESTIC', service_type: 'Dia Siguiente', cost: 298.04, insurance: true, insurance_cost: 45, extended_zone: true, extended_zone_cost: 212.67, recommended: true, total_packages: 1 })
+    expect(r.tarifas[0].detalle).toMatchObject({ insurance: false, insurance_cost: null, extended_zone: null, recommended: false })   // opcionales ausentes → null, nunca inventados
+    expect(claveServicio('DHL', 'EXPRESS DOMESTIC')).toBe('DHL|EXPRESS_DOMESTIC')
   })
-  it('guía: todos los campos obligatorios de origen y destino, token_quote y contenido ≤ 25', () => {
-    const g = buildGuideT1(SHIPPER, RECEIVER, 'tk-fg', 'S100002', '77', 'Las Quintas')
-    expect(g).toMatchObject({ token_quote: 'tk-fg', origen_guia: 't1envios', comercio_id: '77', generar_recoleccion: false, tiene_notificacion: false, contenido: 'Pedido S100002',
-      nombre_origen: 'Renovacell SA', apellidos_origen: 'de CV', calle_origen: 'Blvd. Pedro Infante', numero_origen: '2911', colonia_origen: 'Las Quintas', municipio_origen: 'Culiacán', estado_origen: 'Sinaloa', telefono_origen: '6671647799', email_origen: 'envios@renovacell.mx',
-      nombre_destino: 'Ana María', apellidos_destino: 'Ruiz Pérez', calle_destino: 'Av. Reforma', numero_destino: '123 int. 4', colonia_destino: 'Centro', municipio_destino: 'Ciudad de México', estado_destino: 'CDMX', telefono_destino: '5512345678', referencias_destino: 'Edificio azul', email_destino: 'ana@clinica.mx' })
-    expect(buildGuideT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, colonia: '', refs: '' } }, 't', 'X', '77')).toMatchObject({ colonia_origen: 'Centro', colonia_destino: 'Centro', referencias_destino: 'Sin referencias' })
-    for (const [k, v] of Object.entries(g)) if (typeof v === 'string' && /_(origen|destino)$/.test(k)) expect(v, k).not.toBe('')
+  it('rechazo seguro: sin success/detail, success false, detail vacío, servicios sin total_cost o sin token', () => {
+    expect(parseQuoteT1({ status: 'ok', data: [] })).toMatchObject({ ok: false, motivo: 'forma_no_reconocida' })
+    expect(parseQuoteT1({ success: false, message: 'Bad', detail: [] })).toMatchObject({ ok: false, motivo: 'forma_no_reconocida' })
+    expect(parseQuoteT1({ success: true, detail: [] })).toMatchObject({ ok: false, motivo: 'sin_servicios' })
+    expect(parseQuoteT1({ success: true, detail: [{ carrier: 'DHL', service_name: 'EXPRESS DOMESTIC', cost: 298.04, token: 'x' }] })).toMatchObject({ ok: false, motivo: 'respuesta_incompleta' })   // sin total_cost
+    expect(parseQuoteT1({ success: true, detail: [{ carrier: 'DHL', service_name: 'EXPRESS DOMESTIC', total_cost: 376.16 }] })).toMatchObject({ ok: false, motivo: 'respuesta_incompleta' })   // sin token
+    const x = parseQuoteT1({ success: true, detail: [{ carrier: 'DHL', service_name: 'EXPRESS DOMESTIC', total_cost: 376.16, token: 'ok' }, { carrier: 'UPS', service_name: 'SAVER', total_cost: 0, token: 'z' }] })
+    expect(x.ok && x.tarifas.map((t) => t.serviceCode)).toEqual(['DHL|EXPRESS_DOMESTIC'])   // el incompleto se descarta, el válido queda
+    expect(formaDe({ a: [1, { b: null }] })).toBe('{a:[number]}')
   })
-  it('respuesta de guía: PDF crudo → base64, base64 tal cual, link, paquetería y costo', () => {
-    const crudo = parseGuideT1({ success: true, detail: { guia: '8617898483', file: '%PDF-1.4 hola', link_guia: 'https://t1.test/g.pdf', paqueteria: 'FEDEX', costo: 104.48, num_orden: '3532' } })
-    expect(crudo.tracking).toBe('8617898483'); expect(atob(crudo.labelBase64!)).toBe('%PDF-1.4 hola'); expect(crudo.labelUrl).toBe('https://t1.test/g.pdf'); expect(crudo.carrier).toBe('FedEx'); expect(crudo.cost).toBe(104.48); expect(crudo.numOrden).toBe('3532')
-    const b64 = 'JVBERi0xLjQK'.repeat(12)
-    expect(parseGuideT1({ detail: { guia: 'X1', file: `data:application/pdf;base64,${b64}` } }).labelBase64).toBe(b64)
-    expect(parseGuideT1({ success: false, message: 'No existe una cotización con el token proporcionado' })).toMatchObject({ tracking: '', labelBase64: null, labelUrl: null })
-    expect(t1ErrorMessage(400, { success: false, message: 'No existe una cotización con el token proporcionado' })).toBe('T1: No existe una cotización con el token proporcionado')
-    expect(t1ErrorMessage(401, {})).toMatch(/credenciales/)
+  it('errores documentados en palabras, sin cabeceras ni respuesta completa; reintento solo 429/5xx (cotizar), nunca la guía', () => {
+    expect(errorT1(400, { message: 'destination_postal_code inválido' })).toEqual({ clase: 'cotizacion', mensaje: 'T1: destination_postal_code inválido' })
+    expect(errorT1(401, { message: 'Unauthorized' })).toMatchObject({ clase: 'credenciales' }); expect(errorT1(401, {}).mensaje).not.toContain(KEY)
+    expect(errorT1(402, {})).toMatchObject({ clase: 'sin_saldo' })
+    expect(errorT1(409, { message: 'quote_token expired' })).toMatchObject({ clase: 'token_vencido' })
+    expect(errorT1(500, { message: 'x'.repeat(500) }).mensaje).toBe('T1 no está disponible (500).')
+    for (const st of [400, 401, 402, 409]) expect(reintentableCotizacion(st)).toBe(false)
+    for (const st of [429, 500, 502, 503]) expect(reintentableCotizacion(st)).toBe(true)
+    expect([0, 1, 2, 3, 6].map((i) => esperaReintentoMs(i))).toEqual([600, 1200, 2400, 4800, 8000])
   })
-  it('rastreo: familia externa → estado neutral; entregado trae quién recibió y fecha', () => {
-    const d = { success: true, detail: { codigo: 'DL', descripcion: 'Entregado en recepción', familia_interna: 'Entregado', familia_externa: 'Delivered', guia: 'G1', fecha: '2026-10-21 13:05:00', recibe: 'Ana Ruiz' } }
-    const r = resumenT1(d)
-    expect(r.estado).toBe('entregado'); expect(r.firmadoPor).toBe('Ana Ruiz'); expect(r.entregadoAt).toBe('2026-10-21T19:05:00.000Z'); expect(r.eventos).toHaveLength(1); expect(r.descripcion).toBe('Entregado en recepción · Entregado')
-    expect(resumenT1({ detail: { familia_externa: 'In Process', familia_interna: 'Guia generada' } }).estado).toBe('sin_eventos')
-    expect(resumenT1({ detail: { familia_externa: 'Collected', fecha: '2026-10-21 09:00:00' } }).estado).toBe('recolectado')
-    expect(resumenT1({ detail: { familia_externa: 'Transit', fecha: '2026-10-21 09:00:00' } }).estado).toBe('en_transito')
-    expect(resumenT1({ detail: { familia_externa: 'Exception of delivery', familia_interna: 'Dirección incorrecta', fecha: '2026-10-21 09:00:00' } }).estado).toBe('incidencia')
-    expect(resumenT1({ detail: { familia_externa: 'Algo raro', fecha: '2026-10-21 09:00:00' } }).estado).toBe('en_transito')   // nunca entregado por adivinar
-    expect(parseTrackingT1(d)).toEqual({ status: 'Delivered', events: [{ at: '2026-10-21T19:05:00.000Z', status: 'DL', description: 'Entregado en recepción · Entregado' }] })
+})
+
+describe('T1 v2.0 · guía (contrato oficial)', () => {
+  it('request oficial: quote_token, content ≤ 25, business_id = shop_id, origin_/destination_ completos, razón social opcional, sin recolección ni guide_origin', () => {
+    expect(CONTRATO_T1.guia_request_campos_direccion).toBe(true); expect(CAMPOS_GUIA_V2.cp).toBeNull()
+    const g = buildGuideT1('TOKEN_DHL', 'S100002', '7781', datosOrigenT1(SHIPPER), datosDestinoT1(RECEIVER), SHIPPER.name)
+    expect(g).toEqual({
+      quote_token: 'TOKEN_DHL', content: 'Pedido S100002', business_id: '7781', origin_business_name: 'Renovacell SA de CV',
+      origin_first_name: 'Renovacell SA', origin_last_name: 'de CV', origin_email: 'envios@renovacell.mx', origin_phone: '6671647799', origin_street: 'Nuevo Mundo', origin_number: '1045 17', origin_neighborhood: 'Las Quintas', origin_municipality: 'Culiacán', origin_state: 'Sinaloa', origin_references: 'Local 17, frente al parque',
+      destination_first_name: 'Ana María', destination_last_name: 'Ruiz Pérez', destination_email: 'ana@clinica.mx', destination_phone: '5512345678', destination_street: 'Av. Reforma', destination_number: '123 int. 4', destination_neighborhood: 'Centro', destination_municipality: 'Ciudad de México', destination_state: 'CDMX', destination_references: 'Edificio azul',
+      generate_pickup: false, has_notification: false,
+    })
+    expect(Object.keys(g)).not.toContain('guide_origin')
+    expect(buildGuideT1('t', 'X', '1', datosOrigenT1(SHIPPER), datosDestinoT1(RECEIVER))).not.toHaveProperty('origin_business_name')
   })
-  it('recolección: contacto del origen, paquete entero y horario; confirmación = pick_up', () => {
-    const r = buildPickupT1(SHIPPER, PKG, 'fedex', { date: '2026-10-22', ready: '10:00', close: '18:00', instructions: 'Recepción, preguntar por Alberto' }, '77', 'Las Quintas')
-    expect(r).toMatchObject({ mensajeria: 'FEDEX', nombre_contacto: 'Renovacell SA', apellidos_contacto: 'de CV', calle: 'Blvd. Pedro Infante', numero: '2911', colonia: 'Las Quintas', codigo_postal: '80100', municipio: 'Culiacán', estado: 'Sinaloa', telefono: '6671647799', cantidad_piezas: 1, peso: 2, largo: 30, ancho: 20, alto: 15, fecha: '2026-10-22', hora_inicio: '10:00', horario_cierre: '18:00', comercio_id: '77', referencias: 'Recepción, preguntar por Alberto' })
-    expect(parsePickupT1({ success: true, detail: { recoleccion: { pick_up: '321', localizacion: 'HPU' } } })).toEqual({ confirmation: '321' })
-    expect(parsePickupT1({ success: false })).toEqual({ confirmation: '' })
+  it('el origen sale SOLO de los campos estructurados del ERP (sin dividir textos): sin colonia/referencias se reporta, nunca se inventa', () => {
+    expect(datosOrigenT1(SHIPPER)).toEqual({ nombre: 'Renovacell SA', apellidos: 'de CV', correo: 'envios@renovacell.mx', telefono: '6671647799', calle: 'Nuevo Mundo', numero: '1045 17', colonia: 'Las Quintas', municipio: 'Culiacán', estado: 'Sinaloa', cp: '80197', referencias: 'Local 17, frente al parque' })
+    // como está hoy producción: solo shipping_address "Nuevo Mundo 1045-17" y campos nuevos vacíos → faltan calle, número, colonia y referencias (no se divide el texto)
+    const legado = datosOrigenT1({ ...SHIPPER, addressLine1: 'Nuevo Mundo 1045-17', calle: '', numeroExt: '', numeroInt: '', colonia: '', referencias: '' })
+    expect(legado).toMatchObject({ calle: '', numero: '', colonia: '', referencias: '' })
+    expect(faltantesGuia(legado, datosDestinoT1(RECEIVER))).toEqual(['origen: calle', 'origen: número', 'origen: colonia', 'origen: referencias'])
+    expect(datosOrigenT1({ ...SHIPPER, numeroInt: '' }).numero).toBe('1045')
+    expect(PISTA_ORIGEN_T1).toMatch(/Configuración → Origen de envíos/)
+  })
+  it('sin datos obligatorios NO se arma la guía (nada inventado): faltantes en palabras por lado; teléfonos de 10 dígitos', () => {
+    const o = datosOrigenT1({ ...SHIPPER, colonia: '', referencias: '' }), d = datosDestinoT1({ ...RECEIVER, email: null, address: { ...RECEIVER.address, colonia: '', phone: '55' } })
+    expect(faltantesGuia(o, d)).toEqual(['origen: colonia', 'origen: referencias', 'destino: correo', 'destino: teléfono (10 dígitos)', 'destino: colonia'])
+    expect(() => buildGuideT1('tk', 'S1', '7781', o, d)).toThrow(/faltan: origen: colonia, origen: referencias, destino: correo/)
+    expect(() => buildGuideT1('', 'S1', '7781', datosOrigenT1(SHIPPER), datosDestinoT1(RECEIVER))).toThrow(/token de cotización/)
+    expect(partirNombre('Carlos López')).toEqual({ nombre: 'Carlos', apellidos: 'López' }); expect(partirCalle('Calle sin número')).toEqual({ calle: 'Calle sin número', numero: 'S/N' })
+    // Un solo nombre (hoy prod: shipping_name = "Renovacell"): el apellido no se repite ni se inventa → solo la GUÍA se detiene; cotizar no usa nombres.
+    expect(partirNombre('Renovacell')).toEqual({ nombre: 'Renovacell', apellidos: '' })
+    expect(faltantesGuia(datosOrigenT1({ ...SHIPPER, name: 'Renovacell' }), datosDestinoT1(RECEIVER))).toEqual(['origen: apellidos'])
+    expect(buildQuoteT1({ ...SHIPPER, name: 'Renovacell' }, RECEIVER, PKG).origin_postal_code).toBe('80197')
+  })
+  it('respuesta oficial: tracking_number, order_number, carrier, cost, guide_link como URL y file como PDF base64', () => {
+    expect(CONTRATO_T1.guia_response).toBe(true)
+    const r = parseGuideT1(GUIA); expect(r.ok).toBe(true); if (!r.ok) return
+    expect(r.guia).toEqual({ tracking: '6232915371', orderNumber: '6039298', carrier: 'DHL', cost: 374.11, labelUrl: 'https://shipping-guides-storage-dev.s3.us-east-1.amazonaws.com/labels/ejemplo.pdf', labelBase64: B64, extendedZone: false, currentBalance: 8709760.27 })
+    expect(parseGuideT1({ ...GUIA, detail: { ...GUIA.detail, file: `data:application/pdf;base64,${B64}` } })).toMatchObject({ ok: true, guia: { labelBase64: B64 } })
+  })
+  it('respuestas incompletas: success false → rechazada; success sin tracking → sin_guia (desconocido); forma extraña → no reconocida', () => {
+    expect(parseGuideT1({ success: false, message: 'Insufficient balance' })).toMatchObject({ ok: false, motivo: 'rechazada', mensaje: 'Insufficient balance' })
+    expect(parseGuideT1({ success: true, detail: { order_number: 1, carrier: 'DHL' } })).toMatchObject({ ok: false, motivo: 'sin_guia' })
+    const x = parseGuideT1({ ok: true, guide: '1' }); expect(x).toMatchObject({ ok: false, motivo: 'forma_no_reconocida' }); if (x.ok) return; expect(x.forma).toBe('{ok:boolean,guide:string}')
   })
 })

@@ -153,7 +153,7 @@ export function Guias() {
                       {s.driver_id ? (
                         <span><Icon name="usercheck" style={{ width: 13, height: 13, display: 'inline', verticalAlign: '-2px' }} /> {driverName(s.driver_id)}</span>
                       ) : (
-                        <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}
+                        <span>{s.carrier} {s.tracking_number && <span className="lc" style={{ marginLeft: 6 }}>{s.tracking_number}</span>}{(s.provider_meta as Record<string, unknown> | null)?.ambiente === 'test' && <span className="pill p-warn" style={{ marginLeft: 6 }} data-testid="guia-sandbox">T1 · ambiente de pruebas</span>}
                           {s.status === 'cancelado' && guiaAnulada(s) && <span className="lc" style={{ marginLeft: 6, textDecoration: 'line-through', color: 'var(--ink-3)' }}>{guiaAnulada(s)}</span>}
                           {s.tracking_number && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{s.pickup_confirmation ? 'La paquetería pasará por el paquete (recolección agendada).' : 'La guía no incluye recolección: entrega el paquete en una sucursal o agenda la recolección aquí abajo.'}</span>}
                         </span>

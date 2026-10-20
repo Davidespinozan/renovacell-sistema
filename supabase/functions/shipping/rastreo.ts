@@ -98,7 +98,8 @@ export function debeConsultar(prev: { estado?: string | null; synced_at?: string
   return Number.isNaN(t) || ahora - t >= CACHE_RASTREO_MS
 }
 
-// ── T1 Envíos (GET /webhook-maestro/query/estado-guia/:guia) ─────────────────
+// ── T1 Envíos · traductor de la API anterior (familia_externa/interna). En la v2.0 el endpoint de rastreo NO está
+//    documentado todavía (CONTRATO_T1.rastreo = false): la Edge no lo llama; el traductor queda listo para cuando se confirme.
 // T1 resume la guía en una familia externa (inglés) y una interna (español). Se traduce la externa; la interna va en la
 // descripción. Lo no reconocido cuenta como "en tránsito" (nunca entregado ni incidencia por adivinar).
 const T1_FAMILIA: Record<string, EstadoRastreo> = {

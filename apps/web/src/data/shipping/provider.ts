@@ -42,6 +42,7 @@ export interface RateQuote {
 
 export interface LabelResult {
   provider?: string // 'dhl' | 't1' | 'mock' | …
+  ambiente?: 'test' | 'production' // T1 · una guía sandbox NO es un envío físico real
   carrier: string
   service: string
   serviceCode?: string
@@ -167,6 +168,11 @@ async function callShipping<T>(body: Record<string, unknown>): Promise<T | typeo
       // 501 = provider no configurado → seam al mock.
       const msg = (error as { message?: string }).message ?? ''
       if (/501|not_configured/i.test(msg)) return NOT_CONFIGURED
+      // El cuerpo del error (message/error del servidor) es lo que el operador debe leer; sin cuerpo, el error tal cual.
+      let cuerpo: { error?: string; message?: string } | null = null
+      try { cuerpo = await (error as { context?: Response }).context?.clone().json() } catch { cuerpo = null }
+      if (cuerpo?.error === 'not_configured') return NOT_CONFIGURED
+      if (cuerpo && (cuerpo.message || cuerpo.error)) throw new Error(String(cuerpo.message ?? cuerpo.error))
       throw error
     }
     if (data && typeof data === 'object' && (data as { error?: string }).error === 'not_configured') return NOT_CONFIGURED

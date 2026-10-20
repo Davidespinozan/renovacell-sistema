@@ -16,6 +16,17 @@ import { hasSupabase } from '../../lib/supabase'
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', background: 'var(--card, #fff)', color: 'inherit', marginTop: 6 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 16 }
 
+/** Misma regla que el trigger `_origen_envios_sync` (183): con calle y número exterior la línea es "Calle Número[ Interior]", máximo 45. */
+export function lineaOrigen(f: { shipping_street: string; shipping_ext_number: string; shipping_int_number: string }): { linea: string | null; error: string | null } {
+  const calle = f.shipping_street.trim(), ext = f.shipping_ext_number.trim(), int_ = f.shipping_int_number.trim()
+  if (!calle && !ext) return { linea: null, error: null }
+  if (calle && !ext) return { linea: null, error: 'Captura el número exterior (o S/N) junto con la calle.' }
+  if (!calle && ext) return { linea: null, error: 'Captura la calle junto con el número exterior.' }
+  const linea = [calle, ext, int_].filter(Boolean).join(' ')
+  if (linea.length > 45) return { linea: null, error: `"${linea}" tiene ${linea.length} caracteres; la paquetería acepta 45 en la línea de dirección. Abrevia la calle.` }
+  return { linea, error: null }
+}
+
 export function Configuracion() {
   const { company, saveCompany } = useCompany()
   const [mostrarImportar, setMostrarImportar] = useState(false)
@@ -27,7 +38,9 @@ export function Configuracion() {
   }
   const dirty = useMemo(() => (Object.keys(form) as (keyof typeof form)[]).some((k) => form[k] !== company[k]), [form, company])
   const rfcOk = !form.rfc || /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(form.rfc.trim())
-  const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal))
+  // ORIGEN ESTRUCTURADO (183): con calle + número exterior, la línea de dirección se arma (misma regla que el servidor).
+  const origen = lineaOrigen(form)
+  const puedeGuardar = dirty && rfcOk && (form.regimen_fiscal === '' || esRegimenValido(form.regimen_fiscal)) && !origen.error
 
   const [guardando, setGuardando] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null)
@@ -35,7 +48,7 @@ export function Configuracion() {
     if (!puedeGuardar || guardando) return
     setGuardando(true); setErrorGuardar(null)
     // Son los datos del emisor de cada factura: "Guardado ✓" solo con el servidor confirmado.
-    const r = await saveCompany({ ...form, rfc: (form.rfc ?? '').trim().toUpperCase() })
+    const r = await saveCompany({ ...form, rfc: (form.rfc ?? '').trim().toUpperCase(), ...(origen.linea ? { shipping_address: origen.linea } : {}) })
     setGuardando(false)
     if (!r.ok) { setErrorGuardar(r.error); return }
     setSaved(true)
@@ -132,8 +145,34 @@ export function Configuracion() {
             <input style={input} value={form.shipping_phone} onChange={set('shipping_phone')} placeholder="667 000 0000" />
           </div>
         </div>
-        <label style={label}>Dirección</label>
-        <input style={input} value={form.shipping_address} onChange={set('shipping_address')} placeholder="Calle, número, colonia" />
+        <div className="grid" style={{ gridTemplateColumns: '2fr 1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={label}>Calle</label>
+            <input style={input} value={form.shipping_street} onChange={set('shipping_street')} placeholder="Nuevo Mundo" aria-label="Calle del origen" />
+          </div>
+          <div>
+            <label style={label}>No. exterior</label>
+            <input style={input} value={form.shipping_ext_number} onChange={set('shipping_ext_number')} placeholder="1045" aria-label="Número exterior del origen" />
+          </div>
+          <div>
+            <label style={label}>Interior / local (opcional)</label>
+            <input style={input} value={form.shipping_int_number} onChange={set('shipping_int_number')} placeholder="17" aria-label="Número interior del origen" />
+          </div>
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+          <div>
+            <label style={label}>Colonia</label>
+            <input style={input} value={form.shipping_colonia} onChange={set('shipping_colonia')} placeholder="Las Quintas" aria-label="Colonia del origen" />
+          </div>
+          <div>
+            <label style={label}>Referencias de ubicación</label>
+            <input style={input} value={form.shipping_references} onChange={set('shipping_references')} placeholder="Local 17, frente al parque" aria-label="Referencias del origen" />
+          </div>
+        </div>
+        <label style={label}>Línea de dirección para la paquetería{origen.linea ? ' (se arma con calle y número)' : ''}</label>
+        <input style={{ ...input, ...(origen.linea ? { background: 'var(--surface-2, #f6f8f6)' } : {}) }} value={origen.linea ?? form.shipping_address} onChange={set('shipping_address')} readOnly={!!origen.linea} placeholder="Captura calle y número arriba" aria-label="Línea de dirección del origen" data-testid="origen-linea" />
+        {origen.error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 4 }} data-testid="origen-error">{origen.error}</div>}
+        {!origen.linea && !origen.error && form.shipping_address && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }} data-testid="origen-legado">Hoy la paquetería recibe este texto tal cual. Para T1 captura calle, número exterior, colonia y referencias; la línea se armará sola.</div>}
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
           <div>
             <label style={label}>CP</label>

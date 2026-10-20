@@ -265,7 +265,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
               <div className="ck"><Icon name="check" /></div>
               <h3>Guía generada</h3>
               <p>
-                <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.
+                <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.{result.ambiente === 'test' && <> <span className="pill p-warn" data-testid="guia-sandbox">T1 · ambiente de pruebas: no es un envío real</span></>}
                 Guía <b className="mono">{result.tracking}</b> · entrega estimada {fmtDate(result.estimatedDeliveryAt)}.
                 El doctor ya la ve en su seguimiento.
               </p>
