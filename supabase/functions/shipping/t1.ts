@@ -83,14 +83,17 @@ const correo = (e?: string | null) => (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpia(
 // CUERPO `comercio_id` (string, "Identificador único de la tienda"); el ejemplo v2.0 de T1 Cuenta no lo lista, pero el sandbox
 // ya demostró exigir nombres de esa familia (`valor_paquete`) y el error ERR-QUOTE-STORE ocurre al "registrar" la cotización.
 // Se manda el mismo identificador de la cabecera `shop_id`. Si T1 lo rechaza o no cambia nada, se retira (un solo campo).
-export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; valor_paquete: number; package_type: number; packages: number; comercio_id: string }
+// `package_value` (number, MXN): nombre documentado en T1 Cuenta v2.0 para el valor declarado (obligatorio con insurance=true).
+// `valor_paquete` se conserva mientras el sandbox lo exija (HTTP 400 real del 20 oct); ambos llevan el MISMO número.
+export interface QuoteV2Request { home: boolean; origin_postal_code: string; destination_postal_code: string; weight: number; length: number; width: number; height: number; shipping_days: number; insurance: boolean; package_value: number; valor_paquete: number; package_type: number; packages: number; comercio_id: string }
 export function buildQuoteT1(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, valorMercancia: number, comercioId: string, diasEmbarque = 0): QuoteV2Request {
   const valor = Number(valorMercancia)
+  const declarado = Number.isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : 0
   return {
     comercio_id: String(limpia(comercioId)),
     home: false, origin_postal_code: limpia(shipper.cp).replace(/\D/g, ''), destination_postal_code: limpia(receiver.address.cp).replace(/\D/g, ''),
     weight: entero(pkg.weightKg), length: entero(pkg.lengthCm), width: entero(pkg.widthCm), height: entero(pkg.heightCm),
-    shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, valor_paquete: Number.isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : 0, package_type: 2, packages: entero(pkg.pieces),
+    shipping_days: Math.max(0, Math.floor(diasEmbarque)), insurance: false, package_value: declarado, valor_paquete: declarado, package_type: 2, packages: entero(pkg.pieces),
   }
 }
 export function faltantesCotizacion(q: QuoteV2Request): string[] {
@@ -98,7 +101,7 @@ export function faltantesCotizacion(q: QuoteV2Request): string[] {
   if (!/^\d{5}$/.test(q.origin_postal_code)) f.push('C.P. de origen (5 dígitos)')
   if (!/^\d{5}$/.test(q.destination_postal_code)) f.push('C.P. de destino (5 dígitos)')
   if (!(q.weight > 0 && q.length > 0 && q.width > 0 && q.height > 0)) f.push('peso y medidas del paquete')
-  if (!(q.valor_paquete > 0)) f.push('valor de la mercancía del pedido (renglones con precio)')
+  if (!(q.package_value > 0) || q.valor_paquete !== q.package_value) f.push('valor de la mercancía del pedido (renglones con precio)')
   if (!q.comercio_id) f.push('identificador de la tienda (T1_SHOP_ID)')
   return f
 }

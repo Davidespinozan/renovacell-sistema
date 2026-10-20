@@ -48,13 +48,17 @@ describe('T1 v2.0 · configuración por ambiente', () => {
 describe('T1 v2.0 · cotización (contrato oficial)', () => {
   it('request documentado + valor_paquete (T1 lo exige aunque insurance sea false): cp, medidas enteras, package_type 2, valor de la mercancía del pedido', () => {
     // comercio_id (string) = shop_id: HIPÓTESIS contractual pendiente de validar en sandbox (doc pública lo exige en el cuerpo)
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '7781')).toEqual({ comercio_id: '7781', home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, valor_paquete: 350, package_type: 2, packages: 1 })
+    const q = buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '7781')
+    expect(q).toEqual({ comercio_id: '7781', home: false, origin_postal_code: '80197', destination_postal_code: '06600', weight: 2, length: 30, width: 20, height: 15, shipping_days: 0, insurance: false, package_value: 350, valor_paquete: 350, package_type: 2, packages: 1 })
+    // package_value (nombre v2.0 de T1 Cuenta) y valor_paquete (exigido por el sandbox) son el MISMO número
+    expect(typeof q.package_value).toBe('number'); expect(typeof q.valor_paquete).toBe('number'); expect(q.package_value).toBe(q.valor_paquete)
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 1234.567, '7781')).toMatchObject({ package_value: 1234.57, valor_paquete: 1234.57 })
     expect(typeof buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '338714').comercio_id).toBe('string')
     expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, '7781')).not.toHaveProperty('business_id')   // la guía tiene su propio contrato
     expect(faltantesCotizacion(buildQuoteT1(SHIPPER, { ...RECEIVER, address: { ...RECEIVER.address, cp: '66' } }, PKG, 350, '7781'))).toEqual(['C.P. de destino (5 dígitos)'])
     expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 350, ''))).toEqual(['identificador de la tienda (T1_SHOP_ID)'])
     // pedido sin valor válido: no se manda 0 ni un fijo; se reporta
-    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0, '7781').valor_paquete).toBe(0)
+    expect(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0, '7781')).toMatchObject({ package_value: 0, valor_paquete: 0 })
     expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, 0, '7781'))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
     expect(faltantesCotizacion(buildQuoteT1(SHIPPER, RECEIVER, PKG, NaN, '7781'))).toEqual(['valor de la mercancía del pedido (renglones con precio)'])
   })
