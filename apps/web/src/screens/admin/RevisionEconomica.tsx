@@ -11,6 +11,7 @@ import { useRevisionEconomica } from '../../data/hooks/useRevisionEconomica'
 import { ETIQUETA_INCIDENCIA, ORIENTACION_INCIDENCIA, type CasoRevision, type ClienteRevisionEconomica } from '../../data/ops/revisionEconomica'
 import { revisarDeclaracion as revisarPorDefecto } from '../../data/store/ordersStore'
 import { pedirAbrirPedido } from '../../data/store/ventasIntentStore'
+import { ConciliacionTarjeta } from './ConciliacionTarjeta'   // CS-1A.6 · cobros con tarjeta (CyberSource) pendientes de conciliación
 
 type Revisar = typeof revisarPorDefecto
 const ESTADO_PEDIDO: Record<string, string> = { cancelled: 'Cancelado', pending_payment: 'Pendiente de pago', paid: 'Pagado', picking: 'En surtido', packed: 'Empacado', shipped: 'Enviado', delivered: 'Entregado', fulfilled: 'Completado', draft: 'Borrador' }
@@ -32,6 +33,8 @@ export function RevisionEconomica({ cliente, revisar = revisarPorDefecto }: { cl
         <AlertTriangle size={16} />
         <span>Pedidos cuyo <b>dinero</b> requiere una decisión: declaraciones en pedidos cancelados, dinero recibido sin reembolso autorizado y reembolsos por pagar. Cada pedido es <b>un</b> caso. Aquí no se mueve dinero automáticamente: cada acción usa el flujo autorizado.</span>
       </div>
+
+      <ConciliacionTarjeta />
 
       {rev.estado === 'cargando' || rev.estado === 'inactivo' ? <Aviso testid="revision-cargando">Cargando revisión económica…</Aviso>
         : rev.estado === 'no_autorizado' ? <Aviso testid="revision-no-autorizado">{rev.mensaje}</Aviso>

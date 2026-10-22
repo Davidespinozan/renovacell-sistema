@@ -14,6 +14,12 @@ import { notify } from '../../data/store/notificationsStore'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { useOpId } from '../../data/hooks/useOpId'
 import { Copy } from 'lucide-react'
+// CS-1A.3 · Microform de CyberSource detrás de una bandera LOCAL (apagada por defecto). Con la bandera encendida, la rama de
+// tarjeta captura en campos seguros de CyberSource y entrega un token transitorio al siguiente paso (3DS); NO cobra todavía.
+import { CS_MICROFORM_HABILITADO } from '../../data/payments/flags'
+import { MicroformTarjeta, type TokenTarjeta } from './MicroformTarjeta'
+import { Autenticacion3DS, type Fase } from './Autenticacion3DS'
+import { ConfirmacionPago, type FasePago } from './ConfirmacionPago'
 
 // Mensaje real de la Edge Function (su cuerpo trae `error`), no un genérico.
 async function motivoDeFalla(e: unknown): Promise<string> {
@@ -55,6 +61,13 @@ export function PaymentModal({
   const [bankId, setBankId] = useState<string>('') // cuenta seleccionada (a cuál transfirió)
   const [copied, setCopied] = useState<string>('')
   const selectedBank = banks.find((b) => b.id === bankId) ?? (banks.length === 1 ? banks[0] : null)
+  // CS-1A.3 · Microform activo solo con bandera + backend + pedido real. El token transitorio se recibe aquí (en memoria) y
+  // queda a la espera de CS-1A.4 (3DS); mientras tanto NO hay botón de pagar ni ninguna llamada de cobro.
+  const microformActivo = CS_MICROFORM_HABILITADO && hasSupabase && !!orderId
+  const [tokenTarjeta, setTokenTarjeta] = useState<TokenTarjeta | null>(null)
+  const [recuperar, setRecuperar] = useState<string | null>(null)   // CS-1A.4: reto 3DS en curso tras una interrupción → solo validar
+  const [fase3ds, setFase3ds] = useState<Fase | null>(null)
+  const [fasePago, setFasePago] = useState<FasePago | null>(null)   // CS-1A.5: solo 'confirmado' = posted (asiento registrado)
 
   const cardOk = method !== 'tarjeta' || (card.number.replace(/\D/g, '').length >= 15 && card.name.trim().length > 2)
 
@@ -153,7 +166,20 @@ export function PaymentModal({
                 <button type="button" className={method === 'transferencia' ? 'active' : undefined} onClick={() => setMethod('transferencia')}>Transferencia</button>
               </div>
 
-              {method === 'tarjeta' ? (
+              {method === 'tarjeta' && microformActivo ? (
+                <>
+                  {!tokenTarjeta && !recuperar && <MicroformTarjeta orderId={orderId!} onToken={(t) => setTokenTarjeta(t)} onRecuperar={(id) => setRecuperar(id)} />}
+                  {(tokenTarjeta || recuperar) && fase3ds !== 'completada' && (
+                    <Autenticacion3DS attemptId={tokenTarjeta?.attemptId ?? recuperar!} token={tokenTarjeta?.token ?? null} modo={tokenTarjeta ? 'completo' : 'validar'}
+                      onFin={(f) => { setFase3ds(f); if (f === 'recapturar') { setTokenTarjeta(null); setRecuperar(null) } }} />
+                  )}
+                  {(tokenTarjeta || recuperar) && fase3ds === 'completada' && (
+                    // CS-1A.5: una sola solicitud de cobro; el estado lo decide el servidor. Recuperar (sin token) solo consulta.
+                    <ConfirmacionPago attemptId={tokenTarjeta?.attemptId ?? recuperar!} token={tokenTarjeta?.token ?? null} amount={tokenTarjeta?.amount ?? amount}
+                      onFin={(f) => { setFasePago(f); if (f === 'recuperable') { setTokenTarjeta(null); setRecuperar(null); setFase3ds(null) } }} />
+                  )}
+                </>
+              ) : method === 'tarjeta' ? (
                 <>
                   <label style={{ ...label, marginTop: 16 }}>Número de tarjeta</label>
                   <input style={input} inputMode="numeric" placeholder="4242 4242 4242 4242" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} />
@@ -226,12 +252,17 @@ export function PaymentModal({
 
               <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                 <button className="btn ghost" type="button" onClick={onClose} disabled={busy}>Cancelar</button>
-                <button className="btn" type="button" onClick={pay} disabled={busy || !cardOk} style={(busy || !cardOk) ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
-                  <Icon name="check" /> {busy ? 'Procesando…' : method === 'transferencia' ? 'Ya realicé la transferencia' : `Pagar ${money(amount)}`}
-                </button>
+                {method === 'tarjeta' && microformActivo ? (
+                  // CS-1A.3: sin botón de pago. El cobro llegará con 3DS (CS-1A.4) y se confirmará en el servidor.
+                  <span className="ms" data-testid="pm-cs-espera">{fasePago === 'confirmado' ? 'Pago confirmado' : fasePago ? 'Resultado del pago: ver arriba' : fase3ds === 'completada' ? 'Procesando el pago' : (tokenTarjeta || recuperar) ? 'Autenticación bancaria en curso' : 'Captura tu tarjeta para continuar'}</span>
+                ) : (
+                  <button className="btn" type="button" onClick={pay} disabled={busy || !cardOk} style={(busy || !cardOk) ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
+                    <Icon name="check" /> {busy ? 'Procesando…' : method === 'transferencia' ? 'Ya realicé la transferencia' : `Pagar ${money(amount)}`}
+                  </button>
+                )}
               </div>
 
-              {method === 'tarjeta' && (
+              {method === 'tarjeta' && !microformActivo && (
                 <p style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', marginTop: 12 }}>
                   Tus datos de tarjeta se procesan de forma segura; no pasan por nuestros servidores.
                 </p>

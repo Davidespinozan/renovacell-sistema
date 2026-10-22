@@ -2,6 +2,10 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W2.
 -- Hashes capturados de un cluster con las migraciones hasta W1 inclusive.
 begin;
+\ir ../../../rollback/cs1a7_cierre_manual/99_down.sql   -- CS-1A.7 (187)
+\ir ../../../rollback/cs1a6_reversa/99_down.sql   -- CS-1A.6 (186)
+\ir ../../../rollback/cs1b_reserva_guard/99_down.sql   -- CS-1A.1b (185): la guarda vive en payment_entries; se baja antes que 1a
+\ir ../../../rollback/cs1a_intentos/99_down.sql   -- CS-1A.1a (184): v_order_disponible depende de payment_entries; se baja primero
 -- W2-C se apoya en v_order_money, así que primero baja W2-C.
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)

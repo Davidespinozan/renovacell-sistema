@@ -238,6 +238,165 @@ export type Database = {
         }
         Relationships: []
       }
+      card_payment_attempt_events: {
+        Row: {
+          actor: string | null
+          actor_role: string | null
+          attempt_id: string
+          created_at: string
+          detalle: Json | null
+          from_status: string | null
+          id: number
+          to_status: string
+        }
+        Insert: {
+          actor?: string | null
+          actor_role?: string | null
+          attempt_id: string
+          created_at?: string
+          detalle?: Json | null
+          from_status?: string | null
+          id?: number
+          to_status: string
+        }
+        Update: {
+          actor?: string | null
+          actor_role?: string | null
+          attempt_id?: string
+          created_at?: string
+          detalle?: Json | null
+          from_status?: string | null
+          id?: number
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_payment_attempt_events_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "card_payment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_payment_attempts: {
+        Row: {
+          ambiente: string
+          amount: number
+          created_at: string
+          cs_approval_code: string | null
+          cs_auth_reference_id: string | null
+          cs_auth_status: string | null
+          cs_auth_transaction_id: string | null
+          cs_capture_context_exp: string | null
+          cs_eci: string | null
+          cs_payment_id: string | null
+          cs_payment_status: string | null
+          cs_reason: string | null
+          cs_reconciliation_id: string | null
+          cs_request_sent_at: string | null
+          cs_response_at: string | null
+          currency: string
+          doctor_id: string
+          entry_id: string | null
+          error_safe: string | null
+          id: string
+          op_id: string | null
+          order_id: string
+          provider: string
+          reconcile_note: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          status: string
+          status_at: string
+          updated_at: string
+        }
+        Insert: {
+          ambiente: string
+          amount: number
+          created_at?: string
+          cs_approval_code?: string | null
+          cs_auth_reference_id?: string | null
+          cs_auth_status?: string | null
+          cs_auth_transaction_id?: string | null
+          cs_capture_context_exp?: string | null
+          cs_eci?: string | null
+          cs_payment_id?: string | null
+          cs_payment_status?: string | null
+          cs_reason?: string | null
+          cs_reconciliation_id?: string | null
+          cs_request_sent_at?: string | null
+          cs_response_at?: string | null
+          currency?: string
+          doctor_id: string
+          entry_id?: string | null
+          error_safe?: string | null
+          id?: string
+          op_id?: string | null
+          order_id: string
+          provider?: string
+          reconcile_note?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          status?: string
+          status_at?: string
+          updated_at?: string
+        }
+        Update: {
+          ambiente?: string
+          amount?: number
+          created_at?: string
+          cs_approval_code?: string | null
+          cs_auth_reference_id?: string | null
+          cs_auth_status?: string | null
+          cs_auth_transaction_id?: string | null
+          cs_capture_context_exp?: string | null
+          cs_eci?: string | null
+          cs_payment_id?: string | null
+          cs_payment_status?: string | null
+          cs_reason?: string | null
+          cs_reconciliation_id?: string | null
+          cs_request_sent_at?: string | null
+          cs_response_at?: string | null
+          currency?: string
+          doctor_id?: string
+          entry_id?: string | null
+          error_safe?: string | null
+          id?: string
+          op_id?: string | null
+          order_id?: string
+          provider?: string
+          reconcile_note?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          status?: string
+          status_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_payment_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_payment_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_disponible"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "card_payment_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_money"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
       cash_closings: {
         Row: {
           alcance: string
@@ -6589,6 +6748,21 @@ export type Database = {
           },
         ]
       }
+      v_order_disponible: {
+        Row: {
+          cobrado_neto: number | null
+          external_ref: string | null
+          intento_activo_estado: string | null
+          intento_activo_id: string | null
+          order_id: string | null
+          order_status: string | null
+          reservas_activas: number | null
+          saldo_contable: number | null
+          saldo_disponible: number | null
+          total: number | null
+        }
+        Relationships: []
+      }
       v_order_money: {
         Row: {
           cobrado: number | null
@@ -6954,6 +7128,18 @@ export type Database = {
       _comm_max_intentos: { Args: never; Returns: number }
       _comm_reclamo_caduco: { Args: never; Returns: string }
       _comm_ventana_idempotencia: { Args: never; Returns: string }
+      _cs_es_servidor: { Args: never; Returns: boolean }
+      _cs_estado_activo: { Args: { p_status: string }; Returns: boolean }
+      _cs_evento: {
+        Args: { p_a: string; p_attempt: string; p_de: string; p_detalle: Json }
+        Returns: undefined
+      }
+      _cs_op_id: { Args: { p_payment_id: string }; Returns: string }
+      _cs_texto_seguro: { Args: { p: string }; Returns: string }
+      _cs_transicion_valida: {
+        Args: { p_a: string; p_de: string }
+        Returns: boolean
+      }
       _cuenta_suspendida: { Args: never; Returns: string }
       _fiscal_audit: {
         Args: { p_action: string; p_fiscal: Json; p_resource: string }
@@ -8264,6 +8450,21 @@ export type Database = {
         }
         Returns: Json
       }
+      cs_intento_abrir: {
+        Args: { p_ambiente?: string; p_order: string }
+        Returns: Json
+      }
+      cs_intento_avanzar: {
+        Args: { p_attempt: string; p_datos?: Json; p_estado: string }
+        Returns: Json
+      }
+      cs_intento_cerrar_manual: {
+        Args: { p_attempt: string; p_consulta: Json; p_motivo: string }
+        Returns: Json
+      }
+      cs_intento_contabilizar: { Args: { p_attempt: string }; Returns: Json }
+      cs_intentos_expirar: { Args: never; Returns: number }
+      cs_reservas_activas: { Args: { p_order: string }; Returns: number }
       registrar_cobro: {
         Args: {
           p_amount: number
@@ -8373,6 +8574,7 @@ export type Database = {
         Args: { p_motivo: string; p_op_id: string; p_order: string }
         Returns: Json
       }
+      saldo_disponible: { Args: { p_order: string }; Returns: number }
       salud_sistema: { Args: never; Returns: Json }
       set_doctor_default_location: {
         Args: { p_location_id: string }

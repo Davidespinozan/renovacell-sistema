@@ -63,3 +63,4 @@ y las notas de seguridad. RLS activo en las 12 tablas, default-deny, sin acceso 
 - **Unión de repos** con preservación de historia vía `git subtree`:
   - landing (`github.com/Davidespinozan/renovacell`) → `apps/landing/` (en Módulo 1).
 - **La propuesta comercial NO entra al repo** (material de venta; repo del cliente).
+- **Pagos con tarjeta — BanBajío / CyberSource** (2026-10-20): proveedor principal inicial; Stripe se conserva preparado pero inactivo. Registro de decisiones CS-D01…CS-D04 y auditoría en [`docs/cybersource-banbajio.md`](cybersource-banbajio.md). CS-0 en diseño; ningún bloque de implementación autorizado.
