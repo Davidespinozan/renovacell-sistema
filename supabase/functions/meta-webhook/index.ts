@@ -24,9 +24,12 @@ import { completarNombreMeta, despacharMeta } from '../_shared/metaEnvio.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { IA_PUEDE } from '../_shared/chat.ts'
+import { canalDe, cuentaDe, correlacion, clasificarError, lineaDiagnostico, type Diagnostico } from '../_shared/metaDiagnostico.ts'
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('meta-webhook')
+// META-02 · diagnóstico seguro en los logs de la Edge: canal, etapa, causa, código técnico y correlación; nunca datos de personas.
+const diag = (d: Diagnostico) => console.error(lineaDiagnostico(d))
 
 // Firma HMAC-SHA256 del cuerpo con el App Secret. Meta la manda en 'sha256=<hex>'.
 // Comparación en tiempo (casi) constante para no filtrar por temporización.
@@ -70,10 +73,13 @@ Deno.serve(async (req) => {
   // ── Mensaje entrante: firma + parseo ──
   const body = await req.text()
   if (!(await validSignature(body, req.headers.get('x-hub-signature-256'), [appSecret, appSecretIG]))) {
+    let objeto: unknown = null; try { objeto = JSON.parse(body) } catch { /* sin forma */ }
+    diag({ canal: canalDe(objeto), etapa: 'firma', causa: 'autorizacion', codigo: 'firma_invalida', http: 401, cuenta: cuentaDe(objeto) })
     return new Response('Firma inválida', { status: 401 })
   }
   let payload: Record<string, unknown>
-  try { payload = JSON.parse(body) } catch { return new Response('JSON inválido', { status: 400 }) }
+  try { payload = JSON.parse(body) } catch { diag({ canal: 'desconocido', etapa: 'json', causa: 'validacion', codigo: 'json_invalido', http: 400 }); return new Response('JSON inválido', { status: 400 }) }
+  const canal = canalDe(payload), cuenta = cuentaDe(payload)
 
   try {
   // ── WA-1 · WhatsApp → conversación canónica (Conversaciones). Cada mensaje por su wamid: un reintento de Meta no
@@ -84,10 +90,14 @@ Deno.serve(async (req) => {
   const estados = extraerEstados(payload)
   if (wa.length > 0 || estados.length > 0) {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-    for (const e of estados) await admin.rpc('cc_wa_estado', { p_wamid: e.wamid, p_estado: e.estado, p_error: e.error }).then(() => {}, () => {})
+    for (const e of estados) {
+      // como antes: un estado (entregado/leído) nunca bloquea ni provoca 500; ahora su fallo queda en el log
+      try { const { error: eEst } = await admin.rpc('cc_wa_estado', { p_wamid: e.wamid, p_estado: e.estado, p_error: e.error }); if (eEst) diag({ canal: 'whatsapp', etapa: 'wa_estado', ...clasificarError(eEst), http: 200, correlacion: correlacion(e.wamid), cuenta }) }
+      catch (ex) { diag({ canal: 'whatsapp', etapa: 'wa_estado', ...clasificarError(ex), http: 200, correlacion: correlacion(e.wamid), cuenta }) }
+    }
     for (const m of wa) {
       const { data, error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: false })
-      if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); return new Response('reintentar', { status: 500 }) }
+      if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); diag({ canal: 'whatsapp', etapa: 'wa_entrante', ...clasificarError(error), http: 500, correlacion: correlacion(m.wamid), cuenta }); return new Response('reintentar', { status: 500 }) }
       const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string }
       if (r.duplicado || !r.activo) continue
       enSegundoPlano((async () => {
@@ -107,7 +117,7 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
     for (const m of mt) {
       const { data, error } = await admin.rpc('cc_meta_entrante', { p_canal: m.canal, p_psid: m.psid, p_nombre: null, p_mid: m.mid, p_texto: m.texto, p_encolar: false })
-      if (error) { obs('meta', 'internal_error', { code: 'cc_meta_entrante', error }); return new Response('reintentar', { status: 500 }) }
+      if (error) { obs('meta', 'internal_error', { code: 'cc_meta_entrante', error }); diag({ canal: m.canal, etapa: 'meta_entrante', ...clasificarError(error), http: 500, correlacion: correlacion(m.mid), cuenta }); return new Response('reintentar', { status: 500 }) }
       const r = data as { duplicado: boolean; conversation_id: string; seq: number; visitor_hash: string | null; nuevo: boolean; activo: boolean; modo: string }
       if (r.duplicado) continue
       enSegundoPlano((async () => {
@@ -132,11 +142,14 @@ Deno.serve(async (req) => {
     }))
     console.log('meta-webhook: paquete sin mensajes reconocidos', JSON.stringify({ object: payload.object, entry: forma }))
   }
+  // META-02 · resumen técnico de lo recibido (conteos, nunca contenido) para entender los paquetes que responden 200.
+  diag({ canal, etapa: 'recibido', causa: 'ok', codigo: 'ok', http: 200, cuenta, conteo: { wa: wa.length, estados: estados.length, meta: mt.length } })
   // Meta EXIGE 200 aunque no haya nada que procesar (si no, reintenta y duplica).
   return new Response(JSON.stringify({ received: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (e) {
     // Firma válida y fallo interno al procesar: se reporta y se relanza (el runtime
     // responde 500 y Meta reintenta, exactamente como antes).
+    diag({ canal, etapa: 'procesar', ...clasificarError(e), http: 500, cuenta })
     obs('procesar', 'internal_error', { code: 'exception', error: e })
     throw e
   }

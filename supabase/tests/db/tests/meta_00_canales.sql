@@ -11,7 +11,7 @@ begin
   r := public.cc_meta_entrante('instagram', '17841400000000001', null, 'mid.IG0001', '¿Tienen bioestimuladores?', false);
   c := (r ->> 'conversation_id')::uuid;
   perform tests.ok(r ->> 'actor' = 'visitor' and not (r ->> 'duplicado')::boolean and (r ->> 'nuevo')::boolean and not (r ->> 'activo')::boolean
-    and exists (select 1 from public.cc_messages where conversation_id = c and content = '¿Tienen bioestimuladores?' and actor_type = 'visitor' and client_message_id = 'meta:mid.IG0001'), '1 · Instagram entra como visitante interno');
+    and exists (select 1 from public.cc_messages where conversation_id = c and content = '¿Tienen bioestimuladores?' and actor_type = 'visitor' and client_message_id = public._cc_client_id_canal('meta', 'mid.IG0001')), '1 · Instagram entra como visitante interno');
   perform tests.eq(public._cc_nombre_dueno(c), 'Contacto (Instagram)', '1 · sin nombre todavía: "Contacto (Instagram)"');
   perform public.cc_meta_nombre('instagram', '17841400000000001', 'Ana IG');
   perform tests.eq(public._cc_nombre_dueno(c), 'Ana IG (Instagram)', '1 · con el nombre que consiguió la Edge');

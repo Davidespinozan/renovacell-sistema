@@ -2,6 +2,7 @@
 begin;
 create temp table _mc as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
+\ir ../../../rollback/whatsapp_wamid_largo/99_down.sql   -- META-04 (188) redefine cc_wa_entrante/cc_meta_entrante: se baja primero
 \ir ../../../rollback/meta_canales/99_down.sql
 do $t$ begin
   perform tests.ok(to_regclass('public.cc_meta_contactos') is null and to_regprocedure('public.cc_canales_bandeja()') is null and to_regprocedure('public.cc_wa_bandeja()') is not null
@@ -10,6 +11,7 @@ do $t$ begin
     '170 down · sin tablas ni funciones de Meta; WhatsApp (167–169) sigue; el nombre como en la 167');
 end $t$;
 \ir ../../../migrations/20261223120000_meta_canales.sql
+\ir ../../../migrations/20270110120000_whatsapp_wamid_largo.sql
 do $t$ begin
   perform tests.ok((select todas from _mc) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '170 · se reaplica idéntica');
 end $t$;

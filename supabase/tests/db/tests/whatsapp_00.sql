@@ -16,7 +16,7 @@ begin
   r := public.cc_wa_entrante('5216671112233', 'Ana Ruiz', 'wamid.AAA111', 'Hola, ¿tienen la mascarilla?', false);
   c := (r ->> 'conversation_id')::uuid;
   perform tests.ok(r ->> 'actor' = 'visitor' and not (r ->> 'duplicado')::boolean
-    and exists (select 1 from public.cc_messages where conversation_id = c and content = 'Hola, ¿tienen la mascarilla?' and actor_type = 'visitor' and client_message_id = 'wa:wamid.AAA111'), '1 · desconocido: entra como visitante con su mensaje');
+    and exists (select 1 from public.cc_messages where conversation_id = c and content = 'Hola, ¿tienen la mascarilla?' and actor_type = 'visitor' and client_message_id = public._cc_client_id_canal('wa', 'wamid.AAA111')), '1 · desconocido: entra como visitante con su mensaje');
   perform tests.eq(public._cc_nombre_dueno(c), 'Ana Ruiz (WhatsApp)', '1 · en Conversaciones se ve "Ana Ruiz (WhatsApp)"');
   perform tests.ok((select modo = 'ai_active' and seller_profile_id is null from public.cc_conversations where id = c), '1 · modo espejo: no entra a la cola ni se asigna');
 
