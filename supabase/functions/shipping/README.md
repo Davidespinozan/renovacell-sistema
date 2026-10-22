@@ -78,3 +78,36 @@ fallido sin reintento. **Pendientes (sin red):** rastreo y recolección v2.0 (en
 **Activación a producción (configuración, no programación):** host productivo confirmado y registrado → `T1_API_ENV=production`
 con llave y shop_id productivos → saldo y permisos de la cuenta → pruebas completas en sandbox → alertas/observabilidad →
 autorización explícita → una guía productiva controlada.
+
+### T1-LIVE-01 · cotizar en producción sin guías (preparado, host pendiente)
+Credenciales SEPARADAS por ambiente: sandbox usa `T1_API_KEY` + `T1_SHOP_ID`; producción usa `T1_LIVE_API_KEY` + `T1_LIVE_SHOP_ID`.
+Con `T1_API_ENV=production`: (1) el host sale del registro `HOSTS_T1.production` (hoy `null`: hasta registrar el host oficial
+de T1 Cuenta, production no opera); (2) cotizar exige `T1_LIVE_COTIZAR=on` y rol Dirección; (3) las GUÍAS están bloqueadas por
+código (`GUIAS_LIVE_PERMITIDAS = false`) y el servidor responde 403 antes de cualquier claim, escritura o llamada; (4) la
+cotización no escribe en la base ni cambia pedidos. Reversión: `T1_API_ENV=test` (vuelve al sandbox con sus propias llaves).
+
+## T1-LIVE-02 · autenticación Keycloak para el host productivo (local, sin deploy)
+
+El host productivo documentado por T1 (`https://apiv2.t1envios.com`) rechaza `X-Api-Key` (401 el 20 oct 2026) y exige
+`Authorization: Bearer <access_token>` de Keycloak (`https://id.t1.com/realms/T1`). El adaptador soporta ahora dos modos
+independientes, elegidos por ambiente:
+
+| Variable | Valores | Uso |
+|---|---|---|
+| `T1_AUTH` / `T1_LIVE_AUTH` | `api_key` (defecto) · `keycloak` | modo del ambiente test / production |
+| `T1_LIVE_KC_CLIENT_SECRET`, `T1_LIVE_KC_USERNAME`, `T1_LIVE_KC_PASSWORD` | obligatorias en keycloak | credenciales que entrega T1 (prefijo `T1_KC_` para test) |
+| `T1_LIVE_KC_TOKEN_URL` | opcional | defecto `https://id.t1.com/realms/T1/protocol/openid-connect/token` |
+| `T1_LIVE_KC_CLIENT_ID` | opcional | defecto `t1envios` (documentado) |
+| `T1_LIVE_KC_GRANT` | opcional | solo `password` (único grant documentado); otro valor = `grant_no_soportado` |
+| `T1_LIVE_SHOP_ID`, `T1_LIVE_COTIZAR` | como en T1-LIVE-01 | tienda y control de cotización live |
+
+Comportamiento: token en caché por cuenta con vencimiento anticipado de 60 s (expires_in o 30 min); 400/401 del token endpoint =
+`credenciales_rechazadas`, 403 = `sin_permisos`, 5xx = `proveedor`, red = `sin_respuesta` → la Edge responde 503/502 `t1_autenticacion`
+sin llamar a T1. Un 401 de T1 en la cotización olvida el token (el siguiente intento pide uno nuevo). Las cabeceras se obtienen
+DESPUÉS de los bloqueos de producción (guías live bloqueadas por código, solo Dirección, `T1_LIVE_COTIZAR`). Rutas del host
+productivo sin prefijo `/t1-shipping`: cotización `/quote/create-with-quote`; la ruta de guía NO está confirmada (`null` → 501
+`t1_ruta_no_confirmada`). El token y las credenciales nunca van a logs, respuestas ni mensajes.
+
+Pendiente de T1 (ticket 49867905417): confirmar host y modo, entregar client_secret/usuario/contraseña del realm T1, confirmar
+la ruta de guía y el shop_id de producción. Los secretos legado `T1_AUTH_URL`, `T1_CLIENT_SECRET`, `T1_USERNAME`, `T1_PASSWORD`
+no se leen.

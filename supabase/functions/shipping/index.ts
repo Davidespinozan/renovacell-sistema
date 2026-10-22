@@ -25,7 +25,7 @@ import {
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
-import { t1Config, cabecerasT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, diagnosticoT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, cabecerasWalletT1, resumenWalletT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key)
+import { t1Config, cabecerasAutenticadasT1, olvidarTokenT1, rutaT1, urlT1, RUTAS_T1, CONTRATO_T1, buildQuoteT1, faltantesCotizacion, valorMercancia, parseQuoteT1, datosOrigenT1, datosDestinoT1, faltantesGuia, PISTA_ORIGEN_T1, buildGuideT1, parseGuideT1, errorT1, diagnosticoT1, reintentableCotizacion, esperaReintentoMs, TIMEOUT_MS, describirT1, cabecerasWalletT1, resumenWalletT1, type TarifaT1, type OrigenEnvios } from './t1.ts'   // T1 Envíos API v2.0 (X-Api-Key en sandbox · Keycloak Bearer en el host productivo, T1-LIVE-02)
 
 const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -300,8 +300,22 @@ Deno.serve(conCors(async (req) => {
       return json(503, { error: 't1_config_invalida', message: `T1 no puede operar: ${conf.detalle}` })
     }
     const cfg = conf.cfg
-    const H = cabecerasT1(cfg)
     const ambiente = cfg.ambiente
+    // T1-LIVE-01 · producción: cotizar solo Dirección y solo con T1_LIVE_COTIZAR=on; GUÍAS live bloqueadas en el servidor
+    // (antes de cualquier claim, escritura o llamada). Nada de esto aplica a DHL ni cambia el sandbox.
+    if (ambiente === 'production') {
+      if (action === 'create_shipment' && !cfg.guiasPermitidas) return json(403, { error: 'guias_live_bloqueadas', message: 'Las guías de T1 en producción están bloqueadas en el servidor. Solo se permite cotizar.' })
+      if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'solo_direccion_live', message: 'En producción, T1 solo lo prueba Dirección por ahora.' })
+      if (action === 'rate' && !cfg.cotizarPermitido) return json(409, { error: 'live_cotizacion_desactivada', message: 'La cotización T1 en producción está desactivada (T1_LIVE_COTIZAR).' })
+    }
+    // T1-LIVE-02 · rutas según el modo (el host productivo no lleva el prefijo /t1-shipping); una ruta no confirmada = 501, sin red.
+    const rutaCotizar = rutaT1(cfg, 'cotizar'), rutaGuia = rutaT1(cfg, 'guia')
+    if (!rutaCotizar || (action === 'create_shipment' && !rutaGuia)) return json(501, { error: 't1_ruta_no_confirmada', message: 'La ruta de T1 para esta operación en este modo aún no está confirmada por T1.' })
+    // T1-LIVE-02 · cabeceras según el modo: api_key (X-Api-Key) o keycloak (Bearer con token en caché y vencimiento anticipado).
+    // Se piden DESPUÉS de los bloqueos de producción (nunca se obtiene un token para una operación bloqueada). El token no va a logs.
+    const auth = await cabecerasAutenticadasT1(cfg, fetch)
+    if (!auth.ok) { obs('t1', 'rejected', { code: `auth_${auth.clase}` }); return json(auth.clase === 'proveedor' || auth.clase === 'sin_respuesta' ? 502 : 503, { error: 't1_autenticacion', clase: auth.clase, message: `T1 no puede operar: ${auth.mensaje}` }) }
+    const H = auth.headers
     const conTimeout = async (url: string, init: RequestInit, ms: number) => {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms)
       try { return await fetch(url, { ...init, signal: ctl.signal }) } finally { clearTimeout(t) }
@@ -333,8 +347,9 @@ Deno.serve(conCors(async (req) => {
         let r: Response | null = null, data: unknown = {}
         for (let intento = 0; intento < 3; intento++) {
           if (intento) await new Promise((res) => setTimeout(res, esperaReintentoMs(intento - 1)))
-          r = await conTimeout(urlT1(cfg, RUTAS_T1.cotizar), { method: 'POST', headers: H, body: JSON.stringify(cuerpo) }, TIMEOUT_MS.cotizar)
+          r = await conTimeout(urlT1(cfg, rutaCotizar as string), { method: 'POST', headers: H, body: JSON.stringify(cuerpo) }, TIMEOUT_MS.cotizar)
           data = await r.json().catch(() => ({}))
+          if (r.status === 401 && cfg.keycloak) olvidarTokenT1(cfg.keycloak)   // token rechazado: el siguiente intento pedirá uno nuevo
           if (!reintentableCotizacion(r.status)) break
         }
         return { status: r!.status, ok: r!.ok, data, lectura: parseQuoteT1(data) }
@@ -404,7 +419,7 @@ Deno.serve(conCors(async (req) => {
       // 4) CREAR GUÍA (operación con costo). Excepción/timeout = DESCONOCIDO → reconciliación, SIN reintento.
       let shipResp: Response
       try {
-        shipResp = await conTimeout(urlT1(cfg, RUTAS_T1.guia), { method: 'POST', headers: H, body: JSON.stringify(buildGuideT1(serverRate.token, orderRef, cfg.shopId, origen, destino, shipper.name)) }, TIMEOUT_MS.guia)
+        shipResp = await conTimeout(urlT1(cfg, rutaGuia as string), { method: 'POST', headers: H, body: JSON.stringify(buildGuideT1(serverRate.token, orderRef, cfg.shopId, origen, destino, shipper.name)) }, TIMEOUT_MS.guia)
       } catch (e) {
         obs('create_shipment', 'unknown', { code: 'create_timeout', error: e })
         await markUnknown(admin, attemptId, `create timeout/network: ${(e as Error).message}`)

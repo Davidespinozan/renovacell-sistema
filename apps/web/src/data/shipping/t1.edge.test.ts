@@ -12,14 +12,25 @@ const bloqueT1 = c.slice(c.indexOf("if (s(p.provider) === 't1') {"), c.indexOf(M
 const bloqueDhl = c.slice(c.indexOf(MARCA_DHL))
 
 describe('T1 v2.0 · fuente de la Edge', () => {
-  it('autenticación: X-Api-Key + shop_id en t1.ts; ninguna ruta Keycloak/usuario/contraseña queda viva; host solo del registro', () => {
+  it('autenticación: X-Api-Key + shop_id en t1.ts; los secretos Keycloak LEGADO (T1_AUTH_URL…) no se leen; host solo del registro; la Edge no arma Bearer ni toca tokens', () => {
     const t = sinComentarios(t1)
     expect(t).toMatch(/'X-Api-Key': cfg\.apiKey, shop_id: cfg\.shopId/)
-    for (const viejo of ['T1_AUTH_URL', 'T1_CLIENT_SECRET', 'T1_USERNAME', 'T1_PASSWORD', 'T1_API_URL', 'grant_type', 'openid-connect', 'Bearer']) { expect(t, viejo).not.toContain(viejo); expect(bloqueT1, viejo).not.toContain(viejo) }
+    for (const viejo of ['T1_AUTH_URL', 'T1_CLIENT_SECRET', 'T1_USERNAME', 'T1_PASSWORD', 'T1_API_URL']) { expect(t, viejo).not.toContain(viejo); expect(bloqueT1, viejo).not.toContain(viejo) }
+    for (const sensible of ['grant_type', 'openid-connect', 'Bearer', 'accessToken', 'access_token', 'clientSecret']) expect(bloqueT1, sensible).not.toContain(sensible)   // T1-LIVE-02: todo vive en t1.ts
     expect(t).toMatch(/HOSTS_T1.*test: 'https:\/\/sandbox\.t1api\.com', production: null/)
     expect(bloqueT1).toMatch(/t1Config\(Deno\.env\.get\)/)
-    expect(bloqueT1).not.toMatch(/p\.(ambiente|env|host|base|url)\b/)
-    expect(bloqueT1).toMatch(/urlT1\(cfg, RUTAS_T1\.cotizar\)/); expect(bloqueT1).toMatch(/urlT1\(cfg, RUTAS_T1\.guia\)/)
+    expect(bloqueT1).not.toMatch(/p\.(ambiente|env|host|base|url|auth|token)\b/)
+    expect(bloqueT1).toMatch(/urlT1\(cfg, rutaCotizar as string\)/); expect(bloqueT1).toMatch(/urlT1\(cfg, rutaGuia as string\)/)
+  })
+  it('T1-LIVE-02: las cabeceras salen de cabecerasAutenticadasT1 DESPUÉS de los bloqueos de producción; fallo de token = 502/503 sin red a T1; el token nunca va a obs()/json(); 401 olvida el token', () => {
+    const iProd = bloqueT1.indexOf("if (ambiente === 'production') {"), iAuth = bloqueT1.indexOf('await cabecerasAutenticadasT1(cfg, fetch)'), iRuta = bloqueT1.indexOf("rutaT1(cfg, 'cotizar')"), iCot = bloqueT1.indexOf('rutaCotizar as string')
+    expect(iProd).toBeGreaterThan(0); expect(iRuta).toBeGreaterThan(iProd); expect(iAuth).toBeGreaterThan(iRuta); expect(iCot).toBeGreaterThan(iAuth)
+    expect(bloqueT1).toMatch(/if \(!auth\.ok\) \{ obs\('t1', 'rejected', \{ code: `auth_\$\{auth\.clase\}` \}\); return json\(auth\.clase === 'proveedor' \|\| auth\.clase === 'sin_respuesta' \? 502 : 503, \{ error: 't1_autenticacion'/)
+    expect(bloqueT1).toMatch(/const H = auth\.headers/)
+    expect(bloqueT1).toMatch(/if \(!rutaCotizar \|\| \(action === 'create_shipment' && !rutaGuia\)\) return json\(501, \{ error: 't1_ruta_no_confirmada'/)
+    expect(bloqueT1).toMatch(/r\.status === 401 && cfg\.keycloak\) olvidarTokenT1\(cfg\.keycloak\)/)
+    for (const linea of bloqueT1.split('\n').filter((l) => /obs\(|json\(/.test(l))) expect(linea).not.toMatch(/auth\.headers|\bH\b[^a-zA-Z]|keycloak\.|accessToken|Authorization/)
+    expect(bloqueDhl).not.toMatch(/cabecerasAutenticadasT1|keycloak|rutaT1/)   // DHL intacto
   })
   it('valor_paquete sale de los renglones del pedido (order_items) en cotización y re-cotización, nunca del cliente ni fijo; sin pedido o sin valor → 422', () => {
     expect(bloqueT1).toMatch(/from\('order_items'\)\.select\('qty, unit_price'\)\.eq\('order_id', orderIdQ\)/)
@@ -80,5 +91,21 @@ describe('TEMPORAL · acción de diagnóstico de billetera', () => {
     expect(diag).not.toMatch(/p\.(seller_id|shop_id|api_key|apiKey|key)\b/)
     expect(diag).toMatch(/return json\(200, res\)/); expect(diag).not.toMatch(/json\(200, data\)|JSON\.stringify\(data\)/)
     for (const m of diag.match(/console\.warn\([^\n]*\)/g) ?? []) expect(m).not.toMatch(/\bdata\b|apiKey|cabeceras|current_balance/)
+  })
+})
+
+describe('T1-LIVE-01 · fuente de la Edge', () => {
+  it('en production: guías bloqueadas ANTES de cualquier claim/escritura, cotización solo Dirección y solo con el control encendido; la cotización no escribe', () => {
+    const live = bloqueT1.slice(bloqueT1.indexOf("if (ambiente === 'production') {"), bloqueT1.indexOf("if (action === 'track') {"))
+    expect(live).toMatch(/action === 'create_shipment' && !cfg\.guiasPermitidas\) return json\(403, \{ error: 'guias_live_bloqueadas'/)
+    expect(live).toMatch(/!tieneRol\(q\.quien, \['admin'\]\)\) return json\(403, \{ error: 'solo_direccion_live'/)
+    expect(live).toMatch(/action === 'rate' && !cfg\.cotizarPermitido\) return json\(409, \{ error: 'live_cotizacion_desactivada'/)
+    expect(bloqueT1.indexOf("if (ambiente === 'production') {")).toBeLessThan(bloqueT1.indexOf("from('shipping_attempts')"))   // el bloqueo precede al claim
+    expect(bloqueT1.indexOf("if (ambiente === 'production') {")).toBeLessThan(bloqueT1.indexOf('rutaCotizar as string'))     // y a cualquier llamada a T1
+    const rate = bloqueT1.slice(bloqueT1.indexOf("if (action === 'rate') {"), bloqueT1.indexOf('const montoVisto'))
+    expect(rate.length).toBeGreaterThan(200)
+    expect(rate).not.toMatch(/\.insert\(|\.update\(|\.rpc\(|finalize_shipment/)   // cotizar nunca cambia pedidos ni crea envíos
+    expect(sinComentarios(t1)).toMatch(/GUIAS_LIVE_PERMITIDAS = false/)
+    expect(bloqueDhl).not.toMatch(/guiasPermitidas|cotizarPermitido|T1_LIVE/)   // DHL ajeno a todo esto
   })
 })

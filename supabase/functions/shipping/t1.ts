@@ -1,9 +1,14 @@
 // ============================================================================
 // Adaptador T1 Envíos · API v2.0 (T1 Cuenta) — NEUTRAL→T1 y T1→NEUTRAL.
-// Autenticación: cabeceras `X-Api-Key: <llave>` y `shop_id: <tienda>`; NO hay Keycloak ni usuario/contraseña en la v2.0.
-// Ambientes (registro explícito; el host sale del ambiente, nunca del cliente ni de una URL libre):
-//   test       → https://sandbox.t1api.com              (documentado en T1 Cuenta)
-//   production → SIN CONFIRMAR: hasta que T1 publique el host productivo, production falla de forma segura.
+// Autenticación (dos mecanismos INDEPENDIENTES, elegidos por ambiente con T1_AUTH / T1_LIVE_AUTH):
+//   api_key  → cabeceras `X-Api-Key: <llave>` y `shop_id: <tienda>` (T1 Cuenta v2.0; es lo que acepta sandbox.t1api.com).
+//   keycloak → T1-LIVE-02: `Authorization: Bearer <access_token>` + `shop_id`, con token de Keycloak OpenID (contrato documentado
+//              por T1: POST al token endpoint, grant `password`, client_id `t1envios`, client_secret, usuario y contraseña de
+//              t1envios.com; access_token ≈ 30 min). Es lo que exige el host productivo documentado apiv2.t1envios.com, que
+//              rechazó X-Api-Key con 401 (20 oct 2026). Solo se implementa el grant documentado; nada se supone.
+// Ambientes (registro explícito; el host sale del ambiente y del mecanismo, nunca del cliente ni de una URL libre):
+//   api_key:  test → https://sandbox.t1api.com (documentado) · production → SIN CONFIRMAR (falla de forma segura).
+//   keycloak: test → SIN CONFIRMAR · production → https://apiv2.t1envios.com (developer.t1.com; rutas SIN prefijo /t1-shipping).
 // Endpoints documentados:
 //   POST /t1-shipping/quote/create-with-quote   cotización (home, origin_postal_code, destination_postal_code, weight, length,
 //                                               width, height, shipping_days, insurance, valor_paquete, package_type, packages)
@@ -23,35 +28,135 @@
 import type { NeutralPackage, NeutralReceiver, NeutralShipper } from './dhl.ts'
 
 export type AmbienteT1 = 'test' | 'production'
-/** Registro de ambientes: el host productivo se agrega aquí cuando T1 lo confirme; mientras, production no opera. */
+export type AuthT1 = 'api_key' | 'keycloak'
+/** Registro de ambientes (api_key): el host productivo se agrega aquí cuando T1 lo confirme; mientras, production no opera. */
 export const HOSTS_T1: Record<AmbienteT1, string | null> = { test: 'https://sandbox.t1api.com', production: null }
+/** Registro de ambientes (keycloak): producción documentada en developer.t1.com; sandbox con Keycloak sin confirmar. */
+export const HOSTS_T1_KEYCLOAK: Record<AmbienteT1, string | null> = { test: null, production: 'https://apiv2.t1envios.com' }
 export const RUTAS_T1 = { cotizar: '/t1-shipping/quote/create-with-quote', guia: '/t1-shipping/guide/create-guide', wallet: '/t1-shipping/wallet/movements' } as const
+/** Rutas del host productivo (sin prefijo): cotización documentada; la ruta de guía NO está confirmada (3 variantes vistas) → null. */
+export const RUTAS_T1_KEYCLOAK: Record<keyof typeof RUTAS_T1, string | null> = { cotizar: '/quote/create-with-quote', guia: null, wallet: null }
+export const rutaT1 = (cfg: { auth: AuthT1 }, clave: keyof typeof RUTAS_T1): string | null => (cfg.auth === 'keycloak' ? RUTAS_T1_KEYCLOAK[clave] : RUTAS_T1[clave])
 /** Evidencia de contrato: false = no se opera esa parte hasta tener el esquema oficial o un fixture real sanitizado. */
 export const CONTRATO_T1 = { cotizacion_request: true, cotizacion_response: true, guia_request_campos_direccion: true, guia_response: true, rastreo: false, recoleccion: false } as const
-export const T1_SECRETOS = ['T1_API_ENV', 'T1_API_KEY', 'T1_SHOP_ID'] as const
+export const T1_SECRETOS = ['T1_API_ENV', 'T1_API_KEY', 'T1_SHOP_ID'] as const            // sandbox (test, api_key)
+export const T1_SECRETOS_LIVE = ['T1_API_ENV', 'T1_LIVE_API_KEY', 'T1_LIVE_SHOP_ID', 'T1_LIVE_COTIZAR'] as const   // producción (live, api_key)
+/** Keycloak (T1-LIVE-02): modo por ambiente `T1_AUTH` (test) / `T1_LIVE_AUTH` (production) = api_key | keycloak. Credenciales
+ *  con prefijo por ambiente: T1_KC_* (test) / T1_LIVE_KC_* (production). Obligatorias: CLIENT_SECRET, USERNAME, PASSWORD.
+ *  Opcionales con valor documentado por defecto: TOKEN_URL, CLIENT_ID, GRANT (solo `password`). */
+export const T1_SECRETOS_KEYCLOAK_LIVE = ['T1_API_ENV', 'T1_LIVE_AUTH', 'T1_LIVE_SHOP_ID', 'T1_LIVE_COTIZAR', 'T1_LIVE_KC_CLIENT_SECRET', 'T1_LIVE_KC_USERNAME', 'T1_LIVE_KC_PASSWORD'] as const
+export const KEYCLOAK_T1 = { tokenUrl: 'https://id.t1.com/realms/T1/protocol/openid-connect/token', clientId: 't1envios', grant: 'password', expiraSegPorDefecto: 1800, margenSeg: 60 } as const
+/** T1-LIVE-01 · las GUÍAS en producción quedan bloqueadas en el servidor por código, sin importar secretos ni quién llame. */
+export const GUIAS_LIVE_PERMITIDAS = false as boolean
 
-export interface T1Config { ambiente: AmbienteT1; base: string; apiKey: string; shopId: string }
-export type ConfigT1 = { ok: true; cfg: T1Config } | { ok: false; motivo: 'sin_configurar' | 'ambiente_invalido' | 'relleno' | 'produccion_sin_host'; detalle: string }
+export interface KeycloakT1 { tokenUrl: string; clientId: string; clientSecret: string; username: string; password: string; grant: 'password' }
+export interface T1Config { ambiente: AmbienteT1; auth: AuthT1; base: string; apiKey: string; shopId: string; cotizarPermitido: boolean; guiasPermitidas: boolean; keycloak?: KeycloakT1 }
+export type ConfigT1 = { ok: true; cfg: T1Config } | { ok: false; motivo: 'sin_configurar' | 'ambiente_invalido' | 'relleno' | 'produccion_sin_host' | 'auth_invalida' | 'grant_no_soportado' | 'token_url_invalida'; detalle: string }
 
 const RELLENO = /^\s*$|^\.{2,}$|^<.*>$|^cambiar|^xxx+$|^tu[_ -]|^your[_ -]/i
-/** Lee y valida la configuración desde los secretos. Nunca devuelve ni registra la llave fuera de `cfg`. */
-export function t1Config(env: (k: string) => string | undefined): ConfigT1 {
+/**
+ * Lee y valida la configuración desde los secretos. Nunca devuelve ni registra la llave fuera de `cfg`.
+ * Credenciales SEPARADAS por ambiente: test → T1_API_KEY/T1_SHOP_ID; production → T1_LIVE_API_KEY/T1_LIVE_SHOP_ID.
+ * En production, cotizar exige además T1_LIVE_COTIZAR=on (control independiente); las guías live NO se permiten (código).
+ * `hosts` solo se inyecta en pruebas; en runtime el host sale del registro HOSTS_T1.
+ */
+export function t1Config(env: (k: string) => string | undefined, hosts: Record<AmbienteT1, string | null> = HOSTS_T1, hostsKeycloak: Record<AmbienteT1, string | null> = HOSTS_T1_KEYCLOAK): ConfigT1 {
   const g = (k: string) => (env(k) ?? '').trim()
-  const ambiente = g('T1_API_ENV').toLowerCase(), apiKey = g('T1_API_KEY'), shopId = g('T1_SHOP_ID')
-  if (!ambiente && !apiKey && !shopId) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${T1_SECRETOS.join(', ')}.` }
+  const ambiente = g('T1_API_ENV').toLowerCase()
+  if (!ambiente && !g('T1_API_KEY') && !g('T1_SHOP_ID') && !g('T1_LIVE_API_KEY') && !g('T1_LIVE_AUTH') && !g('T1_AUTH')) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${T1_SECRETOS.join(', ')}.` }
   if (ambiente !== 'test' && ambiente !== 'production') return { ok: false, motivo: 'ambiente_invalido', detalle: 'T1_API_ENV debe ser test o production.' }
-  if (!apiKey || !shopId) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${[!apiKey && 'T1_API_KEY', !shopId && 'T1_SHOP_ID'].filter(Boolean).join(' y ')}.` }
-  if (RELLENO.test(apiKey) || RELLENO.test(shopId) || apiKey.length < 16) return { ok: false, motivo: 'relleno', detalle: 'La llave o el shop_id parecen de relleno.' }
-  const base = HOSTS_T1[ambiente]
+  const live = ambiente === 'production'
+  const modo = (g(live ? 'T1_LIVE_AUTH' : 'T1_AUTH') || 'api_key').toLowerCase()
+  if (modo !== 'api_key' && modo !== 'keycloak') return { ok: false, motivo: 'auth_invalida', detalle: `${live ? 'T1_LIVE_AUTH' : 'T1_AUTH'} debe ser api_key o keycloak.` }
+  const kShop = live ? 'T1_LIVE_SHOP_ID' : 'T1_SHOP_ID'
+  const shopId = g(kShop)
+  const permisos = { cotizarPermitido: live ? g('T1_LIVE_COTIZAR').toLowerCase() === 'on' : true, guiasPermitidas: live ? GUIAS_LIVE_PERMITIDAS : true }
+  if (modo === 'keycloak') {
+    // T1-LIVE-02 · Keycloak: la llave X-Api-Key NO participa; el token se obtiene con las credenciales del prefijo del ambiente.
+    const p = live ? 'T1_LIVE_KC_' : 'T1_KC_'
+    const clientSecret = g(p + 'CLIENT_SECRET'), username = g(p + 'USERNAME'), password = g(p + 'PASSWORD')
+    const faltan = [!shopId && kShop, !clientSecret && p + 'CLIENT_SECRET', !username && p + 'USERNAME', !password && p + 'PASSWORD'].filter(Boolean)
+    if (faltan.length) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${faltan.join(', ')}.` }
+    if (RELLENO.test(shopId) || RELLENO.test(clientSecret) || RELLENO.test(username) || RELLENO.test(password) || clientSecret.length < 8) return { ok: false, motivo: 'relleno', detalle: `Las credenciales Keycloak de ${live ? 'producción' : 'sandbox'} parecen de relleno.` }
+    const grant = (g(p + 'GRANT') || KEYCLOAK_T1.grant).toLowerCase()
+    if (grant !== 'password') return { ok: false, motivo: 'grant_no_soportado', detalle: `Solo está implementado el grant documentado por T1 (password); ${p}GRANT=${grant} no se usa.` }
+    const tokenUrl = g(p + 'TOKEN_URL') || KEYCLOAK_T1.tokenUrl
+    if (!/^https:\/\/[a-z0-9.-]+\/realms\/[^/\s]+\/protocol\/openid-connect\/token$/i.test(tokenUrl)) return { ok: false, motivo: 'token_url_invalida', detalle: `${p}TOKEN_URL debe ser un token endpoint https de Keycloak (…/realms/<realm>/protocol/openid-connect/token).` }
+    const base = hostsKeycloak[ambiente]
+    if (!base) return { ok: false, motivo: 'produccion_sin_host', detalle: `El host de T1 con Keycloak para ${live ? 'producción' : 'sandbox'} no está confirmado; no opera hasta registrarlo.` }
+    return { ok: true, cfg: { ambiente, auth: 'keycloak', base, apiKey: '', shopId, ...permisos, keycloak: { tokenUrl, clientId: g(p + 'CLIENT_ID') || KEYCLOAK_T1.clientId, clientSecret, username, password, grant: 'password' } } }
+  }
+  const kKey = live ? 'T1_LIVE_API_KEY' : 'T1_API_KEY'
+  const apiKey = g(kKey)
+  if (!apiKey || !shopId) return { ok: false, motivo: 'sin_configurar', detalle: `Faltan ${[!apiKey && kKey, !shopId && kShop].filter(Boolean).join(' y ')}.` }
+  if (RELLENO.test(apiKey) || RELLENO.test(shopId) || apiKey.length < 16) return { ok: false, motivo: 'relleno', detalle: `La llave o el identificador de ${live ? 'producción' : 'sandbox'} parecen de relleno.` }
+  const base = hosts[ambiente]
   if (!base) return { ok: false, motivo: 'produccion_sin_host', detalle: 'El host productivo de T1 no está confirmado; production no opera hasta registrarlo.' }
-  return { ok: true, cfg: { ambiente, base, apiKey, shopId } }
+  return { ok: true, cfg: { ambiente, auth: 'api_key', base, apiKey, shopId, ...permisos } }
 }
+/** Cabeceras del modo api_key (sandbox). En modo keycloak NO se usan: ver cabecerasAutenticadasT1. */
 export function cabecerasT1(cfg: T1Config): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-Api-Key': cfg.apiKey, shop_id: cfg.shopId }
 }
+
+// ── T1-LIVE-02 · Keycloak: token, caché con vencimiento anticipado y cabeceras Bearer ─────────────────────────────────
+// Contrato documentado (único implementado): POST tokenUrl, application/x-www-form-urlencoded,
+//   grant_type=password&client_id=<id>&client_secret=<secret>&username=<u>&password=<p>  → { access_token, expires_in, token_type }
+// El token y las credenciales nunca salen de este módulo salvo dentro de la cabecera Authorization; nunca a logs ni mensajes.
+export interface TokenT1 { accessToken: string; expiraEn: number }   // expiraEn = epoch ms
+export type ClaseTokenT1 = 'credenciales_rechazadas' | 'sin_permisos' | 'forma_no_reconocida' | 'proveedor' | 'sin_respuesta'
+export type LecturaToken = { ok: true; token: TokenT1 } | { ok: false; clase: ClaseTokenT1; mensaje: string }
+export function buildTokenRequest(kc: KeycloakT1): { url: string; init: { method: 'POST'; headers: Record<string, string>; body: string } } {
+  const body = new URLSearchParams({ grant_type: kc.grant, client_id: kc.clientId, client_secret: kc.clientSecret, username: kc.username, password: kc.password }).toString()
+  return { url: kc.tokenUrl, init: { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body } }
+}
+/** Clasifica la respuesta del token endpoint en palabras; NUNCA incluye el cuerpo (puede traer el token) ni credenciales. */
+// deno-lint-ignore no-explicit-any
+export function leerToken(status: number, data: any, ahora = Date.now()): LecturaToken {
+  const d = data && typeof data === 'object' ? data : {}
+  if (status === 200) {
+    const tok = typeof d.access_token === 'string' ? d.access_token.trim() : ''
+    const seg = Number(d.expires_in)
+    if (!tok) return { ok: false, clase: 'forma_no_reconocida', mensaje: 'Keycloak respondió 200 sin access_token.' }
+    return { ok: true, token: { accessToken: tok, expiraEn: ahora + (Number.isFinite(seg) && seg > 0 ? seg : KEYCLOAK_T1.expiraSegPorDefecto) * 1000 } }
+  }
+  if (status === 400 || status === 401) return { ok: false, clase: 'credenciales_rechazadas', mensaje: `Keycloak rechazó las credenciales de T1 (${status}${typeof d.error === 'string' ? ' ' + d.error.slice(0, 40) : ''}): revisa usuario, contraseña, client_id y client_secret.` }
+  if (status === 403) return { ok: false, clase: 'sin_permisos', mensaje: 'Keycloak respondió 403: la cuenta no tiene permiso para este cliente o realm.' }
+  if (status >= 500) return { ok: false, clase: 'proveedor', mensaje: `Keycloak de T1 no está disponible (${status}).` }
+  return { ok: false, clase: 'forma_no_reconocida', mensaje: `Keycloak respondió ${status}.` }
+}
+const tokens = new Map<string, TokenT1>()
+const claveToken = (kc: KeycloakT1) => `${kc.tokenUrl}|${kc.clientId}|${kc.username}`   // sin secretos en la clave
+export const tokenVigente = (t: TokenT1 | undefined, ahora = Date.now()) => !!t && t.expiraEn - KEYCLOAK_T1.margenSeg * 1000 > ahora
+export function olvidarTokenT1(kc: KeycloakT1): void { tokens.delete(claveToken(kc)) }
+export function olvidarTodosLosTokensT1(): void { tokens.clear() }
+type FetchT1 = (url: string, init: { method: 'POST'; headers: Record<string, string>; body: string }) => Promise<{ status: number; json(): Promise<unknown> }>
+/** Devuelve un token vigente (caché) o pide uno nuevo con vencimiento anticipado de KEYCLOAK_T1.margenSeg. */
+export async function obtenerTokenT1(kc: KeycloakT1, fetchImpl: FetchT1, ahora = Date.now()): Promise<LecturaToken> {
+  const k = claveToken(kc)
+  const t = tokens.get(k)
+  if (tokenVigente(t, ahora)) return { ok: true, token: t! }
+  tokens.delete(k)
+  const { url, init } = buildTokenRequest(kc)
+  let status = 0, data: unknown = {}
+  try { const r = await fetchImpl(url, init); status = r.status; data = await r.json().catch(() => ({})) }
+  catch { return { ok: false, clase: 'sin_respuesta', mensaje: 'Keycloak de T1 no respondió (red o tiempo de espera).' } }
+  const l = leerToken(status, data, ahora)
+  if (l.ok) tokens.set(k, l.token)
+  return l
+}
+export type CabecerasT1 = { ok: true; headers: Record<string, string> } | { ok: false; clase: ClaseTokenT1; mensaje: string }
+/** Cabeceras autenticadas según el modo: api_key (X-Api-Key) o keycloak (Bearer). Solo en keycloak existe Authorization. */
+export async function cabecerasAutenticadasT1(cfg: T1Config, fetchImpl: FetchT1, ahora = Date.now()): Promise<CabecerasT1> {
+  if (cfg.auth !== 'keycloak') return { ok: true, headers: cabecerasT1(cfg) }
+  if (!cfg.keycloak) return { ok: false, clase: 'credenciales_rechazadas', mensaje: 'Configuración Keycloak ausente.' }
+  const t = await obtenerTokenT1(cfg.keycloak, fetchImpl, ahora)
+  if (!t.ok) return t
+  return { ok: true, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t.token.accessToken}`, shop_id: cfg.shopId } }
+}
 export const urlT1 = (cfg: T1Config, ruta: string) => `${cfg.base}${ruta}`
 /** Texto seguro para logs/UI: nunca la llave. */
-export const describirT1 = (cfg: T1Config) => `T1 ${cfg.ambiente === 'test' ? 'sandbox' : 'producción'} · shop ${cfg.shopId.slice(0, 2)}…`
+export const describirT1 = (cfg: T1Config) => `T1 ${cfg.ambiente === 'test' ? 'sandbox' : 'producción'} (${cfg.auth === 'keycloak' ? 'Keycloak' : 'X-Api-Key'}) · shop ${cfg.shopId.slice(0, 2)}…`
 
 // ── Utilería de datos ───────────────────────────────────────────────────────────────────────────────
 const limpia = (t?: string | null) => String(t ?? '').replace(/\s+/g, ' ').trim()
