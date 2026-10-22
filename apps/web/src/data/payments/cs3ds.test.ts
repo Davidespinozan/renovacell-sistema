@@ -1,6 +1,8 @@
 // CS-1A.4 · contratos 3DS puros (setup / enrolamiento / validación / dispositivo / bill-to / ventana / retorno) + guardas de fuente
 // de las Edges `cs-3ds` y `cs-3ds-return`. Todo simulado: ningún caso aquí cuenta como validado en Sandbox.
 import { describe, it, expect } from 'vitest'
+import mig186 from '../../../../../supabase/migrations/20270108120000_cs1a6_reversa_autorizacion.sql?raw'
+import mig187 from '../../../../../supabase/migrations/20270109120000_cs1a7_cierre_manual.sql?raw'
 import edge from '../../../../../supabase/functions/cs-3ds/index.ts?raw'
 import retorno from '../../../../../supabase/functions/cs-3ds-return/index.ts?raw'
 import {
@@ -100,6 +102,19 @@ describe('CS-1A.4 · validación', () => {
     const h = htmlRetorno3ds()
     expect(h).toContain('postMessage({tipo:"renovacell-3ds-return"},"*")')
     expect(h).not.toMatch(/TransactionId|MD=|fetch\(|XMLHttpRequest|localStorage/)
+  })
+  it('CS-DEPLOY-03B-FIX · abandonar NUNCA libera una reserva ya enviada al banco: solo estados previos al envío, comprobados antes de avanzar', () => {
+    const posteriores = ['auth_validated', 'authz_sent', 'authorized', 'captured', 'posted', 'unknown_requires_reconciliation', 'declined', 'amount_changed', 'expired', 'failed_safe_to_retry', 'closed']
+    for (const e of posteriores) expect(ESTADOS_ACCION.abandonar, e).not.toContain(e)
+    const src = edge.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    const iCheck = src.indexOf("if (!estadoValido('abandonar')) return json(409"), iAvz = src.indexOf("avanzar('failed_safe_to_retry', { error: 'abandonado por el cliente antes de enviar al banco' })")
+    expect(iCheck).toBeGreaterThan(0); expect(iAvz).toBeGreaterThan(iCheck)
+    // la máquina de estados de la base (184, 186 y 187) tampoco admite failed_safe_to_retry desde ningún estado posterior al envío
+    for (const fila of ['authz_sent', 'authorized', 'captured']) {
+      const linea = mig186.split('\n').find((l) => l.includes(`when p_de = '${fila}'`))
+      expect(linea, fila).toBeTruthy(); expect(linea).not.toContain('failed_safe_to_retry')
+    }
+    expect(mig187).toMatch(/v_a\.status = 'unknown_requires_reconciliation' and p_estado = 'failed_safe_to_retry' then\n\s*raise exception 'CIERRE_MANUAL_REQUERIDO/)
   })
 })
 

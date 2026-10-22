@@ -411,3 +411,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# CyberSource · CS-1A.4 · returnUrl del reto 3DS: la llama el ACS del banco dentro del iframe, sin sesión de Renovacell.
+# Página estática sin datos, sin base ni secretos. Las demás funciones cs-* NO se declaran: conservan la verificación de JWT.
+[functions.cs-3ds-return]
+verify_jwt = false

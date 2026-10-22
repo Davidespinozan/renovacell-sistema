@@ -87,15 +87,15 @@ Deno.serve(conCors(async (req) => {
   // Bill-to del ERP (mismo armado que en 3DS); el navegador no manda nada de esto.
   const [{ data: o }, { data: pr }] = await Promise.all([
     admin.from('orders').select('shipping_meta, customer_id').eq('id', intento.order_id).maybeSingle(),
-    admin.from('profiles').select('full_name, email, phone').eq('id', intento.doctor_id).maybeSingle(),
+    admin.from('profiles').select('full_name, email').eq('id', intento.doctor_id).maybeSingle(),   // profiles no tiene teléfono: el teléfono sale del domicilio o del cliente
   ])
   const meta = ((o as { shipping_meta?: Record<string, unknown> } | null)?.shipping_meta ?? {}) as Record<string, unknown>
   const address = (meta.address && typeof meta.address === 'object' ? meta.address : null) as Record<string, unknown> | null
-  const perfil = (pr ?? {}) as { full_name?: string; email?: string; phone?: string }
+  const perfil = (pr ?? {}) as { full_name?: string; email?: string }
   let cliente: { full_name?: string; email?: string; phone?: string } = {}
   const customerId = (o as { customer_id?: string } | null)?.customer_id
   if (customerId) { const { data: c } = await admin.from('customers').select('full_name, email, phone').eq('id', customerId).maybeSingle(); cliente = (c ?? {}) as typeof cliente }
-  const bt = buildBillTo({ nombre: String(address?.nombre ?? cliente.full_name ?? perfil.full_name ?? ''), email: String(cliente.email ?? perfil.email ?? q.quien.email ?? ''), phone: String(address?.phone ?? cliente.phone ?? perfil.phone ?? ''), address })
+  const bt = buildBillTo({ nombre: String(address?.nombre ?? cliente.full_name ?? perfil.full_name ?? ''), email: String(cliente.email ?? perfil.email ?? q.quien.email ?? ''), phone: String(address?.phone ?? cliente.phone ?? ''), address })
   if (!bt.ok) return json(409, { error: 'datos_incompletos', faltan: bt.faltan, message: 'Faltan datos de facturación del pedido.' })
   let cuerpo
   try { cuerpo = buildPaymentRequest({ attemptId, amount, token, authenticationTransactionId: intento.cs_auth_transaction_id, billTo: bt.billTo, modo }) }
