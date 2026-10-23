@@ -15,6 +15,8 @@ import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
 import { recoleccionDe } from '../../data/shipping/recoleccion'
 import { AsignarModal, EntregaPill, entregaDe, ordenarPorSalida } from '../packing/Cola'
 import { SurtirModal } from './Surtido'
+import { useAgendaEntregas } from '../logistics/AgendaEntregas'
+import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe, Shipment } from '../../data/types'
 
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -46,6 +48,12 @@ export function HoyAlmacen() {
   const [preparar, setPreparar] = useState<OrderWithItems | null>(null)
   const [enviar, setEnviar] = useState<OrderWithItems | null>(null)
   const hoy = hoyLocal()
+  const { setScreen } = useRole()
+  // ENT-H · entregas locales de hoy con su horario (agenda del servidor).
+  const agenda = useAgendaEntregas(hoy, hoy)
+  const diaHoy = agenda.data?.dias.find((d) => d.fecha === hoy) ?? null
+  const entregasHoy = diaHoy ? diaHoy.slots.flatMap((s) => s.pedidos.filter((p) => p.estado_pedido !== 'cancelled').map((p) => ({ ...p, inicio: s.inicio, fin: s.fin }))) : []
+  const proxima = entregasHoy.find((e) => e.estado_pedido !== 'delivered')
 
   const byId = useMemo(() => { const m: Record<string, ProductSafe | undefined> = {}; products.forEach((p) => (m[p.id] = p)); return m }, [products])
   const envioDe = useMemo(() => { const m: Record<string, Shipment> = {}; shipments.forEach((s) => { if (!m[s.order_id] || s.created_at > m[s.order_id].created_at) m[s.order_id] = s }); return m }, [shipments])
@@ -64,6 +72,9 @@ export function HoyAlmacen() {
         <Tarjeta titulo="Guías DHL hoy" valor={guiasHoy.length} pie={guiasHoy.length ? 'generadas y con número de rastreo' : 'ninguna todavía'} icono="truck" testid="hoy-guias" />
         <Tarjeta titulo="Recolección DHL hoy" valor={rec ? `${rec.ready}–${rec.close}` : '—'} pie={rec ? <>Confirmada <span className="mono">{rec.confirmation}</span>{recolecciones.length > 1 ? ` · +${recolecciones.length - 1} más` : ''}</> : 'sin recolección agendada para hoy'} icono="clock" testid="hoy-recoleccion" />
         <Tarjeta titulo="En camino" valor={orders.filter((o) => o.status === 'shipped').length} pie="pedidos enviados sin confirmar entrega" icono="pkg" testid="hoy-camino" />
+        <div role="button" tabIndex={0} onClick={() => setScreen('agenda_entregas')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setScreen('agenda_entregas') }} style={{ cursor: 'pointer', display: 'contents' }} aria-label="Ver horarios de entrega">
+          <Tarjeta titulo="Entregas locales hoy" valor={agenda.data ? entregasHoy.length : '—'} pie={agenda.error ? 'No se pudo leer la agenda' : proxima ? <>Siguiente <b>{proxima.inicio}</b> · {proxima.cliente}</> : entregasHoy.length ? 'todas entregadas' : 'ninguna agendada · ver horarios'} icono="clock" alerta={!!proxima} testid="hoy-entregas-locales" />
+        </div>
       </div>
 
       <div className="eyebrow">Esperan tu decisión <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>({casos.length} {casos.length === 1 ? 'caso' : 'casos'})</span></div>

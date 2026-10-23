@@ -3,6 +3,7 @@
 begin;
 create temp table _cx0c as select (select count(*) from public.orders) o, (select count(*) from public.cc_cartera) k, (select count(*) from public.payment_entries) e;
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/cx0c/99_down.sql
 do $t$

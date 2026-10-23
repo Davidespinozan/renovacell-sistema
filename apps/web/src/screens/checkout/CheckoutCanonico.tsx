@@ -20,7 +20,8 @@ import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
-import { MOTIVO_ENTREGA, fleteTexto, opcionDe, promesaDe, requiereDireccion, type OpcionEntrega } from '../../data/ops/entrega'
+import { MOTIVO_ENTREGA, fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
+import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
 export interface MotorLocal {
@@ -93,6 +94,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<EleccionEntrega | null>(null)
   const [opcion, setOpcion] = useState<string | null>(null)   // ENT-0 · id de la opción de entrega elegida (servidor)
+  const [horario, setHorario] = useState<HorarioElegido | null>(null)   // ENT-H · horario de entrega local elegido (solo chofer)
   const [order, setOrder] = useState<PedidoMin | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [payNow, setPayNow] = useState(false)
@@ -137,12 +139,14 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const necesitaDireccion = ops ? requiereDireccion(sel?.tipo) : true   // sin opciones (demo/fixtures) se exige dirección como antes
   const envio = ops ? (sel?.flete ?? null) : null
   const totalConEnvio = total != null && envio != null ? total + envio : total
-  const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null }
+  const necesitaHorario = !!ops && requiereHorario(sel)
+  const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null, horario: necesitaHorario ? horario : null }
 
-  const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || creando || (invoice && !fiscalOk)
+  const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk)
   const confirm = async () => {
     if (necesitaDireccion && !choice?.address) return // a domicilio: exige dirección de entrega (recoger no)
     if (ops && !sel) return
+    if (necesitaHorario && !horario) return   // ENT-H · la entrega local exige horario
     if (invoice && !fiscalOk) { setShowFiscalErr(true); return } // HARD GATE
     if (creando || yaPedido) return
     setCreando(true); setErrorPedido(null)
@@ -255,13 +259,19 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                           <span style={{ flex: 1 }}>
                             <b style={{ display: 'block', fontSize: 13 }}>{o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
                             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                              {puede ? promesaDe(o, hoy) : !o.disponible ? 'Próximamente' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica para este pedido'}
+                              {puede ? (requiereHorario(o) ? (on && horario ? `Llega ${horario.fecha === hoy ? 'hoy' : 'el ' + horario.fecha.slice(8, 10) + '/' + horario.fecha.slice(5, 7)} a las ${horario.inicio}` : 'Eliges un horario de media hora') : promesaDe(o, hoy)) : !o.disponible ? 'Próximamente' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica para este pedido'}
                             </span>
                           </span>
                         </label>
                       )
                     })}
                   </div>
+                  {necesitaHorario && (
+                    <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="checkout-horario">
+                      <div className="eyebrow" style={{ margin: '0 0 8px' }}>¿A qué hora lo recibes? {!horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige un horario</span>}</div>
+                      <HorarioEntregaPicker value={horario} onChange={setHorario} cargar={servidor?.cargarHorarios} compacto />
+                    </div>
+                  )}
                   <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="checkout-corte">
                     {sel?.tipo === 'recoge' ? `${ops.recoge.lugar} · ${ops.recoge.horario}` : ops.corte.antes_de_corte ? `Los pedidos que entran antes de las ${ops.corte.hora} salen el mismo día.` : `Después de las ${ops.corte.hora} los pedidos salen el siguiente día hábil.`}
                   </div>

@@ -4,6 +4,7 @@ begin;
 create temp table _ent as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 set app.entrega_rollback_forzado = 'on';
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql
 do $t$ begin
   perform tests.ok(to_regclass('public.entrega_config') is null and to_regprocedure('public.crear_pedido_con_entrega(uuid,text,uuid,jsonb,jsonb,boolean,uuid,jsonb,jsonb)') is null
@@ -13,10 +14,11 @@ do $t$ begin
                and not exists (select 1 from pg_trigger where tgname = 'orders_shipping_cost_guard')
                and md5(pg_get_functiondef('public.cc_checkout_revisar(uuid,uuid,jsonb)'::regprocedure)) = 'de58088479a7c4a5ee971c240f442802'
                and md5(pg_get_functiondef('public.cc_checkout_confirmar(uuid,text,integer,boolean,uuid)'::regprocedure)) = '49129e57d5f044e624a6d61621fb3bce'
-               and (select n_tablas from _ent) = (select count(*) + 1 from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'),
+               and (select n_tablas from _ent) = (select count(*) + 2 from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'),   -- entrega_config y entrega_horarios (ENT-H)
     '171 down · sin entrega; el checkout como en la 119/137; crear_pedido y la 147 intactos');
 end $t$;
 \ir ../../../migrations/20261224120000_entrega_pedido.sql
+\ir ../../../migrations/20270111120000_entrega_horarios.sql   -- ENT-H (189) se reaplica encima para comparar el estado completo
 do $t$ begin
   perform tests.ok((select todas from _ent) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '171 · se reaplica idéntica');
 end $t$;

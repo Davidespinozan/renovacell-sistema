@@ -1,6 +1,7 @@
 -- C360-0 · El rollback devuelve EXACTAMENTE revisar/confirmar de 119 (confirmar vuelve a pasar null) y retira el helper.
 begin;
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/c360_f3/99_down.sql   -- C360-F3 (121) se baja primero
 \ir ../../../rollback/c360_0/99_down.sql

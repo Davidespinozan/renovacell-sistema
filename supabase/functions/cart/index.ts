@@ -73,6 +73,11 @@ Deno.serve(conCors(async (req) => {
       const dir = !loc ? direccionSnapshot(p.direccion) : null
       // ENT-0 · la entrega ELEGIDA viaja solo como el id de la opción (recoge, local_chofer, foraneo_dhl…); nunca el flete.
       const ent = typeof p.entrega === 'string' && /^[a-z_]{3,30}$/.test(p.entrega) ? { opcion: p.entrega } : null
+      // ENT-H · horario de entrega local {fecha: YYYY-MM-DD, inicio: HH:MM} (forma acotada; la base lo valida y lo reserva al confirmar).
+      const hRaw = p.horario as { fecha?: unknown; inicio?: unknown } | null | undefined
+      const horario = ent && hRaw && typeof hRaw === 'object' && typeof hRaw.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(hRaw.fecha) && typeof hRaw.inicio === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(hRaw.inicio)
+        ? { fecha: hRaw.fecha, inicio: hRaw.inicio } : null
+      if (ent && horario) (ent as Record<string, unknown>).horario = horario
       const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc, p_direccion: dir, p_entrega: ent })
       if (error) return falla(error)
       return json(200, data)

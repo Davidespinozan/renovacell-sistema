@@ -4,14 +4,24 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
-import { EntregaConfigEditor, validarEntrega } from './EntregaConfigEditor'
+import { EntregaConfigEditor, validarEntrega, franjasATexto, textoAFranjas } from './EntregaConfigEditor'
 import type { EntregaConfig } from '../../data/ops/entrega'
 
 vi.mock('../../lib/supabase', () => ({ hasSupabase: true, supabase: { rpc: vi.fn() } }))
 beforeEach(cleanup)
 const CFG: EntregaConfig = { corte: '15:30:00', foraneo_gratis_desde: 5000, foraneo_costo: 600, local_gratis_desde: 500, local_costo: 0, cp_local_desde: '80000', cp_local_hasta: '80299',
   dias_paqueteria: [1, 2, 3, 4, 5], dias_chofer: [1, 2, 3, 4, 5, 6], dias_entrega_foranea: [1, 2, 3, 4, 5], dhl_transito_min: 1, dhl_transito_max: 3, t1_activo: false, t1_transito_min: 2, t1_transito_max: 5,
-  local_mismo_dia: true, recoge_lugar: 'Sucursal Renovacell, Culiacán', recoge_horario: 'Lunes a sábado de 10:00 a 18:00' }
+  local_mismo_dia: true, recoge_lugar: 'Sucursal Renovacell, Culiacán', recoge_horario: 'Lunes a sábado de 10:00 a 18:00',
+  horario_franjas: [{ desde: '10:30', hasta: '13:30' }, { desde: '15:30', hasta: '17:30' }], horario_intervalo_min: 30, horario_cupo: 1, horario_margen_min: 60, horario_dias_adelante: 7 }
+
+describe('ENT-H · bloques de entrega ⇄ texto', () => {
+  it('convierte "10:30-13:30, 15:30-17:30" a bloques y de regreso; rechaza lo mal escrito', () => {
+    expect(textoAFranjas('10:30-13:30, 15:30-17:30')).toEqual([{ desde: '10:30', hasta: '13:30' }, { desde: '15:30', hasta: '17:30' }])
+    expect(textoAFranjas('9:00 a 10:00')).toEqual([{ desde: '09:00', hasta: '10:00' }])
+    expect(textoAFranjas('10:30-10:30')).toBeNull(); expect(textoAFranjas('25:00-26:00')).toBeNull(); expect(textoAFranjas('')).toBeNull()
+    expect(franjasATexto([{ desde: '10:30', hasta: '13:30' }, { desde: '15:30', hasta: '17:30' }])).toBe('10:30-13:30, 15:30-17:30')
+  })
+})
 
 describe('ENT-CFG · regla de entrega', () => {
   it('lee la regla, no deja guardar sin cambios, y manda al comando los valores como números con los días ordenados', async () => {
@@ -49,8 +59,13 @@ describe('ENT-CFG · regla de entrega', () => {
     expect((screen.getByLabelText('C.P. local hasta') as HTMLInputElement).value).toBe('80500')
   })
   it('validación: días vacíos, tránsito invertido y sucursal sin texto', () => {
-    const base = { corte: '15:30', foraneo_gratis_desde: '5000', foraneo_costo: '600', local_gratis_desde: '500', local_costo: '0', cp_local_desde: '80000', cp_local_hasta: '80299', dias_paqueteria: [1], dias_chofer: [1], dias_entrega_foranea: [1], dhl_transito_min: '1', dhl_transito_max: '3', t1_activo: false, t1_transito_min: '2', t1_transito_max: '5', local_mismo_dia: true, recoge_lugar: 'Sucursal', recoge_horario: '10 a 18' }
+    const base = { corte: '15:30', foraneo_gratis_desde: '5000', foraneo_costo: '600', local_gratis_desde: '500', local_costo: '0', cp_local_desde: '80000', cp_local_hasta: '80299', dias_paqueteria: [1], dias_chofer: [1], dias_entrega_foranea: [1], dhl_transito_min: '1', dhl_transito_max: '3', t1_activo: false, t1_transito_min: '2', t1_transito_max: '5', local_mismo_dia: true, recoge_lugar: 'Sucursal', recoge_horario: '10 a 18', horario_franjas: '10:30-13:30, 15:30-17:30', horario_intervalo_min: '30', horario_cupo: '1', horario_margen_min: '60', horario_dias_adelante: '7' }
     expect(validarEntrega(base)).toBeNull()
+    // ENT-H · bloques de entrega: forma HH:MM-HH:MM, fin después de inicio; cupo e intervalo acotados
+    expect(validarEntrega({ ...base, horario_franjas: '10:30-09:00' })).toMatch(/Bloques de entrega/)
+    expect(validarEntrega({ ...base, horario_franjas: 'mañana' })).toMatch(/Bloques de entrega/)
+    expect(validarEntrega({ ...base, horario_cupo: '0' })).toMatch(/por horario/)
+    expect(validarEntrega({ ...base, horario_intervalo_min: '5' })).toMatch(/intervalo/)
     expect(validarEntrega({ ...base, dias_chofer: [] })).toMatch(/chofer/)
     expect(validarEntrega({ ...base, dhl_transito_min: '4' })).toMatch(/DHL/)
     expect(validarEntrega({ ...base, foraneo_costo: '-1' })).toMatch(/costo foráneo/)

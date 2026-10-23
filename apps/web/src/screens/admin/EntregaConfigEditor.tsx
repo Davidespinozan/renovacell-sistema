@@ -14,12 +14,30 @@ interface Form {
   cp_local_desde: string; cp_local_hasta: string; dias_paqueteria: number[]; dias_chofer: number[]; dias_entrega_foranea: number[]
   dhl_transito_min: string; dhl_transito_max: string; t1_activo: boolean; t1_transito_min: string; t1_transito_max: string
   local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string
+  /** ENT-H · bloques "10:30-13:30, 15:30-17:30", intervalo, cupo, margen y días hacia adelante (texto mientras se edita). */
+  horario_franjas: string; horario_intervalo_min: string; horario_cupo: string; horario_margen_min: string; horario_dias_adelante: string
+}
+/** "10:30-13:30, 15:30-17:30" ⇄ [{desde,hasta}] */
+export function franjasATexto(f: Array<{ desde: string; hasta: string }> | null | undefined): string { return (f ?? []).map((x) => `${x.desde}-${x.hasta}`).join(', ') }
+export function textoAFranjas(s: string): Array<{ desde: string; hasta: string }> | null {
+  const partes = s.split(/[,;]+/).map((x) => x.trim()).filter(Boolean)
+  if (partes.length === 0 || partes.length > 6) return null
+  const out: Array<{ desde: string; hasta: string }> = []
+  for (const p of partes) {
+    const m = /^(\d{1,2}):(\d{2})\s*(?:-|–|a)\s*(\d{1,2}):(\d{2})$/.exec(p)
+    if (!m) return null
+    const desde = `${m[1].padStart(2, '0')}:${m[2]}`, hasta = `${m[3].padStart(2, '0')}:${m[4]}`
+    if (Number(m[1]) > 23 || Number(m[3]) > 23 || Number(m[2]) > 59 || Number(m[4]) > 59 || desde >= hasta) return null
+    out.push({ desde, hasta })
+  }
+  return out
 }
 const aForm = (c: EntregaConfig): Form => ({
   corte: String(c.corte).slice(0, 5), foraneo_gratis_desde: String(c.foraneo_gratis_desde), foraneo_costo: String(c.foraneo_costo), local_gratis_desde: String(c.local_gratis_desde), local_costo: String(c.local_costo),
   cp_local_desde: c.cp_local_desde, cp_local_hasta: c.cp_local_hasta, dias_paqueteria: [...c.dias_paqueteria], dias_chofer: [...c.dias_chofer], dias_entrega_foranea: [...c.dias_entrega_foranea],
   dhl_transito_min: String(c.dhl_transito_min), dhl_transito_max: String(c.dhl_transito_max), t1_activo: c.t1_activo, t1_transito_min: String(c.t1_transito_min), t1_transito_max: String(c.t1_transito_max),
   local_mismo_dia: c.local_mismo_dia, recoge_lugar: c.recoge_lugar, recoge_horario: c.recoge_horario,
+  horario_franjas: franjasATexto(c.horario_franjas), horario_intervalo_min: String(c.horario_intervalo_min ?? 30), horario_cupo: String(c.horario_cupo ?? 1), horario_margen_min: String(c.horario_margen_min ?? 60), horario_dias_adelante: String(c.horario_dias_adelante ?? 7),
 })
 const num = (s: string) => Number(String(s).replace(/[$,\s]/g, ''))
 const entero = (s: string, min: number, max: number) => { const n = Number(s); return Number.isInteger(n) && n >= min && n <= max }
@@ -37,6 +55,11 @@ export function validarEntrega(f: Form): string | null {
   if (!entero(f.dhl_transito_min, 0, 30) || !entero(f.dhl_transito_max, 0, 30) || Number(f.dhl_transito_min) > Number(f.dhl_transito_max)) return 'Tránsito DHL: días enteros de 0 a 30, mínimo ≤ máximo.'
   if (!entero(f.t1_transito_min, 0, 30) || !entero(f.t1_transito_max, 0, 30) || Number(f.t1_transito_min) > Number(f.t1_transito_max)) return 'Tránsito T1: días enteros de 0 a 30, mínimo ≤ máximo.'
   if (f.recoge_lugar.trim().length < 3 || f.recoge_horario.trim().length < 3) return 'Escribe dónde y a qué hora se recoge en sucursal.'
+  if (!textoAFranjas(f.horario_franjas)) return 'Bloques de entrega: escribe horas como "10:30-13:30, 15:30-17:30" (cada bloque termina después de empezar).'
+  if (!entero(f.horario_intervalo_min, 10, 120)) return 'El intervalo de los horarios de entrega va de 10 a 120 minutos.'
+  if (!entero(f.horario_cupo, 1, 20)) return 'Entregas por horario: de 1 a 20.'
+  if (!entero(f.horario_margen_min, 0, 480)) return 'El margen del mismo día va de 0 a 480 minutos.'
+  if (!entero(f.horario_dias_adelante, 1, 30)) return 'Días que se agendan hacia adelante: de 1 a 30.'
   return null
 }
 const aDatos = (f: Form): Partial<EntregaConfig> => ({
@@ -44,6 +67,7 @@ const aDatos = (f: Form): Partial<EntregaConfig> => ({
   cp_local_desde: f.cp_local_desde, cp_local_hasta: f.cp_local_hasta, dias_paqueteria: [...f.dias_paqueteria].sort(), dias_chofer: [...f.dias_chofer].sort(), dias_entrega_foranea: [...f.dias_entrega_foranea].sort(),
   dhl_transito_min: Number(f.dhl_transito_min), dhl_transito_max: Number(f.dhl_transito_max), t1_activo: f.t1_activo, t1_transito_min: Number(f.t1_transito_min), t1_transito_max: Number(f.t1_transito_max),
   local_mismo_dia: f.local_mismo_dia, recoge_lugar: f.recoge_lugar.trim(), recoge_horario: f.recoge_horario.trim(),
+  horario_franjas: textoAFranjas(f.horario_franjas) ?? undefined, horario_intervalo_min: Number(f.horario_intervalo_min), horario_cupo: Number(f.horario_cupo), horario_margen_min: Number(f.horario_margen_min), horario_dias_adelante: Number(f.horario_dias_adelante),
 })
 const diasTexto = (d: number[]) => d.length === 7 ? 'todos los días' : d.length === 0 ? 'ningún día' : [...d].sort().map((x) => NOMBRE_DIA[x]).join(', ')
 
@@ -116,6 +140,17 @@ export function EntregaConfigEditor({ ver = verConfigEntrega, guardar = guardarC
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
           <label style={{ fontSize: 12 }}>Dónde se recoge<input style={input} maxLength={200} value={f.recoge_lugar} onChange={texto('recoge_lugar')} aria-label="Lugar para recoger" placeholder="Sucursal Renovacell, calle y número, Culiacán" /></label>
           <label style={{ fontSize: 12 }}>Horario para recoger<input style={input} maxLength={200} value={f.recoge_horario} onChange={texto('recoge_horario')} aria-label="Horario para recoger" placeholder="Lunes a sábado de 10:00 a 18:00" /></label>
+        </div>
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }} data-testid="entrega-horarios-cfg">
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Horarios de entrega local (chofer)</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '2px 0 8px' }}>Al vender una entrega local se elige uno de estos horarios; al elegirlo se bloquea para los demás. Almacén, Chofer y Dirección los ven en "Horarios de entrega".</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, alignItems: 'end' }}>
+            <label style={{ fontSize: 12, gridColumn: 'span 2' }}>Bloques del día (HH:MM-HH:MM, separados por coma)<input style={input} value={f.horario_franjas} onChange={texto('horario_franjas')} aria-label="Bloques de entrega" placeholder="10:30-13:30, 15:30-17:30" /></label>
+            <label style={{ fontSize: 12 }}>Cada (minutos)<input style={input} type="number" min={10} max={120} step={5} value={f.horario_intervalo_min} onChange={texto('horario_intervalo_min')} aria-label="Intervalo de horarios" /></label>
+            <label style={{ fontSize: 12 }}>Entregas por horario<input style={input} type="number" min={1} max={20} value={f.horario_cupo} onChange={texto('horario_cupo')} aria-label="Entregas por horario" /></label>
+            <label style={{ fontSize: 12 }}>Mismo día: mínimo (min) antes del horario<input style={input} type="number" min={0} max={480} step={15} value={f.horario_margen_min} onChange={texto('horario_margen_min')} aria-label="Margen del mismo día" /></label>
+            <label style={{ fontSize: 12 }}>Días que se agendan hacia adelante<input style={input} type="number" min={1} max={30} value={f.horario_dias_adelante} onChange={texto('horario_dias_adelante')} aria-label="Días hacia adelante" /></label>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button className="btn" type="button" onClick={enviar} disabled={!!problema || ocupado || !dirty} data-testid="entrega-guardar"><Save size={15} /> {ocupado ? 'Guardando…' : 'Guardar regla de entrega'}</button>

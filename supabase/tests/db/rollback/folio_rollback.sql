@@ -1,6 +1,7 @@
 -- FOLIO · rollback (en capas: CC-6 depende de siguiente_folio y baja primero).
 begin;
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/cc6/99_down.sql
 \ir ../../../rollback/folio/99_down.sql

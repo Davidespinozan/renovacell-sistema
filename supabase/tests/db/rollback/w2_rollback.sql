@@ -8,6 +8,7 @@ begin;
 \ir ../../../rollback/cs1a_intentos/99_down.sql   -- CS-1A.1a (184): v_order_disponible depende de payment_entries; se baja primero
 -- W2-C se apoya en v_order_money, así que primero baja W2-C.
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/w2c/00_w2_snapshot.sql
 \ir ../../../rollback/w2c/99_down.sql

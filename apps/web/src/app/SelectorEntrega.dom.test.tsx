@@ -5,7 +5,7 @@ import React, { useState } from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { SelectorEntrega, eleccionCompleta } from './SelectorEntrega'
-import type { EleccionEntregaServidor, OpcionesEntrega } from '../data/ops/entrega'
+import type { EleccionEntregaServidor, HorariosDisponibles, OpcionesEntrega } from '../data/ops/entrega'
 
 vi.mock('../lib/supabase', () => ({ hasSupabase: true, supabase: { rpc: vi.fn() } }))
 beforeEach(cleanup)
@@ -25,12 +25,23 @@ const OPS: OpcionesEntrega = {
   ],
 }
 
+// ENT-H · horarios de entrega local del servidor (hoy 21 oct a las 14:00: la mañana ya pasó, 16:00 ocupado)
+const DISP: HorariosDisponibles = {
+  zona: 'America/Mazatlan', hoy: '2026-10-21', ahora: '14:00', salida: '2026-10-21', antes_de_corte: true, corte: '15:30', cupo: 1, intervalo_min: 30, margen_min: 60,
+  franjas: [{ desde: '10:30', hasta: '13:30' }, { desde: '15:30', hasta: '17:30' }],
+  dias: [{ fecha: '2026-10-21', dia_semana: 3, disponibles: 3, slots: [
+    { inicio: '10:30', fin: '11:00', ocupados: 0, cupo: 1, disponible: false, motivo: 'PASADO' }, { inicio: '15:30', fin: '16:00', ocupados: 0, cupo: 1, disponible: true, motivo: null },
+    { inicio: '16:00', fin: '16:30', ocupados: 1, cupo: 1, disponible: false, motivo: 'OCUPADO' }, { inicio: '16:30', fin: '17:00', ocupados: 0, cupo: 1, disponible: true, motivo: null }, { inicio: '17:00', fin: '17:30', ocupados: 0, cupo: 1, disponible: true, motivo: null },
+  ] }],
+}
+const cargarHorarios = async () => ({ ok: true as const, data: DISP })
+
 function Arnes({ cargar, subtotal = 1000, cp = '82000' as string | null }: { cargar: typeof import('../data/ops/entrega').opcionesEntrega; subtotal?: number; cp?: string | null }) {
   const [v, setV] = useState<EleccionEntregaServidor | null>(null)
   const [ops, setOps] = useState<OpcionesEntrega | null>(null)
   return (
     <div>
-      <SelectorEntrega subtotal={subtotal} cp={cp} value={v} onChange={(e, o) => { setV(e); setOps(o) }} cargar={cargar} />
+      <SelectorEntrega subtotal={subtotal} cp={cp} value={v} onChange={(e, o) => { setV(e); setOps(o) }} cargar={cargar} cargarHorarios={cargarHorarios} />
       <pre data-testid="valor">{JSON.stringify(v)}</pre>
       <span data-testid="completa">{String(eleccionCompleta(v, ops))}</span>
     </div>
@@ -69,6 +80,30 @@ describe('ENT-2 · SelectorEntrega', () => {
     fireEvent.click(screen.getByTestId('entrega-recoge'))
     expect(screen.getByTestId('valor')).toHaveTextContent('{"opcion":"recoge"}')
     expect(screen.getByTestId('entrega-corte')).toHaveTextContent(/Sucursal Renovacell, Culiacán · L–S/)
+  })
+  it('ENT-H · la entrega local exige horario: sin él la elección NO está completa; al elegirlo viaja {opcion, horario}; cambiar de opción lo suelta', async () => {
+    render(<Arnes cargar={async () => ({ ok: true, data: { ...OPS, cp: '80020', local: true, sugerida: 'local_chofer' } })} cp="80020" />)
+    await waitFor(() => expect(screen.getByTestId('entrega-local_chofer').querySelector('input')).toBeChecked())
+    expect(screen.getByTestId('valor')).toHaveTextContent('{"opcion":"local_chofer"}')
+    expect(screen.getByTestId('completa')).toHaveTextContent('false')   // falta el horario
+    expect(screen.getByTestId('entrega-horario')).toHaveTextContent(/elige uno para continuar/)
+    await waitFor(() => expect(screen.getByTestId('horario-2026-10-21-15:30')).toBeInTheDocument())
+    expect(screen.getByTestId('horario-2026-10-21-16:00')).toBeDisabled()   // ocupado por otro pedido
+    fireEvent.click(screen.getByTestId('horario-2026-10-21-15:30'))
+    expect(screen.getByTestId('valor')).toHaveTextContent('{"opcion":"local_chofer","horario":{"fecha":"2026-10-21","inicio":"15:30"}}')
+    expect(screen.getByTestId('completa')).toHaveTextContent('true')
+    expect(screen.getByTestId('entrega-local_chofer')).toHaveTextContent(/Llega hoy a las 15:30/)
+    // el ajuste de flete conserva el horario
+    fireEvent.click(screen.getByTestId('entrega-ajustar'))
+    fireEvent.change(screen.getByTestId('entrega-flete'), { target: { value: '150' } })
+    fireEvent.change(screen.getByTestId('entrega-motivo'), { target: { value: 'Zona lejana' } })
+    expect(screen.getByTestId('valor')).toHaveTextContent('"horario":{"fecha":"2026-10-21","inicio":"15:30"}')
+    expect(screen.getByTestId('completa')).toHaveTextContent('true')
+    // cambiar a recoger: sin horario, completa
+    fireEvent.click(screen.getByTestId('entrega-recoge'))
+    expect(screen.getByTestId('valor')).toHaveTextContent('{"opcion":"recoge"}')
+    expect(screen.queryByTestId('entrega-horario')).toBeNull()
+    expect(screen.getByTestId('completa')).toHaveTextContent('true')
   })
   it('si el servidor falla, se explica y la elección queda vacía (el pedido no se crea sin entrega)', async () => {
     render(<Arnes cargar={async () => ({ ok: false, error: 'sin red' })} />)

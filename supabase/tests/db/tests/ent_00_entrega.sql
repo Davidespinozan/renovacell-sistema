@@ -14,6 +14,7 @@ declare
   dir jsonb := '{"line1":"Av. del Mar 10","colonia":"Centro","cp":"82000","city":"Mazatlán","state":"Sinaloa","phone":"6691234567"}'::jsonb;
   dir_loc jsonb := '{"line1":"Blvd. Culiacán 100","colonia":"Centro","cp":"80020","city":"Culiacán","state":"Sinaloa","phone":"6671234567"}'::jsonb;
   lin jsonb; lin_chica jsonb; lin_grande jsonb;
+  f_h text; i_h text; hor jsonb; hor2 jsonb;   -- ENT-H (189): la entrega local por chofer exige un horario; se toma el primero disponible
   SIG text := 'public.crear_pedido_con_entrega(uuid,text,uuid,jsonb,jsonb,boolean,uuid,jsonb,jsonb)';
   function_count int;
 begin
@@ -26,6 +27,11 @@ begin
   lin := jsonb_build_array(jsonb_build_object('product_id', p, 'qty', 2));          -- 2,000
   lin_chica := jsonb_build_array(jsonb_build_object('product_id', p, 'qty', 1));    -- 1,000 (< 5,000 foráneo; ≥ 500 local)
   lin_grande := jsonb_build_array(jsonb_build_object('product_id', p, 'qty', 5));   -- 5,000 (envío gratis)
+  perform tests.act_as_owner();
+  perform tests.act_as(v_pos);
+  select dd ->> 'fecha', x ->> 'inicio' into f_h, i_h from jsonb_array_elements(public.entrega_horarios_disponibles() -> 'dias') dd, jsonb_array_elements(dd -> 'slots') x where (x ->> 'disponible')::boolean limit 1;
+  hor := jsonb_build_object('fecha', f_h, 'inicio', i_h);
+  select jsonb_build_object('fecha', dd ->> 'fecha', 'inicio', x ->> 'inicio') into hor2 from jsonb_array_elements(public.entrega_horarios_disponibles() -> 'dias') dd, jsonb_array_elements(dd -> 'slots') x where (x ->> 'disponible')::boolean offset 1 limit 1;   -- otro horario (el cupo es 1)
   perform tests.act_as_owner();
 
   -- ══ 0 · forma y permisos ════════════════════════════════════════════════════════════════════════
@@ -145,7 +151,7 @@ begin
   perform tests.act_as(v_pos);
   perform tests.throws(format('select public.crear_pedido_con_entrega(%L, null, null, %L, %L, true, %L, null, ''{"opcion":"foraneo_dhl"}'')', gen_random_uuid(), lin, jsonb_build_object('address', dir), cu), 'DATOS_FISCALES_REQUERIDOS', '3.18 · con factura sin receptor: la regla de la 147 sigue');
   -- el personal también puede pedir a nombre de un doctor con la regla del personal (elige él)
-  r := public.crear_pedido_con_entrega(gen_random_uuid(), null, v_doc, lin_chica, jsonb_build_object('address', dir), false, cuD, null, '{"opcion":"local_chofer"}');
+  r := public.crear_pedido_con_entrega(gen_random_uuid(), null, v_doc, lin_chica, jsonb_build_object('address', dir), false, cuD, null, jsonb_build_object('opcion', 'local_chofer', 'horario', hor));   -- ENT-H: con horario
   perform tests.ok(r -> 'entrega' ->> 'actor' = 'staff' and (r ->> 'envio')::numeric = 0, '3.19 · a nombre de un doctor: el personal decide (chofer a Mazatlán, bajo su responsabilidad)');
 
   -- ══ 4 · el doctor por el flujo directo: la regla estricta ═════════════════════════════════════════
@@ -199,7 +205,7 @@ begin
   update public.doctor_locations set active = true where doctor_id = v_doc2;
   cart := (public.cc_carrito_abrir('doctor', null, v_doc2) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(cart, 'doctor', null, v_doc2, p, 1, 'e3');
   perform tests.act_as(v_doc2);
-  r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"local_chofer"}');
+  r := public.cc_checkout_revisar(cart, null, null, jsonb_build_object('opcion', 'local_chofer', 'horario', hor2));   -- ENT-H: con horario
   perform tests.ok((r ->> 'listo')::boolean and (r ->> 'envio')::numeric = 0 and (r -> 'entrega' ->> 'local')::boolean and r -> 'entrega_opciones' ->> 'sugerida' = 'local_chofer', '5.11 · doctor de Culiacán: chofer gratis');
 
   -- ══ 6 · configuración por Dirección ═══════════════════════════════════════════════════════════════

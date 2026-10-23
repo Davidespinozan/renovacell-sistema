@@ -104,6 +104,7 @@ export const ROLES: RoleDef[] = [
       { key: 'guia', label: 'Guías', icon: 'truck', section: 'Pedidos y envíos' },
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Pedidos y envíos' },
+      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Pedidos y envíos' },   // ENT-H · agenda de entregas locales por horario
     ],
   },
   {
@@ -122,6 +123,7 @@ export const ROLES: RoleDef[] = [
     icon: 'truck', isStaff: true, ready: true, requiresFeature: 'chofer',
     modules: [
       { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
+      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock' },   // ENT-H · el chofer ve a qué hora se prometió cada entrega local
     ],
   },
 ]

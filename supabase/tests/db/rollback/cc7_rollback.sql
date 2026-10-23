@@ -3,6 +3,7 @@ begin;
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
 \ir ../../../rollback/reparto_asesores/99_down.sql   -- REPARTO (181) se baja primero (redefine _cc_rutear/evaluador/_cc_atencion/config_ver/iniciar/resumen)
+\ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/cartera_p1/99_down.sql   -- CARTERA-P1 (131) se baja primero
 \ir ../../../rollback/chatv2d1/99_down.sql   -- CHAT V2-D1 (130) se baja primero

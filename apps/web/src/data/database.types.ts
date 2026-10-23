@@ -3732,6 +3732,11 @@ export type Database = {
           dias_paqueteria: number[]
           foraneo_costo: number
           foraneo_gratis_desde: number
+          horario_cupo: number
+          horario_dias_adelante: number
+          horario_franjas: Json
+          horario_intervalo_min: number
+          horario_margen_min: number
           id: number
           local_costo: number
           local_gratis_desde: number
@@ -8220,6 +8225,12 @@ export type Database = {
       promos_vigentes: { Args: never; Returns: Json }
       entrega_config_guardar: { Args: { p: Json }; Returns: Json }
       entrega_config_ver: { Args: never; Returns: Json }
+      entrega_horarios_disponibles: { Args: { p_ahora?: string }; Returns: Json }
+      entrega_horarios_agenda: { Args: { p_desde?: string; p_hasta?: string }; Returns: Json }
+      entrega_horario_reprogramar: {
+        Args: { p_fecha: string; p_inicio: string; p_motivo: string; p_order: string }
+        Returns: Json
+      }
       entrega_opciones: {
         Args: {
           p_actor: string

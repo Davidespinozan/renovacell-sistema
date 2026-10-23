@@ -3,14 +3,20 @@
 // (o regalarlo), lo escribe con su motivo. Nunca se inventa una fecha: todo viene de entrega_opciones.
 import React, { useEffect, useRef, useState } from 'react'
 import { money } from '../lib/format'
-import { MOTIVO_ENTREGA, fleteTexto, opcionDe, opcionesEntrega, promesaDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../data/ops/entrega'
+import { MOTIVO_ENTREGA, fleteTexto, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega } from '../data/ops/entrega'
+import { HorarioEntregaPicker } from './HorarioEntregaPicker'
 
-export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega }: {
+/** ENT-H · el horario elegido viaja solo cuando existe (sin la llave en null). */
+const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido } => (v?.horario ? { horario: v.horario } : {})
+
+export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios }: {
   subtotal: number
   cp: string | null
   value: EleccionEntregaServidor | null
   onChange: (e: EleccionEntregaServidor | null, ops: OpcionesEntrega | null) => void
   cargar?: typeof opcionesEntrega
+  /** ENT-H · horarios de entrega local (inyectable en pruebas). */
+  cargarHorarios?: React.ComponentProps<typeof HorarioEntregaPicker>['cargar']
 }) {
   const [ops, setOps] = useState<OpcionesEntrega | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +42,8 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
       const id = actual && actual.permitido && actual.disponible ? actual.id : r.data.sugerida ?? r.data.opciones.find((o) => o.permitido && o.disponible)?.id ?? null
       if (!id) { onChange(null, r.data); return }
       const o = opcionDe(r.data, id)!
-      if (value?.opcion === id && value.flete != null && value.flete !== o.flete) onChange({ opcion: id, flete: value.flete, motivo: value.motivo }, r.data)   // ajuste conservado
+      if (value?.opcion === id && value.flete != null && value.flete !== o.flete) onChange({ opcion: id, flete: value.flete, motivo: value.motivo, ...hor(value) }, r.data)   // ajuste conservado
+      else if (value?.opcion === id) onChange({ opcion: id, ...hor(value) }, r.data)   // ENT-H · el horario elegido se conserva
       else { onChange({ opcion: id }, r.data); setAjustar(false); setFleteTxt(''); setMotivo('') }
     }, 250)
     return () => clearTimeout(t)
@@ -48,10 +55,13 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
   const aplicarAjuste = (txt: string, mot: string) => {
     if (!sel) return
     const n = Number(txt)
-    if (txt.trim() === '' || !Number.isFinite(n) || n < 0) { onChange({ opcion: sel.id }, ops); return }
-    if (Math.round(n * 100) === Math.round(sel.flete * 100)) { onChange({ opcion: sel.id }, ops); return }
-    onChange({ opcion: sel.id, flete: Math.round(n * 100) / 100, motivo: mot.trim() }, ops)
+    if (txt.trim() === '' || !Number.isFinite(n) || n < 0) { onChange({ opcion: sel.id, ...hor(value) }, ops); return }
+    if (Math.round(n * 100) === Math.round(sel.flete * 100)) { onChange({ opcion: sel.id, ...hor(value) }, ops); return }
+    onChange({ opcion: sel.id, flete: Math.round(n * 100) / 100, motivo: mot.trim(), ...hor(value) }, ops)
   }
+  // ENT-H · el horario viaja junto con la opción (solo entrega local por chofer); cambiar de opción lo suelta.
+  const elegirHorario = (h: HorarioElegido | null) => { if (!sel) return; const { horario: _h, ...resto } = value ?? { opcion: sel.id }; void _h; onChange({ ...resto, opcion: sel.id, ...(h ? { horario: h } : {}) }, ops) }
+  const necesitaHorario = requiereHorario(sel)
   const ajusteIncompleto = value != null && value.flete != null && sel != null && value.flete !== sel.flete && !(value.motivo && value.motivo.trim().length >= 3)
 
   if (error) {
@@ -74,7 +84,7 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
               <span style={{ flex: 1 }}>
                 <b style={{ display: 'block', fontSize: 13 }}>{o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
                 <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  {puede ? promesaDe(o, hoy) : !o.disponible ? 'Pendiente de integrar' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica'}
+                  {puede ? (requiereHorario(o) ? (on && value?.horario ? promesaDe({ ...o, horario: { ...value.horario, fin: '' } }, hoy) : 'Se agenda en un horario de media hora') : promesaDe(o, hoy)) : !o.disponible ? 'Pendiente de integrar' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica'}
                   {fueraZona && puede ? ' · el CP no es de Culiacán: confirma que el chofer sí llega' : ''}
                 </span>
               </span>
@@ -82,6 +92,12 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
           )
         })}
       </div>
+      {sel && necesitaHorario && (
+        <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (value?.horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="entrega-horario">
+          <div className="eyebrow" style={{ margin: '0 0 8px' }}>Horario de entrega {!value?.horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige uno para continuar</span>}</div>
+          <HorarioEntregaPicker value={value?.horario ?? null} onChange={elegirHorario} cargar={cargarHorarios} compacto />
+        </div>
+      )}
       {sel && (
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5 }}>
           <span style={{ color: 'var(--ink-3)' }} data-testid="entrega-corte">
@@ -119,6 +135,7 @@ export function eleccionCompleta(value: EleccionEntregaServidor | null, ops: Opc
   if (!value || !ops) return false
   const o = opcionDe(ops, value.opcion)
   if (!o || !o.permitido || !o.disponible) return false
-  if (value.flete != null && value.flete !== o.flete) return !!value.motivo && value.motivo.trim().length >= 3
+  if (value.flete != null && value.flete !== o.flete && !(value.motivo && value.motivo.trim().length >= 3)) return false
+  if (requiereHorario(o) && !(value.horario && value.horario.fecha && value.horario.inicio)) return false   // ENT-H · la entrega local exige horario
   return true
 }

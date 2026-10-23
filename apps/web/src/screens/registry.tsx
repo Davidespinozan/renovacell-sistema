@@ -26,6 +26,7 @@ import { Guias } from './packing/Guias'
 import { Seguimiento } from './logistics/Seguimiento'
 import { Despacho } from './logistics/Despacho'
 import { MisEntregas } from './driver/MisEntregas'
+import { AgendaEntregas } from './logistics/AgendaEntregas'
 // Pantallas con recharts: lazy para que la librería no cargue hasta abrirlas.
 const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ default: m.Tablero })))
 const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default: m.Ventas })))
@@ -89,6 +90,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   seguimiento: () => <Seguimiento />,
   despacho: () => <Despacho />,
   driver_home: () => <MisEntregas />,
+  agenda_entregas: () => <AgendaEntregas />,   // ENT-H · Almacén y Chofer (Dirección la ve como pestaña de Envíos)
   tablero: () => <Tablero />,
   av_ventas: () => <Ventas />,
   av_traza: () => <Trazabilidad />,
@@ -132,7 +134,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }]} />,
   g_inventario: () => <Pestanas grupo="g_inventario" pestanas={[{ key: 'av_traza', label: 'Trazabilidad', render: () => <Trazabilidad /> }, { key: 'av_mermas', label: 'Mermas', render: () => <Mermas /> }, { key: 'av_control_inv', label: 'Control de inventario', render: () => <ControlInventario /> }, { key: 'av_custodias', label: 'Custodias', render: () => <Custodias /> }]} />,
-  g_envios: () => <Pestanas grupo="g_envios" pestanas={[{ key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }]} />,
+  g_envios: () => <Pestanas grupo="g_envios" pestanas={[{ key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'agenda_entregas', label: 'Horarios de entrega', render: () => <AgendaEntregas sinTitulo /> }]} />,
   g_finanzas: () => <Pestanas grupo="g_finanzas" pestanas={[{ key: 'av_finanzas', label: 'Finanzas', render: () => <Finanzas /> }, { key: 'av_cierre', label: 'Cierre de caja', render: () => <CierreCaja /> }]} />,
   g_cobros: () => <Pestanas grupo="g_cobros" pestanas={[{ key: 'av_pagos', label: 'Pagos por validar', render: () => <PagosPorValidar /> }, { key: 'av_revision', label: 'Revisión económica', render: () => <RevisionEconomica /> }]} />,
   g_facturacion: () => <Pestanas grupo="g_facturacion" pestanas={[{ key: 'av_fin', label: 'Facturación', render: () => <Facturacion /> }, { key: 'av_fiscal', label: 'Revisión fiscal', render: () => <RevisionFiscal /> }]} />,
