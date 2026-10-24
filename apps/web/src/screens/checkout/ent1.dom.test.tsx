@@ -76,9 +76,8 @@ describe('ENT-1 · entrega en el checkout', () => {
     const dhl = screen.getByTestId('entrega-foraneo_dhl')
     await waitFor(() => expect(dhl.querySelector('input')).toBeChecked())   // la sugerida se preselecciona al llegar las opciones
     expect(dhl).toHaveTextContent(/\$600/); expect(dhl).toHaveTextContent(/Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct/)
-    expect(screen.getByTestId('entrega-local_chofer')).toHaveTextContent(/fuera de la zona de entrega local/)   // CX-V2-A · causa real, no el código
-    expect(screen.getByTestId('entrega-local_chofer').querySelector('input')).toBeDisabled()
-    expect(screen.getByTestId('entrega-foraneo_t1')).toHaveTextContent(/Próximamente/)
+    expect(screen.queryByTestId('entrega-local_chofer')).toBeNull()   // CX-V2-B · fuera de zona: no ocupa tarjeta
+    expect(screen.queryByTestId('entrega-foraneo_t1')).toBeNull()     // CX-V2-B · T1 inactivo: oculto
     expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/\$600/)
     expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,650/)
     expect(screen.getByTestId('checkout-corte')).toHaveTextContent(/antes de las 15:30 salen el mismo día/)
@@ -123,7 +122,8 @@ describe('ENT-1 · entrega en el checkout', () => {
     await waitFor(() => expect(screen.getByTestId('checkout-entrega')).toBeInTheDocument())
     fireEvent.click(screen.getByTestId('entrega-recoge'))
     expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,050/)
-    expect(screen.getByTestId('checkout-corte')).toHaveTextContent(/Sucursal Renovacell, Culiacán · Lunes a sábado/)
+    expect(screen.getByTestId('entrega-recoge')).toHaveTextContent(/Lunes a sábado de 10:00 a 18:00/)   // CX-V2-B · el horario va en la tarjeta, una vez
+    expect(screen.queryByTestId('checkout-corte')).toBeNull()
     fireEvent.click(screen.getByTestId('checkout-crear'))
     await waitFor(() => expect(screen.getByTestId('checkout-exito')).toBeInTheDocument())
     expect(rev[rev.length - 1].entrega).toBe('recoge')

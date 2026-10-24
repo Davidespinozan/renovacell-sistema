@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-// CX-V2-A · experiencia de entrega en el checkout del doctor: mínimo y faltante con los números del servidor, botón para
-// agregar productos (carrito intacto), recálculo al cambiar de dirección, la elección se conserva mientras sea válida y, si
-// deja de serlo, se avisa y se exige elegir (nunca cambia sola a recoger); causas reales para local, DHL y T1; total del servidor.
+// CX-V2-A/B · checkout del doctor: solo las alternativas relevantes, faltante con los números del servidor explicado una vez,
+// "Agregar productos" (carrito intacto), recálculo al cambiar de dirección, elección conservada mientras sea válida y, si deja
+// de serlo, aviso y nueva elección (nunca cambia sola a recoger); dirección solo cuando corresponde; total del servidor junto
+// al botón con desglose cuando hay envío con costo.
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
@@ -21,16 +22,18 @@ const MAZATLAN = { id: 'L2', doctor_id: 'D1', name: 'Casa', line1: 'Av. del Mar 
 const CP: Record<string, string> = { L1: '80020', L2: '82000' }
 beforeEach(() => { cleanup(); h.ubicaciones = [CULIACAN, MAZATLAN] })
 
-/** Servidor simulado: devuelve las opciones según el CP de la ubicación revisada y el importe vigente del carrito. */
+/** Servidor simulado: opciones según el CP de la ubicación revisada y el importe vigente del carrito. */
 function montar(subtotal: () => number, onClose = vi.fn()) {
   const rev: Array<{ loc: string | null | undefined; entrega: string | null | undefined }> = []
-  const linea = () => ({ product_id: 'P1', qty: subtotal() / 350, nombre: 'Golden Placenta Mask', precio_unitario: 350, subtotal: subtotal() })
+  const linea = () => ({ product_id: 'P1', qty: Math.max(1, Math.round(subtotal() / 350)), nombre: 'Golden Placenta Mask', precio_unitario: 350, subtotal: subtotal() })
   const cliente = {
     revisarCheckout: async (_c: string, loc?: string | null, _dir?: unknown, entrega?: string | null, horario?: { fecha: string; inicio: string } | null) => {
       rev.push({ loc, entrega })
-      const ops: OpcionesEntrega = opsPara(loc ? CP[loc] ?? null : h.ubicaciones.length ? CP.L1 : null, subtotal())   // sin ubicación elegida el servidor usa la predeterminada (si existe)
+      const us = h.ubicaciones as Array<{ id: string; is_default: boolean }>
+      const pred = us.length ? (us.find((u) => u.is_default) ?? us[0]).id : null
+      const dir = loc ?? pred   // sin ubicación elegida el servidor usa la predeterminada (si existe)
+      const ops: OpcionesEntrega = opsPara(dir ? CP[dir] ?? null : null, subtotal())
       const o = entrega ? ops.opciones.find((x) => x.id === entrega) : null
-      const dir = loc ?? (h.ubicaciones.length ? 'L1' : null)   // el servidor usa la predeterminada si no se eligió ninguna
       const sin: RevisionCheckout = { listo: false, cart_id: 'K', cart_rev: 1, total: subtotal(), moneda: 'MXN', lineas: [linea()], problemas: ['REQUIERE_ENTREGA'], entrega: null, entrega_opciones: ops, direccion: dir ? { location_id: dir, address: { line1: 'x', cp: CP[dir] } } : null }
       if (!o || !o.permitido || !o.disponible) return { ok: true as const, data: sin }
       if (o.tipo === 'local' && !horario) return { ok: true as const, data: { ...sin, problemas: ['HORARIO_REQUERIDO'] } }
@@ -44,92 +47,136 @@ function montar(subtotal: () => number, onClose = vi.fn()) {
 }
 const texto = (id: string) => screen.getByTestId(`entrega-${id}-texto`).textContent ?? ''
 const chip = (id: string) => screen.getByTestId(`entrega-${id}-chip`).textContent ?? ''
-const marcado = (id: string) => (screen.getByTestId(`entrega-${id}`).querySelector('input') as HTMLInputElement).checked
+const radio = (id: string) => screen.getByTestId(`entrega-${id}`).querySelector('input') as HTMLInputElement | null
+const marcado = (id: string) => !!screen.queryByTestId(`entrega-${id}`) && !!radio(id)?.checked
+const visible = (id: string) => (screen.getByTestId(id) as HTMLElement).style.display !== 'none'
 
-describe('CX-V2-A · pedido local de $350', () => {
-  it('explica el mínimo y el faltante con los números del servidor, DHL y T1 con su causa real, recoger como única opción y total $350', async () => {
+describe('1 · local $350', () => {
+  it('recoger gratis seleccionado; entrega a domicilio "Gratis desde $500" con "Agrega $150" y UNA acción; DHL y T1 no ocupan tarjeta; total $350 sin desglose', async () => {
     const { onClose } = montar(() => 350)
-    await waitFor(() => expect(screen.getByTestId('checkout-entrega')).toBeInTheDocument())
     await waitFor(() => expect(marcado('recoge')).toBe(true))
+    expect(chip('recoge')).toBe('Gratis')
+    expect(texto('recoge')).toBe('Listo para recoger hoy · Lunes a sábado de 10:00 a 18:00')
     expect(chip('local_chofer')).toBe('Gratis desde $500')
-    expect(texto('local_chofer')).toBe('Gratis desde $500. Llevas $350 en productos: te faltan $150 para la entrega a tu domicilio.')
-    expect(chip('foraneo_dhl')).toBe('No aplica en tu zona')
-    expect(texto('foraneo_dhl')).toMatch(/Dentro de Culiacán entregamos con nuestro chofer/)
-    expect(chip('foraneo_t1')).toBe('Próximamente')
-    expect(texto('recoge')).toMatch(/No usaremos tu dirección de entrega/)
-    expect(screen.getByTestId('checkout-entrega-unica')).toHaveTextContent(/única forma de entrega/)
-    expect(screen.getByTestId('checkout-direccion-nota')).toHaveTextContent(/no usaremos esta dirección/)
-    expect(screen.getByTestId('checkout-productos')).toHaveTextContent(/\$350/)
-    expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/Gratis/)
+    expect(texto('local_chofer')).toBe('Agrega $150 en productos para recibirlo gratis')
+    expect(radio('local_chofer')).toBeNull()   // visible pero no habilitada: sin radio, distinta de la seleccionada
+    expect(screen.queryByTestId('entrega-foraneo_dhl')).toBeNull()
+    expect(screen.queryByTestId('entrega-foraneo_t1')).toBeNull()
+    expect(screen.getAllByTestId('checkout-agregar')).toHaveLength(1)
+    expect(screen.getByTestId('checkout-entrega').textContent?.match(/\$150/g)).toHaveLength(1)   // el faltante se dice una vez
+    expect(screen.getByTestId('checkout-direccion-nota')).toHaveTextContent('No se usa para recoger en sucursal.')
+    expect(screen.getByTestId('checkout-direccion-resumen')).toHaveTextContent(/Blvd\. Pedro Infante 100/)
+    expect(screen.queryByTestId('checkout-corte')).toBeNull()
+    expect(screen.queryByTestId('checkout-desglose')).toBeNull()
     expect(screen.getByTestId('checkout-total')).toHaveTextContent('$350')
-    expect(screen.getByTestId('checkout-crear')).not.toBeDisabled()   // recoger no bloquea el checkout
-    // el botón regresa al catálogo (cierra el checkout) y el texto promete que el carrito se conserva
-    expect(screen.getByTestId('checkout-faltante')).toHaveTextContent(/Te faltan \$150 para el envío gratis \(desde \$500\)\. Tu carrito se conserva\./)
+    expect(screen.getByTestId('checkout-crear')).not.toBeDisabled()
+    // 9 · agregar productos regresa al catálogo (cierra el checkout; el carrito vive en el servidor)
     fireEvent.click(screen.getByTestId('checkout-agregar'))
     expect(onClose).toHaveBeenCalledTimes(1)
-    // nada de texto fijo del cliente: el texto viejo ya no aparece
-    expect(screen.getByTestId('checkout-entrega').textContent).not.toMatch(/a partir del mínimo|No aplica para este pedido/)
+    expect(marcado('recoge')).toBe(true)   // pulsar la acción no cambió la selección
   })
-  it('al reabrir con $500 (el carrito alcanzó el mínimo): entrega local gratis preseleccionada, sin llamada a agregar', async () => {
-    let sub = 350
-    montar(() => sub)
-    await waitFor(() => expect(marcado('recoge')).toBe(true))
-    cleanup(); sub = 500
-    montar(() => sub)
-    await waitFor(() => expect(screen.getByTestId('checkout-entrega')).toBeInTheDocument())
+})
+
+describe('2 · local $500 (el carrito alcanzó el mínimo)', () => {
+  it('entrega a domicilio gratis preseleccionada (sugerida), sin acción de agregar; total $500', async () => {
+    montar(() => 500)
     await waitFor(() => expect(marcado('local_chofer')).toBe(true))
     expect(chip('local_chofer')).toBe('Gratis')
     expect(texto('local_chofer')).toBe('Eliges un horario de media hora')
-    expect(screen.queryByTestId('checkout-faltante')).toBeNull()
-    expect(screen.queryByTestId('checkout-entrega-unica')).toBeNull()
+    expect(screen.queryByTestId('checkout-agregar')).toBeNull()
+    expect(screen.getByTestId('checkout-corte')).toHaveTextContent('Pedidos antes de las 15:30 salen el mismo día.')
+    expect(screen.queryByTestId('checkout-direccion-nota')).toBeNull()
     expect(screen.getByTestId('checkout-total')).toHaveTextContent('$500')
   })
 })
 
-describe('CX-V2-A · cambio de dirección', () => {
-  it('de Culiacán ($500, chofer) a Mazatlán: recalcula en el servidor, chofer deja de ser válido → aviso y sin selección; el doctor elige DHL y ve $600 y el total $1,100', async () => {
+describe('3/4 · cambio de dirección', () => {
+  it('local → foránea: recalcula, la entrega a domicilio deja de valer → aviso y sin selección; el doctor elige DHL $600; desglose y total $1,100', async () => {
     const { rev } = montar(() => 500)
     await waitFor(() => expect(marcado('local_chofer')).toBe(true))
+    fireEvent.click(screen.getByTestId('checkout-direccion-cambiar'))
     const n = rev.length
-    fireEvent.click(screen.getAllByText(/Casa/)[0])   // ubicación L2 (Mazatlán) en el selector
+    fireEvent.click(screen.getAllByText(/Casa/)[0])
     await waitFor(() => expect(rev.length).toBeGreaterThan(n))
     expect(rev[rev.length - 1]).toMatchObject({ loc: 'L2' })
-    await waitFor(() => expect(screen.getByTestId('checkout-entrega-aviso')).toBeInTheDocument())
-    expect(screen.getByTestId('checkout-entrega-aviso')).toHaveTextContent(/Tu pedido ya no cumple para Entrega local \(chofer de Renovacell\) \(la dirección cambió de zona\)\. Elige otra forma de entrega\./)
-    expect(marcado('local_chofer')).toBe(false); expect(marcado('recoge')).toBe(false); expect(marcado('foraneo_dhl')).toBe(false)
-    expect(screen.getByTestId('checkout-crear')).toBeDisabled()   // sin elección no hay pedido
-    expect(chip('local_chofer')).toBe('Fuera de zona')
+    await waitFor(() => expect(screen.getByTestId('checkout-entrega-aviso')).toHaveTextContent('Entrega a domicilio: no aplica para esta dirección. Elige otra opción.'))
+    expect(screen.queryByTestId('entrega-local_chofer')).toBeNull()
+    expect(marcado('recoge')).toBe(false); expect(marcado('foraneo_dhl')).toBe(false)   // nada se eligió en silencio
+    expect(screen.getByTestId('checkout-crear')).toBeDisabled()
     expect(chip('foraneo_dhl')).toBe('$600')
-    expect(texto('foraneo_dhl')).toMatch(/Gratis desde \$5,000: te faltan \$4,500\./)
+    expect(screen.getByTestId('entrega-foraneo_dhl-nota')).toHaveTextContent('Gratis desde $5,000 · agrega $4,500')
     fireEvent.click(screen.getByTestId('entrega-foraneo_dhl'))
     expect(screen.queryByTestId('checkout-entrega-aviso')).toBeNull()
-    expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/\$600/)
+    expect(screen.getByTestId('checkout-productos')).toHaveTextContent('$500')
+    expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/DHL.*\$600/)
     expect(screen.getByTestId('checkout-total')).toHaveTextContent('$1,100')
-    expect(screen.getByTestId('checkout-faltante')).toHaveTextContent(/Agregar productos para envío gratis/)
     await waitFor(() => expect(screen.getByTestId('checkout-crear')).not.toBeDisabled())
   })
-  it('de Mazatlán a Culiacán conservando "recoger": la elección válida se mantiene sin aviso', async () => {
+  it('foránea → local conservando "recoger": la elección válida se mantiene sin aviso; DHL desaparece', async () => {
     h.ubicaciones = [{ ...MAZATLAN, is_default: true }, { ...CULIACAN, is_default: false }]
     const { rev } = montar(() => 500)
-    await waitFor(() => expect(marcado('foraneo_dhl')).toBe(true))   // sugerida del servidor fuera de Culiacán
+    await waitFor(() => expect(marcado('foraneo_dhl')).toBe(true))
     fireEvent.click(screen.getByTestId('entrega-recoge'))
     expect(marcado('recoge')).toBe(true)
+    fireEvent.click(screen.getByTestId('checkout-direccion-cambiar'))
     const n = rev.length
     fireEvent.click(screen.getAllByText(/Consultorio/)[0])
     await waitFor(() => expect(rev.length).toBeGreaterThan(n))
-    await waitFor(() => expect(chip('local_chofer')).toBe('Gratis'))   // llegaron las opciones de Culiacán
+    await waitFor(() => expect(screen.getByTestId('entrega-local_chofer')).toBeInTheDocument())
     expect(marcado('recoge')).toBe(true)
     expect(screen.queryByTestId('checkout-entrega-aviso')).toBeNull()
-    expect(chip('foraneo_dhl')).toBe('No aplica en tu zona')
+    expect(screen.queryByTestId('entrega-foraneo_dhl')).toBeNull()
   })
 })
 
-describe('CX-V2-A · sin dirección', () => {
-  it('las opciones a domicilio piden dirección, recoger queda disponible y el checkout no se bloquea', async () => {
+describe('5/6 · DHL foráneo', () => {
+  it('con costo ($1,050): DHL $600 preseleccionado, faltante una vez en la tarjeta, desglose Productos/Envío y total $1,650', async () => {
+    h.ubicaciones = [{ ...MAZATLAN, is_default: true }]
+    montar(() => 1050)
+    await waitFor(() => expect(marcado('foraneo_dhl')).toBe(true))
+    expect(screen.getByTestId('entrega-foraneo_dhl-nota')).toHaveTextContent('Gratis desde $5,000 · agrega $3,950')
+    expect(screen.getAllByTestId('checkout-agregar')).toHaveLength(1)
+    expect(screen.getByTestId('checkout-productos')).toHaveTextContent('$1,050')
+    expect(screen.getByTestId('checkout-envio')).toHaveTextContent('$600')
+    expect(screen.getByTestId('checkout-total')).toHaveTextContent('$1,650')
+  })
+  it('gratis ($5,000): DHL "Gratis", sin nota ni acción, sin desglose; total $5,000', async () => {
+    h.ubicaciones = [{ ...MAZATLAN, is_default: true }]
+    montar(() => 5000)
+    await waitFor(() => expect(marcado('foraneo_dhl')).toBe(true))
+    expect(chip('foraneo_dhl')).toBe('Gratis')
+    expect(screen.queryByTestId('entrega-foraneo_dhl-nota')).toBeNull()
+    expect(screen.queryByTestId('checkout-agregar')).toBeNull()
+    expect(screen.queryByTestId('checkout-desglose')).toBeNull()
+    expect(screen.getByTestId('checkout-total')).toHaveTextContent('$5,000')
+  })
+})
+
+describe('7 · sin dirección', () => {
+  it('recoger seleccionado; una tarjeta "Entrega a domicilio" pide la dirección; el formulario queda plegado hasta pulsar "Agregar dirección"', async () => {
     h.ubicaciones = []
     montar(() => 350)
-    await waitFor(() => expect(screen.getByTestId('checkout-entrega')).toBeInTheDocument())
-    // El servidor sin ubicación usa la predeterminada si existe; aquí no hay ninguna → simulamos su respuesta sin CP
-    expect(screen.getByTestId('checkout-direccion-falta')).toHaveTextContent(/agrega una dirección/)
+    await waitFor(() => expect(marcado('recoge')).toBe(true))
+    expect(texto('local_chofer')).toBe('Agrega una dirección para ver si te lo llevamos')
+    expect(radio('local_chofer')).toBeNull()
+    expect(visible('checkout-direccion')).toBe(false)
+    expect(screen.getByTestId('checkout-crear')).not.toBeDisabled()   // recoger no exige dirección
+    fireEvent.click(screen.getByTestId('checkout-agregar-direccion'))
+    expect(visible('checkout-direccion')).toBe(true)
+    expect(marcado('recoge')).toBe(true)
+  })
+})
+
+describe('8 · modalidad que deja de ser válida', () => {
+  it('nunca se confirma una modalidad inválida: tras el aviso el botón sigue bloqueado hasta elegir', async () => {
+    const { rev } = montar(() => 500)
+    await waitFor(() => expect(marcado('local_chofer')).toBe(true))
+    fireEvent.click(screen.getByTestId('checkout-direccion-cambiar'))
+    fireEvent.click(screen.getAllByText(/Casa/)[0])
+    await waitFor(() => expect(screen.getByTestId('checkout-entrega-aviso')).toBeInTheDocument())
+    const n = rev.length
+    fireEvent.click(screen.getByTestId('checkout-crear'))
+    expect(rev.length).toBe(n)   // ni siquiera se intenta revisar/confirmar
+    expect(screen.queryByTestId('checkout-exito')).toBeNull()
   })
 })
