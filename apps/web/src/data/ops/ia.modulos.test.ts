@@ -51,8 +51,8 @@ describe('política', () => {
 
 describe('herramientas', () => {
   const ctxV = { conCuenta: false, idsAutorizados: new Set([A]) }; const ctxD = { conCuenta: true, idsAutorizados: new Set([A, B]) }
-  it('registro cerrado: 16 nombres (9 CC-4 + 6 CC-5 + preparar_checkout CC-6; NO existe confirmar), esquemas estrictos; pedidos solo con cuenta', () => {
-    expect(HERRAMIENTAS.map((h) => h.name).sort()).toEqual(['actualizar_carrito', 'agregar_al_carrito', 'buscar_conocimiento', 'buscar_productos', 'candidatos_comerciales', 'comparar_productos', 'declinar_asesor', 'obtener_disponibilidad', 'obtener_estado_pedido', 'obtener_ficha_producto', 'obtener_precio', 'preparar_checkout', 'quitar_del_carrito', 'solicitar_asesor', 'vaciar_carrito', 'ver_carrito'])
+  it('registro cerrado: 17 nombres (9 CC-4 + 6 CC-5 + preparar_checkout CC-6 + enlace_portal LIVE C1; NO existe confirmar), esquemas estrictos; pedidos solo con cuenta', () => {
+    expect(HERRAMIENTAS.map((h) => h.name).sort()).toEqual(['actualizar_carrito', 'agregar_al_carrito', 'buscar_conocimiento', 'buscar_productos', 'candidatos_comerciales', 'comparar_productos', 'declinar_asesor', 'enlace_portal', 'obtener_disponibilidad', 'obtener_estado_pedido', 'obtener_ficha_producto', 'obtener_precio', 'preparar_checkout', 'quitar_del_carrito', 'solicitar_asesor', 'vaciar_carrito', 'ver_carrito'])
     expect(HERRAMIENTAS.map((h) => h.name)).not.toContain('confirmar_checkout')
     for (const h of HERRAMIENTAS) expect((h.input_schema as { additionalProperties?: boolean }).additionalProperties).toBe(false)
     expect(herramientasPara(false).map((h) => h.name)).not.toContain('obtener_estado_pedido'); expect(herramientasPara(true).map((h) => h.name)).toContain('obtener_estado_pedido')

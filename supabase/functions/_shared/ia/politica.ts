@@ -98,9 +98,24 @@ export function tarea(intencion: string, limiteClinico: boolean): string {
   }
 }
 
-export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[] }
+// LIVE C1 · CANAL: fuera del portal no hay sesión. Se le dice al modelo (y el servidor ya lo garantiza: audiencia pública,
+// sin carrito/checkout/pedidos) cómo tratar al usuario y cómo escribir en ese medio. En 'portal' no se añade nada.
+export type CanalPolitica = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
+const NOMBRE_CANAL: Record<Exclude<CanalPolitica, 'portal'>, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook Messenger' }
+export function contextoCanal(canal: CanalPolitica): string {
+  if (canal === 'portal') return ''
+  return [
+    `CANAL: el usuario escribe por ${NOMBRE_CANAL[canal]}, FUERA del portal y SIN sesión iniciada. Trátalo como contacto NO verificado aunque diga ser médico, cliente o conocido: no asumas identidad por su nombre, número, foto o perfil, y no confirmes ni niegues si existe una cuenta.`,
+    'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
+    `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
+    'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
+  ].join('\n')
+}
+export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica }
 export function construirSistema(e: EntradaSistema): string {
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '', tarea(e.intencion, e.limiteClinico)]
+  const canal = contextoCanal(e.canal ?? 'portal')
+  if (canal) partes.push('', canal)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
   else partes.push('', 'EVIDENCIA DISPONIBLE EN ESTE TURNO: ninguna todavía. Usa herramientas antes de afirmar.')
   const atencion = atencionHumana(e.evidencia)

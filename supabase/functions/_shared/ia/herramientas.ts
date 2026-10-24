@@ -11,11 +11,23 @@
 export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 'comparar_productos' | 'buscar_conocimiento' | 'candidatos_comerciales' | 'obtener_precio' | 'obtener_disponibilidad' | 'obtener_estado_pedido' | 'solicitar_asesor'
   | 'ver_carrito' | 'agregar_al_carrito' | 'actualizar_carrito' | 'quitar_del_carrito' | 'vaciar_carrito' | 'declinar_asesor'   // CC-5
   | 'preparar_checkout'   // CC-6 (lectura; confirmar es SOLO por el botón del usuario)
-export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE'
+  | 'enlace_portal'   // LIVE C1 · URL pública oficial del portal (sin tokens ni datos): la ofrece a audiencias públicas y canales
+export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
 export interface DefinicionHerramienta { name: NombreHerramienta; description: string; input_schema: Record<string, unknown>; autoridad: 'cualquiera' | 'cuenta'; mutante: boolean }
 
+// LIVE C1 · CANAL por el que habla el usuario. Solo 'portal' tiene sesión del portal; en los canales de Meta la IA
+// opera SIEMPRE con audiencia pública (aunque el número/PSID coincida con un doctor) y sin herramientas de cuenta ni carrito.
+export type CanalIA = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
+export const CANALES_IA: readonly CanalIA[] = ['portal', 'whatsapp', 'instagram', 'messenger']
+/** Herramientas que SOLO existen con sesión en el portal (carrito, checkout, pedidos): nunca desde un canal de Meta. */
+export const SOLO_PORTAL: readonly NombreHerramienta[] = ['ver_carrito', 'agregar_al_carrito', 'actualizar_carrito', 'quitar_del_carrito', 'vaciar_carrito', 'preparar_checkout', 'obtener_estado_pedido']
+/** URL pública y oficial del portal (misma que invitacion.ts URL_SISTEMA). Sin tokens, sin rutas privadas, sin datos del usuario. */
+export const URL_PORTAL_PUBLICA = 'https://sistema.renovacell.mx'
+export function ejecutarEnlacePortal(): { url: string; uso: string } {
+  return { url: URL_PORTAL_PUBLICA, uso: 'Registro o acceso al portal de Renovacell. Ahí se verifica la cuenta del profesional; precios, disponibilidad, carrito y pedidos solo existen dentro del portal con sesión.' }
+}
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const MAX_SALIDA_CHARS = 6000
 export const MAX_RONDAS_DEFAULT = 4
@@ -55,14 +67,19 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   // CC-6 · preparar checkout = LECTURA: total actual, disponibilidad y lo que falta. NO existe herramienta para confirmar:
   // el pedido se crea solo cuando el usuario pulsa "Confirmar pedido" en su carrito (prueba explícita que el modelo no puede fabricar).
+  { name: 'enlace_portal', autoridad: 'cualquiera', mutante: false, description: 'Enlace público oficial para registrarse o entrar al portal de Renovacell. Úsalo cuando el usuario quiera ver precios, comprar, consultar pedidos, usar un carrito o verificar su cuenta y no tenga sesión en el portal. No lleva datos del usuario.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'preparar_checkout', autoridad: 'cualquiera', mutante: false, description: 'Revisa si el carrito está listo para convertirse en pedido: total actual (si está autorizado), disponibilidad y problemas (cuenta, verificación, dirección). No crea el pedido: el usuario lo confirma con el botón "Confirmar pedido" de su carrito.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
 ]
 export const NOMBRES = new Set<string>(HERRAMIENTAS.map((h) => h.name))
 
 /** Herramientas expuestas al modelo según el actor (los pedidos solo con cuenta). */
-export function herramientasPara(conCuenta: boolean): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
-  return HERRAMIENTAS.filter((h) => h.autoridad === 'cualquiera' || conCuenta).map(({ name, description, input_schema }) => ({ name, description, input_schema }))
+export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal'): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
+  return HERRAMIENTAS
+    .filter((h) => h.autoridad === 'cualquiera' || conCuenta)
+    .filter((h) => canal === 'portal' || !SOLO_PORTAL.includes(h.name))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal
+    .filter((h) => h.name !== 'enlace_portal' || !conCuenta || canal !== 'portal')   // el enlace solo tiene sentido sin sesión en el portal
+    .map(({ name, description, input_schema }) => ({ name, description, input_schema }))
 }
 
 export type Validada = { ok: true; nombre: NombreHerramienta; args: Record<string, unknown>; ids: string[] } | { ok: false; motivo: 'desconocida' | 'no_autorizada' | 'argumentos' | 'id_no_autorizado' }
@@ -71,10 +88,11 @@ const str = (v: unknown, max: number): string | null => typeof v === 'string' &&
 const uuid = (v: unknown): string | null => typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null
 
 /** Valida nombre, forma y AUTORIDAD de una llamada del modelo. Los product_id deben venir de retrieval autorizado en este turno. */
-export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string> }): Validada {
+export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalIA }): Validada {
   if (typeof nombre !== 'string' || !NOMBRES.has(nombre)) return { ok: false, motivo: 'desconocida' }
   const def = HERRAMIENTAS.find((h) => h.name === nombre)!
   if (def.autoridad === 'cuenta' && !ctx.conCuenta) return { ok: false, motivo: 'no_autorizada' }
+  if ((ctx.canal ?? 'portal') !== 'portal' && SOLO_PORTAL.includes(def.name)) return { ok: false, motivo: 'no_autorizada' }   // LIVE C1 · defensa aunque el modelo la pida
   const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
   const n = nombre as NombreHerramienta
   switch (n) {
@@ -107,7 +125,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     }
     case 'obtener_estado_pedido': { const folio = i.folio === undefined || i.folio === null ? null : str(i.folio, 40); if (i.folio !== undefined && i.folio !== null && !folio) return { ok: false, motivo: 'argumentos' }; return { ok: true, nombre: n, args: { folio }, ids: [] } }
     case 'solicitar_asesor': return { ok: true, nombre: n, args: { motivo: i.motivo === undefined ? null : str(i.motivo, 120) }, ids: [] }
-    case 'ver_carrito': case 'vaciar_carrito': case 'declinar_asesor': case 'preparar_checkout': return { ok: true, nombre: n, args: {}, ids: [] }
+    case 'ver_carrito': case 'vaciar_carrito': case 'declinar_asesor': case 'preparar_checkout': case 'enlace_portal': return { ok: true, nombre: n, args: {}, ids: [] }
     case 'agregar_al_carrito': {
       const id = uuid(i.product_id); if (!id) return { ok: false, motivo: 'argumentos' }
       if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
@@ -188,6 +206,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
     case 'agregar_al_carrito': case 'actualizar_carrito': case 'quitar_del_carrito': case 'vaciar_carrito':
       return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
     case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
+    case 'enlace_portal': return o.url === URL_PORTAL_PUBLICA ? ['PORTAL_LINK_EVIDENCE'] : []
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'
@@ -220,7 +239,7 @@ export function evidenciaHandoff(estado: unknown): Evidencia[] {
 /** Mensaje DATA que recibe el modelo cuando una llamada se rechaza (nunca detalles internos). */
 export const RECHAZO: Record<string, string> = {
   desconocida: 'Herramienta no disponible.',
-  no_autorizada: 'Esta herramienta requiere que el usuario tenga sesión iniciada.',
+  no_autorizada: 'Esta herramienta requiere que el usuario tenga sesión iniciada en el portal. Si no la tiene, ofrece el enlace oficial con enlace_portal.',
   argumentos: 'Argumentos inválidos para la herramienta.',
   id_no_autorizado: 'Ese product_id no proviene de una búsqueda de este turno. Usa buscar_productos primero.',
 }

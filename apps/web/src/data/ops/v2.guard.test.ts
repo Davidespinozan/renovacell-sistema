@@ -87,9 +87,9 @@ describe('IA · contexto', () => {
     expect(p).toMatch(/m\.actor === 'ai' \? 'assistant' : m\.actor === 'visitor' \|\| m\.actor === 'doctor' \? 'user' : null/)
     expect(p).toMatch(/if \(!role\) continue/)
   })
-  it('26 · el registro de herramientas no cambió (16 nombres, sin confirmar pedido)', () => {
+  it('26 · el registro de herramientas no cambió (17 nombres: 16 + enlace_portal de LIVE C1; sin confirmar pedido)', () => {
     const h = codigo(herramientasSrc)
-    expect((h.match(/name: '/g) ?? []).length).toBe(16)
+    expect((h.match(/name: '/g) ?? []).length).toBe(17)
     expect(h).not.toContain("name: 'confirmar_checkout'")
   })
 })

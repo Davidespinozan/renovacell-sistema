@@ -21,15 +21,16 @@ export interface DepsOrquestador {
   proveedor: { nombre: string; modelo: string; generar: (s: Solicitud) => Promise<Respuesta> }
   config: { maxTokens: number; timeoutMs: number; maxRondas: number; historial: number }
   politica: {
-    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[] }) => string
+    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalTurno }) => string
     clasificarIntencion: (t: string) => string; esLimiteClinico: (t: string) => boolean
     historialParaModelo: (m: Array<{ actor: string; content: string }>, maximo?: number) => Array<{ role: 'user' | 'assistant'; content: string }>
     envolverDatos: (etiqueta: string, contenido: string) => string
     MENSAJE_SIN_RESPUESTA: string; MENSAJE_LIMITE_CLINICO: string
   }
   herramientas: {
-    herramientasPara: (conCuenta: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
-    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string> }) => Validada
+    herramientasPara: (conCuenta: boolean, canal?: CanalTurno) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
+    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno }) => Validada
+    ejecutarEnlacePortal?: () => { url: string; uso: string }
     acotarSalida: (v: unknown) => string; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
     evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
@@ -42,7 +43,11 @@ export interface DepsOrquestador {
   observar?: (accion: string, clasificacion: 'internal_error' | 'provider_error' | 'unknown' | 'rejected', detalle?: { mensaje?: string; code?: string | number }) => void
   ahora?: () => number
 }
-export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string }
+// LIVE C1 · `canal`: 'portal' (sesión del portal, por defecto) o un canal de Meta. Fuera del portal el PERFIL NUNCA llega a la
+// IA (audiencia pública, sin herramientas de cuenta ni carrito) aunque la conversación pertenezca a un doctor: la
+// vinculación comercial (cartera, asesor) se conserva en la conversación; la elevación de permisos solo existe con sesión.
+export type CanalTurno = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
+export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno }
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number }; clase?: string; motivoValidacion?: string
@@ -59,7 +64,10 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   }
 
   // 1) Contexto del actor: la ÚNICA fuente de audiencia y permisos.
-  const cx = await rpc('cc_ia_contexto_actor', { p_profile: e.profile })
+  //    LIVE C1 · fuera del portal el perfil no se entrega: la IA habla con audiencia pública, sin excepciones.
+  const canal: CanalTurno = e.canal ?? 'portal'
+  const perfilIA: string | null = canal === 'portal' ? e.profile : null
+  const cx = await rpc('cc_ia_contexto_actor', { p_profile: perfilIA })
   const ctx = (cx.data ?? null) as Ctx | null
   if (cx.error || !ctx || ctx.actor === 'suspendido') return { estado: 'no_autorizado', usage }
 
@@ -87,7 +95,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const nombresCatalogo = Array.isArray(cat.data) ? (cat.data as Array<{ nombre?: string }>).map((p) => String(p.nombre ?? '')).filter(Boolean) : []
 
   const conCuenta = ctx.actor !== 'visitor'
-  const tools = d.herramientas.herramientasPara(conCuenta)
+  const tools = d.herramientas.herramientasPara(conCuenta, canal)
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
@@ -114,7 +122,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia })
+    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal })
     const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
@@ -131,13 +139,13 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     messages.push({ role: 'assistant', content: r.bloques })
     const resultados: Bloque[] = []
     for (const ll of r.llamadas) {
-      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados })
+      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal })
       if (!v.ok) {
         await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: String(ll.name).slice(0, 60), p_status: v.motivo === 'no_autorizada' || v.motivo === 'id_no_autorizado' ? 'no_autorizada' : 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
         continue
       }
-      const ej = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito })
+      const ej = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal })
       const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : ej.data
       if (!ej.error) { for (const id of d.herramientas.idsDe(ej.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(ej.data)) nombresAutorizados.add(n); addEv(d.herramientas.evidenciaDe(v.nombre, ej.data)) }
       const ev = ej.error ? [] : d.herramientas.evidenciaDe(v.nombre, ej.data)
@@ -153,7 +161,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   return await persistir(d.validacion.respuestaSegura('rondas', { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), d.config.maxRondas, 'rondas')
 }
 
-async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null } }): Promise<{ data: unknown; error: string | null }> {
+async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string } }): Promise<{ data: unknown; error: string | null }> {
   const a = v.args
   const dueno = { p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: e.actor === 'doctor' ? e.profile : null }
   // CC-5 · carrito del dueño ligado a la conversación; operation_id estable = turno + llamada (un reintento no duplica).
@@ -185,9 +193,11 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'comparar_productos': return rpc('cc_comparar_productos', { p_ids: a.product_ids, p_audiencia: ctx.audiencia })
     case 'buscar_conocimiento': return rpc('cc_buscar_conocimiento', { p_q: a.consulta, p_limite: LIMITE_RPC.buscar_conocimiento, p_audiencia: ctx.audiencia })
     case 'candidatos_comerciales': return rpc('cc_candidatos_recomendacion', { p_categoria: a.categoria, p_familia: a.familia, p_terminos: a.terminos, p_limite: LIMITE_RPC.candidatos_comerciales, p_audiencia: ctx.audiencia })
-    case 'obtener_precio': return rpc('cc_ia_precio', { p_profile: e.profile, p_product: a.product_id, p_qty: a.cantidad })
-    case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: e.profile, p_product: a.product_id })
-    case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: e.profile, p_folio: a.folio })
+    // LIVE C1 · precio/disponibilidad/pedidos con el perfil que la IA tiene AUTORIZADO (null fuera del portal), nunca e.profile directo.
+    case 'obtener_precio': return rpc('cc_ia_precio', { p_profile: t.perfilIA, p_product: a.product_id, p_qty: a.cantidad })
+    case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: t.perfilIA, p_product: a.product_id })
+    case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: t.perfilIA, p_folio: a.folio })
+    case 'enlace_portal': return { data: t.enlace ? t.enlace() : null, error: t.enlace ? null : 'desconocida' }   // puro: sin base, sin tokens
     case 'solicitar_asesor': return rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
     // CC-7 · rechazo del asesor para ESTA compra (no toca la cartera ni impone enfriamiento global).
     case 'declinar_asesor': return rpc('cc_handoff_rechazar', { p_conv: e.conv, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
