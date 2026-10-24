@@ -6219,6 +6219,10 @@ export type Database = {
           provider: string
           provider_cost: number | null
           quote_ref: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliacion: Json | null
+          request: Json | null
           request_fingerprint: string | null
           service_code: string | null
           status: string
@@ -6240,6 +6244,10 @@ export type Database = {
           provider?: string
           provider_cost?: number | null
           quote_ref?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliacion?: Json | null
+          request?: Json | null
           request_fingerprint?: string | null
           service_code?: string | null
           status?: string
@@ -6261,6 +6269,10 @@ export type Database = {
           provider?: string
           provider_cost?: number | null
           quote_ref?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliacion?: Json | null
+          request?: Json | null
           request_fingerprint?: string | null
           service_code?: string | null
           status?: string
@@ -8428,6 +8440,17 @@ export type Database = {
         Returns: Json
       }
       reactivar_staff: { Args: { p_uid: string }; Returns: Json }
+      reconciliar_guia: {
+        Args: {
+          p_attempt: string
+          p_consulta: Json
+          p_motivo: string
+          p_op_id: string
+          p_resolucion: string
+          p_tracking?: string
+        }
+        Returns: Json
+      }
       recibir_devolucion: {
         Args: {
           p_lines: Json

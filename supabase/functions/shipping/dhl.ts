@@ -19,11 +19,27 @@ export interface NeutralPackage { weightKg: number; lengthCm: number; widthCm: n
 
 const CC = 'MX' // país de destino operativo (Renovacell = MX doméstico); no es dato por-envío.
 
-// Fecha planeada: mañana 10:00 hora local en el formato que exige MyDHL.
-function plannedDate(): string {
-  const d = new Date(Date.now() + 24 * 3600 * 1000)
+// Fecha planeada: el SIGUIENTE DÍA HÁBIL (lunes a viernes) a las 10:00, en el formato que exige MyDHL.
+// DHL D1 · antes era "mañana" fijo: un viernes o un sábado la cotización fallaba con el error 996 ("producto no
+// disponible para la fecha de recolección") y Empaque no sabía por qué. No se asumen festivos de DHL: si cae en uno,
+// DHL lo dirá con el mismo 996 y se vuelve a cotizar otro día.
+export function siguienteDiaHabil(ahoraMs = Date.now()): Date {
+  const d = new Date(ahoraMs)
+  d.setUTCHours(10, 0, 0, 0)
+  do { d.setUTCDate(d.getUTCDate() + 1) } while (d.getUTCDay() === 0 || d.getUTCDay() === 6)
+  return d
+}
+export function plannedDate(ahoraMs = Date.now()): string {
+  const d = siguienteDiaHabil(ahoraMs)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T10:00:00 GMT+00:00`
+}
+
+// DHL D1 · Referencia de cliente (typeCode CU, ≤ 35) ÚNICA por intento: el id del intento sin guiones (32). Viaja en la guía
+// (nivel envío y nivel paquete) y es lo que permite volver a encontrarla en DHL si el resultado quedó desconocido.
+export const REFERENCIA_MAX = 35
+export function referenciaIntento(attemptId: string): string {
+  return attemptId.replace(/-/g, '').slice(0, REFERENCIA_MAX)
 }
 
 // MyDHL limita cada línea a 45 caracteres (más largo → 422 y no sale la guía). En México la COLONIA es clave para que
@@ -57,10 +73,10 @@ export function postalAddress(a: NeutralAddress, countryCode = CC) {
 function shipperAddress(s: NeutralShipper) {
   return { postalCode: s.cp, cityName: s.city, countryCode: s.country || CC, addressLine1: s.addressLine1, ...(s.state ? { provinceCode: s.state } : {}) }
 }
-function packagesOf(p: NeutralPackage) {
+function packagesOf(p: NeutralPackage, referencia?: string) {
   // Un bulto con el peso/medidas reales del paquete final (mismo peso repartido si pieces>1
   // NO se fabrica: se envía 1 package con el peso total; multi-pieza real se modela luego).
-  return [{ weight: p.weightKg, dimensions: { length: p.lengthCm, width: p.widthCm, height: p.heightCm } }]
+  return [{ weight: p.weightKg, dimensions: { length: p.lengthCm, width: p.widthCm, height: p.heightCm }, ...(referencia ? { customerReferences: [{ value: referencia, typeCode: 'CU' }] } : {}) }]
 }
 
 // ---- Cotización -----------------------------------------------------------
@@ -98,12 +114,14 @@ export function parseRates(data: any): Array<{ id: string; carrier: string; serv
 }
 
 // ---- Creación de envío ----------------------------------------------------
-export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, accountNumber: string, productCode: string, orderRef: string) {
+export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, accountNumber: string, productCode: string, orderRef: string, referencia?: string) {
   return {
     plannedShippingDateAndTime: plannedDate(),
     pickup: { isRequested: false },
     productCode,
     accounts: [{ typeCode: 'shipper', number: accountNumber }],
+    // DHL D1 · referencia CU única del intento (probada en sandbox el 23 oct 2026: DHL la acepta en raíz y en el paquete).
+    ...(referencia ? { customerReferences: [{ value: referencia, typeCode: 'CU' }] } : {}),
     customerDetails: {
       shipperDetails: {
         postalAddress: shipperAddress(shipper),
@@ -120,7 +138,7 @@ export function buildShipmentRequest(shipper: NeutralShipper, receiver: NeutralR
       },
     },
     content: {
-      packages: packagesOf(pkg),
+      packages: packagesOf(pkg, referencia),
       isCustomsDeclarable: false,
       description: `Pedido ${orderRef}`,
       incoterm: 'DAP',
@@ -204,8 +222,142 @@ export function dhlErrorMessage(status: number, data: any): string {
   return `DHL ${status}${detail ? `: ${String(detail).slice(0, 300)}` : ''}`
 }
 
+// ---- DHL D1 · Reconciliación: localizar una guía por referencia y recuperar su etiqueta ---------------------------
+// Contrato probado en sandbox (23 oct 2026): GET /tracking?shipmentReference=…&shipperAccountNumber=… (la cuenta es
+// obligatoria: sin ella DHL responde 400 código 1013); 404 "No Shipments Found for ReferenceID | <ref>" cuando no hay
+// nada indexado, lo mismo para una referencia inexistente que para una guía recién creada. Un 404 NUNCA prueba que la
+// guía no exista. GET /shipments/{n}/get-image exige `pickupYearAndMonth` (YYYY-MM).
+const fechaISO = (d: Date) => d.toISOString().slice(0, 10)
+export function urlRastreoPorReferencia(base: string, referencia: string, accountNumber: string, creadoEnMs: number): string {
+  const desde = fechaISO(new Date(creadoEnMs - 86_400_000)), hasta = fechaISO(new Date(creadoEnMs + 2 * 86_400_000))
+  const q = new URLSearchParams({ shipmentReference: referencia, shipmentReferenceType: 'CU', shipperAccountNumber: accountNumber, dateRangeFrom: desde, dateRangeTo: hasta, trackingView: 'all-checkpoints', levelOfDetail: 'all' })
+  return `${base}/tracking?${q.toString()}`
+}
+export function urlRastreoPorNumero(base: string, tracking: string): string {
+  return `${base}/shipments/${encodeURIComponent(tracking)}/tracking?trackingView=all-checkpoints&levelOfDetail=all`
+}
+export function mesRecoleccion(creadoEnMs: number): string {
+  return fechaISO(new Date(creadoEnMs)).slice(0, 7)
+}
+export function urlGetImage(base: string, tracking: string, accountNumber: string, creadoEnMs: number): string {
+  const q = new URLSearchParams({ shipperAccountNumber: accountNumber, typeCode: 'label', pickupYearAndMonth: mesRecoleccion(creadoEnMs), encodingFormat: 'pdf', allInOnePDF: 'false' })
+  return `${base}/shipments/${encodeURIComponent(tracking)}/get-image?${q.toString()}`
+}
+export type ResultadoRastreo = 'encontradas' | 'sin_resultados' | 'error'
+// deno-lint-ignore no-explicit-any
+export function clasificarRastreo(status: number, data: any): ResultadoRastreo {
+  if (status >= 200 && status < 300) return Array.isArray(data?.shipments) && data.shipments.length ? 'encontradas' : 'sin_resultados'
+  if (status === 404 && isTrackingNoData(status, data)) return 'sin_resultados'
+  return 'error'
+}
+// Lo que la reconciliación compara con el snapshot del intento: SOLO hechos que DHL devuelve; nada se completa.
+export interface GuiaHallada { tracking: string; referencias: string[]; producto: string | null; destino_cp: string | null; peso_total: number | null; piezas: number | null; eventos: number }
+// deno-lint-ignore no-explicit-any
+export function guiasDeRastreo(data: any): GuiaHallada[] {
+  const shs = Array.isArray(data?.shipments) ? data.shipments : []
+  // deno-lint-ignore no-explicit-any
+  return shs.map((s: any) => {
+    const refs = new Set<string>()
+    for (const r of Array.isArray(s?.shipperReferences) ? s.shipperReferences : []) if (r?.value != null) refs.add(String(r.value))
+    for (const p of Array.isArray(s?.pieces) ? s.pieces : []) for (const r of Array.isArray(p?.shipperReferences) ? p.shipperReferences : []) if (r?.value != null) refs.add(String(r.value))
+    const peso = Number(s?.totalWeight)
+    const piezas = Number(s?.numberOfPieces ?? (Array.isArray(s?.pieces) ? s.pieces.length : NaN))
+    return {
+      tracking: String(s?.shipmentTrackingNumber ?? ''),
+      referencias: [...refs],
+      producto: s?.productCode != null ? String(s.productCode) : null,
+      destino_cp: s?.receiverDetails?.postalAddress?.postalCode != null ? String(s.receiverDetails.postalAddress.postalCode) : null,
+      peso_total: Number.isFinite(peso) ? peso : null,
+      piezas: Number.isFinite(piezas) ? piezas : null,
+      eventos: Array.isArray(s?.events) ? s.events.length : 0,
+    }
+  }).filter((g: GuiaHallada) => g.tracking)
+}
+// deno-lint-ignore no-explicit-any
+export function parseGetImage(data: any): string | null {
+  const docs = Array.isArray(data?.documents) ? data.documents : []
+  // deno-lint-ignore no-explicit-any
+  const label = docs.find((d: any) => String(d?.typeCode ?? '').toLowerCase() === 'label') ?? docs[0]
+  return label?.content ? String(label.content) : null
+}
+
 export function dhlBaseUrl(env: string | undefined): string {
   return (env ?? 'test').toLowerCase() === 'production'
     ? 'https://express.api.dhl.com/mydhlapi'
     : 'https://express.api.dhl.com/mydhlapi/test'
+}
+
+// ============================================================================
+// DHL D1 · Consulta de reconciliación (vive aquí, sin imports, para que las pruebas web puedan cargar el módulo).
+// El SERVIDOR consulta a DHL por la referencia CU única del intento y, si Dirección trae uno del portal, por número, y
+// arma la evidencia que exige el comando `reconciliar_guia`. Aquí no se decide nada: se recogen hechos sin completarlos.
+// ============================================================================
+export const TIMEOUT_CONSULTA_MS = 20_000
+export const TIMEOUT_COTIZACION_MS = 30_000
+export const TIMEOUT_GUIA_MS = 60_000
+export const MINUTOS_MINIMOS_SIN_GUIA = 60      // los exige el comando; aquí solo se informan a la pantalla
+export const MINUTOS_VIGENCIA_CONSULTA = 30
+
+export interface ConsultaParcial { realizada: boolean; resultado: ResultadoRastreo | 'no_realizada'; encontradas: GuiaHallada[]; http?: number; detalle?: string }
+export interface ConsultaDHL {
+  consultado_en: string
+  referencia: string
+  por_referencia: ConsultaParcial
+  por_tracking?: ConsultaParcial & { tracking: string }
+}
+
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
+
+export async function fetchConTimeout(fetchImpl: FetchLike, url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms)
+  try { return await fetchImpl(url, { ...init, signal: ctl.signal }) } finally { clearTimeout(t) }
+}
+
+async function consultaParcial(fetchImpl: FetchLike, url: string, authz: string, timeoutMs: number): Promise<ConsultaParcial> {
+  try {
+    const r = await fetchConTimeout(fetchImpl, url, { headers: { Authorization: authz } }, timeoutMs)
+    const data = await r.json().catch(() => ({}))
+    const resultado = clasificarRastreo(r.status, data)
+    return {
+      realizada: resultado !== 'error', resultado, http: r.status,
+      encontradas: resultado === 'encontradas' ? guiasDeRastreo(data) : [],
+      ...(resultado === 'error' ? { detalle: dhlErrorMessage(r.status, data) } : {}),
+    }
+  } catch (e) {
+    const abort = /abort/i.test(String((e as Error)?.name ?? '') + String((e as Error)?.message ?? ''))
+    return { realizada: false, resultado: 'error', encontradas: [], detalle: abort ? 'DHL no respondió a tiempo' : 'sin respuesta de la red' }
+  }
+}
+
+// Consulta completa para un intento: por referencia siempre; por número solo si Dirección lo aporta (se verifica en DHL,
+// nunca se toma como prueba por sí solo).
+export async function consultarDHL(o: { base: string; authz: string; account: string; referencia: string; creadoEnMs: number; tracking?: string; fetchImpl?: FetchLike; timeoutMs?: number }): Promise<ConsultaDHL> {
+  const f = o.fetchImpl ?? fetch
+  const ms = o.timeoutMs ?? TIMEOUT_CONSULTA_MS
+  const porRef = await consultaParcial(f, urlRastreoPorReferencia(o.base, o.referencia, o.account, o.creadoEnMs), o.authz, ms)
+  const tn = (o.tracking ?? '').trim()
+  const porTn = tn ? { tracking: tn, ...(await consultaParcial(f, urlRastreoPorNumero(o.base, tn), o.authz, ms)) } : undefined
+  return { consultado_en: new Date().toISOString(), referencia: o.referencia, por_referencia: porRef, ...(porTn ? { por_tracking: porTn } : {}) }
+}
+
+// Guías distintas halladas (por referencia y por número).
+export function guiasDistintas(c: ConsultaDHL): string[] {
+  const set = new Set<string>()
+  for (const g of c.por_referencia.encontradas) if (g.tracking) set.add(g.tracking)
+  for (const g of c.por_tracking?.encontradas ?? []) if (g.tracking) set.add(g.tracking)
+  return [...set]
+}
+
+// Consulta PREVIA a crear una guía nueva en un pedido que ya tuvo un cierre `sin_guia`: fail-closed.
+//   sin_resultados → se puede crear · encontradas → la guía apareció tarde, NO se recompra · error → no se crea.
+export type DecisionPrevia = 'proceder' | 'guia_hallada' | 'fallo'
+export function decisionPrevia(c: ConsultaDHL): DecisionPrevia {
+  if (c.por_referencia.resultado === 'sin_resultados') return 'proceder'
+  if (c.por_referencia.resultado === 'encontradas' && c.por_referencia.encontradas.length) return 'guia_hallada'
+  return 'fallo'
+}
+
+export function horasDesde(iso: string, ahoraMs = Date.now()): number {
+  const t = Date.parse(iso)
+  return Number.isFinite(t) ? Math.max(0, (ahoraMs - t) / 3_600_000) : 0
 }

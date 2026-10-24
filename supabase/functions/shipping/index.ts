@@ -4,6 +4,8 @@
 // para agregar T1 sin reescribir Packing.
 //
 // - Acciones NEUTRAS (DHL): 'rate' | 'create_shipment' | 'track'.
+// - DHL D1 · 'reconciliar_guia' {order_id, sub: 'consultar'|'resolver', …}: solo Dirección; el servidor consulta a DHL por la
+//   referencia CU única del intento y, al resolver, llama al comando `reconciliar_guia` con la identidad de quien decide.
 // - Acciones LEGADAS (agregador Envia/mock, intactas): 'quote' | 'label'.
 // - Seam: si no hay credenciales del provider pedido → 501 → el cliente cae al mock.
 //
@@ -20,6 +22,8 @@ const obs = observador('shipping')
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
   dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult, buildPickupRequest, parsePickup,
+  referenciaIntento, urlGetImage, parseGetImage,   // DHL D1
+  consultarDHL, decisionPrevia, guiasDistintas, horasDesde, fetchConTimeout, TIMEOUT_COTIZACION_MS, TIMEOUT_GUIA_MS, TIMEOUT_CONSULTA_MS, MINUTOS_MINIMOS_SIN_GUIA, MINUTOS_VIGENCIA_CONSULTA,   // DHL D1 · reconciliación
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
 } from './dhl.ts'
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
@@ -473,6 +477,71 @@ Deno.serve(conCors(async (req) => {
     }
   }
 
+  // ===================== DHL D1 · RECONCILIACIÓN DE UN INTENTO DESCONOCIDO (solo Dirección) =====================
+  // `consultar`: el servidor busca en DHL por la referencia CU del intento (y por número si Dirección trae uno del portal) y
+  // devuelve los hechos sin decidir nada. `resolver`: repite la consulta y llama al comando `reconciliar_guia` con la identidad
+  // de Dirección (sin_guia bajo riesgo declarado, o guia_confirmada si coincide con el snapshot). Si queda guía confirmada,
+  // intenta recuperar la etiqueta (get-image) como best-effort.
+  if (action === 'reconciliar_guia') {
+    if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'solo_direccion', message: 'Solo Dirección reconcilia un intento de guía en estado desconocido.' })
+    const orderId = s(p.order_id), sub = s(p.sub)
+    if (!orderId) return json(400, { error: 'Falta order_id.' })
+    if (sub !== 'consultar' && sub !== 'resolver') return json(400, { error: 'sub inválido (consultar | resolver).' })
+    const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD'), account = Deno.env.get('DHL_ACCOUNT_NUMBER')
+    if (!user || !pass || !account) return json(501, { error: 'not_configured', message: 'DHL no habilitado.' })
+    const base = dhlBaseUrl(Deno.env.get('DHL_API_ENV'))
+    const authz = 'Basic ' + btoa(`${user}:${pass}`)
+    const { data: at, error: atErr } = await admin.from('shipping_attempts')
+      .select('id, order_id, provider, status, external_reference, created_at, updated_at, service_code, request, provider_cost, currency')
+      .eq('order_id', orderId).eq('status', 'unknown_requires_reconciliation').limit(1).maybeSingle()
+    if (atErr) return json(500, { error: 'No se pudo leer el intento.' })
+    if (!at) return json(404, { error: 'sin_intento_desconocido', message: 'Este pedido no tiene un intento de guía en estado desconocido.' })
+    if ((s(at.provider) || 'dhl') !== 'dhl') return json(422, { error: 'proveedor_no_soportado', message: 'La reconciliación desde el sistema solo existe para DHL.' })
+    const referencia = referenciaIntento(s(at.external_reference) || String(at.id))
+    const trackingPortal = s(p.tracking) || undefined
+    if (trackingPortal && !/^\d{10}$/.test(trackingPortal)) return json(422, { error: 'tracking_invalido', message: 'Una guía de DHL Express tiene 10 dígitos.' })
+    const creadoEnMs = Date.parse(String(at.created_at))
+    const consulta = await consultarDHL({ base, authz, account, referencia, creadoEnMs, tracking: trackingPortal, fetchImpl: fetch })
+    if (consulta.por_referencia.resultado === 'error') obs('reconciliar_guia', 'provider_error', { code: consulta.por_referencia.http ?? 'red', mensaje: 'DHL no respondió la búsqueda por referencia' })
+    const resumen = {
+      intento: { id: at.id, creado: at.created_at, actualizado: at.updated_at, horas: Math.round(horasDesde(String(at.updated_at ?? at.created_at)) * 10) / 10, referencia, servicio: at.service_code, con_snapshot: !!at.request, costo: at.provider_cost, moneda: at.currency },
+      consulta, guias_distintas: guiasDistintas(consulta),
+      reglas: { minutos_minimos_sin_guia: MINUTOS_MINIMOS_SIN_GUIA, minutos_vigencia_consulta: MINUTOS_VIGENCIA_CONSULTA, advertencia: 'Un 404 de DHL no prueba que la guía no exista.' },
+    }
+    if (sub === 'consultar') return json(200, resumen)
+    // resolver · la evidencia es la consulta del servidor; el cliente solo aporta la decisión, el motivo y sus confirmaciones.
+    const resolucion = s(p.resolucion), motivo = s(p.motivo), opId = s(p.op_id)
+    if (!opId) return json(400, { error: 'Falta op_id.' })
+    const consultaRpc = { ...consulta, portal_revisado: p.portal_revisado === true, acepta_duplicado_tardio: p.acepta_duplicado_tardio === true }
+    const { data: res, error: rpcErr } = await caller.rpc('reconciliar_guia', { p_op_id: opId, p_attempt: at.id, p_resolucion: resolucion, p_consulta: consultaRpc as unknown as never, p_motivo: motivo, p_tracking: trackingPortal ?? null } as never)
+    if (rpcErr) {
+      const code = /^([A-Z_]{4,})\b/.exec(rpcErr.message ?? '')?.[1]
+      return json(code ? 409 : 500, { error: code ?? 'reconciliacion_fallida', message: rpcErr.message, ...resumen })
+    }
+    // deno-lint-ignore no-explicit-any
+    const resultado = (res ?? {}) as Record<string, any>
+    let etiqueta: 'no_aplica' | 'guardada' | 'no_disponible' = 'no_aplica'
+    if (resultado.resolucion === 'guia_confirmada' && resultado.tracking && resultado.shipment_id) {
+      try {
+        const r = await fetchConTimeout(fetch, urlGetImage(base, String(resultado.tracking), account, creadoEnMs), { headers: { Authorization: authz } }, TIMEOUT_CONSULTA_MS)
+        const d = await r.json().catch(() => ({}))
+        const b64 = r.ok ? parseGetImage(d) : null
+        if (b64) {
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+          const path = `${orderId}/${resultado.tracking}.pdf`
+          const { error: upErr } = await admin.storage.from(LABELS_BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: true })
+          // Se escribe con la identidad de Dirección (es lo que admite el candado de envíos).
+          if (!upErr) { const { error: lbErr } = await caller.from('shipments').update({ label_path: path }).eq('id', String(resultado.shipment_id)); etiqueta = lbErr ? 'no_disponible' : 'guardada' }
+          else etiqueta = 'no_disponible'
+        } else {
+          etiqueta = 'no_disponible'
+          obs('reconciliar_guia', 'provider_error', { code: r.status, mensaje: 'DHL no devolvió la etiqueta al reconciliar (get-image)' })
+        }
+      } catch { etiqueta = 'no_disponible' }
+    }
+    return json(200, { resultado, etiqueta, ...resumen })
+  }
+
   // ===================== PROVIDER DHL (acciones neutras) =====================
   if (action === 'rate' || action === 'create_shipment' || action === 'track') {
     const user = Deno.env.get('DHL_API_USERNAME')
@@ -509,7 +578,7 @@ Deno.serve(conCors(async (req) => {
       if (miss.length) return json(422, { error: 'missing_data', missing: miss })
 
       if (action === 'rate') {
-        const r = await fetch(`${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) })
+        const r = await fetchConTimeout(fetch, `${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) }, TIMEOUT_COTIZACION_MS)
         const data = await r.json().catch(() => ({}))
         if (!r.ok) { obs('rate', 'provider_error', { code: r.status, mensaje: 'DHL respondió error en cotización' }); return json(502, { error: dhlErrorMessage(r.status, data) }) }
         const rates = parseRates(data)
@@ -543,20 +612,43 @@ Deno.serve(conCors(async (req) => {
       const { data: cancelacion } = await admin.from('order_cancel_requests').select('id').eq('order_id', orderId).eq('status', 'pendiente').limit(1).maybeSingle()
       if (cancelacion) return json(409, { error: 'cancelacion_solicitada', message: 'Este pedido tiene una cancelación por resolver. Dirección decide antes de generar la guía.' })
 
+      // 1c) DHL D1 · Si a este pedido ya se le resolvió un intento como `sin_guia`, ANTES de comprar se busca en DHL por la
+      //     referencia de ese intento: si la guía apareció tarde no se recompra; si DHL no responde o es ambiguo, no se crea
+      //     (fail-closed). Un 404 sin resultados es lo único que deja seguir.
+      const { data: cerrados } = await admin.from('shipping_attempts')
+        .select('id, external_reference, created_at')
+        .eq('order_id', orderId).eq('status', 'failed_safe_to_retry').eq('reconciliacion->>resolucion', 'sin_guia')
+        .order('reconciled_at', { ascending: false }).limit(3)
+      for (const c of (cerrados ?? []) as Array<{ id: string; external_reference: string | null; created_at: string }>) {
+        const previa = await consultarDHL({ base, authz, account, referencia: referenciaIntento(s(c.external_reference) || c.id), creadoEnMs: Date.parse(c.created_at), fetchImpl: fetch })
+        const decision = decisionPrevia(previa)
+        if (decision === 'guia_hallada') {
+          obs('create_shipment', 'rejected', { code: 'guia_hallada_tarde', mensaje: 'DHL devolvió una guía para un intento cerrado como sin guía' })
+          return json(409, { error: 'guia_hallada_tarde', message: 'DHL ya tiene una guía para un intento de este pedido que se había cerrado como "sin guía". No se genera otra: Dirección debe revisarla en el portal y, si procede, reconciliarla.', guias: guiasDistintas(previa) })
+        }
+        if (decision === 'fallo') {
+          obs('create_shipment', 'provider_error', { code: previa.por_referencia.http ?? 'red', mensaje: 'DHL no respondió la consulta previa a la guía' })
+          return json(503, { error: 'consulta_previa_fallida', message: 'No se pudo comprobar con DHL si existe una guía anterior para este pedido. No se genera una nueva hasta poder comprobarlo.' })
+        }
+      }
+
       // 2) CLAIM durable PRE-proveedor con exclusión real (índice único parcial). Carrera → 23505.
+      //    DHL D1 · el id del intento se fija aquí para que viaje a DHL como Message-Reference (único por petición) y, sin
+      //    guiones, como referencia CU de la guía; el snapshot `request` es lo que permite reconciliar sin inventar datos.
       const fingerprint = await sha256Hex(JSON.stringify({ shipper, receiver, pkg, productCode }))
-      const msgRef = `${orderId}-${idemKey}`.slice(0, 36)
+      const attemptId = crypto.randomUUID()
+      const msgRef = attemptId
+      const referencia = referenciaIntento(attemptId)
       const { data: claim, error: claimErr } = await admin.from('shipping_attempts')
-        .insert({ order_id: orderId, provider: 'dhl', idempotency_key: idemKey, service_code: productCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending' })
+        .insert({ id: attemptId, order_id: orderId, provider: 'dhl', idempotency_key: idemKey, service_code: productCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending', request: { shipper, receiver, pkg, productCode, orderRef } })
         .select('id').single()
       if (claimErr || !claim) return json(409, { error: 'in_progress', message: 'Otra solicitud está creando la guía de este pedido.' })
-      const attemptId = claim.id as string
 
       // 3) RE-COTIZACIÓN server-side = AUTORIDAD del precio/servicio/ETA (liga el precio al paquete real;
       //    ignora cualquier amount/etaDays del cliente). Falla aquí = solo cotización → safe retry.
       let serverRate: { id: string; service: string; serviceCode?: string; amount: number; currency: string; etaDays: number } | undefined
       try {
-        const rq = await fetch(`${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) })
+        const rq = await fetchConTimeout(fetch, `${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) }, TIMEOUT_COTIZACION_MS)
         const rd = await rq.json().catch(() => ({}))
         if (!rq.ok) { obs('create_shipment', 'provider_error', { code: rq.status, mensaje: 'DHL respondió error en cotización previa a la guía' }); await failAttempt(admin, attemptId, dhlErrorMessage(rq.status, rd)); return json(502, { error: dhlErrorMessage(rq.status, rd) }) }
         serverRate = parseRates(rd).find((x) => String(x.serviceCode) === productCode)
@@ -567,11 +659,11 @@ Deno.serve(conCors(async (req) => {
       }
       if (!serverRate) { await failAttempt(admin, attemptId, 'service_not_available'); return json(422, { error: 'service_not_available', message: 'El servicio elegido ya no está disponible para estos datos. Vuelve a cotizar.' }) }
 
-      // 4) CREAR GUÍA. Excepción durante el POST = resultado DESCONOCIDO (no se prueba que DHL no la
+      // 4) CREAR GUÍA. Excepción o timeout durante el POST = resultado DESCONOCIDO (no se prueba que DHL no la
       //    creó) → unknown_requires_reconciliation, SIN retry automático (preferible bloquear a duplicar).
       let shipResp: Response
       try {
-        shipResp = await fetch(`${base}/shipments`, { method: 'POST', headers: { ...H, 'Message-Reference': msgRef }, body: JSON.stringify(buildShipmentRequest(shipper, receiver, pkg, account, productCode, orderRef)) })
+        shipResp = await fetchConTimeout(fetch, `${base}/shipments`, { method: 'POST', headers: { ...H, 'Message-Reference': msgRef, 'Message-Reference-Date': new Date().toUTCString() }, body: JSON.stringify(buildShipmentRequest(shipper, receiver, pkg, account, productCode, orderRef, referencia)) }, TIMEOUT_GUIA_MS)
       } catch (e) {
         obs('create_shipment', 'unknown', { code: 'create_timeout', error: e })
         await markUnknown(admin, attemptId, `create timeout/network: ${(e as Error).message}`)

@@ -111,3 +111,26 @@ productivo sin prefijo `/t1-shipping`: cotización `/quote/create-with-quote`; l
 Pendiente de T1 (ticket 49867905417): confirmar host y modo, entregar client_secret/usuario/contraseña del realm T1, confirmar
 la ruta de guía y el shop_id de producción. Los secretos legado `T1_AUTH_URL`, `T1_CLIENT_SECRET`, `T1_USERNAME`, `T1_PASSWORD`
 no se leen.
+
+## DHL D1 · reconciliación de intentos en estado desconocido (local, sin deploy)
+Un intento `unknown_requires_reconciliation` (timeout o excepción al crear la guía, 2xx sin número, fallo al guardar) ya tiene
+salida desde el sistema, siempre con hechos del proveedor obtenidos por el servidor:
+- **Referencia CU única por intento**: el id del intento sin guiones viaja en la guía (`customerReferences` en la raíz y en el
+  paquete) y como `Message-Reference`. Probado en sandbox (23 oct 2026): DHL la acepta (201). El snapshot de la petición se
+  guarda en `shipping_attempts.request` al reclamar.
+- **Acción `reconciliar_guia` (solo Dirección)**: `sub: 'consultar'` busca en DHL por referencia
+  (`GET /tracking?shipmentReference&shipmentReferenceType=CU&shipperAccountNumber&dateRangeFrom/To`; la cuenta es obligatoria,
+  DHL 400/1013 sin ella) y, si Dirección trae un número del portal, también por número. `sub: 'resolver'` repite la consulta y
+  llama al comando `reconciliar_guia` (migración 190) con la identidad de quien decide; la evidencia nunca viene del cliente.
+- **`sin_guia`**: decisión bajo riesgo declarado: ≥ 60 min, consulta sin resultados, ningún hallazgo, portal revisado, motivo
+  y aceptación expresa del duplicado tardío. Un 404 ("No Shipments Found") NUNCA prueba inexistencia. Libera el pedido.
+- **`guia_confirmada`**: solo si la consulta halló exactamente una guía con la referencia del intento y coincide en servicio,
+  CP de destino, peso (±10 %) y piezas con el snapshot; nadie más la tiene. `finalize_shipment` + pedido enviado por el camino
+  normal; costo del intento si existe (si no, `provider_meta.costo_pendiente`); etiqueta por `get-image` (exige
+  `pickupYearAndMonth=YYYY-MM`) como best-effort.
+- **Consulta previa a recomprar**: si el pedido tuvo un cierre `sin_guia`, antes de crear otra guía se busca por la referencia
+  de ese intento: hallada → 409 `guia_hallada_tarde`; sin respuesta → 503 `consulta_previa_fallida` (fail-closed).
+- **Fecha planeada**: siguiente día hábil lunes a viernes (antes "mañana": un viernes DHL respondía 996). Sin festivos de DHL.
+- **Timeouts**: cotización 30 s, guía 60 s, consultas 20 s. Timeout al crear sigue siendo "desconocido" (nunca se reintenta solo).
+Pantalla: rama "estado desconocido" de `GuiaManualVoid` (detalle de venta de un pedido empacado), sin pantalla nueva.
+Código: `dhl.ts` (sección DHL D1) e `index.ts` (acción `reconciliar_guia`, consulta previa, timeouts). Pruebas: `dhl_d1_00_reconciliar_guia.sql`, `dhl_d1_concurrency.sh`, `dhl_d1_rollback.sql`, `dhlD1.test.ts`, `reconciliarGuia.test.ts`.

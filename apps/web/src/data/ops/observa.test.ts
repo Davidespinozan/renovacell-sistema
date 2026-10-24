@@ -300,7 +300,7 @@ describe('observa.ts · aislamiento', () => {
 
 // ───────────────────────── instrumentación de las Edge Functions ─────────────────────────
 const INSTRUMENTADAS: Record<string, number> = {
-  shipping: 30, 'cfdi-send': 1,   // T1 v2.0: +11 en el bloque T1 (config inválida, cotización, guía, excepción)
+  shipping: 35, 'cfdi-send': 1,   // T1 v2.0: +11 en el bloque T1 (config inválida, cotización, guía, excepción) · T1-LIVE-02: +1 (autenticación) · DHL D1: +4 (consulta por referencia, get-image, consulta previa: hallada tarde / sin respuesta)
   'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 1,
   'stripe-webhook': 3, 'meta-webhook': 3, 'report-transfer': 1,
 }
@@ -360,7 +360,7 @@ describe('Edge Functions · qué reporta y qué no', () => {
     expect(markUnknown).toBe(6)   // DHL 3 + T1 v2.0 3 (timeout de guía, 2xx sin guía reconocible, finalize)
     expect(unknown).toBe(markUnknown + 3)   // PAQ-B: +3 en recolección (sin respuesta al agendar, sin confirmación, sin respuesta al cancelar)
     const provider = (src.match(/obs\('[a-z0-9_]+', 'provider_error'/g) ?? []).length
-    expect(provider).toBe(19)   // DHL 12 (PAQ-A +2 rastreo, PAQ-B +2 recolección) + T1 v2.0 7 (cotización, guía rechazada/409, excepción)
+    expect(provider).toBe(22)   // DHL 12 (PAQ-A +2 rastreo, PAQ-B +2 recolección) + T1 v2.0 7 (cotización, guía rechazada/409, excepción) + DHL D1 3 (referencia, get-image, consulta previa sin respuesta)
   })
   it('L2 · fiscal: incierto → unknown; persistencia → internal_error; 502 Facturama → provider_error', () => {
     const cancel = soloCodigo(edge('cfdi-cancel'))
