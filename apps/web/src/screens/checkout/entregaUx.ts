@@ -20,7 +20,7 @@ export function faltantePara(ops: Pick<OpcionesEntrega, 'regla' | 'subtotal'>, o
 /** Nombre corto de la modalidad (lo que el doctor entiende); el servidor sigue siendo quien la define. */
 export function tituloModalidad(o: Pick<OpcionEntrega, 'tipo' | 'paqueteria' | 'texto'>): string {
   if (o.tipo === 'recoge') return 'Recoger en sucursal'
-  if (o.tipo === 'local') return 'Entrega a domicilio'
+  if (o.tipo === 'local') return 'Entrega con chofer'   // CX-V2-C · dentro de "Enviar a domicilio": el servicio, no la intención
   if (o.tipo === 'foraneo' && o.paqueteria === 'dhl') return 'Envío por DHL'
   if (o.tipo === 'foraneo' && o.paqueteria === 't1') return 'Envío por T1'
   return o.texto
@@ -95,6 +95,46 @@ export function elegirOpcion(ops: OpcionesEntrega, actual: string | null): Selec
   if (unica) return { opcion: elegibles[0].id, invalidada: null, unica }
   const sugerida = ops.sugerida && elegibles.some((o) => o.id === ops.sugerida) ? ops.sugerida : null
   return { opcion: sugerida, invalidada: null, unica }
+}
+
+// ── CX-V2-C · tres conceptos separados ───────────────────────────────────────────────────────────────────────────────
+//   intención del doctor (recoger / enviar a domicilio) · dirección (solo si es domicilio) · modalidad que AUTORIZA el
+//   servidor (recoge, local_chofer, foraneo_dhl…). La intención es solo de interfaz: lo que viaja al servidor sigue siendo
+//   una modalidad que él reconoce. Nunca se usa `recoge` para tapar una intención de domicilio que no cumple.
+export type Intencion = 'recoge' | 'domicilio'
+export const esDomicilio = (o: Pick<OpcionEntrega, 'tipo'> | null | undefined): boolean => o?.tipo === 'local' || o?.tipo === 'foraneo'
+
+/** Intención con la que abre el checkout: la de la modalidad que elegiría la regla de CX-V2-A (única elegible o sugerida). */
+export function intencionInicial(ops: OpcionesEntrega): Intencion | null {
+  const r = elegirOpcion(ops, null)
+  const o = r.opcion ? ops.opciones.find((x) => x.id === r.opcion) ?? null : null
+  return !o ? null : o.tipo === 'recoge' ? 'recoge' : esDomicilio(o) ? 'domicilio' : null
+}
+
+/**
+ * Modalidad dentro de la intención:
+ *  · recoger → la opción de recoger (siempre se puede);
+ *  · domicilio → la elección vigente si sigue siendo una modalidad a domicilio elegible; si dejó de serlo, se informa y se
+ *    exige elegir (nunca se cambia sola, ni a recoger ni a otra con otro precio); sin elección: la única elegible o la
+ *    sugerida del servidor si es a domicilio; si no, ninguna (el doctor ve por qué).
+ */
+export function elegirEnIntencion(ops: OpcionesEntrega, intencion: Intencion | null, actual: string | null): { opcion: string | null; invalidada: OpcionEntrega | null } {
+  if (!intencion) return { opcion: null, invalidada: null }
+  if (intencion === 'recoge') {
+    const r = ops.opciones.find((o) => o.tipo === 'recoge' && puedeElegir(o))
+    return { opcion: r?.id ?? null, invalidada: null }
+  }
+  const elegibles = opcionesElegibles(ops).filter(esDomicilio)
+  const sel = actual ? ops.opciones.find((o) => o.id === actual) ?? null : null
+  if (sel && esDomicilio(sel)) return puedeElegir(sel) ? { opcion: sel.id, invalidada: null } : { opcion: null, invalidada: sel }
+  if (elegibles.length === 1) return { opcion: elegibles[0].id, invalidada: null }
+  const sugerida = ops.sugerida && elegibles.some((o) => o.id === ops.sugerida) ? ops.sugerida : null
+  return { opcion: sugerida, invalidada: null }
+}
+
+/** Opciones de envío a domicilio que se muestran DENTRO de "Enviar a domicilio" (la dirección se elige arriba de ellas). */
+export function tarjetasDomicilio(ops: OpcionesEntrega, sel: string | null, horario: HorarioElegido | null): Tarjeta[] {
+  return tarjetasEntrega(ops, sel, horario).filter((t) => esDomicilio(ops.opciones.find((o) => o.id === t.id)) && t.accion !== 'direccion')
 }
 
 /** Aviso breve cuando la modalidad elegida dejó de ser válida (cambió el carrito o la dirección). */

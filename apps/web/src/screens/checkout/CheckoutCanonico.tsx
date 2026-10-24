@@ -22,7 +22,7 @@ import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
 import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
 import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
-import { avisoInvalidada, claveDireccion, elegirOpcion, resumenDireccion, tarjetasEntrega, tituloModalidad, type Tarjeta } from './entregaUx'   // CX-V2-A/B
+import { avisoInvalidada, claveDireccion, elegirEnIntencion, intencionInicial, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad, type Intencion, type Tarjeta } from './entregaUx'   // CX-V2-A/B/C
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
 export interface MotorLocal {
@@ -94,6 +94,27 @@ const SECCION: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'va
 const NOTA: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.4, color: 'var(--ink-3)' }
 const FILA: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, color: 'var(--ink-2)' }
 
+// CX-V2-C · lo que el doctor eligió (recoger o domicilio y la ubicación guardada) sobrevive a "Agregar productos": al
+// volver del catálogo el checkout reabre con esa intención y esa dirección. Solo en memoria de la pestaña; se borra al
+// crear el pedido. Una dirección capturada "solo para este pedido" no se recuerda.
+let memoria: { intencion: Intencion | null; locationId: string | null } = { intencion: null, locationId: null }
+export function olvidarEleccionCheckout() { memoria = { intencion: null, locationId: null } }
+
+function TarjetaIntencion({ id, testid, on, onElegir, titulo, precio, linea, extra }: { id: Intencion; testid: string; on: boolean; onElegir: (i: Intencion) => void; titulo: string; precio: string; linea: string; extra?: string }) {
+  return (
+    <label data-testid={testid} style={{ display: 'block', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', border: on ? '1.5px solid var(--green-deep)' : '1px solid var(--line)', background: on ? 'var(--ok-bg, #EAF4EC)' : '#fff' }}
+      onClick={() => { if (!on) onElegir(id) }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 24 }}>
+        <input type="radio" name="intencion" checked={on} onChange={() => onElegir(id)} style={{ accentColor: 'var(--green-deep)', width: 18, height: 18, margin: 0, flex: 'none' }} />
+        <b style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{titulo}</b>
+        {precio && <span className="mono" data-testid={`intencion-${id}-chip`} style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', color: precio === 'Gratis' ? 'var(--green-deep)' : 'var(--ink)' }}>{precio}</span>}
+      </span>
+      {linea && <span data-testid={`intencion-${id}-texto`} style={{ display: 'block', ...NOTA, marginTop: 3, paddingLeft: 28 }}>{linea}</span>}
+      {extra && <span data-testid={`intencion-${id}-extra`} style={{ display: 'block', ...NOTA, marginTop: 2, paddingLeft: 28 }}>{extra}</span>}
+    </label>
+  )
+}
+
 export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, onDone, onClose, clienteFiscal = clienteFiscalPorDefecto }: PropsCheckout) {
   const conServidor = !!servidor
   const motor = useCheckoutCanonico(servidor)
@@ -142,13 +163,25 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const [avisoEntrega, setAvisoEntrega] = useState<string | null>(null)
   const [verDireccion, setVerDireccion] = useState(false)   // CX-V2-B · selector de dirección desplegado
   const seccionDireccion = useRef<HTMLDivElement | null>(null)
+  // CX-V2-C · intención del doctor (recoger / domicilio), separada de la dirección y de la modalidad del servidor.
+  const [intencion, setIntencion] = useState<Intencion | null>(memoria.intencion)
+  const intencionLista = useRef(memoria.intencion !== null)   // la intención inicial se fija una sola vez; después solo la cambia el doctor
   useEffect(() => {
     if (!ops) return
-    const r = elegirOpcion(ops, opcion)
+    let i = intencion
+    if (!intencionLista.current) { i = intencionInicial(ops); intencionLista.current = true; if (i !== intencion) setIntencion(i) }
+    const r = elegirEnIntencion(ops, i, opcion)
     if (r.opcion !== opcion) setOpcion(r.opcion)
     if (r.invalidada) setAvisoEntrega(avisoInvalidada(r.invalidada, ops))
   }, [ops])   // eslint-disable-line react-hooks/exhaustive-deps
   const elegir = (id: string) => { setOpcion(id); setAvisoEntrega(null) }
+  const elegirIntencion = (i: Intencion) => {
+    intencionLista.current = true
+    setIntencion(i); setAvisoEntrega(null); setHorario(null)
+    if (ops) setOpcion(elegirEnIntencion(ops, i, null).opcion)
+    if (i === 'domicilio' && !choice?.address) setVerDireccion(true)
+  }
+  useEffect(() => { memoria = { intencion, locationId: choice?.locationId ?? null } }, [intencion, choice?.locationId])
   // CX-V2-A · las opciones y fletes se recalculan en el servidor cuando cambia la dirección (antes: solo al abrir y al confirmar).
   const claveDir = claveDireccion(choice)
   const revisadaCon = useRef<string | null>(null)   // dirección con la que ya revisó el servidor (la de apertura es la predeterminada)
@@ -160,7 +193,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     revisadaCon.current = claveDir
     void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null })
   }, [claveDir, dirRevision])   // eslint-disable-line react-hooks/exhaustive-deps
-  const necesitaDireccion = ops ? requiereDireccion(sel?.tipo) : true   // sin opciones (demo/fixtures) se exige dirección como antes
+  const necesitaDireccion = ops ? (intencion === 'domicilio' || requiereDireccion(sel?.tipo)) : true   // sin opciones (demo/fixtures) se exige dirección como antes
   const envio = ops ? (sel?.flete ?? null) : null
   // Total: el del servidor con envío cuando la revisión ya normalizó ESTA opción; si no, productos + flete de la opción (ambos del servidor).
   const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && typeof motor.revision.total_con_envio === 'number'
@@ -170,17 +203,17 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null, horario: necesitaHorario ? horario : null }
   const conVolumen = lineas.some((l) => l.por_volumen)
   // CX-V2-B · solo las alternativas relevantes; la dirección aparece cuando hay entrega a domicilio en juego.
-  const tarjetas: Tarjeta[] = ops ? tarjetasEntrega(ops, opcion, horario) : []
+  const esDomicilioSel = sel?.tipo === 'local' || sel?.tipo === 'foraneo'
+  const tarjetaRecoge: Tarjeta | null = ops ? tarjetasEntrega(ops, opcion, horario).find((t) => opcionDe(ops, t.id)?.tipo === 'recoge') ?? null : null
+  const opcionesCasa: Tarjeta[] = ops ? tarjetasDomicilio(ops, opcion, horario) : []
   // CX-V2-B hotfix · estados de carga ESTABLES: mientras llega la primera revisión se muestra un esqueleto (sin el selector
   // completo que luego desaparecería); al cambiar de dirección, las opciones quedan atenuadas y bloqueadas hasta que el
   // servidor responda por la dirección nueva; si la revisión falla, no se confirma con los datos anteriores.
   const cargandoInicial = conServidor && !motor.revision && !motor.errorRevision
   const dirPendiente = conServidor && claveDir !== 'ninguna' && revisadaCon.current !== null && claveDir !== revisadaCon.current
   const obsoleto = conServidor && !!ops && !cargandoInicial && (motor.revisando || dirPendiente || !!motor.errorRevision)   // con opciones en pantalla (lo que puede verse viejo)
-  const pideDireccionEnTarjeta = tarjetas.some((t) => t.accion === 'direccion')
   const reintentar = () => { void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null }) }
   const desglose = !!ops && ((envio ?? 0) > 0 || conVolumen)
-  const abrirDireccion = () => { setVerDireccion(true); setTimeout(() => seccionDireccion.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 0) }
 
   const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk) || cargandoInicial || obsoleto
   const confirm = async () => {
@@ -198,6 +231,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     // haría que el doctor pierda su selección por un pedido que no existe.
     if (!r.ok) { setErrorPedido(r.error); return }
     setOrder(r.order); setAviso(r.aviso ?? null)
+    olvidarEleccionCheckout()   // CX-V2-C · la siguiente compra empieza de cero
     onDone?.() // solo con el pedido confirmado
   }
 
@@ -276,87 +310,105 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
               )}
               {avisoRevision && <div role="status" style={{ ...NOTA, color: 'var(--warn)', marginTop: 8 }} data-testid="checkout-aviso">Antes de pedir: {avisoRevision}.</div>}
 
-              {/* CX-V2-B · 2) ¿Cómo quieres recibirlo? Solo lo que aplica a esta dirección y este pedido. */}
+              {/* CX-V2-C · 2) ¿Cómo quieres recibirlo? Primero la intención: recoger o enviar a domicilio. La dirección y las
+                  opciones de envío viven SOLO dentro de "Enviar a domicilio". */}
               {cargandoInicial && (
                 <div data-testid="checkout-cargando" aria-busy="true" aria-live="polite" style={{ marginTop: 20 }}>
                   <div style={SECCION}>¿Cómo quieres recibirlo?</div>
                   <div style={{ display: 'grid', gap: 8 }}>{[0, 1].map((i) => <div key={i} style={{ height: 58, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface-2, #fafafa)' }} />)}</div>
-                  <div style={{ ...SECCION, marginTop: 20 }}>Entregar en</div>
-                  <div style={{ height: 46, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface-2, #fafafa)' }} />
                   <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Calculando opciones de entrega…</span>
                 </div>
               )}
               {!cargandoInicial && ops && (
                 <div data-testid="checkout-entrega" aria-busy={obsoleto || undefined} style={{ marginTop: 20 }}>
                   <div style={SECCION}>¿Cómo quieres recibirlo?{obsoleto && !motor.errorRevision && <span style={{ fontWeight: 400, color: 'var(--ink-3)', fontSize: 12 }} data-testid="checkout-actualizando"> · actualizando…</span>}</div>
-                  {avisoEntrega && <div role="alert" style={{ ...NOTA, color: 'var(--warn)', margin: '0 0 8px' }} data-testid="checkout-entrega-aviso">{avisoEntrega}</div>}
-                  <div role="radiogroup" aria-label="Forma de entrega" style={{ display: 'grid', gap: 8, opacity: obsoleto ? 0.5 : 1, pointerEvents: obsoleto ? 'none' : undefined, transition: 'opacity .15s' }}>
-                    {tarjetas.map((t) => {
-                      const on = opcion === t.id
-                      return (
-                        <label key={t.id} data-testid={`entrega-${t.id}`} aria-disabled={t.bloqueada || undefined}
-                          style={{ display: 'block', padding: '12px 14px', borderRadius: 12, cursor: t.bloqueada ? 'default' : 'pointer',
-                            border: on ? '1.5px solid var(--green-deep)' : t.bloqueada ? '1px dashed var(--line)' : '1px solid var(--line)',
-                            background: on ? 'var(--ok-bg, #EAF4EC)' : t.bloqueada ? 'var(--surface-2, #fafafa)' : '#fff' }}
-                          onClick={() => { if (!t.bloqueada) elegir(t.id) }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 24 }}>
-                            {!t.bloqueada && <input type="radio" name="entrega" checked={on} onChange={() => elegir(t.id)} style={{ accentColor: 'var(--green-deep)', width: 18, height: 18, margin: 0, flex: 'none' }} />}
-                            <b style={{ flex: 1, fontSize: 14, fontWeight: 600, color: t.bloqueada ? 'var(--ink-2)' : 'var(--ink)' }}>{t.titulo}</b>
-                            <span className="mono" data-testid={`entrega-${t.id}-chip`} style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', color: t.bloqueada ? 'var(--ink-3)' : t.precio === 'Gratis' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.precio}</span>
-                          </span>
-                          <span data-testid={`entrega-${t.id}-texto`} style={{ display: 'block', ...NOTA, marginTop: 3, paddingLeft: t.bloqueada ? 0 : 28 }}>{t.linea}</span>
-                          {t.nota && <span data-testid={`entrega-${t.id}-nota`} style={{ display: 'block', ...NOTA, color: 'var(--ink-2)', marginTop: 2, paddingLeft: 28 }}>{t.nota}</span>}
-                          {t.accion && (
-                            <button className="btn ghost sm" type="button" style={{ marginTop: 10, marginLeft: t.bloqueada ? 0 : 28, minHeight: 36 }}
-                              data-testid={t.accion === 'agregar' ? 'checkout-agregar' : 'checkout-agregar-direccion'}
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (t.accion === 'agregar') onClose(); else abrirDireccion() }}>
-                              {t.accion === 'agregar' ? 'Agregar productos' : 'Agregar dirección'}
-                            </button>
-                          )}
-                        </label>
-                      )
-                    })}
+                  <div role="radiogroup" aria-label="Cómo quieres recibirlo" style={{ display: 'grid', gap: 8 }}>
+                    {tarjetaRecoge && (
+                      <TarjetaIntencion id="recoge" testid={`entrega-${tarjetaRecoge.id}`} on={intencion === 'recoge'} onElegir={elegirIntencion}
+                        titulo="Recoger en sucursal" precio={tarjetaRecoge.precio} linea={tarjetaRecoge.linea} extra={intencion === 'recoge' ? ops.recoge.lugar : undefined} />
+                    )}
+                    <TarjetaIntencion id="domicilio" testid="entrega-domicilio" on={intencion === 'domicilio'} onElegir={elegirIntencion}
+                      titulo="Enviar a domicilio" precio=""
+                      linea={intencion === 'domicilio' ? '' : 'Elige la dirección y te mostramos costo y tiempo.'} />
                   </div>
-                  {necesitaHorario && (
-                    <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="checkout-horario">
-                      <div style={{ ...SECCION, margin: '0 0 8px', fontSize: 13 }}>¿A qué hora lo recibes? {!horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige un horario</span>}</div>
-                      <HorarioEntregaPicker value={horario} onChange={setHorario} cargar={servidor?.cargarHorarios} compacto />
-                    </div>
-                  )}
-                  {sel && sel.tipo !== 'recoge' && (
-                    <div style={{ ...NOTA, marginTop: 8 }} data-testid="checkout-corte">
-                      {ops.corte.antes_de_corte ? `Pedidos antes de las ${ops.corte.hora} salen el mismo día.` : `Después de las ${ops.corte.hora} sale el siguiente día hábil.`}
+                  {intencion === 'domicilio' && (
+                    <div ref={seccionDireccion} data-testid="checkout-direccion" style={{ marginTop: 14, paddingLeft: 14, borderLeft: '2px solid var(--line)' }}>
+                      <div style={{ ...SECCION, fontSize: 14, marginBottom: 8 }}>Entregar en</div>
+                      {choice?.address && !verDireccion && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, background: '#fff' }}>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5 }} data-testid="checkout-direccion-resumen">{resumenDireccion(choice.address)}</span>
+                          <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} onClick={() => setVerDireccion(true)} data-testid="checkout-direccion-cambiar">Cambiar</button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* CX-V2-B · 3) dirección: solo cuando hay entrega a domicilio en juego; con "recoger" queda en una línea. El selector
-                  sigue montado (conserva la dirección elegida y la predeterminada del doctor no se toca). */}
-              {/* CX-V2-B hotfix · la dirección SIEMPRE se puede consultar o cambiar (también con "recoger"). Antes se ocultaba cuando
-                  el selector reportaba null (ubicación predeterminada incompleta o varias sin predeterminada) y no había otra vía. */}
-              <div ref={seccionDireccion} style={{ marginTop: 20, display: cargandoInicial || (!choice?.address && !verDireccion && pideDireccionEnTarjeta) ? 'none' : 'block' }} data-testid="checkout-direccion">
-                <div style={SECCION}>{ops && sel?.tipo === 'recoge' ? 'Dirección para entrega a domicilio' : 'Entregar en'}</div>
-                {ops && sel?.tipo === 'recoge' && <div style={{ ...NOTA, marginTop: -4, marginBottom: 6 }} data-testid="checkout-direccion-nota">No se usa para recoger en sucursal.</div>}
-                {ops && choice?.address && !verDireccion && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, background: '#fff' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5 }} data-testid="checkout-direccion-resumen">{resumenDireccion(choice.address)}</span>
-                    <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} onClick={() => setVerDireccion(true)} data-testid="checkout-direccion-cambiar">Cambiar</button>
-                  </div>
+              {/* CX-V2-C · el selector de dirección está SIEMPRE montado (conserva la elección; la predeterminada no se toca) y solo se
+                  ve dentro de "Enviar a domicilio" (o sin opciones del servidor, modo demo). Con "recoger" no se muestra. */}
+              <div data-testid="checkout-direccion-selector" style={{ display: !ops ? (cargandoInicial ? 'none' : 'block') : intencion === 'domicilio' && !cargandoInicial && (verDireccion || !choice?.address) ? 'block' : 'none', marginTop: !ops ? 16 : 8, paddingLeft: ops ? 14 : 0, borderLeft: ops ? '2px solid var(--line)' : undefined }}>
+                {!ops && <div style={SECCION}>Entregar en</div>}
+                <DeliveryLocationPicker legacyBase={base} onChange={setChoice} preferido={memoria.locationId} />
+                {ops && verDireccion && choice?.address && (
+                  <div style={{ textAlign: 'right', marginTop: 6 }}><button className="btn ghost sm" type="button" onClick={() => setVerDireccion(false)} data-testid="checkout-direccion-listo">Listo</button></div>
                 )}
-                {ops && !choice?.address && !verDireccion && !necesitaDireccion && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px dashed var(--line)', borderRadius: 12, background: '#fff' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: 'var(--ink-2)' }} data-testid="checkout-direccion-pendiente">Elige a dónde te lo enviaríamos</span>
-                    <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} onClick={() => setVerDireccion(true)} data-testid="checkout-direccion-elegir">Elegir dirección</button>
-                  </div>
-                )}
-                <div style={{ display: !ops || verDireccion || (!choice?.address && necesitaDireccion) ? 'block' : 'none' }} data-testid="checkout-direccion-selector">
-                  <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
-                  {ops && verDireccion && (
-                    <div style={{ textAlign: 'right', marginTop: 6 }}><button className="btn ghost sm" type="button" onClick={() => setVerDireccion(false)} data-testid="checkout-direccion-listo">{choice?.address ? 'Listo' : 'Cerrar'}</button></div>
+              </div>
+
+              {/* CX-V2-C · opciones de envío para ESA dirección (las autoriza el servidor); solo dentro de "Enviar a domicilio". */}
+              {!cargandoInicial && ops && intencion === 'domicilio' && (
+                <div data-testid="checkout-domicilio" style={{ marginTop: 12, paddingLeft: 14, borderLeft: '2px solid var(--line)' }}>
+                  {!choice?.address ? (
+                    <div style={NOTA} data-testid="checkout-direccion-falta">Elige o completa la dirección para ver costo y tiempo de envío.</div>
+                  ) : (
+                    <>
+                      {avisoEntrega && <div role="alert" style={{ ...NOTA, color: 'var(--warn)', margin: '0 0 8px' }} data-testid="checkout-entrega-aviso">{avisoEntrega}</div>}
+                      <div role="radiogroup" aria-label="Opciones de envío" style={{ display: 'grid', gap: 8, opacity: obsoleto ? 0.5 : 1, pointerEvents: obsoleto ? 'none' : undefined, transition: 'opacity .15s' }}>
+                        {opcionesCasa.map((t) => {
+                          const on = opcion === t.id
+                          return (
+                            <label key={t.id} data-testid={`entrega-${t.id}`} aria-disabled={t.bloqueada || undefined}
+                              style={{ display: 'block', padding: '12px 14px', borderRadius: 12, cursor: t.bloqueada ? 'default' : 'pointer',
+                                border: on ? '1.5px solid var(--green-deep)' : t.bloqueada ? '1px dashed var(--line)' : '1px solid var(--line)',
+                                background: on ? 'var(--ok-bg, #EAF4EC)' : t.bloqueada ? 'var(--surface-2, #fafafa)' : '#fff' }}
+                              onClick={() => { if (!t.bloqueada) elegir(t.id) }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 24 }}>
+                                {!t.bloqueada && <input type="radio" name="entrega" checked={on} onChange={() => elegir(t.id)} style={{ accentColor: 'var(--green-deep)', width: 18, height: 18, margin: 0, flex: 'none' }} />}
+                                <b style={{ flex: 1, fontSize: 14, fontWeight: 600, color: t.bloqueada ? 'var(--ink-2)' : 'var(--ink)' }}>{t.titulo}</b>
+                                <span className="mono" data-testid={`entrega-${t.id}-chip`} style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', color: t.bloqueada ? 'var(--ink-3)' : t.precio === 'Gratis' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.precio}</span>
+                              </span>
+                              <span data-testid={`entrega-${t.id}-texto`} style={{ display: 'block', ...NOTA, marginTop: 3, paddingLeft: t.bloqueada ? 0 : 28 }}>{t.linea}</span>
+                              {t.nota && <span data-testid={`entrega-${t.id}-nota`} style={{ display: 'block', ...NOTA, color: 'var(--ink-2)', marginTop: 2, paddingLeft: 28 }}>{t.nota}</span>}
+                              {t.accion === 'agregar' && (
+                                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, marginLeft: t.bloqueada ? 0 : 28 }}>
+                                  <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} data-testid="checkout-agregar"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose() }}>Agregar productos</button>
+                                </span>
+                              )}
+                            </label>
+                          )
+                        })}
+                        {!opcionesCasa.length && (
+                          <div data-testid="checkout-sin-envio" style={{ ...NOTA, padding: '10px 12px', border: '1px dashed var(--line)', borderRadius: 12 }}>
+                            No tenemos envío a domicilio para esta dirección. Elige otra dirección o recoge en sucursal.
+                          </div>
+                        )}
+                      </div>
+                      {necesitaHorario && (
+                        <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="checkout-horario">
+                          <div style={{ ...SECCION, margin: '0 0 8px', fontSize: 13 }}>¿A qué hora lo recibes? {!horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige un horario</span>}</div>
+                          <HorarioEntregaPicker value={horario} onChange={setHorario} cargar={servidor?.cargarHorarios} compacto />
+                        </div>
+                      )}
+                      {sel && esDomicilioSel && (
+                        <div style={{ ...NOTA, marginTop: 8 }} data-testid="checkout-corte">
+                          {ops.corte.antes_de_corte ? `Pedidos antes de las ${ops.corte.hora} salen el mismo día.` : `Después de las ${ops.corte.hora} sale el siguiente día hábil.`}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
-              </div>
+              )}
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, fontSize: 13.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={invoice} onChange={(e) => setInvoice(e.target.checked)} data-testid="checkout-factura" /> Solicitar factura (CFDI)
@@ -392,7 +444,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Total</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Total{ops && intencion === 'domicilio' && !esDomicilioSel ? ' · envío por definir' : ''}</div>
                     <b data-testid="checkout-total" style={{ fontSize: 22, fontVariantNumeric: 'tabular-nums', opacity: obsoleto ? 0.5 : 1 }}>{cargandoInicial ? 'Calculando…' : totalConEnvio != null ? money(totalConEnvio) : motor.revisando ? 'Calculando…' : '—'}</b>
                   </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>

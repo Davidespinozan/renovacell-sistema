@@ -36,11 +36,13 @@ function fieldsToShipping(f: LocationFields): ShippingAddress {
 // staff/POS "a nombre de" → SOLO leer ubicaciones del doctor, elegir una, o capturar una
 // dirección one-off. No crea/edita/desactiva ni cambia default (lo impediría la RLS de todos
 // modos; §3: no mezclar administración con checkout POS).
-export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowManage = true }: {
+export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowManage = true, preferido }: {
   doctorId?: string
   legacyBase: ShippingAddress | null
   onChange: (c: DeliveryChoice | null) => void
   allowManage?: boolean
+  /** CX-V2-C · ubicación guardada a preseleccionar si sigue activa (p. ej. la que el doctor eligió antes de ir a agregar productos). No cambia la predeterminada. */
+  preferido?: string | null
 }) {
   const { data, loading, reload, createDoctorLocation, setDefaultDoctorLocation } = useDoctorLocations(doctorId)
   const active = data.filter((l) => l.active)
@@ -58,7 +60,7 @@ export function DeliveryLocationPicker({ doctorId, legacyBase, onChange, allowMa
   useEffect(() => {
     if (loading || inited.current) return
     inited.current = true
-    const sel = initialLocationSelection(active)
+    const sel = preferido && active.some((l) => l.id === preferido) ? { mode: 'auto' as const, selectedId: preferido } : initialLocationSelection(active)
     if (sel.mode === 'auto') { setMode('existing'); setSelectedId(sel.selectedId) }
     else if (sel.mode === 'requires-choice') { setMode(null); setSelectedId(null) }
     else if (shouldOfferLegacy(active, legacyBase)) { setMode('legacy') }
