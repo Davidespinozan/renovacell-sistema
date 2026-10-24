@@ -89,20 +89,31 @@ export function useCheckoutCanonico(cfg: ConfigServidor | null) {
   useEffect(() => { vivo.current = true; return () => { vivo.current = false } }, [])
 
   const enVuelo = useRef(new Map<string, Promise<RevisionCheckout | { error: string }>>())
+  // CX-V2-B hotfix · solo la ÚLTIMA revisión pedida actualiza la pantalla (una respuesta tardía de una dirección anterior
+  // no pisa la vigente) y "revisando" dura mientras haya alguna en vuelo.
+  const ultima = useRef(0)
+  const enCursoN = useRef(0)
   const revisarUnaVez = async (e: EleccionEntrega | null): Promise<RevisionCheckout | { error: string }> => {
     const c = cfgRef.current
     if (!c) return { error: 'El checkout requiere conexión con el servidor.' }
     const cliente = c.cliente ?? clientePorDefecto
+    const n = ++ultima.current
+    enCursoN.current += 1
     setRevisando(true)
     try {
       const cartId = await c.obtenerCartId()
-      if (!cartId) { const error = 'Tu carrito no está disponible. Recarga la página.'; if (vivo.current) setErrorRevision(error); return { error } }
+      if (!cartId) { const error = 'Tu carrito no está disponible. Recarga la página.'; if (vivo.current && n === ultima.current) setErrorRevision(error); return { error } }
       const r = await cliente.revisarCheckout(cartId, ...argsRevision(e))
-      if (!r.ok) { if (vivo.current) setErrorRevision(r.error.mensaje); return { error: r.error.mensaje } }
-      revRef.current = { r: r.data, clave: claveEntrega(e) }
-      if (vivo.current) { setRevision(r.data); setErrorRevision(null) }
+      if (!r.ok) { if (vivo.current && n === ultima.current) setErrorRevision(r.error.mensaje); return { error: r.error.mensaje } }
+      if (n === ultima.current) {
+        revRef.current = { r: r.data, clave: claveEntrega(e) }
+        if (vivo.current) { setRevision(r.data); setErrorRevision(null) }
+      }
       return r.data
-    } finally { if (vivo.current) setRevisando(false) }
+    } finally {
+      enCursoN.current -= 1
+      if (vivo.current && enCursoN.current === 0) setRevisando(false)
+    }
   }
   // CX-V2-A · dos revisiones con la MISMA elección (dirección, opción, horario) en vuelo comparten una sola llamada
   // (p. ej. el recálculo por cambio de dirección y un "Crear pedido" inmediato).

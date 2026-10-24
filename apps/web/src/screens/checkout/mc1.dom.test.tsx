@@ -62,6 +62,7 @@ function falso(revisiones: Array<Resp<RevisionCheckout> | (() => Resp<RevisionCh
   return { c, rev, conf }
 }
 const ok = <T,>(data: T): Resp<T> => ({ ok: true, data })
+const esperarRevisionInicial = () => waitFor(() => expect(screen.queryByTestId('checkout-cargando')).toBeNull())
 
 function montar(f: ReturnType<typeof falso>, extra: { onPedido?: () => void; base?: ShippingAddress | null } = {}) {
   const fiscal = { perfilesFiscales: async () => ({ ok: true, data: { perfiles: [{ id: 'PF1', es_predeterminado: true }, { id: 'PF2', es_predeterminado: false }] } }) } as never
@@ -87,6 +88,7 @@ describe('MC-1 · importes del servidor', () => {
   it('muestra subtotal y total de la REVISIÓN (precio por volumen), no precios de lista locales', async () => {
     const f = falso([ok(lista())])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     await waitFor(() => expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,050/))
     expect(screen.getByTestId('checkout-linea')).toHaveTextContent(/350.*c\/u/)
     expect(screen.getByTestId('checkout-linea')).toHaveTextContent(/1,050/)
@@ -95,6 +97,7 @@ describe('MC-1 · importes del servidor', () => {
   it('sin revisión lista usa la proyección del servidor; REQUIERE_DIRECCION no bloquea ni manda a Perfil', async () => {
     const f = falso([ok(noLista(['REQUIERE_DIRECCION']))])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     await waitFor(() => expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,050/))
     expect(screen.queryByTestId('checkout-aviso')).toBeNull()
     expect(screen.queryByText(/perfil/i)).toBeNull()
@@ -134,6 +137,7 @@ describe('MC-1 · dirección (guardada, nueva, legado) y creación', () => {
   it('la revisión del servidor con la MISMA dirección se reutiliza (no se revisa dos veces)', async () => {
     const f = falso([ok(lista({ direccion: { location_id: 'L1', address: { line1: 'Av. Guardada 1' } } }))])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     await waitFor(() => expect(f.rev.length).toBe(1))
     fireEvent.click(screen.getByText('dir-existente'))   // clave 'loc:L1' ≠ 'ninguna' → revisa con L1
     fireEvent.click(screen.getByTestId('checkout-crear'))
@@ -143,9 +147,9 @@ describe('MC-1 · dirección (guardada, nueva, legado) y creación', () => {
   it('carrito ya convertido (reapertura tras un éxito con respuesta perdida): se muestra el pedido, sin otro', async () => {
     const f = falso([ok(noLista(['YA_CONVERTIDO'], { order_id: 'O9' }))])
     montar(f)
-    fireEvent.click(screen.getByText('dir-existente'))
-    fireEvent.click(screen.getByTestId('checkout-crear'))
-    expect(await screen.findByTestId('checkout-exito')).toBeInTheDocument()
+    await esperarRevisionInicial()   // CX-V2-B hotfix · al llegar la revisión se informa que ya es pedido; no hay botón para otro
+    expect(await screen.findByTestId('checkout-ya-pedido')).toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-crear')).toBeNull()
     expect(f.conf).toHaveLength(0)
   })
 })
@@ -154,6 +158,7 @@ describe('MC-1 · factura opcional', () => {
   it('con factura viaja SOLO el perfil fiscal elegido; sin perfil no se puede crear', async () => {
     const f = falso([ok(lista())])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-factura'))
     await waitFor(() => expect(screen.getByTestId('perfil-sel')).toHaveTextContent('PF1'))   // predeterminado preseleccionado
@@ -168,6 +173,7 @@ describe('MC-1 · idempotencia por intento lógico', () => {
   it('doble clic → una sola confirmación', async () => {
     const f = falso([ok(lista())], [ok(confirmado())], 50)
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-existente'))
     await waitFor(() => expect(f.rev.length).toBe(1))
     const b = screen.getByTestId('checkout-crear')
@@ -178,6 +184,7 @@ describe('MC-1 · idempotencia por intento lógico', () => {
   it('reintento tras fallo de red: misma revisión y MISMA clave (sin otra revisión)', async () => {
     const f = falso([ok(lista())], [{ ok: false, error: { codigo: 'red', mensaje: 'No hay conexión con el servidor. Intenta de nuevo.' } }, ok(confirmado())])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
     expect(await screen.findByTestId('checkout-error')).toHaveTextContent('No hay conexión con el servidor.')
@@ -191,6 +198,7 @@ describe('MC-1 · idempotencia por intento lógico', () => {
   it('cambiar la factura entre intentos usa OTRA clave (no se reutiliza para una operación distinta)', async () => {
     const f = falso([ok(lista())], [{ ok: false, error: { codigo: 'red', mensaje: 'Sin red.' } }, ok(confirmado())])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
     await screen.findByTestId('checkout-error')
@@ -210,6 +218,7 @@ describe('MC-1 · idempotencia por intento lógico', () => {
       [ok({ confirmado: false, motivo, cart_id: 'K' }), ok(confirmado())],
     )
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
     expect(await screen.findByTestId('checkout-error')).toHaveTextContent(texto)
@@ -223,6 +232,7 @@ describe('MC-1 · idempotencia por intento lógico', () => {
     const vencida = lista({ expires_at: new Date(Date.now() - 1000).toISOString() }); const nueva = lista()
     const f = falso([ok(vencida), ok(nueva)])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     await waitFor(() => expect(f.rev.length).toBe(1))
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
@@ -235,6 +245,7 @@ describe('MC-1 · errores reales y cierre/reapertura', () => {
   it('fallo de la revisión: error visible y el pedido no se crea', async () => {
     const f = falso([{ ok: false, error: { codigo: 'no_autorizado', mensaje: 'No tienes acceso a este carrito.' } }])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     expect(await screen.findByTestId('checkout-error-revision')).toHaveTextContent('No tienes acceso a este carrito.')
     fireEvent.click(screen.getByText('dir-existente'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
@@ -244,6 +255,7 @@ describe('MC-1 · errores reales y cierre/reapertura', () => {
   it('problema al revisar con la dirección elegida (dirección inválida): se explica en el checkout, no en Perfil', async () => {
     const f = falso([ok(noLista(['REQUIERE_DIRECCION'])), ok(noLista(['REQUIERE_DIRECCION']))])
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     fireEvent.click(screen.getByText('dir-nueva'))
     fireEvent.click(screen.getByTestId('checkout-crear'))
     expect(await screen.findByTestId('checkout-error')).toHaveTextContent('revisa la dirección de entrega')
@@ -256,6 +268,7 @@ describe('MC-1 · errores reales y cierre/reapertura', () => {
     await waitFor(() => expect(f.rev.length).toBe(1))
     v.unmount(); await espera(10)
     montar(f)
+    await esperarRevisionInicial()   // CX-V2-B hotfix · no se confirma con la revisión inicial pendiente
     await waitFor(() => expect(f.rev.length).toBe(2))
     expect(screen.queryByTestId('checkout-error')).toBeNull(); expect(f.conf).toHaveLength(0)
   })

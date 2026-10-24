@@ -171,11 +171,18 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const conVolumen = lineas.some((l) => l.por_volumen)
   // CX-V2-B · solo las alternativas relevantes; la dirección aparece cuando hay entrega a domicilio en juego.
   const tarjetas: Tarjeta[] = ops ? tarjetasEntrega(ops, opcion, horario) : []
-  const domicilioEnJuego = !ops || tarjetas.some((t) => { const o = opcionDe(ops, t.id); return o?.tipo === 'local' || o?.tipo === 'foraneo' })
+  // CX-V2-B hotfix · estados de carga ESTABLES: mientras llega la primera revisión se muestra un esqueleto (sin el selector
+  // completo que luego desaparecería); al cambiar de dirección, las opciones quedan atenuadas y bloqueadas hasta que el
+  // servidor responda por la dirección nueva; si la revisión falla, no se confirma con los datos anteriores.
+  const cargandoInicial = conServidor && !motor.revision && !motor.errorRevision
+  const dirPendiente = conServidor && claveDir !== 'ninguna' && revisadaCon.current !== null && claveDir !== revisadaCon.current
+  const obsoleto = conServidor && !!ops && !cargandoInicial && (motor.revisando || dirPendiente || !!motor.errorRevision)   // con opciones en pantalla (lo que puede verse viejo)
+  const pideDireccionEnTarjeta = tarjetas.some((t) => t.accion === 'direccion')
+  const reintentar = () => { void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null }) }
   const desglose = !!ops && ((envio ?? 0) > 0 || conVolumen)
   const abrirDireccion = () => { setVerDireccion(true); setTimeout(() => seccionDireccion.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 0) }
 
-  const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk)
+  const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk) || cargandoInicial || obsoleto
   const confirm = async () => {
     if (necesitaDireccion && !choice?.address) return // a domicilio: exige dirección de entrega (recoger no)
     if (ops && !sel) return
@@ -261,15 +268,29 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                   <span className="mono">{l.subtotal != null ? money(l.subtotal) : '—'}</span>
                 </div>
               ))}
-              {conServidor && motor.errorRevision && <div role="alert" style={{ ...NOTA, color: 'var(--danger)', marginTop: 8 }} data-testid="checkout-error-revision">{motor.errorRevision}</div>}
+              {conServidor && motor.errorRevision && (
+                <div role="alert" style={{ ...NOTA, color: 'var(--danger)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="checkout-error-revision">
+                  <span style={{ flex: 1 }}>{motor.errorRevision}</span>
+                  <button className="btn ghost sm" type="button" onClick={reintentar} disabled={motor.revisando} data-testid="checkout-reintentar">Reintentar</button>
+                </div>
+              )}
               {avisoRevision && <div role="status" style={{ ...NOTA, color: 'var(--warn)', marginTop: 8 }} data-testid="checkout-aviso">Antes de pedir: {avisoRevision}.</div>}
 
               {/* CX-V2-B · 2) ¿Cómo quieres recibirlo? Solo lo que aplica a esta dirección y este pedido. */}
-              {ops && (
-                <div data-testid="checkout-entrega" style={{ marginTop: 20 }}>
-                  <div style={SECCION}>¿Cómo quieres recibirlo?{motor.revisando && <span style={{ fontWeight: 400, color: 'var(--ink-3)', fontSize: 12 }}> · actualizando…</span>}</div>
+              {cargandoInicial && (
+                <div data-testid="checkout-cargando" aria-busy="true" aria-live="polite" style={{ marginTop: 20 }}>
+                  <div style={SECCION}>¿Cómo quieres recibirlo?</div>
+                  <div style={{ display: 'grid', gap: 8 }}>{[0, 1].map((i) => <div key={i} style={{ height: 58, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface-2, #fafafa)' }} />)}</div>
+                  <div style={{ ...SECCION, marginTop: 20 }}>Entregar en</div>
+                  <div style={{ height: 46, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface-2, #fafafa)' }} />
+                  <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Calculando opciones de entrega…</span>
+                </div>
+              )}
+              {!cargandoInicial && ops && (
+                <div data-testid="checkout-entrega" aria-busy={obsoleto || undefined} style={{ marginTop: 20 }}>
+                  <div style={SECCION}>¿Cómo quieres recibirlo?{obsoleto && !motor.errorRevision && <span style={{ fontWeight: 400, color: 'var(--ink-3)', fontSize: 12 }} data-testid="checkout-actualizando"> · actualizando…</span>}</div>
                   {avisoEntrega && <div role="alert" style={{ ...NOTA, color: 'var(--warn)', margin: '0 0 8px' }} data-testid="checkout-entrega-aviso">{avisoEntrega}</div>}
-                  <div role="radiogroup" aria-label="Forma de entrega" style={{ display: 'grid', gap: 8 }}>
+                  <div role="radiogroup" aria-label="Forma de entrega" style={{ display: 'grid', gap: 8, opacity: obsoleto ? 0.5 : 1, pointerEvents: obsoleto ? 'none' : undefined, transition: 'opacity .15s' }}>
                     {tarjetas.map((t) => {
                       const on = opcion === t.id
                       return (
@@ -312,7 +333,9 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
 
               {/* CX-V2-B · 3) dirección: solo cuando hay entrega a domicilio en juego; con "recoger" queda en una línea. El selector
                   sigue montado (conserva la dirección elegida y la predeterminada del doctor no se toca). */}
-              <div ref={seccionDireccion} style={{ marginTop: 20, display: domicilioEnJuego && (!ops || !!choice?.address || verDireccion || necesitaDireccion) ? 'block' : 'none' }} data-testid="checkout-direccion">
+              {/* CX-V2-B hotfix · la dirección SIEMPRE se puede consultar o cambiar (también con "recoger"). Antes se ocultaba cuando
+                  el selector reportaba null (ubicación predeterminada incompleta o varias sin predeterminada) y no había otra vía. */}
+              <div ref={seccionDireccion} style={{ marginTop: 20, display: cargandoInicial || (!choice?.address && !verDireccion && pideDireccionEnTarjeta) ? 'none' : 'block' }} data-testid="checkout-direccion">
                 <div style={SECCION}>{ops && sel?.tipo === 'recoge' ? 'Dirección para entrega a domicilio' : 'Entregar en'}</div>
                 {ops && sel?.tipo === 'recoge' && <div style={{ ...NOTA, marginTop: -4, marginBottom: 6 }} data-testid="checkout-direccion-nota">No se usa para recoger en sucursal.</div>}
                 {ops && choice?.address && !verDireccion && (
@@ -321,10 +344,16 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                     <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} onClick={() => setVerDireccion(true)} data-testid="checkout-direccion-cambiar">Cambiar</button>
                   </div>
                 )}
-                <div style={{ display: !ops || verDireccion || !choice?.address ? 'block' : 'none' }}>
+                {ops && !choice?.address && !verDireccion && !necesitaDireccion && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px dashed var(--line)', borderRadius: 12, background: '#fff' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: 'var(--ink-2)' }} data-testid="checkout-direccion-pendiente">Elige a dónde te lo enviaríamos</span>
+                    <button className="btn ghost sm" type="button" style={{ minHeight: 36 }} onClick={() => setVerDireccion(true)} data-testid="checkout-direccion-elegir">Elegir dirección</button>
+                  </div>
+                )}
+                <div style={{ display: !ops || verDireccion || (!choice?.address && necesitaDireccion) ? 'block' : 'none' }} data-testid="checkout-direccion-selector">
                   <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
-                  {ops && verDireccion && choice?.address && (
-                    <div style={{ textAlign: 'right', marginTop: 6 }}><button className="btn ghost sm" type="button" onClick={() => setVerDireccion(false)} data-testid="checkout-direccion-listo">Listo</button></div>
+                  {ops && verDireccion && (
+                    <div style={{ textAlign: 'right', marginTop: 6 }}><button className="btn ghost sm" type="button" onClick={() => setVerDireccion(false)} data-testid="checkout-direccion-listo">{choice?.address ? 'Listo' : 'Cerrar'}</button></div>
                   )}
                 </div>
               </div>
@@ -364,7 +393,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Total</div>
-                    <b data-testid="checkout-total" style={{ fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>{totalConEnvio != null ? money(totalConEnvio) : motor.revisando ? 'Calculando…' : '—'}</b>
+                    <b data-testid="checkout-total" style={{ fontSize: 22, fontVariantNumeric: 'tabular-nums', opacity: obsoleto ? 0.5 : 1 }}>{cargandoInicial ? 'Calculando…' : totalConEnvio != null ? money(totalConEnvio) : motor.revisando ? 'Calculando…' : '—'}</b>
                   </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
