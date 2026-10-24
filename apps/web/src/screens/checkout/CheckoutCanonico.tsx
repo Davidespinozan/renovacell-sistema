@@ -20,8 +20,9 @@ import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
-import { MOTIVO_ENTREGA, fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
+import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
 import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
+import { avisoInvalidada, claveDireccion, descripcionOpcion, elegirOpcion, etiquetaOpcion, llamadaFaltante, opcionesVisibles, puedeElegir } from './entregaUx'   // CX-V2-A
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
 export interface MotorLocal {
@@ -131,16 +132,39 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const ops = conServidor ? motor.revision?.entrega_opciones ?? null : null
   const hoy = ops?.corte.hoy ?? null
   const sel: OpcionEntrega | null = opcionDe(ops, opcion)
+  // CX-V2-A · regla de selección: se conserva la elección mientras siga siendo elegible; si deja de serlo se avisa y se
+  // exige elegir de nuevo (nunca se cambia en silencio a recoger); sin elección previa, la única elegible o la sugerida.
+  const [avisoEntrega, setAvisoEntrega] = useState<string | null>(null)
+  const [unica, setUnica] = useState(false)
   useEffect(() => {
     if (!ops) return
-    if (sel && sel.permitido && sel.disponible) return
-    setOpcion(ops.sugerida ?? ops.opciones.find((o) => o.permitido && o.disponible)?.id ?? null)
+    const r = elegirOpcion(ops, opcion)
+    setUnica(r.unica)
+    if (r.opcion !== opcion) setOpcion(r.opcion)
+    if (r.invalidada) setAvisoEntrega(avisoInvalidada(r.invalidada, ops))
   }, [ops])   // eslint-disable-line react-hooks/exhaustive-deps
+  const elegir = (id: string) => { setOpcion(id); setAvisoEntrega(null) }
+  // CX-V2-A · las opciones y fletes se recalculan en el servidor cuando cambia la dirección (antes: solo al abrir y al confirmar).
+  const claveDir = claveDireccion(choice)
+  const revisadaCon = useRef<string | null>(null)   // dirección con la que ya revisó el servidor (la de apertura es la predeterminada)
+  const dirRevision = motor.revision?.direccion?.location_id ? `loc:${motor.revision.direccion.location_id}` : motor.revision ? 'ninguna' : null
+  useEffect(() => {
+    if (!conServidor || dirRevision === null) return   // hasta que llegue la revisión de apertura
+    if (revisadaCon.current === null) revisadaCon.current = dirRevision
+    if (claveDir === 'ninguna' || claveDir === revisadaCon.current) return   // sin elección explícita el servidor ya usó la predeterminada
+    revisadaCon.current = claveDir
+    void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null })
+  }, [claveDir, dirRevision])   // eslint-disable-line react-hooks/exhaustive-deps
   const necesitaDireccion = ops ? requiereDireccion(sel?.tipo) : true   // sin opciones (demo/fixtures) se exige dirección como antes
   const envio = ops ? (sel?.flete ?? null) : null
-  const totalConEnvio = total != null && envio != null ? total + envio : total
+  // Total: el del servidor con envío cuando la revisión ya normalizó ESTA opción; si no, productos + flete de la opción (ambos del servidor).
+  const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && typeof motor.revision.total_con_envio === 'number'
+    ? motor.revision.total_con_envio
+    : total != null && envio != null ? total + envio : total
   const necesitaHorario = !!ops && requiereHorario(sel)
   const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null, horario: necesitaHorario ? horario : null }
+  const faltante = ops ? llamadaFaltante(ops) : null
+  const conVolumen = lineas.some((l) => l.por_volumen)
 
   const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk)
   const confirm = async () => {
@@ -228,6 +252,13 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 </div>
               ))}
 
+              {/* CX-V2-A · resumen económico con los importes del servidor: productos, marca de precio por volumen, envío y total */}
+              {ops && lineas.length > 0 && total != null && (
+                <div className="coitem" data-testid="checkout-productos">
+                  <span>Productos{conVolumen && <span style={{ color: 'var(--green-deep)', fontSize: 12 }}> · precio por volumen aplicado</span>}</span>
+                  <span className="mono">{money(total)}</span>
+                </div>
+              )}
               {ops && sel && (
                 <div className="coitem" data-testid="checkout-envio">
                   <span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.texto}</span></span>
@@ -243,29 +274,47 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
 
               <div className="eyebrow" style={{ marginTop: 16 }}>Dirección de entrega</div>
               <DeliveryLocationPicker legacyBase={base} onChange={setChoice} />
+              {ops && sel?.tipo === 'recoge' && (
+                <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="checkout-direccion-nota">Para recoger en sucursal no usaremos esta dirección. Si cambias a entrega a domicilio, es a donde lo enviaríamos.</div>
+              )}
+              {ops && !choice?.address && opcionesVisibles(ops).some((o) => o.motivo === 'REQUIERE_DIRECCION') && (
+                <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="checkout-direccion-falta">Para enviarlo a domicilio agrega una dirección. También puedes recogerlo en sucursal sin costo.</div>
+              )}
 
               {ops && (
                 <div data-testid="checkout-entrega">
-                  <div className="eyebrow" style={{ marginTop: 16 }}>¿Cómo lo recibes?</div>
+                  <div className="eyebrow" style={{ marginTop: 16 }}>¿Cómo lo recibes?{motor.revisando && <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}> · actualizando…</span>}</div>
+                  {avisoEntrega && <div role="alert" className="ms" style={{ color: 'var(--warn)', marginBottom: 8 }} data-testid="checkout-entrega-aviso">{avisoEntrega}</div>}
                   <div style={{ display: 'grid', gap: 8 }}>
-                    {ops.opciones.filter((o) => o.permitido || o.motivo !== 'SOLO_PERSONAL').map((o) => {
+                    {opcionesVisibles(ops).map((o) => {
                       const on = opcion === o.id
-                      const puede = o.permitido && o.disponible
+                      const puede = puedeElegir(o)
+                      const chip = etiquetaOpcion(o, ops)
                       return (
                         <label key={o.id} className="addr-opt" data-testid={`entrega-${o.id}`} aria-disabled={!puede}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid ' + (on ? 'var(--green-deep)' : 'var(--line)'), borderRadius: 11, background: on ? 'var(--ok-bg, #EAF4EC)' : '#fff', cursor: puede ? 'pointer' : 'not-allowed', opacity: puede ? 1 : 0.55 }}
-                          onClick={() => { if (puede) setOpcion(o.id) }}>
-                          <input type="radio" name="entrega" checked={on} disabled={!puede} onChange={() => setOpcion(o.id)} />
-                          <span style={{ flex: 1 }}>
-                            <b style={{ display: 'block', fontSize: 13 }}>{o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
-                            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                              {puede ? (requiereHorario(o) ? (on && horario ? `Llega ${horario.fecha === hoy ? 'hoy' : 'el ' + horario.fecha.slice(8, 10) + '/' + horario.fecha.slice(5, 7)} a las ${horario.inicio}` : 'Eliges un horario de media hora') : promesaDe(o, hoy)) : !o.disponible ? 'Próximamente' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica para este pedido'}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid ' + (on ? 'var(--green-deep)' : 'var(--line)'), borderRadius: 11, background: on ? 'var(--ok-bg, #EAF4EC)' : '#fff', cursor: puede ? 'pointer' : 'not-allowed', opacity: puede ? 1 : 0.7 }}
+                          onClick={() => { if (puede) elegir(o.id) }}>
+                          <input type="radio" name="entrega" checked={on} disabled={!puede} onChange={() => elegir(o.id)} />
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <b style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 6px', alignItems: 'baseline', fontSize: 13 }}>
+                              <span>{o.texto}</span>
+                              <span className="mono" style={{ fontWeight: 600, fontSize: 12, color: !puede ? 'var(--ink-3)' : o.flete ? 'var(--ink-2)' : 'var(--green-deep)' }} data-testid={`entrega-${o.id}-chip`}>{chip}</span>
+                            </b>
+                            <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }} data-testid={`entrega-${o.id}-texto`}>
+                              {descripcionOpcion(o, ops, { hoy, seleccionada: on, horario })}
                             </span>
                           </span>
                         </label>
                       )
                     })}
                   </div>
+                  {unica && sel && <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="checkout-entrega-unica">Es la única forma de entrega disponible para este pedido.</div>}
+                  {faltante && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 10, padding: '9px 11px', borderRadius: 10, background: 'var(--surface-2, #fafafa)', border: '1px dashed var(--line)' }} data-testid="checkout-faltante">
+                      <span style={{ fontSize: 12.5 }}>Te faltan <b>{money(faltante.faltante)}</b> para el envío gratis (desde {money(faltante.minimo)}). Tu carrito se conserva.</span>
+                      <button className="btn ghost sm" type="button" onClick={onClose} data-testid="checkout-agregar">{faltante.texto}</button>
+                    </div>
+                  )}
                   {necesitaHorario && (
                     <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="checkout-horario">
                       <div className="eyebrow" style={{ margin: '0 0 8px' }}>¿A qué hora lo recibes? {!horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige un horario</span>}</div>
@@ -301,7 +350,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                   <b>Tu pedido no se creó.</b> {errorPedido} Tu selección sigue en el carrito.
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
                 <button className="btn" type="button" onClick={confirm} disabled={bloqueado} aria-busy={creando} style={bloqueado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} data-testid="checkout-crear"><Icon name="check" /> {creando ? 'Creando pedido…' : 'Crear pedido'}</button>
               </div>

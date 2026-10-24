@@ -35,8 +35,9 @@ const OPS: OpcionesEntrega = {
 const LINEA = { product_id: 'P1', qty: 3, nombre: 'Golden Placenta Mask', precio_unitario: 350, subtotal: 1050 }
 const ENTREGA_DHL: EntregaPedido = { opcion: 'foraneo_dhl', tipo: 'foraneo', paqueteria: 'dhl', texto: 'Envío por DHL', flete: 600, flete_regla: 600, local: false, cp: '82000', salida: '2026-10-21', antes_de_corte: true, llega_desde: '2026-10-22', llega_hasta: '2026-10-26' }
 let nRev = 0
-const sinEntrega = (): RevisionCheckout => ({ listo: false, cart_id: 'K', cart_rev: 3, total: 1050, moneda: 'MXN', lineas: [LINEA], problemas: ['REQUIERE_ENTREGA'], entrega: null, entrega_opciones: OPS })
-const lista = (entrega: EntregaPedido): RevisionCheckout => ({ listo: true, cart_id: 'K', cart_rev: 3, review_id: `R${++nRev}`, expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), total: 1050, moneda: 'MXN', lineas: [LINEA], problemas: [], entrega, entrega_opciones: OPS, envio: entrega.flete, total_con_envio: 1050 + entrega.flete })
+const DIR = { location_id: 'L1', address: { line1: 'Av. del Mar 10', cp: '82000' } }   // el servidor revisa con la ubicación predeterminada
+const sinEntrega = (): RevisionCheckout => ({ listo: false, cart_id: 'K', cart_rev: 3, total: 1050, moneda: 'MXN', lineas: [LINEA], problemas: ['REQUIERE_ENTREGA'], entrega: null, entrega_opciones: OPS, direccion: DIR })
+const lista = (entrega: EntregaPedido): RevisionCheckout => ({ listo: true, cart_id: 'K', cart_rev: 3, review_id: `R${++nRev}`, expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), total: 1050, moneda: 'MXN', lineas: [LINEA], problemas: [], entrega, entrega_opciones: OPS, envio: entrega.flete, total_con_envio: 1050 + entrega.flete, direccion: DIR })
 
 // ENT-H · horarios de entrega local (hoy 21 oct 14:00)
 const DISP: HorariosDisponibles = {
@@ -75,7 +76,7 @@ describe('ENT-1 · entrega en el checkout', () => {
     const dhl = screen.getByTestId('entrega-foraneo_dhl')
     await waitFor(() => expect(dhl.querySelector('input')).toBeChecked())   // la sugerida se preselecciona al llegar las opciones
     expect(dhl).toHaveTextContent(/\$600/); expect(dhl).toHaveTextContent(/Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct/)
-    expect(screen.getByTestId('entrega-local_chofer')).toHaveTextContent(/fuera de Culiacán/)
+    expect(screen.getByTestId('entrega-local_chofer')).toHaveTextContent(/fuera de la zona de entrega local/)   // CX-V2-A · causa real, no el código
     expect(screen.getByTestId('entrega-local_chofer').querySelector('input')).toBeDisabled()
     expect(screen.getByTestId('entrega-foraneo_t1')).toHaveTextContent(/Próximamente/)
     expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/\$600/)

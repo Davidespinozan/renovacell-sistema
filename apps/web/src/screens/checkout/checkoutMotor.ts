@@ -49,8 +49,12 @@ const monto = (x: unknown): number | null => (typeof x === 'number' && Number.is
 
 export function vistaDe(r: RevisionCheckout | null): { lineas: LineaVista[]; total: number | null } {
   if (!r) return { lineas: [], total: null }
-  if (r.lineas?.length) return { lineas: r.lineas.map((l) => ({ product_id: l.product_id, nombre: l.nombre, qty: l.qty, unitario: monto(l.precio_unitario), subtotal: monto(l.subtotal) })), total: monto(r.total) }
   const items = r.proyeccion?.items ?? []
+  if (r.lineas?.length) {
+    // CX-V2-A · la marca "precio por volumen" vive en la proyección; se cruza por producto para mostrarla (sin inventar importes).
+    const porVolumen = new Map(items.map((i) => [i.product_id, i.precio?.por_volumen === true]))
+    return { lineas: r.lineas.map((l) => ({ product_id: l.product_id, nombre: l.nombre, qty: l.qty, unitario: monto(l.precio_unitario), subtotal: monto(l.subtotal), por_volumen: porVolumen.get(l.product_id) ?? false })), total: monto(r.total) }
+  }
   return {
     lineas: items.map((i) => ({ product_id: i.product_id, nombre: i.nombre, qty: i.cantidad, unitario: monto(i.precio?.unitario), subtotal: monto(i.precio?.subtotal), por_volumen: i.precio?.por_volumen })),
     total: monto(r.total),
@@ -84,7 +88,8 @@ export function useCheckoutCanonico(cfg: ConfigServidor | null) {
   const vivo = useRef(true)
   useEffect(() => { vivo.current = true; return () => { vivo.current = false } }, [])
 
-  const revisar = useCallback(async (e: EleccionEntrega | null): Promise<RevisionCheckout | { error: string }> => {
+  const enVuelo = useRef(new Map<string, Promise<RevisionCheckout | { error: string }>>())
+  const revisarUnaVez = async (e: EleccionEntrega | null): Promise<RevisionCheckout | { error: string }> => {
     const c = cfgRef.current
     if (!c) return { error: 'El checkout requiere conexión con el servidor.' }
     const cliente = c.cliente ?? clientePorDefecto
@@ -98,7 +103,17 @@ export function useCheckoutCanonico(cfg: ConfigServidor | null) {
       if (vivo.current) { setRevision(r.data); setErrorRevision(null) }
       return r.data
     } finally { if (vivo.current) setRevisando(false) }
-  }, [])
+  }
+  // CX-V2-A · dos revisiones con la MISMA elección (dirección, opción, horario) en vuelo comparten una sola llamada
+  // (p. ej. el recálculo por cambio de dirección y un "Crear pedido" inmediato).
+  const revisar = useCallback((e: EleccionEntrega | null): Promise<RevisionCheckout | { error: string }> => {
+    const clave = claveEntrega(e)
+    const previa = enVuelo.current.get(clave)
+    if (previa) return previa
+    const p = revisarUnaVez(e).finally(() => { enVuelo.current.delete(clave) })
+    enVuelo.current.set(clave, p)
+    return p
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Al abrir: importes del servidor (sin dirección elegida aún el servidor usa la predeterminada, si existe).
   useEffect(() => { if (cfgRef.current) void revisar(null) }, [revisar])
