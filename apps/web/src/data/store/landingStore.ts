@@ -147,7 +147,7 @@ const DEFAULT: LandingContent = {
     body: 'Validamos tu cédula contra el registro oficial. Si eres profesional de la salud, tu acceso es inmediato — aquí mismo, sin salir de esta página.', boton: 'Verificar mi cédula',
     nota: 'Exclusivo para profesionales de la salud. Sus datos se tratan de forma confidencial.',
   },
-  contacto: { whatsapp: '526675310910', email: 'Facturacion@goldenplacenta.com' },
+  contacto: { whatsapp: '5216671647799', email: 'Facturacion@goldenplacenta.com' },
   pie: {
     desc: 'Tecnología celular S²RM® de grado clínico. Estándares europeos y mexicanos desde 2008. Distribución exclusiva a profesionales de la salud.',
     regs: [{ nombre: 'Certificación', valor: 'CE · Comunidad Europea' }, { nombre: 'Registro', valor: 'COFEPRIS · Vigente' }, { nombre: 'Calidad', valor: 'ISO 13485:2016' }],
