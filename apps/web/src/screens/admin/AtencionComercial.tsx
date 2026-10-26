@@ -437,6 +437,8 @@ function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion;
   const chats = (bandeja?.chats ?? []).filter((c) => filtro === 'todos' || c.canal === filtro)
   const sinResponder = chats.filter((c) => c.sin_responder).length
   const algunoActivo = bandeja ? CANALES.some((k) => bandeja.modos[k] === 'activo') : false
+  const enPrueba = bandeja?.modos.whatsapp === 'prueba'   // R4-C5 · solo los contactos autorizados son atendidos
+  const etiquetaModo = (m: string | null | undefined) => (m === 'activo' ? 'activo' : m === 'prueba' ? 'prueba' : 'espejo')
   return (
     <>
     <PanelOperativoCanal cliente={canalOp} canal="whatsapp" onAbrir={abrirPorId}
@@ -444,11 +446,13 @@ function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion;
     <div className="card" data-testid="wa-bandeja">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: 'var(--ink-3)' }}>
-          {bandeja == null ? 'Cargando…' : !algunoActivo
+          {bandeja == null ? 'Cargando…' : enPrueba && !algunoActivo
+            ? <>WhatsApp en <b>modo prueba</b>: solo los contactos autorizados por Dirección reciben respuesta; los demás siguen en espejo (se registran aquí y se contestan en Leadsales).</>
+            : !algunoActivo
             ? <>Los canales están en <b>modo espejo</b>: lo que llega por WhatsApp, Instagram y Facebook se registra aquí, pero todavía se contesta en Leadsales. Desde aquí solo se lee.</>
             : <>Un canal <b>activo</b> lo contesta primero el asistente y avisa a la vendedora; desde aquí Dirección puede leer, contestar y asignar.</>}
         </div>
-        {bandeja && CANALES.map((k) => <span key={k} className={'pill ' + (bandeja.modos[k] === 'activo' ? 'p-ok' : 'p-warn')} data-testid={`canal-modo-${k}`}>{CANAL[k].nombre}: {bandeja.modos[k] === 'activo' ? 'activo' : 'espejo'}</span>)}
+        {bandeja && CANALES.map((k) => <span key={k} className={'pill ' + (bandeja.modos[k] === 'activo' ? 'p-ok' : 'p-warn')} data-testid={`canal-modo-${k}`}>{CANAL[k].nombre}: {etiquetaModo(bandeja.modos[k])}</span>)}
         {bandeja && sinResponder > 0 && <span className="pill p-warn">{sinResponder} sin responder</span>}
         <button type="button" className="btn ghost sm" onClick={() => void cargar()}>Actualizar</button>
       </div>

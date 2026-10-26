@@ -39,7 +39,7 @@ export interface BandejaWhatsApp { modo: 'espejo' | 'activo'; chats: ChatWhatsAp
 // META-CANALES (170) · los tres canales en una bandeja: cada chat trae su `canal` y su `id` (teléfono o PSID).
 export type CanalBandeja = 'whatsapp' | 'instagram' | 'messenger'
 export interface ChatCanal extends Omit<ChatWhatsApp, 'wa_id'> { canal: CanalBandeja; id: string }
-export interface BandejaCanales { modos: Record<CanalBandeja, 'espejo' | 'activo' | null>; chats: ChatCanal[] }
+export interface BandejaCanales { modos: Record<CanalBandeja, 'espejo' | 'activo' | 'prueba' | null>; chats: ChatCanal[] }   // 'prueba': R4-C5, solo WhatsApp
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>

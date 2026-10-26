@@ -10,7 +10,7 @@ begin
   perform tests.act_as_service();
   a2 := tests.user('admin');
   update public.profiles set meta = coalesce(meta, '{}') || '{"capabilities":["conversaciones"]}' where id in (s1, s2);
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo', ia_habilitada = true, envio_pausado = false where id;
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true, envio_pausado = false where id;
   perform tests.act_as_service();
   r := public.cc_wa_entrante('5216670003001', 'Exclusiva', 'wamid.B23B.1', 'Hola', false);
   c := (r ->> 'conversation_id')::uuid; h := r ->> 'visitor_hash';
@@ -105,7 +105,7 @@ begin
   perform tests.ok(exists (select 1 from public.cc_messages where conversation_id = c2 and client_message_id = 'sys:prueba:e'), '8 · espejo: el sistema registra');
 
   -- 9 · saludo de IA insertado directo con la IA apagada: queda en la conversación pero NO sale
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo', ia_habilitada = false where id;
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = false where id;
   perform tests.act_as_service();
   r := public.cc_wa_entrante('5216670003003', 'Saludo', 'wamid.B23B.S1', 'Hola', false);
   c3 := (r ->> 'conversation_id')::uuid;

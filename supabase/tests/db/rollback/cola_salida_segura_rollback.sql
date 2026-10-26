@@ -1,6 +1,7 @@
 -- R4-B2-2 · el down devuelve la cola EXACTAMENTE a producción (26 oct 2026) y retira estados nuevos, evidencia, decisiones,
 -- verificación previa y RPC; se reaplica idéntica. (La negativa con retenidos se prueba en precondition/r4b22_down_precondicion.sh.)
 begin;
+\ir ../../../rollback/canal_prueba_contacto/99_down.sql   -- R4-C5 (0123) se baja ANTES de la línea base de esta cadena
 update public.cc_wa_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');   -- (datos de otras pruebas)
 update public.cc_meta_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');
 create temp table _cs as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
@@ -19,4 +20,5 @@ end $t$;
 do $t$ begin
   perform tests.ok((select todas from _cs) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), 'B2-2 · se reaplica idéntica');
 end $t$;
+\ir ../../../migrations/20270123120000_canal_prueba_contacto.sql   -- R4-C5 (0123) se reaplica tras la comparación final
 rollback;

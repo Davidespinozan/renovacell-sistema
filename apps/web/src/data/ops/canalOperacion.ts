@@ -10,9 +10,11 @@ import { ERROR_GENERICO, referenciaError, type Reportar, type Resultado } from '
 
 export type CanalOp = 'whatsapp' | 'instagram' | 'messenger'
 export const NOMBRE_CANAL_OP: Record<CanalOp, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook' }
-export interface ControlCanal { canal: CanalOp; modo: 'espejo' | 'activo'; ia_habilitada: boolean; envio_pausado: boolean; updated_at: string | null }
+export interface ControlCanal { canal: CanalOp; modo: 'espejo' | 'activo' | 'prueba'; ia_habilitada: boolean; envio_pausado: boolean; updated_at: string | null }
+// R4-C5 · modo prueba (solo WhatsApp): el servidor dice cuántos contactos autorizados hay, con número enmascarado y vencimiento.
+export interface EstadoPrueba { modo_whatsapp: string; vigentes: number; operativa: boolean; permisos: Array<{ id: number; contacto: string; vence_at: string; autorizado_por: string | null }> }
 export interface CambioHistorial { canal: CanalOp; antes: Partial<ControlCanal> | null; despues: Partial<ControlCanal> | null; origen: string | null; actor: string | null; motivo: string | null; at: string }
-export interface EstadoCanales { activacion_disponible: boolean; canales: ControlCanal[]; historial: CambioHistorial[] }
+export interface EstadoCanales { activacion_disponible: boolean; canales: ControlCanal[]; historial: CambioHistorial[]; prueba?: EstadoPrueba | null }
 export type CambiosCanal = Partial<Pick<ControlCanal, 'modo' | 'ia_habilitada' | 'envio_pausado'>>
 export interface SalidaPorDecidir { id: string; estado: 'retenido' | 'incierto'; conversation_id: string; creado: string; texto: string; error: string | null; resultado: Record<string, unknown> | null; contacto?: string; ventana_abierta: boolean | null }
 export interface RevisionSalidas { canal: CanalOp; envio_habilitado: boolean; conteos: Record<string, number>; por_decidir: SalidaPorDecidir[] }
@@ -104,13 +106,18 @@ export function textoAtiende(c: Pick<ControlConversacion, 'atiende' | 'atiende_n
   }
 }
 
-/** Qué controles ofrece la pantalla. Solo refleja al servidor: activar o encender la IA exige la compuerta abierta. */
-export function accionesCanal(c: ControlCanal, activacionDisponible: boolean) {
+/** Qué controles ofrece la pantalla. Solo refleja al servidor: activar o encender la IA exige la compuerta abierta;
+ *  en modo prueba (R4-C5) la IA se enciende solo si el servidor reporta la prueba operativa (permisos vigentes). */
+export function accionesCanal(c: ControlCanal, activacionDisponible: boolean, prueba?: EstadoPrueba | null) {
   const bloqueo = activacionDisponible ? null : 'La activación está bloqueada en el servidor hasta completar y autorizar la puesta en marcha.'
+  const pruebaOperativa = c.modo === 'prueba' && !!prueba?.operativa
+  const iaPorque = c.modo === 'prueba'
+    ? (pruebaOperativa ? null : 'La prueba no tiene contactos autorizados vigentes.')
+    : bloqueo ?? (c.modo !== 'activo' ? 'La IA solo se enciende con el canal activo.' : null)
   return {
     activar: { visible: c.modo === 'espejo', habilitada: activacionDisponible, porque: bloqueo },
-    espejo: { visible: c.modo === 'activo', habilitada: true, porque: null },   // volver a espejo siempre se puede (apaga la IA)
-    encenderIA: { visible: !c.ia_habilitada, habilitada: activacionDisponible && c.modo === 'activo', porque: bloqueo ?? (c.modo !== 'activo' ? 'La IA solo se enciende con el canal activo.' : null) },
+    espejo: { visible: c.modo !== 'espejo', habilitada: true, porque: null },   // volver a espejo siempre se puede (apaga la IA, retiene y cierra la prueba)
+    encenderIA: { visible: !c.ia_habilitada, habilitada: c.modo === 'prueba' ? pruebaOperativa : activacionDisponible && c.modo === 'activo', porque: iaPorque },
     apagarIA: { visible: c.ia_habilitada, habilitada: true, porque: null },
     pausar: { visible: !c.envio_pausado, habilitada: true, porque: null },
     reanudar: { visible: c.envio_pausado, habilitada: true, porque: null },   // reanudar NO libera lo retenido (lo decide Dirección)
@@ -118,16 +125,22 @@ export function accionesCanal(c: ControlCanal, activacionDisponible: boolean) {
 }
 
 /** Lectura rápida para Dirección: ¿atiende la IA?, ¿salen los mensajes?, ¿hay algo por revisar o bloqueado? */
-export function resumenOperativo(c: ControlCanal, activacionDisponible: boolean, rev: RevisionSalidas | null, panel: PanelCanal | null) {
+export function resumenOperativo(c: ControlCanal, activacionDisponible: boolean, rev: RevisionSalidas | null, panel: PanelCanal | null, prueba?: EstadoPrueba | null) {
   const retenidos = rev?.conteos?.retenido ?? 0
   const inciertos = rev?.conteos?.incierto ?? 0
   const humanas = panel?.atencion_humana.filter((h) => h.atiende).length ?? 0
   const esperando = panel?.atencion_humana.filter((h) => !h.atiende).length ?? 0
   const lineas: Array<{ tono: 'ok' | 'warn' | 'dang' | 'neu'; texto: string; testid: string }> = []
-  lineas.push(c.modo === 'activo'
+  const nAut = prueba?.vigentes ?? 0
+  lineas.push(c.modo === 'prueba'
+    ? (prueba?.operativa
+        ? { tono: 'warn', texto: `PRUEBA: solo ${nAut} contacto(s) autorizado(s) ${c.ia_habilitada ? 'con IA' : 'sin IA (pasan a una persona)'}; el resto sigue en espejo`, testid: 'res-ia' }
+        : { tono: 'dang', texto: 'PRUEBA sin contactos autorizados vigentes: inoperante (nadie es atendido). Vuelve a espejo.', testid: 'res-ia' })
+    : c.modo === 'activo'
     ? (c.ia_habilitada ? { tono: 'ok', texto: 'El asistente (IA) atiende primero', testid: 'res-ia' } : { tono: 'warn', texto: 'Canal activo sin IA: los mensajes pasan a una persona', testid: 'res-ia' })
     : { tono: 'neu', texto: 'Modo espejo: se registra y se lee, no se responde desde aquí', testid: 'res-ia' })
   lineas.push(c.envio_pausado ? { tono: 'dang', texto: 'Envíos PAUSADOS: nada sale; lo nuevo queda retenido', testid: 'res-envio' }
+    : c.modo === 'prueba' ? { tono: 'warn', texto: prueba?.operativa ? 'Envíos solo a los contactos autorizados' : 'Sin envíos (ningún contacto vigente)', testid: 'res-envio' }
     : c.modo !== 'activo' ? { tono: 'neu', texto: 'Sin envíos (espejo)', testid: 'res-envio' } : { tono: 'ok', texto: 'Envíos habilitados', testid: 'res-envio' })
   if (retenidos || inciertos) lineas.push({ tono: inciertos ? 'dang' : 'warn', texto: `${retenidos} retenido(s) y ${inciertos} incierto(s) por revisar`, testid: 'res-revision' })
   if (humanas || esperando) lineas.push({ tono: esperando ? 'warn' : 'neu', texto: `${humanas} atendida(s) por personas${esperando ? ` · ${esperando} esperando asesor` : ''}`, testid: 'res-humanas' })

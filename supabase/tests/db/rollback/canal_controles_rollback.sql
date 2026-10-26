@@ -1,5 +1,6 @@
 -- R4-B2-1 · el down retira columnas, historial, triggers, compuerta y RPC sin tocar los modos; se reaplica idéntica.
 begin;
+\ir ../../../rollback/canal_prueba_contacto/99_down.sql   -- R4-C5 (0123) se baja ANTES de la línea base de esta cadena
 create temp table _cc as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select modo from public.cc_wa_config) wa_modo, (select string_agg(canal || ':' || modo, ',' order by canal) from public.cc_meta_config) meta_modos;
 \ir ../../../rollback/canal_controles/99_down.sql
@@ -13,4 +14,5 @@ end $t$;
 do $t$ begin
   perform tests.ok((select todas from _cc) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), 'B2-1 · se reaplica idéntica');
 end $t$;
+\ir ../../../migrations/20270123120000_canal_prueba_contacto.sql   -- R4-C5 (0123) se reaplica tras la comparación final
 rollback;

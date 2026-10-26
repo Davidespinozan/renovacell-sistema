@@ -1,6 +1,7 @@
 -- R4-B2-3b · el down retira exclusividad, filtro de IA en la salida y toma de Dirección sin tocar conversaciones ni mensajes;
 -- se reaplica idéntica.
 begin;
+\ir ../../../rollback/canal_prueba_contacto/99_down.sql   -- R4-C5 (0123) se baja ANTES de la línea base de esta cadena
 create temp table _ex as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select count(*) from public.cc_messages) n_msgs, (select count(*) from public.cc_conversations) n_convs;
 \ir ../../../rollback/exclusividad_toma/99_down.sql
@@ -14,4 +15,5 @@ end $t$;
 do $t$ begin
   perform tests.ok((select todas from _ex) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), 'B2-3b · se reaplica idéntica');
 end $t$;
+\ir ../../../migrations/20270123120000_canal_prueba_contacto.sql   -- R4-C5 (0123) se reaplica tras la comparación final
 rollback;

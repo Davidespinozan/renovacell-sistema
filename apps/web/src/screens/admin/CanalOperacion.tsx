@@ -24,7 +24,7 @@ const fecha = (iso: string | null | undefined) => {
   const d = new Date(iso); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ZONA_NEGOCIO })
 }
 const textoControl = (c: Partial<ControlCanal> | null | undefined) => !c ? '—'
-  : [c.modo === 'activo' ? 'activo' : c.modo === 'espejo' ? 'espejo' : null, c.ia_habilitada != null ? (c.ia_habilitada ? 'IA encendida' : 'IA apagada') : null, c.envio_pausado != null ? (c.envio_pausado ? 'envíos pausados' : 'envíos habilitados') : null].filter(Boolean).join(' · ')
+  : [c.modo === 'activo' ? 'activo' : c.modo === 'espejo' ? 'espejo' : c.modo === 'prueba' ? 'prueba' : null, c.ia_habilitada != null ? (c.ia_habilitada ? 'IA encendida' : 'IA apagada') : null, c.envio_pausado != null ? (c.envio_pausado ? 'envíos pausados' : 'envíos habilitados') : null].filter(Boolean).join(' · ')
 
 function Modal({ titulo, sub, onCerrar, children, testid }: { titulo: string; sub?: string; onCerrar: () => void; children: React.ReactNode; testid: string }) {
   const caja = useRef<HTMLDivElement | null>(null)
@@ -106,7 +106,7 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
   const c = estado?.canales.find((x) => x.canal === canal) ?? null
   const otros = (estado?.canales ?? []).filter((x) => x.canal !== canal)
   const historial = (estado?.historial ?? []).filter((h) => h.canal === canal).slice(0, 10)
-  const resumen = c && estado ? resumenOperativo(c, estado.activacion_disponible, rev, panel) : []
+  const resumen = c && estado ? resumenOperativo(c, estado.activacion_disponible, rev, panel, estado.prueba) : []
   const pendientes = (rev?.conteos?.retenido ?? 0) + (rev?.conteos?.incierto ?? 0)
   const nombre = NOMBRE_CANAL_OP[canal]
 
@@ -119,7 +119,11 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
 
   if (error && !estado) return <div role="alert" className="card" style={{ color: 'var(--danger)' }} data-testid="panel-canal-error">{error}</div>
   if (!estado || !c) return <div className="card" style={{ color: 'var(--ink-3)' }}>Cargando operación de {nombre}…</div>
-  const ac = accionesCanal(c, estado.activacion_disponible)
+  const ac = accionesCanal(c, estado.activacion_disponible, estado.prueba)
+  // R4-C5 · el estado real del modo prueba (contactos vigentes, número enmascarado y vencimiento), nunca disfrazado de espejo
+  const pr = c.modo === 'prueba' ? estado.prueba : null
+  const textoModo = c.modo === 'activo' ? 'Activo' : c.modo === 'prueba'
+    ? (pr?.operativa ? `Prueba · ${pr.vigentes} contacto(s) autorizado(s)` : 'Prueba · sin contactos vigentes (inoperante)') : 'Espejo'
   const boton = (k: string, a: { visible: boolean; habilitada: boolean; porque: string | null }, texto: string, etiqueta: Accion, primario = false) => !a.visible ? null : (
     <span key={k} style={{ display: 'inline-grid', gap: 2 }}>
       <button type="button" className={primario ? 'btn btn-primary' : 'btn'} style={{ minHeight: 40 }} disabled={!a.habilitada} onClick={() => setAccion(etiqueta)} data-testid={`ctl-${k}`} title={a.porque ?? undefined}>{texto}</button>
@@ -139,7 +143,8 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
 
       {abierto && <>
         <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,170px),1fr))', gap: '4px 16px', margin: 0, fontSize: 13 }}>
-          <Dato t="Canal" v={c.modo === 'activo' ? 'Activo' : 'Espejo'} testid="dato-modo" />
+          <Dato t="Canal" v={textoModo} testid="dato-modo" />
+          {c.modo === 'prueba' && <Dato t="Contactos de prueba" v={pr && pr.permisos.length ? pr.permisos.map((p) => `${p.contacto} · vence ${fecha(p.vence_at)}`).join(' · ') : 'Ninguno vigente'} testid="dato-prueba" />}
           <Dato t="Asistente (IA)" v={c.ia_habilitada ? 'Encendida' : 'Apagada'} testid="dato-ia" />
           <Dato t="Envíos" v={c.envio_pausado ? 'Pausados' : 'Habilitados'} testid="dato-envio" />
           <Dato t="Compuerta de activación" v={estado.activacion_disponible ? 'Abierta' : 'Cerrada'} testid="dato-compuerta" />
@@ -150,7 +155,7 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
         )}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           {boton('activar', ac.activar, 'Activar canal', { clave: 'activar', titulo: `Activar ${nombre}`, boton: 'Activar', cambios: { modo: 'activo' }, peligro: true, explica: <>Las respuestas desde el sistema empezarán a salir por {nombre} a clientes reales. Leadsales deja de ser el único que contesta.</> }, true)}
-          {boton('espejo', ac.espejo, 'Volver a espejo', { clave: 'espejo', titulo: `Volver ${nombre} a espejo`, boton: 'Volver a espejo', cambios: { modo: 'espejo' }, peligro: true, explica: <>Se deja de responder desde aquí y la IA se apaga en el mismo cambio. Lo que esté por salir queda <b>retenido</b> para revisión.</> })}
+          {boton('espejo', ac.espejo, 'Volver a espejo', { clave: 'espejo', titulo: `Volver ${nombre} a espejo`, boton: 'Volver a espejo', cambios: { modo: 'espejo' }, peligro: true, explica: <>Se deja de responder desde aquí y la IA se apaga en el mismo cambio. Lo que esté por salir queda <b>retenido</b> para revisión.{c.modo === 'prueba' ? <> Los contactos de prueba vigentes quedan <b>revocados</b> (se conservan en el historial).</> : null}</> })}
           {boton('encender-ia', ac.encenderIA, 'Encender IA', { clave: 'encender-ia', titulo: 'Encender el asistente (IA)', boton: 'Encender IA', cambios: { ia_habilitada: true }, peligro: true, explica: <>El asistente contestará primero cada mensaje nuevo de {nombre} y transferirá a una persona cuando haga falta.</> })}
           {boton('apagar-ia', ac.apagarIA, 'Apagar IA', { clave: 'apagar-ia', titulo: 'Apagar el asistente (IA)', boton: 'Apagar IA', cambios: { ia_habilitada: false }, explica: <>Los mensajes nuevos pasan directo a una persona (solicitud de asesor). Lo ya escrito no cambia.</> })}
           {boton('pausar', ac.pausar, 'Pausar envíos', { clave: 'pausar', titulo: `Pausar envíos de ${nombre}`, boton: 'Pausar', cambios: { envio_pausado: true }, peligro: true, explica: <>Nada sale por {nombre}. Lo pendiente y lo nuevo quedan <b>retenidos</b> hasta que Dirección decida.</> })}

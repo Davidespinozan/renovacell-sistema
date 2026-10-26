@@ -7,7 +7,7 @@ do $t$
 declare v_admin uuid := tests.fixture_admin(); d uuid := tests.user('doctor'); r jsonb; t jsonb; c1 uuid; c2 uuid; c3 uuid; c4 uuid; c5 uuid; c6 uuid; c7 uuid; cp uuid; n bigint; v_turn uuid;
 begin
   -- A · canal activo + IA encendida: el primer mensaje NO pide asesor y la IA trabaja
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
   perform tests.act_as_service();
   r := public.cc_wa_entrante('5216670001001', 'Cliente A', 'wamid.B23A.A1', 'Hola, ¿qué es el S2RM?', false);
   c1 := (r ->> 'conversation_id')::uuid;
@@ -43,7 +43,7 @@ begin
   perform tests.ok(not (t ->> 'transferido')::boolean and t ->> 'motivo' = 'canal_no_activo', 'C · espejo: una falla no transfiere');
 
   -- D · falla definitiva de la IA (activo + IA encendida): UNA transferencia, auditable
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
   perform tests.act_as_service();
   r := public.cc_wa_entrante('5216670001004', 'Cliente D', 'wamid.B23A.D1', 'Hola', false);
   c4 := (r ->> 'conversation_id')::uuid;

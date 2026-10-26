@@ -10,11 +10,11 @@
 set -uo pipefail
 P=("${PSQL_BIN:-psql}" -X -q -At)
 T="$(mktemp -d)"; FAILED=0
-trap 'rm -rf "$T"; "${P[@]}" -c "update public.cc_wa_config set modo = '"'"'espejo'"'"', ia_habilitada = false, envio_pausado = false where id" >/dev/null 2>&1' EXIT
+trap 'rm -rf "$T"; "${P[@]}" -c "update public.cc_wa_config set modo = '"'"'espejo'"'"', ia_habilitada = false, envio_pausado = false where id; alter table public.cc_wa_config enable trigger trg_cc_wa_config_guardia" >/dev/null 2>&1' EXIT
 check() { local r; r=$("${P[@]}" -c "$2" 2>&1 | tail -1); if [ "$r" = "t" ]; then echo "PASS: $1"; else echo "FAIL: $1 (obtenido: $r)"; FAILED=1; fi; }
 SVC="select tests.act_as_service();"
 
-"${P[@]}" -c "update public.cc_wa_config set modo = 'activo', ia_habilitada = false, envio_pausado = false where id" >/dev/null || { echo "FAIL: preparación"; exit 1; }
+"${P[@]}" -c "alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = false, envio_pausado = false where id" >/dev/null || { echo "FAIL: preparación"; exit 1; }
 C=$("${P[@]}" -c "$SVC select public.cc_wa_entrante('5216670008001', 'Cola concurrente', 'wamid.B22.CONC', 'hola', false) ->> 'conversation_id'" | tail -1)
 "${P[@]}" -c "$SVC select count(public.cc_enviar_mensaje('$C', 'system', null, null, 'sys:solicitud:c' || g, 'aviso ' || g)) from generate_series(1, 11) g" >/dev/null
 N=$("${P[@]}" -c "select count(*) from public.cc_wa_salida where conversation_id = '$C' and estado = 'pendiente'")

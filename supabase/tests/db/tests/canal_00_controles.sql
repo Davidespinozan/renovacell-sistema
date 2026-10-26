@@ -26,7 +26,7 @@ begin
   alter table public.cc_meta_config enable trigger trg_cc_meta_config_normalizar;
 
   -- 2 · SQL directo (emergencia): activo+IA y luego espejo → la IA se apaga en la MISMA sentencia; queda en el historial como 'directo'
-  update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
+  alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id;
   update public.cc_wa_config set modo = 'espejo' where id;
   perform tests.ok((select modo = 'espejo' and not ia_habilitada from public.cc_wa_config), '2 · pasar a espejo apaga la IA atómicamente');
   perform tests.eq((select count(*) from public.cc_canal_control_hist where origen = 'directo' and canal = 'whatsapp' and actor_profile_id is null), 2::bigint, '2 · los dos cambios directos quedaron en el historial');

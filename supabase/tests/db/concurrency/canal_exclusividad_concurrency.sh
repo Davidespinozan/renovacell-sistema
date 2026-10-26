@@ -12,14 +12,14 @@
 set -uo pipefail
 P=("${PSQL_BIN:-psql}" -X -q -At)
 T="$(mktemp -d)"; FAILED=0
-trap 'rm -rf "$T"; "${P[@]}" -c "update public.cc_wa_config set modo = '"'"'espejo'"'"', ia_habilitada = false, envio_pausado = false where id" >/dev/null 2>&1' EXIT
+trap 'rm -rf "$T"; "${P[@]}" -c "update public.cc_wa_config set modo = '"'"'espejo'"'"', ia_habilitada = false, envio_pausado = false where id; alter table public.cc_wa_config enable trigger trg_cc_wa_config_guardia" >/dev/null 2>&1' EXIT
 check() { local r; r=$("${P[@]}" -c "$2" 2>&1 | tail -1); if [ "$r" = "t" ]; then echo "PASS: $1"; else echo "FAIL: $1 (obtenido: $r)"; FAILED=1; fi; }
 SVC="select tests.act_as_service();"
 conv() { "${P[@]}" -c "$SVC select public.cc_wa_entrante('$1', 'Conc', '$2', 'hola', false)::text" | tail -1; }
 cid() { python3 -c "import json,sys;print(json.loads(sys.argv[1])['conversation_id'])" "$1"; }
 seq() { python3 -c "import json,sys;print(json.loads(sys.argv[1])['seq'])" "$1"; }
 
-"${P[@]}" -c "update public.cc_wa_config set modo = 'activo', ia_habilitada = true, envio_pausado = false where id" >/dev/null || { echo "FAIL: preparación"; exit 1; }
+"${P[@]}" -c "alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true, envio_pausado = false where id" >/dev/null || { echo "FAIL: preparación"; exit 1; }
 A1=$("${P[@]}" -c "select tests.user('admin')" | tail -1); A2=$("${P[@]}" -c "select tests.user('admin')" | tail -1); S1=$("${P[@]}" -c "select tests.user('pos')" | tail -1)
 "${P[@]}" -c "$SVC update public.profiles set meta = coalesce(meta, '{}') || '{\"capabilities\":[\"conversaciones\"]}' where id = '$S1'" >/dev/null
 
@@ -62,7 +62,7 @@ check "C2 · la IA ya no puede reclamar" "$SVC select public.cc_ia_turno_reclama
 sleep 0.4; ("${P[@]}" -c "$SVC select public.cc_enviar_mensaje('$CA', 'admin', null, '$A1', 'd:1', 'Respuesta durante el cambio')" > "$T/d2.out" 2>&1) & wait
 check "D · la respuesta esperó al cambio y fue rechazada (CANAL_EN_ESPEJO)" "select $(grep -c CANAL_EN_ESPEJO "$T/d2.out") = 1"
 check "D · nada se guardó ni salió" "select count(*) = 0 from public.cc_messages where conversation_id = '$CA' and client_message_id = 'd:1'"
-"${P[@]}" -c "update public.cc_wa_config set modo = 'activo' where id" >/dev/null
+"${P[@]}" -c "alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo' where id" >/dev/null
 
 # E) terminar (sostenido) mientras llega un mensaje del cliente
 ("${P[@]}" -c "begin; $SVC select public.cc_terminar_asesoria('$CB', '$S1'); select pg_sleep(1.2); commit;" > "$T/e1.out" 2>&1) &

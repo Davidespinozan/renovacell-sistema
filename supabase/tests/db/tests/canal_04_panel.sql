@@ -35,7 +35,7 @@ begin
   perform tests.ok(not (k::text ~ '5216670004101|wa_id|psid|telefono'), '2 · sin datos de contacto');
 
   -- 3 · activo con IA: atiende la IA; Dirección puede tomar; escribir exige toma
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id; perform tests.act_as(v_admin);
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = true where id; perform tests.act_as(v_admin);
   k := public.cc_canal_conversacion_control(c);
   perform tests.ok(k ->> 'atiende' = 'ia' and (k ->> 'puede_tomar')::boolean and k ->> 'motivo_no_escribir' = 'toma_requerida', '3 · activo + IA: la IA atiende; tomar sí; escribir exige toma');
   -- coincide con la base al actuar

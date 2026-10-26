@@ -35,7 +35,7 @@ begin
     '3 · R4-B1: el número de un doctor con cuenta aparece como contacto sin cuenta (no se liga por teléfono), con su mensaje');
 
   -- en activo también se ve
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo'; perform tests.act_as(v_admin);
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo'; perform tests.act_as(v_admin);
   perform tests.ok((public.cc_wa_bandeja() ->> 'modo') = 'activo', '4 · reporta el modo del canal');
 
   -- nadie más

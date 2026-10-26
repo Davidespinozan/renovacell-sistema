@@ -8,7 +8,7 @@ declare v_admin uuid := tests.fixture_admin(); s1 uuid := tests.user('pos'); r j
 begin
   -- preparación: WhatsApp e Instagram activos (IA apagada: el ingreso pide asesor y su aviso sys:… se encola)
   perform tests.act_as_owner();
-  update public.cc_wa_config set modo = 'activo', ia_habilitada = false, envio_pausado = false where id;
+  alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo', ia_habilitada = false, envio_pausado = false where id;
   update public.cc_meta_config set modo = 'activo', ia_habilitada = false, envio_pausado = false where canal = 'instagram';
   perform tests.act_as_service();
   r := public.cc_wa_entrante('5216670002001', 'Cola WA', 'wamid.B22.W1', 'Hola', false);
@@ -102,14 +102,14 @@ begin
   -- 5 · espejo: lo pendiente pasa a retenido y nada se reclama
   perform tests.act_as_owner();
   perform tests.ok((select count(*) = 2 from public.cc_wa_salida where id = any (v_ids[1:2]) and estado = 'retenido' and resultado ->> 'retenido_por' = 'pausa'), '5 · lo liberado que aún no salía quedó retenido por la pausa (y sigue así en espejo)');
-  update public.cc_wa_config set modo = 'activo' where id;
+  alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo' where id;
   perform tests.act_as_service();
   perform tests.eq((select count(*) from public.cc_wa_salida_reclamar(20)), 0::bigint, '5 · al volver a activo nada sale solo');
   perform public.cc_enviar_mensaje(c, 'system', null, null, 'sys:solicitud:930', 'pendiente antes de espejo');
   v_id := (select s.id from public.cc_wa_salida s join public.cc_messages m on m.id = s.message_id where m.client_message_id = 'sys:solicitud:930');
   perform tests.act_as_owner(); update public.cc_wa_config set modo = 'espejo' where id;
   perform tests.ok((select estado = 'retenido' and resultado ->> 'retenido_por' = 'canal_no_activo' from public.cc_wa_salida where id = v_id), '5 · pasar a espejo retiene lo pendiente (canal_no_activo)');
-  update public.cc_wa_config set modo = 'activo' where id;
+  alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo' where id;
 
   -- 6 · resolución por clase (Edge nueva y heredada)
   perform tests.act_as_owner();

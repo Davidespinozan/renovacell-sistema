@@ -15,7 +15,7 @@ begin
   perform tests.ok(not exists (select 1 from public.cc_wa_salida where conversation_id = c), '0 · en espejo no se forma nada para WhatsApp');
 
   -- activo
-  perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo'; perform tests.act_as_service();
+  perform tests.act_as_owner(); alter table public.cc_wa_config disable trigger trg_cc_wa_config_guardia; update public.cc_wa_config set modo = 'activo'; perform tests.act_as_service();
   r := public.cc_wa_entrante('5216671239999', 'Luis', 'wamid.S0002', '¿Tienen envío a Mazatlán?', false);
   perform tests.ok((r ->> 'activo')::boolean and (select modo in ('human_requested', 'human_assigned') from public.cc_conversations where id = c), '1 · activo: entra a la cola humana');
   perform tests.act_as_owner(); update public.cc_wa_config set ia_habilitada = true where id; perform tests.act_as_service();   -- R4-B2-3b: la IA solo sale con su canal encendido
