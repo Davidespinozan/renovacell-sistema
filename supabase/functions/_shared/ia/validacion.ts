@@ -66,3 +66,20 @@ export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; e
   if (motivo === 'carrito_lectura_sin_evidencia') return 'Déjame revisar tu carrito antes de confirmarte su contenido. ¿Quieres que lo muestre?'
   return ctx.textoGenerico
 }
+
+// R4-B2-IA1 · Textos seguros del CANAL (WhatsApp/Instagram/Messenger): ahí no hay cuenta, carrito ni pedidos, así que no
+// se promete "lo reviso" ni se remite a botones del portal; y solo se dice que la solicitud de asesor quedó registrada si
+// el servidor lo sostiene (evidencia). El portal conserva respuestaSegura sin cambios.
+export function respuestaSeguraCanal(motivo: string, ctx: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string }): string {
+  if (ctx.limiteClinico || motivo === 'clinico') return ctx.textoLimiteClinico
+  if (motivo === 'precio_sin_evidencia') return 'Por este medio no puedo darte precios: se consultan en el portal para profesionales verificados. Si quieres, te comparto el enlace.'
+  if (motivo === 'stock_sin_evidencia') return 'Por este medio no consulto existencias: la disponibilidad se ve en el portal para profesionales verificados. Si quieres, te comparto el enlace.'
+  if (motivo === 'producto_no_autorizado') return 'Prefiero no afirmar nada de un producto que no consulté. ¿Me dices el nombre exacto y lo busco en el catálogo?'
+  if (motivo === 'pedido_sin_evidencia' || motivo === 'carrito_mutacion_sin_evidencia' || motivo === 'carrito_lectura_sin_evidencia')
+    return 'Por este medio no registro pedidos ni carritos: las compras se hacen en el portal para profesionales verificados. Si necesitas ayuda para completarla, un asesor de Renovacell puede atenderte.'
+  if (motivo === 'promesa_humano_sin_evidencia') {
+    const pedida = ctx.evidencia.includes('HUMAN_REQUESTED') || ctx.evidencia.includes('HANDOFF_EN_CURSO') || ctx.evidencia.includes('HANDOFF_SOLICITADO')
+    return pedida ? 'Tu solicitud de asesor quedó registrada. Mientras tanto, sigo ayudándote con lo que necesites.' : ctx.textoGenerico
+  }
+  return ctx.textoGenerico
+}

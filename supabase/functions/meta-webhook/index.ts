@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación
           // y su cartera siguen siendo del doctor para el asesor humano; la elevación solo existe con sesión en el portal).
           const ia = await responderIA(admin, r.conversation_id, r.seq, r.actor, r.profile_id, r.visitor_hash, m.texto, 'wa:' + m.wa_id, 'whatsapp')
-          if (ia === 'respondio') await despacharWhatsApp(admin)
+          if (ia === 'respondio' || ia === 'transferida') await despacharWhatsApp(admin)   // R4-B2-IA1 · también el aviso de transferencia
         }
       })())
     }
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
         await avisarPush(admin, r.conversation_id, 'visitor', m.texto)
         if (IA_PUEDE(r.modo as never)) {
           const ia = await responderIA(admin, r.conversation_id, r.seq, 'visitor', null, r.visitor_hash, m.texto, 'meta:' + m.psid, m.canal)
-          if (ia === 'respondio') await despacharMeta(admin)
+          if (ia === 'respondio' || ia === 'transferida') await despacharMeta(admin)
         }
       })())
     }

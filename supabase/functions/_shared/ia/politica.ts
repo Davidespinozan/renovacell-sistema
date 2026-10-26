@@ -29,6 +29,11 @@ export function clasificarIntencion(texto: string): Intencion {
   if (!t.trim()) return 'UNKNOWN'
   if (esLimiteClinico(t)) return 'CLINICAL_BOUNDARY'
   if (/\b(asesor|humano|persona|alguien|ejecutivo|vendedor|hablar con|llamar|whatsapp)\b/.test(t)) return 'HUMAN_REQUEST'
+  return clasificarSinPersona(t)
+}
+
+// Reglas comunes después de "¿quiere una persona?" (texto ya en minúsculas). Mismo orden y mismas reglas de siempre.
+function clasificarSinPersona(t: string): Intencion {
   // CC-6 · checkout: intención de COMPRA explícita. La IA solo prepara; confirmar es un botón del usuario.
   if (/\b(confirm[ao]r? (el |mi )?pedido|haz (el |mi )?pedido|hacer (el |mi )?pedido|levanta(r)? (el |mi )?pedido|quiero comprar|comprar(lo|los)?\b|cerrar (el |mi )?pedido|finalizar (la )?compra|cu[aá]nto (sale|ser[ií]a|queda) (todo|el pedido|en total)|proceder al pago|pagar (el |mi )?pedido)\b/.test(t)) return 'CHECKOUT'   // antes que ORDER_STATUS: "confirma mi pedido" es compra, no consulta
   if (/\b(mi pedido|mis pedidos|folio|rastre|gu[ií]a|env[ií]o de mi|cu[aá]ndo llega|estatus de mi|estado de mi)\b/.test(t)) return 'ORDER_STATUS'
@@ -109,11 +114,14 @@ export function contextoCanal(canal: CanalPolitica): string {
     'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
     `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
     'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
+    'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; condiciones especiales como mayoreo, crédito, cotización formal o negociación; pedido, envío, devolución o reclamación; quiere comprar por este medio o no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
   ].join('\n')
 }
 export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica }
 export function construirSistema(e: EntradaSistema): string {
-  const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '', tarea(e.intencion, e.limiteClinico)]
+  const enCanal = !!e.canal && e.canal !== 'portal'
+  const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '',
+    enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
   const canal = contextoCanal(e.canal ?? 'portal')
   if (canal) partes.push('', canal)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
@@ -167,3 +175,79 @@ export function historialParaModelo(mensajes: Array<{ actor: string; content: st
 
 export const MENSAJE_SIN_RESPUESTA = 'No pude generar una respuesta ahora. Si quieres, puedo pedirte un asesor de Renovacell.'
 export const MENSAJE_LIMITE_CLINICO = 'Eso es una decisión clínica sobre un paciente y no puedo indicarte qué aplicar, cuánto ni cómo. Sí puedo darte la información comercial y técnica aprobada de los productos, o pedirte un asesor de Renovacell.'
+
+
+// ══ R4-B2-IA1 · POLÍTICA DE CANAL (WhatsApp / Instagram / Messenger) ════════════════════════════════════════════
+// El portal no cambia (clasificarIntencion y tarea siguen idénticos). En canales la IA atiende primero y solo transfiere
+// ante una necesidad real. Determinista: solicitud EXPLÍCITA de persona y asuntos de pedido/reclamación (responder.ts los
+// transfiere con solicitar_asesor antes del modelo). Depende del modelo (con estas instrucciones): condiciones especiales,
+// compra por este medio, información insuficiente, seguimiento clínico.
+const sinAcentos = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+
+const PIDE_SIN_BOT = /\bno (quiero|deseo) (hablar|platicar|chatear)? ?(con )?(un |una |el |la )?(bot|robot|maquina|ia|inteligencia artificial)\b/
+const NEGACION_PERSONA = /\b(no|sin|nunca|tampoco)\s+((necesito|quiero|requiero|ocupo|deseo|hace falta|me interesa|me pases|me pasen|me llamen|me llames|me marquen|me contacten)\s+)?(\w+\s+){0,3}(asesor|asesora|asesores|vendedor|vendedora|ejecutivo|ejecutiva|persona|humano|alguien|llamada|agente|llamen|llame|marquen|marque|contacten)\b/
+const PIDE_PERSONA: readonly RegExp[] = [
+  /\b(hablar|platicar|comunicarme|comunicar|contactar|chatear)\s+(con\s+)?(un |una |el |la |algun |alguna |su |sus )?(asesor|asesora|asesores|vendedor|vendedora|ejecutivo|ejecutiva|agente|humano|persona|alguien|representante)\b/,
+  /\b(me\s+)?(puede|podria|pueden|podrian)\s+(atender|ayudar|contactar|llamar)\s+(una persona|un humano|un asesor|una asesora|alguien|un vendedor|una vendedora)\b/,
+  /\b(pasame|pasenme|paseme|pasa|comunicame|comuniqueme|comuniquenme|conectame|transfiereme|canalizame)\s+con\b/,
+  /\b(que me (llamen|llame|marquen|marque|contacten|contacte)|llamenme|llameme|marquenme|una llamada)\b/,
+  /\batencion (humana|personal|personalizada)\b/,
+  /\b(quiero|quisiera|necesito|prefiero|me gustaria|ocupo)\s+(a |con )?(un |una )?(asesor|asesora|vendedor|vendedora|ejecutivo|ejecutiva|humano|persona real|agente)\b/,
+  /\b(hay\s+)?(alguna persona|alguien|un humano|un asesor|una asesora)\s+(que\s+)?(me\s+)?(atienda|pueda atender|me atienda)\b/,
+]
+const SOPORTE = /\b(mi pedido|mis pedidos|mi orden|mi compra|mi envio|mi paquete|numero de guia|guia de (rastreo|envio)|rastre(ar|o) (mi|el)|no me (ha )?llega(do)?|cuando llega mi|estatus de mi|estado de mi|devolucion|devolver|reembolso|reclamacion|reclamo|queja|me llego (mal|roto|danado|incompleto)|producto (danado|defectuoso|roto))\b/
+
+/** ¿Pide de forma EXPLÍCITA hablar con una persona? ("whatsapp", "persona", "alguien" o "llamar" solos NO cuentan; las negaciones tampoco). */
+export function esSolicitudHumanaExplicita(texto: string): boolean {
+  const t = sinAcentos(texto)
+  if (!t) return false
+  if (PIDE_SIN_BOT.test(t)) return true
+  if (NEGACION_PERSONA.test(t)) return false
+  return PIDE_PERSONA.some((r) => r.test(t))
+}
+/** Asunto de pedido, envío, devolución o reclamación (la IA del canal no tiene acceso a pedidos). */
+export const esSoporteDePedido = (texto: string): boolean => SOPORTE.test(sinAcentos(texto))
+
+/** Transferencia determinista en canal (antes del modelo): motivo o null. */
+export function transferenciaDeterminista(texto: string): 'cliente_pide_persona' | 'soporte_pedido' | null {
+  if (esLimiteClinico(texto ?? '')) return null   // lo clínico lo atiende la política (límite + seguimiento si lo pide)
+  if (esSolicitudHumanaExplicita(texto)) return 'cliente_pide_persona'
+  if (esSoporteDePedido(texto)) return 'soporte_pedido'
+  return null
+}
+
+/** Clasificador de CANAL: sin falsos positivos de "quiere una persona" y con las formas comunes de precio, existencias y compra. */
+export function clasificarIntencionCanal(texto: string): Intencion {
+  const t = sinAcentos(texto)
+  if (!t) return 'UNKNOWN'
+  if (esLimiteClinico(texto)) return 'CLINICAL_BOUNDARY'
+  if (esSolicitudHumanaExplicita(texto)) return 'HUMAN_REQUEST'
+  if (SOPORTE.test(t)) return 'ORDER_STATUS'
+  if (/\b(quiero|quisiera|me interesa)\s+(comprar|pedir|ordenar|adquirir)|\bcomo (compro|puedo comprar|hago (un |el )?pedido)|\bhacer (un |el )?pedido|\blevantar (un |el )?pedido|\bcomprar(lo|los|la|las)?\b/.test(t)) return 'CHECKOUT'
+  if (/\b(precio|precios|cuesta|cuestan|costo|costos|cuanto (vale|valen|sale|salen|es|cobran)|cotiza\w*|descuento\w*|promocion\w*|promo|mayoreo|credito|precio especial)\b/.test(t)) return 'PRICE'
+  if (/\b(disponib\w*|existencia\w*|stock|inventario|agotad\w*|surtid\w*)\b/.test(t)) return 'AVAILABILITY'
+  if (/\b(compar\w*|diferencia\w*|versus|vs\.?|mejor que|cual (me conviene|es mejor))\b/.test(t)) return 'PRODUCT_COMPARE'
+  return clasificarSinPersona((texto ?? '').toLowerCase())
+}
+
+/** Tarea del turno en canal: orienta y resuelve; transfiere solo ante necesidad real (sin carrito, checkout ni pedidos aquí). */
+export function tareaCanal(intencion: string, limiteClinico: boolean): string {
+  if (limiteClinico || intencion === 'CLINICAL_BOUNDARY') return 'TAREA: pregunta clínica sobre un paciente o un tratamiento. Explica con claridad el límite (no puedes indicar qué aplicar, cuánto ni cómo) y ofrece la información comercial o técnica pública aprobada. Si el usuario quiere seguimiento, usa solicitar_asesor y aclara que lo atenderá un asesor del equipo comercial de Renovacell (no personal clínico).'
+  switch (intencion) {
+    case 'HUMAN_REQUEST': return 'TAREA: el usuario pide hablar con una persona. Usa solicitar_asesor de inmediato, sin pedir confirmación, y confírmalo en UNA frase sin prometer tiempos ni disponibilidad (el sistema ya le informa la disponibilidad real).'
+    case 'ORDER_STATUS': return 'TAREA: pedido, envío, devolución o reclamación. Por este medio no tienes acceso a pedidos: no inventes estados, fechas, guías ni soluciones. Usa solicitar_asesor para que una persona lo revise y dilo en una frase, sin prometer tiempos.'
+    case 'PRICE': return 'TAREA: precio o condiciones comerciales. Por este medio no ves precios ni promociones: no menciones cifras. Explica que los precios se consultan en el portal para profesionales verificados y comparte el enlace con enlace_portal; puedes dar información aprobada del producto. NO transfieras solo porque pregunta el precio. Si pide condiciones especiales (mayoreo, crédito, cotización formal, factura, precio especial o negociación), usa solicitar_asesor.'
+    case 'AVAILABILITY': return 'TAREA: disponibilidad. Por este medio no consultas existencias: no afirmes que hay o que no hay. Indica que la disponibilidad se ve en el portal para profesionales verificados (enlace_portal). No transfieras solo por esta pregunta.'
+    case 'CHECKOUT': case 'CART_VIEW': case 'CART_ADD': case 'CART_UPDATE': case 'CART_REMOVE':
+      return 'TAREA: el usuario quiere comprar. Explica que las compras se hacen en el portal para profesionales verificados (registro y verificación de cédula) y comparte el enlace con enlace_portal. Si quiere completar la compra por este medio, no puede usar el portal o necesita ayuda con la operación, usa solicitar_asesor. Nunca digas que registraste, apartaste o confirmaste un pedido.'
+    case 'PRODUCT_COMPARE': case 'COMMERCIAL_RECOMMENDATION': case 'PRODUCT_INFO': case 'PRODUCT_DISCOVERY':
+      return tarea(intencion, false) + ' Resuelve aquí con lo aprobado; si falta información aprobada, dilo. No transfieras por defecto.'
+    case 'GENERAL_CHAT': return 'TAREA: conversación general. Responde breve y útil, y orienta a lo que puedes hacer aquí: información de productos, cómo comprar en el portal o, si lo necesita, un asesor.'
+    default: return 'TAREA: responde con lo que tengas aprobado; si no entiendes la petición, pide una aclaración breve. Transfiere solo si, tras intentarlo, no puedes resolverlo o el usuario lo pide.'
+  }
+}
+
+// Mensajes seguros del canal (cuando el validador rechaza una respuesta): honestos, sin prometer y sin presentar a un
+// asesor como personal clínico. El portal conserva los suyos.
+export const MENSAJE_SIN_RESPUESTA_CANAL = 'No tengo esa información aprobada por este medio. Si quieres que te atienda un asesor de Renovacell, dímelo y te comunico.'
+export const MENSAJE_LIMITE_CLINICO_CANAL = 'Eso es una decisión clínica sobre un paciente y no puedo indicarte qué aplicar, cuánto ni cómo. Puedo darte la información pública aprobada de los productos; si quieres seguimiento, un asesor del equipo comercial de Renovacell puede atenderte.'

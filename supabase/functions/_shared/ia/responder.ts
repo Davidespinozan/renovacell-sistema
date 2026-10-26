@@ -9,8 +9,29 @@ import { configurar, crearProveedorAnthropic } from './proveedor.ts'
 import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
 
+// R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
+// seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
+const validacionCanal = { ...validacion, respuestaSegura: validacion.respuestaSeguraCanal }
+const politicaCanal = { ...politica, clasificarIntencion: politica.clasificarIntencionCanal, MENSAJE_SIN_RESPUESTA: politica.MENSAJE_SIN_RESPUESTA_CANAL, MENSAJE_LIMITE_CLINICO: politica.MENSAJE_LIMITE_CLINICO_CANAL }
+
 // deno-lint-ignore no-explicit-any
-export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal'): Promise<'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'> {
+type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
+// R4-B2-IA1 · 'transferida' solo existe en canales: el portal conserva exactamente su contrato anterior.
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal?: 'portal'): Promise<ResultadoIA>
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno): Promise<ResultadoIA | 'transferida'>
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal'): Promise<ResultadoIA | 'transferida'> {
+  // R4-B2-IA1 · en canales (WhatsApp/Instagram/Messenger): una solicitud EXPLÍCITA de persona o un asunto de pedido o
+  // reclamación se transfiere de inmediato con la herramienta existente (cc_solicitar_asesor, idempotente), sin llamar al
+  // modelo: el cliente recibe UN aviso (el del sistema, con la disponibilidad real) y no una respuesta duplicada de la IA.
+  // Si ya había una solicitud en curso, la IA sigue informando con normalidad.
+  if (canal !== 'portal') {
+    const motivo = politica.transferenciaDeterminista(texto)
+    if (motivo) {
+      const { data, error } = await admin.rpc('cc_solicitar_asesor', { p_conv: conv, p_actor_type: actor, p_visitor_hash: actor === 'visitor' ? visitorHash : null, p_profile: actor === 'doctor' ? profile : null })
+        .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
+      if (!error && (data as { idempotente?: boolean } | null)?.idempotente === false) return 'transferida'
+    }
+  }
   const env = (k: string) => Deno.env.get(k)
   const cfg = configurar(env)
   const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }
@@ -32,7 +53,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
-      proveedor, config: cfg.config, politica, herramientas, validacion, reglasConocimiento: REGLAS_IA,
+      proveedor, config: cfg.config, politica: canal === 'portal' ? politica : politicaCanal, herramientas, validacion: canal === 'portal' ? validacion : validacionCanal, reglasConocimiento: REGLAS_IA,
     },
   )
   const usados = resultado.usage.input + resultado.usage.output

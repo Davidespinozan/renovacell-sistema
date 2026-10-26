@@ -47,7 +47,8 @@ describe('costura: base, webhook, despacho y chat', () => {
     expect(webhook).toMatch(/admin\.rpc\('cc_meta_entrante', \{ p_canal: m\.canal, p_psid: m\.psid, p_nombre: null, p_mid: m\.mid, p_texto: m\.texto, p_encolar: false \}\)/)
     expect(webhook).toMatch(/if \(error\) \{ obs\('meta', 'internal_error'[^\n]*return new Response\('reintentar', \{ status: 500 \}\)/)
     expect(webhook).toMatch(/if \(r\.nuevo\) await completarNombreMeta\(admin, m\.canal, m\.psid\)/)
-    expect(webhook).toMatch(/if \(ia === 'respondio'\) await despacharMeta\(admin\)/)
+    // R4-B2-IA1 · también se despacha tras una transferencia determinista (el aviso del sistema sale por el canal)
+    expect(webhook).toMatch(/if \(ia === 'respondio' \|\| ia === 'transferida'\) await despacharMeta\(admin\)/)
     expect(webhook).not.toMatch(/prospects/)
   })
   it('meta-send despacha WhatsApp y Meta (tarea con secreto o personal autenticado); el chat devuelve el canal y despacha ambos', () => {
