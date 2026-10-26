@@ -22,6 +22,8 @@ import { HorarioYAlertas } from './HorarioAtencion'
 import { useRole } from '../../auth/RoleContext'
 import { EnlaceContacto } from '../../app/EnlaceContacto'
 import { ChatCanonico } from '../chat/ChatCanonico'
+import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'   // R4-B2-4 · panel operativo mínimo
+import { canalOperacion as canalOpPorDefecto, MOTIVO_NO_ESCRIBIR, type ClienteCanalOperacion, type ControlConversacion } from '../../data/ops/canalOperacion'
 
 type Pestana = 'pendientes' | 'cartera' | 'vendedores' | 'horario' | 'whatsapp'
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
@@ -37,8 +39,8 @@ const PESTANAS_BANDEJA: Pestana[] = ['pendientes', 'whatsapp']
 const PESTANAS_CARTERA: Pestana[] = ['cartera', 'vendedores', 'horario']
 const ETIQUETA: Record<Pestana, string> = { pendientes: 'Solicitudes', whatsapp: 'Canales', cartera: 'Cartera', vendedores: 'Vendedores', horario: 'Horario y alertas' }   // 'whatsapp' = WhatsApp + Instagram + Messenger
 
-export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, onEquipo, onAbrir, pestanas = PESTANAS_BANDEJA, titulo = 'Dirección · Conversaciones · Bandeja', onHorario }: {
-  cliente?: ClienteAtencion; chat?: ClienteChat; onEquipo?: () => void; onAbrir?: (conversationId: string) => void
+export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, canalOp = canalOpPorDefecto, onEquipo, onAbrir, pestanas = PESTANAS_BANDEJA, titulo = 'Dirección · Conversaciones · Bandeja', onHorario }: {
+  cliente?: ClienteAtencion; chat?: ClienteChat; canalOp?: ClienteCanalOperacion; onEquipo?: () => void; onAbrir?: (conversationId: string) => void
   pestanas?: Pestana[]; titulo?: string; onHorario?: () => void   // onHorario: desde la Bandeja, el horario vive en Cartera y horario
 }) {
   const [pestana, setPestana] = useState<Pestana>(() => { const p = pestanaPedida && pestanas.includes(pestanaPedida) ? pestanaPedida : pestanas[0]; if (pestanaPedida && pestanas.includes(pestanaPedida)) pestanaPedida = null; return p })
@@ -97,7 +99,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
       {pestana === 'cartera' && <PestanaCartera vendedores={vendedores} cliente={cliente} onCambio={alCambiar} />}
       {pestana === 'vendedores' && <PestanaVendedores vendedores={vendedores} onEquipo={onEquipo} />}
       {pestana === 'horario' && <HorarioYAlertas cliente={cliente} onCambio={alCambiar} />}
-      {pestana === 'whatsapp' && <PestanaWhatsApp cliente={cliente} chat={chat} />}
+      {pestana === 'whatsapp' && <PestanaWhatsApp cliente={cliente} chat={chat} canalOp={canalOp} />}
     </div>
   )
 }
@@ -407,8 +409,9 @@ const CANAL: Record<CanalBandeja, { nombre: string; pill: string }> = { whatsapp
 const CANALES: CanalBandeja[] = ['whatsapp', 'instagram', 'messenger']
 const contactoDe = (c: ChatCanal) => (c.canal === 'whatsapp' ? telefonoBonito(c.id) : CANAL[c.canal].nombre)
 
-function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: ClienteChat }) {
+function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion; chat: ClienteChat; canalOp: ClienteCanalOperacion }) {
   const [bandeja, setBandeja] = useState<BandejaCanales | null>(null)
+  const [control, setControl] = useState<ControlConversacion | null>(null)   // R4-B2-4 · quién atiende la abierta y si puedo escribir
   const [error, setError] = useState<string | null>(null)
   const [abierta, setAbierta] = useState<ChatCanal | null>(null)
   const [filtro, setFiltro] = useState<CanalBandeja | 'todos'>('todos')
@@ -416,6 +419,9 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
   useEffect(() => { void cargar() }, [cargar])
   useEffect(() => { const t = setInterval(() => { if (!abierta) void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, abierta])
 
+  // R4-B2-4 · desde el panel (atención por personas) se abre la conversación de la bandeja por su id
+  const abrirPorId = (id: string) => { const c = bandeja?.chats.find((x) => x.conversation_id === id); if (c) { setControl(null); setAbierta(c) } }
+  const bloqueo = control?.canal && !control.puede_escribir ? (MOTIVO_NO_ESCRIBIR[control.motivo_no_escribir ?? ''] ?? 'Solo lectura.') : null
   if (abierta?.conversation_id) return (
     <div className="grid" style={{ gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -423,7 +429,8 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
         <span className={'pill ' + CANAL[abierta.canal].pill}>{CANAL[abierta.canal].nombre}</span>
         <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{abierta.cliente_nombre ?? abierta.nombre ?? ''}{abierta.canal === 'whatsapp' ? ` · ${telefonoBonito(abierta.id)}` : ''}{abierta.cliente ? ' · cliente' : ' · sin cuenta'}</span>
       </div>
-      <ChatCanonico embebido asesor puedeEmpresa conversationId={abierta.conversation_id} cliente={chat} nombreCliente={abierta.cliente_nombre ?? abierta.nombre ?? contactoDe(abierta)}
+      <BarraTomaCanal conversationId={abierta.conversation_id} cliente={canalOp} onControl={setControl} />
+      <ChatCanonico embebido asesor puedeEmpresa conversationId={abierta.conversation_id} bloqueoEscritura={control ? bloqueo : 'Comprobando quién atiende…'} cliente={chat} nombreCliente={abierta.cliente_nombre ?? abierta.nombre ?? contactoDe(abierta)}
         etiquetaSalir="Volver a Canales" onSalir={() => { setAbierta(null); void cargar() }} onFin={() => { setAbierta(null); void cargar() }} />
     </div>
   )
@@ -431,6 +438,9 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
   const sinResponder = chats.filter((c) => c.sin_responder).length
   const algunoActivo = bandeja ? CANALES.some((k) => bandeja.modos[k] === 'activo') : false
   return (
+    <>
+    <PanelOperativoCanal cliente={canalOp} canal="whatsapp" onAbrir={abrirPorId}
+      nombres={Object.fromEntries((bandeja?.chats ?? []).filter((c) => c.conversation_id).map((c) => [c.conversation_id as string, c.cliente_nombre ?? c.nombre ?? contactoDe(c)]))} />
     <div className="card" data-testid="wa-bandeja">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: 'var(--ink-3)' }}>
@@ -466,11 +476,12 @@ function PestanaWhatsApp({ cliente, chat }: { cliente: ClienteAtencion; chat: Cl
               </div>}
               <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{hace(c.hace_min)}{c.n_mensajes ? ` · ${c.n_mensajes} mensaje(s)` : ''}{c.ventana_abierta === false ? ' · ventana de 24 h cerrada' : ''}</div>
             </div>
-            {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => setAbierta(c)} data-testid="wa-abrir">{bandeja?.modos[c.canal] === 'activo' ? 'Abrir chat' : 'Ver chat'}</button>}
+            {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => { setControl(null); setAbierta(c) }} data-testid="wa-abrir">{bandeja?.modos[c.canal] === 'activo' ? 'Abrir chat' : 'Ver chat'}</button>}
           </li>
         ))}
       </ul>
     </div>
+    </>
   )
 }
 

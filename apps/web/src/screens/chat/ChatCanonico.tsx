@@ -45,6 +45,7 @@ interface Props {
   tarjetaFinal?: React.ReactNode                       // VERIFICARME · tarjeta al final del hilo (p. ej. crear la cuenta en el chat)
   respuestas?: ClienteRespuestas | null                // CHAT PRO · respuestas rápidas (solo personal; null las apaga)
   puedeEmpresa?: boolean                               // CHAT PRO · Dirección administra las de la empresa
+  bloqueoEscritura?: string | null                     // R4-B2-4 · canal: el servidor dice que aún no puedes escribir (p. ej. falta tomarla); el texto es el porqué
 }
 
 // CHAT PRO · "escribiendo…": se avisa al servidor como mucho cada 3 s mientras se teclea; la marca vence sola en 6 s.
@@ -115,7 +116,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -243,7 +244,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // Leadsales): el redactor se apaga.
   const canal = asesor ? canalDe(conv) : null
   const waEspejo = !!canal && canal.modo === 'espejo'
-  const puedoEscribir = !!conv && !cerrada && !waEspejo && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
+  const puedoEscribir = !!conv && !cerrada && !waEspejo && !bloqueoEscritura && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
 
@@ -518,7 +519,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}
           disabled={!puedoEscribir || enviando || !!pendiente?.error}
-          placeholder={cerrada ? 'La conversación está cerrada' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
+          placeholder={cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
           enterKeyHint="send" autoComplete="off" autoCapitalize="sentences" inputMode="text"
         />
         <button type="submit" className="rc-send" disabled={!puedoEscribir || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>
