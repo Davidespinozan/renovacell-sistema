@@ -1,4 +1,4 @@
--- WHATSAPP EN EL CHAT (167) · los WhatsApp entran a la conversación de su dueño (doctor por celular o visitante interno),
+-- WHATSAPP EN EL CHAT (167) · los WhatsApp entran a una conversación de visitante interno (R4-B1: el celular ya no liga a un doctor),
 -- sin duplicar ante reintentos de Meta; en modo espejo no se encolan; en activo van a su vendedora o a Dirección.
 begin;
 do $t$
@@ -26,11 +26,11 @@ begin
   r2 := public.cc_wa_entrante('5216671112233', null, 'wamid.AAA222', '¿Y el precio?', false);
   perform tests.ok((r2 ->> 'conversation_id')::uuid = c and (select count(*) from public.cc_messages where conversation_id = c and actor_type = 'visitor') = 2, '2 · otro mensaje del mismo número, misma conversación');
 
-  -- 3 · doctor por su celular (con lada de país)
+  -- 3 · R4-B1: el celular de un doctor NO lo identifica (fail-closed); en activo va a la cola como visitante
   r := public.cc_wa_entrante('5216672556669', 'Dr. Ejemplo', 'wamid.BBB111', 'Quiero pedir 3 cajas', true);
-  perform tests.ok(r ->> 'actor' = 'doctor' and (r ->> 'profile_id')::uuid = dA
-    and (select profile_id = dA from public.cc_conversations where id = (r ->> 'conversation_id')::uuid), '3 · doctor reconocido por celular: es SU conversación');
-  perform tests.ok((select modo in ('human_requested', 'human_assigned') and seller_profile_id = s1 from public.cc_conversations where id = (r ->> 'conversation_id')::uuid), '3 · modo activo: a la cola de su vendedora de cartera (' || (select modo || '/' || coalesce(seller_profile_id::text, '-') from public.cc_conversations where id = (r ->> 'conversation_id')::uuid) || ')');
+  perform tests.ok(r ->> 'actor' = 'visitor' and r ->> 'profile_id' is null
+    and (select profile_id is null from public.cc_conversations where id = (r ->> 'conversation_id')::uuid), '3 · R4-B1: celular de un doctor → visitante, no SU conversación');
+  perform tests.ok((select modo in ('human_requested', 'human_assigned') from public.cc_conversations where id = (r ->> 'conversation_id')::uuid), '3 · modo activo: entra a la cola de atención (' || (select modo from public.cc_conversations where id = (r ->> 'conversation_id')::uuid) || ')');
 
   -- 4 · celular de dos cuentas: no se adivina
   r := public.cc_wa_entrante('5216670000777', 'Alguien', 'wamid.CCC111', 'Hola', false);

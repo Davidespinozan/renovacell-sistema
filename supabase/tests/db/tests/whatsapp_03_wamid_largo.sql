@@ -53,13 +53,13 @@ begin
   perform tests.ok((r ->> 'conversation_id')::uuid = v_conv and (r ->> 'actor') = 'visitor', '6 · contacto existente sigue en su conversación');
   perform tests.eq((select client_message_id from public.cc_messages where id = v_msg), 'wa:' || w_corto, '6 · el mensaje histórico no se modifica');
   perform tests.eq((select count(*) from public.cc_messages where conversation_id = v_conv and actor_type = 'visitor'), 3::bigint, '6 · tres mensajes del visitante (primero, histórico y el nuevo)');
-  -- 7 · doctor identificado por celular con wamid largo
+  -- 7 · número de un doctor con wamid largo (R4-B1: no se liga por teléfono)
   perform tests.act_as_owner();
   v_doc := tests.user('doctor'); update public.profiles set meta = coalesce(meta, '{}') || jsonb_build_object('shipping', jsonb_build_object('phone', right(v_tel, 10))) where id = v_doc;
   perform tests.act_as_service();
   r := public.cc_wa_entrante(v_tel, 'Dra', 'wamid.' || repeat('D', 90), 'soy doctora', false);
-  perform tests.ok((r ->> 'actor') = 'doctor' and (r ->> 'profile_id')::uuid = v_doc, '7 · doctor por celular con wamid largo');
-  perform tests.ok((select length(client_message_id) = 67 and actor_type = 'doctor' from public.cc_messages where id = (r ->> 'message_id')::uuid), '7 · derivado también para doctor');
+  perform tests.ok((r ->> 'actor') = 'visitor' and r ->> 'profile_id' is null, '7 · R4-B1: celular de un doctor con wamid largo → visitante (no se liga)');
+  perform tests.ok((select length(client_message_id) = 67 and actor_type = 'visitor' from public.cc_messages where id = (r ->> 'message_id')::uuid), '7 · derivado de 67 también en ese caso');
   -- 8 · Meta: mid real de Instagram (155) entra; duplicado por mid
   r := public.cc_meta_entrante('instagram', '17841400000000777', null, m_largo, 'hola por instagram', false);
   perform tests.ok((r ->> 'duplicado')::boolean = false, '8 · mid de Instagram de 164 entra');

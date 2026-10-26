@@ -23,7 +23,7 @@ begin
   b := public.cc_wa_bandeja();
   perform tests.ok((b -> 'chats' -> 0 ->> 'ultimo_texto') = 'Sí, tenemos.' and not (b -> 'chats' -> 0 ->> 'sin_responder')::boolean, '2 · el último mensaje es el de la IA, no el aviso del sistema');
 
-  -- un doctor con cuenta que escribe por WhatsApp se ve como cliente
+  -- R4-B1: el número de un doctor con cuenta NO lo identifica; en la bandeja se ve como contacto sin cuenta (con su mensaje)
   d := tests.user('doctor', 'wa-doc@t.local');
   perform tests.act_as_service();
   update public.profiles set meta = coalesce(meta, '{}') || '{"name":"Dra. Wa","phone":"6671230002"}' where id = d;
@@ -31,8 +31,8 @@ begin
   perform tests.act_as(v_admin);
   b := public.cc_wa_bandeja();
   -- (en una misma transacción todos los mensajes comparten now(): el orden entre los dos chats no se afirma aquí)
-  perform tests.ok(jsonb_array_length(b -> 'chats') = 2 and exists (select 1 from jsonb_array_elements(b -> 'chats') x where x ->> 'wa_id' = '5216671230002' and (x ->> 'cliente')::boolean and x ->> 'cliente_nombre' = 'Dra. Wa' and x ->> 'ultimo_texto' = 'Buenas'),
-    '3 · el doctor con cuenta aparece como cliente, con su nombre y su mensaje');
+  perform tests.ok(jsonb_array_length(b -> 'chats') = 2 and exists (select 1 from jsonb_array_elements(b -> 'chats') x where x ->> 'wa_id' = '5216671230002' and not coalesce((x ->> 'cliente')::boolean, false) and x ->> 'cliente_nombre' is null and x ->> 'ultimo_texto' = 'Buenas'),
+    '3 · R4-B1: el número de un doctor con cuenta aparece como contacto sin cuenta (no se liga por teléfono), con su mensaje');
 
   -- en activo también se ve
   perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo'; perform tests.act_as(v_admin);

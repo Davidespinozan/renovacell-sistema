@@ -14,6 +14,7 @@ end $t$;
 \ir ../../../migrations/20261222120000_whatsapp_bandeja.sql
 \ir ../../../migrations/20261223120000_meta_canales.sql
 \ir ../../../migrations/20270110120000_whatsapp_wamid_largo.sql
+\ir ../../../migrations/20270117120000_wa_identidad_fail_closed.sql   -- R4-B1: tras reaplicar la 167, el parche de identidad (si no, vuelve la liga por teléfono)
 do $t$ begin
   perform tests.ok((select todas from _wa) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '167 · se reaplica idéntica');
 end $t$;
