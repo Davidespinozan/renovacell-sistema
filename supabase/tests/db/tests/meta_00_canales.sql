@@ -52,17 +52,20 @@ begin
   r := public.cc_meta_entrante('instagram', '17841400000000001', null, 'mid.IG0003', '¿Envían a Mazatlán?', false);
   perform tests.ok((r ->> 'activo')::boolean and (select modo in ('human_requested', 'human_assigned') from public.cc_conversations where id = c), '5 · activo: entra a la cola humana');
   perform tests.ok(exists (select 1 from public.cc_messages m where m.conversation_id = c and m.actor_type = 'system' and m.client_message_id like 'sys:instagram:%'), '5 · el aviso de handoff lleva el origen del canal');
+  perform tests.act_as_owner(); update public.cc_meta_config set ia_habilitada = true where canal = 'instagram'; perform tests.act_as_service();   -- R4-B2-3b: la IA solo sale con su canal encendido
   perform public.cc_enviar_mensaje(c, 'ai', null, null, 'ai:m2', 'Sí, enviamos a todo México.');
   perform tests.ok(exists (select 1 from public.cc_meta_salida where conversation_id = c and canal = 'instagram' and psid = '17841400000000001' and texto = 'Sí, enviamos a todo México.' and estado = 'pendiente'), '5 · la respuesta se forma para Instagram');
   perform public.cc_enviar_mensaje(c2, 'ai', null, null, 'ai:m3', 'Hola Beto');
   perform tests.ok(not exists (select 1 from public.cc_meta_salida where conversation_id = c2), '5 · Messenger sigue en espejo: nada sale');
   perform public._cc_sistema(c, 'Aviso', 'sys:prueba');
-  perform tests.ok((select count(*) from public.cc_meta_salida where conversation_id = c) = 1, '5 · los avisos del sistema y lo del cliente no salen');
+  perform tests.ok((select count(*) from public.cc_meta_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type <> 'system') = 1, '5 · lo del cliente no sale (solo la respuesta de la IA)');
+  perform tests.ok((select count(*) = 1 and bool_and(m.client_message_id like 'sys:instagram:%') from public.cc_meta_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type = 'system'), '5 · R4-B2-2: de los avisos del sistema solo sale el de la transferencia (sys:instagram:)');
 
   -- 6 · reclamar / resolver sin dobles; fuera de 24 h; fallo con reintento
   select count(*) into n from public.cc_meta_salida_reclamar(10);
-  perform tests.ok(n = 1 and (select count(*) from public.cc_meta_salida_reclamar(10)) = 0, '6 · un envío se reclama una sola vez');
-  select * into sal from public.cc_meta_salida where conversation_id = c;
+  perform tests.ok(n = 2 and (select count(*) from public.cc_meta_salida_reclamar(10)) = 0, '6 · un envío se reclama una sola vez (respuesta de la IA + aviso de transferencia, R4-B2-2)');
+  perform public.cc_meta_salida_resolver((select s.id from public.cc_meta_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type = 'system'), true, 'mid.OUT0000', null);
+  select * into sal from public.cc_meta_salida where conversation_id = c and texto = 'Sí, enviamos a todo México.';
   perform public.cc_meta_salida_resolver(sal.id, true, 'mid.OUT0001', null);
   perform tests.ok((select estado = 'enviado' and mid = 'mid.OUT0001' from public.cc_meta_salida where id = sal.id) and exists (select 1 from public.cc_meta_mensajes where mid = 'mid.OUT0001' and direccion = 'out'), '6 · enviado con su mid');
   perform tests.act_as_owner(); update public.cc_meta_contactos set ultimo_entrante_at = now() - interval '25 hours' where psid = '17841400000000001' and canal = 'instagram'; perform tests.act_as_service();
@@ -71,8 +74,8 @@ begin
   perform tests.act_as_owner(); update public.cc_meta_contactos set ultimo_entrante_at = now() where psid = '17841400000000001' and canal = 'instagram'; perform tests.act_as_service();
   perform public.cc_enviar_mensaje(c, 'ai', null, null, 'ai:m5', 'Te paso el catálogo.');
   select * into sal from public.cc_meta_salida_reclamar(10) limit 1;
-  perform public.cc_meta_salida_resolver(sal.id, false, null, 'Meta 500');
-  perform tests.ok((select estado = 'pendiente' and error = 'Meta 500' from public.cc_meta_salida where id = sal.id), '6 · si Meta falla, vuelve a la cola');
+  perform public.cc_meta_salida_resolver(sal.id, false, null, 'Meta 429: límite');
+  perform tests.ok((select estado = 'pendiente' and error = 'Meta 429: límite' from public.cc_meta_salida where id = sal.id), '6 · si Meta lo rechaza por cupo, vuelve a la cola (R4-B2-2: un 5xx quedaría incierto)');
 
   -- 7 · permisos: solo el servidor opera; Dirección solo lee la bandeja
   perform tests.act_as(s1);

@@ -18,16 +18,19 @@ begin
   perform tests.act_as_owner(); update public.cc_wa_config set modo = 'activo'; perform tests.act_as_service();
   r := public.cc_wa_entrante('5216671239999', 'Luis', 'wamid.S0002', '¿Tienen envío a Mazatlán?', false);
   perform tests.ok((r ->> 'activo')::boolean and (select modo in ('human_requested', 'human_assigned') from public.cc_conversations where id = c), '1 · activo: entra a la cola humana');
+  perform tests.act_as_owner(); update public.cc_wa_config set ia_habilitada = true where id; perform tests.act_as_service();   -- R4-B2-3b: la IA solo sale con su canal encendido
   perform public.cc_enviar_mensaje(c, 'ai', null, null, 'ai:2', 'Sí, enviamos a todo México.');
   perform tests.ok(exists (select 1 from public.cc_wa_salida where conversation_id = c and texto = 'Sí, enviamos a todo México.' and estado = 'pendiente' and wa_id = '5216671239999'), '1 · la respuesta de la IA se forma para WhatsApp');
   perform public._cc_sistema(c, 'Lucía se unió a la conversación.', 'sys:prueba');
   perform tests.ok(not exists (select 1 from public.cc_wa_salida where conversation_id = c and texto like 'Lucía se unió%'), '1 · los avisos del sistema no salen');
-  perform tests.ok((select count(*) from public.cc_wa_salida where conversation_id = c) = 1, '1 · lo que escribe el cliente no se le reenvía');
+  perform tests.ok((select count(*) from public.cc_wa_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type <> 'system') = 1, '1 · lo que escribe el cliente no se le reenvía (solo la respuesta de la IA)');
+  perform tests.ok((select count(*) = 1 and bool_and(m.client_message_id like 'sys:wa:%') from public.cc_wa_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type = 'system'), '1 · R4-B2-2: de los avisos del sistema solo sale el de la transferencia (sys:wa:)');
 
   -- reclamar / resolver sin dobles
   select count(*) into n from public.cc_wa_salida_reclamar(10);
-  perform tests.ok(n = 1 and (select count(*) from public.cc_wa_salida_reclamar(10)) = 0, '2 · un envío se reclama una sola vez');
-  select * into x from public.cc_wa_salida where conversation_id = c;
+  perform tests.ok(n = 2 and (select count(*) from public.cc_wa_salida_reclamar(10)) = 0, '2 · un envío se reclama una sola vez (respuesta de la IA + aviso de transferencia, R4-B2-2)');
+  perform public.cc_wa_salida_resolver((select s.id from public.cc_wa_salida s join public.cc_messages m on m.id = s.message_id where s.conversation_id = c and m.actor_type = 'system'), true, 'wamid.OUT0000', null);
+  select * into x from public.cc_wa_salida where conversation_id = c and texto = 'Sí, enviamos a todo México.';
   perform public.cc_wa_salida_resolver(x.id, true, 'wamid.OUT0001', null);
   perform tests.ok((select estado = 'enviado' and wamid = 'wamid.OUT0001' from public.cc_wa_salida where id = x.id) and exists (select 1 from public.cc_wa_mensajes where wamid = 'wamid.OUT0001' and direccion = 'out'), '2 · enviado con su wamid');
 
@@ -45,8 +48,8 @@ begin
   perform tests.act_as_owner(); update public.cc_wa_contactos set ultimo_entrante_at = now() where wa_id = '5216671239999'; perform tests.act_as_service();
   perform public.cc_enviar_mensaje(c, 'ai', null, null, 'ai:4', 'Te paso el catálogo.');
   select * into x from public.cc_wa_salida_reclamar(10) limit 1;
-  perform public.cc_wa_salida_resolver(x.id, false, null, 'Meta 500');
-  perform tests.ok((select estado = 'pendiente' and error = 'Meta 500' from public.cc_wa_salida where id = x.id), '5 · si Meta falla, vuelve a la cola para reintentar');
+  perform public.cc_wa_salida_resolver(x.id, false, null, 'Meta 429: límite');
+  perform tests.ok((select estado = 'pendiente' and error = 'Meta 429: límite' from public.cc_wa_salida where id = x.id), '5 · si Meta lo rechaza por cupo, vuelve a la cola para reintentar (R4-B2-2: un 5xx quedaría incierto)');
 
   -- una conversación sin WhatsApp no forma nada
   d := tests.user('doctor', 'sinwa@t.local');
