@@ -50,6 +50,10 @@ export function mapearErrorChat(mensaje: string | undefined): { status: number; 
   if (/TRANSICION_INVALIDA/.test(m)) return r(409, 'transicion_invalida', 'Esa acción no corresponde al estado actual.')
   if (/CONVERSACION_CERRADA/.test(m)) return r(409, 'conversacion_cerrada', 'La conversación está cerrada.')
   if (/ASESOR_INVALIDO/.test(m)) return r(400, 'asesor_invalido', 'Ese usuario no puede atender conversaciones.')
+  // R4-B2-3b · exclusividad en canales (WhatsApp / Instagram / Messenger)
+  if (/TOMA_REQUERIDA/.test(m)) return r(409, 'toma_requerida', 'Toma la conversación antes de responder.')
+  if (/ATENDIDA_POR_OTRO/.test(m)) return r(409, 'atendida_por_otro', 'Otra persona atiende esta conversación.')
+  if (/CANAL_EN_ESPEJO/.test(m)) return r(409, 'canal_en_espejo', 'Este canal está en modo espejo: no se envían respuestas.')
   if (/CONTENIDO_VACIO|CONTENIDO_LARGO|ACTOR_INVALIDO/.test(m)) return r(400, 'contenido_invalido', 'El mensaje no es válido.')
   return r(503, 'no_disponible', 'No se pudo completar la operación. Intenta más tarde.')
 }
