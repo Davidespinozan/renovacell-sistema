@@ -2,7 +2,9 @@
 // cc_meta_salida) por la Cloud API de WhatsApp y el Send API de la página (Instagram/Messenger). La base decide qué sale
 // (solo canal en modo activo, solo dentro de la ventana de 24 h) y reparte cada envío una sola vez.
 // La llaman la tarea de cada minuto (con su secreto) y, a mano, el personal autenticado (reintento). Sin llaves: 501.
-// Requiere JWT (se despliega SIN --no-verify-jwt); la tarea programada se identifica con x-cron-secret.
+// Se despliega CON --no-verify-jwt (config.toml: [functions.meta-send] verify_jwt = false; WA-RESTORE-R2): la tarea de
+// cada minuto no trae JWT. La función autentica por sí misma: x-cron-secret (CORREOS_CRON_SECRET, ≥ 32, comparación por
+// hash) o, si no, sesión de equipo vía resolverQuien (401 sin sesión, 403 doctor/sin perfil/suspendido).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { resolverQuien } from '../_shared/quien.ts'

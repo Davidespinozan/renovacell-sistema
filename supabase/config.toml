@@ -416,3 +416,16 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Página estática sin datos, sin base ni secretos. Las demás funciones cs-* NO se declaran: conservan la verificación de JWT.
 [functions.cs-3ds-return]
 verify_jwt = false
+
+# WA-RESTORE-R2 · meta-send la invoca la tarea de cada minuto (_whatsapp_despachar) con x-cron-secret y SIN JWT; con la
+# verificación del gateway la rechazaba (401) antes del código. La función autentica por sí misma: secreto de la tarea
+# (CORREOS_CRON_SECRET, ≥ 32, comparación por hash) o sesión de equipo vía resolverQuien (401 sin sesión, 403 doctor/
+# sin perfil/suspendido). Mismo esquema que comm-dispatch.
+[functions.meta-send]
+verify_jwt = false
+
+# R4-C1 · meta-webhook la llama META (sin JWT de Supabase); autentica por firma X-Hub-Signature-256 (META_APP_SECRET) y el GET
+# de verificación por META_VERIFY_TOKEN. En prod corre con verify_jwt=false (v36, desplegada con --no-verify-jwt); declararlo
+# aquí evita que un despliegue sin la bandera la deje en 401 para Meta.
+[functions.meta-webhook]
+verify_jwt = false
