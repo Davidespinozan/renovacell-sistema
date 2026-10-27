@@ -18,7 +18,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
 import { extraerWhatsApp, extraerEstados } from '../_shared/whatsapp.ts'
-import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
+import { despacharWhatsApp, mostrarEscribiendo } from '../_shared/whatsappEnvio.ts'
 import { extraerMeta } from '../_shared/meta.ts'
 import { completarNombreMeta, despacharMeta } from '../_shared/metaEnvio.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
         if (IA_PUEDE(r.modo as never)) {
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación
           // y su cartera siguen siendo del doctor para el asesor humano; la elevación solo existe con sesión en el portal).
+          await mostrarEscribiendo(m.wamid)   // R4-C8 · el cliente ve "leído" y "escribiendo…" mientras la IA responde
           const ia = await responderIA(admin, r.conversation_id, r.seq, r.actor, r.profile_id, r.visitor_hash, m.texto, 'wa:' + m.wa_id, 'whatsapp')
           if (ia === 'respondio' || ia === 'transferida') await despacharWhatsApp(admin)   // R4-B2-IA1 · también el aviso de transferencia
         }

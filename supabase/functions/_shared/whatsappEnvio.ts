@@ -3,12 +3,27 @@
 // Lo llaman el chat (al contestar), meta-webhook (tras la IA) y la tarea de cada minuto (reintentos). Nunca lanza.
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
-import { configWA, cuerpoTexto } from './whatsapp.ts'
+import { configWA, cuerpoEscribiendo, cuerpoTexto } from './whatsapp.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
 
 export interface Despacho { enviados: number; fallidos: number; retenidos: number; inciertos: number }
 
 // deno-lint-ignore no-explicit-any
+/** R4-C8 · "leído" + "escribiendo…" para el mensaje del cliente mientras la IA prepara la respuesta. Mejor esfuerzo: sin
+ *  llaves no hace nada; cualquier error o tardanza (> 3 s) se ignora y nunca bloquea ni cambia la respuesta. */
+export async function mostrarEscribiendo(wamid: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  const cfg = configWA((k) => Deno.env.get(k))
+  if (!cfg || !wamid) return false
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3_000)
+    const resp = await fetchImpl(`https://graph.facebook.com/${cfg.version}/${cfg.phoneId}/messages`, {
+      method: 'POST', signal: ctl.signal, headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpoEscribiendo(wamid)),
+    })
+    clearTimeout(t); await resp.body?.cancel().catch(() => {})
+    return resp.ok
+  } catch { return false }
+}
+
 export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fetch): Promise<Despacho> {
   const cfg = configWA((k) => Deno.env.get(k))
   const r: Despacho = { enviados: 0, fallidos: 0, retenidos: 0, inciertos: 0 }

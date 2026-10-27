@@ -37,8 +37,11 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
+  // R4-C8 · un solo mensaje armonioso: si la IA respondió (ya dijo que un asesor continúa), el aviso del servidor queda
+  // solo para el equipo (prefijo 'comercial': no sale por el canal); si no respondió, el aviso SÍ le llega al cliente.
   if (comercial && canal !== 'portal') {
-    const { data, error } = await admin.rpc('_cc_canal_transferir', { p_conv: conv, p_origen: canal, p_prefijo: canal === 'whatsapp' ? 'wa' : canal, p_motivo: 'atencion_comercial', p_respiro: true })
+    const prefijo = r === 'respondio' ? 'comercial' : canal === 'whatsapp' ? 'wa' : canal
+    const { data, error } = await admin.rpc('_cc_canal_transferir', { p_conv: conv, p_origen: canal, p_prefijo: prefijo, p_motivo: 'atencion_comercial', p_respiro: true })
       .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
     if (r !== 'respondio' && !error && data === true) return 'transferida'
   }

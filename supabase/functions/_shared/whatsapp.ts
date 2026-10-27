@@ -57,6 +57,10 @@ export function configWA(env: (k: string) => string | undefined): ConfigWA | nul
 export function cuerpoTexto(para: string, texto: string): Record<string, unknown> {
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: 'text', text: { preview_url: true, body: texto.slice(0, 4096) } }
 }
+/** R4-C8 · marca el mensaje del cliente como leído y muestra "escribiendo…" (hasta 25 s o hasta la respuesta). No es un mensaje. */
+export function cuerpoEscribiendo(wamid: string): Record<string, unknown> {
+  return { messaging_product: 'whatsapp', status: 'read', message_id: wamid, typing_indicator: { type: 'text' } }
+}
 /** Lee la respuesta de Meta: wamid si se aceptó; si no, el error en una línea (sin datos del token). */
 export function leerRespuestaEnvio(status: number, cuerpo: unknown): { ok: true; wamid: string } | { ok: false; error: string } {
   const c = (cuerpo ?? {}) as { messages?: Array<{ id?: string }>; error?: { message?: string; code?: number } }

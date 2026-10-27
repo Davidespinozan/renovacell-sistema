@@ -137,7 +137,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       // rechazado): que lo consulte y responda de nuevo. Sin rondas o tras la corrección, el texto seguro de siempre.
       if (canal !== 'portal' && v.motivo === 'producto_no_autorizado' && !corregido && ronda < d.config.maxRondas - 1) {
         corregido = true
-        messages.push({ role: 'assistant', content: r.texto }, { role: 'user', content: [{ type: 'text', text: `CORRECCIÓN INTERNA (no la menciones al usuario): tu respuesta no se envió porque nombraste «${String(v.detalle ?? 'un producto')}» sin consultarlo en este turno. Consúltalo con buscar_productos y vuelve a responder al usuario solo con lo que regrese.` }] })
+        messages.push({ role: 'assistant', content: r.texto }, { role: 'user', content: [{ type: 'text', text: `CORRECCIÓN INTERNA (no la menciones al usuario): tu respuesta no se envió porque nombraste «${String(v.detalle ?? 'un producto')}» sin consultarlo en este turno. Si ese producto no hace falta para responder su ÚLTIMO mensaje, responde sin mencionarlo; si sí hace falta, consúltalo con buscar_productos y responde solo con lo que regrese.` }] })
         continue
       }
       return await persistir(d.validacion.respuestaSegura(v.motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), ronda, v.motivo)
