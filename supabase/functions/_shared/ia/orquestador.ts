@@ -47,7 +47,8 @@ export interface DepsOrquestador {
 // IA (audiencia pública, sin herramientas de cuenta ni carrito) aunque la conversación pertenezca a un doctor: la
 // vinculación comercial (cartera, asesor) se conserva en la conversación; la elevación de permisos solo existe con sesión.
 export type CanalTurno = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
-export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno }
+// R4-C13 · `adjunto`: imagen o PDF del cliente en ESTE turno (canal); va junto a su último mensaje y no se persiste.
+export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno; adjunto?: { tipo: 'image' | 'document'; media_type: string; data: string } }
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number }; clase?: string; motivoValidacion?: string
@@ -89,6 +90,10 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   try { historial = await d.leerMensajes(e.conv, e.triggerSeq, 30) } catch { historial = [] }
   const messages: Mensaje[] = d.politica.historialParaModelo(historial, d.config.historial)
   if (!messages.length) messages.push({ role: 'user', content: d.politica.envolverDatos('mensaje_del_usuario', e.textoUsuario.slice(0, 2000)) })
+  const ultimo = messages[messages.length - 1]
+  if (e.adjunto && (e.canal ?? 'portal') !== 'portal' && ultimo.role === 'user' && typeof ultimo.content === 'string') {
+    ultimo.content = [{ type: e.adjunto.tipo, source: { type: 'base64', media_type: e.adjunto.media_type, data: e.adjunto.data } } as unknown as Bloque, { type: 'text', text: ultimo.content } as Bloque]
+  }
 
   // Nombres del catálogo visible (solo para la guarda anti-alucinación; NO van al prompt).
   const cat = await rpc('cc_catalogo_para_ia', { p_audiencia: ctx.audiencia, p_limite: 400 })

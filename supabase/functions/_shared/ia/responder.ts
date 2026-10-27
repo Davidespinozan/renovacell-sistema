@@ -1,7 +1,7 @@
 // CC-4 · Orquestador comercial de IA, compartido por el chat (Edge chat) y WhatsApp (Edge meta-webhook). Aquí solo se
 // arma el entorno (proveedor, límites, lectura interna de mensajes) y se traduce el resultado; la lógica vive en
 // _shared/ia/* (pura, probada). Sin llave del proveedor deja un aviso de sistema una sola vez.
-import { ejecutarTurno, type CanalTurno } from './orquestador.ts'
+import { ejecutarTurno, type CanalTurno, type EntradaTurno } from './orquestador.ts'
 import * as politica from './politica.ts'
 import { esLimiteClinico } from './politica.ts'
 import * as herramientas from './herramientas.ts'
@@ -58,8 +58,8 @@ export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boo
 type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
 // R4-B2-IA1 · 'transferida' solo existe en canales: el portal conserva exactamente su contrato anterior.
 export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal?: 'portal'): Promise<ResultadoIA>
-export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno): Promise<ResultadoIA | 'transferida'>
-export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal'): Promise<ResultadoIA | 'transferida'> {
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, adjunto?: EntradaTurno['adjunto'] | null): Promise<ResultadoIA | 'transferida'>
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal', adjunto: EntradaTurno['adjunto'] | null = null): Promise<ResultadoIA | 'transferida'> {
   // R4-B2-IA1 · en canales (WhatsApp/Instagram/Messenger): una solicitud EXPLÍCITA de persona o un asunto de pedido o
   // reclamación se transfiere de inmediato con la herramienta existente (cc_solicitar_asesor, idempotente), sin llamar al
   // modelo: el cliente recibe UN aviso (el del sistema, con la disponibilidad real) y no una respuesta duplicada de la IA.
@@ -72,7 +72,8 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
         .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
       if (!error && (data as { idempotente?: boolean } | null)?.idempotente === false) return 'transferida'
     } else {
-      comercial = politica.atencionComercial(texto)
+      // R4-C13 · si la IA SÍ ve el archivo, no se transfiere solo por haberlo mandado: cuenta lo que dice el pie de foto
+      comercial = adjunto ? politica.atencionComercial(texto.replace(/^Envió [^.]*\.\s*/, '').replace(/^«|»$/g, '')) : politica.atencionComercial(texto)
       // R4-C11 · "100" tras "2 nabota": la compra sigue aunque este mensaje solo diga la presentación
       // solo para respuestas cortas que continúan la compra ("100", "la de 200", "2"), nunca para un saludo ni otro tema
       if (!comercial && !esLimiteClinico(texto) && politica.esContinuacionCorta(texto)) {
@@ -81,7 +82,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
       }
     }
   }
-  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial)
+  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto)
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
@@ -97,7 +98,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
 }
 
 // deno-lint-ignore no-explicit-any
-async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false): Promise<ResultadoIA> {
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
   const cfg0 = configurar(env)
   // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
@@ -119,7 +120,7 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const canalDeps = canal === 'portal' ? null : dependenciasCanal(await leerNegocio(admin), { comercial })
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
-    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal },
+    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}) },
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),

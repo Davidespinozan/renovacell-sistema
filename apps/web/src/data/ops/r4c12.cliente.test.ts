@@ -16,7 +16,7 @@ describe('búsqueda y archivos', () => {
       expect(politica.atencionComercial(t), t).toBe('adjunto')
     for (const t of ['Envió un sticker por WhatsApp.', 'Compartió una ubicación por WhatsApp.', 'Compartió un contacto por WhatsApp.'])
       expect(politica.atencionComercial(t), t).toBeNull()
-    expect(politica.contextoCanal('whatsapp')).toContain('tú no puedes verlo: agradécelo y dile que un asesor de Renovacell lo revisa aquí mismo')
+    expect(politica.contextoCanal('whatsapp')).toContain('y tú no lo ves (audio, video o no se pudo abrir), agradécelo y dile que un asesor de Renovacell lo revisa aquí mismo')   // R4-C13
   })
   it('"es de lo que me envían ustedes" es recompra', () => {
     for (const t of ['Pues es de lo q me envían ustedes', 'es lo que nos mandan siempre', 'lo que me surten ustedes']) expect(politica.atencionComercial(t.replace(' q ', ' que ')), t).toBe('recompra')
@@ -26,7 +26,7 @@ describe('búsqueda y archivos', () => {
 describe('mensajes seguidos: una sola respuesta', () => {
   it('el webhook espera y no responde si ya llegó otro mensaje del cliente', () => {
     expect(webhook).toMatch(/const AGRUPAR_MS = 3_500/)
-    expect(webhook).toMatch(/await mostrarEscribiendo\(m\.wamid\)[^\n]*\n[\s\S]*?if \(await llegoOtroMensaje\(admin, r\.conversation_id, r\.seq\)\) return\n\s*const ia = await responderIA\(/)
+    expect(webhook).toMatch(/await mostrarEscribiendo\(m\.wamid\)[^\n]*\n[\s\S]*?if \(await llegoOtroMensaje\(admin, r\.conversation_id, r\.seq\)\) return\n[\s\S]*?const ia = await responderIA\(/)   // R4-C13: la descarga del archivo va en medio
     expect(webhook).toMatch(/\.in\('actor_type', \['visitor', 'doctor'\]\)\.gt\('seq', seq\)\.limit\(1\)/)
     expect(webhook).toMatch(/return !error && Array\.isArray\(data\) && data\.length > 0/)
   })

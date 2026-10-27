@@ -1,13 +1,17 @@
 // WHATSAPP (WA-1) · piezas puras del canal: leer los mensajes entrantes del payload de Meta (Cloud API) y el modo del
 // canal. Sin red ni base de datos: se prueban en vitest.
 
-export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string }
+// R4-C13 · `media`: imagen o PDF que la IA puede ver (se descarga de Meta al responder; no se guarda).
+export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' }
+export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA }
 
 const ETIQUETA: Record<string, string> = {
   image: 'Envió una imagen por WhatsApp.', audio: 'Envió un audio por WhatsApp.', voice: 'Envió un audio por WhatsApp.',
   video: 'Envió un video por WhatsApp.', document: 'Envió un documento por WhatsApp.', sticker: 'Envió un sticker por WhatsApp.',
   location: 'Compartió una ubicación por WhatsApp.', contacts: 'Compartió un contacto por WhatsApp.',
 }
+
+export const MIME_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 /** Mensajes ENTRANTES de WhatsApp (entry[].changes[].value.messages[]). Ignora acuses (statuses) y lo que no trae wamid. */
 export function extraerWhatsApp(payload: unknown): EntranteWA[] {
@@ -34,7 +38,11 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
         }
         const pie = String(((m as Record<string, Record<string, unknown>>)[tipo])?.caption ?? '').trim()
         if (!texto.trim()) texto = (ETIQUETA[tipo] ?? 'Envió un mensaje por WhatsApp.') + (pie ? ` «${pie}»` : '')
-        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000) })
+        const obj = (m as Record<string, Record<string, unknown>>)[tipo] ?? {}
+        const mime = String(obj.mime_type ?? '').toLowerCase().split(';')[0].trim(); const mediaId = String(obj.id ?? '')
+        const media: MediaWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'image' && MIME_IMAGEN.includes(mime)) || (tipo === 'document' && mime === 'application/pdf'))
+          ? { id: mediaId, mime, tipo: tipo as 'image' | 'document' } : undefined
+        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}) })
       }
     }
   }

@@ -3,7 +3,7 @@
 // Lo llaman el chat (al contestar), meta-webhook (tras la IA) y la tarea de cada minuto (reintentos). Nunca lanza.
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
-import { configWA, cuerpoEscribiendo, cuerpoTexto } from './whatsapp.ts'
+import { configWA, cuerpoEscribiendo, cuerpoTexto, MIME_IMAGEN, type MediaWA } from './whatsapp.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
 
 export interface Despacho { enviados: number; fallidos: number; retenidos: number; inciertos: number }
@@ -22,6 +22,36 @@ export async function mostrarEscribiendo(wamid: string, fetchImpl: typeof fetch 
     clearTimeout(t); await resp.body?.cancel().catch(() => {})
     return resp.ok
   } catch { return false }
+}
+
+// R4-C13 · descarga el archivo del cliente para que la IA lo VEA en este turno (no se guarda en ningún lado). Dos pasos de la
+// Cloud API: metadatos (url temporal, tipo y tamaño) y luego el binario con el mismo token. Límites: 3.5 MB imagen (≈ 4.7 MB en
+// base64, bajo el tope de 5 MB por imagen del modelo), 10 MB PDF,
+// 8 s por paso. Cualquier falla → null (la IA dice que un asesor lo revisa).
+export interface AdjuntoIA { tipo: 'image' | 'document'; media_type: string; data: string }
+export const MAX_IMAGEN = 3.5 * 1024 * 1024, MAX_PDF = 10 * 1024 * 1024
+export async function descargarMedia(media: MediaWA, fetchImpl: typeof fetch = fetch): Promise<AdjuntoIA | null> {
+  const cfg = configWA((k) => Deno.env.get(k))
+  if (!cfg) return null
+  const limite = media.tipo === 'image' ? MAX_IMAGEN : MAX_PDF
+  const conTiempo = async (url: string) => {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8_000)
+    try { return await fetchImpl(url, { signal: ctl.signal, headers: { Authorization: `Bearer ${cfg.token}` } }) } finally { clearTimeout(t) }
+  }
+  try {
+    const meta = await conTiempo(`https://graph.facebook.com/${cfg.version}/${media.id}`)
+    if (!meta.ok) return null
+    const info = await meta.json().catch(() => null) as { url?: string; mime_type?: string; file_size?: number } | null
+    const mime = String(info?.mime_type ?? media.mime).toLowerCase().split(';')[0].trim()
+    const valido = media.tipo === 'image' ? MIME_IMAGEN.includes(mime) : mime === 'application/pdf'
+    if (!info?.url || !/^https:\/\//.test(info.url) || !valido || Number(info.file_size ?? 0) > limite) return null
+    const bin = await conTiempo(info.url)
+    if (!bin.ok) return null
+    const bytes = new Uint8Array(await bin.arrayBuffer())
+    if (!bytes.length || bytes.length > limite) return null
+    let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return { tipo: media.tipo, media_type: mime, data: btoa(s) }
+  } catch { return null }
 }
 
 export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fetch): Promise<Despacho> {

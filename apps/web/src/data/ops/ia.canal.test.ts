@@ -156,10 +156,10 @@ describe('LIVE C1 · identidad por canal: fuera del portal la IA es audiencia p�
 describe('LIVE C1 · guardas de fuente: el canal viaja hasta la política y el portal no cambia', () => {
   const sin = (s: string) => s.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
   it('meta-webhook pasa el canal real; el chat del portal NO pasa canal (por defecto portal); responder lo reenvía al orquestador', () => {
-    expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, r\.actor, r\.profile_id, r\.visitor_hash, m\.texto, 'wa:' \+ m\.wa_id, 'whatsapp'\)/)
+    expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, r\.actor, r\.profile_id, r\.visitor_hash, m\.texto, 'wa:' \+ m\.wa_id, 'whatsapp', adjunto\)/)   // R4-C13: + la imagen/PDF que la IA ve
     expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, 'visitor', null, r\.visitor_hash, m\.texto, 'meta:' \+ m\.psid, m\.canal\)/)
     expect(sin(chatEdge)).toMatch(/responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto\)/)
-    expect(sin(responderSrc)).toMatch(/canal: CanalTurno = 'portal'\)/); expect(sin(responderSrc)).toMatch(/textoUsuario: texto, canal \}/)
+    expect(sin(responderSrc)).toMatch(/canal: CanalTurno = 'portal', adjunto: EntradaTurno\['adjunto'\] \| null = null\)/); expect(sin(responderSrc)).toMatch(/textoUsuario: texto, canal, \.\.\.\(adjunto \? \{ adjunto \} : \{\}\) \}/)   // R4-C13
     expect(sin(orqSrc)).toMatch(/const perfilIA: string \| null = canal === 'portal' \? e\.profile : null/)
     expect(sin(orqSrc)).toMatch(/rpc\('cc_ia_contexto_actor', \{ p_profile: perfilIA \}\)/)
     for (const fn of ['cc_ia_precio', 'cc_ia_disponibilidad', 'cc_ia_estado_pedido']) expect(sin(orqSrc)).toMatch(new RegExp(`rpc\\('${fn}', \\{ p_profile: t\\.perfilIA`))
