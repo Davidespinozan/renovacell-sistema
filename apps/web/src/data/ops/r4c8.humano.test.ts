@@ -35,7 +35,7 @@ describe('estilo humano del canal', () => {
   })
   it('el portal no recibe el estilo del canal', () => { expect(politica.contextoCanal('portal')).toBe('') })
   it('la corrección interna permite no mencionar el producto si no hace falta (no lo mete en un saludo)', () => {
-    expect(orquestador).toContain('Si ese producto no hace falta para responder su ÚLTIMO mensaje, responde sin mencionarlo')
+    expect(orquestador).toContain('Si ese producto no hace falta para responder su último mensaje, no lo menciones')
   })
 })
 

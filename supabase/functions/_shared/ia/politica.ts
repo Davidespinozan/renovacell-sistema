@@ -236,7 +236,14 @@ export function atencionComercial(texto: string): MotivoComercial | null {
   if (RECOMPRA.test(t)) return 'recompra'
   if (NEGOCIA.test(t)) return 'negociacion'
   if (NIEGA_COMPRA.test(t)) return null
-  return COMPRA.test(t) ? 'compra' : null
+  if (COMPRA.test(t)) return 'compra'
+  // R4-C11 · "2 nabota", "3 de 100", "una caja de hyalux": cantidad + producto en un mensaje corto = compra
+  return t.split(' ').length <= 6 && /^\s*(\d{1,3}|una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(de\s+|cajas?\s+(de\s+)?|piezas?\s+(de\s+)?|viales?\s+(de\s+)?)?[a-z0-9][a-z0-9 ]{2,}$/.test(t) ? 'compra' : null
+}
+/** R4-C11 · ¿la conversación viene de una compra? (un mensaje comercial reciente del usuario en esta sesión) */
+export function compraEnCurso(recientesDelUsuario: readonly string[]): MotivoComercial | null {
+  for (const m of [...recientesDelUsuario].reverse().slice(0, 4)) { const c = atencionComercial(m); if (c) return c }
+  return null
 }
 
 /** Clasificador de CANAL: sin falsos positivos de "quiere una persona" y con las formas comunes de precio, existencias y compra. */

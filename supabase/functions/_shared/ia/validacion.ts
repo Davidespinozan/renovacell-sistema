@@ -71,6 +71,11 @@ export function sinMontosDeEnvio(texto: string, montos: readonly number[]): stri
   return texto.split(/(?<=[.!?\n;])|(?<=,)(?!\d)|(?=\s(?:y|pero|aunque|mientras)\s)/i).map((c) => (RE_FRASE_ENVIO.test(c) ? c.replace(re, '[monto de envío]') : c)).join('')
 }
 
+// R4-C11 · el cliente nunca ve frases de "sistema" del modelo ("Entendido, corrijo mi respuesta:", "Tienes razón. Respondo
+// correctamente:"): se quitan del inicio antes de validar.
+const RE_META_INICIO = /^\s*(?:entendido|de acuerdo|tienes raz[oó]n|perd[oó]n|disculpa|ok)[.,!:]?\s*(?:[^\n.!?]{0,40}\b(?:corrijo|corregir|correcci[oó]n|respondo correctamente|reformulo|mi respuesta anterior)\b[^\n]*?[:.!]\s*)/i
+export const sinFrasesDeSistema = (t: string): string => { const s = t.replace(RE_META_INICIO, ''); return s === t ? t : s.charAt(0).toUpperCase() + s.slice(1) }
+
 /** Texto seguro cuando el modelo no produjo una respuesta válida: nunca inventa; usa la evidencia o se limita. */
 export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string }): string {
   if (ctx.limiteClinico || motivo === 'clinico') return ctx.textoLimiteClinico

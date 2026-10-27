@@ -57,8 +57,9 @@ describe('A · nunca nombra un producto sin consultarlo (y el cliente nunca ve e
     expect(r.estado).toBe('respondio')
     expect(persistidos(db)).toHaveLength(1)
     expect(persistidos(db)[0]).toContain('Nabota 150 UI'); expect(persistidos(db)[0]).not.toContain(RESPALDO)
-    const correccion = JSON.stringify(d.proveedor.solicitudes[1].messages)
-    expect(correccion).toContain('CORRECCIÓN INTERNA'); expect(correccion).toContain('Nabota 100 UI')
+    // R4-C11 · la corrección va en el SISTEMA de la siguiente ronda; los mensajes no cambian (el intento rechazado no entra)
+    expect(d.proveedor.solicitudes[1].system).toContain('ANTES DE RESPONDER'); expect(d.proveedor.solicitudes[1].system).toContain('Nabota 100 UI')
+    expect(d.proveedor.solicitudes[1].messages).toEqual(d.proveedor.solicitudes[0].messages)
     expect(db.llamadas.filter((l) => l.fn === 'cc_ia_herramienta_registrar' && l.args.p_tool === 'validacion_salida')).toHaveLength(1)
   })
   it('una sola corrección: si vuelve a nombrarlo sin consultar, sale el texto seguro (nunca lo inventado)', async () => {

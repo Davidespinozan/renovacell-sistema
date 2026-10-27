@@ -105,7 +105,7 @@ export const LIMITES: Record<string, Regla> = {
   ia_turno_uid:              { limite: 40,  ventanaSegs: 60 },
   ia_turno_hora:             { limite: 120, ventanaSegs: 3600 },
   ia_turno_global:           { limite: 1500, ventanaSegs: 3600 },
-  ia_tokens_dia:             { limite: 400_000, ventanaSegs: 86400 },
+  ia_tokens_dia:             { limite: 3_000_000, ventanaSegs: 86400 },   // R4-C11 · WhatsApp en LIVE para todos: 400k se agotaba con ~50 turnos/día y la IA callaba
   ia_tokens_dia_uid:         { limite: 60_000,  ventanaSegs: 86400 },
   // cart (CC-5): lectura holgada; mutación acotada por sujeto (los controles +/- normales caben) y techo global.
   cart_leer:                 { limite: 120, ventanaSegs: 60 },

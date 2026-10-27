@@ -3,9 +3,10 @@
 // _shared/ia/* (pura, probada). Sin llave del proveedor deja un aviso de sistema una sola vez.
 import { ejecutarTurno, type CanalTurno } from './orquestador.ts'
 import * as politica from './politica.ts'
+import { esLimiteClinico } from './politica.ts'
 import * as herramientas from './herramientas.ts'
 import * as validacion from './validacion.ts'
-import { configurar, crearProveedorAnthropic } from './proveedor.ts'
+import { configurar, crearProveedorAnthropic, esModeloConPensamiento, type OpcionesModelo } from './proveedor.ts'
 import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
 
@@ -35,17 +36,20 @@ export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
     manual: Array.isArray(manual) ? manual as politica.DatosNegocio['manual'] : null, promociones }
 }
 /** Política y validación del canal con los datos del negocio de este turno. */
-export function dependenciasCanal(n: politica.DatosNegocio) {
+export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boolean } = {}) {
   const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
   const manual = politica.textoManual(n); const promos = politica.textoPromociones(n); const nombresPromo = politica.nombresPromocion(n)
   const bloques = [texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
   return {
-    politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (bloques.length ? '\n\n' + bloques.join('\n\n') : '') },
+    politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (bloques.length ? '\n\n' + bloques.join('\n\n') : ''),
+      // R4-C11 · si la conversación viene de una compra ("2 nabota" → "100"), el turno sigue con la tarea de compra
+      clasificarIntencion: (t: string) => { const i = politica.clasificarIntencionCanal(t); return o.comercial && !['CLINICAL_BOUNDARY', 'HUMAN_REQUEST', 'ORDER_STATUS'].includes(i) ? 'CHECKOUT' : i } },
     validacion: { ...validacionCanalBase, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
       if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
+      const limpio = validacion.sinFrasesDeSistema(t.replace(/\r\n?/g, '\n').trim())
       // los productos de una promoción vigente vienen del servidor: cuentan como autorizados en este turno
-      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
-      return v.ok ? { ok: true as const, texto: t.replace(/\r\n?/g, '\n').trim() } : v
+      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(limpio, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
+      return v.ok ? { ok: true as const, texto: limpio } : v
     } },
   }
 }
@@ -67,9 +71,16 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
       const { data, error } = await admin.rpc('cc_solicitar_asesor', { p_conv: conv, p_actor_type: actor, p_visitor_hash: actor === 'visitor' ? visitorHash : null, p_profile: actor === 'doctor' ? profile : null })
         .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
       if (!error && (data as { idempotente?: boolean } | null)?.idempotente === false) return 'transferida'
-    } else comercial = politica.atencionComercial(texto)
+    } else {
+      comercial = politica.atencionComercial(texto)
+      // R4-C11 · "100" tras "2 nabota": la compra sigue aunque este mensaje solo diga la presentación
+      if (!comercial && !esLimiteClinico(texto)) {
+        const previos = await leerInterno(admin, conv, seqUsuario - 1, 8).catch(() => [])
+        comercial = politica.compraEnCurso(previos.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').map((m) => m.content))
+      }
+    }
   }
-  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal)
+  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial)
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
@@ -85,9 +96,11 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
 }
 
 // deno-lint-ignore no-explicit-any
-async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno): Promise<ResultadoIA> {
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
-  const cfg = configurar(env)
+  const cfg0 = configurar(env)
+  // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
+  const cfg = cfg0.ok && canal !== 'portal' ? { ...cfg0, config: configCanal(cfg0.config, env) } : cfg0
   const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }
   if (!cfg.ok) { await aviso(); return 'no_disponible' }
   // CC-0B · ráfaga/hora por sujeto y techo global: sin cupo NO se llama al proveedor.
@@ -100,8 +113,9 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const costo = await limitarTodas(admin, [{ scope: 'ia_tokens_dia', sujeto: 'global', costo: estimado }, ...(actor === 'doctor' ? [{ scope: 'ia_tokens_dia_uid', sujeto, costo: estimado }] : [])])
   if (!costo.permitido) return 'limitada'
 
-  const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis) })
-  const canalDeps = canal === 'portal' ? null : dependenciasCanal(await leerNegocio(admin))
+  const opciones: OpcionesModelo | undefined = canal === 'portal' ? undefined : { effort: esfuerzoCanal(env), fallbacks: true }
+  const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis), opciones })
+  const canalDeps = canal === 'portal' ? null : dependenciasCanal(await leerNegocio(admin), { comercial })
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
     { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal },
@@ -123,6 +137,21 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
     case 'silenciada': return 'silenciada'
     default: return 'no_disponible'   // fallo del proveedor o de persistencia (el orquestador ya dejó el aviso de sistema)
   }
+}
+
+// R4-C11 · configuración del canal: modelo AI_MODEL_CANAL (Claude Opus 5.5 por defecto), más salida (el modelo piensa antes de
+// responder) y más tiempo (el aviso "escribiendo…" ya cubre la espera; la Edge responde a Meta antes).
+export const MODELO_CANAL = 'claude-opus-5-5'
+export function configCanal(base: { model: string; timeoutMs: number; maxTokens: number; maxRondas: number; historial: number; provider: 'anthropic' }, env: (k: string) => string | undefined) {
+  const model = (env('AI_MODEL_CANAL') ?? '').trim() || MODELO_CANAL
+  const num = (k: string, d: number, min: number, max: number) => { const v = Number(env(k)); return Number.isFinite(v) && v >= min && v <= max ? Math.floor(v) : d }
+  return esModeloConPensamiento(model)
+    ? { ...base, model, maxTokens: num('AI_MAX_TOKENS_CANAL', 8000, 1000, 32000), timeoutMs: num('AI_TIMEOUT_MS_CANAL', 45_000, 5_000, 120_000) }
+    : { ...base, model }
+}
+export function esfuerzoCanal(env: (k: string) => string | undefined): 'low' | 'medium' | 'high' {
+  const e = (env('AI_EFFORT_CANAL') ?? '').trim().toLowerCase()
+  return e === 'medium' || e === 'high' ? e : 'low'
 }
 
 // Lectura interna con service_role (el orquestador corre en el servidor, no es un cliente).

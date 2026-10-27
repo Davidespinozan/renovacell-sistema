@@ -11,6 +11,8 @@ export type BloqueEntrada =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string }
+  // R4-C11 · bloques internos del modelo (thinking, redacted_thinking…): se devuelven SIN modificar en la siguiente ronda
+  | { type: 'thinking' | 'redacted_thinking'; [k: string]: unknown }
 // Los mensajes aceptan bloques genéricos (el orquestador los arma); los bloques que ESTE módulo produce son BloqueEntrada.
 export type BloqueGenerico = { type: string; [k: string]: unknown }
 export interface MensajeModelo { role: 'user' | 'assistant'; content: string | BloqueGenerico[] }
@@ -48,9 +50,17 @@ export function parsearAnthropic(status: number, data: unknown): RespuestaModelo
   if (status === 529 || status === 503) return { tipo: 'error', clase: 'provider_unavailable', usage, ambiguo: false }
   if (status < 200 || status >= 300) return { tipo: 'error', clase: 'provider_error', usage, ambiguo: false }
   if (!Array.isArray(d.content)) return { tipo: 'error', clase: 'provider_malformed', usage, ambiguo: false }
+  // R4-C11 · refusal (clasificadores de seguridad o el modelo declina, también tras el fallback): nunca se lee el contenido
+  if (d.stop_reason === 'refusal') return { tipo: 'error', clase: 'provider_error', usage, ambiguo: false }
+  // Tras un fallback a otro modelo, lo que viene ANTES del último bloque 'fallback' (thinking / tool_use del modelo que declinó)
+  // no se reenvía; el bloque 'fallback' es solo un marcador de auditoría.
+  const contenido = d.content as Array<Record<string, unknown>>
+  const ultimoFallback = contenido.map((b) => b?.type).lastIndexOf('fallback')
   const bloques: BloqueEntrada[] = []; const llamadas: LlamadaHerramienta[] = []; const textos: string[] = []
-  for (const b of d.content as Array<Record<string, unknown>>) {
+  for (const [i, b] of contenido.entries()) {
     if (!b || typeof b !== 'object') return { tipo: 'error', clase: 'provider_malformed', usage, ambiguo: false }
+    if (i < ultimoFallback && b.type !== 'text') continue
+    if (b.type === 'thinking' || b.type === 'redacted_thinking') { bloques.push({ ...b } as BloqueEntrada); continue }   // pensado: intacto, sin texto visible
     if (b.type === 'text' && typeof b.text === 'string') { textos.push(b.text); bloques.push({ type: 'text', text: b.text }) }
     else if (b.type === 'tool_use') {
       if (typeof b.id !== 'string' || typeof b.name !== 'string') return { tipo: 'error', clase: 'provider_malformed', usage, ambiguo: false }
@@ -63,18 +73,43 @@ export function parsearAnthropic(status: number, data: unknown): RespuestaModelo
   return { tipo: 'texto', texto: textos.join('\n').trim(), usage, stop }
 }
 
-export function crearProveedorAnthropic(deps: { key: string; model: string; fetch: typeof fetch; url?: string }): Proveedor {
+// R4-C11 · modelos de la generación 5.x (Opus/Sonnet/Haiku 5.5…): pensamiento adaptativo siempre activo, esfuerzo explícito,
+// bloques de pensamiento que se descartan solos si el prefijo cambió (el prompt de sistema lleva la evidencia de cada ronda) y
+// fallback del servidor ante un rechazo de los clasificadores. Haiku 4.5 (portal) sigue con la petición de siempre.
+export interface OpcionesModelo { effort?: 'low' | 'medium' | 'high'; fallbacks?: boolean }
+export const esModeloConPensamiento = (m: string) => /^claude-(opus|sonnet|haiku|fable)-5/.test(m)
+export function cuerpoAnthropic(model: string, s: SolicitudModelo, o: OpcionesModelo = {}): { body: Record<string, unknown>; betas: string[] } {
+  const body: Record<string, unknown> = { model, max_tokens: s.max_tokens, system: s.system, messages: s.messages }
+  if (s.tools.length) body.tools = s.tools
+  const betas: string[] = []
+  if (esModeloConPensamiento(model)) {
+    body.thinking = { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } }; betas.push('thinking-binding-controls-2026-08-01')
+    body.output_config = { effort: o.effort ?? 'low' }
+    if (o.fallbacks !== false && /^claude-(opus-5|sonnet-5-5|fable-5)/.test(model)) { body.fallbacks = 'default'; betas.push('server-side-fallback-2026-07-01') }
+  }
+  return { body, betas }
+}
+
+export function crearProveedorAnthropic(deps: { key: string; model: string; fetch: typeof fetch; url?: string; opciones?: OpcionesModelo }): Proveedor {
   const url = deps.url ?? 'https://api.anthropic.com/v1/messages'
   return {
     nombre: 'anthropic', modelo: deps.model,
     async generar(s) {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), s.timeoutMs)
       try {
-        const body: Record<string, unknown> = { model: deps.model, max_tokens: s.max_tokens, system: s.system, messages: s.messages }
-        if (s.tools.length) body.tools = s.tools
-        const r = await deps.fetch(url, { method: 'POST', signal: ctl.signal, headers: { 'x-api-key': deps.key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        const data = await r.json().catch(() => null)
-        return parsearAnthropic(r.status, data)
+        const pedir = async (o: OpcionesModelo | undefined, sinBetas: boolean) => {
+          const { body, betas } = cuerpoAnthropic(deps.model, s, o)
+          if (sinBetas) delete (body.thinking as Record<string, unknown> | undefined)?.block_binding
+          const headers: Record<string, string> = { 'x-api-key': deps.key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
+          if (betas.length && !sinBetas) headers['anthropic-beta'] = betas.join(',')
+          const r = await deps.fetch(url, { method: 'POST', signal: ctl.signal, headers, body: JSON.stringify(body) })
+          return { status: r.status, data: await r.json().catch(() => null) }
+        }
+        let { status, data } = await pedir(deps.opciones, false)
+        // R4-C11 · red de seguridad: si la cuenta no acepta una opción beta (fallbacks / block_binding) la API responde 400;
+        // se reintenta UNA vez con la petición mínima del modelo (sin betas). Un 400 por otra causa vuelve a fallar igual.
+        if (status === 400 && esModeloConPensamiento(deps.model)) ({ status, data } = await pedir({ ...deps.opciones, fallbacks: false }, true))
+        return parsearAnthropic(status, data)
       } catch (e) {
         // Abort = timeout: el proveedor PUDO haber respondido (ambiguo); la persistencia es idempotente por turno.
         const esAbort = (e as { name?: string })?.name === 'AbortError'

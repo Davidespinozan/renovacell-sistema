@@ -120,10 +120,11 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
 
   // 4) Bucle de herramientas acotado.
   let corregido = false   // R4-C7 · una sola corrección por producto no consultado
+  let notaCorreccion = ''   // R4-C11 · la corrección va como nota del SISTEMA en la siguiente ronda, nunca como mensaje en la conversación
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal })
+    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal }) + notaCorreccion
     const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
@@ -137,7 +138,9 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       // rechazado): que lo consulte y responda de nuevo. Sin rondas o tras la corrección, el texto seguro de siempre.
       if (canal !== 'portal' && v.motivo === 'producto_no_autorizado' && !corregido && ronda < d.config.maxRondas - 1) {
         corregido = true
-        messages.push({ role: 'assistant', content: r.texto }, { role: 'user', content: [{ type: 'text', text: `CORRECCIÓN INTERNA (no la menciones al usuario): tu respuesta no se envió porque nombraste «${String(v.detalle ?? 'un producto')}» sin consultarlo en este turno. Si ese producto no hace falta para responder su ÚLTIMO mensaje, responde sin mencionarlo; si sí hace falta, consúltalo con buscar_productos y responde solo con lo que regrese.` }] })
+        // El intento rechazado NO entra al historial: se vuelve a generar con los mismos mensajes y una nota en el sistema
+        // (si se le presentara como mensaje, el modelo le contestaría: "Entendido, corrijo mi respuesta…").
+        notaCorreccion = `\n\nANTES DE RESPONDER (instrucción interna, no la menciones ni pidas disculpas): no puedes nombrar «${String(v.detalle ?? 'un producto')}» sin haberlo consultado en este turno. Si ese producto no hace falta para responder su último mensaje, no lo menciones; si sí hace falta, consúltalo primero con buscar_productos. Responde directo al usuario, como si fuera tu primera respuesta.`
         continue
       }
       return await persistir(d.validacion.respuestaSegura(v.motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), ronda, v.motivo)

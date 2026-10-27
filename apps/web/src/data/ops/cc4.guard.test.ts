@@ -87,7 +87,7 @@ describe('módulos de IA (puros) y Edge chat', () => {
     expect(s).not.toMatch(/functions\/v1\/assistant/); expect(s).not.toMatch(/historialParaIA/)
     for (const sc of ['ia_turno', 'ia_turno_uid', 'ia_turno_hora', 'ia_turno_global', 'ia_tokens_dia', 'ia_tokens_dia_uid']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }
     expect(s).toMatch(/if \(!v\.permitido\) return 'limitada'/)
-    expect(s).toMatch(/const cfg = configurar\(env\)[\s\S]*if \(!cfg\.ok\) \{ await aviso\(\); return 'no_disponible' \}/)
+    expect(s).toMatch(/const cfg0 = configurar\(env\)[\s\S]*const cfg = cfg0\.ok && canal !== 'portal' \? [^\n]*: cfg0[\s\S]*if \(!cfg\.ok\) \{ await aviso\(\); return 'no_disponible' \}/)   // R4-C11 · el canal ajusta el modelo; sin llave sigue sin llamar al proveedor
     expect(s).not.toMatch(/console\.(log|error|warn)/); expect(s).not.toMatch(/_shared\/observa/)
     expect(s).not.toMatch(/p\.audience|p\.role|p\.verified|p\.customer_id|p\.catalog/)
   })
