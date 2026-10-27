@@ -24,14 +24,29 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   // reclamación se transfiere de inmediato con la herramienta existente (cc_solicitar_asesor, idempotente), sin llamar al
   // modelo: el cliente recibe UN aviso (el del sistema, con la disponibilidad real) y no una respuesta duplicada de la IA.
   // Si ya había una solicitud en curso, la IA sigue informando con normalidad.
+  let comercial: politica.MotivoComercial | null = null
   if (canal !== 'portal') {
     const motivo = politica.transferenciaDeterminista(texto)
     if (motivo) {
       const { data, error } = await admin.rpc('cc_solicitar_asesor', { p_conv: conv, p_actor_type: actor, p_visitor_hash: actor === 'visitor' ? visitorHash : null, p_profile: actor === 'doctor' ? profile : null })
         .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
       if (!error && (data as { idempotente?: boolean } | null)?.idempotente === false) return 'transferida'
-    }
+    } else comercial = politica.atencionComercial(texto)
   }
+  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal)
+  // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
+  // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
+  // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
+  if (comercial && canal !== 'portal') {
+    const { data, error } = await admin.rpc('_cc_canal_transferir', { p_conv: conv, p_origen: canal, p_prefijo: canal === 'whatsapp' ? 'wa' : canal, p_motivo: 'atencion_comercial', p_respiro: true })
+      .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
+    if (r !== 'respondio' && !error && data === true) return 'transferida'
+  }
+  return r
+}
+
+// deno-lint-ignore no-explicit-any
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
   const cfg = configurar(env)
   const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }

@@ -114,7 +114,8 @@ export function contextoCanal(canal: CanalPolitica): string {
     'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
     `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
     'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
-    'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; condiciones especiales como mayoreo, crédito, cotización formal o negociación; pedido, envío, devolución o reclamación; quiere comprar por este medio o no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
+    'R4-C7 · PRODUCTOS: cada vez que el usuario nombre un producto, una marca o una línea, consúltalo con buscar_productos en ESTE turno antes de responder, aunque creas conocerlo. Solo puedes nombrar lo que regrese la herramienta.',
+    'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; pedido, envío, devolución o reclamación; no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. La compra, la recompra y las condiciones especiales (mayoreo, crédito, cotización, descuento) las transfiere el sistema por su cuenta después de tu respuesta: ahí no uses solicitar_asesor. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
   ].join('\n')
 }
 export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica }
@@ -216,6 +217,23 @@ export function transferenciaDeterminista(texto: string): 'cliente_pide_persona'
   return null
 }
 
+// R4-C7 · ATENCIÓN COMERCIAL en canal: compra, recompra o negociación. La IA confirma el producto con el catálogo y pide
+// lo que falta; responder.ts transfiere DESPUÉS de su respuesta a una persona del equipo comercial (aviso neutro del
+// servidor, con la disponibilidad real). Las negaciones ("no quiero comprar todavía") no cuentan.
+const NIEGA_COMPRA = /\b(no|todavia no|aun no|ahorita no|por ahora no|tampoco)\s+((quiero|quisiera|voy a|pienso|necesito|deseo|busco)\s+)?(comprar|pedir|ordenar|adquirir|hacer (un |el )?pedido)\b/
+const COMPRA = /\b(quiero|quisiera|queria|me gustaria|necesito|ocupo|deseo|busco|vengo a|me interesa)\s+(comprar|pedir|ordenar|adquirir|encargar|hacer (un |el |mi )?pedido)\b|\b(como|donde)\s+(compro|le compro|les compro|puedo comprar|pido|puedo pedir|hago (un |el |mi )?pedido)\b|\b(levantar|hacer|hacerte|hacerles|mandar)\s+(un |el |mi )?pedido\b|\bme (vendes|vende|venden|mandas|manda|mandan|envias|envia|envian|apartas|aparta|apartan)\b|\b(mandame|enviame|apartame|vendeme)\b|\bcomo (pago|se paga|les pago|le pago|puedo pagar)\b|\b(quiero|quisiera|necesito|ocupo|me das|dame|deme)\s+(\d+|una?|dos|tres|cuatro|cinco|seis|diez)\s+(cajas?|piezas?|viales?|frascos?|jeringas?|kits?|unidades)\b/
+const RECOMPRA = /\b(lo de siempre|lo mismo de (siempre|la (otra )?vez|la ultima vez)|como la (otra |ultima )?vez|otra vez (el|mi|lo|la)|volver a (pedir|comprar)|repetir (el |mi )?pedido|resurtir|resurtido|con mi (vendedora|vendedor|asesora|asesor|ejecutiva|ejecutivo))\b/
+const NEGOCIA = /\b(mayoreo|medio mayoreo|por volumen|precio especial|precios especiales|credito|a meses|cotizacion|cotizar|cotizame|cotizarme|me cotizas|descuento|descuentos|condiciones especiales|ser distribuidor|distribuidora?|distribuir)\b/
+export type MotivoComercial = 'compra' | 'recompra' | 'negociacion'
+export function atencionComercial(texto: string): MotivoComercial | null {
+  const t = sinAcentos(texto)
+  if (!t || esLimiteClinico(texto ?? '')) return null
+  if (RECOMPRA.test(t)) return 'recompra'
+  if (NEGOCIA.test(t)) return 'negociacion'
+  if (NIEGA_COMPRA.test(t)) return null
+  return COMPRA.test(t) ? 'compra' : null
+}
+
 /** Clasificador de CANAL: sin falsos positivos de "quiere una persona" y con las formas comunes de precio, existencias y compra. */
 export function clasificarIntencionCanal(texto: string): Intencion {
   const t = sinAcentos(texto)
@@ -223,6 +241,8 @@ export function clasificarIntencionCanal(texto: string): Intencion {
   if (esLimiteClinico(texto)) return 'CLINICAL_BOUNDARY'
   if (esSolicitudHumanaExplicita(texto)) return 'HUMAN_REQUEST'
   if (SOPORTE.test(t)) return 'ORDER_STATUS'
+  if (atencionComercial(texto)) return 'CHECKOUT'   // R4-C7 · compra, recompra o negociación
+  if (NIEGA_COMPRA.test(t)) return clasificarSinPersona(t.replace(NIEGA_COMPRA, ' '))   // "no quiero comprar todavía, ¿qué es…?"
   if (/\b(quiero|quisiera|me interesa)\s+(comprar|pedir|ordenar|adquirir)|\bcomo (compro|puedo comprar|hago (un |el )?pedido)|\bhacer (un |el )?pedido|\blevantar (un |el )?pedido|\bcomprar(lo|los|la|las)?\b/.test(t)) return 'CHECKOUT'
   if (/\b(precio|precios|cuesta|cuestan|costo|costos|cuanto (vale|valen|sale|salen|es|cobran)|cotiza\w*|descuento\w*|promocion\w*|promo|mayoreo|credito|precio especial)\b/.test(t)) return 'PRICE'
   if (/\b(disponib\w*|existencia\w*|stock|inventario|agotad\w*|surtid\w*)\b/.test(t)) return 'AVAILABILITY'
@@ -236,9 +256,11 @@ export function tareaCanal(intencion: string, limiteClinico: boolean): string {
   switch (intencion) {
     case 'HUMAN_REQUEST': return 'TAREA: el usuario pide hablar con una persona. Usa solicitar_asesor de inmediato, sin pedir confirmación, y confírmalo en UNA frase sin prometer tiempos ni disponibilidad (el sistema ya le informa la disponibilidad real).'
     case 'ORDER_STATUS': return 'TAREA: pedido, envío, devolución o reclamación. Por este medio no tienes acceso a pedidos: no inventes estados, fechas, guías ni soluciones. Usa solicitar_asesor para que una persona lo revise y dilo en una frase, sin prometer tiempos.'
-    case 'PRICE': return 'TAREA: precio o condiciones comerciales. Por este medio no ves precios ni promociones: no menciones cifras. Explica que los precios se consultan en el portal para profesionales verificados y comparte el enlace con enlace_portal; puedes dar información aprobada del producto. NO transfieras solo porque pregunta el precio. Si pide condiciones especiales (mayoreo, crédito, cotización formal, factura, precio especial o negociación), usa solicitar_asesor.'
+    case 'PRICE': return 'TAREA: precio o condiciones comerciales. Por este medio no ves precios ni promociones: no menciones cifras. Explica que los precios se consultan en el portal para profesionales verificados y comparte el enlace con enlace_portal; puedes dar información aprobada del producto. NO transfieras solo porque pregunta el precio. Las condiciones especiales (mayoreo, crédito, cotización formal, factura, precio especial o negociación) las transfiere el sistema a un asesor.'
     case 'AVAILABILITY': return 'TAREA: disponibilidad. Por este medio no consultas existencias: no afirmes que hay o que no hay. Indica que la disponibilidad se ve en el portal para profesionales verificados (enlace_portal). No transfieras solo por esta pregunta.'
-    case 'CHECKOUT': case 'CART_VIEW': case 'CART_ADD': case 'CART_UPDATE': case 'CART_REMOVE':
+    case 'CHECKOUT':
+      return 'TAREA: atención comercial: el usuario quiere comprar, volver a pedir o pide condiciones (mayoreo, crédito, cotización, descuento). Una persona del equipo comercial de Renovacell cerrará la venta en este mismo chat; el sistema la avisa por su cuenta DESPUÉS de tu respuesta, así que NO uses solicitar_asesor. Tu respuesta, cálida y breve: (1) si menciona un producto, consúltalo con buscar_productos y confirma lo que sí manejamos (solo las presentaciones que regresen; si no aparece, dilo y ofrece opciones reales del catálogo); (2) pide en UNA sola pregunta lo que falte para preparar el pedido (presentación y cantidad; si negocia, volumen o condiciones); (3) di que un asesor de Renovacell continuará contigo por aquí para completar la compra (si la evidencia dice FUERA_DE_HORARIO, en cuanto el equipo esté disponible). Sin precios, existencias ni tiempos. No mandes al portal salvo que lo pida. Nunca digas que registraste, apartaste o confirmaste un pedido.'
+    case 'CART_VIEW': case 'CART_ADD': case 'CART_UPDATE': case 'CART_REMOVE':
       return 'TAREA: el usuario quiere comprar. Explica que las compras se hacen en el portal para profesionales verificados (registro y verificación de cédula) y comparte el enlace con enlace_portal. Si quiere completar la compra por este medio, no puede usar el portal o necesita ayuda con la operación, usa solicitar_asesor. Nunca digas que registraste, apartaste o confirmaste un pedido.'
     case 'PRODUCT_COMPARE': case 'COMMERCIAL_RECOMMENDATION': case 'PRODUCT_INFO': case 'PRODUCT_DISCOVERY':
       return tarea(intencion, false) + ' Resuelve aquí con lo aprobado; si falta información aprobada, dilo. No transfieras por defecto.'

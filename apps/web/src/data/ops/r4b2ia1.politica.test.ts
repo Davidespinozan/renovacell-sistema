@@ -53,7 +53,7 @@ describe('canal: falsos positivos eliminados y solicitudes explícitas reconocid
   })
   it('intenciones del canal: precio, existencias, comparación, compra, pedido/reclamación, clínico, producto', () => {
     expect(politica.clasificarIntencionCanal('¿Cuánto cuesta este producto?')).toBe('PRICE')
-    expect(politica.clasificarIntencionCanal('¿Manejan mayoreo o crédito?')).toBe('PRICE')
+    expect(politica.clasificarIntencionCanal('¿Manejan mayoreo o crédito?')).toBe('CHECKOUT')   // R4-C7 · negociación = atención comercial
     expect(politica.clasificarIntencionCanal('¿Hay existencias?')).toBe('AVAILABILITY')
     expect(politica.clasificarIntencionCanal('compara hyalux y deep')).toBe('PRODUCT_COMPARE')
     expect(politica.clasificarIntencionCanal('quiero comprar 3 cajas por aquí')).toBe('CHECKOUT')
@@ -78,8 +78,8 @@ describe('canal: tarea, contexto y mensajes', () => {
   it('precio: orienta al portal con enlace_portal, sin cifras y sin transferir por defecto; condiciones especiales → asesor', () => {
     const s = sys('PRICE'); expect(s).toContain('enlace_portal'); expect(s).toContain('NO transfieras solo porque pregunta el precio'); expect(s).toContain('mayoreo, crédito, cotización formal')
   })
-  it('compra: portal y asesor solo si quiere completarla por este medio; nunca confirma pedidos; sin botón de checkout', () => {
-    const s = sys('CHECKOUT'); expect(s).toContain('las compras se hacen en el portal'); expect(s).toContain('Nunca digas que registraste'); expect(politica.tareaCanal('CHECKOUT', false)).not.toContain('Confirmar pedido')
+  it('compra (R4-C7): confirma el producto con el catálogo y la cierra un asesor; nunca confirma pedidos; sin botón de checkout', () => {
+    const s = sys('CHECKOUT'); expect(s).toContain('cerrará la venta en este mismo chat'); expect(s).toContain('NO uses solicitar_asesor'); expect(s).toContain('Nunca digas que registraste'); expect(politica.tareaCanal('CHECKOUT', false)).not.toContain('Confirmar pedido')
   })
   it('pedido/reclamación: no inventa estado y transfiere; clínico: límite y asesor COMERCIAL (no clínico)', () => {
     expect(sys('ORDER_STATUS')).toContain('no inventes estados'); expect(sys('ORDER_STATUS')).toContain('solicitar_asesor')

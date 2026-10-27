@@ -119,6 +119,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   }
 
   // 4) Bucle de herramientas acotado.
+  let corregido = false   // R4-C7 · una sola corrección por producto no consultado
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
@@ -132,6 +133,13 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       if (v.ok) return await persistir(v.texto, ronda)
       await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'validacion_salida', p_status: 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
       obs('validacion', 'rejected', { code: v.motivo })
+      // R4-C7 · canal: nombró un producto del catálogo sin consultarlo → UNA corrección interna (el usuario no ve el intento
+      // rechazado): que lo consulte y responda de nuevo. Sin rondas o tras la corrección, el texto seguro de siempre.
+      if (canal !== 'portal' && v.motivo === 'producto_no_autorizado' && !corregido && ronda < d.config.maxRondas - 1) {
+        corregido = true
+        messages.push({ role: 'assistant', content: r.texto }, { role: 'user', content: [{ type: 'text', text: `CORRECCIÓN INTERNA (no la menciones al usuario): tu respuesta no se envió porque nombraste «${String(v.detalle ?? 'un producto')}» sin consultarlo en este turno. Consúltalo con buscar_productos y vuelve a responder al usuario solo con lo que regrese.` }] })
+        continue
+      }
       return await persistir(d.validacion.respuestaSegura(v.motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), ronda, v.motivo)
     }
 
