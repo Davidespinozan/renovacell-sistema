@@ -109,7 +109,7 @@ describe('extensión CC-4 (IA)', () => {
     expect(o).toMatch(/const op = `\$\{t\.turnId\}:r\$\{t\.ronda\}:\$\{v\.nombre\}:\$\{huella\(JSON\.stringify\(a\)\)\}`/)
     expect(o).toMatch(/case 'agregar_al_carrito': return rpc\('cc_carrito_agregar', \{ p_cart: cart, p_actor_type: 'ai'/)
     expect(o).not.toMatch(/SELLER_OFFER|cc_carrito_oferta|p_accion/)
-    expect(o).toMatch(/case 'solicitar_asesor': return rpc\('cc_solicitar_asesor'/); expect(o).toMatch(/case 'declinar_asesor': return rpc\('cc_handoff_rechazar', \{ p_conv: e\.conv, p_actor_type: 'ai'/)
+    expect(o).toMatch(/case 'solicitar_asesor': \{[\s\S]*?return rpc\('cc_solicitar_asesor'/);   // R4-C15: en canal, antes el traspaso con aviso interno expect(o).toMatch(/case 'declinar_asesor': return rpc\('cc_handoff_rechazar', \{ p_conv: e\.conv, p_actor_type: 'ai'/)
     expect(o).toMatch(/const hs = await rpc\('cc_ia_estado_handoff', \{ p_conv: e\.conv \}\)/)
     expect(o).not.toMatch(/^import /m)
   })

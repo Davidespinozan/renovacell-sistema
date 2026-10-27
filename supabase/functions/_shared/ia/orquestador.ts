@@ -227,7 +227,14 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: t.perfilIA, p_product: a.product_id })
     case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: t.perfilIA, p_folio: a.folio })
     case 'enlace_portal': return { data: t.enlace ? t.enlace() : null, error: t.enlace ? null : 'desconocida' }   // puro: sin base, sin tokens
-    case 'solicitar_asesor': return rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
+    case 'solicitar_asesor': {
+      // R4-C15 · canal: cuando la IA decide pasar la conversación, el traspaso se registra con el aviso interno (prefijo
+      // 'comercial', solo para el equipo) y la IA se lo dice al cliente en SU respuesta; así nunca sale "Pediste hablar con un
+      // asesor" a quien no lo pidió. cc_solicitar_asesor queda idempotente y devuelve el estado (modo, asesor) de siempre.
+      const canalE = e.canal ?? 'portal'
+      if (canalE !== 'portal') await rpc('_cc_canal_transferir', { p_conv: e.conv, p_origen: canalE, p_prefijo: 'comercial', p_motivo: 'ia_transfiere', p_respiro: false })
+      return rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
+    }
     // CC-7 · rechazo del asesor para ESTA compra (no toca la cartera ni impone enfriamiento global).
     case 'declinar_asesor': return rpc('cc_handoff_rechazar', { p_conv: e.conv, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
     default: return { data: null, error: 'desconocida' }
