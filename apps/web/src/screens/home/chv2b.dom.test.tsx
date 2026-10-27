@@ -144,6 +144,13 @@ describe('Conversaciones · apertura profunda', () => {
     expect(ch.llamadas.some((l) => l.action === 'abrir' || l.action === 'solicitar_asesor' || l.action === 'asignar')).toBe(false)
     expect(intentoActual()).toBeNull()
   })
+  it('S2 · Dirección abre una conversación aunque no esté en su cola (asignada a otro o sin asesor)', async () => {
+    pedirIntento({ destino: 'asesorias', conversationId: 'AJENA', origen: 'atencion' })
+    render(<Asesorias cliente={ch.c} intervaloMs={600_000} esDireccion />)
+    await waitFor(() => expect(ch.llamadas.some((l) => l.action === 'leer' && l.body?.conversation_id === 'AJENA')).toBe(true))
+    expect(screen.queryByTestId('aviso-apertura')).toBeNull()
+    expect(ch.llamadas.some((l) => l.action === 'iniciar')).toBe(false)   // abrir no es tomar
+  })
   it('S · un id que no está en la cola autorizada no se abre ni revela nada', async () => {
     pedirIntento({ destino: 'asesorias', conversationId: 'AJENA', iniciar: true, origen: 'campana' })
     render(<Asesorias cliente={ch.c} intervaloMs={600_000} />)

@@ -110,13 +110,16 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
       if (!vivo) return
       consumirIntento(intento.id)
       const c = lista.find((x) => x.conversation_id === intento.conversationId)
+      // Dirección abre CUALQUIER conversación (la atienda quien la atienda o aunque nadie la haya tomado); el servidor sigue
+      // decidiendo qué puede leer y escribir. Un vendedor solo abre las de su cola.
+      if (!c && esDireccion) { setAviso(null); setLlegada(intento.conversationId); setEnfocar(true); setAbierta(intento.conversationId); return }
       if (!c) { setAviso('Esa conversación ya no está en tu cola: se atendió, se reasignó o no tienes acceso a ella.'); return }
       setAviso(null)
       if (intento.iniciar) await atender(c)
       else { setLlegada(c.conversation_id); setEnfocar(true); setAbierta(c.conversation_id) }
     })()
     return () => { vivo = false }
-  }, [intento, cargar, atender])
+  }, [intento, cargar, atender, esDireccion])
 
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
