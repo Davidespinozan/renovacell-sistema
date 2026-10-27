@@ -2,6 +2,7 @@
 -- RPC solo para Dirección, validación estricta, motivo obligatorio, historial (rpc y directo), compuerta de activación
 -- cerrada, independencia por canal y sin acceso directo al historial.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); v_admin2 uuid; s1 uuid := tests.user('pos'); d uuid := tests.user('doctor'); r jsonb; e jsonb; n0 bigint; n bigint;
 begin

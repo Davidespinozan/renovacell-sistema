@@ -3,6 +3,7 @@
 -- el personal. Vencer o revocar bloquea también lo pendiente; la compuerta de 'activo' sigue cerrada (RPC y UPDATE directo);
 -- Instagram y Messenger no cambian; "volver a espejo" apaga la IA, retiene y revoca sin borrar; permisos inmutables.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); s1 uuid := tests.user('pos'); a2 uuid; r jsonb; t jsonb; e jsonb;
         ca uuid; cb uuid; ha text; hb text; n bigint; v_id uuid; v_turn uuid; v_hist bigint;

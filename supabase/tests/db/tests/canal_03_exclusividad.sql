@@ -3,6 +3,7 @@
 -- en la atención de otra persona; espejo sin respuestas; lo del cliente, del sistema y de la IA no se bloquea; el saludo de
 -- IA insertado directo no sale si la IA está apagada; el portal no cambia; la toma no crea solicitud ni toca la cartera.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); a2 uuid; s1 uuid := tests.user('pos'); s2 uuid := tests.user('pos'); d uuid := tests.user('doctor');
         r jsonb; t jsonb; c uuid; c2 uuid; c3 uuid; cp uuid; h text; v_turn uuid; n bigint; v_ev bigint;

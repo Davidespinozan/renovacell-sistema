@@ -1,5 +1,6 @@
 -- R4-B2-3a · el down devuelve las 5 funciones EXACTAMENTE a producción (26 oct 2026) y retira los ayudantes; se reaplica idéntica.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6 (0124) se baja antes que R4-C5
 \ir ../../../rollback/canal_prueba_contacto/99_down.sql   -- R4-C5 (0123) se baja ANTES de la línea base de esta cadena
 create temp table _ip as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
@@ -17,4 +18,5 @@ do $t$ begin
   perform tests.ok((select todas from _ip) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), 'B2-3a · se reaplica idéntica');
 end $t$;
 \ir ../../../migrations/20270123120000_canal_prueba_contacto.sql   -- R4-C5 (0123) se reaplica tras la comparación final
+\ir ../../../migrations/20270124120000_whatsapp_compuerta_abierta.sql   -- R4-C6 (0124) se reaplica tras R4-C5
 rollback;

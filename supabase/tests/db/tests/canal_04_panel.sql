@@ -2,6 +2,7 @@
 -- por qué no) y panel del canal (atención humana pedida/en curso + historial de descartados). Solo Dirección, sin datos de
 -- contacto, sin escribir nada; coinciden con lo que la base hace al actuar (toma y exclusividad de B2-3b).
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); a2 uuid; a3 uuid; s1 uuid := tests.user('pos'); d uuid := tests.user('doctor');
         r jsonb; k jsonb; p jsonb; c uuid; c2 uuid; cp uuid; v_ids uuid[]; n_hist bigint; n_ev bigint;

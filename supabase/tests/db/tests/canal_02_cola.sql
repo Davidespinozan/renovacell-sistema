@@ -3,6 +3,7 @@
 -- 'enviando' colgado → incierto sin reintento, decisiones de Dirección (liberar/descartar, ventana, canal, estado, permisos,
 -- auditoría), revisión sin números completos y aislamiento entre canales.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); s1 uuid := tests.user('pos'); r jsonb; c uuid; cig uuid; v_seq bigint; n bigint; v_id uuid; v_ids uuid[]; vg record;
 begin

@@ -3,6 +3,7 @@
 -- la IA transfiere UNA vez (no si ya está transferida/atendida, ni con otro turno en curso, ni en espejo); independencia
 -- por canal; el portal sin cambios; sin vincular por teléfono (R4-B1).
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6: contrato con la compuerta CERRADA (abierta: canal_06)
 do $t$
 declare v_admin uuid := tests.fixture_admin(); d uuid := tests.user('doctor'); r jsonb; t jsonb; c1 uuid; c2 uuid; c3 uuid; c4 uuid; c5 uuid; c6 uuid; c7 uuid; cp uuid; n bigint; v_turn uuid;
 begin

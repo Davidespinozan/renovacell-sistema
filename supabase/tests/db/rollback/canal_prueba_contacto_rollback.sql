@@ -1,6 +1,7 @@
 -- R4-C5-A2 · el down se NIEGA en modo prueba o con permisos vigentes; cerrado, devuelve EXACTAMENTE B2 (las 13 funciones, los
 -- CHECK y los triggers de cc_wa_config), archiva los permisos en el historial y se reaplica idéntico.
 begin;
+\ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6 (0124) se baja antes de la línea base (0123 se compara sin 0124)
 create temp table _c5 as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select string_agg(conname || '=' || pg_get_constraintdef(oid), '|' order by conname) from pg_constraint where conrelid = 'public.cc_wa_config'::regclass) as ck,

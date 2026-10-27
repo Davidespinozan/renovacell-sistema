@@ -3,6 +3,7 @@
 -- inciertos o descartados (protección de producción), así que aquí se neutralizan antes.
 update public.cc_wa_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');
 update public.cc_meta_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');
+\ir ../../../../rollback/whatsapp_compuerta_abierta/99_down.sql
 \ir ../../../../rollback/canal_prueba_contacto/99_down.sql
 \ir ../../../../rollback/panel_canal/99_down.sql
 \ir ../../../../rollback/exclusividad_toma/99_down.sql

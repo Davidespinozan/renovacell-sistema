@@ -5,12 +5,14 @@
 #      (cada registro parte del 'despues' del anterior) y sin errores inesperados.
 #   B. cambios simultáneos en canales distintos → cada uno aplica sobre su fila (independencia).
 #   C. una activación concurrente con pausas → siempre ACTIVACION_BLOQUEADA; el modo nunca sale de espejo.
-# Deja los tres canales como estaban (espejo, sin IA, sin pausa).
+# Deja los tres canales como estaban (espejo, sin IA, sin pausa). R4-C6: corre con la compuerta CERRADA (la baja y la reabre).
 # ============================================================================
 set -uo pipefail
 P=("${PSQL_BIN:-psql}" -X -q -At)
 T="$(mktemp -d)"; FAILED=0
-trap 'rm -rf "$T"' EXIT
+R="$(cd "$(dirname "$0")/../../.." && pwd)"
+"${P[@]}" -v ON_ERROR_STOP=1 -f "$R/rollback/whatsapp_compuerta_abierta/99_down.sql" >/dev/null || { echo "FAIL: cerrar la compuerta (R4-C6 down)"; exit 1; }
+trap 'rm -rf "$T"; "${P[@]}" -v ON_ERROR_STOP=1 -f "$R/migrations/20270124120000_whatsapp_compuerta_abierta.sql" >/dev/null || echo "FAIL: reabrir la compuerta (R4-C6)"' EXIT
 check() { local r; r=$("${P[@]}" -c "$2" 2>&1); if [ "$r" = "t" ]; then echo "PASS: $1"; else echo "FAIL: $1 (obtenido: $r)"; FAILED=1; fi; }
 
 ADMIN=$("${P[@]}" -c "select tests.fixture_admin()") || { echo "FAIL: preparación"; exit 1; }
