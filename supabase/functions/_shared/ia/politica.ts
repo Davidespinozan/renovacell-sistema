@@ -245,6 +245,11 @@ export function atencionComercial(texto: string): MotivoComercial | null {
   // R4-C11 · "2 nabota", "3 de 100", "una caja de hyalux": cantidad + producto en un mensaje corto = compra
   return t.split(' ').length <= 6 && /^\s*(\d{1,3}|una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(de\s+|cajas?\s+(de\s+)?|piezas?\s+(de\s+)?|viales?\s+(de\s+)?)?[a-z0-9][a-z0-9 ]{2,}$/.test(t) ? 'compra' : null
 }
+/** R4-C11 · respuesta corta que continúa una pregunta de la IA ("100", "la de 200", "2 piezas"); un saludo no lo es. */
+export function esContinuacionCorta(texto: string): boolean {
+  const t = sinAcentos(texto)
+  return !!t && t.split(' ').length <= 4 && !SALUDO.test(t) && !/[?¿]/.test(texto) && !esSolicitudHumanaExplicita(texto)
+}
 /** R4-C11 · ¿la conversación viene de una compra? (un mensaje comercial reciente del usuario en esta sesión) */
 export function compraEnCurso(recientesDelUsuario: readonly string[]): MotivoComercial | null {
   for (const m of [...recientesDelUsuario].reverse().slice(0, 4)) { const c = atencionComercial(m); if (c) return c }

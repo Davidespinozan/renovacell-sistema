@@ -74,7 +74,8 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
     } else {
       comercial = politica.atencionComercial(texto)
       // R4-C11 · "100" tras "2 nabota": la compra sigue aunque este mensaje solo diga la presentación
-      if (!comercial && !esLimiteClinico(texto)) {
+      // solo para respuestas cortas que continúan la compra ("100", "la de 200", "2"), nunca para un saludo ni otro tema
+      if (!comercial && !esLimiteClinico(texto) && politica.esContinuacionCorta(texto)) {
         const previos = await leerInterno(admin, conv, seqUsuario - 1, 8).catch(() => [])
         comercial = politica.compraEnCurso(previos.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').map((m) => m.content))
       }

@@ -31,3 +31,10 @@ describe('mensajes seguidos: una sola respuesta', () => {
     expect(webhook).toMatch(/return !error && Array\.isArray\(data\) && data\.length > 0/)
   })
 })
+
+describe('la compra anterior no contamina un saludo nuevo', () => {
+  it('solo una respuesta corta que continúa cuenta como continuación', () => {
+    for (const t of ['100', 'la de 200', '2 piezas', 'la de 100 UI']) expect(politica.esContinuacionCorta(t), t).toBe(true)
+    for (const t of ['buen dia', 'Hola', '¿cuál es el número para marcarles?', 'puedo hablar con un vendedor o persona humana', 'hablo con el barbero?']) expect(politica.esContinuacionCorta(t), t).toBe(false)
+  })
+})
