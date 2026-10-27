@@ -18,6 +18,24 @@ export const SECCIONES: { key: string; label: string; nivel: Nivel }[] = [
 ]
 export const TIPOS_FUENTE = ['renovacell', 'fabricante', 'distribuidor', 'ficha_tecnica', 'catalogo_oficial', 'regulatorio', 'carga_manual'] as const
 
+// R4-C10 · Manual de ventas (conocimiento de la EMPRESA): mismos estados y aprobación que el de producto. Los temas son los
+// que acepta la base (ck_cck_tema). Un borrador con "[COMPLETAR" no se aprueba desde la pantalla.
+export const TEMAS_EMPRESA: { key: string; label: string; ayuda: string }[] = [
+  { key: 'empresa', label: 'Quiénes somos', ayuda: 'Qué es Renovacell, desde cuándo, qué la distingue de otros distribuidores.' },
+  { key: 'como_comprar', label: 'Cómo comprar', ayuda: 'Pasos para comprar: registro, verificación, portal, asesor por WhatsApp.' },
+  { key: 'verificacion', label: 'Verificación de cédula', ayuda: 'Quién puede comprar, qué se revisa y cuánto tarda.' },
+  { key: 'pagos', label: 'Formas de pago', ayuda: 'Transferencia, tarjeta, efectivo; qué puede decir la IA y qué solo el asesor.' },
+  { key: 'envios', label: 'Envíos y entregas', ayuda: 'Complementa lo que ya sale del ERP (cobertura, cadena de frío, empaque).' },
+  { key: 'facturacion', label: 'Facturación', ayuda: 'Cómo se pide la factura, datos necesarios y tiempos.' },
+  { key: 'devoluciones', label: 'Devoluciones y garantías', ayuda: 'Qué se acepta, plazos y cómo se tramita.' },
+  { key: 'politica_comercial', label: 'Política comercial', ayuda: 'Mayoreo, crédito, descuentos, cotizaciones: reglas y quién las autoriza.' },
+  { key: 'atencion', label: 'Atención y horarios', ayuda: 'Cómo atienden los asesores, tiempos de respuesta, canales.' },
+  { key: 'tecnologia', label: 'Tecnología', ayuda: 'Explicación general de la línea (sin indicaciones clínicas).' },
+  { key: 'certificaciones', label: 'Certificaciones', ayuda: 'Registros sanitarios y certificaciones (con fuente).' },
+]
+export interface VersionEmpresa { id: string; tema: string; titulo: string; version: number; rev: number; estado: EstadoConocimiento; audiencia: string; contenido: string; source_id: string | null; importado_de: string | null; created_at: string; approved_at: string | null }
+export const tieneMarcaPendiente = (t: string) => /\[COMPLETAR/i.test(t)
+
 export interface Cobertura { product_id: string; nombre: string; familia: string | null; categoria: string | null; es_padre: boolean; aprobadas: string[]; borradores: string[]; faltantes_t0: string[] | null; faltantes_t1: string[] | null }
 export interface Version { id: string; seccion: string; nivel: Nivel; version: number; rev: number; estado: EstadoConocimiento; audiencia: string; contenido: string; datos: unknown; source_id: string | null; fuente: string | null; importado_de: string | null; created_at: string; approved_at: string | null; retired_at: string | null; retired_reason: string | null }
 export interface Fuente { id: string; tipo: string; referencia: string; documento_url: string | null; version: string | null; captured_at: string; notas: string | null }
@@ -39,7 +57,7 @@ export function mensajeError(m: string | undefined): string {
   if (/CONOCIMIENTO_INMUTABLE/.test(t)) return 'Una versión aprobada o retirada no se edita; crea una nueva versión.'
   if (/ALIAS_AMBIGUO/.test(t)) return 'Ese término ya apunta a otro producto.'
   if (/MOTIVO_REQUERIDO/.test(t)) return 'Indica el motivo.'
-  if (/ck_cpk_contenido/.test(t)) return 'El contenido debe tener entre 1 y 4000 caracteres.'
+  if (/ck_cpk_contenido|ck_cck_contenido/.test(t)) return 'El contenido debe tener entre 1 y 4000 caracteres (título hasta 160).'
   return t || 'No se pudo completar la operación.'
 }
 
@@ -69,6 +87,15 @@ export class ClienteConocimiento {
   restaurar(id: string) { return this.llamar<{ id: string; version: number }>('cc_conocimiento_restaurar', { p_id: id }) }
   importar() { return this.llamar<Record<string, number>>('cc_importar_conocimiento_existente') }
   configurarT2(habilitado: boolean) { return this.llamar<boolean>('cc_config_t2', { p_habilitado: habilitado }) }
+  // R4-C10 · Manual de ventas
+  empresaListar() { return this.llamar<VersionEmpresa[]>('cc_empresa_listar') }
+  empresaGuardar(p: { tema: string; titulo: string; contenido: string; audiencia: 'public' | 'verified'; id?: string | null; rev?: number | null }) {
+    return this.llamar<{ id: string; version: number; rev: number; estado: EstadoConocimiento; claims: Claim[] }>('cc_empresa_guardar', {
+      p_tema: p.tema, p_titulo: p.titulo, p_contenido: p.contenido, p_source: null, p_audiencia: p.audiencia, p_id: p.id ?? null, p_rev: p.rev ?? null,
+    })
+  }
+  empresaAprobar(id: string) { return this.llamar<{ id: string; estado: string; retirada?: string | null }>('cc_empresa_aprobar', { p_id: id }) }
+  empresaRetirar(id: string, motivo: string) { return this.llamar<{ id: string; estado: string }>('cc_empresa_retirar', { p_id: id, p_motivo: motivo }) }
   ficha(product_id: string) { return this.llamar<Record<string, unknown> | null>('cc_ficha_producto', { p_product: product_id, p_audiencia: null }) }
 }
 

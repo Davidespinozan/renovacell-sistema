@@ -18,21 +18,33 @@ const politicaCanalBase = { ...politica, clasificarIntencion: politica.clasifica
 // deno-lint-ignore no-explicit-any
 export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
   const q = async (f: () => PromiseLike<{ data: unknown; error: unknown }>) => { try { const x = await f(); return x.error ? null : x.data } catch { return null } }
-  const [empresa, horario, entrega] = await Promise.all([
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan' }).format(new Date())   // AAAA-MM-DD en Culiacán
+  const [empresa, horario, entrega, manual, promos] = await Promise.all([
     q(() => admin.from('company_settings').select('razon_social, direccion, cp, ciudad, estado, telefono').eq('id', 'default').maybeSingle()),
     q(() => admin.from('cc_horario_semanal').select('dia, abierto, abre, cierra').order('dia')),
     q(() => admin.from('entrega_config').select('recoge_lugar, recoge_horario, cp_local_desde, cp_local_hasta, dias_chofer, local_mismo_dia, corte, local_gratis_desde, local_costo, dias_paqueteria, dhl_transito_min, dhl_transito_max, foraneo_costo, foraneo_gratis_desde').eq('id', 1).maybeSingle()),
+    // R4-C10 · solo lo APROBADO y para cualquier contacto (el canal es público)
+    q(() => admin.from('cc_company_knowledge').select('tema, titulo, contenido').eq('estado', 'approved').eq('audiencia', 'public').order('tema').order('titulo')),
+    // R4-C10 · promociones activas y vigentes hoy: nombre, fin y productos (nunca el precio de la línea)
+    q(() => admin.from('promociones').select('nombre, hasta, promocion_lineas(products(name))').eq('activa', true).lte('desde', hoy).gte('hasta', hoy).order('hasta')),
   ])
-  return { empresa: empresa as politica.DatosNegocio['empresa'], horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'] }
+  const promociones = Array.isArray(promos) ? (promos as Array<{ nombre: string; hasta: string | null; promocion_lineas?: Array<{ products?: { name?: string } | null }> | null }>).map((p) => ({
+    nombre: p.nombre, hasta: p.hasta, productos: [...new Set((p.promocion_lineas ?? []).map((l) => l.products?.name).filter((x): x is string => !!x))],
+  })) : null
+  return { empresa: empresa as politica.DatosNegocio['empresa'], horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'],
+    manual: Array.isArray(manual) ? manual as politica.DatosNegocio['manual'] : null, promociones }
 }
 /** Política y validación del canal con los datos del negocio de este turno. */
 export function dependenciasCanal(n: politica.DatosNegocio) {
   const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
+  const manual = politica.textoManual(n); const promos = politica.textoPromociones(n); const nombresPromo = politica.nombresPromocion(n)
+  const bloques = [texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
   return {
-    politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (texto ? '\n\n' + politica.envolverDatos('negocio', texto) : '') },
+    politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (bloques.length ? '\n\n' + bloques.join('\n\n') : '') },
     validacion: { ...validacionCanalBase, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
       if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
-      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), c)
+      // los productos de una promoción vigente vienen del servidor: cuentan como autorizados en este turno
+      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
       return v.ok ? { ok: true as const, texto: t.replace(/\r\n?/g, '\n').trim() } : v
     } },
   }

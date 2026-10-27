@@ -62,12 +62,12 @@ describe('dependencias del canal por turno', () => {
   })
   it('leerNegocio lee las tres fuentes del ERP y tolera fallos', async () => {
     const tablas: string[] = []
-    const cadena = (tabla: string, data: unknown) => { tablas.push(tabla); const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order']) c[k] = () => c; c.maybeSingle = async () => ({ data, error: null }); c.then = (r: (x: unknown) => unknown, j: (e: unknown) => unknown) => Promise.resolve({ data, error: null }).then(r, j); return c }
-    const admin = { from: (t: string) => cadena(t, t === 'company_settings' ? ERP.empresa : t === 'cc_horario_semanal' ? ERP.horario : ERP.entrega) }
+    const cadena = (tabla: string, data: unknown) => { tablas.push(tabla); const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order', 'lte', 'gte']) c[k] = () => c; c.maybeSingle = async () => ({ data, error: null }); c.then = (r: (x: unknown) => unknown, j: (e: unknown) => unknown) => Promise.resolve({ data, error: null }).then(r, j); return c }
+    const admin = { from: (t: string) => cadena(t, t === 'company_settings' ? ERP.empresa : t === 'cc_horario_semanal' ? ERP.horario : t === 'entrega_config' ? ERP.entrega : []) }
     const n = await leerNegocio(admin)
-    expect(tablas.sort()).toEqual(['cc_horario_semanal', 'company_settings', 'entrega_config'])
+    expect(tablas.sort()).toEqual(['cc_company_knowledge', 'cc_horario_semanal', 'company_settings', 'entrega_config', 'promociones'])   // R4-C10: + manual y promociones
     expect(politica.textoNegocio(n)).toBe(politica.textoNegocio(ERP))
-    const roto = { from: () => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order']) c[k] = () => c; c.maybeSingle = async () => ({ data: null, error: { message: 'x' } }); c.then = (r: (x: unknown) => unknown) => Promise.resolve({ data: null, error: { message: 'x' } }).then(r); return c } }
+    const roto = { from: () => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order', 'lte', 'gte']) c[k] = () => c; c.maybeSingle = async () => ({ data: null, error: { message: 'x' } }); c.then = (r: (x: unknown) => unknown) => Promise.resolve({ data: null, error: { message: 'x' } }).then(r); return c } }
     expect(politica.textoNegocio(await leerNegocio(roto))).toBe('')
   })
 })

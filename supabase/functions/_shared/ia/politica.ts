@@ -115,6 +115,7 @@ export function contextoCanal(canal: CanalPolitica): string {
     `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
     'R4-C8 · ESTILO: escribe como alguien amable del equipo comercial de Renovacell que atiende por chat, en español de México natural y cálido. Responde SOLO a su último mensaje; el historial es contexto, no retomes temas anteriores si el usuario no lo hace. Si solo saluda, devuélvele el saludo (con el que usó: buen día, buenas tardes…) y pregúntale en qué le puedes ayudar, en una línea, sin enumerar lo que puedes hacer ni mencionar productos. Frases cortas, máximo una pregunta por mensaje. Evita frases de máquina ("Encontré…", "Una vez que lo confirmes", "según el catálogo", "Puedo mostrarte información de…"). No te vuelvas a presentar ni repitas "Renovacell" en cada mensaje. Trata de tú con respeto; si el usuario habla de usted, respóndele de usted. Como mucho un emoji de vez en cuando. No cierres cada mensaje con una pregunta genérica ("¿Hay algo más…?", "¿Hay algo específico que necesites?"): pregunta solo cuando haga falta para avanzar. Si te preguntan, eres el asistente virtual de Renovacell: nunca digas que eres una persona.',
     'R4-C9 · NEGOCIO: para dónde están, horario, teléfono, recoger o envíos usa SOLO el bloque de DATOS "negocio" (viene del ERP) y dilo con naturalidad; si un dato no aparece ahí, di que lo confirma un asesor. Renovacell es una empresa con sede física, no solo una plataforma en línea.',
+    'R4-C10 · MANUAL Y PROMOCIONES: el bloque "manual_de_ventas" es lo que Dirección aprobó sobre cómo comprar, verificación, pagos, facturación, devoluciones y política comercial: úsalo como lo haría tu mejor vendedor, con tus palabras y solo lo que dice. Si hay "promociones_vigentes", menciónalas cuando vengan al caso (nombre, productos y hasta cuándo), sin precios: el precio de promoción se ve en el portal o te lo da un asesor.',
     'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
     'R4-C7 · PRODUCTOS: cada vez que el usuario nombre un producto, una marca o una línea, consúltalo con buscar_productos en ESTE turno antes de responder, aunque creas conocerlo. Solo puedes nombrar lo que regrese la herramienta.',
     'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; pedido, envío, devolución o reclamación; no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. La compra, la recompra y las condiciones especiales (mayoreo, crédito, cotización, descuento) las transfiere el sistema por su cuenta después de tu respuesta: ahí no uses solicitar_asesor. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
@@ -281,7 +282,30 @@ export interface DatosNegocio {
   horario?: Array<{ dia: number; abierto: boolean; abre: string | null; cierra: string | null }> | null
   entrega?: { recoge_lugar?: string | null; recoge_horario?: string | null; cp_local_desde?: string | null; cp_local_hasta?: string | null; dias_chofer?: number[] | null; local_mismo_dia?: boolean | null; corte?: string | null
     local_gratis_desde?: number | null; local_costo?: number | null; dias_paqueteria?: number[] | null; dhl_transito_min?: number | null; dhl_transito_max?: number | null; foraneo_costo?: number | null; foraneo_gratis_desde?: number | null } | null
+  // R4-C10 · Manual de ventas APROBADO (audiencia pública) y promociones vigentes (nombre, vigencia y productos; nunca precios)
+  manual?: Array<{ tema: string; titulo: string; contenido: string }> | null
+  promociones?: Array<{ nombre: string; hasta: string | null; productos: string[] }> | null
 }
+const TEMA_MANUAL: Record<string, string> = { empresa: 'Quiénes somos', como_comprar: 'Cómo comprar', verificacion: 'Verificación', pagos: 'Formas de pago', envios: 'Envíos', facturacion: 'Facturación',
+  devoluciones: 'Devoluciones y garantías', politica_comercial: 'Política comercial', atencion: 'Atención', tecnologia: 'Tecnología', certificaciones: 'Certificaciones' }
+export const MAX_MANUAL = 9000
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const fechaLarga = (iso: string | null) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? ''); return m ? `${Number(m[3])} de ${MESES[Number(m[2]) - 1]}` : '' }
+/** Manual de ventas aprobado, por tema, acotado (lo que no cabe se consulta con buscar_conocimiento). */
+export function textoManual(n: DatosNegocio): string {
+  const out: string[] = []; let total = 0
+  for (const m of n.manual ?? []) {
+    const t = `${TEMA_MANUAL[m.tema] ?? m.tema} · ${m.titulo}\n${m.contenido.trim()}`
+    if (total + t.length > MAX_MANUAL) { out.push('(Hay más temas aprobados: consúltalos con buscar_conocimiento.)'); break }
+    out.push(t); total += t.length
+  }
+  return out.join('\n\n')
+}
+/** Promociones vigentes para el canal: nombre, hasta cuándo y en qué productos. Sin precios (se ven en el portal). */
+export function textoPromociones(n: DatosNegocio): string {
+  return (n.promociones ?? []).filter((p) => p.nombre).map((p) => `${p.nombre}${p.hasta ? ` (vigente hasta el ${fechaLarga(p.hasta)})` : ''}${p.productos.length ? `: ${p.productos.join(', ')}` : ''}.`).join('\n')
+}
+export const nombresPromocion = (n: DatosNegocio): string[] => (n.promociones ?? []).flatMap((p) => p.productos)
 const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 const hhmm = (t: string | null | undefined) => (t ?? '').slice(0, 5)
 const pesos = (n: number) => '$' + Math.round(n).toLocaleString('en-US')

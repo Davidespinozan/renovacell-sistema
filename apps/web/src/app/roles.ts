@@ -208,7 +208,7 @@ export const canManageHub = (key: RoleKey): boolean => key === 'admin'
 export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>> = {
   g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }],
   g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }],
-  g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }],
+  g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
   g_inventario: [{ key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }],
   g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }],
   g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],

@@ -51,6 +51,7 @@ import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
 import { Pestanas } from '../app/Pestanas'
 import { Conocimiento } from './admin/Conocimiento' // CC-3
+import { ManualVentas } from './admin/ManualVentas' // R4-C10
 import { AtencionComercialPantalla, CarteraHorarioPantalla } from './admin/AtencionComercial' // CC-7
 import { Mermas } from './admin/Mermas'
 import { Importar } from './admin/Importar'
@@ -112,6 +113,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_promociones: () => <Promociones />,   // PROMO-2 · pestaña de Catálogo
   av_comisiones: () => <Comisiones />,
   av_conocimiento: () => <Conocimiento />,
+  av_manual_ventas: () => <ManualVentas />,   // R4-C10
   av_atencion: () => <AtencionComercialPantalla />,   // CC-7 · Conversaciones → Bandeja
   av_cartera: () => <CarteraHorarioPantalla />,       // REORG CRM · Equipo → Cartera y horario
   av_config: () => <Configuracion />,
@@ -132,7 +134,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
   g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }]} />,
-  g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }]} />,
+  g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   g_inventario: () => <Pestanas grupo="g_inventario" pestanas={[{ key: 'av_traza', label: 'Trazabilidad', render: () => <Trazabilidad /> }, { key: 'av_mermas', label: 'Mermas', render: () => <Mermas /> }, { key: 'av_control_inv', label: 'Control de inventario', render: () => <ControlInventario /> }, { key: 'av_custodias', label: 'Custodias', render: () => <Custodias /> }]} />,
   g_envios: () => <Pestanas grupo="g_envios" pestanas={[{ key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'agenda_entregas', label: 'Horarios de entrega', render: () => <AgendaEntregas sinTitulo /> }]} />,
   g_finanzas: () => <Pestanas grupo="g_finanzas" pestanas={[{ key: 'av_finanzas', label: 'Finanzas', render: () => <Finanzas /> }, { key: 'av_cierre', label: 'Cierre de caja', render: () => <CierreCaja /> }]} />,
