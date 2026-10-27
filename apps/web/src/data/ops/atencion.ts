@@ -22,7 +22,11 @@ export interface PendienteRuteo {
   ruteo_motivo: 'sin_vendedor' | 'vendedor_no_elegible' | 'visitante' | 'reparto' | null; origen: 'carrito' | 'manual' | null; fuera_horario: boolean | null
   solicitado_at: string | null; edad_min: number | null; iniciada: boolean; cart_id: string | null; n_items: number
   atencion?: Atencion | null   // CHV2-A · estado derivado del servidor
+  contacto?: ContactoSolicitud | null   // BANDEJA-1 · de dónde viene, nombre real, número y último mensaje
 }
+export type FuenteConversacion = 'whatsapp' | 'instagram' | 'messenger' | 'enlace' | 'portal'
+export interface ContactoSolicitud { fuente: FuenteConversacion; nombre: string | null; detalle: string | null; ultimo_texto: string | null; ultimo_at: string | null }
+export const ETIQUETA_FUENTE: Record<FuenteConversacion, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', enlace: 'Enlace de contacto', portal: 'Portal' }
 // CHV2-A · umbrales del SLA comercial (minutos hábiles) — Dirección.
 export interface ConfigAtencion { aviso_min: number; escalamiento_min: number; pausar_fuera_horario: boolean; updated_at: string | null; horario: EstadoHorario; reparto?: ConfigReparto }
 // REPARTO (181) · sin vendedor de cartera, la solicitud se reparte al azar; si nadie la inicia en `min` minutos hábiles pasa a otro.

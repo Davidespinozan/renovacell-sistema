@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { capitalizarNombre } from '../../lib/nombres'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { atencion as clientePorDefecto, MOTIVO_RUTEO, textoEstadoHorario, type BandejaCanales, type CanalBandeja, type ChatCanal, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
+import { atencion as clientePorDefecto, ETIQUETA_FUENTE, MOTIVO_RUTEO, type FuenteConversacion, textoEstadoHorario, type BandejaCanales, type CanalBandeja, type ChatCanal, type ClienteAtencion, type ClienteCartera, type Pendientes, type PendienteRuteo, type Vendedor } from '../../data/ops/atencion'
 import { chat as chatPorDefecto, ETIQUETA_MODO, type ClienteChat, type ModoConversacion } from '../../data/ops/chat'
 import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, textoEspera, textoIA, tonoAtencion, KINDS_COMERCIALES } from '../../data/ops/atencionComercial'
 import { recargarAtencion } from '../../data/store/atencionStore'
@@ -37,6 +37,19 @@ export function abrirPestanaAtencion(p: 'horario' | 'cartera' | 'vendedores' | '
 export const pantallaDeAtencion = (p: 'horario' | 'cartera' | 'vendedores' | 'solicitudes' | 'whatsapp'): 'av_atencion' | 'av_cartera' => (p === 'solicitudes' || p === 'whatsapp' ? 'av_atencion' : 'av_cartera')
 const PESTANAS_BANDEJA: Pestana[] = ['pendientes', 'whatsapp']
 const PESTANAS_CARTERA: Pestana[] = ['cartera', 'vendedores', 'horario']
+// BANDEJA-1 · qué es cada pestaña y de dónde viene cada solicitud, dicho en la pantalla
+const AYUDA_PESTANA: Partial<Record<Pestana, string>> = {
+  pendientes: 'Conversaciones que piden o necesitan a una persona, de cualquier origen: WhatsApp, Instagram, Messenger, enlace de contacto o portal.',
+  whatsapp: 'Todos los chats de WhatsApp, Instagram y Messenger (los atienda la IA o una persona) y los controles de la IA de cada canal.',
+}
+const PILL_FUENTE: Record<FuenteConversacion, string> = { whatsapp: 'p-ok', instagram: 'p-warn', messenger: 'p-neu', enlace: 'p-neu', portal: 'p-neu' }
+/** Nombre que ve Dirección: la cuenta del doctor; si no hay cuenta, el nombre del perfil de WhatsApp/Meta o del enlace. */
+export function nombreSolicitud(p: PendienteRuteo): string {
+  if (p.dueno === 'doctor') return capitalizarNombre(p.nombre)
+  const n = p.contacto?.nombre?.trim()
+  if (n) return `${capitalizarNombre(n)} · sin cuenta`
+  return p.contacto ? `Contacto de ${ETIQUETA_FUENTE[p.contacto.fuente]} · sin nombre` : `${capitalizarNombre(p.nombre)} (visitante)`
+}
 const ETIQUETA: Record<Pestana, string> = { pendientes: 'Solicitudes', whatsapp: 'Canales', cartera: 'Cartera', vendedores: 'Vendedores', horario: 'Horario y alertas' }   // 'whatsapp' = WhatsApp + Instagram + Messenger
 
 export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorDefecto, canalOp = canalOpPorDefecto, onEquipo, onAbrir, pestanas = PESTANAS_BANDEJA, titulo = 'Dirección · Conversaciones · Bandeja', onHorario }: {
@@ -95,6 +108,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
           <button key={k} type="button" role="tab" aria-selected={pestana === k} className={pestana === k ? 'active' : undefined} onClick={() => setPestana(k)}>{ETIQUETA[k]}</button>
         ))}
       </div>
+      {AYUDA_PESTANA[pestana] && <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: -4 }} data-testid="ayuda-pestana">{AYUDA_PESTANA[pestana]}</div>}
       {pestana === 'pendientes' && pend && <PestanaPendientes pend={pend} vendedores={vendedores} cliente={cliente} chat={chat} onCambio={alCambiar} foco={foco} onFocoUsado={() => setFoco(null)} onAbrir={onAbrir} />}
       {pestana === 'cartera' && <PestanaCartera vendedores={vendedores} cliente={cliente} onCambio={alCambiar} />}
       {pestana === 'vendedores' && <PestanaVendedores vendedores={vendedores} onEquipo={onEquipo} />}
@@ -170,12 +184,15 @@ function PestanaPendientes({ pend, vendedores, cliente, chat, onCambio, foco, on
               className={destacada === p.conversation_id ? 'rc-llegada' : undefined}
               style={{ border: '1px solid var(--line)', borderLeft: `4px solid var(--${tono === 'dang' ? 'danger' : tono === 'warn' ? 'warn' : tono === 'ok' ? 'green' : 'line'})`, borderRadius: 12, padding: '12px 14px', display: 'grid', gap: 8, outline: 'none' }} data-testid="pendiente">
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <b style={{ fontSize: 15 }}>{capitalizarNombre(p.nombre)}{p.dueno === 'visitante' ? ' (visitante)' : ''}</b>
+                {p.contacto && <span className={'pill ' + PILL_FUENTE[p.contacto.fuente]} data-testid="fuente-solicitud">{ETIQUETA_FUENTE[p.contacto.fuente]}</span>}
+                <b style={{ fontSize: 15 }} data-testid="nombre-solicitud">{nombreSolicitud(p)}</b>
+                {p.contacto?.detalle && <span style={{ fontSize: 13, color: 'var(--ink-3)' }} data-testid="detalle-solicitud">{p.contacto.detalle}</span>}
                 {e ? <span className={'pill ' + PILL[tono]} data-testid="estado-atencion">{ETIQUETA_ATENCION[e]}</span> : <span className="pill p-neu">{p.iniciada ? 'Asesoría iniciada' : ETIQUETA_MODO[p.modo as ModoConversacion] ?? p.modo}</span>}
                 {p.origen === 'carrito' && <span className="pill p-neu">Carrito{p.n_items ? ` · ${p.n_items}` : ''}</span>}
                 {p.fuera_horario && <span className="pill p-warn">Llegó fuera de horario</span>}
                 {p.ruteo_motivo && <span className="pill p-warn">{MOTIVO_RUTEO[p.ruteo_motivo] ?? p.ruteo_motivo}</span>}
               </div>
+              {p.contacto?.ultimo_texto && <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontStyle: 'italic', overflowWrap: 'anywhere' }} data-testid="ultimo-solicitud">«{p.contacto.ultimo_texto}»</div>}
               <dl className="ac-datos" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,190px),1fr))', gap: '4px 16px', margin: 0, fontSize: 13 }}>
                 <Dato t="Vendedor de cartera" v={p.dueno === 'visitante' ? 'Visitante · sin cartera' : carteraNombre ?? 'Sin vendedor de cartera'} testid="dato-cartera" />
                 <Dato t="Atiende esta solicitud" v={p.seller_nombre ?? 'Nadie todavía'} testid="dato-handler" />

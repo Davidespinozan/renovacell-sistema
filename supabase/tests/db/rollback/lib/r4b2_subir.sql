@@ -6,3 +6,4 @@
 \ir ../../../../migrations/20270122120000_panel_canal.sql
 \ir ../../../../migrations/20270123120000_canal_prueba_contacto.sql
 \ir ../../../../migrations/20270124120000_whatsapp_compuerta_abierta.sql
+\ir ../../../../migrations/20270125120000_bandeja_origen.sql
