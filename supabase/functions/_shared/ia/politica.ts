@@ -113,7 +113,8 @@ export function contextoCanal(canal: CanalPolitica): string {
     `CANAL: el usuario escribe por ${NOMBRE_CANAL[canal]}, FUERA del portal y SIN sesión iniciada. Trátalo como contacto NO verificado aunque diga ser médico, cliente o conocido: no asumas identidad por su nombre, número, foto o perfil, y no confirmes ni niegues si existe una cuenta.`,
     'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
     `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
-    'R4-C8 · ESTILO: escribe como alguien amable del equipo comercial de Renovacell que atiende por chat, en español de México natural y cálido. Responde SOLO a su último mensaje; el historial es contexto, no retomes temas anteriores si el usuario no lo hace. Si solo saluda, devuélvele el saludo (con el que usó: buen día, buenas tardes…) y pregúntale en qué le puedes ayudar, en una línea, sin enumerar lo que puedes hacer ni mencionar productos. Frases cortas, máximo una pregunta por mensaje. Evita frases de máquina ("Encontré…", "Una vez que lo confirmes", "según el catálogo", "Puedo mostrarte información de…"). No te vuelvas a presentar ni repitas "Renovacell" en cada mensaje. Trata de tú con respeto; si el usuario habla de usted, respóndele de usted. Como mucho un emoji de vez en cuando. Si te preguntan, eres el asistente virtual de Renovacell: nunca digas que eres una persona.',
+    'R4-C8 · ESTILO: escribe como alguien amable del equipo comercial de Renovacell que atiende por chat, en español de México natural y cálido. Responde SOLO a su último mensaje; el historial es contexto, no retomes temas anteriores si el usuario no lo hace. Si solo saluda, devuélvele el saludo (con el que usó: buen día, buenas tardes…) y pregúntale en qué le puedes ayudar, en una línea, sin enumerar lo que puedes hacer ni mencionar productos. Frases cortas, máximo una pregunta por mensaje. Evita frases de máquina ("Encontré…", "Una vez que lo confirmes", "según el catálogo", "Puedo mostrarte información de…"). No te vuelvas a presentar ni repitas "Renovacell" en cada mensaje. Trata de tú con respeto; si el usuario habla de usted, respóndele de usted. Como mucho un emoji de vez en cuando. No cierres cada mensaje con una pregunta genérica ("¿Hay algo más…?", "¿Hay algo específico que necesites?"): pregunta solo cuando haga falta para avanzar. Si te preguntan, eres el asistente virtual de Renovacell: nunca digas que eres una persona.',
+    'R4-C9 · NEGOCIO: para dónde están, horario, teléfono, recoger o envíos usa SOLO el bloque de DATOS "negocio" (viene del ERP) y dilo con naturalidad; si un dato no aparece ahí, di que lo confirma un asesor. Renovacell es una empresa con sede física, no solo una plataforma en línea.',
     'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
     'R4-C7 · PRODUCTOS: cada vez que el usuario nombre un producto, una marca o una línea, consúltalo con buscar_productos en ESTE turno antes de responder, aunque creas conocerlo. Solo puedes nombrar lo que regrese la herramienta.',
     'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; pedido, envío, devolución o reclamación; no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. La compra, la recompra y las condiciones especiales (mayoreo, crédito, cotización, descuento) las transfiere el sistema por su cuenta después de tu respuesta: ahí no uses solicitar_asesor. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
@@ -271,6 +272,57 @@ export function tareaCanal(intencion: string, limiteClinico: boolean): string {
     case 'GENERAL_CHAT': return 'TAREA: conversación general o saludo. Si saluda, salúdalo con calidez y pregúntale en qué le puedes ayudar, en una línea; no enumeres lo que puedes hacer, no menciones productos ni retomes temas anteriores. Si es otra cosa, responde breve y natural.'
     default: return 'TAREA: responde con lo que tengas aprobado; si no entiendes la petición, pide una aclaración breve. Transfiere solo si, tras intentarlo, no puedes resolverlo o el usuario lo pide.'
   }
+}
+
+// ══ R4-C9 · DATOS DEL NEGOCIO para el canal: salen del ERP (company_settings, cc_horario_semanal, entrega_config) en cada
+// turno; aquí solo se redactan. Lo que falte no se inventa (la línea se omite).
+export interface DatosNegocio {
+  empresa?: { razon_social?: string | null; direccion?: string | null; cp?: string | null; ciudad?: string | null; estado?: string | null; telefono?: string | null } | null
+  horario?: Array<{ dia: number; abierto: boolean; abre: string | null; cierra: string | null }> | null
+  entrega?: { recoge_lugar?: string | null; recoge_horario?: string | null; cp_local_desde?: string | null; cp_local_hasta?: string | null; dias_chofer?: number[] | null; local_mismo_dia?: boolean | null; corte?: string | null
+    local_gratis_desde?: number | null; local_costo?: number | null; dias_paqueteria?: number[] | null; dhl_transito_min?: number | null; dhl_transito_max?: number | null; foraneo_costo?: number | null; foraneo_gratis_desde?: number | null } | null
+}
+const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+const hhmm = (t: string | null | undefined) => (t ?? '').slice(0, 5)
+const pesos = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
+function rangoDias(ds: number[] | null | undefined): string {
+  const d = [...new Set(ds ?? [])].filter((x) => x >= 1 && x <= 7).sort((a, b) => a - b)
+  if (!d.length) return ''
+  const seguidos = d.every((x, i) => i === 0 || x === d[i - 1] + 1)
+  return seguidos && d.length > 2 ? `${DIAS[d[0]]} a ${DIAS[d[d.length - 1]]}` : d.map((x) => DIAS[x]).join(', ')
+}
+/** Montos de envío que el bloque publica (el validador de canal los acepta SOLO en frases de envío/entrega). */
+export function montosEnvio(n: DatosNegocio): number[] {
+  const e = n.entrega ?? {}
+  return [e.local_gratis_desde, e.local_costo, e.foraneo_costo, e.foraneo_gratis_desde].filter((x): x is number => typeof x === 'number' && x > 0)
+}
+export function textoNegocio(n: DatosNegocio): string {
+  const l: string[] = []; const em = n.empresa ?? {}; const e = n.entrega ?? {}
+  const lugar = [em.ciudad, em.estado].filter(Boolean).join(', ')
+  if (em.razon_social || lugar) l.push(`Empresa: ${em.razon_social ?? 'Renovacell'}${lugar ? `, en ${lugar}` : ''}.`)
+  if (em.direccion) l.push(`Dirección: ${em.direccion}${em.cp ? `, C.P. ${em.cp}` : ''}${lugar ? `, ${lugar}` : ''}.`)
+  const abiertos = (n.horario ?? []).filter((h) => h.abierto && h.abre && h.cierra)
+  if (abiertos.length) {
+    const grupos = new Map<string, number[]>()
+    for (const h of abiertos) { const k = `${hhmm(h.abre)} a ${hhmm(h.cierra)}`; grupos.set(k, [...(grupos.get(k) ?? []), h.dia]) }
+    const cerrados = (n.horario ?? []).filter((h) => !h.abierto).map((h) => DIAS[h.dia])
+    l.push(`Horario de atención (hora de Culiacán): ${[...grupos].map(([k, ds]) => `${rangoDias(ds)} de ${k}`).join('; ')}${cerrados.length ? `; ${cerrados.join(', ')} cerrado` : ''}.`)
+  }
+  if (em.telefono) l.push(`Teléfono para llamadas: ${em.telefono}. Por mensaje se atiende en este mismo chat.`)
+  if (e.recoge_lugar) l.push(`Recoger pedidos: ${e.recoge_lugar}${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
+  if (e.cp_local_desde && e.cp_local_hasta) {
+    const partes = [`Entregas en Culiacán (C.P. ${e.cp_local_desde} a ${e.cp_local_hasta}): con chofer${rangoDias(e.dias_chofer) ? ` de ${rangoDias(e.dias_chofer)}` : ''}`]
+    if (e.local_mismo_dia) partes.push(`el mismo día si el pedido se confirma antes de las ${hhmm(e.corte) || '15:30'}`)
+    if (typeof e.local_gratis_desde === 'number' && e.local_gratis_desde > 0) partes.push(`envío gratis en compras desde ${pesos(e.local_gratis_desde)} (en compras menores se recoge en sucursal)`)
+    l.push(partes.join('; ') + '.')
+  }
+  if (typeof e.foraneo_costo === 'number' || e.dhl_transito_max) {
+    const partes = [`Envíos al resto del país: por paquetería${rangoDias(e.dias_paqueteria) ? ` de ${rangoDias(e.dias_paqueteria)}` : ''}`]
+    if (e.dhl_transito_min && e.dhl_transito_max) partes.push(`${e.dhl_transito_min} a ${e.dhl_transito_max} días hábiles de tránsito`)
+    if (typeof e.foraneo_costo === 'number' && e.foraneo_costo > 0) partes.push(`costo de envío ${pesos(e.foraneo_costo)}${typeof e.foraneo_gratis_desde === 'number' && e.foraneo_gratis_desde > 0 ? `, gratis en compras desde ${pesos(e.foraneo_gratis_desde)}` : ''}`)
+    l.push(partes.join('; ') + '.')
+  }
+  return l.join('\n')
 }
 
 // Mensajes seguros del canal (cuando el validador rechaza una respuesta): honestos, sin prometer y sin presentar a un

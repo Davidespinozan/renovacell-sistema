@@ -54,6 +54,23 @@ export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Valid
   return { ok: true, texto: t }
 }
 
+// R4-C9 · el canal puede publicar los montos de ENVÍO del ERP: solo esos montos y solo dentro de frases de envío/entrega
+// quedan fuera de la regla de precio, cláusula por cláusula ("envío gratis y el X en $500" sigue bloqueado); cualquier otra
+// cifra sigue exigiendo PRICE_EVIDENCE.
+const RE_FRASE_ENVIO = /env[ií]o|entrega|gratis|chofer|paqueter[ií]a|flete/i
+export function sinMontosDeEnvio(texto: string, montos: readonly number[]): string {
+  if (!montos.length) return texto
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const formas = montos.flatMap((n) => {
+    const entero = Math.round(n); const variantes = [...new Set([String(entero), entero.toLocaleString('en-US')])]
+    const f = variantes.flatMap((x) => [String.raw`\$\s?${esc(x)}`, String.raw`${esc(x)}\s?(?:mxn|pesos)`])
+    if (entero % 1000 === 0) f.push(String.raw`\$?\s?${entero / 1000}\s?mil(?:\s?pesos)?`)
+    return f
+  })
+  const re = new RegExp(String.raw`(?:${formas.join('|')})(?![\d,])`, 'gi')
+  return texto.split(/(?<=[.!?\n;])|(?<=,)(?!\d)|(?=\s(?:y|pero|aunque|mientras)\s)/i).map((c) => (RE_FRASE_ENVIO.test(c) ? c.replace(re, '[monto de envío]') : c)).join('')
+}
+
 /** Texto seguro cuando el modelo no produjo una respuesta válida: nunca inventa; usa la evidencia o se limita. */
 export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string }): string {
   if (ctx.limiteClinico || motivo === 'clinico') return ctx.textoLimiteClinico

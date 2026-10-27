@@ -11,8 +11,32 @@ import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
 
 // R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
 // seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
-const validacionCanal = { ...validacion, respuestaSegura: validacion.respuestaSeguraCanal }
-const politicaCanal = { ...politica, clasificarIntencion: politica.clasificarIntencionCanal, MENSAJE_SIN_RESPUESTA: politica.MENSAJE_SIN_RESPUESTA_CANAL, MENSAJE_LIMITE_CLINICO: politica.MENSAJE_LIMITE_CLINICO_CANAL }
+const validacionCanalBase = { ...validacion, respuestaSegura: validacion.respuestaSeguraCanal }
+const politicaCanalBase = { ...politica, clasificarIntencion: politica.clasificarIntencionCanal, MENSAJE_SIN_RESPUESTA: politica.MENSAJE_SIN_RESPUESTA_CANAL, MENSAJE_LIMITE_CLINICO: politica.MENSAJE_LIMITE_CLINICO_CANAL }
+
+// R4-C9 · datos del negocio desde el ERP (lectura con service_role; mejor esfuerzo: si falla, la IA no los tiene y lo dice).
+// deno-lint-ignore no-explicit-any
+export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
+  const q = async (f: () => PromiseLike<{ data: unknown; error: unknown }>) => { try { const x = await f(); return x.error ? null : x.data } catch { return null } }
+  const [empresa, horario, entrega] = await Promise.all([
+    q(() => admin.from('company_settings').select('razon_social, direccion, cp, ciudad, estado, telefono').eq('id', 'default').maybeSingle()),
+    q(() => admin.from('cc_horario_semanal').select('dia, abierto, abre, cierra').order('dia')),
+    q(() => admin.from('entrega_config').select('recoge_lugar, recoge_horario, cp_local_desde, cp_local_hasta, dias_chofer, local_mismo_dia, corte, local_gratis_desde, local_costo, dias_paqueteria, dhl_transito_min, dhl_transito_max, foraneo_costo, foraneo_gratis_desde').eq('id', 1).maybeSingle()),
+  ])
+  return { empresa: empresa as politica.DatosNegocio['empresa'], horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'] }
+}
+/** Política y validación del canal con los datos del negocio de este turno. */
+export function dependenciasCanal(n: politica.DatosNegocio) {
+  const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
+  return {
+    politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (texto ? '\n\n' + politica.envolverDatos('negocio', texto) : '') },
+    validacion: { ...validacionCanalBase, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
+      if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
+      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), c)
+      return v.ok ? { ok: true as const, texto: t.replace(/\r\n?/g, '\n').trim() } : v
+    } },
+  }
+}
 
 // deno-lint-ignore no-explicit-any
 type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
@@ -65,13 +89,14 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   if (!costo.permitido) return 'limitada'
 
   const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis) })
+  const canalDeps = canal === 'portal' ? null : dependenciasCanal(await leerNegocio(admin))
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
     { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal },
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
-      proveedor, config: cfg.config, politica: canal === 'portal' ? politica : politicaCanal, herramientas, validacion: canal === 'portal' ? validacion : validacionCanal, reglasConocimiento: REGLAS_IA,
+      proveedor, config: cfg.config, politica: canalDeps ? canalDeps.politica : politica, herramientas, validacion: canalDeps ? canalDeps.validacion : validacion, reglasConocimiento: REGLAS_IA,
     },
   )
   const usados = resultado.usage.input + resultado.usage.output
