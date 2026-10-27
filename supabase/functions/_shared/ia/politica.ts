@@ -118,6 +118,8 @@ export function contextoCanal(canal: CanalPolitica): string {
     'R4-C10 · MANUAL Y PROMOCIONES: el bloque "manual_de_ventas" es lo que Dirección aprobó sobre cómo comprar, verificación, pagos, facturación, devoluciones y política comercial: úsalo como lo haría tu mejor vendedor, con tus palabras y solo lo que dice. Si hay "promociones_vigentes", menciónalas cuando vengan al caso (nombre, productos y hasta cuándo), sin precios: el precio de promoción se ve en el portal o te lo da un asesor.',
     'No prometas tiempos de respuesta ni que alguien contestará fuera del horario; si el usuario pide una persona, usa solicitar_asesor.',
     'R4-C7 · PRODUCTOS: cada vez que el usuario nombre un producto, una marca o una línea, consúltalo con buscar_productos en ESTE turno antes de responder, aunque creas conocerlo. Solo puedes nombrar lo que regrese la herramienta.',
+    'R4-C12 · BÚSQUEDA: busca PRIMERO exactamente como lo escribió el cliente, siglas incluidas (si escribe "TNM", busca "TNM"); si no aparece, prueba la marca o una palabra clave más corta. Si el cliente aclara qué significa una sigla, vuelve a buscar también la sigla. Nunca digas que no lo manejamos sin haber buscado lo que escribió.',
+    'R4-C12 · ARCHIVOS: si su mensaje dice que envió una imagen, documento, audio o video, tú no puedes verlo: agradécelo y dile que un asesor de Renovacell lo revisa aquí mismo; si quiere adelantar, que te escriba el producto o la cantidad. No le pidas dos veces lo mismo.',
     'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; pedido, envío, devolución o reclamación; no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. La compra, la recompra y las condiciones especiales (mayoreo, crédito, cotización, descuento) las transfiere el sistema por su cuenta después de tu respuesta: ahí no uses solicitar_asesor. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
   ].join('\n')
 }
@@ -225,14 +227,17 @@ export function transferenciaDeterminista(texto: string): 'cliente_pide_persona'
 // servidor, con la disponibilidad real). Las negaciones ("no quiero comprar todavía") no cuentan.
 const NIEGA_COMPRA = /\b(no|todavia no|aun no|ahorita no|por ahora no|tampoco)\s+((quiero|quisiera|voy a|pienso|necesito|deseo|busco)\s+)?(comprar|pedir|ordenar|adquirir|hacer (un |el )?pedido)\b/
 const COMPRA = /\b(quiero|quisiera|queria|me gustaria|necesito|ocupo|deseo|busco|vengo a|me interesa)\s+(comprar|pedir|ordenar|adquirir|encargar|hacer (un |el |mi )?pedido)\b|\b(como|donde)\s+(compro|le compro|les compro|puedo comprar|pido|puedo pedir|hago (un |el |mi )?pedido)\b|\b(levantar|hacer|hacerte|hacerles|mandar)\s+(un |el |mi )?pedido\b|\bme (vendes|vende|venden|mandas|manda|mandan|envias|envia|envian|apartas|aparta|apartan)\b|\b(mandame|enviame|apartame|vendeme)\b|\bcomo (pago|se paga|les pago|le pago|puedo pagar)\b|\b(quiero|quisiera|necesito|ocupo|me das|dame|deme)\s+(\d+|una?|dos|tres|cuatro|cinco|seis|diez)\s+(cajas?|piezas?|viales?|frascos?|jeringas?|kits?|unidades)\b/
-const RECOMPRA = /\b(lo de siempre|lo mismo de (siempre|la (otra )?vez|la ultima vez)|como la (otra |ultima )?vez|otra vez (el|mi|lo|la)|volver a (pedir|comprar)|repetir (el |mi )?pedido|resurtir|resurtido|con mi (vendedora|vendedor|asesora|asesor|ejecutiva|ejecutivo))\b/
+const RECOMPRA = /\b(lo que (me|nos) (envian|mandan|surten|venden)|de lo que (me|nos) (envian|mandan)|lo de siempre|lo mismo de (siempre|la (otra )?vez|la ultima vez)|como la (otra |ultima )?vez|otra vez (el|mi|lo|la)|volver a (pedir|comprar)|repetir (el |mi )?pedido|resurtir|resurtido|con mi (vendedora|vendedor|asesora|asesor|ejecutiva|ejecutivo))\b/
 const NEGOCIA = /\b(mayoreo|medio mayoreo|por volumen|precio especial|precios especiales|credito|a meses|cotizacion|cotizar|cotizame|cotizarme|me cotizas|descuento|descuentos|condiciones especiales|ser distribuidor|distribuidora?|distribuir)\b/
 const G_SALUDO = '(hola+|holi|buen(os)? dias?|buenas( tardes| noches| dias)?|que tal|saludos|hey|como (esta|estan|estas)( usted)?|mucho gusto)'
 const SALUDO = new RegExp(`^[\\s¡!¿?.,:)]*${G_SALUDO}([\\s¡!¿?.,:)]+${G_SALUDO}){0,3}[\\s¡!¿?.,:)]*$`)
-export type MotivoComercial = 'compra' | 'recompra' | 'negociacion'
+export type MotivoComercial = 'compra' | 'recompra' | 'negociacion' | 'adjunto'
+// R4-C12 · imagen, documento, audio o video del cliente (la IA no los ve): casi siempre es un producto o un pedido → asesor
+export const esAdjunto = (texto: string): boolean => /^Envió (una imagen|un documento|un audio|un video) por WhatsApp\./.test((texto ?? '').trim())
 export function atencionComercial(texto: string): MotivoComercial | null {
   const t = sinAcentos(texto)
   if (!t || esLimiteClinico(texto ?? '')) return null
+  if (esAdjunto(texto)) return 'adjunto'
   if (RECOMPRA.test(t)) return 'recompra'
   if (NEGOCIA.test(t)) return 'negociacion'
   if (NIEGA_COMPRA.test(t)) return null

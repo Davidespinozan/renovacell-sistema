@@ -93,6 +93,6 @@ describe('"leído" + "escribiendo…" en WhatsApp', () => {
     expect(await mostrarEscribiendo('wamid.X', (async () => new Response('{}', { status: 400 })) as never)).toBe(false)
   })
   it('meta-webhook lo muestra justo antes del turno de IA (solo cuando la IA va a atender)', () => {
-    expect(webhook).toMatch(/if \(IA_PUEDE\(r\.modo as never\)\) \{[\s\S]*?await mostrarEscribiendo\(m\.wamid\)[^\n]*\n\s*const ia = await responderIA\(/)
+    expect(webhook).toMatch(/if \(IA_PUEDE\(r\.modo as never\)\) \{[\s\S]*?await mostrarEscribiendo\(m\.wamid\)[^\n]*\n[\s\S]*?const ia = await responderIA\(/)   // R4-C12: la agrupación va en medio
   })
 })

@@ -26,6 +26,15 @@ import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { IA_PUEDE } from '../_shared/chat.ts'
 import { canalDe, cuentaDe, correlacion, clasificarError, lineaDiagnostico, type Diagnostico } from '../_shared/metaDiagnostico.ts'
 
+const AGRUPAR_MS = 3_500
+// deno-lint-ignore no-explicit-any
+async function llegoOtroMensaje(admin: any, conv: string, seq: number): Promise<boolean> {
+  await new Promise((ok) => setTimeout(ok, AGRUPAR_MS))
+  const { data, error } = await admin.from('cc_messages').select('seq').eq('conversation_id', conv).in('actor_type', ['visitor', 'doctor']).gt('seq', seq).limit(1)
+    .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
+  return !error && Array.isArray(data) && data.length > 0   // ante un error se responde (nunca se deja sin respuesta)
+}
+
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
 const obs = observador('meta-webhook')
 // META-02 · diagnóstico seguro en los logs de la Edge: canal, etapa, causa, código técnico y correlación; nunca datos de personas.
@@ -106,6 +115,9 @@ Deno.serve(async (req) => {
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación
           // y su cartera siguen siendo del doctor para el asesor humano; la elevación solo existe con sesión en el portal).
           await mostrarEscribiendo(m.wamid)   // R4-C8 · el cliente ve "leído" y "escribiendo…" mientras la IA responde
+          // R4-C12 · mensajes seguidos ("Tnm" + "Porfavor."): se espera un momento y, si ya llegó otro del cliente, este turno no
+          // responde; contesta el más reciente con todo el contexto (una sola respuesta, no dos).
+          if (await llegoOtroMensaje(admin, r.conversation_id, r.seq)) return
           const ia = await responderIA(admin, r.conversation_id, r.seq, r.actor, r.profile_id, r.visitor_hash, m.texto, 'wa:' + m.wa_id, 'whatsapp')
           if (ia === 'respondio' || ia === 'transferida') await despacharWhatsApp(admin)   // R4-B2-IA1 · también el aviso de transferencia
         }
