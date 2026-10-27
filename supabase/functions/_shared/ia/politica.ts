@@ -245,6 +245,31 @@ export function atencionComercial(texto: string): MotivoComercial | null {
   // R4-C11 · "2 nabota", "3 de 100", "una caja de hyalux": cantidad + producto en un mensaje corto = compra
   return t.split(' ').length <= 6 && /^\s*(\d{1,3}|una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(de\s+|cajas?\s+(de\s+)?|piezas?\s+(de\s+)?|viales?\s+(de\s+)?)?[a-z0-9][a-z0-9 ]{2,}$/.test(t) ? 'compra' : null
 }
+// R4-C14 · PRE-BÚSQUEDA determinista del canal: las palabras del cliente se buscan en el catálogo ANTES del modelo, para que
+// reconocer "TNM", "nabota" o un SKU no dependa de que el modelo decida buscar. Solo coincidencias fuertes (sku, alias,
+// nombre exacto o inicio de nombre, familia: puntaje ≥ 75); palabras comunes fuera.
+const VACIAS = new Set(('que quiero quisiera queria para por con una uno unos unas los las del tienen tiene tienes hay como cuanto cuanta cuesta cuestan precio precios ' +
+  'favor porfavor hola buen buenos buenas dia dias tardes noches gracias pieza piezas caja cajas comprar compra pedir pedido necesito ocupo existencia existencias ' +
+  'disponible disponibilidad este esta estos estas ese esa esos esas sus mis nos les mas muy bien dame mandame manden envian envio envios ustedes usted ' +
+  'producto productos marca algo otro otra quien donde cuando cual cuales tengo tenemos saber gustaria interesa nosotros ellos ella aqui alla todo todos').split(' '))
+export function palabrasDeProducto(texto: string): string[] {
+  const t = sinAcentos(texto).replace(/[^a-z0-9ñ ]/g, ' ')
+  const palabras = [...new Set(t.split(/\s+/).filter((w) => w.length >= 3 && !VACIAS.has(w) && !/^\d+$/.test(w)))]
+  const frase = t.trim().split(/\s+/).filter((w) => w.length >= 3 && !VACIAS.has(w) && !/^\d+$/.test(w)).join(' ')
+  return [...new Set([...(frase && frase.split(' ').length >= 2 && frase.split(' ').length <= 4 ? [frase] : []), ...palabras])].slice(0, 5)
+}
+export interface ProductoEncontrado { product_id: string; nombre: string; puntaje?: number; [k: string]: unknown }
+export async function prebuscarProductos(texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>): Promise<ProductoEncontrado[]> {
+  const vistos = new Map<string, ProductoEncontrado>()
+  for (const q of palabrasDeProducto(texto)) {
+    const r = await Promise.resolve(buscar(q)).then((x) => x, () => ({ data: null, error: true }))
+    if (r.error || !Array.isArray(r.data)) continue
+    for (const p of r.data as ProductoEncontrado[]) if (p?.product_id && Number(p.puntaje ?? 0) >= 75 && !vistos.has(p.product_id)) vistos.set(p.product_id, p)
+    if (vistos.size >= 8) break
+  }
+  return [...vistos.values()].slice(0, 8)
+}
+
 /** R4-C11 · respuesta corta que continúa una pregunta de la IA ("100", "la de 200", "2 piezas"); un saludo no lo es. */
 export function esContinuacionCorta(texto: string): boolean {
   const t = sinAcentos(texto)

@@ -26,6 +26,8 @@ export interface DepsOrquestador {
     historialParaModelo: (m: Array<{ actor: string; content: string }>, maximo?: number) => Array<{ role: 'user' | 'assistant'; content: string }>
     envolverDatos: (etiqueta: string, contenido: string) => string
     MENSAJE_SIN_RESPUESTA: string; MENSAJE_LIMITE_CLINICO: string
+    // R4-C14 · opcional: pre-búsqueda determinista de los productos que nombró el cliente (canal)
+    prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
   }
   herramientas: {
     herramientasPara: (conCuenta: boolean, canal?: CanalTurno) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
@@ -104,6 +106,17 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
+  // R4-C14 · canal: los productos que el cliente nombró ya vienen buscados (no depende de que el modelo decida buscar)
+  let productosMencionados = ''
+  if (canal !== 'portal' && d.politica.prebuscarProductos) {
+    const pre = await d.politica.prebuscarProductos(e.textoUsuario, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }))
+    if (pre.length) {
+      for (const id of d.herramientas.idsDe(pre)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pre)) nombresAutorizados.add(n)
+      addEv(d.herramientas.evidenciaDe('buscar_productos', pre))
+      productosMencionados = '\n\n' + d.politica.envolverDatos('productos_del_catalogo_que_menciono_el_cliente', d.herramientas.acotarSalida(pre)) +
+        '\nEstos productos de NUESTRO catálogo coinciden con lo que escribió el cliente (ya los busqué por ti): reconócelos por su nombre y confírmalos con naturalidad.'
+    }
+  }
   // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
   if (d.herramientas.evidenciaHandoff) {
     const hs = await rpc('cc_ia_estado_handoff', { p_conv: e.conv })
@@ -129,7 +142,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal }) + notaCorreccion
+    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal }) + productosMencionados + notaCorreccion
     const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
