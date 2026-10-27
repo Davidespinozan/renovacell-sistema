@@ -23,6 +23,7 @@ import { useRole } from '../../auth/RoleContext'
 import { EnlaceContacto } from '../../app/EnlaceContacto'
 import { ChatCanonico } from '../chat/ChatCanonico'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'   // R4-B2-4 · panel operativo mínimo
+import { BandejaConversaciones } from './BandejaConversaciones'   // BANDEJA-2
 import { canalOperacion as canalOpPorDefecto, MOTIVO_NO_ESCRIBIR, type ClienteCanalOperacion, type ControlConversacion } from '../../data/ops/canalOperacion'
 
 type Pestana = 'pendientes' | 'cartera' | 'vendedores' | 'horario' | 'whatsapp'
@@ -42,7 +43,7 @@ const AYUDA_PESTANA: Partial<Record<Pestana, string>> = {
   pendientes: 'Conversaciones que piden o necesitan a una persona, de cualquier origen: WhatsApp, Instagram, Messenger, enlace de contacto o portal.',
   whatsapp: 'Todos los chats de WhatsApp, Instagram y Messenger (los atienda la IA o una persona) y los controles de la IA de cada canal.',
 }
-const PILL_FUENTE: Record<FuenteConversacion, string> = { whatsapp: 'p-ok', instagram: 'p-warn', messenger: 'p-neu', enlace: 'p-neu', portal: 'p-neu' }
+export const PILL_FUENTE: Record<FuenteConversacion, string> = { whatsapp: 'p-ok', instagram: 'p-warn', messenger: 'p-neu', enlace: 'p-neu', portal: 'p-neu' }
 /** Nombre que ve Dirección: la cuenta del doctor; si no hay cuenta, el nombre del perfil de WhatsApp/Meta o del enlace. */
 export function nombreSolicitud(p: PendienteRuteo): string {
   if (p.dueno === 'doctor') return capitalizarNombre(p.nombre)
@@ -118,7 +119,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
   )
 }
 
-function SelectorVendedor({ vendedores, nuevos, valor, onCambio, etiqueta = 'Vendedor' }: { vendedores: Vendedor[]; nuevos: boolean; valor: string; onCambio: (v: string) => void; etiqueta?: string }) {
+export function SelectorVendedor({ vendedores, nuevos, valor, onCambio, etiqueta = 'Vendedor' }: { vendedores: Vendedor[]; nuevos: boolean; valor: string; onCambio: (v: string) => void; etiqueta?: string }) {
   const opciones = vendedores.filter((v) => (nuevos ? v.elegible_nuevos : v.elegible))
   return (
     <select value={valor} onChange={(e) => onCambio(e.target.value)} style={campo} aria-label={etiqueta}>
@@ -237,7 +238,7 @@ function Dato({ t, v, testid }: { t: string; v: string; testid?: string }) {
   return <div style={{ minWidth: 0 }}><dt style={{ color: 'var(--mid)', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.04em' }}>{t}</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }} data-testid={testid}>{v}</dd></div>
 }
 
-function MarcoModal({ titulo, sub, onCerrar, children, testid }: { titulo: string; sub: string; onCerrar: () => void; children: React.ReactNode; testid: string }) {
+export function MarcoModal({ titulo, sub, onCerrar, children, testid }: { titulo: string; sub: string; onCerrar: () => void; children: React.ReactNode; testid: string }) {
   const caja = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null
@@ -262,7 +263,7 @@ function MarcoModal({ titulo, sub, onCerrar, children, testid }: { titulo: strin
 }
 
 /** CHV2-A · Solo esta solicitud: cambia quién atiende AHORA. La cartera NO cambia. Motivo obligatorio. */
-function ModalReasignarSolicitud({ p, vendedores, carteraNombre, cliente, onCerrar, onHecho, nombreVendedor }: { p: PendienteRuteo; vendedores: Vendedor[]; carteraNombre: string | null; cliente: ClienteAtencion; onCerrar: () => void; onHecho: (texto: string) => void; nombreVendedor: (id: string | null | undefined) => string | null }) {
+export function ModalReasignarSolicitud({ p, vendedores, carteraNombre, cliente, onCerrar, onHecho, nombreVendedor }: { p: PendienteRuteo; vendedores: Vendedor[]; carteraNombre: string | null; cliente: ClienteAtencion; onCerrar: () => void; onHecho: (texto: string) => void; nombreVendedor: (id: string | null | undefined) => string | null }) {
   const [v, setV] = useState('')
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -302,7 +303,7 @@ function ModalReasignarSolicitud({ p, vendedores, carteraNombre, cliente, onCerr
 }
 
 /** Cambio PERMANENTE de cartera (cc_cartera_asignar): compras futuras + reruteo de la solicitud abierta. */
-function ModalCambiarCartera({ p, vendedores, carteraNombre, cliente, onCerrar, onHecho }: { p: PendienteRuteo; vendedores: Vendedor[]; carteraNombre: string | null; cliente: ClienteAtencion; onCerrar: () => void; onHecho: (texto: string) => void }) {
+export function ModalCambiarCartera({ p, vendedores, carteraNombre, cliente, onCerrar, onHecho }: { p: PendienteRuteo; vendedores: Vendedor[]; carteraNombre: string | null; cliente: ClienteAtencion; onCerrar: () => void; onHecho: (texto: string) => void }) {
   const [v, setV] = useState('')
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -506,11 +507,10 @@ function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion;
   )
 }
 
-/** Conversaciones → Bandeja: solicitudes de asesor y WhatsApp. Abrir lleva a Asesorías (la conversación exacta). */
+/** Conversaciones → Bandeja (BANDEJA-2): bandeja única de Dirección, todas las conversaciones de todos los orígenes. */
 export function AtencionComercialPantalla() {
   const { setScreen } = useRole()
-  return <AtencionComercial pestanas={PESTANAS_BANDEJA} titulo="Dirección · Conversaciones · Bandeja" onEquipo={() => setScreen('av_equipo')}
-    onAbrir={(id) => irAConversacion(setScreen, id, { origen: 'atencion' })} onHorario={() => { abrirPestanaAtencion('horario'); setScreen('av_cartera') }} />
+  return <BandejaConversaciones onHorario={() => { abrirPestanaAtencion('horario'); setScreen('av_cartera') }} />
 }
 /** Equipo → Cartera y horario: cartera por vendedor, vendedores elegibles, horario y alertas. */
 export function CarteraHorarioPantalla() {

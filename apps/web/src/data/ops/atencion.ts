@@ -24,6 +24,10 @@ export interface PendienteRuteo {
   atencion?: Atencion | null   // CHV2-A · estado derivado del servidor
   contacto?: ContactoSolicitud | null   // BANDEJA-1 · de dónde viene, nombre real, número y último mensaje
 }
+// BANDEJA-2 · bandeja única: cada conversación abierta, de cualquier origen, con su grupo de trabajo
+export type GrupoBandeja = 'por_atender' | 'en_atencion' | 'ia'
+export interface ItemBandeja extends PendienteRuteo { grupo: GrupoBandeja; tomada: boolean; sin_responder: boolean | null; ultimo_actor: string | null; hace_min: number | null }
+export interface BandejaUnificada { resumen: { por_atender: number; en_atencion: number; ia: number; todas: number }; conversaciones: ItemBandeja[] }
 export type FuenteConversacion = 'whatsapp' | 'instagram' | 'messenger' | 'enlace' | 'portal'
 export interface ContactoSolicitud { fuente: FuenteConversacion; nombre: string | null; detalle: string | null; ultimo_texto: string | null; ultimo_at: string | null }
 export const ETIQUETA_FUENTE: Record<FuenteConversacion, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', enlace: 'Enlace de contacto', portal: 'Portal' }
@@ -109,6 +113,7 @@ export class ClienteAtencion {
   asignar(cliente: string, vendedor: string | null, motivo?: string | null) { return this.llamar<{ idempotente: boolean }>('cc_cartera_asignar', { p_cliente: cliente, p_vendedor: vendedor, p_motivo: motivo ?? null }) }
   resumen() { return this.llamar<ResumenRuteo>('cc_ruteo_resumen') }
   pendientes() { return this.llamar<Pendientes>('cc_ruteo_pendientes') }
+  bandeja() { return this.llamar<BandejaUnificada>('cc_bandeja_unificada', { p_limite: 300 }) }   // BANDEJA-2 · todas las conversaciones, solo Dirección
   whatsapp() { return this.llamar<BandejaWhatsApp>('cc_wa_bandeja') }   // WHATSAPP · solo Dirección
   canales() { return this.llamar<BandejaCanales>('cc_canales_bandeja') }   // META-CANALES · WhatsApp + Instagram + Messenger, solo Dirección
   // CHV2-A · pasa SOLO esta solicitud a otro vendedor (handler). La cartera NO cambia; motivo obligatorio.
