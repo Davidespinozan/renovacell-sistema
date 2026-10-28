@@ -1,6 +1,7 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
 create temp table _rp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
+\ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja primero (redefine reparto, cc_vendedores y conteos)
 \ir ../../../rollback/reparto_asesores/99_down.sql
 do $t$ begin
   perform tests.ok(to_regprocedure('public._cc_reparto_elegir(uuid)') is null and not exists (select 1 from information_schema.columns where table_name = 'cc_atencion_config' and column_name = 'reparto_activo')
@@ -10,6 +11,7 @@ do $t$ begin
                and md5(pg_get_functiondef('public.cc_iniciar_asesoria(uuid,uuid)'::regprocedure)) = '35dbad3d69dc1bf2288309a19adee3bc' and md5(pg_get_functiondef('public.cc_ruteo_resumen()'::regprocedure)) = '40a5a685d6ca0451bf23d0ed591f4497', '181 down · las 6 funciones como antes (md5)');
 end $t$;
 \ir ../../../migrations/20270103120000_reparto_asesores.sql
+\ir ../../../migrations/20270129120000_cuentas_internas.sql   -- CUENTAS INTERNAS se reaplica encima
 do $t$ begin
   perform tests.ok((select todas from _rp) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '181 · se reaplica idéntica');
 end $t$;
