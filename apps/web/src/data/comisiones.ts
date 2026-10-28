@@ -40,6 +40,19 @@ export interface EstimacionComisiones {
  *   3. sin vendedor.
  * `placed_by` es el CAPTURISTA y nunca atribuye comisión (D2).
  */
+/**
+ * Cuentas internas (ocultas): la base no deja ver su perfil a quien no es interno, así que un pedido cuyo vendedor
+ * registrado NO está en el equipo visible es de una cuenta interna (pruebas del dueño) y no entra a metas ni comisiones.
+ * `idsEquipo` = todo el equipo que la sesión puede ver (activos y de baja). Para una cuenta interna nada se filtra.
+ */
+export function sinCuentasOcultas<T extends { shipping_meta?: unknown }>(orders: T[], idsEquipo: ReadonlySet<string>): T[] {
+  if (idsEquipo.size === 0) return orders   // el equipo aún no carga: no se esconde nada a ciegas
+  return orders.filter((o) => {
+    const sid = ((o.shipping_meta ?? {}) as { seller_profile_id?: string | null }).seller_profile_id
+    return !sid || idsEquipo.has(sid)
+  })
+}
+
 export function vendedorDe(o: OrderWithItems, vendedores: Vendedor[]): string | null {
   const meta = (o.shipping_meta ?? {}) as { seller?: string | null; seller_profile_id?: string | null }
   if (meta.seller_profile_id) {

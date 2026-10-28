@@ -15,7 +15,7 @@ import { usePaymentEntries } from '../../data/hooks/useMoney'
 import { useRefunds } from '../../data/hooks/useFinanzas'
 import { hasSupabase } from '../../lib/supabase'
 import { entriesFromOrders } from '../../data/ops/moneyMock'
-import { estimarComisiones, type LineaProducto } from '../../data/comisiones'
+import { estimarComisiones, sinCuentasOcultas, type LineaProducto } from '../../data/comisiones'
 import { esteMes, mesPasado, diaNegocio, hoyNegocio } from '../../data/periodo'
 
 export function Comisiones() {
@@ -34,6 +34,8 @@ export function Comisiones() {
   const rateProf = lineRate('prof')
 
   const sellers = useMemo(() => team.filter((u) => u.role === 'pos' && u.active), [team])
+  // Cuentas internas: sus pedidos de prueba no cuentan (su vendedor no está en el equipo visible).
+  const pedidos = useMemo(() => sinCuentasOcultas(orders, new Set(team.map((u) => u.id))), [orders, team])
   // Línea de cada producto (Home Care 'cosm' / Professional 'prof') para la tasa por línea.
   const lineOf = useMemo(() => {
     const m: Record<string, LineaProducto> = {}
@@ -42,13 +44,13 @@ export function Comisiones() {
   }, [products])
 
   const est = useMemo(() => estimarComisiones({
-    orders,
+    orders: pedidos,
     // Con backend, el cobrado sale del libro; en la demo se deriva de los pedidos pagados.
-    entries: hasSupabase ? asientos : entriesFromOrders(orders, refunds, diaNegocio),
+    entries: hasSupabase ? asientos : entriesFromOrders(pedidos, refunds, diaNegocio),
     vendedores: sellers.map((s) => ({ id: s.id, email: s.email, name: s.name })),   // CX-0c · id = identidad canónica
     lineaDe: (pid) => ((pid && lineOf[pid]) === 'prof' ? 'prof' : 'cosm'),
     tasaVigente: { cosm: rateCosm, prof: rateProf },
-  }, periodo), [orders, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])
+  }, periodo), [pedidos, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])
 
   const rows = useMemo(() => est.filas.map((f) => {
     const meta = targetFor(f.email)
