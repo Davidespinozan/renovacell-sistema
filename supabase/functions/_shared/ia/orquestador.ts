@@ -36,6 +36,8 @@ export interface DepsOrquestador {
     acotarSalida: (v: unknown) => string; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
     evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
+    // ENT-P · opcional: completa la salida de una herramienta con datos del negocio (p. ej. envío gratis del carrito)
+    complementar?: (nombre: string, salida: unknown) => unknown
   }
   validacion: {
     validarRespuesta: (t: unknown, c: { evidencia: readonly string[]; nombresAutorizados: readonly string[]; nombresCatalogo: readonly string[]; limiteClinico: boolean }) => { ok: true; texto: string } | { ok: false; motivo: string; detalle?: string }
@@ -174,7 +176,8 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
         continue
       }
-      const ej = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal })
+      const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal })
+      const ej = !ej0.error && d.herramientas.complementar ? { ...ej0, data: d.herramientas.complementar(v.nombre, ej0.data) } : ej0
       const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : ej.data
       if (!ej.error) { for (const id of d.herramientas.idsDe(ej.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(ej.data)) nombresAutorizados.add(n); addEv(d.herramientas.evidenciaDe(v.nombre, ej.data)) }
       const ev = ej.error ? [] : d.herramientas.evidenciaDe(v.nombre, ej.data)

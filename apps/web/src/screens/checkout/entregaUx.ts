@@ -3,19 +3,13 @@
 // CX-V2-B · solo se muestran las alternativas relevantes (lo que no aplica a esa dirección o no está activo no ocupa una
 // tarjeta), cada tarjeta dice una cosa y el faltante se explica UNA vez. La regla de selección es la de CX-V2-A.
 import { money } from '../../lib/format'
-import { MOTIVO_ENTREGA, fleteTexto, promesaDe, requiereHorario, type HorarioElegido, type OpcionEntrega, type OpcionesEntrega } from '../../data/ops/entrega'
+import { MOTIVO_ENTREGA, faltantePara, fleteTexto, promesaDe, requiereHorario, type HorarioElegido, type OpcionEntrega, type OpcionesEntrega } from '../../data/ops/entrega'
 
-export interface Faltante { minimo: number; faltante: number }
+// ENT-P · el faltante vive en data/ops/entrega.ts (lo comparten todas las pantallas que venden); aquí se re-exporta.
+export { faltantePara, type Faltante } from '../../data/ops/entrega'
 
 /** ¿La opción se puede elegir? (permitida por la regla y con la paquetería activa). */
 export const puedeElegir = (o: Pick<OpcionEntrega, 'permitido' | 'disponible'>): boolean => o.permitido && o.disponible
-
-/** Mínimo de envío gratis de ESA modalidad y cuánto falta, con los números del servidor. Null si no aplica. */
-export function faltantePara(ops: Pick<OpcionesEntrega, 'regla' | 'subtotal'>, o: Pick<OpcionEntrega, 'tipo'>): Faltante | null {
-  const minimo = o.tipo === 'local' ? ops.regla.local_gratis_desde : o.tipo === 'foraneo' ? ops.regla.foraneo_gratis_desde : null
-  if (minimo == null || !Number.isFinite(minimo) || minimo <= 0) return null
-  return { minimo, faltante: Math.max(0, Math.round((minimo - Math.max(0, ops.subtotal)) * 100) / 100) }
-}
 
 /** Nombre corto de la modalidad (lo que el doctor entiende); el servidor sigue siendo quien la define. */
 export function tituloModalidad(o: Pick<OpcionEntrega, 'tipo' | 'paqueteria' | 'texto'>): string {

@@ -10,6 +10,8 @@ import { ChevronDown, ShoppingBag } from 'lucide-react'
 import { carrito as clientePorDefecto, ETIQUETA_DISPONIBILIDAD, ETIQUETA_PROBLEMA, formatoMXN, type Carrito, type ClienteCarrito, type Preparacion } from '../../data/ops/carrito'
 import { CheckoutCanonico, domicilioLegadoDelDoctor } from '../checkout/CheckoutCanonico'
 import { payOrder, reloadOrders } from '../../data/store/ordersStore'
+import { AvisoEnvioGratisVista, useAvisoEnvioGratis } from '../../app/AvisoEnvioGratis'   // ENT-P · mismo aviso que el Catálogo
+import { hasSupabase } from '../../lib/supabase'
 
 interface Props { conversationId?: string | null; cartId?: string | null; soloLectura?: boolean; cliente?: ClienteCarrito; intervaloMs?: number; compacto?: boolean }
 
@@ -70,6 +72,10 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
     />
   ) : null
 
+  // ENT-P · el dueño ve cuánto le falta para el envío gratis (mismo aviso que el carrito del Catálogo y el checkout).
+  const esDueno = !!cart && !soloLectura && cart.dueno === 'profile' && cart.rol !== 'asesor' && cart.rol !== 'supervisor'
+  const envio = useAvisoEnvioGratis(cart && cart.total.estado === 'completo' && cart.total.monto != null && cart.n_items > 0 ? cart.total.monto : null, { activo: esDueno && hasSupabase })
+
   if (!cart) return capa
   const puedeMutar = !soloLectura && cart.rol !== 'asesor' && cart.rol !== 'supervisor' && cart.estado === 'active'
   // Vacío: ninguna franja permanente.
@@ -115,6 +121,7 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
                 {cart.total.estado === 'completo' && cart.total.monto != null ? <>Total <b>{formatoMXN(cart.total.monto)}</b> <span className="rc-muted">· se recalcula al pedir</span></>
                   : cart.total.estado === 'requiere_verificacion' ? 'Guarda tu carrito y consulta precios verificando tu cuenta.' : 'Algunos precios se confirman al pedir.'}
               </span>
+              {esDueno && <AvisoEnvioGratisVista aviso={envio} compacto testId="carrito-envio-gratis" />}
               {puedeMutar && <div className="rc-cart-actions">
                 <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => mutar(() => cliente.vaciar(cart.cart_id))} data-testid="carrito-vaciar">Vaciar</button>
                 <button type="button" className="btn sm" disabled={ocupado} onClick={preparar} data-testid="carrito-revisar">{cart.dueno === 'profile' ? 'Revisar pedido' : 'Revisar para pedir'}</button>

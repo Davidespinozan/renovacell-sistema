@@ -36,9 +36,11 @@ export function useChatAbierto(): boolean { return useSyncExternalStore(suscribi
 
 const textoUnidades = (n: number) => `${n} producto${n === 1 ? '' : 's'}`
 
-export function BarraCarrito({ unidades, totalEstimado, bloqueada, onRevisar }: {
+export function BarraCarrito({ unidades, totalEstimado, bloqueada, onRevisar, envio = null }: {
   unidades: number
   totalEstimado: number | null
+  /** ENT-P · línea corta del aviso de envío gratis (la misma que el carrito de escritorio). */
+  envio?: string | null
   /** Quien monta: checkout o modal abierto, carrito convertido/inaccesible. */
   bloqueada: boolean
   onRevisar: () => void
@@ -64,6 +66,7 @@ export function BarraCarrito({ unidades, totalEstimado, bloqueada, onRevisar }: 
       <div className="rc-cart-bar-txt" role="status" aria-live="polite" data-testid="barra-carrito-resumen">
         <span className="rc-cart-bar-n">{textoUnidades(unidades)}</span>
         {total && <span className="rc-cart-bar-total"><span className="rc-cart-bar-lbl">Total </span>estimado <b>{total}</b></span>}
+        {envio && <span className="rc-cart-bar-envio" data-testid="barra-carrito-envio">{envio}</span>}
       </div>
       <button type="button" className="btn rc-cart-bar-btn" onClick={onRevisar} aria-label={`Revisar pedido: ${resumen}`} data-testid="barra-carrito-revisar">Revisar pedido</button>
     </div>

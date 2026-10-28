@@ -25,6 +25,8 @@ import { reloadOrders } from '../../data/store/ordersStore'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
 import { CheckoutCanonico, domicilioLegadoDelDoctor, type MotorLocal } from '../checkout/CheckoutCanonico'
 import { BarraCarrito } from './BarraCarrito'
+import { AvisoEnvioGratisVista, useAvisoEnvioGratis } from '../../app/AvisoEnvioGratis'   // ENT-P · mismo aviso en todas las ventas
+import type { AvisoEnvioGratis as AvisoEnvio } from '../../data/ops/entrega'
 import type { ConfigServidor, ResultadoPedido } from '../checkout/checkoutMotor'
 
 
@@ -142,6 +144,8 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   // Total con descuento por volumen previsualizado (el servidor recalcula al crear el pedido).
   const total = lines.reduce((sum, l) => sum + (effOf(l.product, l.qty) ?? 0) * l.qty, 0)
   const savings = lines.reduce((sum, l) => sum + volumeSavings(priceOf(l.product), volRules, l.product.id, l.qty), 0)
+  // ENT-P · cuánto falta para el envío gratis (regla y zona del servidor, con la dirección predeterminada del doctor).
+  const envio = useAvisoEnvioGratis(lines.length ? total : null, { activo: verified && hasSupabase })
 
   // No se puede pedir más de lo disponible en inventario. Ni un producto sin
   // precio publicado (price null = "a consultar"): evita un pedido con renglón a $0.
@@ -236,7 +240,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
       {/* DERECHA: pedido en curso */}
       {hasSupabase && canon.error && <div role="alert" className="sysnote" style={{ gridColumn: '1 / -1' }}>{canon.error}</div>}
-      {verified && <CartPanel lines={lines} total={total} savings={savings} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />}
+      {verified && <CartPanel lines={lines} total={total} savings={savings} envio={envio} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />}
       {/* MC-3 · barra contextual en móvil: mismo carrito, mismo checkout. Se oculta con checkout/modal abierto y con un
           carrito que no es el activo del servidor (convertido o inaccesible). Total = el mismo estimado del panel. */}
       {verified && <BarraCarrito
@@ -244,6 +248,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
         totalEstimado={lines.length ? total : null}
         bloqueada={checkout || !!openFamily || (hasSupabase && (!canon.cart || canon.cart.estado !== 'active'))}
         onRevisar={() => setCheckout(true)}
+        envio={envio?.titulo ?? null}
       />}
 
       {checkout && (
@@ -412,11 +417,12 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
 }
 
 function CartPanel({
-  lines, total, savings = 0, priceOf, onInc, onDec, onClear, onReview,
+  lines, total, savings = 0, priceOf, onInc, onDec, onClear, onReview, envio = null,
 }: {
   lines: CartLine[]
   total: number
   savings?: number
+  envio?: AvisoEnvio | null
   priceOf: (p: ProductSafe) => number | null
   onInc: (id: string) => void
   onDec: (id: string) => void
@@ -453,6 +459,7 @@ function CartPanel({
             <span>Total</span>
             <b>{money(total)}</b>
           </div>
+          <AvisoEnvioGratisVista aviso={envio} />
           <button className="btn" type="button" style={{ width: '100%', marginTop: 14 }} onClick={onReview}>
             <Icon name="check" /> Revisar y crear pedido
           </button>

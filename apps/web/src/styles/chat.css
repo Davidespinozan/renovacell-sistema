@@ -38,6 +38,7 @@
 .rc-mini--x{color:var(--mid)}
 .rc-mini:disabled{opacity:.5;cursor:not-allowed}
 .rc-cart-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:13px}
+.rc-cart-foot .rc-envio-gratis{flex-basis:100%;order:-1;margin-top:0}   /* ENT-P · el aviso de envío gratis va arriba del total, a todo lo ancho */
 .rc-cart-actions{display:flex;gap:6px;flex-wrap:wrap}
 .rc-muted{color:var(--mid)}
 .rc-note{margin-top:8px;font-size:13px;padding:10px 12px;border-radius:var(--r-sm);background:var(--hueso);color:var(--ink)}

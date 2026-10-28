@@ -3,6 +3,7 @@
 begin;
 create temp table _enth as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
+\ir ../../../rollback/entrega_paridad/99_down.sql   -- ENT-P se baja antes que ENT-H (redefine _entrega_normalizar)
 \ir ../../../rollback/entrega_horarios/99_down.sql
 do $t$ begin
   perform tests.ok(to_regclass('public.entrega_horarios') is null and to_regprocedure('public.entrega_horarios_disponibles(timestamptz)') is null
@@ -19,6 +20,7 @@ do $t$ begin
     '189 down · sin agenda ni horarios; normalizar/aplicar/checkout/guardar como en la 171; la 171 intacta');
 end $t$;
 \ir ../../../migrations/20270111120000_entrega_horarios.sql
+\ir ../../../migrations/20270128120000_entrega_paridad.sql   -- ENT-P se reaplica encima de la 189
 do $t$ begin
   perform tests.ok((select todas from _enth) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '189 · se reaplica idéntica');
 end $t$;

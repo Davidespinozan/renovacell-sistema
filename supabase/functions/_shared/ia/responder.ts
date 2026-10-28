@@ -54,6 +54,25 @@ export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boo
   }
 }
 
+// ENT-P · el PORTAL recibe los mismos datos del negocio que el canal (entrega, horario, manual aprobado y promociones
+// vigentes) y el carrito trae cuánto falta para el envío gratis. Conserva su clasificador, sus mensajes seguros y su
+// validación; solo los montos de envío del ERP, dentro de frases de envío, quedan fuera de la regla de precio.
+export function dependenciasPortal(n: politica.DatosNegocio) {
+  const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
+  const manual = politica.textoManual(n); const promos = politica.textoPromociones(n); const nombresPromo = politica.nombresPromocion(n)
+  const bloques = [texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
+  const extra = (bloques.length ? '\n\n' + bloques.join('\n\n') : '') + (texto ? '\n\n' + politica.REGLA_ENVIO_GRATIS_PORTAL : '')
+  return {
+    politica: { ...politica, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + extra },
+    herramientas: { ...herramientas, complementar: (nombre: string, salida: unknown) => politica.conEnvioGratis(nombre, salida, n) },
+    validacion: { ...validacion, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
+      if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
+      const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
+      return v.ok ? { ok: true as const, texto: t.replace(/\r\n?/g, '\n').trim() } : v
+    } },
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
 // R4-B2-IA1 · 'transferida' solo existe en canales: el portal conserva exactamente su contrato anterior.
@@ -117,14 +136,16 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
 
   const opciones: OpcionesModelo | undefined = canal === 'portal' ? undefined : { effort: esfuerzoCanal(env), fallbacks: true }
   const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis), opciones })
-  const canalDeps = canal === 'portal' ? null : dependenciasCanal(await leerNegocio(admin), { comercial })
+  const negocio = await leerNegocio(admin)
+  const portalDeps = canal === 'portal' ? dependenciasPortal(negocio) : null
+  const canalDeps = portalDeps ?? dependenciasCanal(negocio, { comercial })
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
     { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}) },
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
-      proveedor, config: cfg.config, politica: canalDeps ? canalDeps.politica : politica, herramientas, validacion: canalDeps ? canalDeps.validacion : validacion, reglasConocimiento: REGLAS_IA,
+      proveedor, config: cfg.config, politica: canalDeps.politica, herramientas: portalDeps ? portalDeps.herramientas : herramientas, validacion: canalDeps.validacion, reglasConocimiento: REGLAS_IA,
     },
   )
   const usados = resultado.usage.input + resultado.usage.output

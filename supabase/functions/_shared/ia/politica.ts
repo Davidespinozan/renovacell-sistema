@@ -391,6 +391,38 @@ export function textoNegocio(n: DatosNegocio): string {
   return l.join('\n')
 }
 
+// ENT-P · ENVÍO GRATIS DEL CARRITO: con los montos del ERP y el importe de productos del carrito (precios con IVA, como la
+// regla de entrega_opciones), cuánto le falta al doctor en cada zona. Mismo cálculo que el aviso de las pantallas
+// (faltanteEnvioGratis en data/ops/entrega.ts). Las llaves no empiezan con costo/precio (filtrarProhibidas las quitaría).
+export interface EnvioGratisCarrito {
+  culiacan: { gratis_desde: number; faltante: number; alcanzado: boolean; si_no_llega: string } | null
+  resto_del_pais: { gratis_desde: number; faltante: number; alcanzado: boolean; flete_si_no_llega: number | null } | null
+}
+const redondear = (n: number) => Math.round(n * 100) / 100
+export function envioGratisCarrito(n: DatosNegocio, subtotal: number): EnvioGratisCarrito | null {
+  const e = n.entrega ?? {}; const s = Math.max(0, Number.isFinite(subtotal) ? subtotal : 0)
+  const loc = typeof e.local_gratis_desde === 'number' && e.local_gratis_desde > 0 ? e.local_gratis_desde : null
+  const forn = typeof e.foraneo_gratis_desde === 'number' && e.foraneo_gratis_desde > 0 ? e.foraneo_gratis_desde : null
+  if (loc === null && forn === null) return null
+  return {
+    culiacan: loc === null ? null : { gratis_desde: loc, faltante: redondear(Math.max(0, loc - s)), alcanzado: s >= loc, si_no_llega: 'se recoge en sucursal sin costo' },
+    resto_del_pais: forn === null ? null : { gratis_desde: forn, faltante: redondear(Math.max(0, forn - s)), alcanzado: s >= forn,
+      flete_si_no_llega: typeof e.foraneo_costo === 'number' && e.foraneo_costo > 0 ? e.foraneo_costo : null },
+  }
+}
+/** Añade `envio_gratis` a la lectura del carrito (ver_carrito / preparar_checkout) solo cuando el total está autorizado. */
+export function conEnvioGratis(nombre: string, salida: unknown, n: DatosNegocio): unknown {
+  if ((nombre !== 'ver_carrito' && nombre !== 'preparar_checkout') || !salida || typeof salida !== 'object' || Array.isArray(salida)) return salida
+  const o = salida as Record<string, unknown>
+  const proy = (nombre === 'preparar_checkout' ? o.proyeccion : o) as Record<string, unknown> | undefined
+  const total = (proy?.total ?? null) as { estado?: string; monto?: unknown } | null
+  if (!proy || proy.puede_precio !== true || total?.estado !== 'completo' || typeof total.monto !== 'number') return salida
+  const eg = envioGratisCarrito(n, total.monto)
+  return eg ? { ...o, envio_gratis: eg } : salida
+}
+/** Instrucción para el portal: cómo usar `envio_gratis` del carrito. */
+export const REGLA_ENVIO_GRATIS_PORTAL = 'ENVÍO GRATIS: cuando leas el carrito (ver_carrito o preparar_checkout) y traiga envio_gratis, dile al doctor cuánto le falta para el envío gratis según su zona (Culiacán con chofer o resto del país por paquetería) usando EXACTAMENTE los montos de envio_gratis, sin calcular otros. Si no sabes su zona, menciona ambas en una frase. Si ya lo alcanzó, díselo. No ofrezcas agregar productos que no pidió; puedes preguntarle si quiere sumar algo de lo que ya busca.'
+
 // Mensajes seguros del canal (cuando el validador rechaza una respuesta): honestos, sin prometer y sin presentar a un
 // asesor como personal clínico. El portal conserva los suyos.
 export const MENSAJE_SIN_RESPUESTA_CANAL = 'No tengo esa información aprobada por este medio. Si quieres que te atienda un asesor de Renovacell, dímelo y te comunico.'

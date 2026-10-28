@@ -105,6 +105,74 @@ export function opcionDe(ops: OpcionesEntrega | null | undefined, id: string | n
   return ops?.opciones.find((o) => o.id === id) ?? null
 }
 
+// ═══ ENT-P · PARIDAD: el aviso de envío gratis es UNO para todas las pantallas que venden (checkout del doctor, carrito del
+// Catálogo, barra móvil, carrito del chat, entrega del vendedor en Caja y Levantar pedido) y la IA del portal usa el mismo
+// cálculo (envioGratisCarrito). Los mínimos salen SIEMPRE de `regla` del servidor (entrega_config): aquí no hay cifras.
+export interface Faltante { minimo: number; faltante: number }
+const centavos = (n: number) => Math.round(n * 100) / 100
+/** Mínimo de envío gratis de ESA modalidad y cuánto falta, con los números del servidor. Null si no aplica. */
+export function faltantePara(ops: Pick<OpcionesEntrega, 'regla' | 'subtotal'>, o: Pick<OpcionEntrega, 'tipo'>): Faltante | null {
+  const minimo = o.tipo === 'local' ? ops.regla.local_gratis_desde : o.tipo === 'foraneo' ? ops.regla.foraneo_gratis_desde : null
+  if (minimo == null || !Number.isFinite(minimo) || minimo <= 0) return null
+  return { minimo, faltante: Math.max(0, centavos(minimo - Math.max(0, ops.subtotal))) }
+}
+/** ¿El personal está eligiendo chofer local por debajo del mínimo? (cortesía: el servidor exige motivo). */
+export function localBajoMinimo(ops: Pick<OpcionesEntrega, 'actor' | 'regla' | 'subtotal'> | null | undefined, o: Pick<OpcionEntrega, 'tipo'> | null | undefined): boolean {
+  if (!ops || !o || ops.actor !== 'staff' || o.tipo !== 'local') return false
+  const f = faltantePara(ops, o); return !!f && f.faltante > 0
+}
+
+export interface AvisoEnvioGratis {
+  /** Ya no falta nada en la zona que aplica. */
+  alcanzado: boolean
+  titulo: string
+  detalle: string | null
+  /** 0..1 hacia el mínimo del título (para la barra de avance). */
+  avance: number
+  /** Lo que falta en la zona del título (0 si ya se alcanzó). */
+  faltante: number
+}
+/**
+ * Aviso de envío gratis con las opciones del SERVIDOR (regla, subtotal y si el CP es local). Con CP conocido habla de su
+ * zona; sin CP menciona las dos (resto del país y Culiacán). `quien` cambia la persona: 'doctor' (te faltan) o 'staff'
+ * (al cliente le faltan), para que el vendedor pueda ofrecerle completar.
+ */
+export function avisoEnvioGratis(ops: Pick<OpcionesEntrega, 'regla' | 'subtotal' | 'cp' | 'local'> | null | undefined, money: (n: number) => string, quien: 'doctor' | 'staff' = 'doctor'): AvisoEnvioGratis | null {
+  if (!ops) return null
+  const s = Math.max(0, ops.subtotal || 0)
+  const loc = ops.regla.local_gratis_desde > 0 ? ops.regla.local_gratis_desde : null
+  const forn = ops.regla.foraneo_gratis_desde > 0 ? ops.regla.foraneo_gratis_desde : null
+  const falta = (m: number) => Math.max(0, centavos(m - s))
+  const tf = (n: number) => (quien === 'staff' ? `Al cliente le faltan ${money(n)}` : `Te faltan ${money(n)}`)
+  const avance = (m: number) => Math.min(1, m > 0 ? s / m : 1)
+  const conCp = !!ops.cp && /^\d{5}$/.test(ops.cp)
+  if (conCp && ops.local && loc != null) {
+    const f = falta(loc)
+    return f > 0
+      ? { alcanzado: false, titulo: `${tf(f)} para la entrega gratis con chofer`, detalle: `En Culiacán es gratis desde ${money(loc)} · también se puede recoger sin costo en sucursal`, avance: avance(loc), faltante: f }
+      : { alcanzado: true, titulo: quien === 'staff' ? 'La entrega con chofer en Culiacán ya es gratis' : 'Tu entrega con chofer en Culiacán es gratis', detalle: null, avance: 1, faltante: 0 }
+  }
+  if (conCp && !ops.local && forn != null) {
+    const f = falta(forn)
+    return f > 0
+      ? { alcanzado: false, titulo: `${tf(f)} para el envío gratis`, detalle: `Gratis desde ${money(forn)}${ops.regla.foraneo_flete > 0 ? ` · si no, el envío cuesta ${money(ops.regla.foraneo_flete)}` : ''}`, avance: avance(forn), faltante: f }
+      : { alcanzado: true, titulo: quien === 'staff' ? 'El envío ya es gratis' : 'Tu envío es gratis', detalle: null, avance: 1, faltante: 0 }
+  }
+  // Sin dirección: las dos zonas en una sola línea de detalle.
+  if (forn == null && loc == null) return null
+  if (forn != null) {
+    const f = falta(forn)
+    const local = loc == null ? null : falta(loc) > 0 ? `En Culiacán, chofer gratis desde ${money(loc)} (faltan ${money(falta(loc))})` : 'En Culiacán, la entrega con chofer ya es gratis'
+    return f > 0
+      ? { alcanzado: false, titulo: `${tf(f)} para el envío gratis a todo México`, detalle: local, avance: avance(forn), faltante: f }
+      : { alcanzado: true, titulo: quien === 'staff' ? 'El envío ya es gratis a todo México' : 'Tu envío es gratis a todo México', detalle: null, avance: 1, faltante: 0 }
+  }
+  const f = falta(loc!)
+  return f > 0
+    ? { alcanzado: false, titulo: `${tf(f)} para la entrega gratis con chofer en Culiacán`, detalle: null, avance: avance(loc!), faltante: f }
+    : { alcanzado: true, titulo: 'La entrega con chofer en Culiacán es gratis', detalle: null, avance: 1, faltante: 0 }
+}
+
 /** Opciones para el PERSONAL (punto de venta): importe de productos y CP del domicilio elegido. */
 export async function opcionesEntrega(actor: 'doctor' | 'staff', subtotal: number, cp: string | null): Promise<{ ok: true; data: OpcionesEntrega } | { ok: false; error: string }> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }

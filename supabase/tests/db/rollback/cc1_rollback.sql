@@ -7,6 +7,7 @@ set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (l
 \ir ../../../rollback/bandeja_origen/99_down.sql   -- BANDEJA-1 (0125) se baja primero (redefine cc_ruteo_pendientes)
 \ir ../../../rollback/whatsapp_wamid_largo/99_down.sql   -- META-04 (188) redefine cc_wa_entrante/cc_meta_entrante: se baja primero
 \ir ../../../rollback/reparto_asesores/99_down.sql   -- REPARTO (181) se baja primero (redefine _cc_rutear/evaluador/_cc_atencion/config_ver/iniciar/resumen)
+\ir ../../../rollback/entrega_paridad/99_down.sql   -- ENT-P se baja antes que ENT-H (redefine _entrega_normalizar)
 \ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql   -- ENTREGA (171) se baja primero (redefine el checkout y añade columnas)
 \ir ../../../rollback/meta_canales/99_down.sql   -- META-CANALES (170) se baja antes (usa cc_visitors/cc_messages y cambia _cc_nombre_dueno)

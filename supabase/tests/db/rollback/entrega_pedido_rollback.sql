@@ -4,6 +4,7 @@ begin;
 create temp table _ent as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 set app.entrega_rollback_forzado = 'on';
+\ir ../../../rollback/entrega_paridad/99_down.sql   -- ENT-P se baja antes que ENT-H (redefine _entrega_normalizar)
 \ir ../../../rollback/entrega_horarios/99_down.sql   -- ENT-H (189) se baja primero (redefine normalizar/aplicar/checkout y añade columnas a entrega_config)
 \ir ../../../rollback/entrega_pedido/99_down.sql
 do $t$ begin
@@ -19,6 +20,7 @@ do $t$ begin
 end $t$;
 \ir ../../../migrations/20261224120000_entrega_pedido.sql
 \ir ../../../migrations/20270111120000_entrega_horarios.sql   -- ENT-H (189) se reaplica encima para comparar el estado completo
+\ir ../../../migrations/20270128120000_entrega_paridad.sql   -- ENT-P se reaplica encima de la 189
 do $t$ begin
   perform tests.ok((select todas from _ent) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '171 · se reaplica idéntica');
 end $t$;
