@@ -1,6 +1,7 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
 create temp table _rp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
+\ir ../../../rollback/internas_solo_si_mismas/99_down.sql   -- INTERNAS-2 se baja antes (redefine políticas, cc_vendedores y comisiones_equipo)
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero
 \ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja primero (redefine reparto, cc_vendedores y conteos)
 \ir ../../../rollback/reparto_asesores/99_down.sql
@@ -14,6 +15,7 @@ end $t$;
 \ir ../../../migrations/20270103120000_reparto_asesores.sql
 \ir ../../../migrations/20270129120000_cuentas_internas.sql   -- CUENTAS INTERNAS se reaplica encima
 \ir ../../../migrations/20270130120000_comisiones_jefe_ventas.sql
+\ir ../../../migrations/20270131120000_internas_solo_si_mismas.sql
 do $t$ begin
   perform tests.ok((select todas from _rp) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '181 · se reaplica idéntica');
 end $t$;

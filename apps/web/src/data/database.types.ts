@@ -5555,6 +5555,7 @@ export type Database = {
           active: boolean
           email: string | null
           full_name: string | null
+          interna: boolean
           id: string
           meta: Json | null
           organization: string | null
@@ -5566,6 +5567,7 @@ export type Database = {
           active?: boolean
           email?: string | null
           full_name?: string | null
+          interna?: boolean
           id: string
           meta?: Json | null
           organization?: string | null
@@ -5577,6 +5579,7 @@ export type Database = {
           active?: boolean
           email?: string | null
           full_name?: string | null
+          interna?: boolean
           id?: string
           meta?: Json | null
           organization?: string | null

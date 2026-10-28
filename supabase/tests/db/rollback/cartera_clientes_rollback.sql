@@ -1,6 +1,7 @@
 -- CARTERA-CLIENTES (152) · el down retira la cartera por cliente y devuelve las funciones exactamente a su versión
 -- anterior; todo lo demás queda igual, y la migración se puede volver a aplicar.
 begin;
+\ir ../../../rollback/internas_solo_si_mismas/99_down.sql   -- INTERNAS-2 se baja antes (redefine políticas, cc_vendedores y comisiones_equipo)
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero
 \ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja antes de tomar la foto (redefine reparto, cc_vendedores y conteos)
 create temp table _ck as select

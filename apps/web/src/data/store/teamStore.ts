@@ -44,12 +44,13 @@ const rawMeta = new Map<string, Record<string, unknown>>()
 
 const live = makeLive<TeamUser>(async () => {
   const { data, error } = await supabase.from('profiles')
-    .select('id, email, full_name, role_id, meta, active')
+    .select('id, email, full_name, role_id, meta, active, interna')
     .neq('role_id', 'doctor')
     .order('full_name')
   if (error) throw error
   rawMeta.clear()
-  return (data ?? []).map((p) => {
+  // Cuentas internas: la base ya no deja ver las ajenas; la propia (si se entra con una) tampoco se lista en el equipo.
+  return (data ?? []).filter((p) => !p.interna).map((p) => {
     const meta = (p.meta ?? {}) as { capabilities?: string[]; name?: string; avatar_url?: string; baja?: unknown }
     rawMeta.set(p.id, meta as Record<string, unknown>)
     return {

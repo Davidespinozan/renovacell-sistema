@@ -37,14 +37,20 @@ begin
   perform tests.throws(format('update public.profiles set interna = true where id = %L', v_adm), 'INTERNA_SOLO_SERVIDOR', '3.1 · Dirección no puede ocultarse a sí misma');
   perform tests.throws(format('update public.profiles set interna = true where id = %L', v_ven), 'INTERNA_SOLO_SERVIDOR', '3.2 · ni ocultar a otro');
   perform tests.act_as(i_adm);
-  perform tests.throws(format('update public.profiles set interna = false where id = %L', i_ven), 'INTERNA_SOLO_SERVIDOR', '3.3 · una interna no destapa a otra desde la app');
+  update public.profiles set interna = false where id = i_ven;
+  get diagnostics n = row_count;
+  perform tests.eq(n, 0, '3.3 · una interna no destapa a otra desde la app (ni siquiera la ve)');
+  perform tests.throws(format('update public.profiles set interna = false where id = %L', i_adm), 'INTERNA_SOLO_SERVIDOR', '3.4 · ni a sí misma');
 
   -- ══ 4 · las internas se ven entre sí y conservan sus permisos ══════════════════════════════════
-  perform tests.eq((select count(*)::int from public.profiles where id in (i_adm, i_ven, i_cho, v_ven, v_adm)), 5, '4.1 · la interna de Dirección ve a todos, internas incluidas');
+  perform tests.eq((select count(*)::int from public.profiles where id in (i_adm, i_ven, i_cho, v_ven, v_adm)), 3, '4.1 · la interna de Dirección ve al equipo y a sí misma, pero no a las otras internas (INTERNAS-2)');
   r := public.cc_vendedores();
-  perform tests.ok(r @> jsonb_build_array(jsonb_build_object('id', i_ven)) and r @> jsonb_build_array(jsonb_build_object('id', v_ven)), '4.2 · y su lista de vendedores las incluye');
+  perform tests.ok(not r @> jsonb_build_array(jsonb_build_object('id', i_ven)) and r @> jsonb_build_array(jsonb_build_object('id', v_ven)), '4.2 · y su lista de vendedores tampoco las muestra');
   perform tests.act_as(i_ven);
   perform tests.ok(exists (select 1 from public.profiles where id = i_ven), '4.3 · cada interna se ve a sí misma');
+  update public.profiles set full_name = 'Otro nombre' where id = i_adm;
+  get diagnostics n = row_count;
+  perform tests.eq(n, 0, '4.4 · ni una interna edita a otra interna');
 
   -- ══ 5 · el reparto nunca manda un cliente real a una interna ══════════════════════════════════
   perform tests.act_as_owner();
