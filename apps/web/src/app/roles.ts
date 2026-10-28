@@ -14,7 +14,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas'
 
 export interface ScreenDef {
   key: string
@@ -157,6 +157,9 @@ export const CAPABILITIES: CapabilityDef[] = [
   },
   // CC-7 · Sin módulos: permite que Dirección le asigne clientes NUEVOS (sin él conserva su cartera actual).
   { key: 'nuevos_clientes', label: 'Recibir clientes nuevos', modules: [] },
+  // Jefe de ventas: ve Metas y comisiones de TODO el equipo (lectura; metas y tasas las define Dirección). El servidor
+  // exige esta capacidad (comisiones_equipo).
+  { key: 'jefe_ventas', label: 'Jefe de ventas', modules: [{ key: 'av_comisiones', label: 'Metas y comisiones', icon: 'chart', section: 'Mi cartera' }] },
   {
     key: 'contenido', label: 'Catálogo y sitio web',
     modules: [

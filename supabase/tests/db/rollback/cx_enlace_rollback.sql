@@ -1,6 +1,7 @@
 -- CX-ENLACE (150) · el down retira el prerregistro y devuelve el ruteo, el nombre y la cola exactamente a su versión
 -- anterior; todo lo demás queda igual, y la migración se puede volver a aplicar.
 begin;
+\ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero
 \ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja primero (redefine reparto, cc_vendedores y conteos)
 \ir lib/r4b2_bajar.sql   -- R4-B2 (B2-2, B2-3a, B2-1) se baja ANTES de la línea base de esta cadena
 create temp table _cx as select

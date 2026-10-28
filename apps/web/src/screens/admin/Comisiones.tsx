@@ -17,8 +17,11 @@ import { hasSupabase } from '../../lib/supabase'
 import { entriesFromOrders } from '../../data/ops/moneyMock'
 import { estimarComisiones, sinCuentasOcultas, type LineaProducto } from '../../data/comisiones'
 import { esteMes, mesPasado, diaNegocio, hoyNegocio } from '../../data/periodo'
+import { lineasDe, metasDe, useComisionesEquipo, type leerComisionesEquipo } from '../../data/ops/comisionesEquipo'
 
-export function Comisiones() {
+// Con backend los datos salen de comisiones_equipo (Dirección y jefe de ventas: la misma lectura y el mismo cálculo);
+// solo Dirección edita metas y tasas. Sin backend (demo y pruebas) se usan los datos locales.
+export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}) {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { data: team } = useTeam()
@@ -30,35 +33,42 @@ export function Comisiones() {
   const [cual, setCual] = useState<'mes' | 'pasado'>('mes')
   const hoy = hoyNegocio()
   const periodo = useMemo(() => (cual === 'pasado' ? mesPasado() : esteMes()), [cual, hoy]) // eslint-disable-line react-hooks/exhaustive-deps
-  const rateCosm = lineRate('cosm')
-  const rateProf = lineRate('prof')
+  const srv = useComisionesEquipo(periodo.desde, periodo.hasta, leer ? { leer } : {})
+  const datos = srv.datos
+  const puedeEditar = datos ? datos.puede_editar : true
+  // El jefe de ventas lee metas y tasas del servidor; Dirección usa el almacén de metas (vivo, lo edita aquí mismo).
+  const soloLectura = datos && !puedeEditar ? metasDe(datos.metas) : null
+  const metaDe = soloLectura ? soloLectura.targetFor : targetFor
+  const rateCosm = soloLectura ? soloLectura.lineRate('cosm') : lineRate('cosm')
+  const rateProf = soloLectura ? soloLectura.lineRate('prof') : lineRate('prof')
 
   const sellers = useMemo(() => team.filter((u) => u.role === 'pos' && u.active), [team])
   // Cuentas internas: sus pedidos de prueba no cuentan (su vendedor no está en el equipo visible).
-  const pedidos = useMemo(() => sinCuentasOcultas(orders, new Set(team.map((u) => u.id))), [orders, team])
+  const pedidos = useMemo(() => (datos ? datos.pedidos : sinCuentasOcultas(orders, new Set(team.map((u) => u.id)))), [datos, orders, team])
   // Línea de cada producto (Home Care 'cosm' / Professional 'prof') para la tasa por línea.
   const lineOf = useMemo(() => {
     const m: Record<string, LineaProducto> = {}
     products.forEach((p) => { m[p.id] = p.line === 'prof' ? 'prof' : 'cosm' })
-    return m
-  }, [products])
+    return datos ? { ...m, ...lineasDe(datos.pedidos) } : m
+  }, [products, datos])
 
   const est = useMemo(() => estimarComisiones({
     orders: pedidos,
     // Con backend, el cobrado sale del libro; en la demo se deriva de los pedidos pagados.
-    entries: hasSupabase ? asientos : entriesFromOrders(pedidos, refunds, diaNegocio),
-    vendedores: sellers.map((s) => ({ id: s.id, email: s.email, name: s.name })),   // CX-0c · id = identidad canónica
+    entries: datos ? datos.asientos : hasSupabase ? asientos : entriesFromOrders(pedidos, refunds, diaNegocio),
+    vendedores: datos ? datos.vendedores : sellers.map((s) => ({ id: s.id, email: s.email, name: s.name })),   // CX-0c · id = identidad canónica
     lineaDe: (pid) => ((pid && lineOf[pid]) === 'prof' ? 'prof' : 'cosm'),
     tasaVigente: { cosm: rateCosm, prof: rateProf },
-  }, periodo), [pedidos, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])
+  }, periodo), [datos, pedidos, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])
 
   const rows = useMemo(() => est.filas.map((f) => {
-    const meta = targetFor(f.email)
+    const meta = metaDe(f.email)
     return { ...f, meta, avance: meta > 0 ? (f.vendido / meta) * 100 : 0 }
-  }), [est, targetFor])
+  }), [est, metaDe])
   const sinVend = est.sinVendedor
 
   const editarLinea = (line: 'cosm' | 'prof', actual: number) => {
+    if (!puedeEditar) return
     const label = line === 'prof' ? 'Professional' : 'Home Care'
     const raw = window.prompt(`Tasa VIGENTE de ${label} (%). Ej. 5 = 5%. Cambiarla recalcula la estimación de cualquier periodo: no hay tasas históricas guardadas.`, String((actual * 100).toFixed(2)))
     if (raw == null) return
@@ -72,12 +82,17 @@ export function Comisiones() {
         <div className="eyebrow" style={{ margin: 0 }}>Comercial · Metas y comisiones</div>
         <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{periodo.etiqueta}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn ghost sm" type="button" title="Editar la tasa vigente de Home Care" onClick={() => editarLinea('cosm', rateCosm)}>
-            <Percent size={14} /> Home Care: {(rateCosm * 100).toFixed(1)}%
-          </button>
-          <button className="btn ghost sm" type="button" title="Editar la tasa vigente de Professional" onClick={() => editarLinea('prof', rateProf)}>
-            <Percent size={14} /> Professional: {(rateProf * 100).toFixed(1)}%
-          </button>
+          {puedeEditar ? <>
+            <button className="btn ghost sm" type="button" title="Editar la tasa vigente de Home Care" onClick={() => editarLinea('cosm', rateCosm)}>
+              <Percent size={14} /> Home Care: {(rateCosm * 100).toFixed(1)}%
+            </button>
+            <button className="btn ghost sm" type="button" title="Editar la tasa vigente de Professional" onClick={() => editarLinea('prof', rateProf)}>
+              <Percent size={14} /> Professional: {(rateProf * 100).toFixed(1)}%
+            </button>
+          </> : <>
+            <span className="pill" data-testid="tasa-cosm"><Percent size={12} /> Home Care: {(rateCosm * 100).toFixed(1)}%</span>
+            <span className="pill" data-testid="tasa-prof"><Percent size={12} /> Professional: {(rateProf * 100).toFixed(1)}%</span>
+          </>}
         </div>
       </div>
 
@@ -89,6 +104,9 @@ export function Comisiones() {
           toma al vendedor que el pedido trae registrado. La regla definitiva de comisiones está pendiente de decisión de Dirección.
         </span>
       </div>
+
+      {srv.error && <div role="alert" className="sysnote" data-testid="comisiones-error">{srv.error}</div>}
+      {!puedeEditar && <div className="ms" style={{ color: 'var(--ink-3)' }} data-testid="comisiones-solo-lectura">Vista del jefe de ventas: las metas y las tasas las define Dirección.</div>}
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         <button type="button" className={cual === 'mes' ? 'active' : undefined} onClick={() => setCual('mes')}>Este mes</button>
@@ -115,7 +133,7 @@ export function Comisiones() {
             <thead><tr><th>Vendedor</th><th>Vendido</th><th>Cobrado en el periodo</th><th>Pedidos</th><th>Meta</th><th>Avance</th><th>Comisión estimada</th></tr></thead>
             <tbody>
               {rows.map((r) => (
-                <MetaRow key={r.email} row={r} onSetMeta={(v) => setTarget(r.email, v)} />
+                <MetaRow key={r.email} row={r} onSetMeta={puedeEditar ? (v) => setTarget(r.email, v) : null} />
               ))}
               {rows.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>Sin vendedores activos.</td></tr>}
             </tbody>
@@ -136,9 +154,9 @@ export function Comisiones() {
 
 interface Row { email: string; nombre: string; vendido: number; cobrado: number; pedidos: number; meta: number; avance: number; comisionEstimada: number }
 
-function MetaRow({ row, onSetMeta }: { row: Row; onSetMeta: (v: number) => void }) {
+function MetaRow({ row, onSetMeta }: { row: Row; onSetMeta: ((v: number) => void) | null }) {
   const [val, setVal] = useState(String(row.meta || ''))
-  const save = () => { const n = Number(val.trim()); if (Number.isFinite(n)) onSetMeta(n) }
+  const save = () => { const n = Number(val.trim()); if (onSetMeta && Number.isFinite(n)) onSetMeta(n) }
   const pct = Math.min(100, Math.round(row.avance))
   const ok = row.meta > 0 && row.vendido >= row.meta
   return (
@@ -148,11 +166,11 @@ function MetaRow({ row, onSetMeta }: { row: Row; onSetMeta: (v: number) => void 
       <td data-label="Cobrado en el periodo" className="mono">{money(row.cobrado)}</td>
       <td data-label="Pedidos" className="mono">{row.pedidos}</td>
       <td data-label="Meta">
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        {!onSetMeta ? <span className="mono">{row.meta > 0 ? money(row.meta) : '—'}</span> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: 'var(--ink-3)' }}>$</span>
           <input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && save()} inputMode="numeric"
             placeholder="0" style={{ width: 92, padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
-        </span>
+        </span>}
       </td>
       <td data-label="Avance">
         {row.meta > 0 ? (

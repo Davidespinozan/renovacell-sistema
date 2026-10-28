@@ -1,6 +1,7 @@
 -- CARTERA-CLIENTES (152) · el down retira la cartera por cliente y devuelve las funciones exactamente a su versión
 -- anterior; todo lo demás queda igual, y la migración se puede volver a aplicar.
 begin;
+\ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero
 \ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja antes de tomar la foto (redefine reparto, cc_vendedores y conteos)
 create temp table _ck as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
