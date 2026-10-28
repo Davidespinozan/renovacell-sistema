@@ -57,7 +57,7 @@ export const ROLES: RoleDef[] = [
       // internas (registry g_*) que renderizan las pantallas de siempre. Clientes y Ventas NO van juntas (decisión del dueño).
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Mi trabajo' },
-      { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // Clientes · Por verificar
+      { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // Clientes · Por verificar · Invitar
       { key: 'g_conversaciones', label: 'Conversaciones', icon: 'chat', section: 'Conversaciones' },   // Bandeja · Asignadas · Correos
       { key: 'g_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },           // Productos · Precios · Conocimiento
       { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Catálogo y web' },
@@ -206,7 +206,7 @@ export const canManageHub = (key: RoleKey): boolean => key === 'admin'
 // siguen existiendo (avisos, tareas, búsqueda y enlaces profundos las usan): `resolverDestino` las traduce al grupo y
 // deja pedida la pestaña. Lo que ya no tiene entrada propia (bandeja, seguimiento del vendedor, hoy de Almacén) cae en Inicio.
 export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>> = {
-  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }],
+  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_invitar', label: 'Invitar clientes' }],
   g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }],
   g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
   g_inventario: [{ key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }],

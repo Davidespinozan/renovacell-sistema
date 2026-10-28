@@ -47,6 +47,7 @@ import { Precios } from './admin/Precios'
 import { Promociones } from './admin/Promociones'
 import { RevisionFiscal } from './admin/RevisionFiscal'
 import { Comunicaciones } from './admin/Comunicaciones'
+import { InvitarClientes } from './admin/InvitarClientes'   // INVITA-1
 import { Comisiones } from './admin/Comisiones'
 import { Configuracion } from './admin/Configuracion'
 import { Pestanas } from '../app/Pestanas'
@@ -132,7 +133,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   mi_verificacion: () => <MiVerificacion />,   // cuenta ≠ verificación
   asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
-  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }]} />,
+  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   g_inventario: () => <Pestanas grupo="g_inventario" pestanas={[{ key: 'av_traza', label: 'Trazabilidad', render: () => <Trazabilidad /> }, { key: 'av_mermas', label: 'Mermas', render: () => <Mermas /> }, { key: 'av_control_inv', label: 'Control de inventario', render: () => <ControlInventario /> }, { key: 'av_custodias', label: 'Custodias', render: () => <Custodias /> }]} />,

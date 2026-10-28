@@ -16,10 +16,73 @@ import { hashToken } from '../_shared/visitante.ts'
 import { enlaceInvitacion, validarAceptacion, mapearErrorInvitacion, MENSAJE_ESTADO, URL_SISTEMA } from '../_shared/invitacion.ts'
 import { correoInvitacion } from '../_shared/plantillas.ts'
 import { enviarCorreo, leerConfig } from '../_shared/correo.ts'
+import { configWA } from '../_shared/whatsapp.ts'
+import { clasificarEnvio, resultadoDeExcepcion, type ResultadoEnvio as ResultadoMeta } from '../_shared/salidaClase.ts'
+import { asientoCorreo, asientoWhatsApp, cuerpoPlantillaInvitacion, type Asiento } from '../_shared/invitacionMasiva.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Comparación de tiempo constante (por hash) para el secreto de la tarea programada (igual que meta-send).
+async function iguales(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  const h = async (t: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))
+  const [x, y] = await Promise.all([h(a), h(b)])
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]
+  return d === 0
+}
+
+type Lote = Array<{ envio_id: number; nombre: string; destino: string; token: string; plantilla_wa: string | null; idioma_wa: string }>
+
+// INVITA-1 · un lote por canal y por minuto. La base ya revisó horario, límite diario y a cada cliente; aquí solo se
+// manda y se asienta. Un rechazo del canal (retener) pausa la campaña: el resto del lote ni se intenta.
+// deno-lint-ignore no-explicit-any
+async function enviarMasivas(admin: any, base: string) {
+  const r = { correo: { enviados: 0, fallidos: 0, inciertos: 0, retenidos: 0 }, whatsapp: { enviados: 0, fallidos: 0, inciertos: 0, retenidos: 0 } }
+  const asentar = (canal: 'correo' | 'whatsapp', id: number, a: Asiento) => {
+    const k = a.resultado === 'enviado' ? 'enviados' : a.resultado === 'fallido' ? 'fallidos' : a.resultado === 'incierto' ? 'inciertos' : 'retenidos'
+    r[canal][k]++
+    return admin.rpc('_invm_resolver', { p_envio: id, p_resultado: a.resultado, p_proveedor_id: a.resultado === 'enviado' ? a.id : null, p_error: a.resultado === 'enviado' ? null : a.error })
+      .then(() => {}, () => {})
+  }
+  const cfgCorreo = leerConfig((k) => Deno.env.get(k))
+  if (cfgCorreo) {
+    const { data } = await admin.rpc('_invm_reclamar', { p_canal: 'correo', p_lote: 10 })
+    const lote = (Array.isArray(data) ? data : []) as Lote
+    for (let i = 0; i < lote.length; i++) {
+      const e = lote[i]
+      const m = correoInvitacion(e.nombre, enlaceInvitacion(e.token, base))
+      const a = asientoCorreo(await enviarCorreo(cfgCorreo, { para: e.destino, asunto: m.asunto, texto: m.texto, html: m.html, llaveIdempotencia: `invitacion-masiva:${e.envio_id}:${(await hashToken(e.token))?.slice(0, 16) ?? ''}` }))
+      await asentar('correo', e.envio_id, a)
+      if (a.resultado === 'retener') { for (const resto of lote.slice(i + 1)) await asentar('correo', resto.envio_id, { resultado: 'retener', error: a.error }); break }
+    }
+  }
+  const cfgWA = configWA((k) => Deno.env.get(k))
+  if (cfgWA) {
+    const { data } = await admin.rpc('_invm_reclamar', { p_canal: 'whatsapp', p_lote: 10 })
+    const lote = (Array.isArray(data) ? data : []) as Lote
+    for (let i = 0; i < lote.length; i++) {
+      const e = lote[i]
+      let res: ResultadoMeta
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)
+        const resp = await fetch(`https://graph.facebook.com/${cfgWA.version}/${cfgWA.phoneId}/messages`, {
+          method: 'POST', signal: ctl.signal, headers: { Authorization: `Bearer ${cfgWA.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(cuerpoPlantillaInvitacion(e.destino, e.plantilla_wa ?? '', e.idioma_wa, e.nombre, enlaceInvitacion(e.token, base))),
+        })
+        clearTimeout(t)
+        const cuerpo = await resp.json().catch(() => null) as { messages?: Array<{ id?: string }> } | null
+        res = clasificarEnvio(resp.status, cuerpo, cuerpo?.messages?.[0]?.id)
+      } catch (err) { res = resultadoDeExcepcion(err) }
+      const a = asientoWhatsApp(res)
+      await asentar('whatsapp', e.envio_id, a)
+      // canal pausado: lo que queda del lote vuelve a la cola sin intentarse
+      if (a.resultado === 'retener') { for (const resto of lote.slice(i + 1)) await asentar('whatsapp', resto.envio_id, { resultado: 'retener', error: a.error }); break }
+    }
+  }
+  return r
+}
 
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
@@ -29,9 +92,16 @@ Deno.serve(conCors(async (req) => {
   // deno-lint-ignore no-explicit-any
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
-  const action = p?.action === 'crear' || p?.action === 'ver' || p?.action === 'aceptar' ? p.action as string : null
+  const action = p?.action === 'crear' || p?.action === 'ver' || p?.action === 'aceptar' || p?.action === 'masiva' ? p.action as string : null
   if (!action) return json(400, { error: 'Acción no reconocida.' })
   const base = Deno.env.get('INVITACION_URL_BASE') ?? URL_SISTEMA
+
+  // ── masiva: solo la tarea de cada minuto (x-cron-secret). La base reclama el lote y emite las invitaciones ──
+  if (action === 'masiva') {
+    const secretoCron = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+    if (secretoCron.length < 32 || !(await iguales(req.headers.get('x-cron-secret') ?? '', secretoCron))) return json(401, { error: 'no_autorizado' })
+    return json(200, await enviarMasivas(admin, base))
+  }
 
   // ── crear: personal con sesión; la autoridad la decide la base con SU JWT ──
   if (action === 'crear') {

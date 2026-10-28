@@ -22,13 +22,13 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
     const nav = getNav(getRole('admin'))
     const entry = nav.find((s) => s.key === 'g_clientes')
     expect(entry).toBeTruthy(); expect(entry?.label).toBe('Clientes'); expect(entry?.section).toBe('Clientes')
-    expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }])
+    expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_invitar', label: 'Invitar clientes' }])   // INVITA-1
     // un aviso "por verificar" (screen av_verif) abre el grupo con esa pestaña pedida
     expect(resolverDestino(nav, 'av_verif')).toEqual({ screen: 'g_clientes', pestana: 'av_verif' })
     expect(pantallasAlcanzables(nav).has('av_verif')).toBe(true)
   })
   it('roles.ts declara la pestaña av_verif dentro de g_clientes y el registro la monta', () => {
-    expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'av_verif', label: 'Por verificar' \}\]/)
+    expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'av_verif', label: 'Por verificar' \}, \{ key: 'av_invitar', label: 'Invitar clientes' \}\]/)
     expect(registrySrc).toMatch(/g_clientes: \(\) => <Pestanas grupo="g_clientes"[\s\S]*key: 'av_verif', label: 'Por verificar', render: \(\) => <Doctores \/>/)
   })
   it('menú de Dirección: Clientes solo con Clientes; Ventas en Mi trabajo (no con Clientes); Comisiones dentro de Equipo', () => {
