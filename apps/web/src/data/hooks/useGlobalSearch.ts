@@ -53,7 +53,7 @@ export function useGlobalSearch() {
       return [...screenHits, ...out]
     }
 
-    if (role === 'warehouse') {
+    if (role === 'warehouse' || role === 'packing') {   // AUXILIAR · productos, lotes y pedidos (todo abre pantallas de su menú)
       products.filter((p) => hit(p.name, p.category)).slice(0, 5)
         .forEach((p) => out.push({ id: p.id, type: 'Producto', label: p.name, sub: p.category ?? '', screen: 'stock' }))
       // Lote por código (trazabilidad / dónde está / cuándo caduca).

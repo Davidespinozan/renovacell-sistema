@@ -1,5 +1,6 @@
 -- DHL D1 (190) · el down retira reconciliar_guia, las columnas de evidencia y el tipo de operación; la 190 se reaplica idéntica.
 begin;
+\ir ../../../rollback/auxiliar_almacen/99_down.sql   -- AUXILIAR se baja antes de tomar la foto (redefine recepción, reingreso, custodia y anular_guia)
 create temp table _d1 as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas,
   (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'shipping_attempts') n_cols;

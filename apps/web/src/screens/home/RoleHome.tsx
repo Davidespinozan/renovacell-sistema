@@ -34,6 +34,7 @@ export function RoleHome() {
   if (role === 'doctor') return <HomeDoctor />
   if (role === 'driver') return <HomeChofer />
   if (role === 'warehouse') return <HomeAlmacen />
+  if (role === 'packing') return <HomeAlmacen etiqueta="Empaque y despacho" />
   if (role === 'pos') return <HomeVendedor />
   return <HomeDireccion />
 }
@@ -168,7 +169,7 @@ export function HomeDireccion() {
 // ALM-1 · Inicio = Hoy = Mi bandeja (dueño, 17 oct 2026: "pudieran unirse en uno mismo"). Una sola pantalla: el saludo,
 // las tarjetas del día, los casos que esperan decisión con su botón (preparar → enviar) y, debajo, lo demás pendiente
 // (despachar, recibir, inspeccionar, caducidades). Las pestañas de detalle siguen en el menú; "Hoy" y "Mi bandeja" no.
-export function HomeAlmacen() {
+export function HomeAlmacen({ etiqueta = 'Almacén y empaque' }: { etiqueta?: string } = {}) {
   const { user, setScreen } = useRole()
   const { tareas, fuentes } = useBandeja()
   const resto = tareas.filter((t) => !['surtir', 'empacar'].includes(t.id))   // esos dos ya están como casos con botón
@@ -180,7 +181,7 @@ export function HomeAlmacen() {
   return (
     <div className="rh" data-testid="home-almacen">
       {fuentes}
-      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta="Almacén y empaque"
+      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta={etiqueta}
         detalle="Lo de hoy, en una sola pantalla: prepara, envía y lo demás pendiente." />
       <HoyAlmacen />
       {resto.length > 0 && (

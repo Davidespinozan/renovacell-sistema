@@ -32,9 +32,12 @@ begin
   -- Excede pendiente ⇒ rechazo (no silencioso)
   perform tests.throws(format($s$select public.recibir_lote(p_op_id => gen_random_uuid(), p_product => %L, p_lote => 'OC-L1', p_caducidad => %L, p_cantidad => 41, p_replenishment_id => %L)$s$,
     v_p, v_exp, v_oc), 'RECEPCION_EXCEDE_PENDIENTE', 'recibir más de lo pendiente se rechaza');
-  perform tests.act_as(v_pk);
+  perform tests.act_as(v_pk);   -- AUXILIAR (rol packing): recibir mercancía es de Almacén, no del auxiliar
+  perform tests.throws(format($s$select public.recibir_lote(p_op_id => gen_random_uuid(), p_product => %L, p_lote => 'OC-L1', p_caducidad => %L, p_cantidad => 40, p_replenishment_id => %L)$s$,
+    v_p, v_exp, v_oc), 'NO_AUTORIZADO', 'el auxiliar de almacén no recibe mercancía');
+  perform tests.act_as(v_wh);
   v_r := public.recibir_lote(p_op_id => tests.op(), p_product => v_p, p_lote => 'OC-L1', p_caducidad => v_exp, p_cantidad => 40, p_replenishment_id => v_oc);
-  perform tests.eq(v_r ->> 'replenishment_status', 'recibida', '60 + 40 ⇒ recibida (empaque también recibe)');
+  perform tests.eq(v_r ->> 'replenishment_status', 'recibida', '60 + 40 ⇒ recibida');
   perform tests.eq(tests.qty(v_lot), 100, 'lote con 100');
   -- Orden recibida ⇒ no se reabre
   perform tests.throws(format($s$select public.recibir_lote(p_op_id => gen_random_uuid(), p_product => %L, p_lote => 'OC-L1', p_caducidad => %L, p_cantidad => 1, p_replenishment_id => %L)$s$,

@@ -13,7 +13,7 @@ vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: h.or
 vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ createShipment: vi.fn() }) }))
 vi.mock('../../data/ops/cancelacionSolicitud', () => ({ solicitudDe: () => null, useSolicitudesCancelacion: () => [] }))
-vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'packing', user: { name: 'Pako' } }) }))
+vi.mock('../../auth/RoleContext', () => { const r = { role: 'warehouse', user: { name: 'Alberto' } }; return { useRole: () => r, useRoleOpcional: () => r } })
 vi.mock('../../data/store/ordersStore', () => ({ markShipped: h.markShipped }))
 vi.mock('../../data/store/companyStore', () => ({ currentCompany: () => ({}) }))
 vi.mock('../../data/shipping/shipper', () => ({ shipperFromCompany: () => ({ config: { city: 'Culiacán', cp: '80000' } }) }))

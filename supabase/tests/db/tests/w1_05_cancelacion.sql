@@ -105,7 +105,9 @@ begin
   perform tests.act_as(v_admin);
   v_ret := (public.cancelar_pedido(tests.op(), v_o, 'dañado en empaque') ->> 'return_id')::uuid;
   select jsonb_agg(jsonb_build_object('line_id', id, 'estado', 'dañado')) into v_lines from public.stock_return_lines where return_id = v_ret;
-  perform tests.act_as(v_pk);
+  perform tests.act_as(v_pk);   -- AUXILIAR (rol packing): el reingreso lo confirma Almacén
+  perform tests.throws(format('select public.confirmar_reingreso(gen_random_uuid(), %L, %L)', v_ret, v_lines), 'NO_AUTORIZADO', 'el auxiliar de almacén no confirma reingresos');
+  perform tests.act_as(v_wh);
   v_r := public.confirmar_reingreso(tests.op(), v_ret, v_lines);
   perform tests.eq((v_r ->> 'pendientes_direccion')::int, 1, 'dañado ⇒ queda para Dirección');
   perform tests.eq(tests.qty(v_lq), 46, 'dañado no reingresa');

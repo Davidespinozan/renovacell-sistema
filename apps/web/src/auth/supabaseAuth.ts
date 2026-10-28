@@ -7,7 +7,7 @@ import { atenderSuspension, CUENTA_SUSPENDIDA_MSG } from './suspension'
 
 // La base tiene 8 roles; la app usa 5. Mapeo seguro (packing→almacén, billing/comm→admin).
 export const ROLE_MAP: Record<string, RoleKey> = {
-  admin: 'admin', doctor: 'doctor', warehouse: 'warehouse', packing: 'warehouse',
+  admin: 'admin', doctor: 'doctor', warehouse: 'warehouse', packing: 'packing',   // AUXILIAR DE ALMACÉN: su propio menú (empaque, despacho e inventario físico)
   pos: 'pos', billing: 'admin', comm: 'admin', driver: 'driver',
 }
 

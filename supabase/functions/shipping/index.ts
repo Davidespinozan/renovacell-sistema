@@ -120,6 +120,11 @@ Deno.serve(conCors(async (req) => {
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const action = p.action
+  // AUXILIAR DE ALMACÉN (rol packing): empaca y despacha, pero las guías (crear, recolección, reconciliar) son de
+  // Almacén/Dirección ("la guía la imprime Alberto"). Cotizar, rastrear y ver una etiqueta existente siguen igual.
+  if (['create_shipment', 'label', 'schedule_pickup', 'cancel_pickup', 'reconciliar_guia'].includes(action) && !tieneRol(q.quien, ['admin', 'warehouse'])) {
+    return json(403, { error: 'solo_almacen', message: 'Las guías las genera Almacén.' })
+  }
 
   // ===================== PAQ-A · RASTREO (sincronizar un envío con la paquetería) =====================
   // Lo puede pedir quien YA ve el envío (logística, el chofer asignado o el dueño del pedido): la visibilidad la

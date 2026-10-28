@@ -19,7 +19,7 @@ import { cpSugerido, faltantesEntrega, receptorParaGuia } from '../../data/shipp
 import type { LogisticsPackage, Receiver } from '../../data/shipping/model'
 import type { ProductSafe } from '../../data/types'
 import { BotonRemision } from './Remision'
-import { useRole } from '../../auth/RoleContext'
+import { useRole, useRoleOpcional } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
@@ -145,6 +145,9 @@ export function mensajeProveedor(m: string): string {
 
 export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
   const { createShipment } = useShipments()
+  // AUXILIAR DE ALMACÉN (rol packing): empaca y despacha; la guía de paquetería la genera Almacén (Alberto). El servidor
+  // también se la niega (Edge shipping), aquí solo se explica en vez de ofrecer un botón que fallaría.
+  const puedeGuia = useRoleOpcional()?.role !== 'packing'
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)
   const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
@@ -331,6 +334,11 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                     <button className="btn" type="button" onClick={listoParaRecoger} disabled={busy !== false} data-testid="btn-listo-recoger"><Icon name="check" /> Listo para recoger</button>
                   </div>
                 </>
+              ) : method === 'paqueteria' && !puedeGuia ? (
+                <div className="sysnote" style={{ alignItems: 'flex-start' }} data-testid="guia-de-almacen">
+                  <Icon name="truck" />
+                  <span><b>La guía la genera Almacén.</b> Deja la caja empacada y lista; este pedido sigue en «Por enviar» para que Alberto genere e imprima la guía.</span>
+                </div>
               ) : method === 'paqueteria' ? (
                 <>
                   {/* T1 · con qué se genera la guía: DHL directo o T1 Envíos (varias paqueterías en una cotización) */}

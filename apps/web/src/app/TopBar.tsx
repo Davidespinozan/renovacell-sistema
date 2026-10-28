@@ -125,7 +125,7 @@ function NotifBell() {
       // directo es privado entre sus participantes.
       const audienceOk = n.userIds
         ? n.userIds.includes(currentUserId() ?? '')
-        : (!n.roles || role === 'admin' || n.roles.includes(role))
+        : (!n.roles || role === 'admin' || n.roles.includes(role) || (role === 'packing' && n.roles.includes('warehouse')))   // AUXILIAR · avisos de Almacén que puede abrir (filtro de abajo)
       if (!audienceOk) return false
       // Dirección ve todo (supervisión); el resto solo lo que puede abrir.
       return role === 'admin' || !n.screen || navKeys.has(n.screen)

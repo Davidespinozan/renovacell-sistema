@@ -11,7 +11,7 @@ import type { IconName } from './icons'
 import { FEATURES, type Features } from './config'
 
 export type RoleKey =
-  | 'admin' | 'doctor' | 'warehouse' | 'pos' | 'driver'
+  | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
 export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas'
@@ -105,6 +105,21 @@ export const ROLES: RoleDef[] = [
       { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
       { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Pedidos y envíos' },
       { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Pedidos y envíos' },   // ENT-H · agenda de entregas locales por horario
+    ],
+  },
+  {
+    // AUXILIAR DE ALMACÉN (rol 'packing', dueño 28 oct 2026): "Blanca es la asistente de Alberto; ella en sí se encarga de
+    // empaque y despacho" y del inventario físico (ver existencias y corregir el conteo). Recibir mercancía, compras,
+    // devoluciones, custodia, guías y seguimiento son de Alberto (inventario y control digital); el servidor se los niega.
+    key: 'packing', label: 'Auxiliar de almacén', group: 'Empaque y despacho',
+    icon: 'pkg', isStaff: true, ready: true,
+    modules: [
+      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
+      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
+      { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Pedidos y envíos' },
+      { key: 'cola', label: 'Por enviar', icon: 'pkg', section: 'Pedidos y envíos' },
+      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
+      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Pedidos y envíos' },
     ],
   },
   {

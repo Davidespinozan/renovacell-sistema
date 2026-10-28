@@ -43,7 +43,7 @@ begin
                and has_function_privilege('authenticated', 'public.reconciliar_guia(uuid,uuid,text,jsonb,text,text)', 'execute'), '0.2 · solo authenticated tiene EXECUTE (el rol se decide dentro); el servicio NO');
   perform tests.ok((select count(*) = 4 from information_schema.columns where table_schema = 'public' and table_name = 'shipping_attempts' and column_name in ('request', 'reconciliacion', 'reconciled_by', 'reconciled_at')), '0.3 · columnas de evidencia');
   perform tests.ok(exists (select 1 from pg_constraint where conrelid = 'public.inventory_operations'::regclass and pg_get_constraintdef(oid) like '%reconciliacion_guia%'), '0.4 · tipo de operación registrado');
-  perform tests.ok(md5(pg_get_functiondef('public.finalize_shipment(uuid,jsonb)'::regprocedure)) = 'a1cf5c01877e87f41ee0e9635b478e34' and md5(pg_get_functiondef('public.anular_guia(uuid,uuid,text)'::regprocedure)) = '35015b5940b8848f001e18ce8d6e1356'
+  perform tests.ok(md5(pg_get_functiondef('public.finalize_shipment(uuid,jsonb)'::regprocedure)) = 'a1cf5c01877e87f41ee0e9635b478e34' and md5(pg_get_functiondef('public.anular_guia(uuid,uuid,text)'::regprocedure)) = '34886f6aa94688900f77778fc08e6d7f'
                and md5(pg_get_functiondef('public.anular_guia_manual(uuid,uuid,text,text)'::regprocedure)) = '68f0824cb3572d7ad394886afacdd78e', '0.5 · comandos existentes NO cambiaron');
   o4 := tests.packed_order(dA, jsonb_build_array(jsonb_build_object('product_id', p, 'qty', 1)));
   perform tests.throws(format($q$insert into public.shipping_attempts (order_id, idempotency_key, status, reconciliacion) values (%L::uuid, 'x', 'pending', '{}'::jsonb)$q$, o4), 'ck_shipping_attempts_reconciliacion', '0.6 · evidencia sin autor/fecha no entra');

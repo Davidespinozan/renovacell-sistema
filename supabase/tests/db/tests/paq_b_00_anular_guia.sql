@@ -27,7 +27,7 @@ begin
   perform tests.act_as_owner();
 
   -- ══ 0 · FORMA ══
-  perform tests.ok(md5(pg_get_functiondef('public.anular_guia(uuid,uuid,text)'::regprocedure)) = '35015b5940b8848f001e18ce8d6e1356'
+  perform tests.ok(md5(pg_get_functiondef('public.anular_guia(uuid,uuid,text)'::regprocedure)) = '34886f6aa94688900f77778fc08e6d7f'
                and md5(pg_get_functiondef('public._comm_tr_orders()'::regprocedure)) = 'f6cad9db69196400c9c69685ab7f5580', '0.1 · funciones de la 149');
   perform tests.ok(md5(pg_get_functiondef('public.orders_guard()'::regprocedure)) = 'e88f1bb21a69f79a1d31585cbc75bf7d' and md5(pg_get_functiondef('public.shipments_guard()'::regprocedure)) = 'b1e791b99ca8043cb1e2913e0b294600'
                and md5(pg_get_functiondef('public.finalize_shipment(uuid,jsonb)'::regprocedure)) = 'a1cf5c01877e87f41ee0e9635b478e34' and md5(pg_get_functiondef('public.cancelar_pedido(uuid,uuid,text)'::regprocedure)) = '3da69c03241d6805a274f3acb602e399'
@@ -120,9 +120,11 @@ begin
   perform tests.act_as_owner(); update public.shipping_attempts set status = 'succeeded' where order_id = o2;
   -- aviso ya enviado: no se toca
   perform set_config('app.trusted', 'on', true); update public.comm_outbox set status = 'enviado', provider_message_id = 'm1', sent_at = now() where order_id = o2 and plantilla = 'pedido_enviado'; perform set_config('app.trusted', 'off', true);
-  perform tests.act_as(v_pk); execute format(f, gen_random_uuid(), o2, 'dirección equivocada') into r;
+  perform tests.act_as(v_pk);   -- AUXILIAR (rol packing): las guías son de Almacén (Alberto)
+  perform tests.throws(format(f, gen_random_uuid(), o2, 'dirección equivocada'), 'NO_AUTORIZADO', 'E3a · el auxiliar de almacén no anula guías');
+  perform tests.act_as(v_wh); execute format(f, gen_random_uuid(), o2, 'dirección equivocada') into r;
   perform tests.act_as_owner();
-  perform tests.ok(r ->> 'status' = 'applied' and (select status = 'enviado' from public.comm_outbox where order_id = o2 and plantilla = 'pedido_enviado'), 'E3 · Empaque anula; un aviso que YA se envió queda como evidencia, sin tocar');
+  perform tests.ok(r ->> 'status' = 'applied' and (select status = 'enviado' from public.comm_outbox where order_id = o2 and plantilla = 'pedido_enviado'), 'E3 · Almacén anula; un aviso que YA se envió queda como evidencia, sin tocar');
   -- tras anular, el pedido empacado se puede cancelar por su vía normal (ya no hay guía activa)
   perform tests.act_as(v_admin); r := public.cancelar_pedido(gen_random_uuid(), o2, 'el cliente ya no lo quiere');
   perform tests.ok(r ->> 'status' = 'applied', 'E4 · tras anular la guía, el pedido se puede cancelar por su comando normal');

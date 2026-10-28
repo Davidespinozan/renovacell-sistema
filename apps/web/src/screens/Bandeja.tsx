@@ -63,7 +63,7 @@ function useTareasBase(): Task[] {
     const porSurtir = orders.filter((o) => isSurtible(o, byOrder[o.id]))
     const porEmpacar = orders.filter((o) => o.status === 'packed')
 
-    if (role === 'warehouse') {
+    if (role === 'warehouse' || role === 'packing') {   // AUXILIAR · mismo trabajo de salida; recibir e inspeccionar son de Almacén
       if (porSurtir.length) t.push({ id: 'surtir', icon: 'layers', title: 'Pedidos por surtir', detail: 'Asigna lotes por FEFO y descuenta inventario.', count: porSurtir.length, tone: 'warn', screen: 'surtido' })
       if (porEmpacar.length) t.push({ id: 'empacar', icon: 'pkg', title: 'Pedidos por empacar', detail: 'Asigna envío (paquetería o chofer).', count: porEmpacar.length, tone: 'warn', screen: 'cola' })
       // Carga ya asignada a un chofer que sigue en el almacén.
@@ -71,10 +71,10 @@ function useTareasBase(): Task[] {
       if (porDespachar.length) t.push({ id: 'despachar', icon: 'truck', title: 'Carga por despachar', detail: 'Entrégala al chofer para que salga a ruta.', count: porDespachar.length, tone: 'warn', screen: 'despacho' })
       // Mercancía pedida que todavía no llega completa.
       const porRecibir = compras.filter((c) => c.status === 'pendiente' || c.status === 'parcial')
-      if (porRecibir.length) t.push({ id: 'recibir', icon: 'download', title: 'Compras por recibir', detail: 'Registra la entrada cuando llegue la mercancía.', count: porRecibir.length, tone: 'neu', screen: 'compras' })
+      if (porRecibir.length && role === 'warehouse') t.push({ id: 'recibir', icon: 'download', title: 'Compras por recibir', detail: 'Registra la entrada cuando llegue la mercancía.', count: porRecibir.length, tone: 'neu', screen: 'compras' })
       // Devolución recibida a la que aún le falta la inspección física.
       const porInspeccionar = devoluciones.filter((d) => d.lines.some((l) => l.inspection == null))
-      if (porInspeccionar.length) t.push({ id: 'inspeccionar', icon: 'shield', title: 'Devoluciones por inspeccionar', detail: 'Revisa el producto antes de que Dirección decida su destino.', count: porInspeccionar.length, tone: 'warn', screen: 'devoluciones' })
+      if (porInspeccionar.length && role === 'warehouse') t.push({ id: 'inspeccionar', icon: 'shield', title: 'Devoluciones por inspeccionar', detail: 'Revisa el producto antes de que Dirección decida su destino.', count: porInspeccionar.length, tone: 'warn', screen: 'devoluciones' })
       if (lotesCriticos.length) t.push({ id: 'caduc', icon: 'clock', title: 'Lotes por caducar', detail: 'Caducados o ≤ 60 días: prioriza su salida.', count: lotesCriticos.length, tone: 'dang', screen: 'caduc' })
     }
 
