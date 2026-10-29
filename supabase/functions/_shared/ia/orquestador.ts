@@ -119,6 +119,15 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         '\nEstos productos de NUESTRO catálogo coinciden con lo que escribió el cliente (ya los busqué por ti): reconócelos por su nombre y confírmalos con naturalidad.'
     }
   }
+  // EXPEDIENTE · los productos que el cliente nombró ANTES en esta conversación también cuentan como consultados: la IA puede
+  // retomarlos ("su Dysport de 500") sin que la guarda la bloquee. Solo autorizan nombres; no entran al prompt.
+  if (canal !== 'portal' && d.politica.prebuscarProductos) {
+    const previos = historial.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').slice(-6, -1).map((m) => m.content).join(' . ')
+    if (previos.trim()) {
+      const pre = await d.politica.prebuscarProductos(previos, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }))
+      for (const id of d.herramientas.idsDe(pre)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pre)) nombresAutorizados.add(n)
+    }
+  }
   // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
   if (d.herramientas.evidenciaHandoff) {
     const hs = await rpc('cc_ia_estado_handoff', { p_conv: e.conv })

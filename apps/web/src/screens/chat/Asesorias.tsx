@@ -18,6 +18,7 @@ import { useRole } from '../../auth/RoleContext'
 import { contactoDe as contactoPorDefecto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
+import { PanelCliente } from './PanelCliente'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
 import { Vacio } from '../../app/EmptyState'
@@ -121,6 +122,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
       <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} onDoctor={setPendiente} version={versionPanel} />
+      <PanelCliente conversationId={abierta} chat={cliente} onCambio={() => { void cargar(); void recargarAtencion() }} />
       {contacto && (
         <div className="rc-contacto-ficha" data-testid="contacto-enlace">
           <div><b>{contacto.nombre}</b>{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</div>

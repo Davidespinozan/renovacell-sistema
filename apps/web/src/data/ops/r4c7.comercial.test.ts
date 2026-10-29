@@ -66,7 +66,8 @@ describe('A · nunca nombra un producto sin consultarlo (y el cliente nunca ve e
     const db = base()
     const d = deps(db, [respuestaTexto('Nabota 100 UI es lo mejor.'), respuestaTexto('Te recomiendo Nabota 200 UI.')])
     await ejecutarTurno(entrada('¿qué tal el nabota?'), d)
-    expect(persistidos(db)).toEqual([validacion.respuestaSeguraCanal('producto_no_autorizado', { limiteClinico: false, evidencia: [], textoLimiteClinico: '', textoGenerico: '' })])
+    // EXPEDIENTE · el respaldo ya no pregunta por un producto: es la respuesta general del canal (nunca lo inventado).
+    expect(persistidos(db)).toEqual([politica.MENSAJE_SIN_RESPUESTA_CANAL])
     expect(d.proveedor.solicitudes).toHaveLength(2)
   })
   it('el portal no cambia: sin corrección, texto seguro inmediato', async () => {
@@ -139,5 +140,32 @@ describe('B · responderIA: transfiere con el aviso neutro DESPUÉS del turno de
     const a = adminFalso(true)
     await responderIA(a, CONV, 17, 'doctor', 'p1', null, 'Quisiera comprar Nabota', 'uid:p1')
     expect(a.llamadas.some((l) => l.fn === '_cc_canal_transferir')).toBe(false)
+  })
+})
+
+// EXPEDIENTE (29 oct 2026) · fallas vistas en la conversación de una clienta real por WhatsApp.
+describe('EXPEDIENTE · fallas de la IA en canal', () => {
+  it('"ya me tienen registrada / mi cédula es…" es una clienta que ya compra: pasa a una persona del equipo comercial', () => {
+    expect(politica.atencionComercial('Ya me tiene registrada mi cédula es 11172305')).toBe('recompra')
+    expect(politica.atencionComercial('ya soy cliente de ustedes')).toBe('recompra')
+    expect(politica.atencionComercial('Si ustedes me han surtido siempre')).toBe('recompra')
+    expect(politica.contextoCanal('whatsapp')).toContain('ya es cliente o que ya está registrado')
+  })
+  it('"ya tiene un asesor asignado" sin que el servidor lo sostenga se bloquea', () => {
+    const ctx = { evidencia: [] as string[], nombresAutorizados: [], nombresCatalogo: [], limiteClinico: false }
+    expect(validacion.validarRespuesta('Ya tiene una asesora o asesor del equipo comercial asignado, que se unirá a esta conversación.', ctx)).toMatchObject({ ok: false, motivo: 'promesa_humano_sin_evidencia' })
+    expect(validacion.validarRespuesta('Ya tiene una asesora o asesor del equipo comercial asignado.', { ...ctx, evidencia: ['ASESOR_ASIGNADO'] })).toMatchObject({ ok: true })
+  })
+  it('un producto que nombró ANTES en la conversación cuenta como consultado (no se bloquea al retomarlo)', async () => {
+    const db = base()
+    const rpc0 = db.rpc
+    db.rpc = async (fn, args) => fn === 'cc_buscar_productos'
+      ? { data: /nabota/i.test(String(args.p_q)) ? NABOTA.map((p) => ({ ...p, puntaje: 90 })) : [], error: null }
+      : rpc0(fn, args)
+    const d = { ...deps(db, [respuestaTexto('Con gusto, una persona del equipo le ayuda con su Nabota 100 UI por aquí.')]), rpc: db.rpc,
+      leerMensajes: async () => [{ actor: 'visitor', content: 'quisiera nabota 100' }, { actor: 'ai', content: '¿Cuántas piezas?' }, { actor: 'visitor', content: 'Ya me tiene registrada mi cédula es 11172305' }] }
+    await ejecutarTurno(entrada('Ya me tiene registrada mi cédula es 11172305'), d as never)
+    expect(persistidos(db)).toEqual(['Con gusto, una persona del equipo le ayuda con su Nabota 100 UI por aquí.'])
+    expect((d as { proveedor: { solicitudes: unknown[] } }).proveedor.solicitudes).toHaveLength(1)   // sin corrección: ya estaba consultado
   })
 })

@@ -14,6 +14,7 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
+import { PanelCliente } from '../chat/PanelCliente'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
 import { EnlaceContacto, EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { MarcoModal, ModalCambiarCartera, ModalReasignarSolicitud, nombreSolicitud, PILL_FUENTE, SelectorVendedor } from './AtencionComercial'
@@ -201,6 +202,8 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
       )}
       {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ fontSize: 13, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }} data-testid="bq-msg">{msg.texto}</div>}
       {canal && <BarraTomaCanal conversationId={id} cliente={canalOp} onControl={setControl} />}
+      {/* VINCULAR-CLIENTE · ¿quién es? ficha, sugerencias y acceso al portal. */}
+      {c && !c.profile_id && <PanelCliente conversationId={id} chat={chat} onCambio={onCambio} />}
       <div className="bq-chat">
         <ChatCanonico embebido asesor puedeEmpresa conversationId={id} cliente={chat} nombreCliente={nombre} bloqueoEscritura={bloqueo}
           etiquetaSalir="Cerrar" onSalir={onCerrar} onFin={() => { onCambio(); onCerrar() }} />

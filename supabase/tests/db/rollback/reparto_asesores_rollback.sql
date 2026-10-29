@@ -1,5 +1,6 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
+\ir ../../../rollback/vincular_cliente/99_down.sql   -- VINCULAR-CLIENTE (20270206) se baja primero (redefine _cc_rutear, _cc_nombre_dueno, bandeja y cola)
 \ir ../../../rollback/ensayo_golive/99_down.sql
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)
 create temp table _rp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
