@@ -36,6 +36,8 @@ import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { ExportButton } from '../../app/ExportButton'
 import type { ProductSafe, Profile } from '../../data/types'
 
+const last4 = (s?: string | null): string => { const d = (s ?? '').replace(/\D/g, ''); return d ? d.slice(-4) : '' }
+
 type Filter = 'todos' | 'por_emitir' | 'emitidos' | 'por_cobrar' | 'transfer'
 
 // Reconoce CFDI emitido (simulado 'emitida' Y timbre real 'timbrada') vía la fuente única
@@ -630,7 +632,9 @@ function CobroModal({ order, saldo, onClose }: { order: OrderWithItems; saldo: n
   const [err, setErr] = useState('')
 
   const montoN = Math.max(0, Number(monto) || 0)
-  const valido = montoN > 0
+  // Un cobro mayor al saldo casi siempre es un dedo de más (15000 → 150000): se bloquea y se dice por qué.
+  const excede = saldo > 0 && montoN > saldo + 0.0001
+  const valido = montoN > 0 && !excede
   const parcial = montoN + 0.0001 < saldo
 
   const cobrar = async () => {
@@ -668,6 +672,11 @@ function CobroModal({ order, saldo, onClose }: { order: OrderWithItems; saldo: n
 
           <label style={lbl}>Monto recibido</label>
           <input type="number" min={0} step="0.01" style={fld} value={monto} onChange={(e) => setMonto(e.target.value)} />
+          {excede && (
+            <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }} data-testid="cobro-excede">
+              El monto es mayor al saldo por cobrar ({money(saldo)}). Revisa la cantidad.
+            </div>
+          )}
           {parcial && montoN > 0 && (
             <div style={{ fontSize: 12, color: 'var(--warn)', marginTop: 6 }}>
               Cobro parcial: quedará un saldo de {money(saldo - montoN)}. El pedido NO pasa a pagado.
@@ -682,7 +691,7 @@ function CobroModal({ order, saldo, onClose }: { order: OrderWithItems; saldo: n
               <label style={lbl}>Cuenta donde cayó <span style={{ opacity: .7, textTransform: 'none' }}>(opcional)</span></label>
               <select style={fld} value={banco} onChange={(e) => setBanco(e.target.value)}>
                 <option value="">Sin especificar</option>
-                {bancos.map((b) => <option key={b.id} value={b.id}>{b.bank_name}</option>)}
+                {bancos.map((b) => { const tail = last4(b.account_number) || last4(b.clabe); return <option key={b.id} value={b.id}>{b.bank_name}{tail ? ` ···· ${tail}` : ''}</option> })}
               </select>
             </>
           )}

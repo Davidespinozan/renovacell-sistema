@@ -5,6 +5,7 @@ begin;
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero
 \ir ../../../rollback/cuentas_internas/99_down.sql   -- CUENTAS INTERNAS se baja primero (redefine reparto, cc_vendedores y conteos)
 \ir lib/r4b2_bajar.sql   -- R4-B2 (B2-2, B2-3a, B2-1) se baja ANTES de la línea base de esta cadena
+\ir ../../../rollback/ensayo_golive/99_down.sql
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)
 create temp table _cx as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,

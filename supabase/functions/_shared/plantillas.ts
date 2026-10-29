@@ -80,7 +80,7 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
     case 'registro_recibido':
       return { asunto: 'Recibimos tu registro en Renovacell', titulo: 'Recibimos tu registro', parrafos: [
         'Gracias por registrarte. Estamos revisando tu cédula profesional y tu identificación; normalmente lo resolvemos el mismo día hábil.',
-        'Mientras tanto ya puedes entrar, conocer el catálogo y hablar con tu asesora. Te avisaremos por este medio en cuanto tu cuenta quede verificada.',
+        'Mientras tanto ya puedes entrar, conocer el catálogo y hablar con nuestro equipo comercial. Te avisaremos por este medio en cuanto tu cuenta quede verificada.',
       ], datos: [], boton: { label: 'Entrar a Renovacell', href: URL_SISTEMA }, pie: 'Recibes este correo porque creaste una cuenta en Renovacell.' }
     case 'promocion': {   // PROMO-4 · datos: nombre, vigencia, lineas[] (texto por producto), promocion_id
       const lineas = Array.isArray(d.lineas) ? (d.lineas as unknown[]).map((x) => String(x ?? '')).filter(Boolean) : []
@@ -218,7 +218,7 @@ export function marcoCorreo(o: { asunto: string; titulo: string; saludo: string;
 export function correoInvitacion(nombre: string, enlace: string): { asunto: string; texto: string; html: string } {
   const quien = nombreBonito(nombre)
   const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
-  const parrafos = ['Te invitamos a crear tu cuenta en Renovacell. Como ya eres cliente, tu cuenta queda verificada: podrás ver precios, hacer pedidos y hablar con tu asesora.']
+  const parrafos = ['Te invitamos a crear tu cuenta en Renovacell. Como ya eres cliente, tu cuenta queda verificada: podrás ver precios, hacer pedidos y hablar con nuestro equipo comercial.']
   const texto = `${saludo}\n\n${parrafos[0]}\n\nCrea tu contraseña aquí (el enlace vence en 14 días):\n${enlace}\n\nRenovacell · Tecnologías Antiedad`
   const html = marcoCorreo({ asunto: 'Tu cuenta en Renovacell', titulo: 'Tu cuenta te espera', saludo, parrafos,
     botones: [{ href: enlace, label: 'Crear mi cuenta' }], nota: 'El enlace vence en 14 días.', pie: 'Recibes este correo porque eres cliente de Renovacell.' })

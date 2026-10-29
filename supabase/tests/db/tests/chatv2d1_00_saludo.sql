@@ -29,9 +29,9 @@ begin
   perform tests.eq(public._cc_primer_nombre('Lucía · Ventas'), 'Lucía', 'D1 · nombre: sin rol');
   perform tests.ok(public._cc_primer_nombre('ventas1@renovacell.mx') is null and public._cc_primer_nombre('') is null and public._cc_primer_nombre(null) is null, 'D1 · cuenta técnica o vacía → sin nombre');
   perform tests.eq(public._cc_texto_saludo('David', 'Golden Placenta Mask', true, 'Lucía'),
-    '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, tu asesora, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'D1 · plantilla completa (texto aprobado)');
+    '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, de nuestro equipo comercial, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'D1 · plantilla completa (texto aprobado)');
   perform tests.ok(public._cc_texto_saludo(null, null, false, null) like '¡Hola! 👋 Veo que estás armando tu pedido.%Ya registré tu solicitud con nuestro equipo comercial. Mientras tanto, estoy aquí para ayudarte.', 'D1 · variante segura sin nombre, producto ni asesora');
-  perform tests.ok(public._cc_texto_saludo('Ana', 'X', true, null) like '%Tu asesora ya tiene tu solicitud.%', 'D1 · asesora confirmada sin nombre presentable');
+  perform tests.ok(public._cc_texto_saludo('Ana', 'X', true, null) like '%Nuestro equipo comercial ya tiene tu solicitud.%', 'D1 · asesora confirmada sin nombre presentable');
   v_txt := public._cc_texto_saludo('David', 'Golden Placenta Mask', true, 'Lucía') || public._cc_texto_saludo(null, null, false, null);
   perform tests.ok(v_txt !~* '(\$|precio|costo|disponib|existencia|descuento|promoci|horario|minuto|hora|inmediat|dosis|indicaci|beneficio|garantiz)', 'D1 · sin precios, disponibilidad, descuentos, horarios, tiempos ni afirmaciones clínicas');
   perform tests.eq(public._cc_procedencia_mensaje('ai', 'tpl:saludo:x:1'), 'ia_plantilla', 'D1 · procedencia: plantilla');
@@ -44,7 +44,7 @@ begin
   ses_a := (select id from public.cc_conversation_sessions where conversation_id = cA and estado = 'abierta');
   select m2.* into g from public.cc_messages m2 where m2.conversation_id = cA and m2.client_message_id like 'tpl:saludo:%';
   perform tests.ok(g.actor_type = 'ai' and g.client_message_id = 'tpl:saludo:' || kA || ':0', 'D1 · persona Asistente con procedencia tpl:saludo:<carrito>:<seq>');
-  perform tests.eq(g.content, '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, tu asesora, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'D1 · nombre, producto y asesora confirmada (canónicos)');
+  perform tests.eq(g.content, '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, de nuestro equipo comercial, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'D1 · nombre, producto y asesora confirmada (canónicos)');
   perform tests.eq(g.seq, (select seq from public.cc_messages where conversation_id = cA and client_message_id like 'sys:handoff:%') + 1, 'D1 · justo después del aviso (orden: aviso → ruteo → saludo)');
   perform tests.ok(g.seq >= (select first_seq from public.cc_conversation_sessions where id = ses_a), 'D1 · dentro de la sesión del episodio');
   perform tests.eq((select count(*)::int from public.cc_ai_turns), v_ai0, 'D1 · ninguna llamada al proveedor (sin cc_ai_turns)');
@@ -91,7 +91,7 @@ begin
   r := public.cc_carrito_agregar(kU, 'doctor', null, dU, pB, 1, 'u-1');
   cU := (r -> 'handoff' ->> 'conversation_id')::uuid;
   v_txt := (select content from public.cc_messages where conversation_id = cU and client_message_id like 'tpl:saludo:%');
-  perform tests.ok(v_txt like '%Tu asesora ya tiene tu solicitud.%' and v_txt not like '%@%', 'D1 · asesora confirmada con cuenta técnica → sin nombre');
+  perform tests.ok(v_txt like '%Nuestro equipo comercial ya tiene tu solicitud.%' and v_txt not like '%@%', 'D1 · asesora confirmada con cuenta técnica → sin nombre');
 
   -- ══ producto no disponible para contexto (firma de 1 argumento: reintento/adopción) → variante genérica ══
   kX := (public.cc_carrito_abrir('doctor', null, dX) ->> 'cart_id')::uuid;
@@ -123,7 +123,7 @@ begin
   perform tests.act_as_owner(); update public.cc_carts set handoff_session_id = null where id = kD; perform tests.act_as_service();
   r := public.cc_carrito_actualizar(kD, 'doctor', null, dD, pA, 2, 'd-2');
   v_txt := (select content from public.cc_messages where conversation_id = cD and client_message_id like 'tpl:saludo:%' order by seq desc limit 1);
-  perform tests.eq(v_txt, '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, tu asesora, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'DAVID · episodio nuevo con el saludo esperado');
+  perform tests.eq(v_txt, '¡Hola, David! 👋 Veo que te interesa Golden Placenta Mask. ¿Te gustaría conocer sus características o necesitas alguna recomendación? Lucía, de nuestro equipo comercial, ya tiene tu solicitud. Mientras tanto, estoy aquí para ayudarte.', 'DAVID · episodio nuevo con el saludo esperado');
   perform tests.eq((select count(*)::int from public.cc_messages where conversation_id = cD and client_message_id like 'tpl:saludo:%'), 2, 'DAVID · un saludo por episodio (1 + 1)');
 
   -- ══ esquema: procedencia garantizada ══

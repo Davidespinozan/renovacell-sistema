@@ -81,7 +81,7 @@ const cartDoctor = (n: number): Carrito => ({ cart_id: 'K', estado: 'active', re
 const C4 = (() => {
   const mensajes: Mensaje[] = [
     { id: 'c1', seq: 1, actor: 'doctor', content: '¿Tienen la Golden Placenta Mask en caja de 5?', created_at: new Date(Date.now() - 600_000).toISOString(), propio: true },
-    { id: 'c2', seq: 2, actor: 'ai', content: 'Sí, la manejamos en caja de 5 piezas. ¿Quieres que tu asesora te confirme el precio por volumen?', created_at: new Date(Date.now() - 590_000).toISOString(), propio: false },
+    { id: 'c2', seq: 2, actor: 'ai', content: 'Sí, la manejamos en caja de 5 piezas. ¿Quieres que tu asesoría te confirme el precio por volumen?', created_at: new Date(Date.now() - 590_000).toISOString(), propio: false },
   ]
   let leido = 2
   const sesion = { id: 'S2', ordinal: 2, estado: 'abierta' as const, origen: 'cliente', first_seq: 1, last_seq: null, opened_at: new Date(Date.now() - 600_000).toISOString(), closed_at: null, close_reason: null }

@@ -40,7 +40,7 @@ describe('ChatCanonico · aviso de atención humana (doctor)', () => {
   it('CI-2 · fuera de horario (o sin horario): sin inventar horarios ni prometer inmediatez; nombre solo si está asignada', async () => {
     const f = chatFalso({ modo: 'human_assigned', asesor_nombre: 'Ana', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: true, asignado: true, puede_rechazar: true } })
     render(<ChatCanonico cliente={f.c} conCarrito={false} intervaloMs={60_000} />)
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ana, tu asesora, ya tiene tu solicitud.')
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Ana, de nuestro equipo comercial, ya tiene tu solicitud.')
     expect(screen.getByTestId('chat-modo')).toHaveTextContent('Avisamos a Ana · el asistente sigue contigo')
     expect(screen.queryByText(/horario|pronto|en breve/)).toBeNull()
   })

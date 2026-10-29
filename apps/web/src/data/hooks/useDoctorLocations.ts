@@ -6,7 +6,9 @@ import { listDoctorLocations, createDoctorLocation, updateDoctorLocation, deacti
 
 export function useDoctorLocations(doctorId?: string) {
   const [data, setData] = useState<DoctorLocation[]>([])
-  const [loading, setLoading] = useState(false)
+  // Nace cargando: la primera carga sale en el efecto, y quien preselecciona (el selector del checkout) no debe
+  // decidir con la lista vacía de antes de que llegue la respuesta.
+  const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
     setLoading(true)

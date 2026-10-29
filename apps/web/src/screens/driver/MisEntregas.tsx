@@ -10,8 +10,10 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { entregar } from '../../data/ops/entregar'
+import { entregaDelPedido, promesaDe } from '../../data/ops/entrega'
+import { hoyNegocio } from '../../data/periodo'
 import { driverIdByEmail, driverName } from '../../data/mock/shipments'
-import { clientOf, deliveryOf } from '../../data/mock/profiles'
+import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
@@ -237,7 +239,7 @@ export function MisEntregas() {
         orderedMine.map((s) => {
           const order = orderById[s.order_id]
           if (!order) return null
-          const client = clientOf(order.doctor_id)
+          const client = clienteDePedido(order)
           const deliv = deliveryOf(order) // dirección/teléfono de ENTREGA (del pedido; respaldo al perfil)
           const items = order.items.filter((it) => it.unit_price != null)
           const photo = photos[s.id]
@@ -252,13 +254,14 @@ export function MisEntregas() {
                     : s.status === 'despachado'
                       ? <span className="pill p-warn">Confirma tu carga</span>
                       : <span className="pill p-blue"><span className="d" /> En reparto</span>}
-                <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                  {s.estimated_delivery_at ? `Estimada ${fmtDate(s.estimated_delivery_at)}` : ''}
+                <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="chofer-promesa">
+                  {/* Lo que se le prometió al cliente (día y horario) manda; la estimada del envío es respaldo. */}
+                  {(() => { const e = entregaDelPedido(order.shipping_meta); return e ? promesaDe(e, hoyNegocio()) : s.estimated_delivery_at ? `Estimada ${fmtDate(s.estimated_delivery_at)}` : '' })()}
                 </span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13, marginBottom: 12 }}>
-                <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name} · {client.clinic}</div>
+                <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name}{client.clinic ? ` · ${client.clinic}` : ''}</div>
                 <div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Teléfono</div>
                   <a className="tap-link" href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
@@ -411,7 +414,7 @@ export function MisEntregas() {
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 6px', borderBottom: i < entregadas.length - 1 ? '1px solid var(--line)' : 'none' }}>
                   <span className="mono" style={{ fontSize: 13 }}>{o?.external_ref ?? '—'}</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{clientOf(o?.doctor_id ?? null).name}</div>
+                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? clienteDePedido(o).name : 'Cliente'}</div>
                     {s.received_by && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Recibió: {s.received_by}</div>}
                   </div>
                   {s.delivered_at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fmtDate(s.delivered_at)}</span>}

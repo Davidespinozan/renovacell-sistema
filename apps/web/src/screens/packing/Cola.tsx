@@ -24,7 +24,7 @@ import { useRole, useRoleOpcional } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
-import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
+import { estimadaDe, promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
@@ -275,7 +275,8 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     setBusy('chofer'); setError(null)
     const r = await createShipment({
       order_id: order.id, carrier: null, tracking_number: null, driver_id: driverId,
-      estimated_delivery_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
+      // La estimada sale de lo que se le PROMETIÓ al cliente (horario o día de llegada); solo sin promesa, +2 días.
+      estimated_delivery_at: estimadaDe(entregaPedido) ?? new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
     })
     setBusy(false)
     if (!r.ok) { setError(`No se asignó el chofer. ${r.error}`); return }

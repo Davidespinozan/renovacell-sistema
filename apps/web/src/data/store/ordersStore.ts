@@ -444,8 +444,9 @@ export async function markShipped(orderId: string, shipping_meta: Record<string,
   // Recién ahora, con el servidor confirmado: estado, aviso y bitácora.
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta: nextMeta } : o))
   emit()
-  notify({ text: `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
-  logAudit({ actor: 'Empaque', action: 'Envío asignado', resource: folioOf(orderId) })
+  const recoge = (nextMeta as { method?: unknown }).method === 'recoge'
+  notify({ text: recoge ? `Pedido ${folioOf(orderId)} listo para recoger en sucursal` : `Pedido ${folioOf(orderId)} en camino`, roles: ['admin'], screen: 'seguimiento' })
+  logAudit({ actor: 'Empaque', action: recoge ? 'Listo para recoger' : 'Envío asignado', resource: folioOf(orderId) })
   return { ok: true }
 }
 

@@ -14,7 +14,7 @@ export interface LectorSesiones {
   leerSesion(sessionId: string, desdeSeq?: number): Promise<Res<{ sesion: SesionResumen & { asesor_nombre: string | null }; rol: string; solo_lectura: boolean; mensajes: Mensaje[] }>>
 }
 export interface CacheSesion { meta: SesionResumen & { asesor_nombre: string | null }; mensajes: Mensaje[]; completa: boolean }
-export const ETIQUETA_ASESOR_HIST = 'Asesora'
+export const ETIQUETA_ASESOR_HIST = 'Asesoría'
 const PAGINA = 100   // límite que fija la Edge `leer_sesion`
 const SIN_ACCESO = 'No tienes acceso a esta conversación anterior.'
 

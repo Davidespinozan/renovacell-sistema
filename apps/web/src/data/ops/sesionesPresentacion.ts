@@ -43,7 +43,7 @@ export const cantidadMensajes = (n: number | null | undefined): string => `${n ?
 export function motivoCierre(motivo: string | null | undefined, visor: Visor, asesorNombre?: string | null): string | null {
   switch (motivo) {
     case null: case undefined: return null
-    case 'asesor_finalizo': { const n = nombrePersona(asesorNombre); return visor === 'personal' && n ? `Finalizada por ${n}` : 'Finalizada por tu asesora' }
+    case 'asesor_finalizo': { const n = nombrePersona(asesorNombre); return visor === 'personal' && n ? `Finalizada por ${n}` : 'Asesoría finalizada' }
     case 'direccion_finalizo': return 'Finalizada por Renovacell'
     case 'inactividad': return 'Cerrada por inactividad'
     case 'solicitud_expirada': return visor === 'personal' ? 'Solicitud expirada' : 'Sin asesor disponible'

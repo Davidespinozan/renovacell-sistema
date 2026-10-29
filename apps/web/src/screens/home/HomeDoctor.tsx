@@ -134,7 +134,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           <span className="rh-chip rh-chip--estado" role="status" data-testid="doctor-atencion">
             <span className={`rh-chip-dot${modo === 'human_active' ? ' rh-chip-dot--on' : ''}`} aria-hidden />
             <span>{primerNombre(conv.asesor_nombre)
-              ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesora{modo === 'human_active' ? ' · en conversación' : ''}</>
+              ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesoría{modo === 'human_active' ? ' · en conversación' : ''}</>
               : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
           </span>
         )}

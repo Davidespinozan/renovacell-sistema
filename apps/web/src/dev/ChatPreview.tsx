@@ -25,7 +25,7 @@ const sesion = (id: string, ordinal: number, desdeMin: number, hastaMin: number 
   close_reason: motivo, actual: hastaMin == null, last_activity_at: hace(hastaMin ?? 5), n_mensajes: ultimo - primero + 1, asesor_nombre: asesor })
 const humana: Mensaje[] = [
   msg(1, 'doctor', 'Hola, quiero cotizar 3 cajas de Golden Placenta Mask.', true, 140), msg(2, 'system', 'Registramos tu solicitud para que un asesor personal te atienda.', false, 139),
-  msg(3, 'ai', 'Mientras se une tu asesora: la mascarilla tiene precio por volumen desde 3 piezas.', false, 139), msg(4, 'system', 'Lucía se unió a la conversación.', false, 120),
+  msg(3, 'ai', 'Mientras se une tu asesor de ventas: la mascarilla tiene precio por volumen desde 3 piezas.', false, 139), msg(4, 'system', 'Lucía se unió a la conversación.', false, 120),
   msg(5, 'seller', 'Hola doctor, soy Lucía. Con 3 cajas te aplica el precio por volumen. ¿Te preparo el pedido?', false, 119), msg(6, 'doctor', 'Sí, a Culiacán por favor.', true, 115),
   msg(7, 'seller', 'Listo, te lo dejo en el carrito para que lo confirmes cuando quieras.', false, 112), msg(8, 'doctor', 'Gracias.', true, 110), msg(9, 'system', 'La asesoría terminó. Puedes seguir escribiendo; te responde el asistente.', false, 100),
 ]

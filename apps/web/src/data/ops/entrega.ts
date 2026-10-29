@@ -88,6 +88,21 @@ export function promesaDe(e: PromesaInput, hoy?: string | null): string {
   if (e.llega_desde === e.llega_hasta) return `${sale} · llega ${esHoy(e.llega_desde) ? 'hoy mismo' : 'el ' + fechaCorta(e.llega_desde)}`
   return `${sale} · llega entre el ${fechaCorta(e.llega_desde)} y el ${fechaCorta(e.llega_hasta)}`
 }
+/** La entrega que se prometió al crear el pedido (shipping_meta.entrega), si la hay. */
+export function entregaDelPedido(shippingMeta: unknown): EntregaPedido | null {
+  const m = shippingMeta && typeof shippingMeta === 'object' ? (shippingMeta as { entrega?: EntregaPedido | null }) : null
+  return m?.entrega ?? null
+}
+/** Instante estimado de llegada según la PROMESA (hora del negocio, UTC-7 todo el año): el fin del horario
+ *  reservado o, sin horario, el último día prometido a las 18:00. Null si el pedido no trae promesa. */
+export function estimadaDe(e: Pick<EntregaPedido, 'llega_hasta'> & Partial<Pick<EntregaPedido, 'horario'>> | null): string | null {
+  if (!e) return null
+  const h = e.horario ?? null
+  const [dia, hora] = h?.fecha && (h.fin || h.inicio) ? [h.fecha, h.fin || h.inicio] : [e.llega_hasta, '18:00']
+  if (!dia || !/^\d{4}-\d{2}-\d{2}$/.test(dia.slice(0, 10)) || !/^\d{2}:\d{2}$/.test(hora)) return null
+  const t = new Date(`${dia.slice(0, 10)}T${hora}:00-07:00`)
+  return Number.isNaN(t.getTime()) ? null : t.toISOString()
+}
 /** Título de la opción con su paquetería. */
 export function tituloOpcion(o: Pick<OpcionEntrega, 'texto'>): string { return o.texto }
 /** Flete en texto: "Gratis" o el importe. */

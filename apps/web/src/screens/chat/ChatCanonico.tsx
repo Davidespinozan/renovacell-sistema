@@ -53,7 +53,7 @@ const PING_ESCRIBIENDO_MS = 3000
 const SONDEO_ESCRIBIENDO_MS = 1500
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
-export const ETIQUETA_ASESOR = 'Asesora'
+export const ETIQUETA_ASESOR = 'Asesoría'
 // D4-FIX · textos neutrales del cierre y de la pérdida legítima de acceso del asesor (no son errores).
 export const TEXTO_ASESORIA_FINALIZADA = 'Asesoría finalizada. El historial permanece disponible en Cliente 360.'
 export const TEXTO_SIN_ASIGNACION = 'Esta conversación ya no está asignada a ti. Puedes consultar su historial en Cliente 360.'
@@ -83,7 +83,7 @@ export function subtituloDe(conv: Conversacion | null, asesor: boolean): string 
  */
 export function textoHandoff(conv: Pick<Conversacion, 'asesor_nombre' | 'handoff'>): { titulo: string; detalle: string } {
   const nombre = conv.handoff?.asignado ? primerNombre(conv.asesor_nombre) : null
-  if (nombre) return { titulo: `${nombre}, tu ${ETIQUETA_ASESOR.toLowerCase()}, ya tiene tu solicitud.`, detalle: '' }
+  if (nombre) return { titulo: `${nombre}, de nuestro equipo comercial, ya tiene tu solicitud.`, detalle: '' }
   return { titulo: 'Nuestro equipo comercial ya tiene tu solicitud.', detalle: '' }
 }
 

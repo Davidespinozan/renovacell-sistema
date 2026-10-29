@@ -29,12 +29,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const hub = nav.filter((s) => HUB_KEYS.has(s.key))
   const modules = nav.filter((s) => !HUB_KEYS.has(s.key))
 
-  // Agrupa módulos por sección (consecutivos). Sin sección → grupo del rol.
+  // Agrupa módulos por sección (en el orden en que aparece cada sección). Sin sección → grupo del rol.
+  // Una capacidad puede sumar módulos a una sección del rol ya listada (p. ej. Conversaciones en "Mi cartera"
+  // después de Eventos): se unen al mismo grupo en vez de repetir el encabezado.
   const groups: { header: string; items: ScreenDef[] }[] = []
   modules.forEach((m) => {
     const header = m.section ?? r.group
-    const last = groups[groups.length - 1]
-    if (last && last.header === header) last.items.push(m)
+    const grupo = groups.find((g) => g.header === header)
+    if (grupo) grupo.items.push(m)
     else groups.push({ header, items: [m] })
   })
 

@@ -258,7 +258,9 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   // TOPE real de un reembolso: no se puede devolver dinero que nunca entró. El servidor
   // reimpone ambos topes (restante del pedido y cobrado neto).
   const topeReembolso = Math.min(restante, dinero ? dinero.cobrado_neto : restante)
-  const puedeDevolver = order.status !== 'cancelled' && order.status !== 'draft' && topeReembolso > 0.0001
+  // Un pedido CANCELADO que ya se cobró también se reembolsa (Revisión económica manda aquí); solo dinero: el
+  // producto regresa por el reingreso de la cancelación.
+  const puedeDevolver = order.status !== 'draft' && topeReembolso > 0.0001
   const lib = dinero ? etiquetaLiberacion(dinero) : null
   const [showForm, setShowForm] = useState(false)
   return (
@@ -281,8 +283,11 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
           {dinero && (
             <div className="sysnote" style={{ marginBottom: 14 }}>
               <span style={{ flex: 1 }}>
-                Cobrado <b>{money(dinero.cobrado_neto)}</b> de {money(dinero.total)} · saldo <b>{money(dinero.saldo)}</b>
-                {lib && <> · {lib.texto}{lib.detalle ? ` (${lib.detalle})` : ''}</>}
+                {order.status === 'cancelled'
+                  // Cancelado: ya no se cobra; lo único que importa es si queda dinero del cliente por devolver.
+                  ? <>Pedido cancelado · cobrado neto <b>{money(dinero.cobrado_neto)}</b>{dinero.cobrado_neto > 0.0001 && dinero.reembolso_pendiente <= 0.0001 ? ' · falta autorizar su reembolso' : dinero.cobrado_neto <= 0.0001 ? ' · nada por cobrar ni por devolver' : ''}</>
+                  : <>Cobrado <b>{money(dinero.cobrado_neto)}</b> de {money(dinero.total)} · saldo <b>{money(dinero.saldo)}</b>
+                    {lib && <> · {lib.texto}{lib.detalle ? ` (${lib.detalle})` : ''}</>}</>}
                 {dinero.reembolso_pendiente > 0.0001 && <> · <b style={{ color: 'var(--warn)' }}>reembolso autorizado sin pagar: {money(dinero.reembolso_pendiente)}</b></>}
               </span>
             </div>
@@ -306,6 +311,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
             </tbody>
           </table>
 
+          {(() => { const envio = Number((order as { shipping_cost?: number | null }).shipping_cost ?? 0); return envio > 0 ? <div className="cototal" style={{ marginTop: 12, fontSize: 13 }} data-testid="detalle-envio"><span>Envío</span><b>{money(envio)}</b></div> : null })()}
           <div className="cototal" style={{ marginTop: 12 }}><span>Total</span><b>{money(order.total)}</b></div>
           {yaDevuelto > 0 && (
             <>
@@ -334,7 +340,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
 
           {puedeDevolver && !showForm && (
             <div style={{ marginTop: 14 }}>
-              <button className="btn ghost sm" type="button" onClick={() => setShowForm(true)}><Undo2 size={14} /> Devolver / Corregir</button>
+              <button className="btn ghost sm" type="button" onClick={() => setShowForm(true)}><Undo2 size={14} /> {order.status === 'cancelled' ? 'Reembolsar al cliente' : 'Devolver / Corregir'}</button>
             </div>
           )}
           {puedeDevolver && showForm && (
@@ -375,7 +381,8 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
 }) {
   const { data: refunds, autorizarReembolso, returnedByItem } = useRefunds()
   const { opId, renew } = useOpId()
-  const [tipo, setTipo] = useState<'devolucion' | 'correccion' | 'cortesia'>('devolucion')
+  const cancelado = order.status === 'cancelled'
+  const [tipo, setTipo] = useState<'devolucion' | 'correccion' | 'cortesia'>(cancelado ? 'correccion' : 'devolucion')
   const [qtys, setQtys] = useState<Record<string, number>>({})   // piezas a regresar por renglón
   const [montoCorr, setMontoCorr] = useState(String(restante))    // monto libre para corrección
   const [motivo, setMotivo] = useState('')
@@ -409,12 +416,13 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
   return (
     <div style={{ marginTop: 14, padding: 14, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--hueso, #f8f9f6)' }}>
       <div className="seg" style={{ marginBottom: 12 }}>
-        <button type="button" className={tipo === 'devolucion' ? 'active' : undefined} onClick={() => setTipo('devolucion')}>Devolución</button>
-        <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>Corrección</button>
-        <button type="button" className={tipo === 'cortesia' ? 'active' : undefined} onClick={() => setTipo('cortesia')}>Cortesía</button>
+        {!cancelado && <button type="button" className={tipo === 'devolucion' ? 'active' : undefined} onClick={() => setTipo('devolucion')}>Devolución</button>}
+        <button type="button" className={tipo === 'correccion' ? 'active' : undefined} onClick={() => setTipo('correccion')}>{cancelado ? 'Reembolso por cancelación' : 'Corrección'}</button>
+        {!cancelado && <button type="button" className={tipo === 'cortesia' ? 'active' : undefined} onClick={() => setTipo('cortesia')}>Cortesía</button>}
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-        {tipo === 'devolucion' ? 'Reembolso por producto devuelto: elige renglones y piezas para calcular el monto. Esto AUTORIZA el reembolso; el dinero sale cuando se registre su pago. La entrada física del producto la registra Almacén en «Devoluciones y reingresos» y Dirección decide su destino.'
+        {cancelado ? 'El pedido se canceló después de cobrarse: devuelve el dinero al cliente. Esto AUTORIZA el reembolso; el dinero sale cuando se registre su pago. El producto regresa por el reingreso de la cancelación.'
+          : tipo === 'devolucion' ? 'Reembolso por producto devuelto: elige renglones y piezas para calcular el monto. Esto AUTORIZA el reembolso; el dinero sale cuando se registre su pago. La entrada física del producto la registra Almacén en «Devoluciones y reingresos» y Dirección decide su destino.'
           : tipo === 'correccion' ? 'El cobro estuvo mal (no entró producto). Solo corrige el dinero; no toca inventario.'
           : 'Se cobró pero no debía (cortesía). Regresa el dinero; el producto se queda con el cliente, no toca inventario.'}
       </div>
@@ -452,7 +460,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>Motivo</label>
       <input style={{ ...fld, marginTop: 5, marginBottom: 8 }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="¿Por qué?" />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {(tipo === 'devolucion' ? PRESETS_DEV : PRESETS_CORR).map((pz) => (
+        {(cancelado ? ['Cliente canceló', 'Pedido duplicado', 'Sin existencia'] : tipo === 'devolucion' ? PRESETS_DEV : PRESETS_CORR).map((pz) => (
           <button key={pz} type="button" className="chip-btn" style={{ fontSize: 11.5, padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999, backgroundColor: 'var(--cp-surface)', cursor: 'pointer' }} onClick={() => setMotivo(pz)}>{pz}</button>
         ))}
       </div>
@@ -460,7 +468,7 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button className="btn ghost sm" type="button" onClick={onClose}>Cancelar</button>
         <button className="btn sm" type="button" disabled={!valid || busy} style={!valid || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={submit}>
-          {busy ? 'Autorizando…' : `Autorizar ${({ devolucion: 'devolución', correccion: 'corrección', cortesia: 'cortesía' } as const)[tipo]}`}
+          {busy ? 'Autorizando…' : `Autorizar ${cancelado ? 'reembolso' : ({ devolucion: 'devolución', correccion: 'corrección', cortesia: 'cortesía' } as const)[tipo]}`}
         </button>
       </div>
     </div>

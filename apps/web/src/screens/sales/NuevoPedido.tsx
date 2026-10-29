@@ -65,6 +65,15 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const volRules = useReglasPrecio()
   const stockMap = useMemo(() => stockByProduct(lots), [lots])
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
+  // Buscador (igual que Caja): por nombre, categoría o SKU, para no scrollear todo el catálogo. Lo que ya va en el
+  // pedido se queda visible aunque no coincida, para poder ajustar su cantidad.
+  const [buscar, setBuscar] = useState('')
+  const [cartIds, setCartIds] = useState<ReadonlySet<string>>(new Set())
+  const visibles = useMemo(() => {
+    const s = buscar.trim().toLowerCase()
+    if (!s) return sellable
+    return sellable.filter((p) => cartIds.has(p.id) || `${p.name} ${p.category ?? ''} ${p.sku ?? ''}`.toLowerCase().includes(s))
+  }, [sellable, buscar, cartIds])
   // Precio unitario efectivo previsto = LEAST(base, volumen). El servidor (crear_pedido) es la autoridad.
   const effOf = (p: { id: string; price: number | null }, qty: number): number | null => effectiveUnitPrice(p.price, volRules, p.id, qty)
 
@@ -227,8 +236,17 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
             </div>
             <div className="mbody">
+              <input
+                value={buscar}
+                onChange={(e) => { setBuscar(e.target.value); setCartIds(new Set(Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0))) }}
+                placeholder="Buscar producto por nombre, categoría o SKU…"
+                aria-label="Buscar producto"
+                data-testid="np-buscar"
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginBottom: 8 }}
+              />
               <div style={{ display: 'grid', gap: 8, maxHeight: '46vh', overflow: 'auto' }}>
-                {sellable.map((p) => {
+                {visibles.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 2px' }}>Ningún producto coincide con “{buscar}”.</div>}
+                {visibles.map((p) => {
                   const qty = cart[p.id] ?? 0
                   const stock = stockInfoFor(stockMap, p.id)
                   const out = !stock.tracked || stock.qty <= 0
@@ -241,9 +259,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                         </div>
                         {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
-                      {qty > 0 && <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Minus size={14} /></button>}
+                      {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}
                       {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>}
-                      <button className="btn sm" type="button" disabled={out} style={out ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => add(p.id)}><Plus size={14} /></button>
+                      <button className="btn sm" type="button" aria-label={`Agregar ${p.name}`} disabled={out} style={out ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => add(p.id)}><Plus size={14} /></button>
                     </div>
                   )
                 })}

@@ -29,7 +29,7 @@ import { venderPOS, newPosOp, type PosOp, type PosResult } from '../../data/ops/
 import { estadoOperacion } from '../../data/ops/w1Command'
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { orderClientName } from '../../data/ops/orderClient'
-import { clientOf } from '../../data/mock/profiles'
+import { clienteDePedido } from '../../data/mock/profiles'
 import type { Customer } from '../../data/ops/customer'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
@@ -475,7 +475,7 @@ export function Caja() {
                 </p>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
-                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, done.doctor_id ? clientOf(done.doctor_id).phone : undefined)}>
+                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, (() => { const t = clienteDePedido(done).phone; return t && t !== '—' ? t : undefined })())}>
                     <Icon name="chat" /> Enviar por WhatsApp
                   </button>
                   <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>

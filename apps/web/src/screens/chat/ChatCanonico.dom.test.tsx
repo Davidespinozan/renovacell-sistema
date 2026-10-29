@@ -49,7 +49,7 @@ describe('encabezado', () => {
     expect(subtituloDe(conv({ modo: 'human_requested', handoff: { origen: 'carrito', cart_id: 'K', fuera_horario: true, asignado: false, puede_rechazar: true } }), false)).toBe('Avisamos a nuestro equipo comercial · el asistente sigue contigo')   // CI-2 · sin inventar horarios
   })
   it('13 · humano activo: "Lucía · Asesora"', () => {
-    expect(subtituloDe(conv({ modo: 'human_active', asesor_nombre: 'Lucía' }), false)).toBe('Lucía · Asesora')
+    expect(subtituloDe(conv({ modo: 'human_active', asesor_nombre: 'Lucía' }), false)).toBe('Lucía · Asesoría')
     expect(subtituloDe(conv({ modo: 'human_active', asesor_nombre: 'Lucía' }), false)).not.toMatch(/Ventas/)
   })
 })
@@ -82,12 +82,12 @@ describe('hilo', () => {
     render(<ChatCanonico panel embebido cliente={f.cliente} conCarrito={false} intervaloMs={60_000} />)
     const card = await screen.findByTestId('aviso-handoff')
     expect(card.className).toContain('rc-card')
-    expect(card).toHaveTextContent('Lucía, tu asesora, ya tiene tu solicitud.')   // V2-D2 · estado compacto; la bienvenida es el saludo de D1
+    expect(card).toHaveTextContent('Lucía, de nuestro equipo comercial, ya tiene tu solicitud.')   // V2-D2 · estado compacto; la bienvenida es el saludo de D1
     expect(screen.getByTestId('btn-rechazar-asesor')).toHaveTextContent('Seguir solo con el asistente')
     expect(screen.queryByTestId('msg-system')).toBeNull()                       // sin duplicar: la tarjeta ocupa su lugar
     expect(screen.getByTestId('msg-doctor').className).toContain('rc-msg--own')
     expect(screen.getByTestId('msg-ai').className).toContain('rc-msg--ai')
-    const seller = screen.getByTestId('msg-seller'); expect(seller.className).toContain('rc-msg--seller'); expect(seller).toHaveTextContent('Lucía · Asesora')
+    const seller = screen.getByTestId('msg-seller'); expect(seller.className).toContain('rc-msg--seller'); expect(seller).toHaveTextContent('Lucía · Asesoría')
     expect(screen.getAllByText('Hoy').length).toBeGreaterThan(0)              // separador de día
   })
 })

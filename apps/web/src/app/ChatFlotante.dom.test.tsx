@@ -94,7 +94,7 @@ describe('ChatFlotante', () => {
     expect(screen.queryByTestId('chat-drawer')).toBeNull()                       // nunca se abre solo
     expect(chatUi.getSnapshot()).toBeNull()
     fireEvent.click(screen.getByTestId('chat-fab'))                              // apertura explícita
-    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Lucía, tu asesora, ya tiene tu solicitud.')
+    expect(await screen.findByTestId('aviso-handoff')).toHaveTextContent('Lucía, de nuestro equipo comercial, ya tiene tu solicitud.')
     expect(screen.getAllByTestId('chat-canonico').length).toBe(1)
     expect(document.body.classList.contains('chat-open')).toBe(true)
   })
