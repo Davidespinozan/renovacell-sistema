@@ -210,3 +210,19 @@
   .rh-card .rh-btn{min-height:44px;flex:1}
 }
 .rh-card .rh-ctas{margin-top:auto}
+/* Hora de la solicitud arriba a la derecha (como en la lista de un chat); estado y subtítulo en una fila. */
+.rh-card-top{flex-wrap:nowrap;align-items:baseline}
+.rh-card-hace{flex:none;font-size:12px;color:var(--mid);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rh-card-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.rh-meta li{min-height:24px;padding:0 9px;font-size:12px}
+/* Alerta flotante con el mismo lenguaje: sin franja gruesa, anillo de tono en el ícono, etiquetas cortas. */
+.rc-al{border-left:1px solid var(--line);border-radius:16px;padding:14px 16px;gap:10px}
+.rc-al-ic{width:40px;height:40px;box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px rgba(190,120,0,.28)}
+.rc-al--dang .rc-al-ic{box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px rgba(200,40,40,.28)}
+.rc-al-kicker{letter-spacing:.03em;font-size:11px}
+.rc-al-hace{text-transform:none;letter-spacing:0;font-weight:500;color:var(--mid)}
+.rc-al-sub{font-size:13.5px;color:var(--ink-2);margin-top:2px}
+.rc-al-lines.rh-meta{display:flex;flex-wrap:wrap;gap:6px;padding-left:0;margin-top:8px}
+.rc-al-ctas{justify-content:flex-end;padding-left:0;padding-top:10px;border-top:1px solid var(--line)}
+.rc-al .rh-btn{min-height:38px;border-radius:var(--pill);padding:0 16px}
+.rc-al-nota{padding-left:0;text-align:right}

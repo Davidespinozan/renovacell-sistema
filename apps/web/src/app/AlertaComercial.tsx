@@ -14,6 +14,7 @@ import { onNuevaNotificacion, markRead, type Notif } from '../data/store/notific
 import { fuenteComercial, getEstadoAtencion, recargarAtencion, useAtencionComercial, type EstadoAtencionComercial } from '../data/store/atencionStore'
 import { alertaAccionable, lineasSolicitud, KINDS_COMERCIALES, type AlertaAccionable } from '../data/ops/atencionComercial'
 import { irAConversacion, irASolicitud } from '../data/store/navIntentStore'
+import { claseEspera, partirLineas } from '../screens/home/primitives'
 import { escucharPestanas, limpiarVencidos, marcar, reclamar, yaPresentado } from '../lib/avisosPestanas'
 
 interface Senal { clave: string; notifId: string; kind: string; conversationId: string }
@@ -92,19 +93,21 @@ function Tarjeta({ a, onAccion, onDescartar }: { a: AlertaAccionable; onAccion: 
     ? `${nombre} solicita atención`
     : escalada ? `${nombre} sigue esperando asesor` : `${nombre} solicita asesor sin vendedor`
   const kicker = a.tipo === 'vendedor' ? (a.kind === 'handoff_aviso' ? 'Recordatorio · solicitud de asesor' : 'Nueva solicitud de asesor') : escalada ? 'Escalada a Dirección' : 'Sin vendedor elegible'
-  const lineas = [
+  const { lineas: todas, hace } = partirLineas([
     a.tipo === 'direccion' ? (a.item.seller_nombre ? `Asignada a ${a.item.seller_nombre}` : 'Nadie la atiende todavía') : null,
     ...lineasSolicitud(a.item),
-  ].filter((x): x is string => !!x).slice(0, 4)
+  ])
+  const [sub, ...lineas] = todas.slice(0, 4)
   const peligro = escalada || a.tipo === 'direccion'
   return (
     <article className={`rc-al${peligro ? ' rc-al--dang' : ''}`} role="alert" aria-live="assertive" data-testid="alerta-comercial">
       <div className="rc-al-top">
         <span className="rc-al-ic" aria-hidden><Icon name="chat" /></span>
         <div className="rc-al-tx">
-          <div className="rc-al-kicker">{kicker}</div>
+          <div className="rc-al-kicker">{kicker}{hace && <span className="rc-al-hace"> · {hace}</span>}</div>
           <div className="rc-al-title">{titulo}</div>
-          {lineas.length > 0 && <ul className="rc-al-lines">{lineas.map((l) => <li key={l}>{l}</li>)}</ul>}
+          {sub && <div className="rc-al-sub">{sub}</div>}
+          {lineas.length > 0 && <ul className="rc-al-lines rh-meta">{lineas.map((l) => <li key={l} className={claseEspera(l)}>{l}</li>)}</ul>}
         </div>
         <button type="button" className="rc-al-x" onClick={onDescartar} aria-label="Descartar alerta (la solicitud sigue en Inicio)" title="Descartar" data-testid="alerta-descartar"><Icon name="x" /></button>
       </div>
