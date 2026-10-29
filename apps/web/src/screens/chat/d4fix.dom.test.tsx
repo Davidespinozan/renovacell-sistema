@@ -147,3 +147,32 @@ describe('FIX-A · "Terminar asesoría" solo donde el backend lo acepta', () => 
     expect(!!screen.queryByTestId('btn-iniciar')).toBe(iniciar)
   })
 })
+
+// TERMINAR-SOLICITUD (mig 20270205) · dueño: "no hay manera de terminar conversaciones". Una solicitud sin iniciar se
+// cierra con confirmación: Dirección siempre; el vendedor solo la que tiene asignada.
+describe('TERMINAR-SOLICITUD · cerrar una solicitud sin iniciar', () => {
+  it('Dirección (supervisor) cierra una solicitud sin vendedor, previa confirmación', async () => {
+    const f = falso({ modo: 'human_requested', rol: 'supervisor', asesor_soy_yo: false }); const onFin = vi.fn()
+    const conf = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<ChatCanonico embebido asesor conversationId="C1" cliente={f.c} intervaloMs={60_000} onFin={onFin} onSalir={vi.fn()} />)
+    fireEvent.click(await screen.findByTestId('btn-cerrar-solicitud'))
+    await waitFor(() => expect(onFin).toHaveBeenCalledWith('terminada'))
+    expect(f.llamadas).toContain('terminar')
+    expect(screen.queryByTestId('btn-terminar')).toBeNull()
+    conf.mockRestore()
+  })
+  it('si no confirma, no se cierra nada', async () => {
+    const f = falso({ modo: 'human_assigned', rol: 'asesor', asesor_soy_yo: true })
+    const conf = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<ChatCanonico embebido asesor conversationId="C1" cliente={f.c} intervaloMs={60_000} onSalir={vi.fn()} />)
+    fireEvent.click(await screen.findByTestId('btn-cerrar-solicitud'))
+    expect(f.llamadas).not.toContain('terminar')
+    conf.mockRestore()
+  })
+  it('un vendedor que no es el asignado no ve el botón', async () => {
+    const f = falso({ modo: 'human_assigned', rol: 'asesor', asesor_soy_yo: false })
+    render(<ChatCanonico embebido asesor conversationId="C1" cliente={f.c} intervaloMs={60_000} onSalir={vi.fn()} />)
+    await screen.findByTestId('chat-canonico'); await espera(30)
+    expect(screen.queryByTestId('btn-cerrar-solicitud')).toBeNull()
+  })
+})

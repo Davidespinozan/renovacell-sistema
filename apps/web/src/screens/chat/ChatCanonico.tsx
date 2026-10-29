@@ -317,8 +317,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   }
   // D4-FIX · Terminar: si el servidor confirma, NO se relee (el asesor deja de tener acceso por diseño de C1); se
   // detiene el sondeo y quien monta vuelve a su lista con la confirmación. Un fallo real conserva su manejo.
-  const terminarAsesoria = async () => {
+  const terminarAsesoria = async (solicitud = false) => {
     if (!convId) return
+    // TERMINAR-SOLICITUD · cerrar una solicitud que nadie inició se confirma: el cliente sigue con el asistente.
+    if (solicitud && !window.confirm('¿Cerrar esta solicitud de asesor? El cliente sigue con el asistente y puede volver a pedir un asesor cuando quiera.')) return
     setErrorTerminar(null)
     const r = await cliente.terminar(convId)
     if (!r.ok) { setErrorTerminar(r.error.mensaje); await cargar(convId, 0); return }
@@ -427,6 +429,11 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           {/* D4-FIX · solo en los estados que el backend acepta (human_active / human_ended); en human_assigned se pulsa "Iniciar" */}
           {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_ended') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
             <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria()} data-testid="btn-terminar"><span className="rc-larga">Terminar asesoría</span><span className="rc-corta" aria-hidden>Terminar</span></button>
+          )}
+          {/* TERMINAR-SOLICITUD (mig 20270205) · una solicitud sin iniciar también se cierra: Dirección cualquiera, el
+              vendedor la que tiene asignada. Sin vendedor solo Dirección (lo decide la base). */}
+          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && !cerrada && (modo === 'human_requested' || modo === 'human_assigned') && (conv.rol === 'supervisor' || conv.asesor_soy_yo) && (
+            <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria(true)} data-testid="btn-cerrar-solicitud"><span className="rc-larga">Cerrar solicitud</span><span className="rc-corta" aria-hidden>Cerrar</span></button>
           )}
           {!finAtencion && vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
