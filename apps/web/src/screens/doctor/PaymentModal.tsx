@@ -96,6 +96,8 @@ export function PaymentModal({
         })
         if (e) { setError(await motivoDeFalla(e)); setBusy(false); return }
         renew()
+        // La tarjeta del pedido pasa a "Pago en revisión" sin recargar la página (import diferido: no arrastra los stores).
+        void import('../../data/store/refrescar').then((m) => m.refrescarDatos()).catch(() => {})
       } else {
         notify({ text: `Transferencia informada · pedido ${folio} · confírmala al recibirla`, roles: ['admin'], screen: 'av_fin' })
       }

@@ -3,6 +3,18 @@
 import type { Shipment } from '../types'
 import type { OrderWithItems } from '../store/ordersStore'
 
+// Recoge en sucursal: Empaque lo marca "listo para recoger" (pedido enviado SIN envío) y se cierra cuando el cliente
+// pasa por él. No es un envío atorado ni "en camino".
+export const esRecoge = (o: Pick<OrderWithItems, 'shipping_meta'>): boolean =>
+  (o.shipping_meta as { method?: string } | null)?.method === 'recoge'
+
+// El envío que cuenta para un pedido: el más reciente que no está cancelado (una guía anulada o un envío cancelado
+// no tapa al vigente); si todos están cancelados, el más reciente.
+export function envioVigente(shipments: Shipment[], orderId: string): Shipment | undefined {
+  const del = shipments.filter((s) => s.order_id === orderId).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  return del.find((s) => s.status !== 'cancelado') ?? del[0]
+}
+
 export interface Diagnosis {
   stuck: boolean
   reason: string
@@ -29,6 +41,8 @@ export function diagnoseShipment(order: OrderWithItems, shipment: Shipment | und
 
   if (order.status === 'delivered') {
     statusLabel = 'Entregado'; statusPill = 'p-ok'
+  } else if (order.status === 'shipped' && esRecoge(order)) {
+    statusLabel = 'Listo para recoger'; statusPill = 'p-warn'
   } else if (!shipment) {
     // Empacado pero sin envío asignado = surtido sin salir.
     statusLabel = 'Empacado · sin asignar'; statusPill = 'p-warn'

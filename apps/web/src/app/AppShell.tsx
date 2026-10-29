@@ -10,6 +10,7 @@ import { ChatFlotante } from './ChatFlotante'
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
+import { instalarRefresco, refrescarDatos } from '../data/store/refrescar'
 
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
@@ -29,6 +30,9 @@ export function AppShell() {
 
   // Cerrar el drawer al cambiar de rol o pantalla.
   useEffect(() => setDrawer(false), [role, screen])
+  // Datos al día: al llegar un aviso, al volver a la pestaña y al abrir otra pantalla (antes: solo al iniciar sesión).
+  useEffect(() => { instalarRefresco() }, [])
+  useEffect(() => { refrescarDatos() }, [screen])
 
   return (
     <div className="app">

@@ -57,6 +57,12 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
       ], datos: [...fila('Pedido', folio), ...fila('Monto', monto), ...fila('Forma de pago', m ? m.charAt(0).toUpperCase() + m.slice(1) : '')] }
     }
     case 'pedido_enviado': {
+      // Recoge en sucursal: el mismo hecho (sale del almacén) para el cliente es "ya puedes pasar por él".
+      if (String(d.metodo ?? '') === 'recoge') {
+        return { asunto: `Tu ${ref} está listo para recoger`, titulo: 'Tu pedido está listo para recoger', parrafos: [
+          'Ya puedes pasar por tu pedido a nuestra sucursal. Si alguien más lo recoge por ti, que mencione el número de pedido.',
+        ], datos: fila('Pedido', folio), rastreo: null }
+      }
       const paq = String(d.paqueteria ?? '').trim(); const numero = String(d.rastreo ?? '').trim()
       return { asunto: `Tu ${ref} va en camino`, titulo: 'Tu pedido va en camino', parrafos: [
         numero ? 'Tu pedido ya salió de nuestro almacén. Puedes seguirlo con el número de rastreo.' : 'Tu pedido ya salió con nuestro equipo de entregas.',

@@ -83,11 +83,11 @@ describe('FISCAL-3-FE · selección de RPC y argumentos', () => {
 })
 
 describe('FISCAL-3-FE · respuestas', () => {
-  it('éxito: total y folio del servidor; aviso a Almacén una sola vez', async () => {
+  it('éxito: total y folio del servidor; el aviso de pedido nuevo lo emite el servidor (no el navegador)', async () => {
     h.rpc.mockResolvedValueOnce(ok({ folio: 'S123456', total: 450 }))
     const r = await conFactura()
     expect(r.ok && r.order.total).toBe(450); expect(r.ok && r.order.external_ref).toBe('S123456'); expect(r.ok && r.repetido).toBeFalsy()
-    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).not.toHaveBeenCalled()   // 20270203: trigger trg_aviso_pedido_nuevo → Dirección y vendedor
   })
   it('repetido (idempotent): éxito marcado como repetido, con SU folio y total', async () => {
     h.rpc.mockResolvedValueOnce(ok({ idempotent: true, folio: 'S777777', total: 300 }))

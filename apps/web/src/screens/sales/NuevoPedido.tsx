@@ -214,7 +214,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
             <div className="success">
               <div className="ck"><Plus size={26} /></div>
               <h3>{repetido ? 'Pedido confirmado' : 'Pedido creado'}</h3>
-              <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó como <b>contra pedido</b> y ya aparece en Almacén → Preparar pedidos.</p>
+              <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó <b>pendiente de pago</b>. Dirección ya recibió el aviso: en cuanto registre el cobro o autorice el crédito, pasa a Almacén para prepararse.</p>
               {promesa && <p data-testid="np-promesa" style={{ fontSize: 13.5 }}><b>{promesa.texto}</b>{promesa.flete > 0 ? ` · flete ${money(promesa.flete)}` : ' · sin flete'}<br />{promesa.promesa}</p>}
               {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>

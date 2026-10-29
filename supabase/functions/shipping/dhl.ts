@@ -281,8 +281,18 @@ export function parseGetImage(data: any): string | null {
   return label?.content ? String(label.content) : null
 }
 
+// Ambiente de DHL. Solo dos valores válidos: 'production' (guías reales) o 'test'/'sandbox' (sin valor = test). Cualquier
+// otra cosa ('prod', 'live', 'PRODUCTION ' con espacios…) antes caía EN SILENCIO a pruebas y se imprimían guías falsas
+// como reales: ahora es un error de configuración (falla cerrado).
+export function dhlAmbiente(env: string | undefined): 'production' | 'test' {
+  const v = (env ?? '').trim().toLowerCase()
+  if (v === 'production') return 'production'
+  if (v === '' || v === 'test' || v === 'sandbox') return 'test'
+  throw new Error(`DHL_API_ENV inválido ("${env}"): usa exactamente production o test`)
+}
+
 export function dhlBaseUrl(env: string | undefined): string {
-  return (env ?? 'test').toLowerCase() === 'production'
+  return dhlAmbiente(env) === 'production'
     ? 'https://express.api.dhl.com/mydhlapi'
     : 'https://express.api.dhl.com/mydhlapi/test'
 }

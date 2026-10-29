@@ -94,7 +94,7 @@ async function hydrate() {
   // avisar, y las colas y la cobranza se calculaban sobre un historial incompleto.
   const { data, error } = await leerTodo('los pedidos', (desde, hasta) => supabase
     .from('orders')
-    .select('id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
+    .select('id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, shipping_cost, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
     .order('created_at', { ascending: false }).order('id').range(desde, hasta))
   if (g !== hgen) return // llegó una hidratación más nueva; ignora esta
   if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
@@ -188,7 +188,9 @@ export async function createOrder(input: {
     orders = [o, ...orders]
     items = [...items, ...newItems]
     emit()
-    notify({ text: `Nuevo pedido ${folio} · contra pedido`, roles: ['warehouse'], screen: 'surtido' })
+    // Con backend avisa el SERVIDOR (trigger de pedido nuevo → Dirección y el vendedor): Almacén no puede hacer nada con
+    // un pedido sin pagar. Sin backend (demo), el aviso local equivalente.
+    if (!hasSupabase) notify({ text: `Nuevo pedido ${folio} · por cobrar`, roles: ['admin'], screen: 'av_pagos' })
     logAudit({ actor: input.placedBy ?? 'Portal del Doctor', action: 'Pedido creado', resource: folio })
     return { ...o, items: newItems }
   }
@@ -463,6 +465,24 @@ export async function markDelivered(orderId: string, opts: { remote?: boolean } 
   emit()
   notify({ text: `Pedido ${folioOf(orderId)} entregado`, roles: ['admin'], screen: 'av_ventas' })
   logAudit({ actor: 'Chofer', action: 'Entrega confirmada', resource: folioOf(orderId) })
+  return { ok: true }
+}
+
+// Recoge en sucursal: el cliente pasó por su pedido. No hay envío (ni chofer ni guía): Almacén/Dirección lo cierra
+// con quién lo recogió, que queda en el pedido. Mismo cambio de estado que una entrega (enviado → entregado), y el
+// servidor manda el aviso de "entregado" al cliente.
+export async function entregarRecoge(orderId: string, recogio: string): Promise<Escritura> {
+  const cur = orders.find((o) => o.id === orderId)
+  if (!cur || cur.status !== 'shipped') return { ok: false, error: 'Este pedido no está listo para recoger: recarga para ver su estado actual.', ambiguous: false }
+  const nextMeta = { ...((cur.shipping_meta as object | null) ?? {}), recogio, recogido_at: new Date().toISOString() }
+  if (hasSupabase && isUuid(orderId)) {
+    const r = await confirmar(`entregar el pedido ${folioOf(orderId)} al cliente`,
+      supabase.from('orders').update({ status: 'delivered', shipping_meta: nextMeta as unknown as Json }).eq('id', orderId))
+    if (!r.ok) { hydrate(); return r }
+  }
+  orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered', shipping_meta: nextMeta } : o))
+  emit()
+  logAudit({ actor: 'Almacén', action: 'Entregado en sucursal', resource: folioOf(orderId), detail: `Recogió: ${recogio}` })
   return { ok: true }
 }
 

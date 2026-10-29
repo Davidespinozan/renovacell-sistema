@@ -49,6 +49,7 @@ describe('T1 · proveedor de la guía en Empaque', () => {
     await screen.findByText(/FedEx/)
     fireEvent.click(screen.getByRole('button', { name: /Generar guía/ }))
     expect(await screen.findByTestId('guia-sandbox')).toHaveTextContent(/ambiente de pruebas: no es un envío real/)
+    expect(await screen.findByText(/el pedido NO se marcó como enviado/)).toBeTruthy()   // ni "va en camino" al cliente
     expect(srv.create.mock.calls[0][0].provider).toBe('t1'); expect(srv.create.mock.calls[0][0].rate.amount).toBe(140)   // el total que vio el operador viaja para confirmarse en el servidor
   })
   it('si el servidor reporta cambio de precio, no hay guía y el mensaje pide recotizar', async () => {

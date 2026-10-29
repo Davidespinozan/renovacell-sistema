@@ -9,7 +9,8 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useShipments } from '../../data/hooks/useShipments'
 import { markShipped } from '../../data/store/ordersStore'
-import { getDrivers } from '../../data/mock/shipments'
+import { getDrivers, driverName } from '../../data/mock/shipments'
+import { envioVigente } from '../../data/ops/seguimiento'
 import { quoteShipment, createShipmentReal, NOMBRE_PROVEEDOR, type RateQuote, type LabelResult, type ProveedorPaqueteria } from '../../data/shipping/provider'
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
@@ -79,9 +80,21 @@ const labelStyle: React.CSSProperties = {
 export function Cola() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
+  const { data: shipments = [], dispatchShipment } = useShipments()
   const [active, setActive] = useState<OrderWithItems | null>(null)
   // CANCELACIÓN · Dirección cancela directo; los demás la solicitan. Con una solicitud pendiente no se envía.
-  const { role } = useRole()
+  const { role, user } = useRole()
+  // Ya asignado a un chofer y esperando salida: se despacha desde aquí (no se vuelve a asignar: eso duplicaba el envío).
+  const [despachando, setDespachando] = useState<string | null>(null)
+  const [errDespacho, setErrDespacho] = useState<Record<string, string>>({})
+  const despachar = async (o: OrderWithItems, shipmentId: string, driverId: string) => {
+    setDespachando(o.id); setErrDespacho((m) => ({ ...m, [o.id]: '' }))
+    const folio = o.external_ref ?? o.id
+    const d = await dispatchShipment(shipmentId, user?.name ?? 'Almacén', folio)
+    const e = d.ok ? await markShipped(o.id, { method: 'chofer', driver: driverName(driverId), driver_id: driverId }) : d
+    setDespachando(null)
+    if (!e.ok) setErrDespacho((m) => ({ ...m, [o.id]: d.ok ? `La carga salió, pero el pedido NO pasó a En camino. ${e.error}` : `NO se despachó. ${e.error}` }))
+  }
   const esDireccion = role === 'admin'
   const solicitudes = useSolicitudesCancelacion()
   const [cancelando, setCancelando] = useState<OrderWithItems | null>(null)
@@ -116,10 +129,22 @@ export function Cola() {
               </div>
             ))}
             {sol && <AvisoCancelacion solicitud={sol} esDireccion={esDireccion} />}
+            {(() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
+              <div className="sysnote" style={{ marginTop: 10 }} data-testid="cola-asignado">
+                <Icon name="truck" /><span>Asignado a <b>{driverName(env.driver_id)}</b> · por despachar. Cuando le entregues la carga, despáchala.</span>
+              </div>
+            ) : null })()}
+            {errDespacho[o.id] && <div style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{errDespacho[o.id]}</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-              <button className="btn" type="button" onClick={() => setActive(o)} disabled={!!sol} title={sol ? 'Hay una cancelación por resolver' : undefined}>
-                <Icon name="truck" /> Asignar envío
-              </button>
+              {(() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
+                <button className="btn" type="button" disabled={!!sol || despachando === o.id} onClick={() => void despachar(o, env.id, env.driver_id!)} data-testid="cola-despachar">
+                  <Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}
+                </button>
+              ) : (
+                <button className="btn" type="button" onClick={() => setActive(o)} disabled={!!sol} title={sol ? 'Hay una cancelación por resolver' : undefined}>
+                  <Icon name="truck" /> Asignar envío
+                </button>
+              ) })()}
               <BotonRemision order={o} className="btn ghost" />
               {!sol && (esDireccion
                 ? <button className="btn ghost" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={() => setCancelando(o)} data-testid="btn-cancelar-pedido">Cancelar pedido</button>
@@ -226,6 +251,14 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
           label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
         })
       }
+      // Guía de AMBIENTE DE PRUEBAS (DHL o T1 en sandbox): no es un envío real. El pedido NO se marca enviado (eso le manda
+      // al cliente "va en camino" con un número de rastreo que no existe); se muestra la guía para la prueba y nada más.
+      if (label.ambiente === 'test') {
+        setResult(label)
+        setError(`Guía de PRUEBAS (${label.carrier}): no es un envío real y el pedido NO se marcó como enviado. Pide a Dirección activar la paquetería en producción.`)
+        setBusy(false)
+        return
+      }
       const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
       // La guía YA existe aunque el pedido no haya cambiado de estado: se muestra
       // siempre, para que el operador no pierda el número de rastreo, y se le dice
@@ -285,10 +318,11 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
               <div className="ck"><Icon name="check" /></div>
               <h3>Guía generada</h3>
               <p>
-                <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.{result.ambiente === 'test' && <> <span className="pill p-warn" data-testid="guia-sandbox">T1 · ambiente de pruebas: no es un envío real</span></>}
+                <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.{result.ambiente === 'test' && <> <span className="pill p-warn" data-testid="guia-sandbox">{result.carrier} · ambiente de pruebas: no es un envío real</span></>}
                 Guía <b className="mono">{result.tracking}</b> · entrega estimada {fmtDate(result.estimatedDeliveryAt)}.
-                El doctor ya la ve en su seguimiento.
+                {!error && result.ambiente !== 'test' && <> El doctor ya la ve en su seguimiento.</>}
               </p>
+              {error && <div className="sysnote" style={{ marginTop: 10, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }} data-testid="guia-aviso">{error}</div>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
                 <a className="btn" href={result.labelUrl} target="_blank" rel="noreferrer"><Icon name="download" /> Imprimir etiqueta</a>
                 <button className="btn ghost" type="button" onClick={onClose}>Listo</button>

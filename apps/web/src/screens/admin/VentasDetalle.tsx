@@ -2,6 +2,7 @@
 // Portal + ventas POS (mismo store), filtrable. NO es el Tablero ni Trazabilidad.
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
+import { orderClientName } from '../../data/ops/orderClient'
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
@@ -20,6 +21,7 @@ import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
+import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { GuiaManualVoid } from './GuiaManualVoid'
@@ -59,7 +61,8 @@ export function VentasDetalle() {
 
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
-  const clientName = (o: OrderWithItems) => (o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
+  // Nombre del cliente del pedido: el snapshot del servidor (cuentas sin portal = casi todas), luego el doctor.
+  const clientName = (o: OrderWithItems) => orderClientName(o, (id) => doctorsById[id]?.full_name, o.doctor_id ? 'Doctor' : 'Mostrador (POS)')
   const productsSummary = (o: OrderWithItems) => {
     const names = o.items.map((it) => productsById[it.product_id ?? '']?.name ?? 'Producto')
     if (names.length === 0) return '—'
@@ -156,7 +159,7 @@ export function VentasDetalle() {
           { key: 'id', label: 'Canal', format: (_v, o) => (channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal') },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
           { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
-          { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status).label },
+          { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o) }).label },
           { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
         ]} />
         <ExportButton
@@ -194,7 +197,7 @@ export function VentasDetalle() {
             </thead>
             <tbody>
               {rows.map((o) => {
-                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status); const isPos = channelOf(o) === 'pos'
+                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o) }); const isPos = channelOf(o) === 'pos'
                 return (
                   <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
@@ -245,7 +248,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   onClose: () => void
   onCancel: () => void
 }) {
-  const p = payInfo(order, dinero); const sv = statusView(order.status)
+  const p = payInfo(order, dinero); const sv = statusView(order.status, { recoge: esRecoge(order) })
   const { user, role } = useRole()
   const { data: refunds, refundedByOrder } = useRefunds()
   const { data: entries } = usePaymentEntries()

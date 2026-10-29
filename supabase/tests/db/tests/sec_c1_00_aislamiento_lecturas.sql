@@ -56,9 +56,9 @@ begin
   -- ══ FORMA ════════════════════════════════════════════════════════════════════════════════════
   perform tests.ok((select string_agg(tablename || '=' || md5(qual), ',' order by tablename) from pg_policies where schemaname = 'public' and cmd = 'SELECT'
                     and tablename in ('order_items','payment_entries','payment_claims','refunds','cash_closings','inventory_movements','orders'))
-    = 'cash_closings=f07a46d9d9ceca9490b7a227394ca50a,inventory_movements=a57e5032292211476a5a2c9f88c3cf60,order_items=ade972101e92ee55948b004d0d03cfe3,'
+    = 'cash_closings=f07a46d9d9ceca9490b7a227394ca50a,inventory_movements=a57e5032292211476a5a2c9f88c3cf60,order_items=9786c0ee8a8f12c3ed7295d9214cb8db,'
       'orders=457f39b6ea229576071c7c7f4f4a389d,payment_claims=6355714e576fcd50cdd9bc3a52810b05,payment_entries=172b94d73fdb6f9d4374e9d6dcb0d07e,refunds=a3783ee439bf98656dd35f22b74dc246',
-    'G1 · políticas SEC-C1 instaladas y orders_select_scoped intacta');
+    'G1 · políticas SEC-C1 instaladas (order_items con la rama del chofer, 20270203) y orders_select_scoped intacta');
   perform tests.ok((select string_agg(proname || '=' || md5(pg_get_functiondef(oid)), ',' order by proname) from pg_proc where pronamespace = 'public'::regnamespace
                     and proname in ('estado_dinero_pedido','estado_fiscal_pedido','efectivo_esperado','tramo_corte_caja','_sec_c1_pos_ve_pedido','_sec_c1_ve_pedido','_sec_c1_pos_ve_movimiento'))
     = '_sec_c1_pos_ve_movimiento=14b0f521726efff2be278ccfee165ea6,_sec_c1_pos_ve_pedido=88173057fc46e7dd94f986aab64c23ca,_sec_c1_ve_pedido=7a0a76e0ff4969dff47c5a30c6efee64,efectivo_esperado=85db31cc72539b1097166d272887dccc,estado_dinero_pedido=7744d815fd05b6d654e6076f9c530b62,'

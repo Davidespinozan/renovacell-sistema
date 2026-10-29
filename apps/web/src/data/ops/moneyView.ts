@@ -29,8 +29,11 @@ export function etiquetaPago(m: Pick<OrderMoney, 'estado_pago' | 'saldo' | 'cobr
 
 // Un crédito sigue ABIERTO mientras haya saldo. Si después se cobró completo, el crédito quedó
 // saldado: el pedido ya no es "a crédito" ni puede estar "vencido" (el libro manda sobre la fecha).
-export const creditoAbierto = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo'>): boolean => m.credito_autorizado && m.saldo > 0.0001
-export const creditoVencido = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo' | 'vencido'>): boolean => creditoAbierto(m) && m.vencido
+// Un pedido cancelado tampoco tiene crédito que cobrar (cancelar no revoca el crédito en el libro).
+type ConEstado = { order_status?: string | null }
+export const creditoAbierto = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo'> & ConEstado): boolean =>
+  m.credito_autorizado && m.saldo > 0.0001 && m.order_status !== 'cancelled'
+export const creditoVencido = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo' | 'vencido'> & ConEstado): boolean => creditoAbierto(m) && m.vencido
 
 // Por qué (o por qué no) se puede surtir. NUNCA dice "pagado" por un crédito.
 export function etiquetaLiberacion(m: Pick<OrderMoney, 'liberado' | 'credito_autorizado' | 'due_date' | 'vencido' | 'estado_pago' | 'saldo'>): EtiquetaPago {

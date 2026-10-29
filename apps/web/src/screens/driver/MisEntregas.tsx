@@ -87,7 +87,8 @@ export function MisEntregas() {
   // Solo con chofer resuelto: si driverId es null (aún cargando) no se listan
   // envíos —evita que un envío sin chofer (driver_id null) entre por null===null.
   const myAll = driverId ? shipments.filter((s) => s.driver_id === driverId) : []
-  const mine = myAll.filter((s) => s.status !== 'delivered')
+  // Un envío cancelado (pedido cancelado o guía anulada) sale de la ruta: ya no se entrega.
+  const mine = myAll.filter((s) => s.status !== 'delivered' && s.status !== 'cancelado')
   const entregadas = myAll.filter((s) => s.status === 'delivered')
   // Piezas a bordo = suma de unidades de los pedidos pendientes en su ruta.
   const piezasABordo = mine.reduce((s, sh) => {

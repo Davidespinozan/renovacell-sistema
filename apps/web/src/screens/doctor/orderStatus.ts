@@ -10,7 +10,9 @@ export interface StatusView {
   step: number
 }
 
-export function statusView(status: OrderStatus | null): StatusView {
+// `recoge`: el pedido "enviado" de recoger en sucursal está LISTO PARA RECOGER, no en camino.
+export function statusView(status: OrderStatus | null, opts: { recoge?: boolean } = {}): StatusView {
+  if (status === 'shipped' && opts.recoge) return { label: 'Listo para recoger', pill: 'p-warn', step: 3 }
   switch (status) {
     case 'draft': return { label: 'Borrador', pill: 'p-neu', step: 0 }
     case 'pending_payment': return { label: 'Pendiente de pago', pill: 'p-warn', step: 0 }

@@ -9,7 +9,7 @@ import { fmtDate, money } from '../../lib/format'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
-import { planSurtido, canFulfill, surtirPedido, type ItemPlan } from '../../data/ops/surtir'
+import { planSurtido, canFulfill, surtirPedido, mapaEnCustodia, type ItemPlan } from '../../data/ops/surtir'
 import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
 import { useOrderMoney } from '../../data/hooks/useMoney'
@@ -39,7 +39,7 @@ export function Surtido() {
   // esos entran al surtido en lote (los que no, se abren uno a uno para ver el detalle).
   const fulfillable = useMemo(() => {
     const m: Record<string, boolean> = {}
-    pending.forEach((o) => { m[o.id] = canFulfill(planSurtido(o, lots)) })
+    pending.forEach((o) => { m[o.id] = canFulfill(planSurtido(o, lots, mapaEnCustodia())) })
     return m
   }, [pending, lots])
 
@@ -181,7 +181,7 @@ export function SurtirModal({
   const [err, setErr] = useState<string | null>(null)
   const { opId } = useOpId() // misma intención ⇒ mismo op_id en cada reintento
 
-  const plans = useMemo(() => planSurtido(order, lots), [order, lots])
+  const plans = useMemo(() => planSurtido(order, lots, mapaEnCustodia()), [order, lots])
   const ok = canFulfill(plans)
 
   const confirm = async () => {

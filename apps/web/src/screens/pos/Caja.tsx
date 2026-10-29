@@ -359,7 +359,7 @@ export function Caja() {
             {entrega === 'entrega' ? (
               <div style={{ marginTop: 12 }} data-testid="pos-pedido-entrega">
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-                  {client ? <>Pedido para <b>{client.name}</b>: eliges su domicilio, el tipo de entrega (chofer, DHL o recoger) con el flete y la fecha —la entrega local se agenda en un horario disponible—, y queda <b>contra pedido</b> para Almacén.</> : <>Primero elige el <b>cliente</b> arriba: el pedido con entrega va a su nombre y usa sus domicilios.</>}
+                  {client ? <>Pedido para <b>{client.name}</b>: eliges su domicilio, el tipo de entrega (chofer, DHL o recoger) con el flete y la fecha —la entrega local se agenda en un horario disponible—, y queda <b>pendiente de pago</b>: pasa a Almacén cuando Dirección registre el cobro o autorice el crédito.</> : <>Primero elige el <b>cliente</b> arriba: el pedido con entrega va a su nombre y usa sus domicilios.</>}
                 </div>
                 <button className="btn" type="button" style={{ width: '100%' }} disabled={!client} onClick={() => setPedidoAbierto(true)} data-testid="pos-continuar-entrega">
                   <Icon name="truck" /> Continuar con la entrega

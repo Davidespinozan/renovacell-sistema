@@ -1,5 +1,6 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
+\ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)
 create temp table _rp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/internas_solo_si_mismas/99_down.sql   -- INTERNAS-2 se baja antes (redefine políticas, cc_vendedores y comisiones_equipo)
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero

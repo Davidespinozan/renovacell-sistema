@@ -42,7 +42,7 @@ export interface RateQuote {
 
 export interface LabelResult {
   provider?: string // 'dhl' | 't1' | 'mock' | …
-  ambiente?: 'test' | 'production' // T1 · una guía sandbox NO es un envío físico real
+  ambiente?: 'test' | 'production' // DHL/T1 · una guía sandbox NO es un envío físico real (y no marca el pedido enviado)
   carrier: string
   service: string
   serviceCode?: string

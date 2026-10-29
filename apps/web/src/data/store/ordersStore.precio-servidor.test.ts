@@ -113,7 +113,7 @@ describe('W4-01 · createOrder dice la verdad', () => {
   it('CONFIRMADO: solo entonces se avisa a Almacén y se audita', async () => {
     const r = await pedir()
     expect(r.ok).toBe(true)
-    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).not.toHaveBeenCalled()   // el aviso de pedido nuevo lo emite el servidor (20270203)
     expect(logAudit).toHaveBeenCalledTimes(1)
     expect(getFallosSnapshot()).toHaveLength(0)
   })

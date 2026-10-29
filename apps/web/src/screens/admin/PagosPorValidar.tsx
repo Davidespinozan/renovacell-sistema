@@ -3,6 +3,7 @@
 // comprobante esté aquí, NO hay dinero en el libro y el pedido no está pagado.
 // Al confirmar nace el ASIENTO (`revisar_pago`) y el servidor recalcula payment_status;
 // al rechazar (con motivo) el pedido queda sin pagar y el cliente puede volver a reportar.
+import { orderClientName } from '../../data/ops/orderClient'
 import React, { useMemo, useState } from 'react'
 import { BadgeDollarSign, Clock, Landmark, FileImage, Check, X } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -32,7 +33,7 @@ export function PagosPorValidar() {
 
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
   const banksById = useMemo(() => Object.fromEntries(banks.map((b) => [b.id, b])), [banks])
-  const clientName = (o: OrderWithItems | null) => (!o ? 'Pedido aún no cargado' : o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
+  const clientName = (o: OrderWithItems | null) => (!o ? 'Pedido aún no cargado' : orderClientName(o, (id) => doctorsById[id]?.full_name, o.doctor_id ? 'Doctor' : 'Mostrador (POS)'))
   const bankLabel = (t: PaymentClaim): string => {
     const b = t.bank_account_id ? banksById[t.bank_account_id] : null
     if (!b) return 'Cuenta no indicada'

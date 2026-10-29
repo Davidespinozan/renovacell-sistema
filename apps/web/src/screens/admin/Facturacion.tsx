@@ -3,6 +3,7 @@
 // cobro y de CFDI, y permite "Emitir CFDI" / "Marcar cobrado". La emisión REAL
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
+import { orderClientName } from '../../data/ops/orderClient'
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
@@ -77,7 +78,7 @@ export function Facturacion() {
 
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
-  const clientName = (o: OrderWithItems) => (o.doctor_id ? doctorsById[o.doctor_id]?.full_name ?? 'Doctor' : 'Mostrador (POS)')
+  const clientName = (o: OrderWithItems) => orderClientName(o, (id) => doctorsById[id]?.full_name, o.doctor_id ? 'Doctor' : 'Mostrador (POS)')
   // Datos fiscales del doctor (viven en profiles.meta.fiscal) para el CFDI.
   const fiscalOf = (o: OrderWithItems): { rfc: string; name: string; cfdiUse: string } => {
     const f = ((o.doctor_id ? doctorsById[o.doctor_id]?.meta : null) as { fiscal?: Record<string, string> } | null)?.fiscal
@@ -114,11 +115,12 @@ export function Facturacion() {
   // Cuentas por cobrar agregadas por cliente (Sección B: alertas de adeudo).
   const debt = useMemo(() => {
     const m = new Map<string, { name: string; count: number; total: number; oldest: string }>()
-    valid.filter((o) => o.doctor_id).forEach((o) => {
+    // Por CUENTA del cliente (customer_id; casi todas sin portal), con respaldo al doctor en pedidos legacy.
+    valid.filter((o) => o.customer_id || o.doctor_id).forEach((o) => {
       const saldo = byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)
       if (saldo <= 0.0001) return
-      const id = o.doctor_id as string
-      const e = m.get(id) ?? { name: doctorsById[id]?.full_name ?? 'Doctor', count: 0, total: 0, oldest: o.created_at }
+      const id = (o.customer_id ?? o.doctor_id) as string
+      const e = m.get(id) ?? { name: clientName(o), count: 0, total: 0, oldest: o.created_at }
       e.count += 1; e.total += saldo
       if (o.created_at < e.oldest) e.oldest = o.created_at
       m.set(id, e)

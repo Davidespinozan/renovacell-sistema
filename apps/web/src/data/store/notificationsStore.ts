@@ -81,6 +81,11 @@ async function hydrate() {
   emit()
 }
 
+// Quien quiera reaccionar a un aviso que llega en vivo (p. ej. recargar los datos de la pantalla: un "pago confirmado"
+// no sirve si la lista de Almacén sigue con la foto de hace una hora). Sin importar stores aquí: evita ciclos.
+const alLlegar = new Set<(n: Notif) => void>()
+export function alLlegarAviso(cb: (n: Notif) => void): () => void { alLlegar.add(cb); return () => { alLlegar.delete(cb) } }
+
 // Realtime necesita el TOKEN del usuario (si va con anon key el RLS filtra todo).
 let notifChannel: ReturnType<typeof supabase.channel> | null = null
 async function ensureRealtime() {
@@ -97,6 +102,7 @@ async function ensureRealtime() {
       items = [nueva, ...items]
       emit()
       senalar(nueva)
+      alLlegar.forEach((cb) => { try { cb(nueva) } catch (e) { console.warn('[notif] alLlegar', e) } })
     })
     .subscribe()
 }

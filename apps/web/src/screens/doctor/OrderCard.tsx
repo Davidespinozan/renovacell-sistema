@@ -5,6 +5,7 @@ import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
 import { statusView } from './orderStatus'
+import { esRecoge } from '../../data/ops/seguimiento'
 import { Trk } from './Trk'
 import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { trackingUrl } from '../../data/shipping/provider'
@@ -32,7 +33,7 @@ export function OrderCard({
   dinero?: OrderMoney | null
   pagoReportado?: boolean
 }) {
-  const sv = statusView(order.status)
+  const sv = statusView(order.status, { recoge: esRecoge(order) })
   // Con libro de dinero, "por pagar" es tener SALDO: un pago parcial sigue pendiente.
   const saldo = dinero ? dinero.saldo : (order.payment_status === 'paid' ? 0 : (order.total ?? 0))
   const unpaid = saldo > 0.0001 && order.status !== 'cancelled'
@@ -78,14 +79,19 @@ export function OrderCard({
         <b>{money(order.total)}</b>
       </div>
 
-      {unpaid && onPay && (
+      {unpaid && onPay && (pagoReportado ? (
+        // Ya informó su pago: no se le vuelve a ofrecer pagar (el servidor lo rechazaría) mientras Renovacell lo revisa.
+        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--cp-surface-2, #f3f5f2)', border: '1px solid var(--line)', fontSize: 13 }} data-testid="pago-en-revision">
+          Recibimos tu comprobante. Lo estamos revisando y te avisamos en cuanto se confirme.
+        </div>
+      ) : (
         <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--warn-bg)', border: '1px solid #EEDDB6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: 'var(--warn)', fontWeight: 600 }}>Este pedido está pendiente de pago.</span>
           <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={onPay}>
-            <Icon name="receipt" /> Pagar {money(order.total)}
+            <Icon name="receipt" /> Pagar {money(saldo)}
           </button>
         </div>
-      )}
+      ))}
 
       {order.payment_status === 'paid' && order.payment_ref && (
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>

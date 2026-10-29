@@ -21,7 +21,7 @@ import { observador } from '../_shared/observa.ts'
 const obs = observador('shipping')
 import {
   buildRateRequest, parseRates, buildShipmentRequest, parseShipment, parseTracking,
-  dhlErrorMessage, dhlBaseUrl, isTrackingNoData, emptyTrackingResult, buildPickupRequest, parsePickup,
+  dhlErrorMessage, dhlBaseUrl, dhlAmbiente, isTrackingNoData, emptyTrackingResult, buildPickupRequest, parsePickup,
   referenciaIntento, urlGetImage, parseGetImage,   // DHL D1
   consultarDHL, decisionPrevia, guiasDistintas, horasDesde, fetchConTimeout, TIMEOUT_COTIZACION_MS, TIMEOUT_GUIA_MS, TIMEOUT_CONSULTA_MS, MINUTOS_MINIMOS_SIN_GUIA, MINUTOS_VIGENCIA_CONSULTA,   // DHL D1 · reconciliación
   type NeutralShipper, type NeutralReceiver, type NeutralPackage,
@@ -675,6 +675,13 @@ Deno.serve(conCors(async (req) => {
         return json(409, { error: 'unknown_requires_reconciliation', message: 'No se pudo confirmar el resultado con DHL; la guía pudo crearse. Requiere reconciliación (no se reintenta automáticamente).' })
       }
       const shipData = await shipResp.json().catch(() => ({}))
+      // Un 5xx/408/429 de DHL (o de su gateway) en la CREACIÓN no prueba que la guía no exista: se trata como
+      // desconocido (reconciliación) en vez de "reintentar seguro", que podía comprar una segunda guía.
+      if (shipResp.status >= 500 || shipResp.status === 408 || shipResp.status === 429) {
+        obs('create_shipment', 'unknown', { code: shipResp.status, mensaje: 'DHL respondió error de servidor al crear la guía' })
+        await markUnknown(admin, attemptId, `create ${shipResp.status}: ${dhlErrorMessage(shipResp.status, shipData)}`)
+        return json(409, { error: 'unknown_requires_reconciliation', message: 'DHL respondió con error de su lado; la guía pudo crearse. Requiere reconciliación (no se reintenta automáticamente).' })
+      }
       if (!shipResp.ok) { obs('create_shipment', 'provider_error', { code: shipResp.status, mensaje: 'DHL rechazó la creación de la guía' }); await failAttempt(admin, attemptId, dhlErrorMessage(shipResp.status, shipData)); return json(502, { error: dhlErrorMessage(shipResp.status, shipData) }) }
       const { tracking, labelBase64, labelFormat } = parseShipment(shipData)
       if (!tracking) { obs('create_shipment', 'unknown', { code: 'sin_tracking', mensaje: 'DHL 2xx sin tracking' }); await markUnknown(admin, attemptId, 'DHL 2xx sin tracking'); return json(409, { error: 'unknown_requires_reconciliation', message: 'DHL respondió sin número de guía; requiere reconciliación.' }) }
@@ -702,7 +709,7 @@ Deno.serve(conCors(async (req) => {
         order_id: orderId, carrier: 'DHL', tracking_number: tracking, status: 'in_transit',
         estimated_delivery_at: estimatedDeliveryAt, provider: 'dhl', service_code: productCode,
         label_path: labelPath, package: pkg, ship_from: shipper, ship_to: receiver,
-        provider_meta: { trackingNumber: tracking, labelFormat }, provider_cost: serverRate.amount,
+        provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')) }, provider_cost: serverRate.amount,
         currency: serverRate.currency, quote_ref: quoteRef,
       }
       const { error: finErr } = await admin.rpc('finalize_shipment', { p_attempt_id: attemptId, p_shipment: shipmentRow as unknown as never })
@@ -710,7 +717,7 @@ Deno.serve(conCors(async (req) => {
 
       let labelUrl = ''
       if (labelPath) { const { data: sg } = await admin.storage.from(LABELS_BUCKET).createSignedUrl(labelPath, SIGNED_TTL); labelUrl = sg?.signedUrl ?? '' }
-      return json(200, { label: { provider: 'dhl', carrier: 'DHL', service: serverRate.service ?? 'DHL Express', serviceCode: productCode, tracking, labelUrl, amount: serverRate.amount, currency: serverRate.currency, etaDays, estimatedDeliveryAt } })
+      return json(200, { label: { provider: 'dhl', carrier: 'DHL', service: serverRate.service ?? 'DHL Express', serviceCode: productCode, tracking, labelUrl, amount: serverRate.amount, currency: serverRate.currency, etaDays, estimatedDeliveryAt, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')) } })
     } catch (e) {
       obs('dhl', 'provider_error', { code: 'exception', error: e })
       return json(502, { error: `Error con DHL: ${(e as Error).message}` })

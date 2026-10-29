@@ -18,7 +18,8 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { useRole } from '../../auth/RoleContext'
 import { driverName } from '../../data/mock/shipments'
 import { clientOf, deliveryOf } from '../../data/mock/profiles'
-import { diagnoseShipment } from '../../data/ops/seguimiento'
+import { diagnoseShipment, envioVigente, esRecoge } from '../../data/ops/seguimiento'
+import { entregarRecoge } from '../../data/store/ordersStore'
 import type { Shipment } from '../../data/types'
 
 interface Row {
@@ -68,7 +69,7 @@ export function Seguimiento() {
     )
     return inFlight
       .map((o): Row => {
-        const shipment = shipments.find((s) => s.order_id === o.id)
+        const shipment = envioVigente(shipments, o.id)
         return { order: o, shipment, ...diagnoseShipment(o, shipment) }
       })
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || (a.order.created_at < b.order.created_at ? 1 : -1))
@@ -149,11 +150,25 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
   const client = clientOf(order.doctor_id)
   const deliv = deliveryOf(order) // dirección de ENTREGA del pedido (respaldo al perfil)
   const items = order.items.filter((it) => it.unit_price != null)
+  const recoge = esRecoge(order)
   const method = shipment
     ? shipment.driver_id
       ? `Chofer propio · ${driverName(shipment.driver_id)}`
       : `${shipment.carrier}${shipment.tracking_number ? ` · guía ${shipment.tracking_number}` : ''}`
-    : 'Sin asignar'
+    : recoge ? 'Recoge en sucursal' : 'Sin asignar'
+  // Recoge en sucursal: se cierra aquí cuando el cliente pasa por su pedido (no hay chofer ni guía que lo cierren).
+  const puedeEntregarRecoge = recoge && !shipment && order.status === 'shipped'
+  const recogioYa = (order.shipping_meta as { recogio?: string } | null)?.recogio
+  const [recogeAbierto, setRecogeAbierto] = useState(false)
+  const [recogio, setRecogio] = useState('')
+  const [entregandoRecoge, setEntregandoRecoge] = useState(false)
+  const confirmarRecoge = async () => {
+    if (!recogio.trim()) return
+    setEntregandoRecoge(true)
+    const r = await entregarRecoge(order.id, recogio.trim())
+    setEntregandoRecoge(false)
+    if (r.ok) setRecogeAbierto(false)
+  }
 
   // PAQ-A · Envío por paquetería: su estado lo reporta la paquetería. Se pone al día al abrir; si ya entregó, el
   // pedido se cierra solo. El cierre manual queda solo como respaldo (cuando la paquetería no lo refleja).
@@ -205,6 +220,22 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       </div>
 
       {tieneGuia && <RastreoEnvio rastreo={rastreo} cargando={consultando} onActualizar={actualizarRastreo} />}
+
+      {(puedeEntregarRecoge || (recoge && recogioYa)) && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }} data-testid="recoge-cierre">
+          {recogioYa && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Recogió: {recogioYa}</span>}
+          {puedeEntregarRecoge && (recogeAbierto ? (
+            <>
+              <input value={recogio} onChange={(e) => setRecogio(e.target.value)} placeholder="¿Quién lo recogió?" aria-label="Quién lo recogió"
+                style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
+              <button className="btn sm" type="button" disabled={!recogio.trim() || entregandoRecoge} style={!recogio.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => void confirmarRecoge()} data-testid="recoge-confirmar"><Icon name="check" /> {entregandoRecoge ? 'Guardando…' : 'Confirmar entrega'}</button>
+              <button className="btn ghost sm" type="button" onClick={() => setRecogeAbierto(false)}>Cancelar</button>
+            </>
+          ) : (
+            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setRecogeAbierto(true)} data-testid="recoge-entregar"><Icon name="check" /> Entregado al cliente</button>
+          ))}
+        </div>
+      )}
 
       {(tienePrueba || puedeCerrarPaqueteria) && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>

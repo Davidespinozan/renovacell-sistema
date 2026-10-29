@@ -92,3 +92,11 @@ describe('crédito saldado — se dio a crédito y después se cobró completo (
     expect(etiquetaLiberacion(parcial).texto).toBe('Crédito VENCIDO')
   })
 })
+
+describe('crédito de un pedido cancelado', () => {
+  it('no cuenta como crédito abierto ni vencido', () => {
+    const m = con({ credito_autorizado: true, vencido: true, saldo: 700, order_status: 'cancelled' })
+    expect(creditoAbierto(m)).toBe(false)
+    expect(creditoVencido(m)).toBe(false)
+  })
+})
