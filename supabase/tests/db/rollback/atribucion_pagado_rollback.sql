@@ -1,6 +1,7 @@
 -- ATRIBUCIÓN Y PAGADO (20270203) · el down devuelve atribución, cobro, evaluador y políticas a su texto exacto anterior y
 -- retira el aviso de pedido nuevo; la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/ensayo_golive/99_down.sql   -- ENSAYO-GOLIVE (20270204) se baja antes (redefine el aviso de pedido nuevo)
 create temp table _ap as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(tablename || ':' || policyname || ':' || coalesce(qual, '') || ':' || coalesce(with_check, ''), ',' order by tablename, policyname)) from pg_policies where schemaname = 'public') pols;

@@ -19,6 +19,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
 import { extraerWhatsApp, extraerEstados } from '../_shared/whatsapp.ts'
 import { descargarMedia, despacharWhatsApp, mostrarEscribiendo } from '../_shared/whatsappEnvio.ts'
+import { guardarImagenWA } from '../_shared/adjuntos.ts'
 import { extraerMeta } from '../_shared/meta.ts'
 import { completarNombreMeta, despacharMeta } from '../_shared/metaEnvio.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
@@ -107,9 +108,13 @@ Deno.serve(async (req) => {
     for (const m of wa) {
       const { data, error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: false })
       if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); diag({ canal: 'whatsapp', etapa: 'wa_entrante', ...clasificarError(error), http: 500, correlacion: correlacion(m.wamid), cuenta }); return new Response('reintentar', { status: 500 }) }
-      const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string }
+      const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string; message_id?: string }
       if (r.duplicado || !r.activo) continue
       enSegundoPlano((async () => {
+        // ALTA-DESDE-CONVERSACIÓN · la imagen se descarga UNA vez: queda guardada en la conversación (INE, comprobante,
+        // producto) aunque atienda una persona, y la misma descarga la ve la IA si le toca responder.
+        const adjunto = m.media ? await descargarMedia(m.media) : null
+        if (adjunto && r.message_id) await guardarImagenWA(admin, r.conversation_id, r.message_id, adjunto)
         await avisarPush(admin, r.conversation_id, r.actor, m.texto)
         if (IA_PUEDE(r.modo as never)) {
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación
@@ -118,8 +123,7 @@ Deno.serve(async (req) => {
           // R4-C12 · mensajes seguidos ("Tnm" + "Porfavor."): se espera un momento y, si ya llegó otro del cliente, este turno no
           // responde; contesta el más reciente con todo el contexto (una sola respuesta, no dos).
           if (await llegoOtroMensaje(admin, r.conversation_id, r.seq)) return
-          // R4-C13 · imagen o PDF: la IA lo ve en este turno (no se guarda); si no se pudo descargar, sigue como antes
-          const adjunto = m.media ? await descargarMedia(m.media) : null
+          // R4-C13 · imagen o PDF: la IA lo ve en este turno (ya descargado arriba); si no se pudo descargar, sigue como antes
           const ia = await responderIA(admin, r.conversation_id, r.seq, r.actor, r.profile_id, r.visitor_hash, m.texto, 'wa:' + m.wa_id, 'whatsapp', adjunto)
           if (ia === 'respondio' || ia === 'transferida') await despacharWhatsApp(admin)   // R4-B2-IA1 · también el aviso de transferencia
         }

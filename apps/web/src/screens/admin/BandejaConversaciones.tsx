@@ -14,7 +14,8 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
-import { PanelCliente } from '../chat/PanelCliente'
+import { PanelCliente, accionesIneVisitante } from '../chat/PanelCliente'
+import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
 import { EnlaceContacto, EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { MarcoModal, ModalCambiarCartera, ModalReasignarSolicitud, nombreSolicitud, PILL_FUENTE, SelectorVendedor } from './AtencionComercial'
@@ -174,6 +175,7 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
     if (!r.ok) { setMsg({ ok: false, texto: r.error }); return }
     setMsg({ ok: true, texto: `Asignada a ${vendedores.find((v) => v.id === sel)?.nombre ?? 'el vendedor'}.` }); setSel(''); onCambio()
   }
+  const ine = useIne(id)   // ALTA-DESDE-CONVERSACIÓN · fotos marcadas como INE para el alta
   const bloqueo = canal ? (control ? (control.canal && !control.puede_escribir ? (MOTIVO_NO_ESCRIBIR[control.motivo_no_escribir ?? ''] ?? 'Solo lectura.') : null) : 'Comprobando quién atiende…') : null
   const e = c ? estadoLinea(c) : null
   return (
@@ -206,6 +208,7 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
       {c && !c.profile_id && <PanelCliente conversationId={id} chat={chat} onCambio={onCambio} />}
       <div className="bq-chat">
         <ChatCanonico embebido asesor puedeEmpresa conversationId={id} cliente={chat} nombreCliente={nombre} bloqueoEscritura={bloqueo}
+          accionesAdjunto={c && !c.profile_id ? accionesIneVisitante(id, ine, (lado, a) => elegirIne(id, lado, a)) : undefined}
           etiquetaSalir="Cerrar" onSalir={onCerrar} onFin={() => { onCambio(); onCerrar() }} />
       </div>
       {modal === 'solicitud' && c && <ModalReasignarSolicitud p={c} vendedores={vendedores} carteraNombre={null} cliente={cliente} onCerrar={() => setModal(null)}

@@ -428,3 +428,11 @@
 .pc-msg{font-size:13px;color:var(--danger)}
 .pc-msg.ok{color:var(--green-deep)}
 @media (max-width:640px){.pc-cand{flex-wrap:wrap}.pc-cand .btn{width:100%}}
+.pc-alta-btn{justify-self:start}
+.pc-alta{display:grid;gap:8px;padding:12px;border-radius:12px;background:var(--hueso)}
+.pc-alta-h{display:grid;gap:2px}.pc-alta-h b{font-size:14px}.pc-alta-h span{font-size:12.5px;color:var(--mid)}
+.pc-campo{width:100%;min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--cp-surface);font:inherit;font-size:14px;color:var(--ink)}
+.pc-campo:focus{outline:none;border-color:var(--green-soft);box-shadow:0 0 0 3px rgba(95,184,115,.18)}
+.pc-ine{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mid)}
+.pc-ine .ok{color:var(--green-deep);font-weight:600}
+.pc-alta .pc-acciones{justify-content:flex-end}

@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W2.
 -- Hashes capturados de un cluster con las migraciones hasta W1 inclusive.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/cs1a7_cierre_manual/99_down.sql   -- CS-1A.7 (187)
 \ir ../../../rollback/cs1a6_reversa/99_down.sql   -- CS-1A.6 (186)
 \ir ../../../rollback/cs1b_reserva_guard/99_down.sql   -- CS-1A.1b (185): la guarda vive en payment_entries; se baja antes que 1a

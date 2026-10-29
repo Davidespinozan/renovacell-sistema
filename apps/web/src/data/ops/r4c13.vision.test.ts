@@ -104,6 +104,9 @@ describe('traspaso con archivo', () => {
     expect(a.llamadas).toContain('_cc_canal_transferir')
   })
   it('el webhook descarga el archivo antes del turno y se lo pasa a la IA', () => {
-    expect(webhook).toMatch(/const adjunto = m\.media \? await descargarMedia\(m\.media\) : null\n\s*const ia = await responderIA\([^\n]*'whatsapp', adjunto\)/)
+    // ALTA-DESDE-CONVERSACIÓN · se descarga UNA vez al inicio (también se guarda en la conversación) y la IA recibe esa descarga.
+    expect(webhook).toMatch(/const adjunto = m\.media \? await descargarMedia\(m\.media\) : null\n\s*if \(adjunto && r\.message_id\) await guardarImagenWA\(admin, r\.conversation_id, r\.message_id, adjunto\)/)
+    expect(webhook).toMatch(/const ia = await responderIA\([^\n]*'whatsapp', adjunto\)/)
+    expect(webhook.match(/descargarMedia\(m\.media\)/g)).toHaveLength(1)
   })
 })

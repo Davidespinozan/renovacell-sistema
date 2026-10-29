@@ -18,7 +18,8 @@ import { useRole } from '../../auth/RoleContext'
 import { contactoDe as contactoPorDefecto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
-import { PanelCliente } from './PanelCliente'
+import { PanelCliente, accionesIneVisitante } from './PanelCliente'
+import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
 import { Vacio } from '../../app/EmptyState'
@@ -55,7 +56,9 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     setHerr(r.ok ? `Foto guardada como ${clave === 'ine-front' ? 'INE frente' : 'INE reverso'} en su verificación.` : r.mensaje)
     if (r.ok) setVersionPanel((n) => n + 1)
   }
-  const accionesAdjunto = (m: Mensaje) => (pendiente && m.actor === 'doctor' && m.adjunto && !m.adjunto.uso ? (
+  const ineVisitante = useIne(abierta ?? '')
+  const accionesVisitante = abierta ? accionesIneVisitante(abierta, ineVisitante, (lado, a) => elegirIne(abierta, lado, a)) : () => null
+  const accionesAdjunto = (m: Mensaje) => (m.actor === 'visitor' ? accionesVisitante(m) : pendiente && m.actor === 'doctor' && m.adjunto && !m.adjunto.uso ? (
     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine">
       <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-front')}>Usar como INE frente</button>
       <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-back')}>Usar como INE reverso</button>

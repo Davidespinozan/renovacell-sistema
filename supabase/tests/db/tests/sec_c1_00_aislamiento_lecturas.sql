@@ -3,6 +3,7 @@
 -- meta.owner, venta de mostrador propia) y cada ruta que NO da visibilidad (capturista, histórico Odoo, ajeno).
 -- Cortes y arqueo: POS solo su corte de cajero. Dirección, Facturación, Almacén, Empaque, doctor y service_role intactos.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 do $t$
 declare
   v_admin uuid := tests.fixture_admin(); v_bill uuid := tests.user('billing');

@@ -31,6 +31,12 @@ export function mensajeExpediente(t: string | undefined): string {
   if (/CONVERSACION_CERRADA/.test(m)) return 'La conversación ya está cerrada.'
   if (/CLIENTE_INACTIVO/.test(m)) return 'Ese cliente está dado de baja: reactívalo antes de vincularlo.'
   if (/CLIENTE_INEXISTENTE/.test(m)) return 'Ese cliente ya no existe.'
+  if (/DATO_INVALIDO:nombre/.test(m)) return 'Escribe su nombre completo (nombre y apellido).'
+  if (/DATO_INVALIDO:cedula/.test(m)) return 'La cédula profesional son 7 u 8 dígitos.'
+  if (/DATO_INVALIDO:email/.test(m)) return 'Revisa el correo.'
+  if (/POSIBLE_DUPLICADO/.test(m)) return 'Ya hay una ficha con ese correo o cédula: búscala arriba y vincúlala en lugar de darla de alta.'
+  if (/YA_VINCULADA/.test(m)) return 'Esta conversación ya tiene ficha.'
+  if (/ADJUNTO_NO_ES_DEL_CLIENTE/.test(m)) return 'La foto de la INE tiene que ser una que esta persona mandó en esta conversación.'
   return 'No se pudo completar. Intenta de nuevo.'
 }
 
@@ -47,6 +53,11 @@ export class ClienteExpediente {
   ficha(conv: string) { return this.llamar<FichaConversacion>('cc_cliente_de_conversacion', { p_conv: conv }) }
   sugerencias(conv: string) { return this.llamar<SugerenciaCliente[]>('cc_cliente_sugerencias', { p_conv: conv }) }
   vincular(conv: string, customer: string, guardarNumero = true) { return this.llamar<ResultadoVinculo>('cc_vincular_cliente', { p_conv: conv, p_customer: customer, p_guardar_numero: guardarNumero }) }
+  /** Alta de un cliente NUEVO desde la conversación: queda verificado por quien lo da de alta, en su cartera y ligado. */
+  alta(conv: string, d: { nombre: string; cedula: string; email?: string; ciudad?: string; ineFrente?: string; ineReverso?: string }) {
+    return this.llamar<{ customer_id: string; nombre: string; vendedor: string | null }>('cc_alta_cliente_conversacion', {
+      p_conv: conv, p_nombre: d.nombre, p_cedula: d.cedula, p_email: d.email || null, p_ciudad: d.ciudad || null, p_ine_frente: d.ineFrente ?? null, p_ine_reverso: d.ineReverso ?? null })
+  }
   desvincular(conv: string) { return this.llamar<{ idempotente: boolean }>('cc_desvincular_cliente', { p_conv: conv }) }
 }
 export const expediente = new ClienteExpediente()

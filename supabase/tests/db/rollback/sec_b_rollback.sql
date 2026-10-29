@@ -1,6 +1,7 @@
 -- SEC-B (139) · el down restaura EXACTAMENTE las cuatro funciones de producción (md5), sin comentario, con los mismos permisos,
 -- forma y políticas; sin cambios de datos. Revertir REABRE F2 (se comprueba que pos vuelve a pasar la compuerta de cobro).
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 create temp table _secb as select (select count(*) from public.payment_entries) e, (select count(*) from public.payment_claims) c,
   (select count(*) from public.refunds) r, (select count(*) from public.cash_closings) k, (select count(*) from public.orders) o;
 \ir ../../../rollback/sec_b/99_down.sql

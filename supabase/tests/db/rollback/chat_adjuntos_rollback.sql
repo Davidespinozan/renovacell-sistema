@@ -1,5 +1,6 @@
 -- FOTOS EN EL CHAT (157) · el down retira tabla, comandos y bucket sin tocar ninguna otra función; se reaplica igual.
 begin;
+\ir ../../../rollback/alta_desde_conversacion/99_down.sql   -- ALTA (20270208) usa cc_adjuntos: se baja primero
 create temp table _ca as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname not like 'cc_adjunto_%') resto;

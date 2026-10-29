@@ -1,6 +1,7 @@
 -- SEC-A (138) · el down restaura EXACTAMENTE las funciones de producción (md5), sus permisos (PUBLIC/anon/authenticated/
 -- service_role) y deja intactas las políticas que dependen de ellas; sin cambios de datos.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 create temp table _seca as select (select count(*) from public.orders) o, (select count(*) from public.shipments) s;
 \ir ../../../rollback/sec_a/99_down.sql
 do $t$

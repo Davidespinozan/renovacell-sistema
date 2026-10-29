@@ -3,6 +3,7 @@
 -- autoriza rol Y pertenencia ANTES de la idempotencia; pedido ajeno e inexistente responden igual. Dirección, Facturación, el
 -- webhook (service_role) y el doctor dueño conservan su operación. Un rechazo no deja asiento, declaración, reembolso ni corte.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 do $t$
 declare
   v_admin uuid := tests.fixture_admin(); v_bill uuid := tests.user('billing');

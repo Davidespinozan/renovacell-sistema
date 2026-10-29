@@ -4,6 +4,7 @@ import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { PanelCliente } from './PanelCliente'
+import { elegirIne } from '../../data/store/ineSeleccion'
 import type { ClienteExpediente, FichaConversacion } from '../../data/ops/expediente'
 import type { ClienteChat } from '../../data/ops/chat'
 
@@ -18,6 +19,7 @@ function falso(fichas: FichaConversacion[]) {
     sugerencias: vi.fn(async () => ({ ok: true as const, data: [LOURDES] })),
     vincular: vi.fn(async () => ({ ok: true as const, data: { customer_id: 'CU1', idempotente: false, numero_guardado: true, reasignada: true, vendedor: 'R', vendedor_nombre: 'Roberto Ibarra' } })),
     desvincular: vi.fn(async () => ({ ok: true as const, data: { idempotente: false } })),
+    alta: vi.fn(async () => ({ ok: true as const, data: { customer_id: 'CU9', nombre: 'Ana Gómez Ruiz', vendedor: 'A' } })),
   }
   return c as unknown as ClienteExpediente & typeof c
 }
@@ -50,5 +52,18 @@ describe('PanelCliente', () => {
     const { container } = render(<PanelCliente conversationId="C1" cliente={c} />)
     await waitFor(() => expect(c.ficha).toHaveBeenCalled())
     expect(container.querySelector('[data-testid=panel-cliente]')).toBeNull()
+  })
+  it('no es cliente: alta verificada con sus datos y la INE marcada en el chat', async () => {
+    const c = falso([{ vinculado: false, con_cuenta: false }, VINCULADA])
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<PanelCliente conversationId="C7" cliente={c} />)
+    fireEvent.click(await screen.findByTestId('pc-alta-abrir'))
+    fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Ana Gómez Ruiz' } })
+    fireEvent.change(screen.getByLabelText('Cédula profesional'), { target: { value: '12345678' } })
+    elegirIne('C7', 'frente', 'AD1')
+    expect(await screen.findByText('frente ✓')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('pc-alta-guardar'))
+    await waitFor(() => expect(c.alta).toHaveBeenCalledWith('C7', expect.objectContaining({ nombre: 'Ana Gómez Ruiz', cedula: '12345678', ineFrente: 'AD1' })))
+    expect(await screen.findByTestId('pc-msg')).toHaveTextContent(/quedó dada de alta/)
   })
 })

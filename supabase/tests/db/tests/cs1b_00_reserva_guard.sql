@@ -3,6 +3,7 @@
 -- El consumo de la reserva propia es estructural (captured + external_ref = cs_payment_id + importe + tarjeta): una variable de
 -- sesión falsificada no evade nada. Las carreras reales están en concurrency/cs1b_concurrency.sh.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 do $t$
 declare v_admin uuid := tests.fixture_admin(); v_doc uuid := tests.user('doctor'); v_bill uuid := tests.user('billing'); v_pos uuid := tests.user('pos');
         v_prod uuid := tests.product(100); v_o1 uuid; v_o2 uuid; v_o3 uuid; v_o4 uuid; v_o5 uuid; v_o6 uuid; v_pv uuid;

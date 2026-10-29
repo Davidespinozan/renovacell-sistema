@@ -2,6 +2,7 @@
 -- orders dan exactamente la misma visibilidad (dueño, chofer, Dirección, vendedor, autor POS, ruta heredada meta.owner);
 -- pedido ajeno e inexistente son indistinguibles; service_role (BYPASSRLS) conserva su acceso a tablas.
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 do $t$
 declare
   v_admin uuid := tests.fixture_admin();

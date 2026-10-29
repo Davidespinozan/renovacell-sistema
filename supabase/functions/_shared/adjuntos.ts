@@ -3,6 +3,28 @@
 // enlaces temporales a quien YA está leyendo esa conversación.
 
 export const TEXTO_IMAGEN = 'Envió una imagen.'
+// ALTA-DESDE-CONVERSACIÓN · la foto que llega por WhatsApp también queda guardada con su mensaje ("Envió una imagen por WhatsApp.").
+export const esMensajeConImagen = (content: unknown): boolean => typeof content === 'string' && (content === TEXTO_IMAGEN || content.startsWith('Envió una imagen por WhatsApp.'))
+const MAX_BYTES_ADJUNTO = 3_000_000
+const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png' }
+/** Guarda en el bucket privado `chat` la imagen entrante de WhatsApp (ya descargada para la IA) y la registra con SU mensaje.
+ *  Solo JPG/PNG de hasta 3 MB (lo que acepta cc_adjuntos); cualquier falla deja el mensaje como estaba. */
+// deno-lint-ignore no-explicit-any
+export async function guardarImagenWA(admin: any, conv: string, messageId: string, adj: { tipo: string; media_type: string; data: string }): Promise<boolean> {
+  const ext = EXT[adj.media_type]
+  if (adj.tipo !== 'image' || !ext || !messageId) return false
+  try {
+    const bin = atob(adj.data); const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    if (!bytes.length || bytes.length > MAX_BYTES_ADJUNTO) return false
+    const ruta = `${conv}/${crypto.randomUUID()}.${ext}`
+    const { error: eSub } = await admin.storage.from('chat').upload(ruta, bytes, { contentType: adj.media_type })
+    if (eSub) return false
+    const { error } = await admin.rpc('cc_adjunto_registrar_wa', { p_message: messageId, p_ruta: ruta, p_tipo: adj.media_type, p_bytes: bytes.length })
+    if (error) { await admin.storage.from('chat').remove([ruta]).then(() => {}, () => {}); return false }
+    return true
+  } catch { return false }
+}
 export const VIGENCIA_ENLACE_SEG = 600
 
 /** client_message_id de una imagen: siempre con prefijo `img:` (así la base sabe que lleva adjunto). */
@@ -16,7 +38,7 @@ type Msj = { id?: unknown; content?: unknown; adjunto?: unknown }
 export async function conAdjuntos(admin: any, data: unknown): Promise<unknown> {
   const d = data as { mensajes?: Msj[] } | null
   const msgs = Array.isArray(d?.mensajes) ? d!.mensajes! : []
-  const ids = msgs.filter((m) => m.content === TEXTO_IMAGEN && typeof m.id === 'string').map((m) => m.id as string)
+  const ids = msgs.filter((m) => esMensajeConImagen(m.content) && typeof m.id === 'string').map((m) => m.id as string)
   if (!ids.length) return data
   try {
     const { data: ads } = await admin.from('cc_adjuntos').select('id, message_id, ruta, tipo, uso').in('message_id', ids)

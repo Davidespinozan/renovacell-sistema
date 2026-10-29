@@ -2,7 +2,7 @@
 // "¿quién es?": la ficha si ya se sabe; si no, sugerencias (teléfono, correo, nombre que escribió) y búsqueda para
 // vincularla. Desde la ficha, su vendedor le manda el acceso al portal ahí mismo. Todo lo decide el servidor.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link2, Search, UserCheck, KeyRound, X } from 'lucide-react'
+import { Link2, Search, UserCheck, KeyRound, X, UserPlus, IdCard } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
 import { BuscadorClientes, type ClienteBusqueda } from '../../data/ops/buscarClientes'
 import { crearInvitacion } from '../../data/ops/invitacion'
@@ -10,6 +10,7 @@ import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { fmtDate } from '../../lib/format'
 import type { ClienteChat } from '../../data/ops/chat'
 import { currentUserId } from '../../lib/supabase'
+import { useIne, olvidarIne } from '../../data/store/ineSeleccion'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
@@ -30,6 +31,9 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
   const [ocupado, setOcupado] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [cambiando, setCambiando] = useState(false)
+  const [alta, setAlta] = useState(false)
+  const [form, setForm] = useState({ nombre: '', cedula: '', email: '', ciudad: '' })
+  const ine = useIne(conversationId)
   const bus = useMemo(() => buscador ?? new BuscadorClientes(), [buscador])
   useEffect(() => () => bus.limpiar(), [bus])
 
@@ -42,7 +46,7 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
       setSug(s.ok ? s.data : [])
     }
   }, [cliente, conversationId])
-  useEffect(() => { setMsg(null); setRes(null); setQ(''); setCambiando(false); void cargar() }, [cargar])
+  useEffect(() => { setMsg(null); setRes(null); setQ(''); setCambiando(false); setAlta(false); void cargar() }, [cargar])
 
   const vincular = async (id: string, nombre: string) => {
     setOcupado(true); setMsg(null)
@@ -71,6 +75,16 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
     setRes(null)
     setEstadoBusqueda(r.estado === 'entrada_invalida' ? 'Escribe al menos 3 letras del nombre o los últimos 4 dígitos del teléfono.'
       : r.estado === 'cuota_excedida' ? 'Llegaste al límite de búsquedas por ahora. Intenta en un momento.' : 'No se pudo buscar. Intenta de nuevo.')
+  }
+  const darDeAlta = async () => {
+    if (!window.confirm(`¿Revisaste su cédula${ine.frente ? ' y su INE' : ''}? Queda dada de alta como cliente verificada, en tu cartera.`)) return
+    setOcupado(true); setMsg(null)
+    const r = await cliente.alta(conversationId, { ...form, ineFrente: ine.frente, ineReverso: ine.reverso })
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    olvidarIne(conversationId); setAlta(false)
+    setMsg({ ok: true, texto: `${capitalizarNombre(r.data.nombre)} quedó dada de alta. Ya le puedes mandar su acceso al portal.` })
+    await cargar()
   }
   const mandarAcceso = async () => {
     if (!ficha?.customer_id || !chat) return
@@ -149,9 +163,37 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
             ? <div className="pc-nota">Sin coincidencias. Si es cliente nuevo, puede registrarse desde el portal.</div>
             : <ul className="pc-lista" data-testid="pc-resultados">{res.map((c) => <Fila key={c.customer_id} id={c.customer_id} nombre={c.nombre} sub={c.telefono_mascara ?? 'sin teléfono'} />)}</ul>)}
           <label className="pc-check"><input type="checkbox" checked={guardarNumero} onChange={(e) => setGuardarNumero(e.target.checked)} /> Guardar en su ficha el número desde el que escribe</label>
+          {!cambiando && !alta && <button type="button" className="btn ghost sm pc-alta-btn" onClick={() => setAlta(true)} data-testid="pc-alta-abrir"><UserPlus size={14} /> No es cliente todavía: darla de alta</button>}
+          {alta && (
+            <form className="pc-alta" onSubmit={(e) => { e.preventDefault(); void darDeAlta() }} data-testid="pc-alta">
+              <div className="pc-alta-h"><b>Alta de cliente</b><span>Pídele sus datos por este chat. Si te manda su INE, márcala debajo de la foto.</span></div>
+              <input className="pc-campo" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre completo" aria-label="Nombre completo" required />
+              <input className="pc-campo" value={form.cedula} onChange={(e) => setForm({ ...form, cedula: e.target.value })} placeholder="Cédula profesional" inputMode="numeric" aria-label="Cédula profesional" required />
+              <input className="pc-campo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Correo (para su acceso)" aria-label="Correo" />
+              <input className="pc-campo" value={form.ciudad} onChange={(e) => setForm({ ...form, ciudad: e.target.value })} placeholder="Ciudad" aria-label="Ciudad" />
+              <div className="pc-ine"><IdCard size={14} aria-hidden /> INE: <span className={ine.frente ? 'ok' : ''}>{ine.frente ? 'frente ✓' : 'frente pendiente'}</span> · <span className={ine.reverso ? 'ok' : ''}>{ine.reverso ? 'reverso ✓' : 'reverso pendiente'}</span></div>
+              <div className="pc-acciones">
+                <button type="button" className="btn ghost sm" onClick={() => setAlta(false)}>Cancelar</button>
+                <button type="submit" className="btn sm" disabled={ocupado || !form.nombre.trim() || !form.cedula.trim()} data-testid="pc-alta-guardar">Dar de alta verificada</button>
+              </div>
+            </form>
+          )}
         </div>
       )}
       {msg && <div className={'pc-msg' + (msg.ok ? ' ok' : '')} role={msg.ok ? 'status' : 'alert'} data-testid="pc-msg">{msg.texto}</div>}
     </section>
   )
+}
+
+/** ALTA-DESDE-CONVERSACIÓN · debajo de cada foto que mandó quien escribe (sin cuenta): marcarla como su INE para el alta. */
+export function accionesIneVisitante(conversationId: string, sel: { frente?: string; reverso?: string }, elegir: (lado: 'frente' | 'reverso', id: string) => void) {
+  return (m: { actor: string; adjunto?: { id: string; uso?: string | null } | null }) => (m.actor === 'visitor' && m.adjunto && !m.adjunto.uso ? (
+    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine-visitante">
+      {(['frente', 'reverso'] as const).map((lado) => (
+        <button key={lado} type="button" className={'btn ghost sm' + (sel[lado] === m.adjunto!.id ? ' on' : '')} onClick={() => elegir(lado, m.adjunto!.id)}>
+          {sel[lado] === m.adjunto!.id ? `INE ${lado} ✓` : `Usar como INE ${lado}`}
+        </button>
+      ))}
+    </span>
+  ) : null)
 }

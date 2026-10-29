@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
+\ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/ensayo_golive/99_down.sql
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)
 \ir ../../../rollback/auxiliar_almacen/99_down.sql   -- AUXILIAR se baja antes de tomar la foto (redefine recepción, reingreso, custodia y anular_guia)
