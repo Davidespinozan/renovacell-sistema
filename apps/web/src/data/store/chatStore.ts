@@ -6,7 +6,7 @@
 import type { Conversation, Message } from '../types'
 import { CURRENT_USER as MOCK_ME, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../mock/chat'
 import { isStaffUser } from '../mock/users'
-import { getSnapshot as teamSnapshot } from './teamStore'
+import { getSnapshot as directorySnapshot, subscribe as directorySubscribe } from './directoryStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { notify } from './notificationsStore'
 import { CHAT_SCREEN } from '../../app/roles'
@@ -36,13 +36,16 @@ let seq = 9000
 
 const listeners = new Set<() => void>()
 
-// Nombre del otro miembro de un DM (para el título, correcto para AMBOS lados).
-function dmTitle(conv: Conversation): string | null {
+// Nombre del otro miembro de un DM (para el título, correcto para AMBOS lados). Sale del directorio del staff
+// (`staff_directory`, legible por todo el staff), no de `profiles`: el perfil ajeno solo lo lee Dirección, y con él
+// Almacén veía el título guardado por quien abrió el chat — su PROPIO nombre — como si hablara consigo mismo.
+export function dmTitle(conv: Conversation, meId: string = CURRENT_USER.id, meName: string = CURRENT_USER.name): string | null {
   if (conv.kind !== 'dm') return conv.title
-  const me = CURRENT_USER.id
-  const otherId = conv.member_ids.find((m) => m !== me)
-  const other = teamSnapshot().find((u) => u.id === otherId)
-  return other?.name ?? conv.title
+  const otherId = conv.member_ids.find((m) => m !== meId)
+  const other = directorySnapshot().find((u) => u.id === otherId)
+  if (other) return other.name
+  // Sin directorio todavía: el título guardado solo sirve si no es el mío.
+  return conv.title && conv.title !== meName ? conv.title : 'Mensaje directo'
 }
 
 function sortedConvs(): Conversation[] {
@@ -79,7 +82,7 @@ const MENSAJES_RECIENTES = 2000
 async function hydrate() {
   if (!hasSupabase) return
   CURRENT_USER.id = currentUserId() ?? CURRENT_USER.id
-  const me = teamSnapshot().find((u) => u.id === CURRENT_USER.id)
+  const me = directorySnapshot().find((u) => u.id === CURRENT_USER.id)
   if (me) CURRENT_USER.name = me.name
   const [{ data: convs, error: ce }, { data: msgs, error: me2 }] = await Promise.all([
     supabase.from('conversations').select('id, kind, title, area, member_ids, created_at, last_message_at'),
@@ -137,6 +140,8 @@ async function ensureRealtime() {
 }
 
 if (hasSupabase) {
+  // El directorio llega después que las conversaciones: al cargar, se recalculan los títulos de los directos.
+  directorySubscribe(() => emit())
   hydrate()
   ensureRealtime()
   supabase.auth.onAuthStateChange((ev) => {

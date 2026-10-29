@@ -5,7 +5,7 @@ import { screen, fireEvent, cleanup } from '@testing-library/react'
 import { renderWithRole } from '../test/utils'
 import { CommonView } from './CommonView'
 
-beforeEach(cleanup)
+beforeEach(() => { cleanup(); localStorage.clear() })   // Pestanas recuerda la pestaña elegida
 
 describe('<CommonView>', () => {
   it('muestra la biblioteca y las solicitudes de recurso', () => {
@@ -16,6 +16,7 @@ describe('<CommonView>', () => {
 
   it('abre el modal de subir asset', () => {
     renderWithRole(<CommonView />)
+    fireEvent.click(screen.getByTestId('pestana-biblioteca'))
     fireEvent.click(screen.getByText('Subir asset'))
     // El modal tiene su propio encabezado + campo de etiquetas.
     expect(screen.getByPlaceholderText('logo, marca')).toBeInTheDocument()
@@ -23,8 +24,25 @@ describe('<CommonView>', () => {
 
   it('permite solicitar un recurso al equipo', () => {
     renderWithRole(<CommonView />)
-    fireEvent.click(screen.getByText(/Solicitar recurso/i))
+    fireEvent.click(screen.getByTestId('pestana-solicitudes'))
+    fireEvent.click(screen.getByRole('button', { name: /Solicitar recurso/i }))
     // Tras abrir el modal, "Solicitar recurso" está como botón y como título.
     expect(screen.getAllByText(/Solicitar recurso/i).length).toBeGreaterThan(1)
+  })
+
+  it('el muro resalta lo nuevo y "Enterado" lo marca como leído', () => {
+    renderWithRole(<CommonView />)
+    const nuevos = screen.getAllByRole('button', { name: /^Enterado$/ })
+    expect(nuevos.length).toBeGreaterThan(0)
+    fireEvent.click(nuevos[0])
+    expect(screen.getAllByRole('button', { name: /^Enterado$/ }).length).toBe(nuevos.length - 1)
+  })
+
+  it('publicar: la barra plegada abre el formulario y Cancelar lo cierra', () => {
+    renderWithRole(<CommonView />)
+    fireEvent.click(screen.getByText(/Publica un aviso o anuncio/))
+    expect(screen.getByLabelText('Título')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByLabelText('Título')).toBeNull()
   })
 })

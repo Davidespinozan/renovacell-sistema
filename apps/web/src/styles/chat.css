@@ -332,3 +332,59 @@
 /* WA-2 · avisos del canal WhatsApp para el personal (sobre el redactor). */
 .rc-wa-aviso{margin:0;padding:8px 14px;font-size:12.5px;line-height:1.4;background:#e7f5ec;color:#11502a;border-top:1px solid #cfe7d8}
 .rc-wa-aviso--cerrada{background:var(--warn-bg);color:var(--warn);border-top-color:transparent}
+
+/* ── Chat del equipo (hub) · mismo lenguaje que el chat de mensajería ──────────────────────────────
+   Escritorio: lista y conversación lado a lado. Teléfono (≤900px): una a la vez; abrir un chat oculta la lista. */
+.tc{display:grid;grid-template-columns:minmax(280px,360px) 1fr;height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:460px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--cp-surface);box-shadow:var(--sh-sm)}
+.tc-lista{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--cp-surface)}
+.tc-lista-head{display:flex;align-items:center;gap:8px;padding:14px 14px 8px}
+.tc-lista-titulo{font-size:18px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.tc-nuevo{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:var(--pill);border:0;background:var(--green-deep);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background var(--dur-fast)}
+.tc-nuevo:hover{background:var(--green)}
+.tc-buscar{display:flex;align-items:center;gap:8px;margin:0 12px 8px;padding:0 12px;min-height:38px;border-radius:10px;background:#f0f2f1;color:var(--mid)}
+.tc-buscar input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:14px;color:var(--ink)}
+.tc-filas{flex:1;overflow-y:auto;overscroll-behavior:contain}
+.tc-row{width:100%;display:flex;align-items:center;gap:12px;padding:0 14px;border:0;background:none;font:inherit;text-align:left;color:inherit;cursor:pointer;transition:background var(--dur-fast)}
+.tc-row:hover{background:#f5f6f5}
+.tc-row.on{background:#ebefec}
+.tc-row-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;padding:12px 0;border-bottom:1px solid var(--line)}
+.tc-row:last-child .tc-row-meta{border-bottom-color:transparent}
+.tc-row-top,.tc-row-bottom{display:flex;align-items:center;gap:8px;min-width:0}
+.tc-row-nombre{flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-row-cuando{flex:none;font-size:11.5px;color:var(--wa-meta,#667781);font-variant-numeric:tabular-nums}
+.tc-row.nueva .tc-row-cuando{color:var(--green);font-weight:600}
+.tc-row-adelanto{flex:1;min-width:0;font-size:13.5px;color:var(--wa-meta,#667781);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-row.nueva .tc-row-adelanto{color:var(--ink);font-weight:500}
+.tc-row-tick{display:inline-block;vertical-align:-3px;margin-right:3px;color:#8696a0}
+.tc-badge{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;background:var(--green);color:#fff;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.tc-av-grupo{background:var(--green-deep)}
+.tc-vacio{display:grid;justify-items:center;gap:10px;padding:40px 20px;color:var(--mid);font-size:13.5px;text-align:center}
+.tc-panel{min-width:0;min-height:0;display:flex}
+.tc-hilo{flex:1;height:100%;--wa-meta:#667781}
+.tc-hilo .rc-head .avatar{box-shadow:0 0 0 2px rgba(255,255,255,.28)}
+.tc-volver{display:none}
+.tc-reposo{flex:1;display:grid;place-content:center;justify-items:center;gap:8px;padding:24px;text-align:center;background-color:#e9ede7;
+  background-image:radial-gradient(rgba(0,90,13,.055) 1.1px,transparent 1.2px),radial-gradient(rgba(0,90,13,.04) 1px,transparent 1.1px);background-size:22px 22px,22px 22px;background-position:0 0,11px 11px}
+.tc-reposo-ico{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--green-deep);box-shadow:0 1px 3px rgba(11,20,14,.12)}
+.tc-reposo-t{font-size:18px;font-weight:600;color:var(--ink)}
+.tc-reposo-s{font-size:13.5px;color:var(--mid);max-width:300px}
+/* Borrar un mensaje propio: aparece al pasar el cursor (siempre visible en táctil). */
+.tc-msg .rc-bubble-wrap{position:relative}
+.tc-del{position:absolute;top:-9px;left:-9px;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--danger);display:none;place-items:center;cursor:pointer;box-shadow:var(--sh-sm)}
+.tc-msg:hover .tc-del,.tc-msg:focus-within .tc-del{display:grid}
+.tc-msg .rc-bubble-wrap:focus{outline:none}
+/* Directorio de "Nuevo mensaje" */
+.tc-directorio{max-height:380px;overflow:auto;display:flex;flex-direction:column}
+.tc-pick{display:flex;align-items:center;gap:12px;padding:9px 6px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;text-align:left;cursor:pointer;border-radius:8px}
+.tc-pick:hover{background:#f5f6f5}
+.tc-pick-meta{display:flex;flex-direction:column;min-width:0}
+.tc-pick-nombre{font-size:14.5px;font-weight:600;color:var(--ink)}
+.tc-pick-rol{font-size:12.5px;color:var(--mid)}
+@media (max-width:900px){
+  .tc{grid-template-columns:1fr;height:calc(100dvh - 148px);border-radius:var(--r)}
+  .tc-lista{border-right:0}
+  .tc--abierto .tc-lista{display:none}
+  .tc:not(.tc--abierto) .tc-panel{display:none}
+  .tc-volver{display:grid}
+  .tc-row{min-height:64px}
+}

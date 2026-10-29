@@ -1,22 +1,24 @@
-// VISTA COMÚN — hub interno con estilo social cálido (inspirado en Healthy Space
-// Club): feed de anuncios/avisos con avatar, "hace X", reacciones, acuse de
-// lectura y comentarios en sheet; biblioteca visual. NADA de publicaciones
-// públicas: es comunicación interna del equipo. Lectura para todo el staff;
-// admin y "comunicación" publican/editan.
+// VISTA COMÚN ("Avisos del equipo") — comunicación interna del equipo, con el mismo cuidado visual que el chat:
+// muro de avisos con autor y puesto, lo nuevo resaltado, "Enterado" como acuse de lectura, reacciones y comentarios;
+// la Biblioteca y las Solicitudes de recurso en sus propias pestañas para que el muro no se pierda entre tarjetas.
+// Lectura para todo el staff; Dirección y quien tenga 'anuncios' publican/editan.
 import React, { useMemo, useState } from 'react'
 import {
-  Megaphone, Bell, ThumbsUp, CheckCheck, MessageCircle, Pin, Pencil, Trash2,
+  Megaphone, Bell, ThumbsUp, CheckCheck, Check, MessageCircle, Pin, Pencil, Trash2,
   X, Send, Image as ImageIcon, Download, Eye, ShieldCheck, Upload, Plus,
 } from 'lucide-react'
 import { useAssets, type AssetInput } from '../data/hooks/useAssets'
 import { useResources } from '../data/hooks/useResources'
 import { timeAgo } from '../lib/format'
+import { cuandoPublicado } from '../lib/cuando'
 import { uploadImage } from '../lib/uploads'
 import { UserAvatar } from '../app/UserAvatar'
 import { useUsers } from '../data/hooks/useUsers'
 import { ROLES, getRole, canManageHub, type RoleKey } from '../app/roles'
 import { useRole } from '../auth/RoleContext'
-import { Icon } from '../app/icons'
+import { currentUserId } from '../lib/supabase'
+import { Pestanas } from '../app/Pestanas'
+import { conEnlaces } from './chat/ChatCanonico'
 import { useAnnouncements, type AnnouncementKind } from '../data/hooks/useAnnouncements'
 import { useAnnSocial, type AnnComment } from '../data/hooks/useAnnSocial'
 import type { Announcement, RoleId } from '../data/types'
@@ -33,7 +35,7 @@ const STAFF = ROLES.filter((r) => r.isStaff)
 const byPinnedThenDate = (a: Announcement, b: Announcement) =>
   Number(isPinned(b)) - Number(isPinned(a)) || (a.created_at < b.created_at ? 1 : -1)
 
-type Filter = 'todos' | 'anuncio' | 'aviso'
+type Filter = 'todos' | 'sinleer' | 'anuncio' | 'aviso'
 
 export function CommonView() {
   const { role, user, capabilities } = useRole()
@@ -49,11 +51,11 @@ export function CommonView() {
   const ann = useAnnouncements()
   const assets = useAssets()
   const resources = useResources()
-  // Fotos del equipo (para el autor de cada anuncio) — del directorio seguro.
+  // Fotos y puesto del equipo (para el autor de cada aviso) — del directorio seguro.
   const { data: directory } = useUsers({ staffOnly: true })
-  const avatarById = useMemo(() => {
-    const m: Record<string, string | undefined> = {}
-    directory.forEach((u) => { m[u.id] = u.avatarUrl })
+  const equipo = useMemo(() => {
+    const m: Record<string, { url?: string; rol: string }> = {}
+    directory.forEach((u) => { m[u.id] = { url: u.avatarUrl, rol: u.role } })
     return m
   }, [directory])
   const [reqOpen, setReqOpen] = useState(false)
@@ -64,34 +66,45 @@ export function CommonView() {
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [assetOpen, setAssetOpen] = useState(false)
 
-  const feed = useMemo(
-    () => ann.data
-      .filter((a) => (filter === 'todos' ? true : kindOf(a) === filter))
-      // Segmentación real: si el anuncio es para un área, solo esa área (o quien gestiona) lo ve.
-      .filter((a) => { const aud = audienceOf(a); return aud == null || aud === role || canManage })
-      .sort(byPinnedThenDate),
-    [ann.data, filter, role, canManage],
+  // Segmentación real: si el anuncio es para un área, solo esa área (o quien gestiona) lo ve.
+  const visibles = useMemo(
+    () => ann.data.filter((a) => { const aud = audienceOf(a); return aud == null || aud === role || canManage }).sort(byPinnedThenDate),
+    [ann.data, role, canManage],
   )
+  const sinLeer = visibles.filter((a) => !social.read(a.id))
+  const feed = visibles.filter((a) => (filter === 'todos' ? true : filter === 'sinleer' ? !social.read(a.id) : kindOf(a) === filter))
+  const pendientes = resources.data.filter((rr) => rr.status !== 'entregado').length
+  const autorDe = (a: Announcement) => {
+    const mio = !!a.created_by && a.created_by === currentUserId()
+    const e = equipo[a.created_by ?? '']
+    return { url: e?.url ?? (mio || authorOf(a) === user?.name ? user?.avatarUrl : undefined), rol: e?.rol ?? (mio ? r.label : '') }
+  }
 
-  return (
-    <div className="grid" style={{ justifyItems: 'center', gap: 18 }}>
-      <div className="feed">
-        {/* Composer (solo admin/comm) */}
-        {canManage && <Composer onPublish={ann.create} meUrl={user?.avatarUrl} meName={user?.name} />}
+  const muro = (
+    <div className="av-muro">
+      {canManage && <Composer onPublish={ann.create} meUrl={user?.avatarUrl} meName={user?.name} />}
 
-        {/* Filtros */}
-        <div className="fchips">
-          {([['todos', 'Todos'], ['anuncio', 'Anuncios'], ['aviso', 'Avisos']] as const).map(([k, lbl]) => (
-            <button key={k} className={'fchip' + (filter === k ? ' on' : '')} onClick={() => setFilter(k)} type="button">{lbl}</button>
+      <div className="av-barra">
+        <div className="fchips" role="group" aria-label="Filtrar avisos">
+          {([['todos', 'Todos'], ['sinleer', 'Sin leer'], ['aviso', 'Avisos'], ['anuncio', 'Anuncios']] as const).map(([k, lbl]) => (
+            <button key={k} className={'fchip' + (filter === k ? ' on' : '')} onClick={() => setFilter(k)} type="button">
+              {lbl}{k === 'sinleer' && sinLeer.length > 0 ? ` · ${sinLeer.length}` : ''}
+            </button>
           ))}
         </div>
+        {sinLeer.length > 1 && (
+          <button type="button" className="av-todo-leido" onClick={() => sinLeer.forEach((a) => social.markRead(a.id))}><CheckCheck size={15} /> Marcar todo como leído</button>
+        )}
+      </div>
 
-        {/* Feed */}
-        {feed.map((a) => (
+      {feed.map((a) => {
+        const autor = autorDe(a)
+        return (
           <FeedCard
             key={a.id}
             a={a}
-            authorUrl={avatarById[a.created_by ?? ''] ?? (authorOf(a) === user?.name ? user?.avatarUrl : undefined)}
+            authorUrl={autor.url}
+            authorRole={autor.rol}
             canManage={canManage}
             reacted={social.reacted(a.id)}
             read={social.read(a.id)}
@@ -103,97 +116,113 @@ export function CommonView() {
             onComments={() => { social.markRead(a.id); setSheetFor(a) }}
             onEdit={() => setEditing(a)}
             onPin={() => ann.togglePin(a.id)}
-            onDelete={() => ann.remove(a.id)}
+            onDelete={() => { if (window.confirm('¿Borrar esta publicación?')) ann.remove(a.id) }}
           />
-        ))}
+        )
+      })}
 
-        {/* Biblioteca */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-          <ImageIcon size={18} color="var(--green-deep)" />
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Biblioteca</h2>
-          {canManage && (
-            <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAssetOpen(true)}>
-              <Upload size={14} /> Subir asset
-            </button>
-          )}
+      {feed.length === 0 && (
+        <div className="av-vacio">
+          <div className="av-vacio-ico">{filter === 'sinleer' ? <CheckCheck size={26} /> : <Megaphone size={26} />}</div>
+          <div className="av-vacio-t">{filter === 'sinleer' ? 'Estás al día' : 'Aún no hay publicaciones'}</div>
+          <div className="av-vacio-s">{filter === 'sinleer' ? 'Ya leíste todos los avisos del equipo.' : canManage ? 'Publica el primer aviso para el equipo.' : 'Aquí verás los avisos y anuncios del equipo.'}</div>
         </div>
-        <div className="libgrid" style={{ width: '100%' }}>
-          {assets.data.map((as) => (
-            <div key={as.id} className="libcard" style={{ position: 'relative' }}>
+      )}
+
+      {!canManage && <div className="av-nota">Aquí publican Dirección y quien administra los avisos. Para hablar con alguien, usa el Chat del equipo.</div>}
+    </div>
+  )
+
+  const biblioteca = (
+    <div className="av-seccion">
+      <div className="av-seccion-head">
+        <div><h2>Biblioteca</h2><p>Logos, imágenes y materiales listos para usar.</p></div>
+        {canManage && <button className="btn sm" type="button" onClick={() => setAssetOpen(true)}><Upload size={14} /> Subir asset</button>}
+      </div>
+      <div className="libgrid" style={{ width: '100%' }}>
+        {assets.data.map((as) => (
+          <div key={as.id} className="libcard" style={{ position: 'relative' }}>
+            {canDesign && (
+              <button
+                type="button" className="libdel" title="Eliminar de la biblioteca"
+                onClick={() => { if (window.confirm('¿Eliminar este asset de la biblioteca?')) assets.remove(as.id) }}
+              >
+                <Trash2 size={15} color="var(--danger)" />
+              </button>
+            )}
+            {as.url && (as.url.startsWith('data:image') || /^https?:\/\//.test(as.url)) ? (
+              <img src={as.url} alt={as.key ?? ''} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <div className="libtile"><ImageIcon /></div>
+            )}
+            <div className="libbody">
+              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
+                {as.url ? (
+                  <>
+                    <a className="btn ghost sm" style={{ flex: '1 1 auto' }} href={as.url} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
+                    <a className="btn sm" style={{ flex: '1 1 auto' }} href={as.url} download><Download size={14} /> Descargar</a>
+                  </>
+                ) : (
+                  <span style={{ flex: '1 1 auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Sin archivo</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {assets.data.length === 0 && <div className="av-vacio"><div className="av-vacio-ico"><ImageIcon size={26} /></div><div className="av-vacio-t">La biblioteca está vacía</div><div className="av-vacio-s">{canManage ? 'Sube el primer material para el equipo.' : 'Aquí aparecerán los materiales que suba Dirección.'}</div></div>}
+    </div>
+  )
+
+  // Solicitudes de recurso — pedir artes/recursos a quien tenga Diseño
+  const solicitudes = (
+    <div className="av-seccion">
+      <div className="av-seccion-head">
+        <div><h2>Solicitudes de recurso</h2><p>Pide un arte o material; lo atiende quien tenga Diseño.</p></div>
+        <button className="btn sm" type="button" onClick={() => setReqOpen(true)}><Plus size={14} /> Solicitar recurso</button>
+      </div>
+      <div className="av-lista">
+        {resources.data.map((rr) => {
+          const pill = rr.status === 'entregado' ? 'p-ok' : rr.status === 'en_proceso' ? 'p-blue' : 'p-warn'
+          const lbl = rr.status === 'entregado' ? 'Entregado' : rr.status === 'en_proceso' ? 'En proceso' : 'Solicitado'
+          return (
+            <div key={rr.id} className="av-sol">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{rr.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Pidió {rr.requestedBy}</div>
+              </div>
+              {rr.status === 'entregado' && rr.assetUrl && (
+                <a className="btn ghost sm" href={rr.assetUrl} target="_blank" rel="noreferrer" download><Eye size={14} /> Ver</a>
+              )}
+              {canDesign && rr.status === 'entregado' && rr.assetUrl && (
+                <button className="btn sm" type="button" title="Pasar a la Biblioteca" onClick={() => toLibrary(rr)}>
+                  <ImageIcon size={14} /> A biblioteca
+                </button>
+              )}
+              <span className={'pill ' + pill}>{lbl}</span>
               {canDesign && (
-                <button
-                  type="button" className="libdel" title="Eliminar de la biblioteca"
-                  onClick={() => { if (window.confirm('¿Eliminar este asset de la biblioteca?')) assets.remove(as.id) }}
-                >
+                <button className="fbtn" type="button" title="Eliminar solicitud"
+                  onClick={() => { if (window.confirm('¿Eliminar esta solicitud de recurso?')) resources.remove(rr.id) }}>
                   <Trash2 size={15} color="var(--danger)" />
                 </button>
               )}
-              {as.url && (as.url.startsWith('data:image') || /^https?:\/\//.test(as.url)) ? (
-                <img src={as.url} alt={as.key ?? ''} style={{ width: '100%', height: 92, objectFit: 'cover', display: 'block' }} />
-              ) : (
-                <div className="libtile"><ImageIcon /></div>
-              )}
-              <div className="libbody">
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{as.key}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(as.tags ?? []).join(' · ')}</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
-                  {as.url ? (
-                    <>
-                      <a className="btn ghost sm" style={{ flex: '1 1 auto' }} href={as.url} target="_blank" rel="noreferrer"><Eye size={14} /> Ver</a>
-                      <a className="btn sm" style={{ flex: '1 1 auto' }} href={as.url} download><Download size={14} /> Descargar</a>
-                    </>
-                  ) : (
-                    <span style={{ flex: '1 1 auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Sin archivo</span>
-                  )}
-                </div>
-              </div>
             </div>
-          ))}
-        </div>
-
-        {/* Solicitudes de recurso — para esto es la Vista Común: pedir artes/recursos */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-          <ImageIcon size={18} color="var(--green-deep)" />
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Solicitudes de recurso</h2>
-          <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setReqOpen(true)}><Plus size={14} /> Solicitar recurso</button>
-        </div>
-        <div className="grid" style={{ gap: 8, width: '100%' }}>
-          {resources.data.slice(0, 5).map((rr) => {
-            const pill = rr.status === 'entregado' ? 'p-ok' : rr.status === 'en_proceso' ? 'p-blue' : 'p-warn'
-            const lbl = rr.status === 'entregado' ? 'Entregado' : rr.status === 'en_proceso' ? 'En proceso' : 'Solicitado'
-            return (
-              <div key={rr.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{rr.title}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Pidió {rr.requestedBy}</div>
-                </div>
-                {rr.status === 'entregado' && rr.assetUrl && (
-                  <a className="btn ghost sm" href={rr.assetUrl} target="_blank" rel="noreferrer" download><Eye size={14} /> Ver</a>
-                )}
-                {canDesign && rr.status === 'entregado' && rr.assetUrl && (
-                  <button className="btn sm" type="button" title="Pasar a la Biblioteca" onClick={() => toLibrary(rr)}>
-                    <ImageIcon size={14} /> A biblioteca
-                  </button>
-                )}
-                <span className={'pill ' + pill}>{lbl}</span>
-                {canDesign && (
-                  <button className="fbtn" type="button" title="Eliminar solicitud"
-                    onClick={() => { if (window.confirm('¿Eliminar esta solicitud de recurso?')) resources.remove(rr.id) }}>
-                    <Trash2 size={15} color="var(--danger)" />
-                  </button>
-                )}
-              </div>
-            )
-          })}
-          {resources.data.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Aún no hay solicitudes.</div>}
-        </div>
-
-        {!canManage && (
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
-            Modo lectura · solo Administración publica.
-          </div>
-        )}
+          )
+        })}
+        {resources.data.length === 0 && <div className="av-vacio"><div className="av-vacio-t">Aún no hay solicitudes</div></div>}
       </div>
+    </div>
+  )
+
+  return (
+    <div className="av">
+      <Pestanas grupo="avisos_equipo" pestanas={[
+        { key: 'muro', label: 'Avisos', conteo: sinLeer.length, render: () => muro },
+        { key: 'biblioteca', label: 'Biblioteca', render: () => biblioteca },
+        { key: 'solicitudes', label: 'Solicitudes de recurso', conteo: pendientes, render: () => solicitudes },
+      ]} />
 
       {sheetFor && (
         <CommentsSheet
@@ -320,11 +349,12 @@ function Avatar({ name, sm, url }: { name: string; sm?: boolean; url?: string })
 }
 
 function FeedCard({
-  a, authorUrl, canManage, reacted, read, reactionCount, readCount, commentCount,
+  a, authorUrl, authorRole, canManage, reacted, read, reactionCount, readCount, commentCount,
   onReact, onRead, onComments, onEdit, onPin, onDelete,
 }: {
   a: Announcement
   authorUrl?: string
+  authorRole?: string
   canManage: boolean
   reacted: boolean
   read: boolean
@@ -336,92 +366,95 @@ function FeedCard({
 }) {
   const kind = kindOf(a)
   const aud = audienceOf(a)
-  const reactions = reactionCount
-  const reads = readCount
   const author = authorOf(a)
+  const fijado = isPinned(a)
 
   return (
-    <div className={'fcard' + (isPinned(a) ? ' pinned' : '')}>
-      <div className="fhead">
+    <article className={`av-card av-card--${kind}${fijado ? ' fijado' : ''}${read ? '' : ' nuevo'}`} data-testid="aviso">
+      <header className="av-head">
         <Avatar name={author} url={authorUrl} />
-        <div style={{ minWidth: 0 }}>
-          <div className="fname">{author}</div>
-          <div className="fmeta">
-            <span>{timeAgo(a.created_at)}</span>
-            <span className={'pill ' + (kind === 'aviso' ? 'p-warn' : 'p-neu')}>
-              {kind === 'aviso' ? <Bell size={11} /> : <Megaphone size={11} />} {kind === 'aviso' ? 'Aviso' : 'Anuncio'}
-            </span>
-            {aud && <span className="pill p-blue">{roleLabel(aud)}</span>}
-            {isPinned(a) && <span className="pill p-ok"><Pin size={11} /> Fijado</span>}
-          </div>
+        <div className="av-quien">
+          <div className="av-autor">{author}</div>
+          <div className="av-meta"><span title={new Date(a.created_at).toLocaleString('es-MX')}>{cuandoPublicado(a.created_at)}</span>{authorRole && <><span aria-hidden>·</span><span>{authorRole}</span></>}</div>
+        </div>
+        <div className="av-etiquetas">
+          {fijado && <span className="av-tag av-tag--fijado"><Pin size={12} /> Fijado</span>}
+          <span className={`av-tag av-tag--${kind}`}>{kind === 'aviso' ? <Bell size={12} /> : <Megaphone size={12} />} {kind === 'aviso' ? 'Aviso' : 'Anuncio'}</span>
         </div>
         {canManage && (
-          <div className="fmanage">
-            <button className="fbtn" type="button" onClick={onEdit} title="Editar"><Pencil size={15} /></button>
-            <button className="fbtn" type="button" onClick={onPin} title="Fijar"><Pin size={15} /></button>
-            <button className="fbtn" type="button" onClick={onDelete} title="Borrar"><Trash2 size={15} className="danger" color="var(--danger)" /></button>
+          <div className="av-gestion">
+            <button className="fbtn" type="button" onClick={onEdit} title="Editar" aria-label="Editar"><Pencil size={15} /></button>
+            <button className={'fbtn' + (fijado ? ' on' : '')} type="button" onClick={onPin} title={fijado ? 'Quitar de arriba' : 'Fijar arriba'} aria-label="Fijar"><Pin size={15} /></button>
+            <button className="fbtn" type="button" onClick={onDelete} title="Borrar" aria-label="Borrar"><Trash2 size={15} color="var(--danger)" /></button>
           </div>
         )}
-      </div>
+      </header>
 
-      <div className="ftitle">{a.title}</div>
-      <div className="fbody">{a.body}</div>
+      <h3 className="av-titulo">{!read && <span className="av-punto" aria-label="Nuevo" />}{a.title}</h3>
+      {a.body && <div className="av-cuerpo">{conEnlaces(a.body)}</div>}
+      {aud && <div className="av-para">Para: <b>{roleLabel(aud)}</b></div>}
 
-      <div className="factions">
-        <button className={'fbtn' + (reacted ? ' on' : '')} type="button" onClick={onReact}>
-          <ThumbsUp size={16} /> {reactions || ''} <span style={{ fontWeight: 500 }}>Me sirve</span>
+      <footer className="av-pie">
+        <button className={'av-accion' + (reacted ? ' on' : '')} type="button" onClick={onReact} aria-pressed={reacted}>
+          <ThumbsUp size={16} /> Me sirve{reactionCount ? <span className="av-num">{reactionCount}</span> : null}
         </button>
-        <button className={'fbtn read' + (read ? ' on' : '')} type="button" onClick={onRead}>
-          <CheckCheck size={16} /> {read ? 'Leído' : 'Marcar leído'} {reads ? `· ${reads}` : ''}
+        <button className="av-accion" type="button" onClick={onComments}>
+          <MessageCircle size={16} /> {commentCount ? `${commentCount} ${commentCount === 1 ? 'comentario' : 'comentarios'}` : 'Comentar'}
         </button>
-        <button className="fbtn" type="button" onClick={onComments}>
-          <MessageCircle size={16} /> {commentCount || ''} <span style={{ fontWeight: 500 }}>Comentar</span>
-        </button>
-      </div>
-    </div>
+        <span className="av-pie-sep" />
+        {read
+          ? <span className="av-leido"><CheckCheck size={16} /> Enterado{canManage && readCount ? ` · lo leyeron ${readCount}` : ''}</span>
+          : <button className="av-enterado" type="button" onClick={onRead}><Check size={16} /> Enterado</button>}
+      </footer>
+    </article>
   )
 }
 
 function Composer({ onPublish, meUrl, meName }: { onPublish: (input: { title: string; body: string; kind: AnnouncementKind; pinned: boolean; audience: RoleId | null }) => void; meUrl?: string; meName?: string }) {
+  const [abierto, setAbierto] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [kind, setKind] = useState<AnnouncementKind>('anuncio')
   const [pinned, setPinned] = useState(false)
   const [audience, setAudience] = useState<RoleId | ''>('')
 
+  const limpiar = () => { setTitle(''); setBody(''); setPinned(false); setAudience(''); setKind('anuncio'); setAbierto(false) }
   const publish = () => {
     if (!title.trim()) return
     onPublish({ title: title.trim(), body: body.trim(), kind, pinned, audience: audience || null })
-    setTitle(''); setBody(''); setPinned(false); setAudience(''); setKind('anuncio')
+    limpiar()
+  }
+
+  if (!abierto) {
+    return (
+      <button type="button" className="av-escribir" onClick={() => setAbierto(true)}>
+        <Avatar name={meName ?? 'Tú'} url={meUrl} />
+        <span>Publica un aviso o anuncio para el equipo…</span>
+        <span className="av-escribir-btn"><Plus size={15} /> Publicar</span>
+      </button>
+    )
   }
 
   return (
-    <div className="composer">
-      <Avatar name={meName ?? 'Tú'} url={meUrl} />
-      <div style={{ flex: 1 }}>
-        <input
-          value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título…"
-          style={{ width: '100%', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 600, background: 'none' }}
-        />
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Escribe un anuncio o aviso para el equipo…" rows={2} />
-        <div className="composer-actions">
-          <div className="fchips">
-            <button type="button" className={'fchip' + (kind === 'anuncio' ? ' on' : '')} onClick={() => setKind('anuncio')}>Anuncio</button>
-            <button type="button" className={'fchip' + (kind === 'aviso' ? ' on' : '')} onClick={() => setKind('aviso')}>Aviso</button>
-          </div>
-          <select
-            aria-label="Destinatario del anuncio"
-            value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}
-            style={{ padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 'var(--pill)', fontFamily: 'inherit', fontSize: 12.5, backgroundColor: 'var(--cp-surface)' }}
-          >
+    <div className="av-composer">
+      <div className="av-composer-tipo" role="radiogroup" aria-label="Tipo de publicación">
+        <button type="button" role="radio" aria-checked={kind === 'anuncio'} className={kind === 'anuncio' ? 'on' : ''} onClick={() => setKind('anuncio')}><Megaphone size={15} /> Anuncio<small>Información general</small></button>
+        <button type="button" role="radio" aria-checked={kind === 'aviso'} className={kind === 'aviso' ? 'on aviso' : ''} onClick={() => setKind('aviso')}><Bell size={15} /> Aviso<small>Algo que el equipo debe atender</small></button>
+      </div>
+      <input className="av-campo av-campo--titulo" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" aria-label="Título" />
+      <textarea className="av-campo" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Escribe el mensaje para el equipo…" rows={4} aria-label="Mensaje" />
+      <div className="av-composer-pie">
+        <label className="av-select">
+          <span>Para</span>
+          <select aria-label="Destinatario del anuncio" value={audience} onChange={(e) => setAudience(e.target.value as RoleId | '')}>
             <option value="">Todo el equipo</option>
             {STAFF.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Fijar
-          </label>
-          <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={publish}><Send size={14} /> Publicar</button>
-        </div>
+        </label>
+        <label className="av-check"><input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Fijar arriba</label>
+        <span className="av-pie-sep" />
+        <button className="btn ghost sm" type="button" onClick={limpiar}>Cancelar</button>
+        <button className="btn sm" type="button" onClick={publish} disabled={!title.trim()}><Send size={14} /> Publicar</button>
       </div>
     </div>
   )

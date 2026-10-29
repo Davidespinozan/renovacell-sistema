@@ -21,8 +21,9 @@ describe('<Chat>', () => {
     renderWithRole(<Chat />)
     fireEvent.click(screen.getByText('Almacén y Empaque'))
     expect(screen.getByPlaceholderText(/Mensaje a Almacén y Empaque/i)).toBeInTheDocument()
-    // Mensaje sembrado del hilo de almacén.
-    expect(screen.getByText(/STL-44/)).toBeInTheDocument()
+    // Mensaje sembrado del hilo de almacén (dentro del hilo; la lista también lo adelanta).
+    const hilo = document.querySelector('.rc-thread') as HTMLElement
+    expect(within(hilo).getByText(/STL-44/)).toBeInTheDocument()
   })
 
   it('el botón "Nuevo" abre el directorio de staff', () => {
@@ -38,7 +39,26 @@ describe('<Chat>', () => {
     const input = screen.getByPlaceholderText(/Mensaje a Todos/i)
     fireEvent.change(input, { target: { value: 'Mensaje de prueba' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(screen.getByText('Mensaje de prueba')).toBeInTheDocument()
+    const hilo = document.querySelector('.rc-thread') as HTMLElement
+    expect(within(hilo).getByText('Mensaje de prueba')).toBeInTheDocument()
+    // Burbuja propia (lado derecho) y adelanto "visto por mí" en la lista.
+    expect(within(hilo).getAllByTestId('tc-propio').length).toBeGreaterThan(0)
+  })
+
+  it('Shift+Enter no envía (salto de línea); Enter sí', () => {
+    renderWithRole(<Chat />)
+    fireEvent.click(screen.getByText('Todos'))
+    const input = screen.getByPlaceholderText(/Mensaje a Todos/i)
+    fireEvent.change(input, { target: { value: 'Línea uno' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect((input as HTMLTextAreaElement).value).toBe('Línea uno')
+  })
+
+  it('busca entre los chats por nombre', () => {
+    renderWithRole(<Chat />)
+    fireEvent.change(screen.getByLabelText('Buscar un chat'), { target: { value: 'almac' } })
+    expect(screen.getByText('Almacén y Empaque')).toBeInTheDocument()
+    expect(screen.queryByText('Dirección')).toBeNull()
   })
 
   it('vuelve a la lista con la flecha y abre otro hilo', () => {
