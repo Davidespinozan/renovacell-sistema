@@ -3,8 +3,10 @@
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import { EnlaceContacto } from './EnlaceContacto'
+import { EnlaceContacto, EnlaceContactoBotones } from './EnlaceContacto'
 import atencionSrc from '../screens/admin/AtencionComercial.tsx?raw'
+import bandejaSrc from '../screens/admin/BandejaConversaciones.tsx?raw'
+import asesoriasSrc from '../screens/chat/Asesorias.tsx?raw'
 
 afterEach(cleanup)
 describe('Enlace de contacto (Dirección)', () => {
@@ -26,5 +28,15 @@ describe('Enlace de contacto (Dirección)', () => {
   })
   it('vive en la Bandeja de Conversaciones, la pantalla de Dirección donde se asigna vendedor', () => {
     expect(atencionSrc).toMatch(/\{titulo\}<\/div>\s*\n\s*\{pestanas\.includes\('pendientes'\) && <EnlaceContacto \/>\}/)   // REORG CRM · vive en la Bandeja de Conversaciones (solicitudes)
+  })
+  // 29 oct 2026 (dueño: "el url ya no lo tiene a la mano nadie desde conversaciones"): siempre visible en el encabezado.
+  it('la barra del enlace copia y comparte, y está en el encabezado de ambas bandejas', async () => {
+    const writeText = vi.fn(async () => {}); Object.assign(navigator, { clipboard: { writeText } })
+    render(<EnlaceContactoBotones url="https://renovacell.mx/contacto" />)
+    fireEvent.click(screen.getByTestId('copiar-enlace'))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://renovacell.mx/contacto'))
+    expect(decodeURIComponent((screen.getByTestId('compartir-enlace-whatsapp') as HTMLAnchorElement).href)).toMatch(/Chatea con un asesor: https:\/\/renovacell\.mx\/contacto$/)
+    expect(bandejaSrc).toMatch(/<div className="bq-head">[\s\S]{0,400}<EnlaceContactoBotones \/>/)
+    expect(asesoriasSrc).toMatch(/Conversaciones con clientes<\/h2>[\s\S]{0,300}<EnlaceContactoBotones \/>/)
   })
 })

@@ -15,7 +15,7 @@ import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
-import { EnlaceContacto } from '../../app/EnlaceContacto'
+import { EnlaceContacto, EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { MarcoModal, ModalCambiarCartera, ModalReasignarSolicitud, nombreSolicitud, PILL_FUENTE, SelectorVendedor } from './AtencionComercial'
 
 type Vista = GrupoBandeja | 'todas'
@@ -95,7 +95,8 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
       <style>{CSS}</style>
       <div className="bq-head">
         <div className="eyebrow" style={{ margin: 0 }}>Dirección · Conversaciones</div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <EnlaceContactoBotones />
           <button type="button" className="btn ghost sm" onClick={() => void cargar()} aria-label="Actualizar" data-testid="bq-actualizar"><RefreshCw size={15} /></button>
           <button type="button" className="btn ghost sm" onClick={() => setAjustes(true)} data-testid="bq-ajustes"><Settings2 size={15} style={{ marginRight: 6 }} />Canales y horario</button>
         </div>

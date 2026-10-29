@@ -7,13 +7,31 @@ import { urlEnlaceContacto } from '../data/ops/contactoEnlace'
 
 export const TEXTO_COMPARTIR = 'Renovacell · Tecnologías Antiedad. Chatea con un asesor:'
 
-export function EnlaceContacto({ url = urlEnlaceContacto() }: { url?: string }) {
+function useCopiarEnlace(url: string) {
   const [copiado, setCopiado] = useState(false)
   const copiar = async () => {
     try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) }
     catch { window.prompt('Copia el enlace de contacto:', url) }
   }
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${TEXTO_COMPARTIR} ${url}`)}`
+  return { copiado, copiar, whatsapp }
+}
+
+// Versión de barra para el encabezado de Conversaciones (Dirección y vendedores): el enlace siempre a la mano, sin
+// abrir ningún ajuste. Copiar y compartir por WhatsApp en un toque.
+export function EnlaceContactoBotones({ url = urlEnlaceContacto() }: { url?: string }) {
+  const { copiado, copiar, whatsapp } = useCopiarEnlace(url)
+  return (
+    <span className="enlace-barra" data-testid="enlace-contacto-barra" title={`Enlace de contacto: ${url}. Quien lo abre deja sus datos y conversa con nosotros; llega a su vendedor o a Dirección.`}>
+      <span className="enlace-barra-et"><Link2 size={15} aria-hidden /> Enlace de contacto</span>
+      <button type="button" onClick={() => void copiar()} data-testid="copiar-enlace"><Copy size={14} /> {copiado ? 'Copiado' : 'Copiar'}</button>
+      <a href={whatsapp} target="_blank" rel="noreferrer" data-testid="compartir-enlace-whatsapp"><Send size={14} /> WhatsApp</a>
+    </span>
+  )
+}
+
+export function EnlaceContacto({ url = urlEnlaceContacto() }: { url?: string }) {
+  const { copiado, copiar, whatsapp } = useCopiarEnlace(url)
   return (
     // REORG CRM · compacto: una fila con el enlace y sus botones; la explicación va plegada (sigue en el DOM para quien la busca).
     <div className="card" data-testid="enlace-contacto" style={{ display: 'grid', gap: 8, padding: '10px 14px' }}>

@@ -15,7 +15,8 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico, TEXTO_ASESORIA_FINALIZADA } from './ChatCanonico'
 import { useRole } from '../../auth/RoleContext'
-import { contactoDe as contactoPorDefecto, urlEnlaceContacto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
+import { contactoDe as contactoPorDefecto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
+import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
@@ -43,7 +44,6 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     void contactoDe(abierta).then((c) => { if (vivo) setContacto(c) })
     return () => { vivo = false }
   }, [abierta, contactoDe])
-  const [copiado, setCopiado] = useState(false)
   // FOTOS · si el dueño de la conversación es un doctor por verificar, sus fotos ofrecen "Usar como INE".
   const [pendiente, setPendiente] = useState<DoctorPendiente | null>(null)
   const [versionPanel, setVersionPanel] = useState(0)
@@ -72,11 +72,6 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     const inv = await crearInvitacion(customerId)
     if (!inv.ok) { setHerr(inv.mensaje); return }
     await mandar(`Te dejo tu invitación para crear tu cuenta en Renovacell. Como ya eres cliente, queda verificada: ${inv.data.enlace}`, 'Le mandaste la invitación a crear su cuenta.')
-  }
-  const copiarEnlace = async () => {
-    const url = urlEnlaceContacto()
-    try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) }
-    catch { window.prompt('Copia el enlace de contacto:', url) }
   }
 
   const cargar = useCallback(async () => {
@@ -158,7 +153,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
         <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><BotonAvisos className="btn ghost sm" /></span>
-        <button type="button" className="btn ghost sm" onClick={() => void copiarEnlace()} title="El enlace único para compartir en grupos: quien lo abre deja sus datos y conversa en este mismo chat." data-testid="copiar-enlace">{copiado ? 'Enlace copiado' : 'Copiar enlace de contacto'}</button>
+        <EnlaceContactoBotones />
       </div>
       <p style={{ margin: '0 0 12px', color: 'var(--ink-3, #667)', fontSize: 13 }}>
         {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Conversaciones → Solicitudes.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}

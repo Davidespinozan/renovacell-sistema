@@ -388,3 +388,10 @@
   .tc-volver{display:grid}
   .tc-row{min-height:64px}
 }
+
+/* Enlace de contacto siempre a la mano en el encabezado de Conversaciones (Dirección y vendedores). */
+.enlace-barra{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:var(--pill);background:var(--cp-surface);box-shadow:var(--sh-sm);flex-wrap:wrap}
+.enlace-barra-et{display:inline-flex;align-items:center;gap:6px;padding:0 10px 0 8px;font-size:12.5px;font-weight:700;color:var(--green-deep);white-space:nowrap}
+.enlace-barra button,.enlace-barra a{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 12px;border:0;border-radius:var(--pill);background:var(--ok-bg);color:var(--green-deep);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.enlace-barra button:hover,.enlace-barra a:hover{background:var(--green-deep);color:#fff}
+@media (max-width:640px){.enlace-barra{display:flex;width:100%;gap:6px;padding:8px;border-radius:14px}.enlace-barra-et{flex-basis:100%;padding:2px 4px}.enlace-barra button,.enlace-barra a{flex:1;justify-content:center;min-height:42px}}
