@@ -41,6 +41,8 @@ export const INICIO_SCREEN: ScreenDef = { key: 'inicio', label: 'Inicio', icon: 
 export const COMMON_SCREEN: ScreenDef = { key: 'comun', label: 'Avisos del equipo', icon: 'megaphone' }
 export const CHAT_SCREEN: ScreenDef = { key: 'chat', label: 'Chat del equipo', icon: 'chat' }
 export const HUB_SCREENS: ScreenDef[] = [COMMON_SCREEN, CHAT_SCREEN]
+// STRYV Care (solo Dirección): no ocupa entrada en el menú; se abre desde el pie del menú ("Operado por STRYV").
+export const STRYV_CARE_SCREEN: ScreenDef = { key: 'stryv_care', label: 'STRYV Care', icon: 'shield' }
 // Claves que el marco agrupa arriba ("Hub Renovacell" en el sidebar; pestañas del bottom-nav del staff).
 export const HUB_KEYS: ReadonlySet<string> = new Set([INICIO_SCREEN.key, ...HUB_SCREENS.map((s) => s.key)])
 

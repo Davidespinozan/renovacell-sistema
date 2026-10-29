@@ -12,6 +12,7 @@ import { Calendario } from './Calendario'
 import { Clientes } from './Clientes'
 import { CommonView } from './CommonView'
 import { Chat } from './hub/Chat'
+import { StryvCare } from './stryv/StryvCare'
 import { Catalogo, CatalogoPantalla } from './doctor/Catalogo'
 import { MisPedidos } from './doctor/MisPedidos'
 import { Historial } from './doctor/Historial'
@@ -166,6 +167,8 @@ export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
     if (FEATURES.comunicacionInterna) return <Chat />
     return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }
+  // STRYV Care: solo Dirección (la Edge también lo exige; aquí no se muestra a nadie más).
+  if (screen === 'stryv_care') return role === 'admin' ? <StryvCare /> : <Placeholder role={role} screen={screen} />
   const real = SCREENS[screen]
   if (real) return <React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{real()}</React.Suspense>
   return <Placeholder role={role} screen={screen} />

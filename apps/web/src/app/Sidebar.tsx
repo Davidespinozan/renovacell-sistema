@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react'
 import { ChevronRight, LogOut, Settings } from 'lucide-react'
 import { Icon } from './icons'
-import { getRole, getNav, HUB_KEYS, type ScreenDef } from './roles'
+import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
@@ -125,11 +125,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </button>
           </div>
         )}
-        {!plano && (
-          <div className="op">
-            <span className="live" /> Operado por <b>STRYV</b>
-          </div>
-        )}
+        {/* Como en Fukuroll: "Operado por STRYV" en el pie. Dirección lo usa como entrada a su plan STRYV Care;
+            el resto del equipo llega a la página de STRYV. El doctor (menú plano) no lo ve. */}
+        {!plano && (role === 'admin' ? (
+          <button type="button" className={'side-stryv' + (screen === STRYV_CARE_SCREEN.key ? ' on' : '')} onClick={() => go(STRYV_CARE_SCREEN.key)} data-testid="side-stryv">
+            <span className="ss-top"><span className="live" /> Operado por <b>STRYV</b></span>
+            <span className="side-care">Ver mi plan STRYV Care<span className="ss-arrow" aria-hidden>›</span></span>
+          </button>
+        ) : (
+          <a className="side-stryv side-stryv--link" href="https://stryvstudio.com" target="_blank" rel="noopener noreferrer" aria-label="Operado por STRYV · stryvstudio.com">
+            <span className="ss-top"><span className="live" /> Operado por <b>STRYV</b></span>
+          </a>
+        ))}
       </div>
 
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}

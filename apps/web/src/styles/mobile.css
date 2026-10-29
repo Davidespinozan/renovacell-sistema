@@ -167,3 +167,45 @@ td .mono, td.mono { white-space: nowrap; }
   /* La cabecera solo lleva el título: el rol es el mismo en todas las pantallas. */
   .top .screen-sub { display: none; }
 }
+
+/* ── STRYV · pie del menú y plan STRYV Care (mismo diseño que Fukuroll, en los verdes de Renovacell) ───────── */
+.side-stryv{display:flex;flex-direction:column;align-items:center;gap:7px;width:100%;margin-top:4px;padding:10px 10px 9px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.72);font:inherit;font-size:11.5px;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s}
+.side-stryv .ss-top{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.side-stryv b{color:#fff;font-weight:800;letter-spacing:.04em}
+.side-stryv .live{background:#22C55E}
+.side-care{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:7px 8px;border-radius:999px;background:var(--green-soft);color:#06210F;font-size:12px;font-weight:700}
+.side-stryv .ss-arrow{font-size:15px;line-height:1;transition:transform .15s}
+.side-stryv:hover,.side-stryv.on{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22);color:#fff}
+.side-stryv:hover .ss-arrow{transform:translateX(3px)}
+.side-stryv--link{padding:9px 10px}
+
+.care{display:grid;gap:14px;max-width:640px}
+.care-card{display:grid;gap:12px;padding:22px 22px 20px;border:1px solid var(--line);border-radius:18px;background:var(--cp-surface);box-shadow:var(--sh-card)}
+.care-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.care-brand{font-size:24px;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+.care-brand span{font-weight:600;letter-spacing:0;color:var(--green)}
+.care-precio{font-size:36px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.care-precio small{font-size:14px;font-weight:600;color:var(--mid);letter-spacing:0}
+.care-p{margin:0;font-size:14px;color:var(--ink-2);line-height:1.55}
+.care-lista{list-style:none;margin:2px 0;padding:0;display:grid;gap:7px;font-size:13.5px;color:var(--ink-2)}
+.care-lista li{display:flex;gap:8px;align-items:flex-start;line-height:1.45}
+.care-lista svg{flex:none;margin-top:2px;color:var(--green)}
+.care-accion{display:grid;gap:8px;justify-items:start;margin-top:4px}
+.care-nota{margin:0;font-size:12.5px;color:var(--mid)}
+.care-datos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.care-datos > div{display:grid;gap:3px;padding:12px 14px;border-radius:12px;background:var(--hueso)}
+.care-datos span{font-size:12px;color:var(--mid)}
+.care-datos b{font-size:14.5px;color:var(--ink)}
+.care-recibos{display:grid;gap:2px;margin-top:6px}
+.care-h{font-size:12px;font-weight:700;color:var(--mid);margin-bottom:4px}
+.care-recibo{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.care-recibo:last-child{border-bottom:0}
+.care-recibo small{display:block;font-size:12px;color:var(--mid)}
+.care-recibo a{color:var(--green-deep);font-weight:600;display:inline-flex;align-items:center;gap:3px;margin-left:6px}
+.care-ok{padding:10px 14px;border-radius:12px;background:var(--ok-bg);color:var(--green-deep);font-weight:600;font-size:13.5px}
+.care-error{padding:10px 14px;border-radius:12px;background:var(--danger-bg);color:var(--danger);font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.care-cargando{font-size:13.5px;color:var(--mid)}
+.care-link{justify-self:start;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--cp-surface);color:var(--ink-2);font-size:12px;letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+.care-link b{color:var(--ink);letter-spacing:.14em}
+.care-link .live{background:#22C55E}
+@media (max-width:640px){.care-datos{grid-template-columns:1fr}.care-card{padding:18px 16px}}

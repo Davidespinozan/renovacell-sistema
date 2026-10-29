@@ -11,12 +11,13 @@ import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
 import { instalarRefresco, refrescarDatos } from '../data/store/refrescar'
+import { regresoDeStripe, CLAVE_REGRESO_CARE } from '../data/ops/stryvCare'
 
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
 
 export function AppShell() {
-  const { role, screen, verified } = useRole()
+  const { role, screen, verified, user, setScreen } = useRole()
   const [drawer, setDrawer] = useState(false)
 
   // La pestaña: "Sistema operativo" es solo del equipo (ERP); el doctor ve la marca del negocio (decisión del dueño).
@@ -33,6 +34,13 @@ export function AppShell() {
   // Datos al día: al llegar un aviso, al volver a la pestaña y al abrir otra pantalla (antes: solo al iniciar sesión).
   useEffect(() => { instalarRefresco() }, [])
   useEffect(() => { refrescarDatos() }, [screen])
+  // Al volver de Stripe (?care=ok|cancel|volver) se abre STRYV Care una vez, ya con la sesión de Dirección resuelta.
+  useEffect(() => {
+    const r = regresoDeStripe(); if (!r || !user || role !== 'admin') return
+    try { sessionStorage.setItem(CLAVE_REGRESO_CARE, r) } catch { /* sin almacenamiento: solo se omite el aviso */ }
+    window.history.replaceState(null, '', window.location.pathname)
+    setScreen('stryv_care')
+  }, [role, user, setScreen])
 
   return (
     <div className="app">

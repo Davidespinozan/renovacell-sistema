@@ -127,7 +127,7 @@ describe('CORS · inventario y webhooks', () => {
       if (/'Access-Control-Allow-Origin': '\*'/.test(src)) conAsterisco.push(nombre(p))
     }
     // CC-1 añade `visitor` (nace ya con la lista blanca).
-    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invitacion', 'invite-doctor', 'meta-send', 'push', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'verificacion', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
+    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invitacion', 'invite-doctor', 'meta-send', 'push', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'stryv-care', 'verificacion', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
     for (const f of conHelper) expect(conAsterisco, f).not.toContain(f)
     expect(conAsterisco).toEqual([])   // CC-0B.2 cerrado en el preflight: ninguna Edge conserva '*'
   })

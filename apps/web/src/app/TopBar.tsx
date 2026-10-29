@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './icons'
 import { BrandLogo } from './BrandLogo'
-import { getRole, getScreenDef, getNav, pantallasAlcanzables, COMMON_SCREEN, CHAT_SCREEN } from './roles'
+import { getRole, getScreenDef, getNav, pantallasAlcanzables, COMMON_SCREEN, CHAT_SCREEN, STRYV_CARE_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { useGlobalSearch } from '../data/hooks/useGlobalSearch'
 import { useNotifications, type Notif } from '../data/hooks/useNotifications'
@@ -17,11 +17,12 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const r = getRole(role)
   // Pasa las capabilities para resolver también el título de las pantallas de
   // capacidad (Diseño/Eventos); si no, caían al primero de la nav ("Inicio").
-  const s = getScreenDef(r, screen, undefined, capabilities)
+  const s = screen === STRYV_CARE_SCREEN.key ? STRYV_CARE_SCREEN : getScreenDef(r, screen, undefined, capabilities)
   // El doctor no ve su "rol" repetido en cada pantalla (es la cara de la marca hacia el cliente).
   const esDoctor = role === 'doctor'
   const sub =
     esDoctor ? (screen === 'inicio' ? 'Renovacell · Tecnologías Antiedad' : '')
+      : screen === STRYV_CARE_SCREEN.key ? 'Mantenimiento e infraestructura'
       : screen === COMMON_SCREEN.key ? 'Comunicación del equipo'
         : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
           : r.label

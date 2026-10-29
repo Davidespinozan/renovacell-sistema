@@ -927,6 +927,14 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 @media(max-width:420px){.id-tile .id-lbl{font-size:11px;}.id-tile .id-hint{display:none;}}
 
 /* FOOTER */
+/* Pie: "Operado por STRYV" → página de STRYV (mismo diseño que el menú de Fukuroll). Fijo: no lo cambia el editor. */
+.footer-stryv{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem .95rem;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);
+  color:rgba(245,245,245,.72);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;transition:background .2s,border-color .2s,color .2s}
+.foot-bottom .footer-stryv b{color:#fff;font-weight:800;letter-spacing:.18em}
+.footer-stryv:hover{background:rgba(255,255,255,.09);border-color:rgba(95,184,115,.55);color:#fff}
+.fs-dot{width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 8px rgba(34,197,94,.7)}
+/* Los botones flotantes (asistente, WhatsApp) viven en la esquina inferior derecha: que no tapen el pie. */
+@media (min-width:761px){.foot-bottom{padding-right:96px}}
 footer{background:var(--ink);color:rgba(249,250,248,.6);padding:60px 28px 28px;}
 .foot-inner{max-width:1440px;margin:0 auto;}
 .foot-top{
@@ -2702,7 +2710,7 @@ body.rc-has-ann .nav{top:38px}
     <div class="foot-bottom">
       <span data-rc="footerText">© 2026 Renovacell® · Todos los derechos reservados</span>
       <a href="/landing/privacidad.html" class="foot-legal">Aviso de privacidad</a>
-      <span data-rc-html="pieCredito">Construido con <b>STRYV Studio</b> · Valencia</span>
+      <a class="footer-stryv" href="https://stryvstudio.com" target="_blank" rel="noopener" aria-label="Operado por STRYV · stryvstudio.com"><span class="fs-dot"></span>Operado por <b>STRYV</b></a>
     </div>
   </div>
 </footer>
