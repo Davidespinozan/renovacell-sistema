@@ -9,6 +9,7 @@
 // La Edge no escribe en payment_entries: la contabilización es exclusivamente cs_intento_contabilizar (ledger W2).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
+import { RESPUESTA_APAGADO, tarjetaEnLineaActiva } from '../_shared/pagosEnLinea.ts'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { conCors } from '../_shared/cors.ts'
 import { observador } from '../_shared/observa.ts'
 import { csConfig, solicitarCS, RUTAS_CS } from '../_shared/cybersource.ts'
@@ -36,6 +37,7 @@ Deno.serve(conCors(async (req) => {
   const attemptId = String(p.attempt_id ?? '')
   if (!UUID.test(attemptId)) return json(400, { error: 'Falta attempt_id.' })
   if (!['pagar', 'estado'].includes(accion)) return json(400, { error: 'accion_invalida' })
+  if (accion === 'pagar' && !(await tarjetaEnLineaActiva(admin))) return json(409, RESPUESTA_APAGADO)   // PAGOS EN LÍNEA · apagado por Dirección (consultar el estado sigue)
 
   const leer = async (): Promise<Intento | null> => {
     const { data } = await caller.from('card_payment_attempts').select('id, order_id, doctor_id, ambiente, amount, status, cs_auth_transaction_id, cs_payment_id, entry_id').eq('id', attemptId).maybeSingle()

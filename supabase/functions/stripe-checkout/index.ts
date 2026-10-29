@@ -7,6 +7,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien } from '../_shared/quien.ts'
 import Stripe from 'npm:stripe@17'
+import { RESPUESTA_APAGADO, tarjetaEnLineaActiva } from '../_shared/pagosEnLinea.ts'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 
 const cors = {
@@ -29,6 +30,7 @@ Deno.serve(conCors(async (req) => {
   const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
   const q = await resolverQuien(caller, createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } }))
   if (!q.ok) return json(q.status, q.body)
+  if (!(await tarjetaEnLineaActiva(createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })))) return json(409, RESPUESTA_APAGADO)   // PAGOS EN LÍNEA · apagado por Dirección
   // CC-0A · UNVERIFIED CANNOT CHECKOUT: invariante explícita (antes solo la cubría la RLS de
   // orders de forma indirecta). La verdad es `is_verified()` del servidor; falla cerrado.
   if (q.quien.role === 'doctor') {

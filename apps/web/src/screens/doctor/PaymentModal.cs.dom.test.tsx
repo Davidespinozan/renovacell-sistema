@@ -28,8 +28,9 @@ vi.mock('./ConfirmacionPago', () => ({ ConfirmacionPago: (p: { attemptId: string
 } }))
 
 import { PaymentModal } from './PaymentModal'
+import { _fijarPagosEnLinea } from '../../data/ops/pagosEnLinea'
 
-beforeEach(() => { cleanup(); invoke.mockClear(); flags.CS_MICROFORM_HABILITADO = false; a3ds.props.length = 0; cpago.props.length = 0 })
+beforeEach(() => { cleanup(); _fijarPagosEnLinea(true); invoke.mockClear(); flags.CS_MICROFORM_HABILITADO = false; a3ds.props.length = 0; cpago.props.length = 0 })
 const props = { folio: 'S100002', amount: 6000, orderId: '11111111-1111-4111-8111-111111111111', onPaid: vi.fn(), onClose: vi.fn() }
 
 describe('CS-1A.3 · PaymentModal y la bandera', () => {

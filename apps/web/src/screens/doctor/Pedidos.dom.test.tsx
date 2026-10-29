@@ -7,8 +7,9 @@ import { RoleProvider } from '../../auth/RoleContext'
 import { takeReorderSeed } from '../../data/store/reorderStore'
 import { MisPedidos } from './MisPedidos'
 import { Historial } from './Historial'
+import { _fijarPagosEnLinea } from '../../data/ops/pagosEnLinea'
 
-beforeEach(cleanup)
+beforeEach(() => { cleanup(); _fijarPagosEnLinea(true) })   // PAGOS EN LÍNEA · estas pruebas cubren la rama de tarjeta
 
 // Estas pantallas usan useRole() (para "Volver a pedir" → navegar al catálogo),
 // así que deben renderizarse dentro del provider, como en la app real.

@@ -8,6 +8,7 @@
 // ni cabeceras firmadas. El navegador no elige merchant, ambiente, host, importe ni redes: todo sale del servidor.
 // SEAM: sin secretos CS_* responde 501 (como stripe-checkout). targetOrigins = el Origin de la página, validado contra la lista
 // blanca de CORS (la misma que decide si la página puede llamarnos). Requiere JWT: desplegar SIN --no-verify-jwt.
+import { RESPUESTA_APAGADO, tarjetaEnLineaActiva } from '../_shared/pagosEnLinea.ts'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { conCors, origenPermitido } from '../_shared/cors.ts'
@@ -28,6 +29,7 @@ Deno.serve(conCors(async (req) => {
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
   const q = await resolverQuien(caller, admin)
   if (!q.ok) return json(q.status, q.body)
+  if (!(await tarjetaEnLineaActiva(admin))) return json(409, RESPUESTA_APAGADO)   // PAGOS EN LÍNEA · apagado por Dirección
   // Solo el doctor VERIFICADO (la verdad la pone el servidor) o Dirección. El dueño del pedido lo valida cs_intento_abrir.
   if (!(tieneRol(q.quien, ['admin']) || (q.quien.role === 'doctor' && q.quien.verified))) {
     return json(403, { error: 'no_verificado', message: 'Tu cuenta aún no está verificada por Renovacell.' })

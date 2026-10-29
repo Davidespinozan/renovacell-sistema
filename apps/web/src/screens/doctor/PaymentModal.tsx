@@ -4,7 +4,7 @@
 // W2 · una transferencia INFORMADA no es un pago: crea una declaración
 // (`reportar_pago`, vía la Edge Function report-transfer) que Facturación verifica. El
 // pedido NO queda pagado aquí, y el texto que ve el cliente lo dice así.
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { processPayment, type PayMethod, type PayResult } from '../../data/payments/provider'
@@ -18,6 +18,7 @@ import { Copy } from 'lucide-react'
 // tarjeta captura en campos seguros de CyberSource y entrega un token transitorio al siguiente paso (3DS); NO cobra todavía.
 import { CS_MICROFORM_HABILITADO } from '../../data/payments/flags'
 import { MicroformTarjeta, type TokenTarjeta } from './MicroformTarjeta'
+import { useTarjetaEnLinea } from '../../data/ops/pagosEnLinea'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { Autenticacion3DS, type Fase } from './Autenticacion3DS'
 import { ConfirmacionPago, type FasePago } from './ConfirmacionPago'
 
@@ -52,7 +53,10 @@ export function PaymentModal({
   const { opId, renew } = useOpId()
   // Cuentas ACTIVAS (principal primero) — el doctor elige a cuál transfirió.
   const banks = bankAll.filter((b) => b.active).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.display_order - b.display_order)
-  const [method, setMethod] = useState<PayMethod>('tarjeta')
+  // PAGOS EN LÍNEA · con el interruptor de Dirección apagado no se ofrece "Tarjeta": solo transferencia (y en sucursal).
+  const tarjetaEnLinea = useTarjetaEnLinea()
+  const [method, setMethod] = useState<PayMethod>(tarjetaEnLinea ? 'tarjeta' : 'transferencia')
+  useEffect(() => { if (!tarjetaEnLinea && method === 'tarjeta') setMethod('transferencia') }, [tarjetaEnLinea, method])
   const [card, setCard] = useState({ number: '', name: '', exp: '', cvc: '' })
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<PayResult | null>(null)
@@ -161,7 +165,12 @@ export function PaymentModal({
               <button className="mclose" type="button" onClick={onClose} disabled={busy}><Icon name="x" /></button>
             </div>
             <div className="mbody">
-              <div className="seg" style={{ marginBottom: 4 }}>
+              {!tarjetaEnLinea && (
+                <div className="ms" style={{ color: 'var(--ink-3)', margin: '2px 0 8px' }} data-testid="pago-sin-tarjeta">
+                  Por ahora el pago es por <b>transferencia</b>, o en efectivo o con tarjeta en sucursal. El pago con tarjeta en línea estará disponible pronto.
+                </div>
+              )}
+              <div className="seg" style={{ marginBottom: 4, ...(tarjetaEnLinea ? {} : { display: 'none' }) }}>
                 <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
                 <button type="button" className={method === 'transferencia' ? 'active' : undefined} onClick={() => setMethod('transferencia')}>Transferencia</button>
               </div>

@@ -10,6 +10,7 @@ import { clabeValida, type BankAccount } from '../../data/store/companyBankStore
 import { REGIMENES_OPTIONS, esRegimenValido } from '../../data/sat/regimenesFiscales'
 import { HorarioYAlertas } from './HorarioAtencion'   // CC-7 + CHV2-B (umbrales de alerta)
 import { EmpaquesEditor } from './EmpaquesEditor'   // EMP-1 · catálogo de hieleras y cajas
+import { PagosEnLineaEditor } from './PagosEnLineaEditor'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { EntregaConfigEditor } from './EntregaConfigEditor'   // ENT-CFG · regla de entrega editable por Dirección
 import { DiagnosticoT1Temporal } from './DiagnosticoT1Temporal'   // TEMPORAL · retirar tras la comprobación de T1 sandbox
 import { hasSupabase } from '../../lib/supabase'
@@ -204,6 +205,7 @@ export function Configuracion() {
         </div>
       </div>
 
+      {hasSupabase && <PagosEnLineaEditor />}   {/* PAGOS EN LÍNEA · tarjeta en el portal: apagada hasta tener BanBajío */}
       <BankAccountsEditor />
       {hasSupabase && <DiagnosticoT1Temporal />}   {/* TEMPORAL · diagnóstico T1 sandbox; se retira después */}
       {hasSupabase && <EntregaConfigEditor />}   {/* ENT-CFG · corte, fletes, C.P. locales, días, tránsito y sucursal (autoridad del servidor) */}
