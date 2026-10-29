@@ -24,6 +24,9 @@ docs/PROPOSAL.md
 # …pero el CÓDIGO fuente sí se versiona aunque tenga esas palabras (no es material de venta).
 !apps/**/src/**/*[Pp]ricing*
 !apps/**/src/**/*[Cc]otiz*
+!apps/**/e2e/**/*[Cc]otiz*
+!supabase/**/*[Cc]otiz*
+!supabase/**/*[Cc]otiz*/**
 !apps/**/src/**/*[Dd]eck*
 # Las migraciones de BD SIEMPRE se versionan (nunca son material de venta), aunque el
 # nombre contenga "pricing"/"cotiz"/"deck" (p.ej. volume_pricing_engine).
