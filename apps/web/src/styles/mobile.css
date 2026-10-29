@@ -209,3 +209,5 @@ td .mono, td.mono { white-space: nowrap; }
 .care-link b{color:var(--ink);letter-spacing:.14em}
 .care-link .live{background:#22C55E}
 @media (max-width:640px){.care-datos{grid-template-columns:1fr}.care-card{padding:18px 16px}}
+.care-regular{margin-left:10px;font-size:16px;font-weight:600;color:var(--mid);letter-spacing:0}
+.care-infra{margin:0;padding:10px 12px;border-radius:12px;background:var(--hueso);font-size:12.5px;line-height:1.5;color:var(--ink-2)}

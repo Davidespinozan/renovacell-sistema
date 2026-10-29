@@ -1,9 +1,9 @@
-// STRYV Care (solo Dirección): el plan de mantenimiento e infraestructura del sistema. Estado de la suscripción,
+// STRYV Care (solo Dirección): el plan de mantenimiento y soporte del sistema. Estado de la suscripción,
 // próximo cobro, tarjeta, recibos y los botones que llevan a las páginas seguras de Stripe. Mismo contenido y flujo
 // que el panel de Fukuroll; la tarjeta se pone una sola vez en Stripe y se cobra sola cada mes.
 import React, { useCallback, useEffect, useState } from 'react'
 import { Check, ExternalLink, ShieldCheck } from 'lucide-react'
-import { stryvCare, CLAVE_REGRESO_CARE, ESTADO_CARE, INCLUYE_CARE, fechaCare, pesosCare, type StatusCare } from '../../data/ops/stryvCare'
+import { stryvCare, CLAVE_REGRESO_CARE, ESTADO_CARE, INCLUYE_CARE, NOTA_INFRA_CARE, PRECIO_REGULAR_CARE_CENTAVOS, fechaCare, pesosCare, type StatusCare } from '../../data/ops/stryvCare'
 
 export function StryvCare({ cliente = stryvCare }: { cliente?: typeof stryvCare } = {}) {
   const [d, setD] = useState<StatusCare | null>(null)
@@ -45,12 +45,15 @@ export function StryvCare({ cliente = stryvCare }: { cliente?: typeof stryvCare 
 
         {d && d.estado !== 'no_disponible' && (
           <>
-            <div className="care-precio">{pesosCare(d.monto_centavos)}<small> MXN al mes</small></div>
-            <p className="care-p">Mantenimiento e infraestructura de tu sistema, operado por STRYV.</p>
+            <div className="care-precio">{pesosCare(d.monto_centavos)}<small> MXN al mes</small>
+              {(d.monto_centavos ?? 0) < PRECIO_REGULAR_CARE_CENTAVOS && <s className="care-regular" data-testid="care-regular">{pesosCare(PRECIO_REGULAR_CARE_CENTAVOS)}</s>}
+            </div>
+            <p className="care-p">Mantenimiento y soporte de tu sistema, operado por STRYV.</p>
           </>
         )}
 
         <ul className="care-lista">{INCLUYE_CARE.map((t) => <li key={t}><Check size={15} aria-hidden /> {t}</li>)}</ul>
+        <p className="care-infra">{NOTA_INFRA_CARE}</p>
 
         {d?.estado === 'inactivo' && (
           <div className="care-accion">

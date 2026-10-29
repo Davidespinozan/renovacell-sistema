@@ -1,4 +1,5 @@
-// POST /stryv-care — suscripción mensual "STRYV Care" (mantenimiento e infraestructura del sistema), cobrada por STRYV
+// POST /stryv-care — suscripción mensual "STRYV Care" (mantenimiento y soporte del sistema; la infraestructura externa
+// la paga Renovacell directamente), cobrada por STRYV
 // en SU cuenta de Stripe, no en la de Renovacell. Mismo diseño que en Fukuroll (fukuroll/supabase/functions/stryv-care).
 //   { action: 'status' }   → estado de la suscripción, próximo cobro, tarjeta y últimos recibos
 //   { action: 'checkout' } → página segura de Stripe para poner la tarjeta y suscribirse → { url }
@@ -46,7 +47,7 @@ async function portalConfig(stripe: Stripe): Promise<string> {
   const ya = l.data.find((c) => c.metadata?.app === 'stryv-care')
   if (ya) return ya.id
   const c = await stripe.billingPortal.configurations.create({
-    business_profile: { headline: 'STRYV Care · mantenimiento e infraestructura' },
+    business_profile: { headline: 'STRYV Care · mantenimiento y soporte' },
     features: { payment_method_update: { enabled: true }, invoice_history: { enabled: true } },
     metadata: { app: 'stryv-care' },
   })

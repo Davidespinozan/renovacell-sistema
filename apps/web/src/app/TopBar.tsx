@@ -22,7 +22,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const esDoctor = role === 'doctor'
   const sub =
     esDoctor ? (screen === 'inicio' ? 'Renovacell · Tecnologías Antiedad' : '')
-      : screen === STRYV_CARE_SCREEN.key ? 'Mantenimiento e infraestructura'
+      : screen === STRYV_CARE_SCREEN.key ? 'Mantenimiento y soporte'
       : screen === COMMON_SCREEN.key ? 'Comunicación del equipo'
         : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
           : r.label

@@ -42,14 +42,17 @@ export const ESTADO_CARE: Record<string, { tono: 'ok' | 'warn' | 'dang' | 'neu';
 export const fechaCare = (ts?: number | null): string => (ts ? new Date(ts * 1000).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '—')
 export const pesosCare = (c?: number): string => `$${((c ?? 0) / 100).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
-// Lo que incluye: el mismo plan que en Fukuroll, con los nombres de las piezas de Renovacell.
+// Lo que incluye. Diferencia con Fukuroll (dueño, 29 oct 2026): en Renovacell la infraestructura externa la contrata y
+// la paga Renovacell; STRYV Care es mantenimiento y soporte. Por eso el plan bajó de $4,000 a $2,500.
 export const INCLUYE_CARE: readonly string[] = [
-  'Sistema operativo, portal del doctor y página pública siempre en línea',
-  'Servidores, base de datos, dominio y certificados de seguridad',
+  'Sistema operativo, portal del doctor y página pública funcionando y al día',
+  'Administración técnica de servidores, base de datos, dominio y certificados',
   'Respaldos, monitoreo y corrección de fallas',
   'Ajustes de catálogo, precios y fotos',
   'Soporte directo con STRYV',
 ]
+export const PRECIO_REGULAR_CARE_CENTAVOS = 400000
+export const NOTA_INFRA_CARE = 'Los servicios externos (servidores, base de datos, dominio, correo, WhatsApp, paquetería y timbrado) los contrata y paga Renovacell directamente; por eso el plan tiene precio preferente.'
 
 // Al volver de Stripe la URL trae ?care=ok|cancel|volver: se consume una vez y abre esta pantalla.
 export function regresoDeStripe(loc: { search: string; pathname: string } = window.location): 'ok' | 'cancel' | 'volver' | null {
