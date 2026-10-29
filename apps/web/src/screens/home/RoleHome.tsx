@@ -76,7 +76,7 @@ export function HomeVendedor() {
               {solicitudes.map((c) => {
                 const e = estadoDe(c)
                 return (
-                  <TarjetaAtencion key={c.conversation_id} testid="solicitud" tono={tonoAtencion(e)} titulo={`${capitalizarNombre(c.dueno)} solicita atención`} estado={e ? ETIQUETA_ATENCION[e] : undefined}
+                  <TarjetaAtencion key={c.conversation_id} testid="solicitud" persona={c.dueno} tono={tonoAtencion(e)} titulo={`${capitalizarNombre(c.dueno)} solicita atención`} estado={e ? ETIQUETA_ATENCION[e] : undefined}
                     lineas={lineasSolicitud(c)}
                     ctas={[{ label: 'Atender ahora', primaria: true, testid: 'btn-atender', onClick: () => irAConversacion(setScreen, c.conversation_id, { iniciar: true, origen: 'inicio' }) }]} />
                 )
@@ -89,7 +89,7 @@ export function HomeVendedor() {
         <Seccion titulo="Continúa donde te quedaste" nivel="continuar" conteo={activas.length} id="activas">
           <Tarjetas>
             {activas.map((c) => (
-              <TarjetaAtencion key={c.conversation_id} testid="asesoria-activa" tono="ok" titulo={capitalizarNombre(c.dueno)} estado="Asesoría en curso"
+              <TarjetaAtencion key={c.conversation_id} testid="asesoria-activa" persona={c.dueno} tono="ok" titulo={capitalizarNombre(c.dueno)} estado="Asesoría en curso"
                 lineas={[c.sin_leer > 0 ? `${c.sin_leer} mensaje${c.sin_leer === 1 ? '' : 's'} sin leer` : 'Sin mensajes nuevos', c.n_items ? `${c.n_items} producto${c.n_items === 1 ? '' : 's'} en su carrito` : 'Carrito vacío']}
                 ctas={[{ label: 'Continuar', testid: 'btn-continuar', onClick: () => irAConversacion(setScreen, c.conversation_id, { origen: 'inicio' }) }]} />
             ))}
@@ -143,7 +143,7 @@ export function HomeDireccion() {
               const quien = c.seller_nombre ? `Asignada a ${c.seller_nombre}` : c.ruteo_motivo ? MOTIVO_RUTEO[c.ruteo_motivo] ?? 'Sin vendedor' : 'Sin vendedor'
               const escalada = e === 'escalado'
               return (
-                <TarjetaAtencion key={c.conversation_id} testid="intervencion" tono={tonoAtencion(e)} estado={e ? ETIQUETA_ATENCION[e] : undefined}
+                <TarjetaAtencion key={c.conversation_id} testid="intervencion" persona={c.nombre} tono={tonoAtencion(e)} estado={e ? ETIQUETA_ATENCION[e] : undefined}
                   titulo={escalada ? `${capitalizarNombre(c.nombre)} sigue esperando asesor` : `${capitalizarNombre(c.nombre)} solicita asesor`}
                   lineas={[quien, ...lineasSolicitud(c)]}
                   ctas={[
@@ -223,7 +223,7 @@ export function HomeChofer() {
       {incidencias.length > 0 && (
         <Seccion titulo="Requiere tu atención" nivel="atencion" conteo={incidencias.length} id="atencion">
           <Tarjetas>
-            <TarjetaAtencion tono="dang" titulo={`${incidencias.length} incidencia${incidencias.length === 1 ? '' : 's'} sin resolver`} lineas={['Revisa la entrega y repórtala o reintenta.']}
+            <TarjetaAtencion tono="dang" icono="truck" titulo={`${incidencias.length} incidencia${incidencias.length === 1 ? '' : 's'} sin resolver`} lineas={['Revisa la entrega y repórtala o reintenta.']}
               ctas={[{ label: 'Ver mis entregas', primaria: true, onClick: () => setScreen('driver_home') }]} testid="incidencias" />
           </Tarjetas>
         </Seccion>
@@ -231,7 +231,7 @@ export function HomeChofer() {
       <Seccion titulo="Tu siguiente entrega" nivel="continuar" conteo={mias.length} id="siguiente">
         {!siguiente ? <Vacio icon="truck" titulo="Tu ruta está libre" detalle="Cuando Almacén te asigne carga, aquí verás la dirección y cómo llegar." testid="vacio-chofer" /> : (
           <Tarjetas>
-            <TarjetaAtencion tono="neu" testid="siguiente-entrega" titulo={parada?.name ?? 'Entrega asignada'} estado={pedido?.external_ref ?? undefined}
+            <TarjetaAtencion tono="neu" icono="truck" testid="siguiente-entrega" titulo={parada?.name ?? 'Entrega asignada'} estado={pedido?.external_ref ?? undefined}
               lineas={[parada?.addr || null, mias.length > 1 ? `Después: ${mias.length - 1} parada${mias.length - 1 === 1 ? '' : 's'} más` : 'Es tu última parada']}
               ctas={[{ label: 'Ir a la entrega', primaria: true, onClick: () => setScreen('driver_home') }]} />
           </Tarjetas>

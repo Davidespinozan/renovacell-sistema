@@ -183,3 +183,30 @@
   .rh--doctor .rh-producto-precio{font-size:14px}
   .rh-promos{grid-template-columns:1fr}
 }
+
+/* ── Tarjeta de atención, lenguaje del chat (29 oct 2026) ─────────────────────────────────────────────
+   Avatar con anillo de tono, nombre y estado, subtítulo y etiquetas cortas; acciones compactas a la derecha.
+   Sin franja lateral gruesa: el tono vive en el anillo y en la etiqueta de espera. */
+.rh-cards{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+.rh-card{gap:12px;padding:16px;border-left:1px solid var(--line);border-radius:16px;transition:box-shadow var(--dur-fast),transform var(--dur-fast),border-color var(--dur-fast)}
+@media (hover:hover){.rh-card:hover{box-shadow:var(--sh-card-h);transform:translateY(-1px);border-color:#d5dcd4}}
+.rh-card-head{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.rh-card-av{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--ok-bg);color:var(--green-deep);font-weight:700;font-size:15px;box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px var(--line)}
+.rh-card-av svg{width:20px;height:20px}
+.rh-card--dang .rh-card-av{background:var(--danger-bg);color:var(--danger);box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px rgba(200,40,40,.28)}
+.rh-card--warn .rh-card-av{background:var(--warn-bg);color:var(--warn);box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px rgba(190,120,0,.28)}
+.rh-card--ok .rh-card-av{box-shadow:0 0 0 2px var(--cp-surface),0 0 0 4px rgba(0,154,62,.3)}
+.rh-card-main{flex:1;min-width:0;display:grid;gap:3px}
+.rh-card-top{align-items:center}
+.rh-card-title{font-size:15.5px;font-weight:650;letter-spacing:-.01em;color:var(--ink)}
+.rh-card-sub{font-size:13.5px;color:var(--ink-2);line-height:1.4;overflow-wrap:anywhere}
+.rh-meta{display:flex;flex-wrap:wrap;gap:6px;padding-left:56px}
+.rh-meta li{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:var(--pill);background:#f2f4f3;color:var(--ink-2);font-size:12.5px;font-weight:500;line-height:1.2}
+.rh-meta li.rh-meta--espera{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.rh-ctas{justify-content:flex-end;margin-top:2px;padding-top:12px;border-top:1px solid var(--line)}
+.rh-card .rh-btn{min-height:38px;padding:0 16px;border-radius:var(--pill);font-size:13.5px}
+@media (max-width:640px){
+  .rh-meta{padding-left:0}
+  .rh-card .rh-btn{min-height:44px;flex:1}
+}
+.rh-card .rh-ctas{margin-top:auto}

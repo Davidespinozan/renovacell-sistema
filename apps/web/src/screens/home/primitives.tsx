@@ -42,15 +42,30 @@ export function Seccion({ titulo, nivel, conteo, accion, children, id }: { titul
 }
 
 export interface Cta { label: string; onClick: () => void; testid?: string; primaria?: boolean; disabled?: boolean }
-export function TarjetaAtencion({ tono, titulo, estado, lineas, ctas, testid, destacada }: { tono: Tono; titulo: string; estado?: string; lineas: Array<string | null | undefined | false>; ctas: Cta[]; testid?: string; destacada?: boolean }) {
+// Tarjeta de atención con el lenguaje del chat: foto/inicial de la persona (o ícono), nombre y estado arriba, la
+// primera línea como subtítulo y el resto como etiquetas cortas (no una pila de renglones grises). El tono vive en
+// el anillo del avatar y en la etiqueta de espera, no en una franja gruesa.
+const ESPERA = /esperando|fuera de horario|sin respuesta|vencid/i
+export function TarjetaAtencion({ tono, titulo, estado, lineas, ctas, testid, destacada, persona, icono }: { tono: Tono; titulo: string; estado?: string; lineas: Array<string | null | undefined | false>; ctas: Cta[]; testid?: string; destacada?: boolean; persona?: string | null; icono?: IconName }) {
   const ls = lineas.filter((l): l is string => !!l)
+  const [primera, ...meta] = ls
+  // Si el subtítulo ya lo dice la etiqueta de estado ("Sin vendedor" vs "Sin vendedor asignado"), no se repite.
+  const sub = primera && !(estado && estado.toLowerCase().includes(primera.toLowerCase())) ? primera : undefined
+  const nombre = persona ? nombrePersona(persona) : ''
+  const visitante = !nombre || /visitante|sin nombre/i.test(nombre)
   return (
     <article className={`rh-card rh-card--${tono}${destacada ? ' rh-card--destacada' : ''}`} data-testid={testid}>
-      <div className="rh-card-top">
-        <div className="rh-card-title">{titulo}</div>
-        {estado && <span className={`pill ${PILL[tono]}`}>{estado}</span>}
+      <div className="rh-card-head">
+        <span className="rh-card-av" aria-hidden>{persona && !visitante ? initials(nombre) : <Icon name={icono ?? (persona ? 'chat' : 'bell')} />}</span>
+        <div className="rh-card-main">
+          <div className="rh-card-top">
+            <div className="rh-card-title">{titulo}</div>
+            {estado && <span className={`pill ${PILL[tono]}`}>{estado}</span>}
+          </div>
+          {sub && <div className="rh-card-sub">{sub}</div>}
+        </div>
       </div>
-      {ls.length > 0 && <ul className="rh-lines">{ls.map((l) => <li key={l}>{l}</li>)}</ul>}
+      {meta.length > 0 && <ul className="rh-lines rh-meta">{meta.map((l) => <li key={l} className={ESPERA.test(l) ? 'rh-meta--espera' : undefined}>{l}</li>)}</ul>}
       {ctas.length > 0 && (
         <div className="rh-ctas">
           {ctas.map((c) => (
