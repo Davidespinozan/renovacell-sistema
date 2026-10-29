@@ -18,6 +18,7 @@ import { clasificarDeclaraciones } from '../../data/ops/pagosPendientes'
 import { useRole } from '../../auth/RoleContext'
 import { reloadOrders } from '../../data/store/ordersStore'
 import type { Profile } from '../../data/types'
+import { Vacio } from '../../app/EmptyState'
 
 const metodoLabel = (m: string): string => METODOS.find((x) => x.value === m)?.label ?? m
 const last4 = (s?: string | null): string => { const d = (s ?? '').replace(/\D/g, ''); return d ? d.slice(-4) : '' }
@@ -74,12 +75,12 @@ export function PagosPorValidar() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <BadgeDollarSign size={18} />
-        <div className="eyebrow" style={{ margin: 0 }}>Finanzas · Pagos por validar</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Finanzas · Pagos por validar</div>
         <span className="pill p-warn" style={{ marginLeft: 'auto' }} data-testid="pagos-contador">{rows.length} por revisar</span>
       </div>
       {pend.enCancelados.length > 0 && (
         <div className="sysnote" style={{ background: 'var(--warn-bg)' }} data-testid="pagos-en-cancelados">
-          <span style={{ flex: 1 }}><b>{pend.enCancelados.length}</b> comprobante(s) de pedidos <b>cancelados</b> esperan decisión: se revisan en <b>Revisión económica</b> (registrar el dinero que sí llegó o rechazarlo).</span>
+          <span style={{ flex: 1 }}><b>{pend.enCancelados.length}</b> {pend.enCancelados.length === 1 ? 'comprobante' : 'comprobantes'} de pedidos <b>cancelados</b> esperan decisión: se revisan en <b>Revisión económica</b> (registrar el dinero que sí llegó o rechazarlo).</span>
           <button type="button" className="btn ghost sm" onClick={() => setScreen('av_revision')}>Ir a Revisión económica</button>
         </div>
       )}
@@ -89,6 +90,10 @@ export function PagosPorValidar() {
         <span>Pagos <b>informados</b> por los clientes: son declaraciones, todavía no hay dinero registrado. Verifica que cayó en la cuenta destino y <b>confirma</b> — ahí se registra el cobro en el libro — o <b>rechaza</b> con motivo si no lo localizas. El pedido no se factura hasta que el pago quede confirmado.</span>
       </div>
 
+      {/* Sin pagos no se pintan 9 encabezados sobre un renglón vacío: va el vacío compartido. */}
+      {rows.length === 0 ? (
+        <Vacio icono="check" titulo="No hay pagos por validar" pista="Cuando un cliente informe una transferencia o un depósito, aparecerá aquí para que lo confirmes." data-testid="pagos-vacio" />
+      ) : (
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
@@ -122,11 +127,11 @@ export function PagosPorValidar() {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-3)' }}>No hay pagos por validar. 🎉</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+      )}
     </div>
   )
 }

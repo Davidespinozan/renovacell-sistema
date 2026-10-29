@@ -75,8 +75,8 @@ export function Despacho() {
     setDespachando(false)
     const total = mf.paradas.length
     flash(ok === total
-      ? `Manifiesto despachado a ${mf.chofer} · ${total} pedido(s) · falta que confirme`
-      : `Se despacharon ${ok} de ${total} pedido(s) a ${mf.chofer}. Los demás NO salieron: revisa los avisos.`)
+      ? `Manifiesto despachado a ${mf.chofer} · ${total} ${total === 1 ? 'pedido' : 'pedidos'} · falta que confirme`
+      : `Se despacharon ${ok} de ${total} ${total === 1 ? 'pedido' : 'pedidos'} a ${mf.chofer}. Los demás NO salieron: revisa los avisos.`)
   }
 
   // Imprime la hoja de salida de un chofer (misma técnica que el recibo del POS: monta el
@@ -109,7 +109,7 @@ export function Despacho() {
             <div className="chip" style={{ width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--green-soft)' }}><Icon name="truck" /></div>
             <div>
               <div style={{ fontWeight: 700 }}>{mf.chofer}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{mf.paradas.length} pedido(s) · {mf.totalPiezas} pieza(s)</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{mf.paradas.length} {mf.paradas.length === 1 ? 'pedido' : 'pedidos'} · {mf.totalPiezas} {mf.totalPiezas === 1 ? 'pieza' : 'piezas'}</div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn ghost sm" type="button" onClick={() => imprimir(mf)}><Icon name="download" /> Imprimir manifiesto</button>
@@ -141,6 +141,10 @@ export function Despacho() {
         <div style={{ padding: '16px 16px 6px' }}>
           <div className="eyebrow" style={{ margin: 0 }}>Despachadas / en ruta</div>
         </div>
+        {/* Sin cargas en ruta: vacío compacto en vez de una tabla con encabezados y una sola fila gris. */}
+        {enRuta.length === 0 ? (
+          <div className="op-vacio"><Vacio plano icono="truck" titulo="Sin cargas despachadas" pista="Las cargas aparecen aquí cuando autorizas la salida de un manifiesto." /></div>
+        ) : (
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Pedido</th><th>Chofer</th><th>Estado</th><th>Autorizó</th></tr></thead>
@@ -157,10 +161,10 @@ export function Despacho() {
                   </tr>
                 )
               })}
-              {enRuta.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-3)' }}>Sin cargas despachadas.</td></tr>}
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {printMf && <ManifiestoPrint mf={printMf} who={who} empresa={empresa} />}

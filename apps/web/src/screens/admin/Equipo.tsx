@@ -50,7 +50,7 @@ export function Equipo() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Administración · Equipo</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Administración · Equipo</div>
         <ExportButton name="equipo" rows={users} style={{ marginLeft: 'auto' }} columns={[
           { key: 'name', label: 'Nombre' },
           { key: 'email', label: 'Correo' },
@@ -77,7 +77,8 @@ export function Equipo() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             <button className="btn ghost sm" type="button" onClick={() => setEditing(u)}><Pencil size={14} /> Editar</button>
             <button className="btn ghost sm" type="button" onClick={() => setPwFor(u)}><KeyRound size={14} /> Contraseña</button>
-            <button className="btn ghost sm" type="button" style={{ color: u.active ? 'var(--danger)' : 'var(--green-deep)' }} onClick={() => void onToggle(u)}>
+            {/* Suspender es reversible → neutro; solo «Dar de baja» (definitiva) lleva rojo. */}
+            <button className="btn ghost sm" type="button" style={u.active ? undefined : { color: 'var(--green-deep)' }} onClick={() => void onToggle(u)}>
               {u.active ? <><Ban size={14} /> Suspender</> : <><RotateCcw size={14} /> Reactivar</>}
             </button>
             {u.active && <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => onDelete(u)}><Trash2 size={14} /> Dar de baja</button>}
@@ -89,8 +90,9 @@ export function Equipo() {
               {CAPABILITIES.map((c) => {
                 const on = u.capabilities.includes(c.key)
                 return (
-                  <button key={c.key} type="button" className={'fchip' + (on ? ' on' : '')} onClick={() => toggleCapability(u.id, c.key)}>
-                    {on ? '✓ ' : '+ '}{c.label}
+                  // .pa-resp: activa = píldora suave de marca (pulido-admin.css), no verde sólido.
+                  <button key={c.key} type="button" className={'fchip pa-resp' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggleCapability(u.id, c.key)}>
+                    {on ? <Check size={13} aria-hidden="true" /> : '+ '}{c.label}
                   </button>
                 )
               })}

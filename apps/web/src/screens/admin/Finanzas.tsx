@@ -61,7 +61,7 @@ export function Finanzas() {
           <AlertTriangle size={16} />
           <span>
             <b>Costo incompleto: se conoce el de {er.cobertura_pct}% de las {er.unidades_vendidas} unidades vendidas.</b>{' '}
-            {er.unidades_sin_surtir > 0 && <>{er.unidades_sin_surtir} unidad(es) vendida(s) aún no se surten: su costo se conoce al salir del almacén. </>}
+            {er.unidades_sin_surtir > 0 && <>{er.unidades_sin_surtir} {er.unidades_sin_surtir === 1 ? 'unidad vendida aún no se surte' : 'unidades vendidas aún no se surten'}: su costo se conoce al salir del almacén. </>}
             {er.unidades_sin_costo > 0 && <>{er.unidades_sin_costo} unidad(es) salieron sin costo registrado. </>}
             Por eso <b>utilidad y margen se muestran como no confiables</b>: un costo desconocido no se cuenta como cero.
           </span>
@@ -159,7 +159,7 @@ export function Finanzas() {
           </div>
           {cxc.data && (
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
-              {cxc.data.pedidos} pedido(s) con saldo · {money(cxc.data.a_credito)} a crédito{cxc.data.vencido > 0 ? ` · ${money(cxc.data.vencido)} vencido` : ''}.
+              {cxc.data.pedidos} {cxc.data.pedidos === 1 ? 'pedido' : 'pedidos'} con saldo · {money(cxc.data.a_credito)} a crédito{cxc.data.vencido > 0 ? ` · ${money(cxc.data.vencido)} vencido` : ''}.
             </div>
           )}
         </div>
@@ -171,7 +171,7 @@ export function Finanzas() {
               <div style={{ fontSize: 20, fontWeight: 600 }}>{money(cxp.total)}</div>
             </div>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxp.count} compra(s) a proveedor sin pagar (a costo real).</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>{cxp.count} {cxp.count === 1 ? 'compra' : 'compras'} a proveedor sin pagar (a costo real).</div>
           {porPagar.length > 0 && (
             <div style={{ marginTop: 10, display: 'grid', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
               {porPagar.map((p) => (

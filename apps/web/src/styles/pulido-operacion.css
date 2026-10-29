@@ -1,0 +1,85 @@
+/* Pulido de entrega (29 oct 2026) · operacion. Solo presentación; se importa después de mobile.css. */
+
+/* ── Vacío compacto ────────────────────────────────────────────────────────────────────────
+   <Vacio plano> dentro de una tarjeta que ya tiene título: misma receta (ícono · frase · pista)
+   pero sin el aire de 32 px que pide un vacío de pantalla completa. */
+.op-vacio .empty{padding:18px 12px 14px}
+.op-vacio .empty-ic{width:36px;height:36px;margin-bottom:4px}
+.op-vacio .empty-ic svg{width:18px;height:18px}
+.op-vacio .empty-t{font-size:14px;line-height:20px}
+.op-vacio .empty-d{font-size:12.5px}
+
+/* ── Encabezado de tarjeta con acción (Por caducar: Exportar junto al conteo) ─────────────── */
+.op-cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px 4px}
+.op-cardhead-n{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:var(--pill);background:var(--hueso);border:1px solid var(--line);color:var(--ink-2);font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
+
+/* ── Buscador de pantalla (patrón .searchbox del TopBar, a todo lo ancho) ─────────────────── */
+.searchbox.op-search,.searchbox.pos-search{width:100%;max-width:none;flex:1 1 auto;min-width:0;padding:10px 14px;min-height:44px;cursor:text}
+.searchbox.op-search svg,.searchbox.pos-search svg{flex:none}
+.searchbox.op-search input,.searchbox.pos-search input{font-size:14px;color:var(--ink);min-width:0}
+/* iOS acerca la página al enfocar un campo de menos de 16 px. */
+@media (max-width:900px){.searchbox.op-search input,.searchbox.pos-search input{font-size:16px}}
+
+/* ── Tarjeta-lista con divisores (Clientes) ─────────────────────────────────────────────── */
+.card.op-lista{padding:4px 0;display:flex;flex-direction:column;overflow:hidden}
+.op-fila{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;text-align:left;
+  background:none;border:0;border-bottom:1px solid var(--line);font:inherit;color:inherit;cursor:pointer;transition:background .14s}
+.op-fila:last-child{border-bottom:0}
+.op-fila:hover:not(:disabled){background:var(--hueso)}
+.op-fila:focus-visible{outline:2px solid var(--green-soft);outline-offset:-2px}
+@media (max-width:640px){.op-fila{padding:10px 12px;gap:10px}.op-fila .pill{font-size:10.5px}}
+
+/* ── Punto de venta ─────────────────────────────────────────────────────────────────────── */
+/* Ticket: en escritorio desplaza .canvas, así que top es relativo al lienzo (no a la ventana): 16 px lo
+   deja alineado con el buscador y lo mantiene a la vista. Con factura abierta el ticket puede ser más
+   alto que la pantalla: se desplaza dentro de sí para que "Cobrar" nunca quede inalcanzable. En teléfono
+   (≤900 px) no hay sticky: la barra de venta lleva al ticket. */
+@media (min-width:901px){
+  .pos-ticket{position:sticky;top:16px;max-height:calc(100vh - 120px);max-height:calc(100dvh - 120px);overflow-y:auto;overscroll-behavior:contain}
+}
+.posthumb.pos-noimg{display:grid;place-items:center;color:var(--ink-3);background:var(--hueso)}
+.posthumb.pos-noimg svg{width:26px;height:26px;opacity:.55}
+.poscard.is-out{cursor:default}
+.poscard.is-out:hover{transform:none;border-color:var(--line);box-shadow:var(--sh-card)}
+.poscard.is-out .posthumb{opacity:.7;filter:grayscale(.5)}
+.poscard.is-out .pr{color:var(--ink-3)}
+.poscard.is-out .pill.p-dang{font-weight:700}
+.pos-promo{font-size:10.5px;line-height:1.35;color:var(--green-deep);font-weight:600;letter-spacing:-.005em}
+
+/* ── Inicio de Almacén: indicadores ─────────────────────────────────────────────────────── */
+.hoy-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.hoy-kpi-t{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
+.hoy-kpi-v{font-size:26px;font-weight:800;margin-top:4px;line-height:1.15}
+.hoy-kpi-p{font-size:12px;color:var(--ink-3);margin-top:2px}
+.hoy-kpi-tenue{font-size:16px;font-weight:600;color:var(--ink-3)}
+@media (max-width:640px){
+  .hoy-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .hoy-kpis .card.hoy-kpi{padding:12px}
+  .hoy-kpis > [role=button] > .card.hoy-kpi{grid-column:1 / -1}
+  .hoy-kpi-t{font-size:11.5px;line-height:1.25}
+  .hoy-kpi-t svg{width:15px;height:15px}
+  .hoy-kpi-v{font-size:21px;margin-top:2px}
+  .hoy-kpi-p{font-size:11px;line-height:1.3}
+  .hoy-kpi-tenue{font-size:14px}
+}
+
+/* ── Inventario: total por producto y acciones del lote ─────────────────────────────────── */
+.inv-tot{text-align:right;flex:none;margin-left:12px}
+.inv-tot-n{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.inv-tot-d{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.inv-tot-cad{color:var(--danger)}
+.lote .inv-acc{display:inline-flex;gap:6px;flex:none}
+.lote .inv-acc .btn svg{width:14px;height:14px}
+.lote .inv-merma svg{color:var(--danger)}
+@media (max-width:640px){.lote{flex-wrap:wrap}.lote .inv-acc{width:100%;justify-content:flex-end}.lote .inv-acc .btn{min-height:44px}}
+
+/* ── Conversaciones con clientes (vendedor): encabezado ─────────────────────────────────── */
+.ases-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 16px;margin-bottom:12px}
+.ases-head-txt{min-width:0;flex:1 1 280px}
+.ases-head-txt p{margin:4px 0 0;color:var(--ink-3);font-size:13px;line-height:1.45;max-width:62ch}
+.ases-head-acc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:0 1 auto}
+@media (max-width:900px){
+  .ases-head{flex-direction:column;align-items:stretch}
+  .ases-head-acc{justify-content:flex-start}
+  .ases-head-acc > .btn{min-height:44px}
+}

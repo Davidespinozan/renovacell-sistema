@@ -103,7 +103,8 @@ export function HomeVendedor() {
           {resto.length === 0 ? <Vacio titulo="Sin otros pendientes." /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>}
         </Seccion>
       ) })()}
-      <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento /></Seccion>
+      {/* Embebido: sin el título propio de Seguimiento ni "Exportar"; sin filas muestra su vacío. */}
+      <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento embebido /></Seccion>
       <AtajosMovil items={atajos} />
     </div>
   )
@@ -214,9 +215,11 @@ export function HomeChofer() {
   const parada = pedido ? deliveryOf(pedido) : null
   const atajos = useAccesos([{ key: 'driver_home', label: 'Mis entregas', icon: 'truck' }])
   return (
-    <div className="rh" data-testid="home-chofer">
-      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta="Chofer"
-        detalle={mias.length ? `${mias.length} entrega${mias.length === 1 ? '' : 's'} pendiente${mias.length === 1 ? '' : 's'}.` : 'No tienes entregas pendientes.'} />
+    // Pulido (29 oct): sin etiqueta "Chofer" (ya la dice la barra superior) y el resumen del día en el saludo;
+    // el vacío de abajo no repite la misma frase. .rh--chofer acota el CSS (vacío en tarjeta, atajo a lo ancho).
+    <div className="rh rh--chofer" data-testid="home-chofer">
+      <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)}
+        detalle={mias.length ? `Hoy: ${mias.length} entrega${mias.length === 1 ? '' : 's'} por hacer.` : 'Hoy: sin entregas asignadas por ahora.'} />
       {incidencias.length > 0 && (
         <Seccion titulo="Requiere tu atención" nivel="atencion" conteo={incidencias.length} id="atencion">
           <Tarjetas>
@@ -226,7 +229,7 @@ export function HomeChofer() {
         </Seccion>
       )}
       <Seccion titulo="Tu siguiente entrega" nivel="continuar" conteo={mias.length} id="siguiente">
-        {!siguiente ? <Vacio icon="truck" titulo="No tienes entregas pendientes." detalle="Cuando Almacén te asigne carga aparecerá aquí." testid="vacio-chofer" /> : (
+        {!siguiente ? <Vacio icon="truck" titulo="Tu ruta está libre" detalle="Cuando Almacén te asigne carga, aquí verás la dirección y cómo llegar." testid="vacio-chofer" /> : (
           <Tarjetas>
             <TarjetaAtencion tono="neu" testid="siguiente-entrega" titulo={parada?.name ?? 'Entrega asignada'} estado={pedido?.external_ref ?? undefined}
               lineas={[parada?.addr || null, mias.length > 1 ? `Después: ${mias.length - 1} parada${mias.length - 1 === 1 ? '' : 's'} más` : 'Es tu última parada']}

@@ -60,7 +60,7 @@ export function Configuracion() {
     <div className="grid" style={{ gap: 16, maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Building2 size={18} />
-        <div className="eyebrow" style={{ margin: 0 }}>Dirección · Configuración de la empresa</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Dirección · Configuración de la empresa</div>
       </div>
       {/* Herramienta de migración: ya se usó para traer Odoo; se queda aquí (fuera del menú) por si llega otro Excel. */}
       {!mostrarImportar && (

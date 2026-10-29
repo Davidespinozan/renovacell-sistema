@@ -146,7 +146,7 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Quedan</div><b className="mono">{lot.quantity} u</b></div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Caduca</div>{fmtDate(lot.expiry_date ?? '')}</div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Costo unitario</div><b className="mono">{money(lotCost)}</b></div>
-          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Llegó a</div><b>{clientesUnicos}</b> cliente(s)</div>
+          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Llegó a</div><b>{clientesUnicos}</b> {clientesUnicos === 1 ? 'cliente' : 'clientes'}</div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Utilidad del lote</div><b className="mono" style={{ color: utilidadLote >= 0 ? 'var(--green-deep)' : 'var(--danger)' }}>{money(utilidadLote)}</b></div>
         </div>
       </div>
@@ -155,7 +155,7 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
       <div className="card">
         <div className="eyebrow" style={{ marginBottom: 8 }}>De dónde vino</div>
         {entrada
-          ? <div style={{ fontSize: 14 }}><span className="pill p-ok" style={{ marginRight: 8 }}>Alta en almacén</span><b className="mono">+{entrada.change} u</b> el {fmtDate(entrada.created_at)}{entrada.reference ? <span style={{ color: 'var(--ink-3)' }}> · ref. {entrada.reference}</span> : null}</div>
+          ? <div style={{ fontSize: 14 }}><span className="pill p-ok" style={{ marginRight: 8 }}>Alta en almacén</span><b className="mono">+{entrada.change} u</b> el {fmtDate(entrada.created_at)}{entrada.reference ? <span style={{ color: 'var(--ink-3)' }}> · {/^sin_orden/.test(entrada.reference) ? 'Sin pedido' : `ref. ${entrada.reference}`}</span> : null}</div>
           : <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Sin registro de entrada.</div>}
       </div>
 

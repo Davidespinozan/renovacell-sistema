@@ -128,7 +128,7 @@ function NuevaCampana({ cliente, vendedores, ocupados, onCreada, onAviso }: {
         {!previa ? <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>Calculando a quién le llega…</span> : (
           <>
             <span className="pill p-ok">Le llega a {previa.elegibles.toLocaleString('es-MX')}</span>
-            {previa.elegibles > 0 && <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>≈ {diasEstimados(previa.elegibles, limite)} día(s) hábil(es) a {limite} por día</span>}
+            {previa.elegibles > 0 && <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>≈ {diasEstimados(previa.elegibles, limite)} {diasEstimados(previa.elegibles, limite) === 1 ? 'día hábil' : 'días hábiles'} a {limite} por día</span>}
             {omitidos.map(([m, n]) => <span key={m} className="pill p-neu" title="No se le envía">{MOTIVO_OMITIDO[m] ?? m}: {n.toLocaleString('es-MX')}</span>)}
           </>
         )}
@@ -141,7 +141,7 @@ function NuevaCampana({ cliente, vendedores, ocupados, onCreada, onAviso }: {
       </div>
       {confirmar && previa && (
         <ConfirmModal title={`Invitar por ${ETIQUETA_CANAL[canal]}`} confirmLabel="Empezar envío" onClose={() => setConfirmar(false)} onConfirm={() => void lanzar()}
-          message={<>Se mandará la invitación a <b>{previa.elegibles.toLocaleString('es-MX')}</b> cliente(s), hasta <b>{limite}</b> por día y solo en horario de atención. Puedes pausarla o cancelarla cuando quieras.</>} />
+          message={<>Se mandará la invitación a <b>{previa.elegibles.toLocaleString('es-MX')}</b> {previa.elegibles === 1 ? 'cliente' : 'clientes'}, hasta <b>{limite}</b> por día y solo en horario de atención. Puedes pausarla o cancelarla cuando quieras.</>} />
       )}
     </div>
   )

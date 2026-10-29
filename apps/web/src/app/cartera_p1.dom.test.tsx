@@ -36,7 +36,7 @@ function carteraFalsa(asignados: Array<{ profile_id: string; customer_id: string
   })
   return { c, llamadas }
 }
-const filas = () => screen.queryAllByRole('button').filter((b) => b.className === 'card')
+const filas = () => screen.queryAllByRole('button').filter((b) => b.className === 'card' || b.className === 'op-fila')   // la lista ahora es una tarjeta con filas .op-fila
 
 beforeEach(() => { cleanup(); h.role = 'pos'; h.name = 'Lucía · Ventas'; h.customers = [DAVID, H1, H2, OTRO] })
 

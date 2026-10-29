@@ -251,13 +251,18 @@ export function Caja() {
     <div className="grid pos-wrap">
       {/* Catálogo POS (solo productos con precio) */}
       <div className="grid" style={{ gap: 16 }}>
-        <div className="eyebrow">Punto de Venta · Caja</div>
-        <input
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-          placeholder="Buscar producto por nombre, categoría o SKU…"
-          style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
-        />
+        <div className="eyebrow crumb">Punto de Venta · Caja</div>
+        {/* Buscador con el patrón .searchbox del sistema (ícono + campo sin borde propio). Sigue
+            filtrando por nombre, categoría y SKU; el texto corto solo es lo que cabe sin cortarse. */}
+        <label className="searchbox pos-search">
+          <Icon name="search" aria-hidden />
+          <input
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder="Buscar producto o SKU"
+            aria-label="Buscar producto por nombre, categoría o SKU"
+          />
+        </label>
         {filtered.length === 0 ? (
           <Vacio icono="search" titulo={<>Ningún producto coincide con “{buscar}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setBuscar('')}>Limpiar búsqueda</button>} />
         ) : (
@@ -267,15 +272,19 @@ export function Caja() {
             const stock = stockInfoFor(stockMap, p.id)
             const out = !stock.tracked || stock.qty <= 0
             return (
-              <div key={p.id} className="poscard" style={out ? { opacity: 0.55 } : undefined} onClick={() => { if (!out) add(p.id) }}>
-                {p.image_url && (
+              // Agotado: la tarjeta conserva su contraste (antes opacity .55 lavaba toda la rejilla cuando
+              // casi todo está en cero); solo se atenúa la imagen y la píldora "Agotado" dice el porqué.
+              <div key={p.id} className={out ? 'poscard is-out' : 'poscard'} aria-disabled={out || undefined} onClick={() => { if (!out) add(p.id) }}>
+                {p.image_url ? (
                   <img src={p.image_url} alt="" loading="lazy" className="posthumb" />
+                ) : (
+                  <div className="posthumb pos-noimg" aria-hidden="true"><Icon name="pkg" /></div>
                 )}
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
                 <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(effOf(p, qty)) : money(p.price)}</div>
                 {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0)
-                  return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{disc ? 'Precio por volumen' : promo}</div> : null })()}
+                  return promo ? <div className="pos-promo" title={promo}>{disc ? 'Precio por volumen' : promo}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
                   : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
                 {qty > 0 && (
@@ -294,7 +303,9 @@ export function Caja() {
 
       {/* Ticket */}
       <BarraVenta unidades={unidades} total={total} ancla={ticketRef} />
-      <div ref={ticketRef} className="card ticket" style={{ position: 'sticky', top: 90, scrollMarginTop: 84 }}>
+      {/* El sticky vive en pulido-operacion.css: en escritorio el que desplaza es .canvas, y el top:90
+          en línea lo empujaba 90 px abajo del buscador aun sin scroll. En teléfono no aplica (barra de venta). */}
+      <div ref={ticketRef} className="card ticket pos-ticket" style={{ scrollMarginTop: 84 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
           <Icon name="store" style={{ width: 18, height: 18, color: 'var(--green-deep)' }} />
           <h3 style={{ fontSize: 16, fontWeight: 600 }}>Venta</h3>

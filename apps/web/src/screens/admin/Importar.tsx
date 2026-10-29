@@ -225,7 +225,7 @@ export function Importar() {
           <button className="btn ghost" type="button" onClick={preview} disabled={!text.trim()}><Table size={15} /> Previsualizar</button>
           <button className="btn" type="button" onClick={doImport} disabled={!rows?.length || busy}
             style={{ marginLeft: 'auto', ...(!rows?.length || busy ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}>
-            <Upload size={15} /> {busy ? 'Importando…' : `Importar ${rows?.length ?? ''} registro(s)`}
+            <Upload size={15} /> {busy ? 'Importando…' : `Importar ${rows?.length ?? ''} ${rows?.length === 1 ? 'registro' : 'registros'}`}
           </button>
         </div>
 
@@ -260,7 +260,7 @@ export function Importar() {
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle size={15} style={{ color: 'var(--warn)' }} />
-            <b>{rows.length}</b> registro(s) listos. Revisa que las columnas hayan quedado bien antes de confirmar.
+            <b>{rows.length}</b> {rows.length === 1 ? 'registro listo' : 'registros listos'}. Revisa que las columnas hayan quedado bien antes de confirmar.
           </div>
           <div className="tbl-scroll">
             <table className="tbl-cards">

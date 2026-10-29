@@ -11,13 +11,13 @@ describe('<CommonView>', () => {
   it('muestra la biblioteca y las solicitudes de recurso', () => {
     renderWithRole(<CommonView />)
     expect(screen.getByText('Biblioteca')).toBeInTheDocument()
-    expect(screen.getByText('Solicitudes de recurso')).toBeInTheDocument()
+    expect(screen.getByTestId('pestana-solicitudes')).toBeInTheDocument()
   })
 
   it('abre el modal de subir asset', () => {
     renderWithRole(<CommonView />)
     fireEvent.click(screen.getByTestId('pestana-biblioteca'))
-    fireEvent.click(screen.getByText('Subir asset'))
+    fireEvent.click(screen.getByText('Subir material'))
     // El modal tiene su propio encabezado + campo de etiquetas.
     expect(screen.getByPlaceholderText('logo, marca')).toBeInTheDocument()
   })

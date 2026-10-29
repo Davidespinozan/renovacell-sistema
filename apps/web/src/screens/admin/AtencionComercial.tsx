@@ -84,7 +84,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
   const r = pend?.resumen
   return (
     <div className="grid" style={{ gap: 14, maxWidth: 1040, minWidth: 0 }} data-testid="atencion-comercial">
-      <div className="eyebrow" style={{ margin: 0 }}>{titulo}</div>
+      <div className="eyebrow crumb" style={{ margin: 0 }}>{titulo}</div>
       {pestanas.includes('pendientes') && <EnlaceContacto />}
       <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
@@ -99,7 +99,7 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
             <span className={'pill ' + (r.handoffs_sin_asignar ? 'p-warn' : 'p-neu')} data-testid="n-sin-asignar">{r.handoffs_sin_asignar} sin vendedor</span>
             <span className={'pill ' + (r.reasignacion ? 'p-warn' : 'p-neu')}>{r.reasignacion} por reasignar</span>
             <span className={'pill ' + (r.handoffs_pendientes ? 'p-dang' : 'p-neu')}>{r.handoffs_pendientes} sin rutear</span>
-            <span className="pill p-neu">{r.vendedores_elegibles} vendedor(es) elegible(s)</span>
+            <span className="pill p-neu">{r.vendedores_elegibles} {r.vendedores_elegibles === 1 ? 'vendedor elegible' : 'vendedores elegibles'}</span>
           </div>
         )}
       </div>
@@ -124,7 +124,7 @@ export function SelectorVendedor({ vendedores, nuevos, valor, onCambio, etiqueta
   return (
     <select value={valor} onChange={(e) => onCambio(e.target.value)} style={campo} aria-label={etiqueta}>
       <option value="">{opciones.length ? 'Elige vendedor…' : 'Sin vendedores elegibles'}</option>
-      {opciones.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.clientes ? ` · ${v.clientes} cliente(s)` : ''}</option>)}
+      {opciones.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.clientes ? ` · ${v.clientes} ${v.clientes === 1 ? 'cliente' : 'clientes'}` : ''}</option>)}
     </select>
   )
 }
@@ -218,7 +218,7 @@ function PestanaPendientes({ pend, vendedores, cliente, chat, onCambio, foco, on
       </ul>
       {pend.carritos_pendientes.length > 0 && (
         <div style={{ marginTop: 12, fontSize: 13, color: 'var(--warn)' }} data-testid="carritos-pendientes">
-          {pend.carritos_pendientes.length} carrito(s) activaron atención humana pero el ruteo no se completó; se reintenta solo cuando el cliente vuelve al chat. Su compra no se vio afectada.
+          {pend.carritos_pendientes.length} {pend.carritos_pendientes.length === 1 ? 'carrito activó' : 'carritos activaron'} atención humana pero el ruteo no se completó; se reintenta solo cuando el cliente vuelve al chat. Su compra no se vio afectada.
         </div>
       )}
       {modal?.tipo === 'solicitud' && (
@@ -403,7 +403,7 @@ function PestanaVendedores({ vendedores, onEquipo }: { vendedores: Vendedor[]; o
             <span className={'pill ' + (v.activo ? 'p-neu' : 'p-dang')}>{v.activo ? 'Activo' : 'Inactivo'}</span>
             <span className={'pill ' + (v.conversaciones ? 'p-neu' : 'p-warn')}>{v.conversaciones ? 'Atiende conversaciones' : 'No atiende conversaciones'}</span>
             <span className={'pill ' + (v.nuevos_clientes ? 'p-neu' : 'p-warn')}>{v.nuevos_clientes ? 'Recibe clientes nuevos' : 'No recibe nuevos'}</span>
-            <span className="pill p-neu">{v.clientes} cliente(s)</span>
+            <span className="pill p-neu">{v.clientes} {v.clientes === 1 ? 'cliente' : 'clientes'}</span>
           </li>
         ))}
       </ul>
@@ -496,7 +496,7 @@ function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion;
               {c.ultimo_texto && <div style={{ fontSize: 12.5, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 520 }}>
                 <span style={{ color: 'var(--ink-3)' }}>{ACTOR[c.ultimo_actor ?? ''] ?? ''}{c.ultimo_actor ? ': ' : ''}</span>{c.ultimo_texto}
               </div>}
-              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{hace(c.hace_min)}{c.n_mensajes ? ` · ${c.n_mensajes} mensaje(s)` : ''}{c.ventana_abierta === false ? ' · ventana de 24 h cerrada' : ''}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{hace(c.hace_min)}{c.n_mensajes ? ` · ${c.n_mensajes} ${c.n_mensajes === 1 ? 'mensaje' : 'mensajes'}` : ''}{c.ventana_abierta === false ? ' · ventana de 24 h cerrada' : ''}</div>
             </div>
             {c.conversation_id && <button type="button" className="btn sm" style={{ minHeight: 40 }} onClick={() => { setControl(null); setAbierta(c) }} data-testid="wa-abrir">{bandeja?.modos[c.canal] === 'activo' ? 'Abrir chat' : 'Ver chat'}</button>}
           </li>

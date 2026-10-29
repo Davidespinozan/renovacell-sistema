@@ -49,6 +49,6 @@ describe('<CustomerDirectory> paginación (250 → 3 páginas)', () => {
     fireEvent.click(screen.getByText('Siguiente')) // ir a página 2
     fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/), { target: { value: 'Cliente 137' } })
     expect(screen.getByText('Cliente 137')).toBeTruthy() // estaba en pág 2, la búsqueda global lo encuentra
-    expect(screen.getByText(/Mostrando 1–1 de 1 · Página 1 de 1/)).toBeTruthy()
+    expect(screen.getByText(/^Mostrando 1–1 de 1$/)).toBeTruthy() // una sola página: sin "Página 1 de 1"
   })
 })

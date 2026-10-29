@@ -7,6 +7,7 @@
 //     control real es del servidor).
 // Abrir una cuenta pasa SIEMPRE por la ficha 360 (RPC autorizada): si el servidor la niega, se ve el aviso y nada más.
 import React, { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Search } from 'lucide-react'
 import { Vacio, Cargando } from './EmptyState'
 import { initials, avatarColor } from '../lib/format'
 import { useRole } from '../auth/RoleContext'
@@ -27,8 +28,6 @@ type Cartera = { fase: 'cargando' } | { fase: 'lista'; filas: FilaCartera[] } | 
 interface Abierto { id: string; nombre: string }
 
 const peligro = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }
-const campo = { flex: 1, minWidth: 0, padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 16, outline: 'none', backgroundColor: 'var(--cp-surface)' }
-const tarjeta = { display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' as const, cursor: 'pointer', width: '100%', fontFamily: 'inherit' }
 const tenue = { fontSize: 12.5, color: 'var(--ink-3)' }
 
 export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPorDefecto, buscador: buscadorInyectado, cliente360 }: {
@@ -106,7 +105,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
 
   return (
     <div className="grid" style={{ gap: 16 }} data-testid="directorio-ventas">
-      <div className="eyebrow">{title} · Directorio comercial</div>
+      <div className="eyebrow crumb">{title} · Directorio comercial</div>
 
       {conCartera && (
         <div className="seg" style={{ alignSelf: 'flex-start' }}>
@@ -119,8 +118,11 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
       {vista === 'all' && (
         <>
           <form onSubmit={enviar} style={{ display: 'flex', gap: 8 }} data-testid="dv-form">
-            <input value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Buscar cliente" maxLength={80}
-              placeholder="Nombre (3 letras o más) o últimos 4 dígitos del teléfono" style={campo} />
+            <label className="searchbox op-search">
+              <Search aria-hidden />
+              <input value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Buscar cliente" maxLength={80}
+                placeholder="Nombre (3 letras o más) o últimos 4 dígitos del teléfono" />
+            </label>
             <button className="btn" type="submit" disabled={busqueda.fase === 'buscando'} data-testid="dv-buscar">Buscar</button>
           </form>
           <div style={{ display: 'grid', gap: 10 }} aria-live="polite" data-testid="dv-resultados">
@@ -135,8 +137,10 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
             {busqueda.fase === 'resultados' && busqueda.clientes.length > 0 && (
               <>
                 <div style={tenue}>Resultados de «{busqueda.q.trim()}». Si no aparece, escribe más del nombre.</div>
+                {/* Resultados y cartera: una tarjeta-lista con divisores, no una tarjeta alta por cliente. */}
+                <div className="card op-lista">
                 {busqueda.clientes.map((c) => (
-                  <button key={c.customer_id} type="button" className="card" style={tarjeta} onClick={() => setAbierto({ id: c.customer_id, nombre: c.nombre })} data-testid="dv-resultado">
+                  <button key={c.customer_id} type="button" className="op-fila" onClick={() => setAbierto({ id: c.customer_id, nombre: c.nombre })} data-testid="dv-resultado">
                     <div className="avatar" style={{ background: avatarColor(c.nombre || '?') }}>{initials(c.nombre || '?')}</div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 600 }}>{c.nombre}</div>
@@ -144,6 +148,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
                     </div>
                   </button>
                 ))}
+                </div>
               </>
             )}
             {busqueda.fase === 'aviso' && (
@@ -163,7 +168,10 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
         <>
           <div style={{ ...tenue, marginTop: -8 }} data-testid="cartera-explicacion">Clientes asignados a ti por Dirección (asignación vigente).</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Filtrar mi cartera" placeholder="Filtrar mi cartera por nombre…" style={campo} />
+            <label className="searchbox op-search">
+              <Search aria-hidden />
+              <input value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Filtrar mi cartera" placeholder="Filtrar mi cartera por nombre…" />
+            </label>
             <button className="btn ghost" type="button" onClick={() => void cargarCartera()} disabled={miCartera.fase === 'cargando'} data-testid="cartera-refrescar">Actualizar</button>
           </div>
           {miCartera.fase === 'cargando' ? (
@@ -175,8 +183,9 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
           ) : filasCartera.length === 0 ? (
             <Vacio icono="search" titulo={<>Ninguno coincide con “{filtro}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setFiltro('')}>Limpiar búsqueda</button>} />
           ) : (
-            filasCartera.map((c) => (
-              <button key={c.clave} type="button" className="card" style={{ ...tarjeta, ...(c.customer_id ? {} : { cursor: 'default', opacity: 0.7 }) }} disabled={!c.customer_id}
+            <div className="card op-lista">
+            {filasCartera.map((c) => (
+              <button key={c.clave} type="button" className="op-fila" style={c.customer_id ? undefined : { cursor: 'default', opacity: 0.7 }} disabled={!c.customer_id}
                 onClick={() => { if (c.customer_id) setAbierto({ id: c.customer_id, nombre: c.nombre }) }} data-testid="cartera-fila">
                 <div className="avatar" style={{ background: avatarColor(c.nombre || '?') }}>{initials(c.nombre || '?')}</div>
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -185,7 +194,8 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
                 </div>
                 <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-asignado">Asignado</span>
               </button>
-            ))
+            ))}
+            </div>
           )}
         </>
       )}

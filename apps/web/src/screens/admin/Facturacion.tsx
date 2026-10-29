@@ -147,7 +147,7 @@ export function Facturacion() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Administración · Facturación</div>
+      <div className="eyebrow crumb">Administración · Facturación</div>
 
       {/* KPIs */}
       <div className="grid sigs">
@@ -155,7 +155,7 @@ export function Facturacion() {
         <Stat icon={<Receipt size={18} />} v={String(porEmitir)} k="Por emitir" s="solicitados sin CFDI" />
         <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados" />
         <Stat icon={<BadgeDollarSign size={18} />} v={cifra(kTodo, (k) => money(k.cobrado_neto))} k="Cobrado" s="histórico · lo que entró menos lo que salió" />
-        <Stat icon={<Clock size={18} />} v={cifra(kCxc, (c) => money(c.total))} k="Por cobrar" s={kCxc.data ? `saldo a hoy · ${kCxc.data.pedidos} pedido(s)` : 'saldo a hoy'} />
+        <Stat icon={<Clock size={18} />} v={cifra(kCxc, (c) => money(c.total))} k="Por cobrar" s={kCxc.data ? `saldo a hoy · ${kCxc.data.pedidos} ${kCxc.data.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'saldo a hoy'} />
       </div>
 
       {/* Filtros */}
@@ -255,7 +255,7 @@ export function Facturacion() {
                   </tr>
                 )
               })}
-              {debt.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-3)' }}>Sin adeudos · todo cobrado. 🎉</td></tr>}
+              {debt.length === 0 && <tr><td colSpan={4} className="pa-vacio-c"><Vacio plano icono="check" titulo="Sin adeudos" pista="Todo lo vendido está cobrado." /></td></tr>}
             </tbody>
           </table>
         </div>

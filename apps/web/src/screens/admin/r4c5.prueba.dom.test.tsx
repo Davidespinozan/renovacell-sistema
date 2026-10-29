@@ -65,10 +65,10 @@ describe('lógica pura del modo prueba', () => {
 })
 
 describe('<PanelOperativoCanal> en modo prueba', () => {
-  it('operativa: "Prueba · 1 contacto(s) autorizado(s)", número enmascarado y vencimiento; nunca "Espejo"', async () => {
+  it('operativa: "Prueba · 1 contacto autorizado", número enmascarado y vencimiento; nunca "Espejo"', async () => {
     const s = servidor({ vigentes: 1 })
     render(<PanelOperativoCanal cliente={new ClienteCanalOperacion(s.rpc, vi.fn())} />); await abrir()
-    expect(screen.getByTestId('dato-modo').textContent).toBe('Prueba · 1 contacto(s) autorizado(s)')
+    expect(screen.getByTestId('dato-modo').textContent).toBe('Prueba · 1 contacto autorizado')
     expect(screen.getByTestId('dato-prueba').textContent).toMatch(/^…3464 · vence /)
     expect(screen.getByTestId('res-ia').textContent).toMatch(/^PRUEBA: solo 1/)
     expect(screen.getByTestId('panel-canal').textContent).not.toMatch(/Modo espejo|Sin envíos \(espejo\)/)

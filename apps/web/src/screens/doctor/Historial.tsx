@@ -32,7 +32,7 @@ export function Historial() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Portal del Doctor · Historial</div>
+      <div className="eyebrow crumb">Portal del Doctor · Historial</div>
       {loading ? (
         <Cargando etiqueta="Cargando tu historial…" />
       ) : past.length === 0 ? (

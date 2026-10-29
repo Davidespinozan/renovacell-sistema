@@ -18,6 +18,7 @@ import {
   pendingReingresos, pendingDisposicion, returnableForOrder, recibirDevolucion, confirmarReingreso,
   type StockReturn, type Returnable,
 } from '../../data/store/stockReturnsStore'
+import { Vacio } from '../../app/EmptyState'
 
 const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 const errBox: React.CSSProperties = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }
@@ -51,7 +52,7 @@ export function Devoluciones() {
       <div className="card">
         <div className="eyebrow">Reingresos por confirmar · pedidos empacados cancelados</div>
         {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
-          : reingresos.length === 0 ? <div style={{ color: 'var(--ink-3)' }}>No hay reingresos pendientes.</div>
+          : reingresos.length === 0 ? <div className="op-vacio"><Vacio plano icono="check" titulo="No hay reingresos pendientes" /></div>
           : reingresos.map((r) => <ReingresoCard key={r.id} ret={r} names={names} />)}
       </div>
 
@@ -59,7 +60,7 @@ export function Devoluciones() {
 
       <div className="card">
         <div className="eyebrow">En revisión de Dirección</div>
-        {porDisponer.length === 0 ? <div style={{ color: 'var(--ink-3)' }}>Nada pendiente.</div> : (
+        {porDisponer.length === 0 ? <div className="op-vacio"><Vacio plano icono="check" titulo="Nada pendiente" /></div> : (
           <table className="tbl-cards">
             <thead><tr><th>Pedido</th><th>Producto</th><th>Lote</th><th>Cant.</th><th>Inspección</th></tr></thead>
             <tbody>

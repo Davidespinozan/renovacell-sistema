@@ -1,0 +1,77 @@
+/* Pulido de entrega (29 oct 2026) · portal. Solo presentación; se importa después de mobile.css. */
+
+/* ── Catálogo del doctor ───────────────────────────────────────────────────────────────────────────── */
+/* Familia: en el lugar del precio, "N presentaciones · desde $X" en una línea (antes gris chico + "Varias
+   presentaciones"). Mismo alto de renglón que .pr de las tarjetas sencillas para que la rejilla no brinque. */
+.dcat-card .pp-fam-pr{font-size:14px;font-weight:600;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcat-card .pp-fam-desde{font-weight:600;color:var(--ink)}
+/* La píldora de volumen ("10% menos desde 5 pzas") no se parte en dos renglones: si no cabe, se recorta. */
+.dcat-promo{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Mi verificación · cuenta verificada ───────────────────────────────────────────────────────────── */
+.pp-verif-ok{display:grid;justify-items:center;text-align:center;gap:6px;padding:28px 20px;max-width:640px}
+.pp-verif-ic{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--green-deep);margin-bottom:4px}
+.pp-verif-ic svg{width:24px;height:24px}
+.pp-verif-t{font-size:18px;font-weight:700;color:var(--ink)}
+.pp-verif-d{font-size:14px;color:var(--ink-2);margin-bottom:10px}
+.pp-verif-ok .btn{min-height:44px;padding-left:22px;padding-right:22px}
+
+/* ── Inicio del doctor ─────────────────────────────────────────────────────────────────────────────── */
+/* "Disponibles para ti": en escritorio la rejilla es de 4; mostrar 6 dejaba 2 huérfanos. Solo se recorta lo
+   que se ve (en móvil es tira deslizable y se quedan todos). */
+@media (min-width:701px){
+  .rh--doctor .rh-productos > .rh-producto:nth-child(n+5){display:none}
+}
+
+/* ── Inicio del chofer ─────────────────────────────────────────────────────────────────────────────── */
+/* El vacío vive en una tarjeta (no flotando sobre el lienzo) y el único atajo ocupa la fila completa. */
+.rh--chofer .rh-empty{background:var(--cp-surface);border:1px solid var(--line);box-shadow:var(--sh-sm)}
+.rh--chofer .rh-empty-ic{background:var(--ok-bg);box-shadow:none}
+@media (max-width:900px){
+  .rh-quick.rh-quick--movil:has(> .rh-tile:only-child){grid-template-columns:1fr}
+  .rh-quick--movil > .rh-tile:only-child{flex-direction:row;align-items:center;min-height:56px;padding:12px 14px}
+  .rh-quick--movil > .rh-tile:only-child .rh-tile-t{font-size:14px}
+}
+
+/* ── Inicio del vendedor · pedidos en camino ───────────────────────────────────────────────────────── */
+/* Seguimiento (logistics/Seguimiento.tsx, no es de esta área) trae su propio eyebrow "Seguimiento de envíos"
+   y un Exportar; dentro de Inicio la sección ya tiene título. Se oculta el eyebrow y, si Exportar está
+   deshabilitado (sin filas), la fila completa de encabezado. */
+
+/* ── Mis entregas (chofer) ─────────────────────────────────────────────────────────────────────────── */
+/* Entregas cerradas: una fila en escritorio; en móvil se apila. */
+.pp-cerrada{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"folio cli fecha btn" "folio rec fecha btn";column-gap:10px;row-gap:2px;align-items:center;padding:10px 6px}
+.pp-cerrada-folio{grid-area:folio;font-size:13px}
+.pp-cerrada-cli{grid-area:cli;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pp-cerrada-rec{grid-area:rec;font-size:12px;color:var(--ink-3);min-width:0;overflow-wrap:anywhere}
+.pp-cerrada-fecha{grid-area:fecha;font-size:12px;color:var(--ink-3);white-space:nowrap}
+.pp-cerrada-prueba{grid-area:btn}
+@media (max-width:700px){
+  .pp-cerrada{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"folio cli fecha" "rec rec rec" "btn btn btn";row-gap:6px;padding:12px 4px}
+  .pp-cerrada-prueba{min-height:44px;justify-content:center;width:100%}
+}
+/* KPIs de la ruta: tres columnas compactas en móvil (antes 2 + 1 a lo ancho) y etiquetas más legibles. */
+.pp-kpis3 .sig .k{font-size:12px;color:var(--ink-2);letter-spacing:.04em}
+@media (max-width:700px){
+  .sigs.pp-kpis3{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .sigs.pp-kpis3 > :last-child:nth-child(odd){grid-column:auto}
+  .pp-kpis3 .card.sig{padding:10px;grid-template-columns:1fr;row-gap:2px}
+  .pp-kpis3 .sig .chip{display:none}
+  .pp-kpis3 .sig .k{grid-row:1;grid-column:1;font-size:11.5px;letter-spacing:.02em;text-transform:none;line-height:1.2}
+  .pp-kpis3 .sig .v{grid-row:2;grid-column:1;font-size:22px;margin-top:2px}
+  .pp-kpis3 .sig .s{grid-row:3;grid-column:1;font-size:11.5px;line-height:1.3}
+}
+
+/* ── Horarios de entrega ───────────────────────────────────────────────────────────────────────────── */
+/* Horarios libres consecutivos en una sola línea tenue. */
+.pp-libres{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-3)}
+.pp-libres .mono{font-size:12.5px;min-width:96px}
+/* Teléfono: píldora táctil de 44 px con ícono, para marcar directo desde la ruta. */
+a.pp-tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:var(--pill);border:1px solid var(--line);background:var(--cp-surface);color:var(--green-deep);font-weight:600;font-size:13px;text-decoration:none;font-variant-numeric:tabular-nums}
+a.pp-tel:hover{border-color:var(--green-soft)}
+a.pp-tel:focus-visible{outline:3px solid var(--green-soft);outline-offset:2px}
+/* Tarjetas angostas (teléfono, 2 columnas): mejor dos renglones que esconder "desde $X" o la cantidad de la promo. */
+@media (max-width:640px){
+  .dcat-card .pp-fam-pr{white-space:normal;line-height:1.3}
+  .dcat-promo{white-space:normal;text-overflow:clip;line-height:1.3}
+}

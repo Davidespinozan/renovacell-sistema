@@ -185,8 +185,9 @@ export function MisEntregas() {
       <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
 
       {/* Resumen de la ruta (asignada por Empaque al elegir chofer) */}
-      <div className="grid sigs">
-        <div className="card sig"><div className="chip"><Icon name="truck" /></div><div className="v">{mine.length}</div><div className="k">En tu ruta</div><div className="s">{piezasABordo} pieza(s) por entregar</div></div>
+      {/* pp-kpis3: en móvil las tres caben en una fila compacta (antes 2+1, la tercera a lo ancho). */}
+      <div className="grid sigs pp-kpis3">
+        <div className="card sig"><div className="chip"><Icon name="truck" /></div><div className="v">{mine.length}</div><div className="k">En tu ruta</div><div className="s">{piezasABordo} {piezasABordo === 1 ? 'pieza' : 'piezas'} por entregar</div></div>
         <div className="card sig"><div className="chip"><Icon name="check" /></div><div className="v">{entregadas.length}</div><div className="k">Entregadas</div><div className="s">de tu ruta</div></div>
         <div className={'card sig' + (incidencias ? ' dang' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{incidencias}</div><div className="k">Con incidencia</div><div className="s">requieren atención</div></div>
       </div>
@@ -234,7 +235,7 @@ export function MisEntregas() {
       )}
 
       {mine.length === 0 ? (
-        <Vacio icono="truck" titulo="No tienes entregas asignadas pendientes." pista="Cuando Despacho te asigne una ruta aparecerá aquí." />
+        <Vacio icono="truck" titulo="No tienes entregas asignadas pendientes." pista="Cuando Almacén te asigne una ruta, aparecerá aquí." />
       ) : (
         orderedMine.map((s) => {
           const order = orderById[s.order_id]
@@ -411,15 +412,15 @@ export function MisEntregas() {
             {entregadas.map((s, i) => {
               const o = orderById[s.order_id]
               return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 6px', borderBottom: i < entregadas.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                  <span className="mono" style={{ fontSize: 13 }}>{o?.external_ref ?? '—'}</span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? clienteDePedido(o).name : 'Cliente'}</div>
-                    {s.received_by && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Recibió: {s.received_by}</div>}
-                  </div>
-                  {s.delivered_at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fmtDate(s.delivered_at)}</span>}
+                // .pp-cerrada (pulido-portal.css): rejilla por áreas; en escritorio una fila, en móvil se
+                // apila (folio · cliente · fecha / quién recibió / "Ver prueba" a lo ancho con 44 px).
+                <div key={s.id} className="pp-cerrada" style={{ borderBottom: i < entregadas.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <span className="mono pp-cerrada-folio">{o?.external_ref ?? '—'}</span>
+                  <span className="pp-cerrada-cli">{o ? clienteDePedido(o).name : 'Cliente'}</span>
+                  {s.received_by && <span className="pp-cerrada-rec">Recibió: {s.received_by}</span>}
+                  {s.delivered_at && <span className="pp-cerrada-fecha">{fmtDate(s.delivered_at)}</span>}
                   {s.proof_image_url && (
-                    <button className="btn ghost sm" type="button" onClick={() => verPrueba(s.proof_image_url)}><Icon name="image" /> Ver prueba</button>
+                    <button className="btn ghost sm pp-cerrada-prueba" type="button" onClick={() => verPrueba(s.proof_image_url)}><Icon name="image" /> Ver prueba</button>
                   )}
                 </div>
               )

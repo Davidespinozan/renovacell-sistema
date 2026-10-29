@@ -123,7 +123,7 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
   // R4-C5 · el estado real del modo prueba (contactos vigentes, número enmascarado y vencimiento), nunca disfrazado de espejo
   const pr = c.modo === 'prueba' ? estado.prueba : null
   const textoModo = c.modo === 'activo' ? 'Activo' : c.modo === 'prueba'
-    ? (pr?.operativa ? `Prueba · ${pr.vigentes} contacto(s) autorizado(s)` : 'Prueba · sin contactos vigentes (inoperante)') : 'Espejo'
+    ? (pr?.operativa ? `Prueba · ${pr.vigentes} ${pr.vigentes === 1 ? 'contacto autorizado' : 'contactos autorizados'}` : 'Prueba · sin contactos vigentes (inoperante)') : 'Espejo'
   const boton = (k: string, a: { visible: boolean; habilitada: boolean; porque: string | null }, texto: string, etiqueta: Accion, primario = false) => !a.visible ? null : (
     <span key={k} style={{ display: 'inline-grid', gap: 2 }}>
       <button type="button" className={primario ? 'btn btn-primary' : 'btn'} style={{ minHeight: 40 }} disabled={!a.habilitada} onClick={() => setAccion(etiqueta)} data-testid={`ctl-${k}`} title={a.porque ?? undefined}>{texto}</button>
@@ -233,9 +233,9 @@ export function RevisionDeSalidas({ canal, rev, cliente, onCambio }: { canal: Ca
     <div style={{ display: 'grid', gap: 8 }} data-testid="revision-salidas">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <b style={{ fontSize: 13.5 }}>Salidas por revisar</b>
-        <span className={'pill ' + ((rev?.conteos?.retenido ?? 0) ? 'p-warn' : 'p-neu')} data-testid="n-retenidos">{rev?.conteos?.retenido ?? 0} retenido(s)</span>
-        <span className={'pill ' + ((rev?.conteos?.incierto ?? 0) ? 'p-dang' : 'p-neu')} data-testid="n-inciertos">{rev?.conteos?.incierto ?? 0} incierto(s)</span>
-        <span className="pill p-neu" data-testid="n-descartados">{rev?.conteos?.descartado ?? 0} descartado(s)</span>
+        <span className={'pill ' + ((rev?.conteos?.retenido ?? 0) ? 'p-warn' : 'p-neu')} data-testid="n-retenidos">{rev?.conteos?.retenido ?? 0} {(rev?.conteos?.retenido ?? 0) === 1 ? 'retenido' : 'retenidos'}</span>
+        <span className={'pill ' + ((rev?.conteos?.incierto ?? 0) ? 'p-dang' : 'p-neu')} data-testid="n-inciertos">{rev?.conteos?.incierto ?? 0} {(rev?.conteos?.incierto ?? 0) === 1 ? 'incierto' : 'inciertos'}</span>
+        <span className="pill p-neu" data-testid="n-descartados">{rev?.conteos?.descartado ?? 0} {(rev?.conteos?.descartado ?? 0) === 1 ? 'descartado' : 'descartados'}</span>
       </div>
       {filas.length === 0 ? <div style={{ fontSize: 13, color: 'var(--ink-3)' }} data-testid="sin-revision">No hay mensajes retenidos ni inciertos.</div> : <>
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}><b>Retenido</b>: no salió (pausa o espejo); se libera o se descarta. <b>Incierto</b>: se intentó enviar y no hubo confirmación de Meta: <b>pudo haber llegado</b>; revísalo en el teléfono y, si hace falta, escribe de nuevo desde la conversación. No se reenvía desde aquí.</div>
@@ -256,7 +256,7 @@ export function RevisionDeSalidas({ canal, rev, cliente, onCambio }: { canal: Ca
           ))}
         </ul>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }} data-testid="n-seleccion">{elegidas.length} seleccionado(s) · máximo {MAX_SELECCION}</span>
+          <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }} data-testid="n-seleccion">{elegidas.length} {elegidas.length === 1 ? 'seleccionado' : 'seleccionados'} · máximo {MAX_SELECCION}</span>
           <button type="button" className="btn" style={{ minHeight: 40 }} disabled={!puedeLiberar} onClick={() => setAccion('liberar')} data-testid="btn-liberar" title={porqueNoLiberar ?? undefined}>Liberar</button>
           <button type="button" className="btn" style={{ minHeight: 40 }} disabled={elegidas.length === 0} onClick={() => setAccion('descartar')} data-testid="btn-descartar">Descartar</button>
           {elegidas.length > 0 && porqueNoLiberar && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="porque-no-liberar">{porqueNoLiberar}</span>}
@@ -264,14 +264,14 @@ export function RevisionDeSalidas({ canal, rev, cliente, onCambio }: { canal: Ca
       </>}
       {resultado && (
         <div className="rh-note rh-note--neu" role="status" data-testid="resultado-decision">
-          <span><b>{resultado.aplicados} de {resultado.total}</b> {resultado.accion === 'liberar' ? 'liberado(s)' : 'descartado(s)'}.
+          <span><b>{resultado.aplicados} de {resultado.total}</b> {resultado.accion === 'liberar' ? (resultado.aplicados === 1 ? 'liberado' : 'liberados') : (resultado.aplicados === 1 ? 'descartado' : 'descartados')}.
             <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
               {resultado.resultados.map((x) => <li key={x.id} data-testid="resultado-fila"><span style={{ color: 'var(--ink-3)' }}>{(textos[x.id] ?? '').slice(0, 60)}</span> — {ETIQUETA_RESULTADO[x.resultado] ?? x.resultado}</li>)}
             </ul>
           </span>
         </div>
       )}
-      {accion && <Confirmar testid={`confirmar-${accion}`} titulo={accion === 'liberar' ? `Liberar ${elegidas.length} mensaje(s)` : `Descartar ${elegidas.length} mensaje(s)`}
+      {accion && <Confirmar testid={`confirmar-${accion}`} titulo={accion === 'liberar' ? `Liberar ${elegidas.length} ${elegidas.length === 1 ? 'mensaje' : 'mensajes'}` : `Descartar ${elegidas.length} ${elegidas.length === 1 ? 'mensaje' : 'mensajes'}`}
         explica={accion === 'liberar' ? <>Vuelven a la cola y salen por {NOMBRE_CANAL_OP[canal]}. El servidor no libera los que estén fuera de la ventana de 24 h.</> : <>No se enviarán nunca. Quedan en el historial con tu nombre y el motivo.</>}
         boton={accion === 'liberar' ? 'Liberar' : 'Descartar'} peligro onConfirmar={decidir} onCerrar={() => setAccion(null)} />}
     </div>

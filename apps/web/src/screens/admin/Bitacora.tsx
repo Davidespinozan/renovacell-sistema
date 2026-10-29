@@ -17,6 +17,24 @@ const actionPill = (action: string): string => {
   return 'p-neu'
 }
 
+// Los disparadores de la base escriben la acción cruda «TG_OP tabla» (p. ej. «UPDATE orders»).
+// Se traduce SOLO al pintar; lo exportado y lo guardado siguen intactos.
+const TABLAS: Record<string, string> = { orders: 'pedido', shipments: 'envío', payments: 'pago', customers: 'cliente', products: 'producto' }
+const VERBOS: Record<string, string> = { INSERT: 'Creó', UPDATE: 'Actualizó', DELETE: 'Eliminó' }
+const accionHumana = (action: string): string => {
+  const m = /^(INSERT|UPDATE|DELETE) ([a-z_]+)$/.exec(action)
+  if (!m) return action
+  return `${VERBOS[m[1]]} ${TABLAS[m[2]] ?? 'registro'}`
+}
+// Un UUID completo no le dice nada a Dirección: se abrevia a 8 caracteres (el completo queda en
+// el tooltip y en la exportación). Folios (S100002) y nombres pasan tal cual.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const recursoHumano = (r: string): string => {
+  if (UUID.test(r)) return r.slice(0, 8)
+  if (r === 'dia') return 'día'
+  return r
+}
+
 export function Bitacora() {
   const { data } = useAudit()
   const [area, setArea] = useState<string>('todos')
@@ -30,7 +48,7 @@ export function Bitacora() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Administración · Bitácora</div>
+        <div className="eyebrow crumb">Administración · Bitácora</div>
         <ExportButton name="bitacora" rows={rows} style={{ marginLeft: 'auto' }} columns={[
           { key: 'at', label: 'Fecha/hora', format: (v) => dt(v as string) },
           { key: 'actor', label: 'Autor' },
@@ -48,7 +66,7 @@ export function Bitacora() {
       <div className="fchips">
         {areas.map((a) => (
           <button key={a} type="button" className={'fchip' + (area === a ? ' on' : '')} onClick={() => setArea(a)}>
-            {a === 'todos' ? 'Todas las áreas' : a}
+            {a === 'todos' ? 'Todas las personas' : a}
           </button>
         ))}
       </div>
@@ -64,8 +82,8 @@ export function Bitacora() {
                 <tr key={e.id}>
                   <td data-label="Fecha/hora" style={{ whiteSpace: 'nowrap' }}>{dt(e.at)}</td>
                   <td data-label="Autor">{e.actor}</td>
-                  <td data-label="Acción"><span className={'pill ' + actionPill(e.action)}>{e.action}</span></td>
-                  <td data-label="Recurso" className="mono">{e.resource}{e.detail ? <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}> · {e.detail}</span> : null}</td>
+                  <td data-label="Acción"><span className={'pill ' + actionPill(e.action)}>{accionHumana(e.action)}</span></td>
+                  <td data-label="Recurso" className="mono" title={e.resource !== recursoHumano(e.resource) ? e.resource : undefined}>{recursoHumano(e.resource)}{e.detail ? <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}> · {e.detail}</span> : null}</td>
                 </tr>
               ))}
               {rows.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-3)' }}>Sin registros.</td></tr>}

@@ -18,10 +18,13 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   // Pasa las capabilities para resolver también el título de las pantallas de
   // capacidad (Diseño/Eventos); si no, caían al primero de la nav ("Inicio").
   const s = getScreenDef(r, screen, undefined, capabilities)
+  // El doctor no ve su "rol" repetido en cada pantalla (es la cara de la marca hacia el cliente).
+  const esDoctor = role === 'doctor'
   const sub =
-    screen === COMMON_SCREEN.key ? ''
-      : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
-        : r.label
+    esDoctor ? (screen === 'inicio' ? 'Renovacell · Tecnologías Antiedad' : '')
+      : screen === COMMON_SCREEN.key ? 'Comunicación del equipo'
+        : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
+          : r.label
 
   const search = useGlobalSearch()
   const [q, setQ] = useState('')
@@ -75,14 +78,15 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             <Icon name="search" />
             <input
               ref={inputRef}
-              placeholder="Buscar o ir a…  (pedidos, clientes, productos, lotes)"
+              placeholder={esDoctor ? 'Buscar productos o pedidos…' : 'Buscar pedidos, clientes, productos…'}
+              aria-label="Buscar"
               value={q}
               onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0) }}
               onFocus={() => setOpen(true)}
               onKeyDown={onInputKey}
               onBlur={() => window.setTimeout(() => setOpen(false), 150)}
             />
-            <kbd className="kbd-hint" aria-hidden="true">⌘K</kbd>
+            {!esDoctor && <kbd className="kbd-hint" aria-hidden="true">⌘K</kbd>}
           </div>
           {open && q.trim().length >= 2 && (
             <div className="searchpop">

@@ -48,6 +48,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const alternar = (h: string) => setAbiertas((a) => { const n = { ...a, [h]: !estaAbierta(h) }; guardarSecciones(n); return n })
 
   const go = (key: string) => { setScreen(key); onNavigate?.() }
+  // El doctor (cliente) ve un menú plano de pocas entradas: sin encabezados internos ("Hub", "Portal del Doctor"),
+  // sin la píldora de rol y sin la firma del operador. Es la cara de la marca.
+  const plano = role === 'doctor'
 
   const Link = (s: ScreenDef) => (
     // R-36/R-24: enlaces sin href → damos foco por teclado (role=button, tabIndex) y activación
@@ -76,9 +79,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {/* Rol activo: deja claro en qué puerta está parado el usuario. */}
-      <div className="side-role"><Icon name={r.icon} /> {r.label}</div>
+      {!plano && <div className="side-role"><Icon name={r.icon} /> {r.label}</div>}
 
       <nav className="nav">
+        {plano && <div className="nav-hub nav-plano">{[...hub, ...modules].map(Link)}</div>}
+        {!plano && <>
         {/* Inicio + Avisos/Chat del equipo. En móvil el hub del staff vive en el bottom-nav → se oculta aquí. */}
         {hub.length > 0 && (
           <div className="nav-hub">
@@ -96,6 +101,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {estaAbierta(g.header) && g.items.map(Link)}
           </React.Fragment>
         ))}
+        </>}
       </nav>
 
       <div className="side-foot">
@@ -119,9 +125,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </button>
           </div>
         )}
-        <div className="op">
-          <span className="live" /> Operado por <b>STRYV</b>
-        </div>
+        {!plano && (
+          <div className="op">
+            <span className="live" /> Operado por <b>STRYV</b>
+          </div>
+        )}
       </div>
 
       {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} />}

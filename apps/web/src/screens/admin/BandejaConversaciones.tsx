@@ -5,7 +5,7 @@
 // conversación se alternan. Enlace de contacto, horario y controles de la IA viven en "Canales y horario" (no son trabajo
 // del día). La autoridad sigue en la base: aquí solo se muestran y se piden acciones.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Settings2, Search, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Settings2, Search, ArrowLeft, RefreshCw, MessageCircle } from 'lucide-react'
 import { atencion as clientePorDefecto, ETIQUETA_FUENTE, textoEstadoHorario, type BandejaUnificada, type ClienteAtencion, type FuenteConversacion, type GrupoBandeja, type ItemBandeja, type Pendientes, type Vendedor } from '../../data/ops/atencion'
 import { chat as chatPorDefecto, type ClienteChat } from '../../data/ops/chat'
 import { canalOperacion as canalOpPorDefecto, MOTIVO_NO_ESCRIBIR, type ClienteCanalOperacion, type ControlConversacion } from '../../data/ops/canalOperacion'
@@ -94,7 +94,7 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
     <div className="bq" data-testid="bandeja-unificada" data-abierta={abierta ? 'si' : 'no'}>
       <style>{CSS}</style>
       <div className="bq-head">
-        <div className="eyebrow" style={{ margin: 0 }}>Dirección · Conversaciones</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Dirección · Conversaciones</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <EnlaceContactoBotones />
           <button type="button" className="btn ghost sm" onClick={() => void cargar()} aria-label="Actualizar" data-testid="bq-actualizar"><RefreshCw size={15} /></button>
@@ -145,7 +145,7 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
         <section className="bq-panel card" aria-label="Conversación abierta">
           {abierta
             ? <Panel key={abierta} id={abierta} c={seleccion} cliente={cliente} chat={chat} canalOp={canalOp} onCambio={alCambiar} onCerrar={() => setAbierta(null)} />
-            : <div className="bq-vacio bq-elige">Elige una conversación de la lista para leerla y atenderla.</div>}
+            : <div className="bq-vacio bq-elige"><span className="bq-elige-ico"><MessageCircle size={28} /></span><b>Conversaciones de clientes</b><span>Elige una conversación de la lista para leerla y atenderla.</span></div>}
         </section>
       </div>
       {ajustes && <ModalAjustes cliente={cliente} canalOp={canalOp} onHorario={onHorario} onCerrar={() => setAjustes(false)} onAbrir={(id) => { setAjustes(false); setAbierta(id) }} />}
@@ -223,7 +223,7 @@ function ModalAjustes({ cliente, canalOp, onHorario, onCerrar, onAbrir }: { clie
       <div className="card" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontWeight: 600 }} data-testid="bq-horario">{textoEstadoHorario(r?.horario)}</div>
-          {r && <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{r.vendedores_elegibles} vendedor(es) recibiendo conversaciones</div>}
+          {r && <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{r.vendedores_elegibles} {r.vendedores_elegibles === 1 ? 'vendedor recibe' : 'vendedores reciben'} conversaciones</div>}
         </div>
         {onHorario && <button type="button" className="btn ghost" onClick={() => { onCerrar(); onHorario() }}>Horario y alertas</button>}
       </div>
@@ -240,8 +240,8 @@ const CSS = `
 .bq-lista { padding: 10px !important; display: grid; gap: 8px; max-height: calc(100vh - 170px); overflow: auto; position: sticky; top: 12px; }
 .bq-busca { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; color: var(--ink-3); background: var(--cp-surface, #fff); }
 .bq-busca input { border: 0; outline: none; flex: 1; min-height: 40px; font: inherit; font-size: 14px; background: transparent; color: var(--ink); }
-.bq-vistas { flex-wrap: wrap; }
-.bq-vistas button { display: inline-flex; gap: 6px; align-items: center; }
+.bq-vistas { flex-wrap: nowrap; width: 100%; }
+.bq-vistas button { display: inline-flex; gap: 5px; align-items: center; justify-content: center; flex: 1; padding: 8px 6px; }
 .bq-n { font-size: 11.5px; padding: 0 6px; border-radius: 10px; background: var(--line); color: var(--ink-2); min-width: 18px; text-align: center; }
 .bq-n-alerta { background: var(--danger); color: #fff; }
 .bq-sub { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink-3); flex-wrap: wrap; }
@@ -258,7 +258,10 @@ const CSS = `
 .bq-l3 { font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
 .bq-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); display: inline-block; }
 .bq-vacio { color: var(--ink-3); font-size: 13.5px; padding: 16px 8px; text-align: center; }
-.bq-elige { padding: 48px 16px; }
+.bq-elige { display: grid; place-content: center; justify-items: center; gap: 8px; min-height: calc(100vh - 230px); border-radius: var(--r); background-color: #e9ede7;
+  background-image: radial-gradient(rgba(0,90,13,.055) 1.1px, transparent 1.2px), radial-gradient(rgba(0,90,13,.04) 1px, transparent 1.1px); background-size: 22px 22px, 22px 22px; background-position: 0 0, 11px 11px; }
+.bq-elige b { font-size: 17px; font-weight: 600; color: var(--ink); }
+.bq-elige-ico { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--green-deep); box-shadow: 0 1px 3px rgba(11,20,14,.12); }
 .bq-panel { padding: 12px !important; min-width: 0; }
 .bq-conv { display: grid; gap: 10px; min-width: 0; }
 .bq-conv-head { display: flex; gap: 8px; align-items: flex-start; }

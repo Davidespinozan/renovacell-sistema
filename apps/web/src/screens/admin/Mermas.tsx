@@ -3,7 +3,7 @@
 // real del lote), por periodo y producto. Antes solo existía la baja, sin reporte ni $.
 // SENSIBLE: usa costos → solo Dirección.
 import React, { useMemo, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { TriangleAlert, PackageCheck } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { ExportButton } from '../../app/ExportButton'
 import { useInventory } from '../../data/hooks/useInventory'
@@ -11,6 +11,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
 import { mesNegocio, etiquetaMes } from '../../data/periodo'
 
+// En cero no hay nada que advertir: el triángulo solo aparece cuando la cifra existe.
+const icMerma = (valor: number) => (valor > 0 ? <TriangleAlert size={18} /> : <PackageCheck size={18} />)
 const MERMA_REASONS = new Set(['merma', 'baja'])
 const reasonLabel = (r: string | null): string => (r === 'baja' ? 'Baja' : r === 'merma' ? 'Merma (caducidad/daño)' : r ?? '—')
 
@@ -57,7 +59,7 @@ export function Mermas() {
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <TriangleAlert size={18} />
-        <div className="eyebrow" style={{ margin: 0 }}>Dirección · Mermas valuadas</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Dirección · Mermas valuadas</div>
         <div className="seg" style={{ marginLeft: 'auto' }}>
           <button type="button" className={scope === 'mes' ? 'active' : undefined} onClick={() => setScope('mes')}>{etiquetaMes(curYm)}</button>
           <button type="button" className={scope === 'todo' ? 'active' : undefined} onClick={() => setScope('todo')}>Histórico</button>
@@ -65,9 +67,9 @@ export function Mermas() {
       </div>
 
       <div className="grid sigs">
-        <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{money(totalValor)}</div><div className="k">{unidSinCosto > 0 ? 'Pérdida por merma (mínimo)' : 'Pérdida por merma'}</div><div className="s">{scope === 'mes' ? etiquetaMes(curYm) : 'histórico'} · a costo{unidSinCosto > 0 ? ` · ${unidSinCosto} unidad(es) sin costo registrado` : ''}</div></div>
-        <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{totalUnid}</div><div className="k">Unidades dadas de baja</div><div className="s">caducidad / daño</div></div>
-        <div className="card sig"><div className="chip"><TriangleAlert size={18} /></div><div className="v">{rows.length}</div><div className="k">Eventos de merma</div><div className="s">movimientos registrados</div></div>
+        <div className="card sig"><div className="chip">{icMerma(totalValor)}</div><div className="v">{money(totalValor)}</div><div className="k">{unidSinCosto > 0 ? 'Pérdida por merma (mínimo)' : 'Pérdida por merma'}</div><div className="s">{scope === 'mes' ? etiquetaMes(curYm) : 'histórico'} · a costo{unidSinCosto > 0 ? ` · ${unidSinCosto} ${unidSinCosto === 1 ? 'unidad' : 'unidades'} sin costo registrado` : ''}</div></div>
+        <div className="card sig"><div className="chip">{icMerma(totalUnid)}</div><div className="v">{totalUnid}</div><div className="k">Unidades dadas de baja</div><div className="s">caducidad / daño</div></div>
+        <div className="card sig"><div className="chip">{icMerma(rows.length)}</div><div className="v">{rows.length}</div><div className="k">Eventos de merma</div><div className="s">movimientos registrados</div></div>
       </div>
 
       <div className="card" style={{ padding: 0 }}>

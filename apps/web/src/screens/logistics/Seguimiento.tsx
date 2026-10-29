@@ -7,6 +7,7 @@ import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { reloadShipments } from '../../data/store/shipmentsStore'
 import { reloadOrders } from '../../data/store/ordersStore'
 import { Icon } from '../../app/icons'
+import { Vacio } from '../../app/EmptyState'
 import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { signedProofUrl } from '../../lib/uploads'
@@ -31,7 +32,12 @@ interface Row {
   statusPill: string
 }
 
-export function Seguimiento() {
+/**
+ * `embebido`: cuando la lista vive dentro de otra pantalla (Inicio del vendedor, sección "en camino"), la sección
+ * anfitriona ya trae su título: se ocultan el eyebrow propio y el Exportar (deshabilitado sin filas, solo ruido), y
+ * sin pedidos se muestra un vacío compacto en lugar de nada. Por omisión, la pantalla completa de siempre.
+ */
+export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
   const { data: orders } = useAllOrders()
   const { data: shipments, resolveIncident } = useShipments()
   const { data: products } = useProducts()
@@ -79,7 +85,7 @@ export function Seguimiento() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {!embebido && <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="eyebrow">Seguimiento de envíos</div>
         <ExportButton
           name="seguimiento-envios"
@@ -107,13 +113,13 @@ export function Seguimiento() {
             { key: 'estimada', label: 'Entrega estimada', format: (v) => (v ? fmtDate(v as string) : '') },
           ]}
         />
-      </div>
+      </div>}
 
       {stuckCount > 0 && (
         <div className="alert">
           <div className="ico"><Icon name="truck" /></div>
           <div className="x">
-            <b>{stuckCount} envío(s) atorado(s).</b> Hay pedidos vencidos o surtidos sin salir. Revísalos antes de que el doctor reclame.
+            <b>{stuckCount} {stuckCount === 1 ? 'envío atorado' : 'envíos atorados'}.</b> Hay pedidos vencidos o surtidos sin salir. Revísalos antes de que el doctor reclame.
           </div>
         </div>
       )}
@@ -136,6 +142,10 @@ export function Seguimiento() {
             )
           })}
         </div>
+      )}
+
+      {embebido && rows.length === 0 && (
+        <div className="op-vacio"><Vacio plano icono="truck" titulo="Sin pedidos en camino" data-testid="seguimiento-vacio" /></div>
       )}
 
       {rows.map((r) => (

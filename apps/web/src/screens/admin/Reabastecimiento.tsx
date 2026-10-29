@@ -121,7 +121,8 @@ export function Reabastecimiento() {
                       {enCurso(p.id)
                         ? <span className="pill p-blue">Compra pendiente de recibir</span>
                         : puedeComprar
-                          ? <button className={'btn sm' + (bajo ? '' : ' ghost')} type="button"
+                          // Acción de fila siempre fantasma: el estado (Bajo/Agotado) ya lo señala la píldora.
+                          ? <button className="btn ghost sm" type="button"
                               onClick={() => setReplen({ product: p, suggested: sugerido })} data-testid="btn-comprar">
                               <ShoppingCart size={14} /> Comprar a proveedor
                             </button>

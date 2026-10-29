@@ -8,6 +8,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useUsers } from '../../data/hooks/useUsers'
 import { useCustodies, useCustodyLines } from '../../data/hooks/useCustody'
 import type { Custody } from '../../data/ops/custody'
+import { Vacio } from '../../app/EmptyState'
 
 export function VentasEvento() {
   const { data: custodias, loading } = useCustodies()
@@ -50,7 +51,7 @@ export function VentasEvento() {
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '10px 14px 14px' }}>
           {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
-            : ventas.length === 0 ? <div style={{ color: 'var(--ink-3)' }}>Todavía no hay ventas desde custodia.</div>
+            : ventas.length === 0 ? <div className="op-vacio"><Vacio plano icono="receipt" titulo="Todavía no hay ventas desde custodia" /></div>
               : (
                 <table className="tbl-cards">
                   <thead><tr><th>Fecha</th><th>Custodia</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Importe</th></tr></thead>

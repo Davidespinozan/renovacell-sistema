@@ -297,7 +297,7 @@ describe('T15/T16 · los candidatos por categoría son propuesta, no autoridad',
     expect(await screen.findByText(/No se validará ningún producto/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('Aplicar propuesta', { selector: '.modal button' }))
     await waitFor(() => expect(mocks.aplicarPropuestaCategoria).toHaveBeenCalledWith('Sérum'))
-    expect(await screen.findByText(/4 producto\(s\) pre-llenado\(s\) y 0 validado\(s\)/)).toBeInTheDocument()
+    expect(await screen.findByText(/4 productos prellenados y 0 validados/)).toBeInTheDocument()
   })
 
   it('T16 — la pantalla declara que no pisa valores ni toca productos validados', async () => {

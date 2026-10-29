@@ -6,10 +6,11 @@ import { useRole } from '../auth/RoleContext'
 import { getNav, getRole } from './roles'
 
 const CLAVE = 'rc_guia_inventario_oculta'
-const PASOS: Array<{ n: number; titulo: string; texto: string; keys: string[] }> = [
-  { n: 1, titulo: 'Se pide al proveedor', texto: 'Dirección registra la compra (producto, cantidad y costo). Todavía no hay inventario.', keys: ['av_inv', 'compras'] },
-  { n: 2, titulo: 'Llega y se recibe', texto: 'Almacén captura lo que llegó, con lote y caducidad. Aquí nace el inventario.', keys: ['entradas'] },
-  { n: 3, titulo: 'Ya está en Inventario', texto: 'Se ve por producto y por lote, y sale con los pedidos.', keys: ['stock'] },
+// `destino` es solo el rótulo del botón («Ir a …»); la pantalla real la decide `keys` según el menú del rol.
+const PASOS: Array<{ n: number; titulo: string; texto: string; keys: string[]; destino: string }> = [
+  { n: 1, titulo: 'Se pide al proveedor', texto: 'Dirección registra la compra (producto, cantidad y costo). Todavía no hay inventario.', keys: ['av_inv', 'compras'], destino: 'Compras a proveedores' },
+  { n: 2, titulo: 'Llega y se recibe', texto: 'Almacén captura lo que llegó, con lote y caducidad. Aquí nace el inventario.', keys: ['entradas'], destino: 'Recibir mercancía' },
+  { n: 3, titulo: 'Ya está en Inventario', texto: 'Se ve por producto y por lote, y sale con los pedidos.', keys: ['stock'], destino: 'Inventario' },
 ]
 
 export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
@@ -29,13 +30,16 @@ export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
             const key = p.keys.find((k) => nav.has(k))
             const actual = paso === p.n
             return (
-              <li key={p.n} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderRadius: 12, border: '1px solid var(--line)', background: actual ? 'var(--ok-bg, #EAF4EC)' : 'transparent' }} data-testid={`guia-paso-${p.n}`}>
+              <li key={p.n} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 12, border: '1px solid var(--line)', background: actual ? 'var(--ok-bg, #EAF4EC)' : 'transparent' }} data-testid={`guia-paso-${p.n}`}>
+                <div style={{ display: 'flex', gap: 10, flex: 1 }}>
                 <span style={{ flex: 'none', width: 24, height: 24, borderRadius: 12, background: actual ? 'var(--green-deep)' : 'var(--line)', color: actual ? '#fff' : 'var(--ink-2)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{p.n}</span>
                 <span style={{ minWidth: 0 }}>
                   <b style={{ display: 'block', fontSize: 13 }}>{p.titulo}{actual ? ' · estás aquí' : ''}</b>
                   <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{p.texto}</span>
-                  {key && !actual && <> <button type="button" className="btn ghost sm" style={{ marginTop: 4 }} onClick={() => setScreen(key)}>Ir</button></>}
                 </span>
+                </div>
+                {/* Botón aparte, abajo a la derecha: dentro de la oración se leía como parte del texto. */}
+                {key && !actual && <button type="button" className="btn ghost sm" style={{ alignSelf: 'flex-end' }} onClick={() => setScreen(key)}>Ir a {p.destino}</button>}
               </li>
             )
           })}

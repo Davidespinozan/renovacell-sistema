@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from 'react'
 import { Plus, X, Check, Trash2, ChevronLeft, ChevronRight, Palette, Package, Megaphone } from 'lucide-react'
 import { useCalendar, type CalEntry, type CalKind } from '../data/hooks/useCalendar'
+import { Vacio } from '../app/EmptyState'
 
 const KIND: Record<CalKind, { label: string; pill: string; icon: React.ReactNode }> = {
   entrega: { label: 'Entrega', pill: 'p-blue', icon: <Palette size={11} /> },
@@ -52,7 +53,7 @@ export function Calendario() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Diseño · Calendario de entregas y producción</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Diseño · Calendario de entregas y producción</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPick(todayIso)}>
           <Plus size={14} /> Nuevo compromiso
         </button>
@@ -60,11 +61,17 @@ export function Calendario() {
 
       <div className="card">
         {/* Cabecera del mes */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-          <button className="iconbtn-round" type="button" aria-label="Mes anterior" onClick={() => move(-1)}><ChevronLeft size={17} /></button>
-          <div style={{ fontWeight: 600, fontSize: 15, minWidth: 130, flex: '1 1 130px', textAlign: 'center' }}>{MONTHS[cursor.m]} {cursor.y}</div>
-          <button className="iconbtn-round" type="button" aria-label="Mes siguiente" onClick={() => move(1)}><ChevronRight size={17} /></button>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', flex: '1 1 240px' }}>
+        {/* Título del mes + flechas agrupadas a la izquierda (fantasma, no círculos verdes sueltos);
+            la leyenda va a la derecha y baja de renglón en teléfono. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div className="pa-cal-mes">
+            <div style={{ fontWeight: 600, fontSize: 15, minWidth: 120 }}>{MONTHS[cursor.m]} {cursor.y}</div>
+            <div className="pa-cal-nav">
+              <button className="btn ghost sm" type="button" aria-label="Mes anterior" onClick={() => move(-1)}><ChevronLeft size={16} /></button>
+              <button className="btn ghost sm" type="button" aria-label="Mes siguiente" onClick={() => move(1)}><ChevronRight size={16} /></button>
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {(Object.keys(KIND) as CalKind[]).map((k) => (
               <span key={k} style={{ fontSize: 11.5, color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <span className={'pill ' + KIND[k].pill} style={{ padding: '1px 7px' }}>{KIND[k].icon}</span> {KIND[k].label}
@@ -111,7 +118,7 @@ export function Calendario() {
       {/* Próximos compromisos */}
       <div className="card">
         <div className="eyebrow" style={{ marginBottom: 8 }}>Próximos compromisos</div>
-        {upcoming.length === 0 && <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Sin compromisos agendados. Agrega uno con “Nuevo compromiso”.</div>}
+        {upcoming.length === 0 && <div className="pa-vacio-c"><Vacio plano icono="clock" titulo="Sin compromisos agendados" pista="Agrega uno con «Nuevo compromiso» o tocando un día del mes." /></div>}
         {upcoming.map((e) => (
           <div key={e.id} className="lrow" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 220px' }}>

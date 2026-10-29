@@ -109,7 +109,7 @@ export function Cola() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Envíos · Por enviar</div>
+      <div className="eyebrow crumb">Envíos · Por enviar</div>
 
       {queue.length === 0 ? (
         <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
@@ -498,7 +498,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                             <input type="radio" name="rate" checked={rateId === r.id} onChange={() => setRateId(r.id)} />
                             <span style={{ flex: 1 }}>
                               <b>{r.carrier}</b> · {r.service}
-                              <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Entrega en {r.etaDays} día(s)</span>
+                              <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Entrega en {r.etaDays} {r.etaDays === 1 ? 'día' : 'días'}</span>
                             </span>
                             <b className="mono">{money(r.amount)}</b>
                           </label>

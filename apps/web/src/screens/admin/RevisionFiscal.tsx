@@ -621,7 +621,7 @@ function TabCategorias({ defaults, categorias, reload }: {
     const r = await aplicarPropuestaCategoria(categoria)
     setAplicando(null)
     if (!r.ok) { setAviso({ ok: false, text: r.error }); return }
-    setAviso({ ok: true, text: `Propuesta aplicada a ${categoria}: ${r.data.prellenados} producto(s) pre-llenado(s) y ${r.data.validados} validado(s). Siguen requiriendo validación una por una.` })
+    setAviso({ ok: true, text: `Propuesta aplicada a ${categoria}: ${r.data.prellenados} ${r.data.prellenados === 1 ? 'producto prellenado' : 'productos prellenados'} y ${r.data.validados} ${r.data.validados === 1 ? 'validado' : 'validados'}. Siguen requiriendo validación una por una.` })
     await reload()
   }
 

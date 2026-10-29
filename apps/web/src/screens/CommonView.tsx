@@ -137,7 +137,7 @@ export function CommonView() {
     <div className="av-seccion">
       <div className="av-seccion-head">
         <div><h2>Biblioteca</h2><p>Logos, imágenes y materiales listos para usar.</p></div>
-        {canManage && <button className="btn sm" type="button" onClick={() => setAssetOpen(true)}><Upload size={14} /> Subir asset</button>}
+        {canManage && <button className="btn sm" type="button" onClick={() => setAssetOpen(true)}><Upload size={14} /> Subir material</button>}
       </div>
       <div className="libgrid" style={{ width: '100%' }}>
         {assets.data.map((as) => (
@@ -211,7 +211,7 @@ export function CommonView() {
             </div>
           )
         })}
-        {resources.data.length === 0 && <div className="av-vacio"><div className="av-vacio-t">Aún no hay solicitudes</div></div>}
+        {resources.data.length === 0 && <div className="av-vacio"><div className="av-vacio-ico"><ImageIcon size={26} /></div><div className="av-vacio-t">Aún no hay solicitudes</div><div className="av-vacio-s">Pide un arte o material y aquí verás cómo va.</div></div>}
       </div>
     </div>
   )
@@ -221,7 +221,7 @@ export function CommonView() {
       <Pestanas grupo="avisos_equipo" pestanas={[
         { key: 'muro', label: 'Avisos', conteo: sinLeer.length, render: () => muro },
         { key: 'biblioteca', label: 'Biblioteca', render: () => biblioteca },
-        { key: 'solicitudes', label: 'Solicitudes de recurso', conteo: pendientes, render: () => solicitudes },
+        { key: 'solicitudes', label: 'Solicitudes', conteo: pendientes, render: () => solicitudes },
       ]} />
 
       {sheetFor && (
@@ -314,7 +314,7 @@ function AssetUploadModal({ onClose, onSave }: { onClose: () => void; onSave: (i
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div><h3>Subir asset</h3><div className="ms">Logo, imagen o documento para el equipo.</div></div>
+          <div><h3>Subir material</h3><div className="ms">Logo, imagen o documento para el equipo.</div></div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">

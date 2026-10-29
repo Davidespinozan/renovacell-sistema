@@ -97,37 +97,12 @@ export function Tablero() {
   // Un lote sin costo no vale cero: el valor se muestra como mínimo y se dice cuántos faltan.
   const riesgoTexto = riesgo.completo
     ? `${money(riesgo.valor)} en riesgo`
-    : `al menos ${money(riesgo.valor)} en riesgo · ${riesgo.lotesSinCosto} lote(s) sin costo`
+    : `al menos ${money(riesgo.valor)} en riesgo · ${riesgo.lotesSinCosto} ${riesgo.lotesSinCosto === 1 ? 'lote' : 'lotes'} sin costo`
 
   return (
-    <div className="grid" style={{ gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Administración · Tablero</div>
-        <ExportButton
-          name="tablero-indicadores"
-          style={{ marginLeft: 'auto' }}
-          rows={[
-            { indicador: `Ventas · ${pMes.etiqueta}`, valor: kMes.data?.ventas ?? 'No disponible' },
-            { indicador: `Cobrado · ${pMes.etiqueta}`, valor: kMes.data?.cobrado_neto ?? 'No disponible' },
-            { indicador: 'Por cobrar · a hoy', valor: cxc.data?.total ?? 'No disponible' },
-            { indicador: 'Pedidos · histórico', valor: kTodo.data?.pedidos ?? 'No disponible' },
-            { indicador: 'Ventas · histórico', valor: kTodo.data?.ventas ?? 'No disponible' },
-            { indicador: 'Ticket promedio · histórico', valor: kTodo.data?.ticket ?? 'No disponible' },
-            { indicador: 'Doctores con compra · histórico', valor: act.active },
-            { indicador: 'Por surtir', valor: porSurtir.length },
-            { indicador: 'Envíos atorados', valor: atorados.length },
-            { indicador: 'Lotes por caducar', valor: porCaducar.length },
-            { indicador: riesgo.completo ? 'Valor en riesgo por caducidad' : 'Valor en riesgo por caducidad (mínimo: hay lotes sin costo)', valor: riesgo.valor },
-            { indicador: 'Lotes por caducar sin costo registrado', valor: riesgo.lotesSinCosto },
-            { indicador: 'Lead time pedido→entrega (días)', valor: lt.promedioDias ?? '' },
-            { indicador: 'Entregas medidas', valor: lt.entregados },
-          ]}
-          columns={[
-            { key: 'indicador', label: 'Indicador' },
-            { key: 'valor', label: 'Valor' },
-          ]}
-        />
-      </div>
+    <div className="grid pa-tablero" style={{ gap: 18 }}>
+      {/* La miga queda oculta por CSS; «Exportar» se mudó junto a «Tu dinero» para no dejarlo solo en su renglón. */}
+      <div className="eyebrow crumb">Administración · Tablero</div>
       {cargandoPedidos && orders.length === 0 ? (<><CargandoKpis n={4} /><Cargando filas={4} /></>) : (<>
 
       <AvisoKpi estados={[kMes, kAnterior, kTodo, cxc]} />
@@ -156,12 +131,39 @@ export function Tablero() {
 
       {/* TU DINERO (posición de cobranza del mes, en lenguaje llano — inspirado en CuboPolar) */}
       <div>
-        <div className="eyebrow" style={{ margin: '0 0 12px' }}>Tu dinero · {pMes.etiqueta}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 12px', flexWrap: 'wrap' }}>
+          <div className="eyebrow" style={{ margin: 0 }}>Tu dinero · {pMes.etiqueta}</div>
+          <div style={{ marginLeft: 'auto' }}>
+            <ExportButton
+              name="tablero-indicadores"
+              rows={[
+                { indicador: `Ventas · ${pMes.etiqueta}`, valor: kMes.data?.ventas ?? 'No disponible' },
+                { indicador: `Cobrado · ${pMes.etiqueta}`, valor: kMes.data?.cobrado_neto ?? 'No disponible' },
+                { indicador: 'Por cobrar · a hoy', valor: cxc.data?.total ?? 'No disponible' },
+                { indicador: 'Pedidos · histórico', valor: kTodo.data?.pedidos ?? 'No disponible' },
+                { indicador: 'Ventas · histórico', valor: kTodo.data?.ventas ?? 'No disponible' },
+                { indicador: 'Ticket promedio · histórico', valor: kTodo.data?.ticket ?? 'No disponible' },
+                { indicador: 'Doctores con compra · histórico', valor: act.active },
+                { indicador: 'Por surtir', valor: porSurtir.length },
+                { indicador: 'Envíos atorados', valor: atorados.length },
+                { indicador: 'Lotes por caducar', valor: porCaducar.length },
+                { indicador: riesgo.completo ? 'Valor en riesgo por caducidad' : 'Valor en riesgo por caducidad (mínimo: hay lotes sin costo)', valor: riesgo.valor },
+                { indicador: 'Lotes por caducar sin costo registrado', valor: riesgo.lotesSinCosto },
+                { indicador: 'Lead time pedido→entrega (días)', valor: lt.promedioDias ?? '' },
+                { indicador: 'Entregas medidas', valor: lt.entregados },
+              ]}
+              columns={[
+                { key: 'indicador', label: 'Indicador' },
+                { key: 'valor', label: 'Valor' },
+              ]}
+            />
+          </div>
+        </div>
         <div className="grid sigs">
           <Sig icon="chart" value={cifra(kMes, (k) => money(k.ventas))} k="Vendiste" s="pedidos levantados en el mes" />
           <Sig icon="receipt" value={cifra(kMes, (k) => money(k.cobrado_neto))} k="Cobrado en el mes" s="dinero que entró en el mes, menos lo que salió" />
           <Sig icon="check" value={cifra(kMes, () => (avance == null ? '—' : `${Math.round(avance)}%`))} k="Avance de cobro" s="de lo vendido en el mes, ya cobrado" tone={avance != null && avance < 70 ? 'warn' : undefined} />
-          <Sig icon="clock" value={cifra(cxc, (c) => money(c.total))} k="Te deben" s={cxc.data ? `a hoy · ${cxc.data.pedidos} pedido(s) con saldo · incluye crédito` : 'saldo a hoy'} tone={cxc.data && cxc.data.total > 0 ? 'warn' : undefined} />
+          <Sig icon="clock" value={cifra(cxc, (c) => money(c.total))} k="Te deben" s={cxc.data ? `a hoy · ${cxc.data.pedidos} ${cxc.data.pedidos === 1 ? 'pedido' : 'pedidos'} con saldo · incluye crédito` : 'saldo a hoy'} tone={cxc.data && cxc.data.total > 0 ? 'warn' : undefined} />
         </div>
       </div>
 
@@ -174,7 +176,7 @@ export function Tablero() {
         <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
         <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
         <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? riesgoTexto : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
-        <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} entregas · peor ${lt.peorDias} d` : 'sin entregas aún'} />
+        <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} ${lt.entregados === 1 ? 'entrega' : 'entregas'} · peor ${lt.peorDias} d` : 'sin entregas aún'} />
       </div>
 
       {/* ALERTAS */}
@@ -284,7 +286,7 @@ function DoctoresRiesgo() {
                     <span className={'pill ' + (d.diasSinPedir >= 90 ? 'p-dang' : d.diasSinPedir >= 60 ? 'p-warn' : 'p-neu')}>{d.diasSinPedir} días</span>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>últ. {fmtDate(d.lastOrder)}</div>
                   </td>
-                  <td data-label="Histórico" className="mono">{money(d.total)}<div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{d.orders} pedido(s)</div></td>
+                  <td data-label="Histórico" className="mono">{money(d.total)}<div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{d.orders} {d.orders === 1 ? 'pedido' : 'pedidos'}</div></td>
                   <td data-label="Contacto">
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {d.phone && <a className="btn ghost sm" href={`tel:${d.phone}`}><Icon name="usercheck" /> Llamar</a>}

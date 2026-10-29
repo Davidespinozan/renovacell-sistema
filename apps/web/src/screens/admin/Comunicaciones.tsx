@@ -41,7 +41,7 @@ export function Comunicaciones() {
     // Se reporta lo que el SERVIDOR asentó, desglosado: enviados no es lo mismo que procesados.
     setAviso({ ok: r.fallido === 0 && r.incierto === 0, text: r.procesados === 0
       ? 'No había mensajes por enviar.'
-      : `Se procesaron ${r.procesados}: ${r.enviado} enviado(s), ${r.incierto} sin confirmar, ${r.fallido} no enviado(s).` })
+      : `Se procesaron ${r.procesados}: ${r.enviado} ${r.enviado === 1 ? 'enviado' : 'enviados'}, ${r.incierto} sin confirmar, ${r.fallido} ${r.fallido === 1 ? 'no enviado' : 'no enviados'}.` })
     await reload()
   }
 

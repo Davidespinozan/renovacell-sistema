@@ -11,6 +11,7 @@ import { useRevisionEconomica } from '../../data/hooks/useRevisionEconomica'
 import { ETIQUETA_INCIDENCIA, ORIENTACION_INCIDENCIA, type CasoRevision, type ClienteRevisionEconomica } from '../../data/ops/revisionEconomica'
 import { revisarDeclaracion as revisarPorDefecto } from '../../data/store/ordersStore'
 import { pedirAbrirPedido } from '../../data/store/ventasIntentStore'
+import { Vacio, Cargando } from '../../app/EmptyState'
 import { ConciliacionTarjeta } from './ConciliacionTarjeta'   // CS-1A.6 · cobros con tarjeta (CyberSource) pendientes de conciliación
 
 type Revisar = typeof revisarPorDefecto
@@ -26,8 +27,8 @@ export function RevisionEconomica({ cliente, revisar = revisarPorDefecto }: { cl
     <div className="grid" style={{ gap: 16 }} data-testid="revision-economica">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Scale size={18} />
-        <div className="eyebrow" style={{ margin: 0 }}>Finanzas · Revisión económica</div>
-        {rev.estado === 'listo' && <span className={'pill ' + (rev.data.resumen.abiertos ? 'p-warn' : 'p-ok')} style={{ marginLeft: 'auto' }} data-testid="revision-contador">{rev.data.resumen.abiertos} caso(s) abierto(s)</span>}
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Finanzas · Revisión económica</div>
+        {rev.estado === 'listo' && <span className={'pill ' + (rev.data.resumen.abiertos ? 'p-warn' : 'p-ok')} style={{ marginLeft: 'auto' }} data-testid="revision-contador">{rev.data.resumen.abiertos} {rev.data.resumen.abiertos === 1 ? 'caso abierto' : 'casos abiertos'}</span>}
       </div>
       <div className="sysnote">
         <AlertTriangle size={16} />
@@ -36,14 +37,14 @@ export function RevisionEconomica({ cliente, revisar = revisarPorDefecto }: { cl
 
       <ConciliacionTarjeta />
 
-      {rev.estado === 'cargando' || rev.estado === 'inactivo' ? <Aviso testid="revision-cargando">Cargando revisión económica…</Aviso>
+      {rev.estado === 'cargando' || rev.estado === 'inactivo' ? <div data-testid="revision-cargando"><Cargando filas={2} etiqueta="Cargando revisión económica…" /></div>
         : rev.estado === 'no_autorizado' ? <Aviso testid="revision-no-autorizado">{rev.mensaje}</Aviso>
         : rev.estado === 'error' ? (
           <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }} data-testid="revision-error">
             <span style={{ flex: 1 }}>{rev.mensaje}</span>
             <button type="button" className="btn ghost sm" onClick={() => void rev.recargar()}>Reintentar</button>
           </div>
-        ) : rev.data.casos.length === 0 ? <Aviso testid="revision-vacia">Sin casos abiertos. No hay dinero ni declaraciones pendientes de decisión.</Aviso>
+        ) : rev.data.casos.length === 0 ? <Vacio icono="check" titulo="Sin casos abiertos" pista="No hay dinero ni declaraciones pendientes de decisión." data-testid="revision-vacia" />
         : <>
             {rev.data.casos.map((c) => <Caso key={c.order_id} caso={c} revisar={revisar} recargar={rev.recargar} abrirEnVentas={() => { pedirAbrirPedido(c.order_id, c.folio); setScreen('av_ventas') }} />)}
             <div className="ms" style={{ color: 'var(--ink-3)' }} data-testid="revision-nota-stripe">Anomalías de pago en línea (Stripe): todavía no disponibles en esta vista.</div>

@@ -1,0 +1,57 @@
+/* Pulido de entrega (29 oct 2026) · admin. Solo presentación; se importa después de mobile.css. */
+
+/* ── Sitio web · barra pegajosa de guardar ─────────────────────────────────────────────
+   En línea tenía bottom:0 y en teléfono quedaba DETRÁS de la barra inferior fija: solo se veía
+   «Restaurar». Aquí se sube por encima de ella (68 px + zona segura) y no envuelve: la pista
+   larga se oculta en teléfono para que «Guardar y publicar» siempre quepa. */
+.pa-savebar{position:sticky;bottom:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:nowrap;box-shadow:var(--sh-card)}
+.pa-savebar-hint{font-size:11.5px;color:var(--ink-3);min-width:0}
+.pa-savebar-ok{font-size:12.5px;color:var(--green-deep);font-weight:600;white-space:nowrap}
+.pa-savebar .btn{white-space:nowrap;flex:none}
+@media (max-width:900px){
+  .pa-savebar{bottom:calc(68px + env(safe-area-inset-bottom, 0px));padding:10px 12px}
+  .pa-savebar-hint{display:none}
+  .pa-savebar .btn{min-height:44px}
+}
+
+/* ── Equipo · responsabilidades ────────────────────────────────────────────────────────
+   Activas como píldora suave de marca (no verde sólido con brillo: con 4–5 por persona la
+   tarjeta pesaba demasiado). Gana a .fchip.on de social.css y mobile.css por especificidad. */
+.fchip.pa-resp{display:inline-flex;align-items:center;gap:5px}
+.fchip.pa-resp.on{background:var(--ok-bg);color:var(--green-deep);border:1px solid var(--ok-line);box-shadow:none}
+.fchip.pa-resp.on:hover{border-color:var(--green-soft)}
+
+/* ── Vacíos compactos dentro de tablas/tarjetas ya existentes ──────────────────────────── */
+.pa-vacio-c .empty{padding:18px 16px}
+.pa-vacio-c .empty-ic{width:36px;height:36px;margin-bottom:4px}
+.pa-vacio-c .empty-ic svg{width:17px;height:17px}
+.pa-vacio-c .empty-t{font-size:14px}
+td.pa-vacio-c{padding:0}
+
+/* ── Cierre de caja · «Cierres recientes» ──────────────────────────────────────────────
+   La tarjeta es media columna: la tabla desplaza DENTRO de ella en vez de cortar los botones
+   de imprimir/anular, y «Alcance» tiene ancho propio para no partirse en 6 renglones. */
+@media (min-width:901px){
+  .pa-tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pa-cierres{min-width:560px}
+  .pa-cierres td,.pa-cierres th{white-space:nowrap}
+  .pa-cierres td.pa-alcance{white-space:normal;min-width:170px}
+}
+
+/* ── Calendario · flechas de mes agrupadas con el título ───────────────────────────────── */
+.pa-cal-mes{display:flex;align-items:center;gap:10px}
+.pa-cal-nav{display:inline-flex;gap:4px}
+.pa-cal-nav .btn{width:34px;height:34px;padding:0;justify-content:center;display:inline-grid;place-items:center}
+@media (max-width:900px){ .pa-cal-nav .btn{width:44px;height:44px} }
+
+/* ── Metas y comisiones ───────────────────────────────────────────────────────────────── */
+/* El nombre de quien más vendió no es una cifra: a tamaño de KPI se partía en dos renglones. */
+.sig .v.pa-sig-nombre{font-size:18px;line-height:1.25;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+/* Tasas como píldoras al lado del periodo (botón editable o solo lectura, mismo tamaño). */
+.pa-tasas .btn.ghost.sm,.pa-tasas .pill{min-height:0;padding:3px 10px;font-size:12px;border-radius:var(--pill);box-shadow:none;gap:4px}
+.pa-tasas .btn svg{width:12px;height:12px}
+@media (max-width:900px){ .pa-tasas .btn.ghost.sm{min-height:44px} }
+
+/* ── Tablero · rejilla estable de KPIs (sin huérfanos) ─────────────────────────────────── */
+@media (min-width:1100px){ .pa-tablero .sigs{grid-template-columns:repeat(4,minmax(0,1fr))} }
+@media (min-width:641px) and (max-width:1099px){ .pa-tablero .sigs{grid-template-columns:repeat(2,minmax(0,1fr))} }

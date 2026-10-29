@@ -132,7 +132,7 @@ export function ReconciliarGuia({ orderId, onResuelto, consultar = consultarReco
         <div style={{ marginTop: 10, fontSize: 13 }} data-testid="reconciliar-consulta">
           <div>Intento de hace <b>{minutos} min</b> · referencia <span className="mono">{refIntento}</span> · servicio <b>{datos.intento.servicio ?? '—'}</b>{!datos.intento.con_snapshot && <> · <span style={{ color: 'var(--danger)' }}>sin snapshot de la petición: aquí solo se puede cerrar sin guía</span></>}</div>
           <div style={{ marginTop: 4 }}>
-            Búsqueda por referencia: {porRef?.resultado === 'sin_resultados' ? <b>DHL no devolvió ninguna guía</b> : porRef?.resultado === 'encontradas' ? <b style={{ color: 'var(--danger)' }}>DHL devolvió {porRef.encontradas.length} guía(s)</b> : <b style={{ color: 'var(--danger)' }}>DHL no respondió ({porRef?.detalle ?? 'error'}); vuelve a consultar</b>}
+            Búsqueda por referencia: {porRef?.resultado === 'sin_resultados' ? <b>DHL no devolvió ninguna guía</b> : porRef?.resultado === 'encontradas' ? <b style={{ color: 'var(--danger)' }}>DHL devolvió {porRef.encontradas.length} {porRef.encontradas.length === 1 ? 'guía' : 'guías'}</b> : <b style={{ color: 'var(--danger)' }}>DHL no respondió ({porRef?.detalle ?? 'error'}); vuelve a consultar</b>}
             {datos.consulta.por_tracking && <> · Por número {datos.consulta.por_tracking.tracking}: {datos.consulta.por_tracking.resultado === 'encontradas' ? <b>existe en DHL</b> : datos.consulta.por_tracking.resultado === 'sin_resultados' ? <b>DHL no la tiene</b> : <b style={{ color: 'var(--danger)' }}>sin respuesta</b>}</>}
           </div>
           {guias.length > 0 && (

@@ -32,10 +32,11 @@ export function accionDe(o: OrderWithItems, liberado: boolean, envio: Shipment |
 
 function Tarjeta({ titulo, valor, pie, icono, alerta, testid }: { titulo: string; valor: React.ReactNode; pie: React.ReactNode; icono: React.ComponentProps<typeof Icon>['name']; alerta?: boolean; testid: string }) {
   return (
-    <div className="card" style={{ border: alerta ? '1.5px solid var(--warn)' : undefined, minWidth: 0 }} data-testid={testid}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--ink-3)' }}>{titulo}<span style={{ marginLeft: 'auto', color: alerta ? 'var(--warn)' : 'var(--green-deep)' }}><Icon name={icono} /></span></div>
-      <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4, color: alerta ? 'var(--warn)' : 'var(--ink)' }}>{valor}</div>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{pie}</div>
+    // Tamaños en pulido-operacion.css (.hoy-kpi-*): en teléfono la rejilla pasa a 2 columnas compactas.
+    <div className="card hoy-kpi" style={{ border: alerta ? '1.5px solid var(--warn)' : undefined, minWidth: 0 }} data-testid={testid}>
+      <div className="hoy-kpi-t">{titulo}<span style={{ marginLeft: 'auto', color: alerta ? 'var(--warn)' : 'var(--green-deep)' }}><Icon name={icono} /></span></div>
+      <div className="hoy-kpi-v" style={{ color: alerta ? 'var(--warn)' : 'var(--ink)' }}>{valor}</div>
+      <div className="hoy-kpi-p">{pie}</div>
     </div>
   )
 }
@@ -67,10 +68,12 @@ export function HoyAlmacen() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+      {/* Rejilla de indicadores: auto-fit en escritorio; ≤640 px, 2 columnas para que el trabajo del día
+          (la lista de abajo) no quede a cinco tarjetas de distancia. */}
+      <div className="hoy-kpis">
         <Tarjeta titulo="Esperan tu decisión" valor={casos.length} pie={`${nPreparar} por preparar · ${nEnviar} por enviar`} icono="layers" alerta={casos.length > 0} testid="hoy-decision" />
         <Tarjeta titulo="Guías DHL hoy" valor={guiasHoy.length} pie={guiasHoy.length ? 'generadas y con número de rastreo' : 'ninguna todavía'} icono="truck" testid="hoy-guias" />
-        <Tarjeta titulo="Recolección DHL hoy" valor={rec ? `${rec.ready}–${rec.close}` : '—'} pie={rec ? <>Confirmada <span className="mono">{rec.confirmation}</span>{recolecciones.length > 1 ? ` · +${recolecciones.length - 1} más` : ''}</> : 'sin recolección agendada para hoy'} icono="clock" testid="hoy-recoleccion" />
+        <Tarjeta titulo="Recolección DHL hoy" valor={rec ? `${rec.ready}–${rec.close}` : <span className="hoy-kpi-tenue">Sin agendar</span>} pie={rec ? <>Confirmada <span className="mono">{rec.confirmation}</span>{recolecciones.length > 1 ? ` · +${recolecciones.length - 1} más` : ''}</> : 'sin recolección agendada para hoy'} icono="clock" testid="hoy-recoleccion" />
         <Tarjeta titulo="En camino" valor={orders.filter((o) => o.status === 'shipped').length} pie="pedidos enviados sin confirmar entrega" icono="pkg" testid="hoy-camino" />
         <div role="button" tabIndex={0} onClick={() => setScreen('agenda_entregas')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setScreen('agenda_entregas') }} style={{ cursor: 'pointer', display: 'contents' }} aria-label="Ver horarios de entrega">
           <Tarjeta titulo="Entregas locales hoy" valor={agenda.data ? entregasHoy.length : '—'} pie={agenda.error ? 'No se pudo leer la agenda' : proxima ? <>Siguiente <b>{proxima.inicio}</b> · {proxima.cliente}</> : entregasHoy.length ? 'todas entregadas' : 'ninguna agendada · ver horarios'} icono="clock" alerta={!!proxima} testid="hoy-entregas-locales" />

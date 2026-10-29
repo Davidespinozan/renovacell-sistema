@@ -72,7 +72,7 @@ describe('PAY-EXP-01A-3 · un solo universo de declaraciones pendientes', () => 
   })
   it('las de pedidos cancelados NO se pierden: aviso con cuenta y acceso a Revisión económica', () => {
     render(<PagosPorValidar />)
-    expect(screen.getByTestId('pagos-en-cancelados')).toHaveTextContent('1 comprobante(s) de pedidos cancelados')
+    expect(screen.getByTestId('pagos-en-cancelados')).toHaveTextContent('1 comprobante de pedidos cancelados')
     fireEvent.click(screen.getByText('Ir a Revisión económica'))
     expect(srv.setScreen).toHaveBeenCalledWith('av_revision')
   })

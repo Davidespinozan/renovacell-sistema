@@ -89,7 +89,7 @@ export function ManualVentas({ cliente = clientePorDefecto }: { cliente?: Client
             <section key={t.key} style={{ border: '1px solid var(--line, #e5e7eb)', borderRadius: 12, padding: 12 }} data-testid={`tema-${t.key}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                 <div><strong>{t.label}</strong> <span style={sutil}>{t.ayuda}</span></div>
-                <button type="button" className="btn" style={{ fontSize: 12 }} onClick={() => nuevo(t.key)} data-testid={`nuevo-${t.key}`}>+ Agregar</button>
+                <button type="button" className="btn ghost sm" onClick={() => nuevo(t.key)} data-testid={`nuevo-${t.key}`}>+ Agregar</button>
               </div>
 
               {editor && editor.tema === t.key && (
@@ -104,7 +104,7 @@ export function ManualVentas({ cliente = clientePorDefecto }: { cliente?: Client
                     </select>
                     <span style={sutil}>{editor.contenido.length}/4000</span>
                     <button type="button" className="btn btn-primary" onClick={guardar} disabled={!editor.titulo.trim() || !editor.contenido.trim()} data-testid="btn-guardar">Guardar borrador</button>
-                    <button type="button" className="btn" onClick={() => setEditor(null)}>Cancelar</button>
+                    <button type="button" className="btn ghost" onClick={() => setEditor(null)}>Cancelar</button>
                   </div>
                 </div>
               )}
@@ -116,16 +116,17 @@ export function ManualVentas({ cliente = clientePorDefecto }: { cliente?: Client
                   return (
                     <li key={v.id} style={{ border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, padding: '10px 12px' }} data-testid="version-item">
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                        <div><strong>{v.titulo}</strong> <span style={sutil}>v{v.version} · {ETIQUETA_AUDIENCIA[v.audiencia] ?? v.audiencia}</span> <span style={{ fontSize: 12, fontWeight: 600, color: COLOR_ESTADO[v.estado] }}>{ETIQUETA_ESTADO[v.estado]}</span>
+                        <div><strong title={v.importado_de ? `Importado de: ${v.importado_de}` : undefined}>{v.titulo}</strong> <span style={sutil}>v{v.version} · {ETIQUETA_AUDIENCIA[v.audiencia] ?? v.audiencia}</span> <span style={{ fontSize: 12, fontWeight: 600, color: COLOR_ESTADO[v.estado] }}>{ETIQUETA_ESTADO[v.estado]}</span>
                           {pendiente && <span style={{ fontSize: 12, fontWeight: 600, color: '#b91c1c', marginLeft: 6 }} data-testid="marca-pendiente">Falta completar</span>}</div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          {v.estado === 'draft' && <><button type="button" className="btn" onClick={() => editar(v)}>Editar</button><button type="button" className="btn btn-primary" onClick={() => void aprobar(v)} disabled={pendiente} data-testid="btn-aprobar">Aprobar</button></>}
-                          {v.estado === 'approved' && !hayBorrador(v) && <button type="button" className="btn" onClick={() => nuevaVersion(v)} data-testid="btn-nueva-version">Nueva versión</button>}
-                          {v.estado === 'approved' && <button type="button" className="btn" onClick={() => void retirar(v)}>Retirar</button>}
+                        {/* Acciones de fila en fantasma: el único verde sólido de la vista es «Guardar borrador». */}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {v.estado === 'draft' && <><button type="button" className="btn ghost sm" onClick={() => editar(v)}>Editar</button><button type="button" className="btn ghost sm" onClick={() => void aprobar(v)} disabled={pendiente} data-testid="btn-aprobar">Aprobar</button></>}
+                          {v.estado === 'approved' && !hayBorrador(v) && <button type="button" className="btn ghost sm" onClick={() => nuevaVersion(v)} data-testid="btn-nueva-version">Nueva versión</button>}
+                          {v.estado === 'approved' && <button type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={() => void retirar(v)}>Retirar</button>}
                         </div>
                       </div>
                       <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', fontSize: 14 }}>{v.contenido}</div>
-                      {v.importado_de && <div style={{ ...sutil, marginTop: 4 }}>Origen: {v.importado_de}</div>}
+                      {/* El origen de importación (clave interna) ya no se pinta: queda como tooltip del título. */}
                     </li>
                   )
                 })}

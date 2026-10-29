@@ -52,7 +52,7 @@ export function Solicitudes() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Diseño · Solicitudes y pendientes</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Diseño · Solicitudes y pendientes</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setNuevo(true)}>
           <Plus size={14} /> Nuevo pendiente
         </button>
@@ -61,7 +61,7 @@ export function Solicitudes() {
       {abiertas > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>
           <div className="ico"><Play size={18} /></div>
-          <div className="x"><b>{abiertas} pendiente(s) abierto(s).</b> Lo que el equipo pidió y tus propios proyectos de diseño.</div>
+          <div className="x"><b>{abiertas} {abiertas === 1 ? 'pendiente abierto' : 'pendientes abiertos'}.</b> Lo que el equipo pidió y tus propios proyectos de diseño.</div>
         </div>
       )}
 

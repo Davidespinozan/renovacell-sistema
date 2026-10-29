@@ -200,7 +200,7 @@ export function CierreCaja() {
           </select>
 
           <div className="tket-total" style={{ marginTop: 16 }}>
-            <span>Efectivo por arquear {leyendo ? '' : '(servidor)'}</span>
+            <span>Efectivo por arquear</span>
             <b className="mono">{leyendo ? 'Calculando…' : money(esperado)}</b>
           </div>
 
@@ -265,8 +265,10 @@ export function CierreCaja() {
               { key: 'usuario', label: 'Usuario' },
             ]} />
           </div>
-          <div style={{ padding: '0 14px 8px' }}>
-            <table className="tbl-cards">
+          {/* .pa-tbl-scroll: en escritorio la tarjeta es angosta; la tabla desplaza dentro de ella
+              en vez de cortar los botones de imprimir/anular (pulido-admin.css). */}
+          <div className="pa-tbl-scroll" style={{ padding: '0 14px 8px' }}>
+            <table className="tbl-cards pa-cierres">
               <thead><tr><th>Fecha</th><th>Alcance</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th></th></tr></thead>
               <tbody>
                 {cierres.map((c) => {
@@ -275,12 +277,12 @@ export function CierreCaja() {
                   return (
                   <tr key={c.id} style={muerto ? { opacity: 0.55 } : undefined}>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(c.fecha)}</td>
-                    <td data-label="Alcance">
+                    <td data-label="Alcance" className="pa-alcance">
                       {c.alcance === 'cajero' ? 'Por cajero' : c.alcance === 'dia' ? 'Caja del día' : c.alcance}
                       {esAnulacion && <span className="pill p-neu" style={{ marginLeft: 6, fontSize: 10 }}>anulación</span>}
                       {muerto && !esAnulacion && <span className="pill p-dang" style={{ marginLeft: 6, fontSize: 10 }}>anulado</span>}
                       {(c.void_reason || c.motivo) && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{c.void_reason ?? c.motivo}</div>}
-                      {c.corte_desde && <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{hora(c.corte_desde)} → {hora(c.corte_hasta)}</div>}
+                      {c.corte_desde && <div style={{ fontSize: 10.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{hora(c.corte_desde)} → {hora(c.corte_hasta)}</div>}
                     </td>
                     <td data-label="Esperado" className="mono">{money(c.esperado)}</td>
                     <td data-label="Contado" className="mono">{money(c.contado)}</td>

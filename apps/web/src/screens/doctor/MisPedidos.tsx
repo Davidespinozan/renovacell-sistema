@@ -38,11 +38,12 @@ export function MisPedidos() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Portal del Doctor · Mis pedidos</div>
+      <div className="eyebrow crumb">Portal del Doctor · Mis pedidos</div>
       {loading ? (
         <Cargando etiqueta="Cargando tus pedidos…" />
       ) : active.length === 0 ? (
-        <Vacio icono="bag" titulo="No tienes pedidos activos." pista="Crea uno desde el catálogo." />
+        <Vacio icono="bag" titulo="No tienes pedidos activos." pista="Cuando hagas un pedido, aquí verás su avance hasta que llegue."
+          accion={<button type="button" className="btn" onClick={() => setScreen('catalogo')} data-testid="mis-pedidos-ir-catalogo">Ir al catálogo</button>} />
       ) : (
         active.map((o) => (
           <OrderCard

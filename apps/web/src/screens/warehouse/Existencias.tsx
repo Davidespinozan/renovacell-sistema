@@ -8,7 +8,7 @@ import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
-import { daysUntil, severity, sevPill, sevLabel } from './expiry'
+import { daysUntil, severity, sevPill, etiquetaCaducidad } from './expiry'
 import { MermaModal } from './MermaModal'
 import { AjusteModal } from './AjusteModal'
 import type { Lot, ProductSafe } from '../../data/types'
@@ -88,10 +88,14 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
             {product.name}{' '}
             <span className={'ltag ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</span>
           </div>
-          <div style={{ textAlign: 'right', fontSize: 12 }}>
-            <div style={{ fontWeight: 600 }} title="Todo el inventario, incluido lo caducado">Física: {fisica}</div>
-            <div style={{ color: 'var(--green-deep)' }} title="No caducado (lo que se puede vender)">Disponible: {disponible}</div>
-            {caducado > 0 && <div style={{ color: 'var(--danger)' }} title="Caducado: existe físicamente pero NO es vendible">Caducado: {caducado}</div>}
+          {/* Una cifra que manda (lo disponible para venta) y el desglose como subtítulo: antes "Física/Disponible"
+              competían arriba a la derecha y la cantidad del lote flotaba a media fila. */}
+          <div className="inv-tot">
+            <div className="inv-tot-n" title="No caducado (lo que se puede vender)">{disponible} {disponible === 1 ? 'pza' : 'pzas'}</div>
+            <div className="inv-tot-d">
+              <span title="Todo el inventario, incluido lo caducado">{disponible === 1 ? 'disponible' : 'disponibles'} · física {fisica}</span>
+              {caducado > 0 && <span className="inv-tot-cad" title="Caducado: existe físicamente pero NO es vendible"> · caducado {caducado}</span>}
+            </div>
           </div>
         </div>
         {lots.map((l) => {
@@ -104,15 +108,18 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
                 <span className="fefo"><Icon name="check" /> Usar primero</span>
               )}
               <span style={{ color: 'var(--ink-3)' }}>{fmtDate(l.expiry_date ?? '')}</span>
-              <span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span>
+              <span className={'pill ' + sevPill(sev)}>{etiquetaCaducidad(d, l.expiry_date)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
               <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
-              <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)" style={{ marginLeft: 'auto' }}
-                onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}>Ajustar</button>
-              {l.quantity > 0 && (
-                <button className="btn ghost sm" type="button" title="Dar de baja por merma (parcial o total)" style={{ color: 'var(--danger)' }}
-                  onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}>Merma</button>
-              )}
+              {/* Ajustar y Merma pesan igual (fantasma); solo el ícono de Merma va en rojo para avisar que da de baja. */}
+              <span className="inv-acc">
+                <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)"
+                  onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="edit" /> Ajustar</button>
+                {l.quantity > 0 && (
+                  <button className="btn ghost sm inv-merma" type="button" title="Dar de baja por merma (parcial o total)"
+                    onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="trash" /> Merma</button>
+                )}
+              </span>
             </div>
           )
         })}

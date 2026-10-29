@@ -9,6 +9,7 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
+import { Vacio, Cargando } from '../../app/EmptyState'
 import { fmtDate } from '../../lib/format'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { useStockReturns } from '../../data/hooks/useStockReturns'
@@ -65,8 +66,8 @@ function Disposicion() {
     })
     return [...m.values()]
   }, [returns])
-  if (loading) return <div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>
-  if (groups.length === 0) return <div className="card" style={{ color: 'var(--ink-3)' }}>No hay devoluciones pendientes de disposición.</div>
+  if (loading) return <Cargando filas={2} />
+  if (groups.length === 0) return <div className="pa-vacio-c"><Vacio icono="check" titulo="No hay devoluciones pendientes" pista="Cuando regrese mercancía, aquí decides si vuelve al almacén o se da de baja." /></div>
   return <>{groups.map((g) => <DisposicionCard key={g.ret.id} ret={g.ret} lines={g.lines} />)}</>
 }
 
@@ -140,7 +141,7 @@ function Conciliacion() {
         <div style={{ marginTop: 12 }}>
           <div className="sysnote" style={errores.length ? { background: 'var(--danger-bg)', color: 'var(--danger)' } : undefined}>
             <Icon name={errores.length ? 'x' : 'check'} />
-            <span>{errores.length === 0 ? '0 diferencias: la existencia de cada lote cuadra con su kardex.' : `${errores.length} diferencia(s) de inventario. Revísalas antes de operar.`}</span>
+            <span>{errores.length === 0 ? '0 diferencias: la existencia de cada lote cuadra con su kardex.' : `${errores.length} ${errores.length === 1 ? 'diferencia' : 'diferencias'} de inventario. Revísalas antes de operar.`}</span>
           </div>
           {[...errores, ...otros].length > 0 && (
             <table className="tbl-cards" style={{ marginTop: 10 }}>

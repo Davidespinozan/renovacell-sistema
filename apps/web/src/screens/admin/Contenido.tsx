@@ -396,7 +396,7 @@ function LandingTab() {
 
       <SecCard title="Marca y menú">
         <div className="form-grid-2">
-          <T label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} hint="Admite HTML, p. ej. RENOVACELL<sup>®</sup>" />
+          <T label="Nombre" value={draft.brand.name} onChange={(v) => upSec('brand', { name: v })} hint="Las etiquetas <sup>…</sup> hacen que el ® se vea pequeño y arriba en la página; déjalas como están." />
           <T label="Bajada" value={draft.brand.tagline} onChange={(v) => upSec('brand', { tagline: v })} />
         </div>
         <ImageField label="Isotipo (ícono de marca)" value={draft.brand.logoUrl} onChange={(v) => upSec('brand', { logoUrl: v })} folder="landing" ratio="1 / 1"
@@ -568,15 +568,17 @@ function LandingTab() {
         <A label="Descripción" value={draft.seo.description} onChange={(v) => upSec('seo', { description: v })} />
       </SecCard>
 
-      <div className="card" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Barra de guardar pegajosa: la posición y el alto libre sobre la barra inferior del
+          teléfono viven en pulido-admin.css (.pa-savebar); en línea quedaba detrás de ella. */}
+      <div className="card pa-savebar">
         <button className="btn ghost sm" type="button" onClick={() => { setDraft(resetLanding()); setSaved(false) }}>
           <RotateCcw size={14} /> Restaurar
         </button>
-        <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Los cambios se ven en la página pública al recargarla.</span>
+        <span className="pa-savebar-hint">Los cambios se ven en la página pública al recargarla.</span>
+        {saved && <span className="pa-savebar-ok">Guardado ✓</span>}
         <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={() => { saveLanding(draft); setSaved(true) }}>
           Guardar y publicar
         </button>
-        {saved && <span style={{ fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}>Guardado ✓</span>}
       </div>
     </div>
   )

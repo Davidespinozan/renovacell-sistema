@@ -103,7 +103,7 @@ describe('el resultado de un envío se desglosa', () => {
     mocks.despacharMensajes.mockResolvedValueOnce({ ok: true, procesados: 3, enviado: 1, fallido: 1, incierto: 1 })
     render(<Comunicaciones />)
     fireEvent.click(await screen.findByText('Enviar pendientes'))
-    expect(await screen.findByText('Se procesaron 3: 1 enviado(s), 1 sin confirmar, 1 no enviado(s).')).toBeInTheDocument()
+    expect(await screen.findByText('Se procesaron 3: 1 enviado, 1 sin confirmar, 1 no enviado.')).toBeInTheDocument()
   })
 
   it('después de enviar se relee el buzón del servidor', async () => {

@@ -43,6 +43,33 @@ function direccionCorta(p: PedidoAgendado): string {
   return [d.line1, d.colonia, d.cp ? `C.P. ${d.cp}` : null, d.city].filter(Boolean).join(', ')
 }
 
+// Teléfono legible para marcar: 10 dígitos de México como "667 123 4567" (quita +52/52 delante); otro largo, tal cual.
+function telLegible(t: string): string {
+  const d = t.replace(/\D/g, '')
+  const diez = d.length === 12 && d.startsWith('52') ? d.slice(2) : d
+  return diez.length === 10 ? `${diez.slice(0, 3)} ${diez.slice(3, 6)} ${diez.slice(6)}` : t
+}
+
+// No hay ícono de teléfono en app/icons (no es de esta pantalla); trazo propio con el mismo grosor.
+const IcoTel = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
+  </svg>
+)
+
+type Bloque = { tipo: 'slot'; slot: SlotAgenda } | { tipo: 'libres'; slots: SlotAgenda[] }
+/** Junta los horarios libres consecutivos en un solo bloque: la agenda muestra lo ocupado, no 16 filas de "libre". */
+function agrupar(slots: SlotAgenda[]): Bloque[] {
+  const out: Bloque[] = []
+  for (const s of slots) {
+    const prev = out[out.length - 1]
+    if (s.pedidos.length > 0) out.push({ tipo: 'slot', slot: s })
+    else if (prev && prev.tipo === 'libres') prev.slots.push(s)
+    else out.push({ tipo: 'libres', slots: [s] })
+  }
+  return out
+}
+
 function Reprogramar({ pedido, actual, onListo, onCancelar, reprogramar = reprogramarHorarioEntrega, cargarHorarios }: {
   pedido: PedidoAgendado; actual: HorarioElegido; onListo: (msg: string) => void; onCancelar: () => void
   reprogramar?: typeof reprogramarHorarioEntrega; cargarHorarios?: React.ComponentProps<typeof HorarioEntregaPicker>['cargar']
@@ -82,25 +109,31 @@ function Slot({ dia, slot, puedeReprogramar, abierto, onAbrir, onCerrar, onListo
 }) {
   const libre = slot.pedidos.length === 0
   const lleno = slot.pedidos.length >= slot.cupo
+  // Los libres llegan agrupados (agrupar); la píldora solo marca ocupación, con mayúscula inicial.
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(96px, 110px) 1fr', gap: 10, padding: '10px 0', borderTop: '1px solid var(--line)' }} data-testid={`agenda-${dia.fecha}-${slot.inicio}`}>
       <div>
         <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>{slot.inicio}–{slot.fin}</div>
-        <span className={'pill ' + (libre ? 'p-neu' : lleno ? 'p-ok' : 'p-warn')} style={{ marginTop: 4 }}>{libre ? 'libre' : lleno ? (slot.cupo > 1 ? `lleno · ${slot.pedidos.length}` : 'ocupado') : `${slot.pedidos.length} de ${slot.cupo}`}</span>
+        {!libre && <span className={'pill ' + (lleno ? 'p-ok' : 'p-warn')} style={{ marginTop: 4 }}>{lleno ? (slot.cupo > 1 ? `Lleno · ${slot.pedidos.length}` : 'Ocupado') : `${slot.pedidos.length} de ${slot.cupo}`}</span>}
       </div>
       <div style={{ display: 'grid', gap: 8 }}>
         {libre && <span style={{ fontSize: 12.5, color: 'var(--ink-3)', alignSelf: 'center' }}>Nadie agendado.</span>}
-        {slot.pedidos.map((p) => (
+        {slot.pedidos.map((p) => {
+          // Si el envío dice lo mismo que el pedido ("Entregado" y "Entregado · Manuel"), una sola píldora con el chofer.
+          const ep = ESTADO_PEDIDO[p.estado_pedido ?? ''] ?? p.estado_pedido ?? ''
+          const ee = p.envio_estado ? ESTADO_ENVIO[p.envio_estado] ?? p.envio_estado : null
+          const mismo = ee != null && ee === ep
+          return (
           <div key={p.order_id} style={{ fontSize: 13 }} data-testid={`agenda-pedido-${p.order_id}`}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="mono" style={{ fontWeight: 700 }}>{p.folio ?? '—'}</span>
               <b>{p.cliente}</b>
-              <span className={'pill ' + (p.estado_pedido === 'cancelled' ? 'p-dang' : p.estado_pedido === 'shipped' || p.estado_pedido === 'delivered' ? 'p-ok' : p.pagado ? 'p-neu' : 'p-warn')}>{ESTADO_PEDIDO[p.estado_pedido ?? ''] ?? p.estado_pedido ?? ''}{!p.pagado && p.estado_pedido !== 'cancelled' && p.estado_pedido !== 'delivered' ? ' · sin pagar' : ''}</span>
-              {p.envio_estado && <span className="pill p-neu">{ESTADO_ENVIO[p.envio_estado] ?? p.envio_estado}{p.chofer ? ` · ${p.chofer}` : ''}</span>}
+              <span className={'pill ' + (p.estado_pedido === 'cancelled' ? 'p-dang' : p.estado_pedido === 'shipped' || p.estado_pedido === 'delivered' ? 'p-ok' : p.pagado ? 'p-neu' : 'p-warn')}>{ep}{!p.pagado && p.estado_pedido !== 'cancelled' && p.estado_pedido !== 'delivered' ? ' · sin pagar' : ''}{mismo && p.chofer ? ` · ${p.chofer}` : ''}</span>
+              {ee && !mismo && <span className="pill p-neu">{ee}{p.chofer ? ` · ${p.chofer}` : ''}</span>}
             </div>
             <div style={{ color: 'var(--ink-2)', marginTop: 2 }}>{direccionCorta(p)}{p.direccion?.refs ? ` · Ref.: ${p.direccion.refs}` : ''}</div>
             <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              {p.telefono ? <a href={`tel:${p.telefono}`} className="tap-link" style={{ color: 'var(--green-deep)', fontWeight: 600 }}>Tel: {p.telefono}</a> : <span>Sin teléfono</span>}
+              {p.telefono ? <a href={`tel:${p.telefono}`} className="tap-link pp-tel" aria-label={`Llamar al ${telLegible(p.telefono)}`}><IcoTel /> {telLegible(p.telefono)}</a> : <span>Sin teléfono</span>}
               {p.flete ? <span>Flete {money(p.flete)}</span> : <span>Flete gratis</span>}
               {puedeReprogramar && p.estado_pedido !== 'cancelled' && p.estado_pedido !== 'delivered' && abierto !== p.order_id && (
                 <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => onAbrir(p.order_id)} data-testid={`agenda-cambiar-${p.order_id}`}><Icon name="clock" /> Cambiar horario</button>
@@ -108,7 +141,8 @@ function Slot({ dia, slot, puedeReprogramar, abierto, onAbrir, onCerrar, onListo
             </div>
             {abierto === p.order_id && <Reprogramar pedido={p} actual={{ fecha: dia.fecha, inicio: slot.inicio }} onListo={onListo} onCancelar={onCerrar} reprogramar={reprogramar} cargarHorarios={cargarHorarios} />}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -134,7 +168,7 @@ export function AgendaEntregas({ cargar = agendaEntregasLocales, reprogramar = r
 
   return (
     <div className="grid" style={{ gap: 14 }} data-testid="agenda-entregas">
-      {!sinTitulo && <PageHead title="Horarios de entrega">Entregas locales por chofer, agendadas en bloques de media hora. {puedeReprogramar ? 'Puedes mover una entrega a otro horario con motivo.' : 'Lo que ves aquí es lo que se prometió al cliente.'}</PageHead>}
+      {!sinTitulo && <PageHead title="Horarios de entrega">{puedeReprogramar ? 'Las entregas locales de cada día, por horario. Si hace falta, mueve una a otro horario.' : 'Las entregas locales de cada día, por horario, tal como se le prometieron al cliente.'}</PageHead>}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="btn ghost sm" onClick={() => { setDesde(sumarDias(desde, -7)); setDiaSel(null) }} aria-label="Semana anterior" data-testid="agenda-prev"><Icon name="chevronLeft" /></button>
         <b style={{ fontSize: 13.5 }}>{fechaCorta(desde)} – {fechaCorta(hasta)}</b>
@@ -164,11 +198,16 @@ export function AgendaEntregas({ cargar = agendaEntregasLocales, reprogramar = r
           <div className="card" data-testid={`agenda-dia-panel-${dia.fecha}`}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
               <h4 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, textTransform: 'capitalize' }}>{dia.hoy ? 'Hoy · ' : ''}{fechaCorta(dia.fecha)}</h4>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{dia.entregas} entrega{dia.entregas === 1 ? '' : 's'} · {dia.slots.length} horarios</span>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{dia.entregas} entrega{dia.entregas === 1 ? '' : 's'} · {dia.slots.length} {dia.slots.length === 1 ? 'horario' : 'horarios'}</span>
             </div>
             {dia.slots.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Ese día no hay horarios configurados.</div>}
-            {dia.slots.map((s) => (
-              <Slot key={s.inicio} dia={dia} slot={s} puedeReprogramar={puedeReprogramar} abierto={abierto} onAbrir={setAbierto} onCerrar={() => setAbierto(null)} onListo={avisar} reprogramar={reprogramar} cargarHorarios={cargarHorarios} />
+            {agrupar(dia.slots).map((b) => b.tipo === 'slot' ? (
+              <Slot key={b.slot.inicio} dia={dia} slot={b.slot} puedeReprogramar={puedeReprogramar} abierto={abierto} onAbrir={setAbierto} onCerrar={() => setAbierto(null)} onListo={avisar} reprogramar={reprogramar} cargarHorarios={cargarHorarios} />
+            ) : (
+              <div key={b.slots[0].inicio} className="pp-libres" data-testid={`agenda-libres-${dia.fecha}-${b.slots[0].inicio}`}>
+                <span className="mono">{b.slots[0].inicio}–{b.slots[b.slots.length - 1].fin}</span>
+                <span>{b.slots.length === 1 ? 'Horario libre' : `${b.slots.length} horarios libres`}</span>
+              </div>
             ))}
           </div>
         </>

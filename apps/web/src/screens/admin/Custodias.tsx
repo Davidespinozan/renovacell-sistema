@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Box, ShieldCheck, AlertTriangle, RefreshCw } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
+import { Vacio, Cargando } from '../../app/EmptyState'
 import { useUsers } from '../../data/hooks/useUsers'
 import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
 import { saldoDe } from '../../data/store/custodyStore'
@@ -73,8 +74,8 @@ export function Custodias() {
           </button>
         </div>
         <div style={{ padding: '10px 14px 14px' }}>
-          {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
-            : custodias.length === 0 ? <div style={{ color: 'var(--ink-3)' }}>Todavía no hay custodias.</div>
+          {loading ? <Cargando plano filas={2} />
+            : custodias.length === 0 ? <div className="pa-vacio-c"><Vacio plano icono="box" titulo="Todavía no hay custodias" pista="Cuando se entregue producto en custodia, aparecerá aquí con su saldo." /></div>
               : (
                 <table className="tbl-cards">
                   <thead>

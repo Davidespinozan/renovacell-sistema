@@ -37,6 +37,6 @@ describe('Enlace de contacto (Dirección)', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://renovacell.mx/contacto'))
     expect(decodeURIComponent((screen.getByTestId('compartir-enlace-whatsapp') as HTMLAnchorElement).href)).toMatch(/Chatea con un asesor: https:\/\/renovacell\.mx\/contacto$/)
     expect(bandejaSrc).toMatch(/<div className="bq-head">[\s\S]{0,400}<EnlaceContactoBotones \/>/)
-    expect(asesoriasSrc).toMatch(/Conversaciones con clientes<\/h2>[\s\S]{0,300}<EnlaceContactoBotones \/>/)
+    expect(asesoriasSrc).toMatch(/Conversaciones con clientes<\/h2>[\s\S]{0,1200}<EnlaceContactoBotones \/>/)
   })
 })

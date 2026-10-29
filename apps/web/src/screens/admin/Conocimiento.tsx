@@ -10,6 +10,9 @@ const sutil: React.CSSProperties = { fontSize: 12, color: 'var(--ink-3, #667)' }
 const COLOR_ESTADO: Record<string, string> = { draft: '#b45309', approved: '#15803d', retired: '#6b7280' }
 const ETIQUETA_ESTADO: Record<string, string> = { draft: 'Borrador', approved: 'Aprobada', retired: 'Retirada' }
 const etiquetaSeccion = (k: string) => SECCIONES.find((s) => s.key === k)?.label ?? k
+// Los niveles T0/T1/T2 son el contrato interno (fuente y habilitación); en pantalla se leen en humano.
+const ETIQUETA_NIVEL: Record<string, string> = { T0: 'General', T1: 'Técnico', T2: 'Clínico' }
+const nivelHumano = (n?: string) => (n ? ETIQUETA_NIVEL[n] ?? n : '')
 
 export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: ClienteConocimiento }) {
   const [cobertura, setCobertura] = useState<Cobertura[]>([])
@@ -55,7 +58,7 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
   }
   const aprobar = async (v: Version) => {
     let confirmar = false
-    if (v.nivel === 'T2') { confirmar = window.confirm('Contenido clínico/regulatorio (T2). ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?'); if (!confirmar) return }
+    if (v.nivel === 'T2') { confirmar = window.confirm('Contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?'); if (!confirmar) return }
     const r = await cliente.aprobar(v.id, confirmar)
     if (!r.ok) { setError(r.error); return }
     setError(null); setAviso(`Aprobada ${etiquetaSeccion(v.seccion)} v${v.version}${r.data.retirada ? ' (la versión anterior quedó retirada)' : ''}.`); await refrescar()
@@ -76,9 +79,9 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
   }
   const cambiarT2 = async () => {
     const siguiente = !t2
-    if (siguiente && !window.confirm('Habilitar T2 permite aprobar y servir contenido clínico/regulatorio a doctores verificados. ¿Dirección lo autoriza?')) return
+    if (siguiente && !window.confirm('Permitir información clínica deja aprobar y servir contenido clínico/regulatorio a doctores verificados. ¿Dirección lo autoriza?')) return
     const r = await cliente.configurarT2(siguiente); if (!r.ok) { setError(r.error); return }
-    setT2(r.data); setAviso(r.data ? 'T2 habilitado.' : 'T2 bloqueado.')
+    setT2(r.data); setAviso(r.data ? 'Información clínica permitida.' : 'Información clínica bloqueada.')
   }
   const registrarFuente = async () => {
     if (!nuevaFuente?.referencia.trim()) return
@@ -100,8 +103,8 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
           <p style={{ margin: 0, ...sutil }}>Lo que la IA y el equipo pueden afirmar de cada producto: por sección, con versión, fuente y aprobación de Dirección. Precio, existencias y fiscal viven en sus propias pantallas.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ ...sutil, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={t2} onChange={cambiarT2} data-testid="t2-switch" /> Contenido clínico (T2) habilitado</label>
-          <button type="button" className="btn" onClick={importar} data-testid="btn-importar">Importar lo existente como borrador</button>
+          <label style={{ ...sutil, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={t2} onChange={cambiarT2} data-testid="t2-switch" /> Permitir información clínica para doctores verificados</label>
+          <button type="button" className="btn ghost sm" onClick={importar} data-testid="btn-importar">Importar lo existente como borrador</button>
         </div>
       </div>
       {error && <div role="alert" style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>{error}</div>}
@@ -120,8 +123,8 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 560, overflow: 'auto' }}>
             {lista.map((c) => (
               <li key={c.product_id}>
-                <button type="button" onClick={() => void abrir(c)} data-testid="producto-item" style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 10, border: '1px solid ' + (sel?.product_id === c.product_id ? 'var(--accent, #2563eb)' : 'var(--line, #e5e7eb)'), background: 'var(--card, #fff)', cursor: 'pointer' }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{c.nombre}{c.es_padre ? ' · familia' : ''}</div>
+                <button type="button" onClick={() => void abrir(c)} data-testid="producto-item" style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 10, border: '1px solid ' + (sel?.product_id === c.product_id ? 'var(--green)' : 'var(--line, #e5e7eb)'), background: 'var(--card, #fff)', cursor: 'pointer' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{c.nombre}{c.es_padre ? ' · con varias presentaciones' : ''}</div>
                   <div style={sutil}>{[c.categoria, c.familia].filter(Boolean).join(' · ')} — {c.aprobadas.length} aprobadas{c.borradores.length ? `, ${c.borradores.length} borrador${c.borradores.length > 1 ? 'es' : ''}` : ''}</div>
                 </button>
               </li>
@@ -133,17 +136,17 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
           <section data-testid="detalle">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <h3 style={{ margin: 0 }}>{sel.nombre}</h3>
-              <button type="button" className="btn" onClick={() => { setSel(null); setEditor(null) }}>Cerrar</button>
+              <button type="button" className="btn ghost sm" onClick={() => { setSel(null); setEditor(null) }}>Cerrar</button>
             </div>
-            <div style={{ ...sutil, margin: '4px 0 12px' }}>Faltan T0: {(sel.faltantes_t0 ?? []).map(etiquetaSeccion).join(', ') || 'nada'} · Faltan T1: {(sel.faltantes_t1 ?? []).map(etiquetaSeccion).join(', ') || 'nada'}</div>
+            <div style={{ ...sutil, margin: '4px 0 12px' }}>Falta lo general: {(sel.faltantes_t0 ?? []).map(etiquetaSeccion).join(', ') || 'nada'} · Falta lo técnico: {(sel.faltantes_t1 ?? []).map(etiquetaSeccion).join(', ') || 'nada'}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              {SECCIONES.map((s) => <button key={s.key} type="button" className="btn" style={{ fontSize: 12 }} onClick={() => nuevaSeccion(s.key)} data-testid={`nueva-${s.key}`}>+ {s.label} <span style={sutil}>{s.nivel}</span></button>)}
+              {SECCIONES.map((s) => <button key={s.key} type="button" className="btn ghost sm" onClick={() => nuevaSeccion(s.key)} data-testid={`nueva-${s.key}`}>+ {s.label} <span style={sutil}>{nivelHumano(s.nivel)}</span></button>)}
             </div>
 
             {editor && (
               <div style={{ border: '1px solid var(--line, #e5e7eb)', borderRadius: 12, padding: 12, marginBottom: 12 }} data-testid="editor">
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                  <strong>{editor.id ? 'Editar borrador' : 'Nueva versión'} · {etiquetaSeccion(editor.seccion)}</strong><span style={sutil}>{nivelEditor}{nivelEditor !== 'T0' ? ' · exige fuente' : ''}{nivelEditor === 'T2' ? ' · requiere T2 habilitado' : ''}</span>
+                  <strong>{editor.id ? 'Editar borrador' : 'Nueva versión'} · {etiquetaSeccion(editor.seccion)}</strong><span style={sutil}>{nivelHumano(nivelEditor)}{nivelEditor !== 'T0' ? ' · exige fuente' : ''}{nivelEditor === 'T2' ? ' · requiere permitir información clínica' : ''}</span>
                 </div>
                 <textarea style={{ ...input, minHeight: 120 }} maxLength={4000} value={editor.contenido} onChange={(e) => setEditor({ ...editor, contenido: e.target.value })} placeholder="Texto que Renovacell puede afirmar. Sin precios, sin existencias, sin promesas." data-testid="editor-contenido" />
                 <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -151,9 +154,9 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
                     <option value="">Sin fuente</option>
                     {fuentes.map((f) => <option key={f.id} value={f.id}>{f.tipo} · {f.referencia}{f.version ? ` (${f.version})` : ''}</option>)}
                   </select>
-                  <button type="button" className="btn" onClick={() => setNuevaFuente({ tipo: 'fabricante', referencia: '', documento_url: '', version: '' })}>+ Fuente</button>
+                  <button type="button" className="btn ghost sm" onClick={() => setNuevaFuente({ tipo: 'fabricante', referencia: '', documento_url: '', version: '' })}>+ Fuente</button>
                   <button type="button" className="btn btn-primary" onClick={guardar} disabled={!editor.contenido.trim()} data-testid="btn-guardar">Guardar borrador</button>
-                  <button type="button" className="btn" onClick={() => setEditor(null)}>Cancelar</button>
+                  <button type="button" className="btn ghost sm" onClick={() => setEditor(null)}>Cancelar</button>
                 </div>
                 {nuevaFuente && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto auto', gap: 8, marginTop: 8, alignItems: 'center' }}>
@@ -177,11 +180,11 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
               {versiones.map((v) => (
                 <li key={v.id} style={{ border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, padding: '10px 12px' }} data-testid="version-item">
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-                    <div><strong>{etiquetaSeccion(v.seccion)}</strong> <span style={sutil}>{v.nivel} · v{v.version}</span> <span style={{ fontSize: 12, fontWeight: 600, color: COLOR_ESTADO[v.estado] }}>{ETIQUETA_ESTADO[v.estado]}</span></div>
+                    <div><strong>{etiquetaSeccion(v.seccion)}</strong> <span style={sutil}>{nivelHumano(v.nivel)} · v{v.version}</span> <span style={{ fontSize: 12, fontWeight: 600, color: COLOR_ESTADO[v.estado] }}>{ETIQUETA_ESTADO[v.estado]}</span></div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {v.estado === 'draft' && <><button type="button" className="btn" onClick={() => editarVersion(v)}>Editar</button><button type="button" className="btn btn-primary" onClick={() => void aprobar(v)} data-testid="btn-aprobar">Aprobar</button></>}
-                      {v.estado === 'approved' && <button type="button" className="btn" onClick={() => void retirar(v)}>Retirar</button>}
-                      {v.estado === 'retired' && <button type="button" className="btn" onClick={() => void restaurar(v)}>Restaurar como borrador</button>}
+                      {v.estado === 'draft' && <><button type="button" className="btn ghost sm" onClick={() => editarVersion(v)}>Editar</button><button type="button" className="btn ghost sm" onClick={() => void aprobar(v)} data-testid="btn-aprobar">Aprobar</button></>}
+                      {v.estado === 'approved' && <button type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={() => void retirar(v)}>Retirar</button>}
+                      {v.estado === 'retired' && <button type="button" className="btn ghost sm" onClick={() => void restaurar(v)}>Restaurar como borrador</button>}
                     </div>
                   </div>
                   <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', fontSize: 14 }}>{v.contenido}</div>

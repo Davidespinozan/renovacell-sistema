@@ -6,6 +6,9 @@
 @import './styles/home.css';
 @import '@renovacell/ui/responsive.css';
 @import './styles/mobile.css';
+@import './styles/pulido-portal.css';
+@import './styles/pulido-admin.css';
+@import './styles/pulido-operacion.css';
 
 @tailwind base;
 @tailwind components;

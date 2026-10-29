@@ -22,6 +22,7 @@ import { esteMes, mesPasado, ultimosDias, todoElHistorico, periodoAnterior, enPe
 import { cifra, AvisoKpi } from '../../app/Kpi'
 import type { ProductSafe, Profile } from '../../data/types'
 import { VentasDetalle } from './VentasDetalle'
+import { Vacio } from '../../app/EmptyState'
 import { SolicitudesCancelacionPendientes } from '../../app/Cancelacion'   // CANCELACIÓN · lo que piden cancelar
 
 const GREEN = '#007311'
@@ -45,7 +46,7 @@ export function Ventas() {
   return (
     <div className="grid" style={{ gap: 18 }}>
       <div>
-        <div className="eyebrow" style={{ marginBottom: 0 }}>Administración · Ventas</div>
+        <div className="eyebrow crumb" style={{ marginBottom: 0 }}>Administración · Ventas</div>
       </div>
       <SolicitudesCancelacionPendientes />
       <div className="fchips">
@@ -181,7 +182,7 @@ function VentasResumen() {
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Retención y recompra</h2>
         <Bloque titulo={<><AlertTriangle size={14} style={ic} /> Doctores en riesgo · {DIAS_RIESGO} días o más sin pedir</>}>
           {risk.length === 0 ? (
-            <div style={{ fontSize: 13.5, color: 'var(--ink-3)' }}>Ningún doctor verificado con compras lleva {DIAS_RIESGO} días o más sin pedir. 🎉</div>
+            <div className="pa-vacio-c"><Vacio plano icono="check" titulo="Ningún doctor en riesgo" pista={`Ningún doctor verificado con compras lleva ${DIAS_RIESGO} días o más sin pedir.`} /></div>
           ) : (
             <table className="tbl-cards">
               <thead><tr><th>Doctor</th><th>Último pedido</th><th>Histórico</th></tr></thead>

@@ -20,6 +20,7 @@ import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
+import { Vacio } from '../../app/EmptyState'
 import { usarFotoComoIne } from '../../data/ops/verificacion'
 import type { DoctorPendiente } from '../../data/ops/verificacion'
 import type { Mensaje } from '../../data/ops/chat'
@@ -150,18 +151,28 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
 
   return (
     <div className="card" data-testid="asesorias">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-        <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
-        <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><BotonAvisos className="btn ghost sm" /></span>
-        <EnlaceContactoBotones />
+      {/* Encabezado en dos bloques: título + descripción a la izquierda y UNA fila de acciones a la
+          derecha (avisos + enlace de contacto). Antes "Activar avisos" quedaba suelto al centro por el
+          space-between de tres hijos. En teléfono se apila: título, descripción y luego las acciones. */}
+      <div className="ases-head">
+        <div className="ases-head-txt">
+          <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
+          <p>
+            {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Conversaciones → Solicitudes.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
+          </p>
+        </div>
+        <div className="ases-head-acc">
+          <BotonAvisos className="btn ghost sm" />
+          <EnlaceContactoBotones />
+        </div>
       </div>
-      <p style={{ margin: '0 0 12px', color: 'var(--ink-3, #667)', fontSize: 13 }}>
-        {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Conversaciones → Solicitudes.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
-      </p>
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {cargando && <div style={{ color: 'var(--ink-3, #667)' }}>Cargando…</div>}
-      {!cargando && cola.length === 0 && !error && <div style={{ color: 'var(--ink-3, #667)' }}>No hay conversaciones esperando asesor.</div>}
+      {!cargando && cola.length === 0 && !error && (
+        <div className="op-vacio"><Vacio plano icono="chat" titulo="No hay conversaciones esperando asesor."
+          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí.'} /></div>
+      )}
       {esDireccion && <Seccion titulo={`Sin vendedor (${sinAsignar.length})`} items={sinAsignar} llegada={llegada} accion={(c) => (
         <div style={{ display: 'flex', gap: 6 }}>
           {onAtencion && <button type="button" className="btn btn-primary" onClick={onAtencion} data-testid="btn-asignar">Asignar vendedor</button>}

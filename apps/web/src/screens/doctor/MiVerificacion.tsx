@@ -5,11 +5,12 @@ import { useRole } from '../../auth/RoleContext'
 import { completarVerificacion as completarPorDefecto, miVerificacion as leerPorDefecto, reducirFoto, type MiVerificacion as Estado } from '../../data/ops/verificacion'
 import { textoFaltan } from './AvisoVerificacion'
 import { FotoIne } from '../../app/FotoIne'
+import { Icon } from '../../app/icons'
 
 const ESTADO: Record<string, string> = { pending: 'En revisión', verified: 'Verificada', rejected: 'No aprobada', revoked: 'Acceso retirado' }
 
 export function MiVerificacion({ leer = leerPorDefecto, completar = completarPorDefecto, reducir = reducirFoto }: { leer?: typeof leerPorDefecto; completar?: typeof completarPorDefecto; reducir?: typeof reducirFoto }) {
-  const { actualizarVerificacion } = useRole()
+  const { actualizarVerificacion, setScreen } = useRole()
   const [v, setV] = useState<Estado | null>(null)
   const [cedula, setCedula] = useState(''); const [frente, setFrente] = useState<string | null>(null); const [reverso, setReverso] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [enviando, setEnviando] = useState(false)
@@ -25,7 +26,15 @@ export function MiVerificacion({ leer = leerPorDefecto, completar = completarPor
     setFrente(null); setReverso(null); setMsg({ ok: true, texto: 'Listo: lo revisaremos y te avisaremos aquí.' }); await cargar()
   }
   if (!v) return <div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>
-  if (v.verificado) return <div className="card" data-testid="mi-verificacion-ok"><b>Tu cuenta está verificada.</b> Ya puedes ver precios y hacer pedidos.</div>
+  // Verificada: bloque de éxito con salida directa al catálogo (antes era una frase suelta sin acción).
+  if (v.verificado) return (
+    <div className="card pp-verif-ok" data-testid="mi-verificacion-ok">
+      <span className="pp-verif-ic" aria-hidden="true"><Icon name="check" /></span>
+      <div className="pp-verif-t">Cuenta verificada</div>
+      <div className="pp-verif-d">Ya puedes ver precios y hacer pedidos.</div>
+      <button type="button" className="btn" onClick={() => setScreen('catalogo')} data-testid="mi-verificacion-ver-catalogo">Ver catálogo</button>
+    </div>
+  )
   const rechazado = v.estado === 'rejected' || v.estado === 'revoked'
   const campo: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 11, fontFamily: 'inherit', fontSize: 15 }
   return (

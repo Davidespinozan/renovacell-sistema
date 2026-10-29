@@ -80,7 +80,7 @@ export function Doctores() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Administración · Por verificar</div>
+        <div className="eyebrow crumb">Administración · Por verificar</div>
         <ExportButton name="doctores" rows={sorted} style={{ marginLeft: 'auto' }} columns={[
           { key: 'full_name', label: 'Nombre' },
           { key: 'organization', label: 'Consultorio' },
@@ -95,14 +95,14 @@ export function Doctores() {
       {pendientes > 0 && (
         <div className="alert" style={{ cursor: 'default' }}>
           <div className="ico"><Clock size={20} /></div>
-          <div className="x"><b>{pendientes} doctor(es) pendiente(s) de verificar.</b> Revisa su cédula y las fotos de su INE en <b>Revisar / Aprobar</b> (ahí también se vincula su ficha de cliente).</div>
+          <div className="x"><b>{pendientes} {pendientes === 1 ? 'doctor pendiente' : 'doctores pendientes'} de verificar.</b> Revisa su cédula y las fotos de su INE en <b>Revisar / Aprobar</b> (ahí también se vincula su ficha de cliente).</div>
         </div>
       )}
 
       {orphans.length > 0 && (
         <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)', display: 'block' }}>
           <div style={{ fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ScanFace size={15} /> {orphans.length} doctor(es) verificado(s) SIN cliente vinculado
+            <ScanFace size={15} /> {orphans.length} {orphans.length === 1 ? 'doctor verificado' : 'doctores verificados'} SIN cliente vinculado
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 8 }}>
             Están verificados pero no aparecen en <b>Clientes</b> (que se alimenta de clientes). Vincula su ficha comercial para completarlos.

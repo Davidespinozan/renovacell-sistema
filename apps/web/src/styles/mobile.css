@@ -108,3 +108,62 @@ button.taskrow:focus-visible { outline: 2px solid rgba(0, 115, 17, .6); outline-
   /* Botones: mismo alto táctil, texto de 14 */
   .btn { font-size: 14px; }
 }
+
+/* ── PULIDO 29 oct 2026 (auditoría de entrega): reglas transversales, solo presentación ─────────────────────
+   Una sola forma de presentar la pantalla, pestañas compactas, etiquetas sin mayúsculas sostenidas, cifras que no se
+   parten, tarjetas alineadas y sin "costuras" de fondo en teléfono. */
+/* Encabezado de pantalla: tarjeta sobria sin destellos; el texto usa el ancho disponible. */
+.page-h::before, .page-h::after { display: none; }
+.page-h { background: var(--cp-surface); box-shadow: var(--sh-sm); }
+.page-h p { max-width: 96ch; }
+/* Pestañas segmentadas del tamaño de su contenido (no una barra vacía a todo lo ancho). */
+.seg { width: fit-content; align-self: flex-start; justify-self: start; }
+/* Un ícono en el título de sección ya marca la sección: sin la rayita además. */
+.eyebrow:has(svg)::before { display: none; }
+.eyebrow svg { width: 15px; height: 15px; color: var(--green-deep); }
+/* Etiquetas de línea y de lote: mayúscula inicial, tono de la marca (sin azul ni morado). */
+.ltag, .fefo { text-transform: none; letter-spacing: .01em; font-size: 11.5px; font-weight: 600; }
+.ltag.prof { background: var(--ok-bg); color: var(--green-deep); }
+.ltag.cosm { background: var(--cp-slate-100); color: var(--ink-2); }
+.dcat-linea { text-transform: none; letter-spacing: .01em; font-size: 12px; font-weight: 600; }
+.dcat-linea.prof { color: var(--green-deep); }
+.dcat-linea.cosm { color: var(--ink-2); }
+.ptile.cosm { background: radial-gradient(circle at 50% 32%, #F1F3F2, #E2E7E4); }
+.ptile.cosm svg { color: var(--ink-3); }
+/* Folios, SKU y montos en tablas: nunca partidos en dos renglones. */
+td .mono, td.mono { white-space: nowrap; }
+/* Tarjetas de producto (Caja y catálogo): nombre a 2 renglones fijos, precio y botón siempre abajo. */
+.pcard h5 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; margin: 0; }
+.pcard .pb > :last-child { margin-top: auto; }
+.dcat-promo { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* En táctil no hay hover: el borde verde no se queda "pegado" tras tocar. */
+@media (hover: none) { .pcard:hover, .card.sig:hover, .card.clickable:hover { transform: none; border-color: var(--line); box-shadow: var(--sh-card); } }
+/* Indicadores: el valor de texto largo (un nombre, un producto) no se parte a tamaño de cifra. */
+.sig .v { overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  /* Sin costura de fondo: el lienzo en teléfono es plano. */
+  .main { background: var(--hueso); }
+  /* Título de la cabecera en UN renglón con puntos suspensivos (no empuja el logo). */
+  .top .screen-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+}
+/* La miga ("Administración · Tablero") repetía el título y el rol que ya muestra la barra superior. */
+.eyebrow.crumb { display: none; }
+/* Botón redondo (enviar, flechas del calendario): plano como el resto. */
+.iconbtn-round { background: var(--green-deep); box-shadow: 0 1px 2px rgba(11, 18, 32, .12); }
+/* Nota informativa: el texto corre como párrafo (no se parte en columnas por cada negrita). */
+.sysnote > :not(svg) { min-width: 0; }
+.sysnote:not(:has(> svg)) { display: block; }
+@media (max-width: 900px) {
+  .main { min-height: 100vh; min-height: 100dvh; }
+}
+@media (max-width: 640px) {
+  /* Listas dentro de UNA tarjeta: la fila de una tabla-tarjeta dentro de .card es un renglón con divisor, no otra tarjeta. */
+  .card table.tbl-cards tr { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; padding: 6px 0; background: transparent; }
+  .card table.tbl-cards tbody tr:last-child { border-bottom: 0; }
+  table.tbl-cards td:not([data-label]) { justify-content: center; text-align: center; }
+  table.tbl-cards td::before { text-transform: none; letter-spacing: 0; font-size: 12px; }
+  /* Pestañas: una fila deslizable, nunca dos renglones. */
+  .seg { flex-wrap: nowrap !important; max-width: 100%; }
+  /* La cabecera solo lleva el título: el rol es el mismo en todas las pantallas. */
+  .top .screen-sub { display: none; }
+}

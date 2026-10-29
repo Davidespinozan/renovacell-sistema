@@ -79,9 +79,10 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Comercial · Metas y comisiones</div>
+        <div className="eyebrow crumb" style={{ margin: 0 }}>Comercial · Metas y comisiones</div>
         <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{periodo.etiqueta}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Tasas como píldoras junto al periodo (pulido-admin.css · .pa-tasas): son contexto, no acciones grandes. */}
+        <div className="pa-tasas" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {puedeEditar ? <>
             <button className="btn ghost sm" type="button" title="Editar la tasa vigente de Home Care" onClick={() => editarLinea('cosm', rateCosm)}>
               <Percent size={14} /> Home Care: {(rateCosm * 100).toFixed(1)}%
@@ -117,7 +118,7 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
         <div className="card sig"><div className="chip"><Target size={18} /></div><div className="v">{money(est.totales.vendido)}</div><div className="k">Vendido</div><div className="s">pedidos del periodo atribuidos a vendedores</div></div>
         <div className="card sig"><div className="chip"><Receipt size={18} /></div><div className="v">{money(est.totales.cobrado)}</div><div className="k">Cobrado en el periodo</div><div className="s">por fecha de pago, de pedidos con vendedor</div></div>
         <div className="card sig"><div className="chip"><Percent size={18} /></div><div className="v">{money(est.totales.comisionEstimada)}</div><div className="k">Comisión estimada</div><div className="s">sobre lo vendido · tasas de hoy · no es a pagar</div></div>
-        <div className="card sig"><div className="chip"><Trophy size={18} /></div><div className="v">{rows[0] && rows[0].vendido > 0 ? rows[0].nombre.split('·')[0].trim() : '—'}</div><div className="k">Mayor venta del periodo</div><div className="s">{rows[0] && rows[0].vendido > 0 ? money(rows[0].vendido) : 'sin ventas'}</div></div>
+        <div className="card sig"><div className="chip"><Trophy size={18} /></div><div className="v pa-sig-nombre">{rows[0] && rows[0].vendido > 0 ? rows[0].nombre.split('·')[0].trim() : '—'}</div><div className="k">Mayor venta del periodo</div><div className="s">{rows[0] && rows[0].vendido > 0 ? money(rows[0].vendido) : 'sin ventas'}</div></div>
       </div>
 
       <div className="card" style={{ padding: 0 }}>
@@ -145,7 +146,7 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--ink-3)' }}>Ventas sin vendedor registrado (mostrador / autoservicio del doctor):</span>
           <b className="mono">{money(sinVend.vendido)}</b>
-          <span style={{ color: 'var(--ink-3)' }}>· {sinVend.pedidos} pedido(s) · fuera de la estimación</span>
+          <span style={{ color: 'var(--ink-3)' }}>· {sinVend.pedidos} {sinVend.pedidos === 1 ? 'pedido' : 'pedidos'} · fuera de la estimación</span>
         </div>
       )}
     </div>
@@ -180,7 +181,7 @@ function MetaRow({ row, onSetMeta }: { row: Row; onSetMeta: ((v: number) => void
             </span>
             <span className="mono" style={{ fontSize: 12, color: ok ? 'var(--green-deep)' : 'var(--ink-3)' }}>{Math.round(row.avance)}%</span>
           </span>
-        ) : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>sin meta</span>}
+        ) : <span style={{ color: 'var(--ink-3)', opacity: 0.6 }} title="Sin meta asignada">—</span>}
       </td>
       <td data-label="Comisión estimada" className="mono" title="Estimación sobre lo vendido con la tasa vigente. No es una cantidad a pagar."><b>{money(row.comisionEstimada)}</b> <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>est.</span></td>
     </tr>

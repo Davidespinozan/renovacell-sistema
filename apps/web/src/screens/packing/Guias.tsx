@@ -117,7 +117,7 @@ export function Guias() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="eyebrow">Envíos · Guías</div>
+        <div className="eyebrow crumb">Envíos · Guías</div>
         <ExportButton
           name="guias"
           style={{ marginLeft: 'auto' }}

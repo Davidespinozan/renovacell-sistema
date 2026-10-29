@@ -164,7 +164,9 @@ function ShippingLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
   const m = meta as { carrier?: string; tracking?: string; driver?: string; method?: string }
   if (m.method === 'recoge') return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Listo para recoger en sucursal.</div>   // ENT-3
   if (m.driver) {
-    return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Entrega: chofer propio · {m.driver}</div>
+    // Va pegada a la línea de entrega (EntregaLine ya dice tipo y promesa): solo quién la lleva.
+    // "Chofer propio" es jerga interna; el doctor solo necesita el nombre.
+    return <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }} data-testid="pedido-te-entrega">Te entrega: <b style={{ color: 'var(--ink-2)' }}>{m.driver}</b></div>
   }
   if (m.carrier) {
     const url = m.tracking ? trackingUrl(m.carrier, m.tracking) : null

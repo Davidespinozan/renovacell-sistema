@@ -6,7 +6,7 @@
 // equivalencia EXPLÍCITA; no son asignaciones). Ambas carteras vienen del servidor por id, nunca por nombre.
 import { Vacio, Cargando } from './EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
-import { UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { UserCheck, UserX, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from './ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
@@ -90,7 +90,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div className="eyebrow">{title} · Directorio comercial</div>
+        <div className="eyebrow crumb">{title} · Directorio comercial</div>
         {!loading && !error && (
           <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
             {customers.length.toLocaleString('es-MX')} · {conPortal.toLocaleString('es-MX')} con portal
@@ -117,12 +117,15 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
       )}
       {enCartera && EXPLICACION[effectiveScope] && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: -8 }} data-testid="cartera-explicacion">{EXPLICACION[effectiveScope]}</div>}
 
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Buscar por nombre, correo, teléfono, ciudad o vendedor…"
-        style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
-      />
+      <label className="searchbox op-search">
+        <Search aria-hidden />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Buscar cliente"
+          placeholder="Buscar por nombre, correo, teléfono, ciudad o vendedor…"
+        />
+      </label>
 
       {loading ? (
         <Cargando etiqueta="Cargando directorio…" />
@@ -140,9 +143,11 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
         <Vacio icono="search" titulo={<>Ninguno coincide con “{q}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setQ('')}>Limpiar búsqueda</button>} />
       ) : (
         <>
+          {/* Una tarjeta-lista con divisores (no una tarjeta alta por cliente): en 100 renglones por página
+              la lista se recorre de un vistazo y en teléfono no se vuelve una torre de tarjetas. */}
+          <div className="card op-lista">
           {visible.map((c) => (
-            <button key={c.id} type="button" className="card" onClick={() => setDetail(c)}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
+            <button key={c.id} type="button" className="op-fila" onClick={() => setDetail(c)}>
               <div className="avatar" style={{ background: avatarColor(c.full_name || '?') }}>{initials(c.full_name || '?')}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{c.full_name}</div>
@@ -157,6 +162,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
               </span>
             </button>
           ))}
+          </div>
           <Pager pg={pg} onPage={setPage} />
         </>
       )}
@@ -178,7 +184,8 @@ function Pager({ pg, onPage }: { pg: import('../data/ops/customer').Page<Custome
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 4 }}>
       <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-        Mostrando {nf(pg.from)}–{nf(pg.to)} de {nf(pg.total)} · Página {nf(pg.page)} de {nf(pg.totalPages)}
+        {/* "Página 1 de 1" no informa nada: el número de página solo aparece cuando hay más de una. */}
+        Mostrando {nf(pg.from)}–{nf(pg.to)} de {nf(pg.total)}{pg.totalPages > 1 ? ` · Página ${nf(pg.page)} de ${nf(pg.totalPages)}` : ''}
       </div>
       {pg.totalPages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>

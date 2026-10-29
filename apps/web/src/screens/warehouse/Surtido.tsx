@@ -89,7 +89,7 @@ export function Surtido() {
         <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="check" />
           <span style={{ flex: 1 }}>
-            Surtiste <b>{batchResult.ok}</b> pedido(s).{' '}
+            Surtiste <b>{batchResult.ok}</b> {batchResult.ok === 1 ? 'pedido' : 'pedidos'}.{' '}
             {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no se pudieron surtir y quedaron pendientes.</span>}
             {batchResult.errors.map((e) => <span key={e} style={{ display: 'block', fontSize: 12, color: 'var(--danger)' }}>{e}</span>)}
           </span>
@@ -99,7 +99,7 @@ export function Surtido() {
 
       {selIds.length > 0 && (
         <div className="card" style={{ position: 'sticky', top: 74, zIndex: 5, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px', borderColor: 'var(--green-deep)' }}>
-          <span style={{ fontWeight: 600 }}>{selIds.length} seleccionado(s)</span>
+          <span style={{ fontWeight: 600 }}>{selIds.length} {selIds.length === 1 ? 'seleccionado' : 'seleccionados'}</span>
           <span className="mono" style={{ color: 'var(--ink-3)' }}>{selUnits} u</span>
           <button className="btn ghost sm" type="button" onClick={clearSel}>Limpiar</button>
           <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={surtirLote} disabled={batchBusy}>

@@ -7,7 +7,7 @@ import { ExportButton } from '../../app/ExportButton'
 import { fmtDate } from '../../lib/format'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
-import { daysUntil, severity, sevPill, sevLabel } from './expiry'
+import { daysUntil, severity, sevPill, sevLabel, etiquetaCaducidad } from './expiry'
 import { MermaModal } from './MermaModal'
 import type { ProductSafe } from '../../data/types'
 
@@ -45,16 +45,17 @@ export function Caducidades() {
         <div className="alert">
           <div className="ico"><Icon name="clock" /></div>
           <div className="x">
-            <b>{urgent.length} lote(s) necesitan atención.</b> Hay producto caducado o que vence en menos de 60 días. Dale salida o retíralo.
+            <b>{urgent.length === 1 ? '1 lote necesita atención.' : `${urgent.length} lotes necesitan atención.`}</b> Hay producto caducado o que vence en menos de 60 días. Dale salida o retíralo.
           </div>
         </div>
       )}
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '14px 16px 0', display: 'flex' }}>
+        {/* Exportar vive en la fila de encabezado de la tarjeta, junto al conteo, no suelto sobre la tabla. */}
+        <div className="op-cardhead">
+          <div className="eyebrow" style={{ margin: 0 }}>Lotes con existencia <span className="op-cardhead-n">{rows.length}</span></div>
           <ExportButton
             name="por-caducar"
-            style={{ marginLeft: 'auto' }}
             rows={rows.map(({ lot, d }) => ({ producto: byId[lot.product_id]?.name ?? 'Producto', lote: lot.lot_code, caduca: lot.expiry_date, estado: sevLabel(d), cantidad: lot.quantity }))}
             columns={[
               { key: 'producto', label: 'Producto' },
@@ -78,7 +79,7 @@ export function Caducidades() {
                     <td data-label="Producto">{byId[lot.product_id]?.name ?? 'Producto'}</td>
                     <td data-label="Lote"><span className="lc">{lot.lot_code}</span></td>
                     <td data-label="Caducidad">{fmtDate(lot.expiry_date ?? '')}</td>
-                    <td data-label="Estado"><span className={'pill ' + sevPill(sev)}>{sevLabel(d)}</span></td>
+                    <td data-label="Estado"><span className={'pill ' + sevPill(sev)}>{etiquetaCaducidad(d, lot.expiry_date)}</span></td>
                     <td data-label="Cantidad" className="mono">{lot.quantity} {lot.quantity === 1 ? 'pza' : 'pzas'}</td>
                     <td data-label="" style={{ textAlign: 'right' }}>
                       <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setMermaLot({ id: lot.id, lot_code: lot.lot_code, quantity: lot.quantity, producto: byId[lot.product_id]?.name })}>Dar de baja</button>

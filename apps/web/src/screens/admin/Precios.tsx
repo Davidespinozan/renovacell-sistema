@@ -141,8 +141,8 @@ function MayoreoTab({ skus }: { skus: ProductSafe[] }) {
         </div>
         {active && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{assigned} cliente(s) asignado(s)</span>
-            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{overrides.length} override(s)</span>
+            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{assigned} {assigned === 1 ? 'cliente asignado' : 'clientes asignados'}</span>
+            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{overrides.length} {overrides.length === 1 ? 'precio especial' : 'precios especiales'}</span>
             <button className="btn ghost sm" type="button" onClick={() => { const n = window.prompt('Nuevo nombre', active.name); if (n && n.trim()) renameList(active.id, n.trim()) }}><Pencil size={13} /> Renombrar</button>
             <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { if (window.confirm(`¿Eliminar "${active.name}"? Los clientes en ella vuelven al precio base.`)) { deleteList(active.id); setActiveId('') } }}><Trash2 size={13} /> Eliminar</button>
           </div>

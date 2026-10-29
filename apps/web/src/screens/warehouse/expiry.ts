@@ -30,3 +30,12 @@ export function sevLabel(days: number | null): string {
   if (days === 1) return 'Caduca mañana'
   return `Caduca en ${days} días`
 }
+
+// Solo presentación (pantallas de Almacén): a más de 60 días "Caduca en 400 días" no se lee de un vistazo;
+// basta mes y año. sevLabel no cambia (lo usan la exportación y otras vistas): lo cercano sigue en días.
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+export function etiquetaCaducidad(days: number | null, iso: string | null | undefined): string {
+  const m = iso ? /^(\d{4})-(\d{2})/.exec(iso) : null
+  if (days != null && days > 60 && m) return `Caduca ${MESES[Number(m[2]) - 1]} ${m[1]}`
+  return sevLabel(days)
+}

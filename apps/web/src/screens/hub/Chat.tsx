@@ -135,7 +135,7 @@ export function Chat() {
             )
           })}
           {conversations.length === 0 && (
-            <div className="tc-vacio"><MessageCircle size={28} /><div>Aún no hay conversaciones.</div><button className="btn sm" type="button" onClick={() => setNewOpen(true)}><Plus size={14} /> Escribirle a alguien</button></div>
+            <div className="tc-vacio"><MessageCircle size={28} /><div>Aún no hay conversaciones. Toca «Nuevo» para escribirle a alguien del equipo.</div></div>
           )}
           {conversations.length > 0 && lista.length === 0 && <div className="tc-vacio"><div>Sin resultados.</div></div>}
         </div>

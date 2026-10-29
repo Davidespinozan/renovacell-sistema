@@ -95,7 +95,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
     }
     if (dropped > 0 || capped > 0) {
       const parts: string[] = []
-      if (dropped > 0) parts.push(`${dropped} producto(s) ya no están disponibles`)
+      if (dropped > 0) parts.push(dropped === 1 ? '1 producto ya no está disponible' : `${dropped} productos ya no están disponibles`)
       if (capped > 0) parts.push(`${capped} se ajustaron al stock actual`)
       setReorderNote(`Rearmamos tu pedido anterior · ${parts.join(' y ')}.`)
     } else if (Object.keys(next).length > 0) {
@@ -128,7 +128,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const disponibles = visibles.filter(hayExistencia)
   const agotados = visibles.filter((e) => !hayExistencia(e))
   const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
-    <FamilyCard key={e.product.id} entry={e} cart={cart} onOpen={() => setOpenFamily(e.product)} />
+    <FamilyCard key={e.product.id} entry={e} cart={cart} priceOf={priceOf} onOpen={() => setOpenFamily(e.product)} />
   ) : (
     <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
   )
@@ -320,9 +320,12 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec, pend
 }
 
 // Tarjeta de FAMILIA: una sola imagen (del padre) + resumen de variantes. Abre el selector.
-function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; onOpen: () => void }) {
+function FamilyCard({ entry, cart, onOpen, priceOf }: { entry: CatalogEntry; cart: Cart; onOpen: () => void; priceOf?: (p: ProductSafe) => number | null }) {
   const p = entry.product
   const disponibles = entry.variants.filter(isSellableVariant).length
+  // Precio mínimo con lo que ya está en memoria (priceOf es síncrono; sin verificar devuelve null).
+  const precios = priceOf ? entry.variants.filter(isSellableVariant).map(priceOf).filter((x): x is number => x != null) : []
+  const desde = precios.length ? Math.min(...precios) : null
   const enCarrito = entry.variants.reduce((s, v) => s + (cart[v.id] ?? 0), 0)
   const isProf = p.line === 'prof'
   return (
@@ -333,10 +336,12 @@ function FamilyCard({ entry, cart, onOpen }: { entry: CatalogEntry; cart: Cart; 
       <div className="pb">
         <div className={'dcat-linea ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}</div>
         <h5>{p.name}</h5>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
-          {entry.variants.length} variante(s){disponibles !== entry.variants.length ? ` · ${disponibles} con precio` : ''}
+        {/* Una sola línea en el lugar del precio: cuántas presentaciones y, si ya hay precios
+            cargados (doctor verificado), "desde" el más barato que se puede vender. */}
+        <div className="pr pp-fam-pr" data-testid="familia-resumen">
+          {entry.variants.length} {entry.variants.length === 1 ? 'presentación' : 'presentaciones'}
+          {desde != null && <span className="pp-fam-desde"> · desde {money(desde)}</span>}
         </div>
-        <div className="pr" style={{ fontSize: 13, color: 'var(--ink-3)' }}>Varias presentaciones</div>
         <button className="addb" type="button" onClick={onOpen}>
           <Icon name="grid" /> Ver variantes{enCarrito > 0 ? ` (${enCarrito})` : ''}
         </button>
@@ -370,7 +375,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
         <div className="mhead">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', backgroundColor: 'var(--cp-surface)', border: '1px solid var(--line)' }} />}
-            <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} variante(s) · elige presentación</div></div>
+            <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} {variants.length === 1 ? 'presentación' : 'presentaciones'} · elige una</div></div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
         </div>

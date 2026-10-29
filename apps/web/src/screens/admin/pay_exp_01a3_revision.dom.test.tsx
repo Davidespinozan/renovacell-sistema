@@ -46,7 +46,7 @@ describe('PAY-EXP-01A-3 · estados', () => {
     await esperar()
     expect(screen.getAllByTestId('revision-caso')).toHaveLength(1)
     expect(f.llamadas[0]).toEqual({ p_incluir_resueltos: false })
-    expect(screen.getByTestId('revision-contador')).toHaveTextContent('1 caso(s) abierto(s)')
+    expect(screen.getByTestId('revision-contador')).toHaveTextContent('1 caso abierto')
     expect(screen.getByTestId('revision-nota-stripe')).toBeInTheDocument()
   })
   it('sin casos → "Sin casos abiertos"', async () => {
