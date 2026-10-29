@@ -9,7 +9,7 @@ import { ChatCanonico, TEXTO_ASESORIA_FINALIZADA, TEXTO_SIN_ASIGNACION } from '.
 import { Asesorias } from './Asesorias'
 import type { ClienteChat, Conversacion, ColaItem, ErrorChat } from '../../data/ops/chat'
 
-vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'ventas', setScreen: vi.fn() }) }))
+vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'ventas', setScreen: vi.fn() }), useRoleOpcional: () => null }))
 beforeEach(cleanup)
 
 const NO_AUT: ErrorChat = { codigo: 'no_autorizado', mensaje: 'No tienes acceso a esta conversación.' }

@@ -1,5 +1,6 @@
 -- CC-1 · El rollback retira el dominio de visitante y devuelve el dedupe a CC-0B.
 begin;
+\ir ../../../rollback/cotizaciones/99_down.sql   -- COTIZACIONES (20270209) apunta a cc_conversations: se baja primero
 \ir ../../../rollback/vincular_cliente/99_down.sql   -- VINCULAR-CLIENTE (20270206) se baja primero (redefine _cc_rutear, _cc_nombre_dueno, bandeja y cola)
 -- Rollback EN CAPAS (como W1/W2): CC-3 reutiliza _cc_append_only y CC-2 se apoya en cc_visitors
 -- (FK restrict), así que bajan primero, en orden inverso.

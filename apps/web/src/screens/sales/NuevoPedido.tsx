@@ -48,7 +48,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   onClose: () => void
   /** ENT-POS · carrito que ya armó el Punto de venta (product_id → cantidad): el pedido con entrega arranca con él. */
   initialCart?: Record<string, number>
-  onCreado?: () => void
+  onCreado?: (pedido?: { id: string; external_ref: string | null }) => void   // COTIZACIONES · quien lo abrió puede ligar el pedido
 }) {
   const isCustomer = !!customer
   // SEC-C4-B5 · DATOS FISCALES DEL PEDIDO ≠ PERFIL FISCAL PERMANENTE DEL CLIENTE.
@@ -180,7 +180,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
         intento.current = null; setRepetido(!!r.repetido)
         const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
         if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
-        setFolio(r.order.external_ref ?? it.op.folio); onCreado?.(); return
+        setFolio(r.order.external_ref ?? it.op.folio); onCreado?.({ id: r.order.id, external_ref: r.order.external_ref ?? null }); return
       }
       const motivo: MotivoFallo = r.incierto ? 'incierto' : (r.motivo ?? (r.ambiguous ? 'incierto' : 'rechazo'))
       // Incierto: se congela la solicitud ORIGINAL y su id; el siguiente clic la reenvía tal cual.

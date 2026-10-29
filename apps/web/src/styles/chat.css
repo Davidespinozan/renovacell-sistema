@@ -436,3 +436,23 @@
 .pc-ine{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mid)}
 .pc-ine .ok{color:var(--green-deep);font-weight:600}
 .pc-alta .pc-acciones{justify-content:flex-end}
+/* ── Cotizaciones ─────────────────────────────────────────────────────────────────────────────────── */
+.cot-modal{width:min(640px,100%)}
+.cot-modal .mbody{display:grid;gap:10px}
+.cot-lista{list-style:none;margin:0;padding:0;max-height:min(46vh,420px);overflow:auto;display:grid;gap:2px}
+.cot-prod{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:10px}
+.cot-prod.on{background:var(--ok-bg)}
+.cot-prod-tx{flex:1;min-width:0;display:grid}
+.cot-prod-tx b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cot-prod-tx small{font-size:12px;color:var(--mid)}
+.cot-qty{display:flex;align-items:center;gap:6px}
+.cot-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line);font-size:13.5px}
+.cot-pie small{color:var(--mid);font-size:11.5px}
+.cot-resumen{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cot-resumen li{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}
+.cot-resumen li.tot{border-bottom:0;font-size:15.5px}
+.cot-envio{display:flex;gap:8px;flex-wrap:wrap}
+.pc-cots{display:grid;gap:4px;padding-top:8px;border-top:1px solid var(--line);margin-top:4px}
+.pc-cot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.pc-cot b{font-variant-numeric:tabular-nums}
+.pc-cot .pc-cot-acc{margin-left:auto;display:flex;gap:4px}

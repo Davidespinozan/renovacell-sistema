@@ -2,7 +2,7 @@
 // "¿quién es?": la ficha si ya se sabe; si no, sugerencias (teléfono, correo, nombre que escribió) y búsqueda para
 // vincularla. Desde la ficha, su vendedor le manda el acceso al portal ahí mismo. Todo lo decide el servidor.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link2, Search, UserCheck, KeyRound, X, UserPlus, IdCard } from 'lucide-react'
+import { Link2, Search, UserCheck, KeyRound, X, UserPlus, IdCard, FileText, ShoppingBag } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
 import { BuscadorClientes, type ClienteBusqueda } from '../../data/ops/buscarClientes'
 import { crearInvitacion } from '../../data/ops/invitacion'
@@ -11,12 +11,17 @@ import { fmtDate } from '../../lib/format'
 import type { ClienteChat } from '../../data/ops/chat'
 import { currentUserId } from '../../lib/supabase'
 import { useIne, olvidarIne } from '../../data/store/ineSeleccion'
+import { cotizaciones as cotPorDefecto, estadoVisible, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
+import { NuevaCotizacion } from '../sales/NuevaCotizacion'
+import { NuevoPedido } from '../sales/NuevoPedido'
+import { useRoleOpcional } from '../../auth/RoleContext'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
 
-export function PanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador }: {
+export function PanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto }: {
   conversationId: string
+  cot?: ClienteCotizaciones
   chat?: ClienteChat              // para mandar el acceso al portal dentro de la misma conversación
   onCambio?: () => void           // la conversación pudo pasar a otro vendedor
   cliente?: ClienteExpediente
@@ -34,6 +39,11 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
   const [alta, setAlta] = useState(false)
   const [form, setForm] = useState({ nombre: '', cedula: '', email: '', ciudad: '' })
   const ine = useIne(conversationId)
+  // COTIZACIONES · las del cliente, para cotizar, reenviar, convertir en pedido o cancelar desde aquí.
+  const user = useRoleOpcional()?.user ?? null
+  const [cots, setCots] = useState<Cotizacion[]>([])
+  const [modal, setModal] = useState<null | 'cotizar' | 'pedido' | { convertir: Cotizacion }>(null)
+  const cargarCots = useCallback(async (customer?: string) => { if (!customer) { setCots([]); return } const r = await cot.deCliente(customer); setCots(r.ok ? r.data : []) }, [cot])
   const bus = useMemo(() => buscador ?? new BuscadorClientes(), [buscador])
   useEffect(() => () => bus.limpiar(), [bus])
 
@@ -41,11 +51,12 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
     const f = await cliente.ficha(conversationId)
     if (!f.ok) { setFicha(null); setMsg({ ok: false, texto: f.mensaje }); return }
     setFicha(f.data)
+    if (f.data.vinculado && f.data.es_tuyo) void cargarCots(f.data.customer_id)
     if (!f.data.vinculado && !f.data.con_cuenta) {
       const s = await cliente.sugerencias(conversationId)
       setSug(s.ok ? s.data : [])
     }
-  }, [cliente, conversationId])
+  }, [cliente, conversationId, cargarCots])
   useEffect(() => { setMsg(null); setRes(null); setQ(''); setCambiando(false); setAlta(false); void cargar() }, [cargar])
 
   const vincular = async (id: string, nombre: string) => {
@@ -85,6 +96,21 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
     olvidarIne(conversationId); setAlta(false)
     setMsg({ ok: true, texto: `${capitalizarNombre(r.data.nombre)} quedó dada de alta. Ya le puedes mandar su acceso al portal.` })
     await cargar()
+  }
+  const reenviarCot = async (c: Cotizacion) => {
+    if (!chat) return
+    setOcupado(true); setMsg(null)
+    const e = await chat.enviar(conversationId, textoCotizacion(c, primerNombre(capitalizarNombre(ficha?.nombre ?? '')) || undefined))
+    if (e.ok) await cot.enviar(c.id, 'chat')
+    setOcupado(false)
+    setMsg(e.ok ? { ok: true, texto: `Le reenviaste la cotización ${c.folio}.` } : { ok: false, texto: e.error.mensaje })
+    void cargarCots(ficha?.customer_id)
+  }
+  const cancelarCot = async (c: Cotizacion) => {
+    if (!window.confirm(`¿Cancelar la cotización ${c.folio}?`)) return
+    const r = await cot.cancelar(c.id)
+    setMsg(r.ok ? { ok: true, texto: `Cotización ${c.folio} cancelada.` } : { ok: false, texto: r.mensaje })
+    void cargarCots(ficha?.customer_id)
   }
   const mandarAcceso = async () => {
     if (!ficha?.customer_id || !chat) return
@@ -132,6 +158,8 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
             )}
           </div>
           <div className="pc-acciones">
+            {ficha.es_tuyo && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => setModal('cotizar')} data-testid="pc-cotizar"><FileText size={14} /> Cotizar</button>}
+            {ficha.es_tuyo && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => setModal('pedido')} data-testid="pc-pedido"><ShoppingBag size={14} /> Levantar pedido</button>}
             {ficha.es_tuyo && !ficha.tiene_cuenta && chat && (
               <button type="button" className="btn sm" disabled={ocupado} onClick={() => void mandarAcceso()} data-testid="pc-acceso"><KeyRound size={14} /> {ficha.invitacion_vigente ? 'Reenviar acceso al portal' : 'Mandar acceso al portal'}</button>
             )}
@@ -140,6 +168,26 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
               <button type="button" className="rc-ico" disabled={ocupado} onClick={() => void desvincular()} aria-label="Quitar vínculo" title="Quitar vínculo" data-testid="pc-desvincular"><X size={16} /></button>
             </>}
           </div>
+          {ficha.es_tuyo && cots.length > 0 && (
+            <div className="pc-cots" data-testid="pc-cotizaciones">
+              {cots.slice(0, 3).map((c) => {
+                const e = estadoVisible(c)
+                return (
+                  <div key={c.id} className="pc-cot">
+                    <b>{c.folio}</b><span>{money(c.total)}</span>
+                    <span className={'pill ' + (e === 'vigente' ? 'p-ok' : e === 'convertida' ? 'p-neu' : 'p-warn')}>{e === 'vigente' ? `Vigente al ${fmtDate(c.vigente_hasta)}` : e === 'convertida' ? 'Ya es pedido' : e === 'vencida' ? 'Vencida' : 'Cancelada'}</span>
+                    {e === 'vigente' && (
+                      <span className="pc-cot-acc">
+                        {chat && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void reenviarCot(c)}>Reenviar</button>}
+                        <button type="button" className="btn sm" disabled={ocupado} onClick={() => setModal({ convertir: c })} data-testid="pc-convertir">Convertir en pedido</button>
+                        <button type="button" className="rc-ico" onClick={() => void cancelarCot(c)} aria-label={`Cancelar ${c.folio}`} title="Cancelar"><X size={15} /></button>
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       ) : (
         <div className="pc-quien">
@@ -181,6 +229,16 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
         </div>
       )}
       {msg && <div className={'pc-msg' + (msg.ok ? ' ok' : '')} role={msg.ok ? 'status' : 'alert'} data-testid="pc-msg">{msg.texto}</div>}
+      {modal === 'cotizar' && ficha.customer_id && (
+        <NuevaCotizacion customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', email: ficha.email }} conversationId={conversationId} chat={chat} cliente={cot}
+          onClose={() => { setModal(null); void cargarCots(ficha.customer_id) }} />
+      )}
+      {(modal === 'pedido' || (modal && typeof modal === 'object')) && ficha.customer_id && (
+        <NuevoPedido customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', phone: ficha.telefono ?? null }} placedBy={user?.name ?? 'Ventas'}
+          initialCart={typeof modal === 'object' && modal ? Object.fromEntries(modal.convertir.lineas.map((l) => [l.product_id, l.qty])) : undefined}
+          onClose={() => { setModal(null); void cargar() }}
+          onCreado={(pedido) => { if (typeof modal === 'object' && modal && pedido) void cot.convertida(modal.convertir.id, pedido.id).then(() => cargarCots(ficha.customer_id)) }} />
+      )}
     </section>
   )
 }

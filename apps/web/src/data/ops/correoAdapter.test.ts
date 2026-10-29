@@ -14,6 +14,7 @@ import correoSrc from '../../../../../supabase/functions/_shared/correo.ts?raw'
 import migSrc from '../../../../../supabase/migrations/20261021120000_w4_comunicaciones.sql?raw'
 import mig165 from '../../../../../supabase/migrations/20261218120000_correos_automaticos.sql?raw'
 import mig175 from '../../../../../supabase/migrations/20261228120000_promociones_difusion.sql?raw'   // PROMO-4 · plantilla 'promocion'
+import migCot from '../../../../../supabase/migrations/20270209120000_cotizaciones.sql?raw'   // COTIZACIONES · plantilla 'cotizacion'
 
 const soloCodigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 const CFG: ConfigCorreo = { proveedor: 'resend', apiKey: 're_SECRETO_123', remitente: 'Renovacell <pedidos@renovacell.mx>' }
@@ -146,10 +147,10 @@ describe('las credenciales no salen del adaptador', () => {
 })
 
 describe('plantillas: vocabulario cerrado y texto limpio', () => {
-  it('las plantillas son exactamente las que la base sabe encolar (6 de pedido + 3 de cuenta, 165; + promocion, 175)', () => {
-    const enBase = [...(migSrc + mig165 + mig175).matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado|registro_recibido|cuenta_verificada|verificacion_rechazada|promocion)'/g)].map((m) => m[1])
+  it('las plantillas son exactamente las que la base sabe encolar (6 de pedido + 3 de cuenta, 165; + promocion, 175; + cotizacion, 20270209)', () => {
+    const enBase = [...(migSrc + mig165 + mig175 + migCot).matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado|registro_recibido|cuenta_verificada|verificacion_rechazada|promocion|cotizacion)'/g)].map((m) => m[1])
     for (const p of PLANTILLAS) expect(enBase).toContain(p)
-    expect(PLANTILLAS).toHaveLength(10)
+    expect(PLANTILLAS).toHaveLength(11)
   })
   it('todas se arman, incluso sin datos, sin dejar "undefined", "null" ni "NaN"', () => {
     for (const p of PLANTILLAS) {

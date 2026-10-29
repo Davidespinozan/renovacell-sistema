@@ -8,6 +8,7 @@ export const PLANTILLAS = [
   'pedido_cancelado', 'reembolso_realizado',
   'registro_recibido', 'cuenta_verificada', 'verificacion_rechazada',   // CORREOS-AUTO (165) · su cuenta
   'promocion',   // PROMO-4 (175) · difusión de una promoción a los doctores
+  'cotizacion',  // COTIZACIONES (20270209) · cotización que el vendedor le manda a su cliente
 ] as const
 export type Plantilla = (typeof PLANTILLAS)[number]
 
@@ -89,6 +90,17 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
         `Tenemos una promoción para ti${vig ? ' ' + vig : ''}. Los precios se aplican solos en tu portal al hacer tu pedido; no necesitas códigos.`,
       ], datos: lineas.map((l): [string, string] => { const i = l.indexOf(': '); return i > 0 ? [l.slice(0, i), l.slice(i + 2)] : [l, ''] }),
         boton: { label: 'Ver el catálogo', href: URL_SISTEMA }, pie: 'Precios para profesionales de la salud verificados. Recibes este correo por tu cuenta en Renovacell.' }
+    }
+    case 'cotizacion': {   // datos: folio, total, vigente_hasta, notas, vendedor, lineas[{nombre, qty, unit_price, subtotal}]
+      const lineas = Array.isArray(d.lineas) ? (d.lineas as Array<Record<string, unknown>>) : []
+      const vence = d.vigente_hasta ? new Date(String(d.vigente_hasta)).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mazatlan' }) : ''
+      const vend = String(d.vendedor ?? '').trim(); const notas = String(d.notas ?? '').trim()
+      return { asunto: `Tu cotización ${folio || ''} de Renovacell`.replace(/\s+/g, ' ').trim(), titulo: 'Tu cotización', parrafos: [
+        `${vend ? vend + ' te preparó' : 'Te preparamos'} esta cotización${vence ? `, vigente hasta el ${vence}` : ''}.`,
+        'Para confirmar tu pedido, responde a este correo o escríbele a tu asesor por WhatsApp.',
+        ...(notas ? [notas] : []),
+      ], datos: [...lineas.map((l): [string, string] => [`${Number(l.qty ?? 0)} × ${String(l.nombre ?? '')}`, dinero(l.subtotal)]), ...fila('Total', dinero(d.total)), ...fila('Cotización', folio)],
+        boton: { label: 'Entrar a Renovacell', href: URL_SISTEMA }, pie: 'Precios para profesionales de la salud. El envío se confirma al hacer el pedido.' }
     }
     case 'cuenta_verificada':
       return { asunto: 'Tu cuenta Renovacell está verificada', titulo: 'Tu cuenta está verificada', parrafos: [
