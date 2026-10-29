@@ -601,7 +601,18 @@ export async function registrarCobroDePedido(opId: string, a: {
 function avisarCobro(orderId: string, o: Order) {
   notify({ text: `Pago registrado · ${folioOf(orderId)}`, roles: ['admin'], screen: 'av_fin' })
   notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
-  if (o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+  avisarDueno(o, `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`)
+}
+
+// PAGO-DESDE-CONVERSACIÓN · el dueño del pedido es su cuenta (doctor_id) o, si el pedido se hizo a su ficha antes de que
+// tuviera cuenta, la cuenta ligada hoy a esa ficha (customers.profile_id). Sin cuenta no hay a quién avisar en la app.
+function avisarDueno(o: Order, text: string) {
+  if (o.doctor_id) { notify({ text, userIds: [o.doctor_id], screen: 'pedidosdr' }); return }
+  if (!o.customer_id || !hasSupabase) return
+  void supabase.from('customers').select('profile_id').eq('id', o.customer_id).maybeSingle().then(({ data }) => {
+    const p = (data as { profile_id?: string | null } | null)?.profile_id
+    if (p) notify({ text, userIds: [p], screen: 'pedidosdr' })
+  }, () => {})
 }
 
 // DECLARAR un pago (el cliente o el staff informa que pagó). NO mueve dinero: abre un
@@ -660,12 +671,12 @@ export async function reviewTransfer(
         const preparable = r.data.payment_status === 'paid' && fresco.status !== 'cancelled'
         if (preparable) notify({ text: `Transferencia confirmada · ${o.external_ref ?? folioOf(orderId)} · listo para surtir`, roles: ['warehouse'], screen: 'surtido' })
         notify({ text: `Pago confirmado · ${o.external_ref ?? folioOf(orderId)}`, roles: ['admin'], screen: 'av_pagos' })
-        if (preparable && o.doctor_id) notify({ text: `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+        if (preparable) avisarDueno(o, `Tu pago del pedido ${o.external_ref ?? folioOf(orderId)} quedó confirmado; ya entró a preparación.`)
         logAudit({ actor: 'Administración', action: 'Transferencia confirmada', resource: folioOf(orderId) })
       }
     } else if (nuevo) {
       logAudit({ actor: 'Administración', action: 'Transferencia rechazada', resource: folioOf(orderId), detail: reason })
-      if (o.doctor_id) notify({ text: `No confirmamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}${reason ? ` (${reason})` : ''}. Reintenta el pago o usa otro método.`, userIds: [o.doctor_id], screen: 'pedidosdr' })
+      avisarDueno(o, `No confirmamos tu transferencia del pedido ${o.external_ref ?? folioOf(orderId)}${reason ? ` (${reason})` : ''}. Reintenta el pago o usa otro método.`)
     }
     return { ok: true, status: r.status }
   }

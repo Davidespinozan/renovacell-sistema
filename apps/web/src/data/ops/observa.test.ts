@@ -302,7 +302,7 @@ describe('observa.ts · aislamiento', () => {
 const INSTRUMENTADAS: Record<string, number> = {
   shipping: 36, 'cfdi-send': 1,   // GO-LIVE (28 oct): +1 (5xx de DHL al crear = desconocido) · T1 v2.0: +11 en el bloque T1 (config inválida, cotización, guía, excepción) · T1-LIVE-02: +1 (autenticación) · DHL D1: +4 (consulta por referencia, get-image, consulta previa: hallada tarde / sin respuesta)
   'comm-dispatch': 3, 'staff-admin': 2, 'register-doctor': 1,
-  'stripe-webhook': 3, 'meta-webhook': 3, 'report-transfer': 1,
+  'stripe-webhook': 3, 'meta-webhook': 3, 'report-transfer': 3,   // PAGO-DESDE-CONVERSACIÓN (29 oct): +2 (foto del chat no legible, copia a proofs fallida)
 }
 const NO_INSTRUMENTADAS = ['assistant', 'cfdi', 'invite-doctor', 'stripe-checkout', 'meta-send', 'capture-lead']
 

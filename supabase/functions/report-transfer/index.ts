@@ -47,6 +47,9 @@ const MENSAJES: Record<string, string> = {
   SIN_SALDO: 'Ese pedido no tiene saldo por cobrar.',
   PEDIDO_CANCELADO: 'Ese pedido está cancelado.',
   NO_AUTORIZADO: 'Ese pedido no es tuyo.',
+  ADJUNTO_NO_ES_DEL_CLIENTE: 'El comprobante tiene que ser una foto que el cliente mandó en su conversación.',
+  MONTO_MAYOR_AL_SALDO: 'El monto es mayor a lo que debe del pedido.',
+  COMPROBANTE_YA_USADO: 'Esa foto ya respalda otro pago.',
   MONTO_INVALIDO: 'El monto debe ser mayor a cero.',
   METODO_INVALIDO: 'Forma de pago no válida.',
   CUENTA_INVALIDA: 'La cuenta bancaria seleccionada no es válida o está inactiva.',
@@ -73,6 +76,7 @@ Deno.serve(conCors(async (req) => {
   let body: {
     orderId?: string; reference?: string; proof?: string
     bank_account_id?: string | null; amount?: number; method?: string; opId?: string
+    adjuntoId?: string   // PAGO-DESDE-CONVERSACIÓN · foto que el cliente mandó en su conversación (lo reporta su vendedor)
   }
   try { body = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   if (!body.orderId || !UUID.test(body.orderId)) return json(400, { error: 'Falta el pedido.' })
@@ -89,6 +93,35 @@ Deno.serve(conCors(async (req) => {
   if (!(monto > 0)) return json(400, { error: 'Ese pedido no tiene saldo por cobrar.' })
   const metodo = ['transferencia', 'efectivo', 'tarjeta', 'stripe', 'otro'].includes(body.method ?? '')
     ? body.method! : 'transferencia'
+
+  // PAGO-DESDE-CONVERSACIÓN · el vendedor (o Dirección) reporta el pago de SU cliente con la foto que el cliente mandó
+  // por el chat. 1) el servidor autoriza y dice qué foto y a qué ruta fija (con el JWT del llamante, sin escribir nada);
+  // 2) la foto se copia del bucket 'chat' a 'proofs', donde Dirección ya ve los comprobantes; 3) el comando crea la
+  // declaración (re-valida todo y exige esa ruta). Un reintento copia a la misma ruta: no deja huérfanos.
+  if (body.adjuntoId !== undefined) {
+    if (!UUID.test(body.adjuntoId)) return json(400, { error: 'Falta la foto del comprobante.' })
+    const { data: prep, error: ePrep } = await caller.rpc('cc_pago_comprobante_preparar', { p_order: body.orderId, p_adjunto: body.adjuntoId })
+    if (ePrep) return json(400, { error: traducir(ePrep.message) })
+    const pr = prep as { ruta_chat: string; tipo: string; ruta_comprobante: string }
+    const foto = await admin.storage.from('chat').download(pr.ruta_chat)
+    if (foto.error || !foto.data) { obs('comprobante', 'internal_error', { code: 'chat_download_failed', error: foto.error }); return json(503, { error: 'No se pudo leer la foto. Intenta de nuevo.' }) }
+    const up = await admin.storage.from('proofs').upload(pr.ruta_comprobante, foto.data, { contentType: pr.tipo, upsert: true })
+    if (up.error) { obs('comprobante', 'internal_error', { code: 'proof_upload_failed', error: up.error }); return json(503, { error: 'No se pudo guardar el comprobante. Intenta de nuevo.' }) }
+    const opIdV = body.opId && UUID.test(body.opId) ? body.opId : crypto.randomUUID()
+    const { data: resV, error: eV } = await caller.rpc('cc_reportar_pago_cliente', {
+      p_op_id: opIdV, p_order: body.orderId, p_method: metodo, p_amount: monto,
+      p_reference: (body.reference ?? '').slice(0, 80) || null, p_adjunto: body.adjuntoId, p_proof_path: pr.ruta_comprobante,
+    })
+    if (eV) return json(400, { error: traducir(eV.message) })
+    const estadoV = (resV as { status?: string } | null)?.status
+    if (estadoV === 'applied') {
+      await admin.from('notifications').insert({
+        body: `Pago informado por ${q.quien.full_name ?? q.quien.email ?? 'el vendedor'} · pedido ${order.external_ref ?? order.id} · comprobante del chat · verifica que cayó y regístralo`,
+        roles: ['admin'], screen: 'av_pagos',
+      }).then(() => {}, () => {})
+    }
+    return json(200, { ok: true, status: estadoV ?? 'applied', claim_id: (resV as { claim_id?: string } | null)?.claim_id, op_id: opIdV })
+  }
 
   // Comprobante (opcional) → bucket privado. Se sube ANTES del comando para poder
   // guardar su ruta en la declaración; si el comando falla, el archivo queda huérfano

@@ -104,7 +104,8 @@ describe('PAY-EXP-01A-3 · avisos veraces al verificar', () => {
   it('reviewTransfer solo avisa "listo para surtir" con pago completo y pedido no cancelado', () => {
     expect(ordersStoreSrc).toMatch(/const preparable = r\.data\.payment_status === 'paid' && fresco\.status !== 'cancelled'/)
     expect(ordersStoreSrc).toMatch(/if \(preparable\) notify\(\{ text: `Transferencia confirmada/)
-    expect(ordersStoreSrc).toMatch(/if \(preparable && o\.doctor_id\) notify\(\{ text: `Tu pago del pedido/)
+    // PAGO-DESDE-CONVERSACIÓN · el aviso al dueño pasa por avisarDueno (cuenta del pedido o la ligada a su ficha); la compuerta sigue igual.
+    expect(ordersStoreSrc).toMatch(/if \(preparable\) avisarDueno\(o, `Tu pago del pedido/)
   })
   it('revisarDeclaracion usa el comando canónico y no emite avisos de preparación ni de reintento', () => {
     const cuerpo = ordersStoreSrc.slice(ordersStoreSrc.indexOf('export async function revisarDeclaracion'), ordersStoreSrc.indexOf('// Espejo local del efecto'))

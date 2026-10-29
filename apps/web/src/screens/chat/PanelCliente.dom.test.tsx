@@ -3,8 +3,9 @@
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
-import { PanelCliente } from './PanelCliente'
-import { elegirIne } from '../../data/store/ineSeleccion'
+import { PanelCliente, accionesIneVisitante } from './PanelCliente'
+import { elegirIne, ineDe } from '../../data/store/ineSeleccion'
+import type { ClientePagos, PedidoCliente } from '../../data/ops/pagoConversacion'
 import type { ClienteExpediente, FichaConversacion } from '../../data/ops/expediente'
 import type { ClienteChat } from '../../data/ops/chat'
 
@@ -65,5 +66,34 @@ describe('PanelCliente', () => {
     fireEvent.click(screen.getByTestId('pc-alta-guardar'))
     await waitFor(() => expect(c.alta).toHaveBeenCalledWith('C7', expect.objectContaining({ nombre: 'Ana Gómez Ruiz', cedula: '12345678', ineFrente: 'AD1' })))
     expect(await screen.findByTestId('pc-msg')).toHaveTextContent(/quedó dada de alta/)
+  })
+  it('pago desde la conversación: reporta con la foto marcada como comprobante y, validado, manda el recibo', async () => {
+    const c = falso([VINCULADA])
+    const base: PedidoCliente = { id: 'O1', folio: 'S1203', fecha: '2026-10-29T10:00:00Z', total: 2000, estado: 'pending_payment', saldo: 2000, cobrado: 0, estado_pago: 'pendiente', en_revision: false, ultimo_pago: null }
+    const pagado: PedidoCliente = { ...base, saldo: 0, cobrado: 2000, ultimo_pago: { monto: 2000, fecha: '2026-10-29', metodo: 'transferencia' } }
+    let lista = [base]
+    const pagos = { pedidos: vi.fn(async () => ({ ok: true as const, data: lista })), reportar: vi.fn(async () => ({ ok: true as const, data: { status: 'applied' } })) }
+    const enviar = vi.fn(async () => ({ ok: true, data: {} }))
+    render(<PanelCliente conversationId="C8" cliente={c} pagos={pagos as unknown as ClientePagos} chat={{ enviar } as unknown as ClienteChat} />)
+    fireEvent.click(await screen.findByTestId('pc-reportar-pago'))
+    // la conversación quedó marcada como ligada: debajo de sus fotos se ofrece "comprobante", no "INE"
+    expect(ineDe('C8').vinculada).toBe(true)
+    const { container } = render(<>{accionesIneVisitante('C8', ineDe('C8'), () => {})({ actor: 'visitor', adjunto: { id: 'ADJ1' } })}</>)
+    expect(container).toHaveTextContent('Usar como comprobante de pago')
+    expect(screen.getByTestId('pc-pago-enviar')).toBeDisabled()
+    elegirIne('C8', 'comprobante', 'ADJ1')
+    await waitFor(() => expect(screen.getByTestId('pc-pago-enviar')).not.toBeDisabled())
+    lista = [{ ...base, en_revision: true }]
+    fireEvent.click(screen.getByTestId('pc-pago-enviar'))
+    await waitFor(() => expect(pagos.reportar).toHaveBeenCalledWith(expect.objectContaining({ orderId: 'O1', adjuntoId: 'ADJ1', amount: 2000, method: 'transferencia' })))
+    expect(await screen.findByTestId('pc-msg')).toHaveTextContent(/Dirección lo valida/)
+    expect(await screen.findByText('Pago en revisión')).toBeInTheDocument()
+    expect(ineDe('C8').comprobante).toBeUndefined()
+    cleanup()
+    lista = [pagado]
+    render(<PanelCliente conversationId="C8" cliente={falso([VINCULADA])} pagos={pagos as unknown as ClientePagos} chat={{ enviar } as unknown as ClienteChat} />)
+    fireEvent.click(await screen.findByTestId('pc-recibo'))
+    await waitFor(() => expect(enviar).toHaveBeenCalled())
+    expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/^Hola Lourdes, recibimos tu pago de \$2,000.* del pedido S1203\. Tu pedido quedó pagado por completo\./)
   })
 })

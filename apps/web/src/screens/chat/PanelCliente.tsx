@@ -2,7 +2,7 @@
 // "¿quién es?": la ficha si ya se sabe; si no, sugerencias (teléfono, correo, nombre que escribió) y búsqueda para
 // vincularla. Desde la ficha, su vendedor le manda el acceso al portal ahí mismo. Todo lo decide el servidor.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link2, Search, UserCheck, KeyRound, X, UserPlus, IdCard, FileText, ShoppingBag } from 'lucide-react'
+import { Link2, Search, UserCheck, KeyRound, X, UserPlus, IdCard, FileText, ShoppingBag, Banknote, Receipt } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
 import { BuscadorClientes, type ClienteBusqueda } from '../../data/ops/buscarClientes'
 import { crearInvitacion } from '../../data/ops/invitacion'
@@ -10,7 +10,8 @@ import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { fmtDate } from '../../lib/format'
 import type { ClienteChat } from '../../data/ops/chat'
 import { currentUserId } from '../../lib/supabase'
-import { useIne, olvidarIne } from '../../data/store/ineSeleccion'
+import { useIne, olvidarIne, olvidarComprobante, marcarVinculada } from '../../data/store/ineSeleccion'
+import { pagosConversacion, estadoPedidoPago, textoRecibo, type ClientePagos, type MetodoPago, type PedidoCliente } from '../../data/ops/pagoConversacion'
 import { cotizaciones as cotPorDefecto, estadoVisible, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import { NuevaCotizacion } from '../sales/NuevaCotizacion'
 import { NuevoPedido } from '../sales/NuevoPedido'
@@ -19,9 +20,10 @@ import { useRoleOpcional } from '../../auth/RoleContext'
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
 
-export function PanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto }: {
+export function PanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto, pagos = pagosConversacion }: {
   conversationId: string
   cot?: ClienteCotizaciones
+  pagos?: ClientePagos
   chat?: ClienteChat              // para mandar el acceso al portal dentro de la misma conversación
   onCambio?: () => void           // la conversación pudo pasar a otro vendedor
   cliente?: ClienteExpediente
@@ -44,6 +46,10 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
   const [cots, setCots] = useState<Cotizacion[]>([])
   const [modal, setModal] = useState<null | 'cotizar' | 'pedido' | { convertir: Cotizacion }>(null)
   const cargarCots = useCallback(async (customer?: string) => { if (!customer) { setCots([]); return } const r = await cot.deCliente(customer); setCots(r.ok ? r.data : []) }, [cot])
+  // PAGO-DESDE-CONVERSACIÓN · sus pedidos: reportar el pago con la foto del comprobante y mandarle el recibo.
+  const [pedidos, setPedidos] = useState<PedidoCliente[]>([])
+  const [pago, setPago] = useState<{ orderId: string; folio: string | null; monto: string; metodo: MetodoPago; ref: string; opId: string } | null>(null)
+  const cargarPedidos = useCallback(async () => { const r = await pagos.pedidos(conversationId); setPedidos(r.ok ? r.data : []) }, [pagos, conversationId])
   const bus = useMemo(() => buscador ?? new BuscadorClientes(), [buscador])
   useEffect(() => () => bus.limpiar(), [bus])
 
@@ -51,13 +57,14 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
     const f = await cliente.ficha(conversationId)
     if (!f.ok) { setFicha(null); setMsg({ ok: false, texto: f.mensaje }); return }
     setFicha(f.data)
-    if (f.data.vinculado && f.data.es_tuyo) void cargarCots(f.data.customer_id)
+    marcarVinculada(conversationId, !!(f.data.vinculado && f.data.es_tuyo))
+    if (f.data.vinculado && f.data.es_tuyo) { void cargarCots(f.data.customer_id); void cargarPedidos() } else setPedidos([])
     if (!f.data.vinculado && !f.data.con_cuenta) {
       const s = await cliente.sugerencias(conversationId)
       setSug(s.ok ? s.data : [])
     }
-  }, [cliente, conversationId, cargarCots])
-  useEffect(() => { setMsg(null); setRes(null); setQ(''); setCambiando(false); setAlta(false); void cargar() }, [cargar])
+  }, [cliente, conversationId, cargarCots, cargarPedidos])
+  useEffect(() => { setMsg(null); setRes(null); setQ(''); setCambiando(false); setAlta(false); setPago(null); void cargar() }, [cargar])
 
   const vincular = async (id: string, nombre: string) => {
     setOcupado(true); setMsg(null)
@@ -111,6 +118,27 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
     const r = await cot.cancelar(c.id)
     setMsg(r.ok ? { ok: true, texto: `Cotización ${c.folio} cancelada.` } : { ok: false, texto: r.mensaje })
     void cargarCots(ficha?.customer_id)
+  }
+  const abrirPago = (p: PedidoCliente) => setPago({ orderId: p.id, folio: p.folio, monto: String(p.saldo), metodo: 'transferencia', ref: '', opId: crypto.randomUUID() })
+  const reportarPago = async () => {
+    if (!pago || !ine.comprobante) return
+    const monto = Number(pago.monto.replace(/[$,\s]/g, ''))
+    if (!(monto > 0)) { setMsg({ ok: false, texto: 'Escribe el monto que pagó.' }); return }
+    setOcupado(true); setMsg(null)
+    const r = await pagos.reportar({ orderId: pago.orderId, adjuntoId: ine.comprobante, amount: monto, method: pago.metodo, reference: pago.ref.trim(), opId: pago.opId })
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    olvidarComprobante(conversationId); setPago(null)
+    setMsg({ ok: true, texto: `Pago de ${money(monto)} reportado para ${pago.folio ?? 'el pedido'}. Dirección lo valida y entonces le puedes mandar su recibo.` })
+    void cargarPedidos()
+  }
+  const mandarRecibo = async (p: PedidoCliente) => {
+    const texto = textoRecibo(p, primerNombre(capitalizarNombre(ficha?.nombre ?? '')) || undefined)
+    if (!chat || !texto) return
+    setOcupado(true); setMsg(null)
+    const r = await chat.enviar(conversationId, texto)
+    setOcupado(false)
+    setMsg(r.ok ? { ok: true, texto: `Le mandaste el recibo de ${p.folio ?? 'su pedido'} por este chat.` } : { ok: false, texto: r.error.mensaje })
   }
   const mandarAcceso = async () => {
     if (!ficha?.customer_id || !chat) return
@@ -188,6 +216,38 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
               })}
             </div>
           )}
+          {ficha.es_tuyo && pedidos.length > 0 && (
+            <div className="pc-cots pc-pedidos" data-testid="pc-pedidos">
+              {pedidos.slice(0, 4).map((p) => {
+                const e = estadoPedidoPago(p)
+                return (
+                  <div key={p.id} className="pc-cot">
+                    <b>{p.folio ?? '—'}</b><span>{money(p.total)}</span>
+                    <span className={'pill p-' + e.tono}>{e.texto}</span>
+                    <span className="pc-cot-acc">
+                      {p.saldo > 0 && !p.en_revision && <button type="button" className="btn sm" disabled={ocupado} onClick={() => abrirPago(p)} data-testid="pc-reportar-pago"><Banknote size={14} /> Reportar pago</button>}
+                      {p.ultimo_pago && chat && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void mandarRecibo(p)} data-testid="pc-recibo"><Receipt size={14} /> Mandar recibo</button>}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {pago && (
+            <form className="pc-alta pc-pago" onSubmit={(e) => { e.preventDefault(); void reportarPago() }} data-testid="pc-pago">
+              <div className="pc-alta-h"><b>Reportar pago · {pago.folio ?? 'pedido'}</b><span>Pídele la foto de su comprobante por este chat y márcala debajo de la foto. Dirección lo valida.</span></div>
+              <input className="pc-campo" value={pago.monto} onChange={(e) => setPago({ ...pago, monto: e.target.value })} inputMode="decimal" placeholder="Monto" aria-label="Monto" required />
+              <select className="pc-campo" value={pago.metodo} onChange={(e) => setPago({ ...pago, metodo: e.target.value as MetodoPago })} aria-label="Forma de pago">
+                <option value="transferencia">Transferencia o depósito</option><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta (terminal)</option><option value="otro">Otro</option>
+              </select>
+              <input className="pc-campo" value={pago.ref} onChange={(e) => setPago({ ...pago, ref: e.target.value })} placeholder="Referencia o clave de rastreo (opcional)" aria-label="Referencia" maxLength={80} />
+              <div className="pc-ine"><Receipt size={14} aria-hidden /> Comprobante: <span className={ine.comprobante ? 'ok' : ''}>{ine.comprobante ? 'foto elegida ✓' : 'marca su foto en el chat («Usar como comprobante»)'}</span></div>
+              <div className="pc-acciones">
+                <button type="button" className="btn ghost sm" onClick={() => setPago(null)}>Cancelar</button>
+                <button type="submit" className="btn sm" disabled={ocupado || !ine.comprobante} data-testid="pc-pago-enviar">Reportar a Dirección</button>
+              </div>
+            </form>
+          )}
         </div>
       ) : (
         <div className="pc-quien">
@@ -243,9 +303,16 @@ export function PanelCliente({ conversationId, chat, onCambio, cliente = expedie
   )
 }
 
-/** ALTA-DESDE-CONVERSACIÓN · debajo de cada foto que mandó quien escribe (sin cuenta): marcarla como su INE para el alta. */
-export function accionesIneVisitante(conversationId: string, sel: { frente?: string; reverso?: string }, elegir: (lado: 'frente' | 'reverso', id: string) => void) {
-  return (m: { actor: string; adjunto?: { id: string; uso?: string | null } | null }) => (m.actor === 'visitor' && m.adjunto && !m.adjunto.uso ? (
+/** ALTA-DESDE-CONVERSACIÓN · debajo de cada foto que mandó quien escribe (sin cuenta): marcarla como su INE para el alta.
+ *  PAGO-DESDE-CONVERSACIÓN · ya ligada a su ficha, la foto se marca como comprobante de pago. */
+export function accionesIneVisitante(conversationId: string, sel: { frente?: string; reverso?: string; comprobante?: string; vinculada?: boolean }, elegir: (lado: 'frente' | 'reverso' | 'comprobante', id: string) => void) {
+  return (m: { actor: string; adjunto?: { id: string; uso?: string | null } | null }) => (m.actor === 'visitor' && m.adjunto && sel.vinculada ? (
+    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-comprobante">
+      <button type="button" className={'btn ghost sm' + (sel.comprobante === m.adjunto.id ? ' on' : '')} onClick={() => elegir('comprobante', m.adjunto!.id)}>
+        {sel.comprobante === m.adjunto.id ? 'Comprobante ✓' : 'Usar como comprobante de pago'}
+      </button>
+    </span>
+  ) : m.actor === 'visitor' && m.adjunto && !m.adjunto.uso ? (
     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine-visitante">
       {(['frente', 'reverso'] as const).map((lado) => (
         <button key={lado} type="button" className={'btn ghost sm' + (sel[lado] === m.adjunto!.id ? ' on' : '')} onClick={() => elegir(lado, m.adjunto!.id)}>
