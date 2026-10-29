@@ -23,7 +23,7 @@ describe('AUXILIAR de almacén', () => {
     expect(keys('warehouse')).toEqual(expect.arrayContaining(['compras', 'entradas', 'devoluciones', 'consigna_alm', 'guia', 'seguimiento', 'stock', 'surtido', 'cola', 'despacho']))
   })
   it('en "Por enviar" el auxiliar no genera guía; el servidor tampoco lo deja', () => {
-    expect(colaSrc).toMatch(/const puedeGuia = useRoleOpcional\(\)\?\.role !== 'packing'/)
+    expect(colaSrc).toMatch(/const sesion = useRoleOpcional\(\)\n\s+const puedeGuia = sesion\?\.role !== 'packing'/)
     expect(colaSrc).toMatch(/method === 'paqueteria' && !puedeGuia/)
     expect(shippingSrc).toMatch(/\['create_shipment', 'label', 'schedule_pickup', 'cancel_pickup', 'reconciliar_guia'\]\.includes\(action\) && !tieneRol\(q\.quien, \['admin', 'warehouse'\]\)/)
     for (const f of ['recibir_lote', 'recibir_devolucion', 'confirmar_reingreso', 'anular_guia', 'abrir_custodia', 'entregar_custodia', 'devolver_de_custodia', 'registrar_perdida_custodia']) expect(migSrc).toContain(`FUNCTION public.${f}(`)

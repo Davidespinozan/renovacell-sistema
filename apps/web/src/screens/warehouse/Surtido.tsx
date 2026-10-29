@@ -13,6 +13,7 @@ import { planSurtido, canFulfill, surtirPedido, type ItemPlan } from '../../data
 import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
 import { useOrderMoney } from '../../data/hooks/useMoney'
+import { creditoAbierto, creditoVencido } from '../../data/ops/moneyView'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 
@@ -136,9 +137,9 @@ export function Surtido() {
                   {(() => {
                     // Un pedido liberado por CRÉDITO no está pagado: se surte, pero Almacén lo ve.
                     const d = byOrder[o.id]
-                    if (!d?.credito_autorizado) return null
-                    return <span className={'pill ' + (d.vencido ? 'p-dang' : 'p-warn')} title={`Saldo ${d.saldo}`}>
-                      {d.vencido ? 'Crédito vencido' : 'A crédito · sin pagar'}
+                    if (!d || !creditoAbierto(d)) return null
+                    return <span className={'pill ' + (creditoVencido(d) ? 'p-dang' : 'p-warn')} title={`Saldo ${d.saldo}`}>
+                      {creditoVencido(d) ? 'Crédito vencido' : 'A crédito · sin pagar'}
                     </span>
                   })()}
                   <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>

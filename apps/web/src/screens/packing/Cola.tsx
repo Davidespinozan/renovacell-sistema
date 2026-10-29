@@ -144,10 +144,11 @@ export function mensajeProveedor(m: string): string {
 }
 
 export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
-  const { createShipment } = useShipments()
+  const { createShipment, dispatchShipment } = useShipments()
   // AUXILIAR DE ALMACÉN (rol packing): empaca y despacha; la guía de paquetería la genera Almacén (Alberto). El servidor
   // también se la niega (Edge shipping), aquí solo se explica en vez de ofrecer un botón que fallaría.
-  const puedeGuia = useRoleOpcional()?.role !== 'packing'
+  const sesion = useRoleOpcional()
+  const puedeGuia = sesion?.role !== 'packing'
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)
   const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
@@ -181,7 +182,12 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   const [rateId, setRateId] = useState('')
   const [busy, setBusy] = useState<false | 'quote' | 'label' | 'chofer'>(false)
   const [result, setResult] = useState<LabelResult | null>(null)
-  const [doneChofer, setDoneChofer] = useState(false)
+  // Chofer asignado: el envío queda "por despachar". Si la carga se le entrega en este momento, se despacha aquí
+  // mismo (mismo paso que Despacho); si no, queda en el manifiesto. Antes el modal cerraba y el despacho se olvidaba:
+  // el chofer veía "Esperando que Almacén te despache" con la carga ya en la mano.
+  const [asignado, setAsignado] = useState<{ shipmentId: string; driverId: string; chofer: string } | null>(null)
+  const [despachado, setDespachado] = useState(false)
+  const doneChofer = asignado != null
   const [error, setError] = useState<string | null>(null)
 
   const pkg: LogisticsPackage = {
@@ -243,9 +249,20 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     // R-62: NO marcamos el pedido "En camino" aquí (sigue en el almacén, por_despachar). El
     // chofer y el manifiesto ya lo ven por el shipment. El pedido pasa a "enviado" al DESPACHAR
     // el manifiesto (Despacho), para no falsear el Tablero mostrando en tránsito lo que sigue
-    // en el estante. (drv se usa solo para el mensaje de confirmación de abajo.)
-    void drv
-    setDoneChofer(true)
+    // en el estante.
+    setAsignado({ shipmentId: r.shipment.id, driverId, chofer: drv?.name ?? 'el chofer' })
+  }
+
+  // Igual que Despacho: primero el envío y, solo si quedó, el pedido pasa a "enviado".
+  const despacharAhora = async () => {
+    if (!asignado) return
+    setBusy('chofer'); setError(null)
+    const d = await dispatchShipment(asignado.shipmentId, sesion?.user?.name ?? 'Almacén', orderRef)
+    if (!d.ok) { setBusy(false); setError(`La carga NO quedó despachada. ${d.error}`); return }
+    const e = await markShipped(order.id, { method: 'chofer', driver: asignado.chofer, driver_id: asignado.driverId })
+    setBusy(false)
+    if (!e.ok) { setError(`La carga quedó despachada, pero el pedido NO pasó a En camino. ${e.error}`); return }
+    setDespachado(true)
   }
 
   // ENT-3 · Recoger en sucursal / mostrador: no hay guía ni chofer; el pedido queda "listo para recoger" (enviado) y se
@@ -291,9 +308,23 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
           <div className="mbody">
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
-              <h3>Chofer asignado</h3>
-              <p><b>{order.external_ref}</b> quedó <b>por despachar</b> con chofer propio. Aparece en su manifiesto; pasará a <b>En camino</b> cuando se despache la carga.</p>
-              <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
+              {despachado ? (
+                <>
+                  <h3>Carga despachada</h3>
+                  <p><b>{order.external_ref}</b> salió con <b>{asignado?.chofer}</b>. Le aparece para que confirme que la recibió.</p>
+                  <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
+                </>
+              ) : (
+                <>
+                  <h3>Chofer asignado</h3>
+                  <p><b>{order.external_ref}</b> quedó <b>por despachar</b> con {asignado?.chofer}. ¿Ya le entregaste la carga? Despáchala ahora; si sale después, queda en su manifiesto de <b>Despacho</b>.</p>
+                  {error && <div style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }} data-testid="despachar-ahora-error">{error}</div>}
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+                    <button className="btn" type="button" disabled={busy === 'chofer'} onClick={() => void despacharAhora()} data-testid="despachar-ahora"><Icon name="truck" /> {busy === 'chofer' ? 'Despachando…' : 'Ya le entregué la carga: despachar'}</button>
+                    <button className="btn ghost" type="button" disabled={busy === 'chofer'} onClick={onClose}>Sale después</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (

@@ -29,7 +29,7 @@ import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/o
 import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
 import { useOpId } from '../../data/hooks/useOpId'
 import { METODOS, type OrderMoney, type PaymentClaim, type PaymentMethod } from '../../data/ops/money'
-import { etiquetaPago, etiquetaLiberacion } from '../../data/ops/moneyView'
+import { creditoAbierto, etiquetaPago, etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
 import { ExportButton } from '../../app/ExportButton'
@@ -53,7 +53,7 @@ function cobroTag(o: OrderWithItems, m?: OrderMoney | null): Tag {
     if (o.payment_status === 'paid') return { label: 'Pagado', pill: 'p-ok' }
     return { label: 'Pendiente', pill: 'p-neu' }
   }
-  if (m.estado_pago !== 'paid' && m.credito_autorizado) {
+  if (m.estado_pago !== 'paid' && creditoAbierto(m)) {
     const e = etiquetaLiberacion(m)
     return { label: e.texto, pill: PILL[e.tono] }
   }

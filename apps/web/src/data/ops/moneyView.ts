@@ -27,11 +27,16 @@ export function etiquetaPago(m: Pick<OrderMoney, 'estado_pago' | 'saldo' | 'cobr
   }
 }
 
+// Un crédito sigue ABIERTO mientras haya saldo. Si después se cobró completo, el crédito quedó
+// saldado: el pedido ya no es "a crédito" ni puede estar "vencido" (el libro manda sobre la fecha).
+export const creditoAbierto = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo'>): boolean => m.credito_autorizado && m.saldo > 0.0001
+export const creditoVencido = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo' | 'vencido'>): boolean => creditoAbierto(m) && m.vencido
+
 // Por qué (o por qué no) se puede surtir. NUNCA dice "pagado" por un crédito.
 export function etiquetaLiberacion(m: Pick<OrderMoney, 'liberado' | 'credito_autorizado' | 'due_date' | 'vencido' | 'estado_pago' | 'saldo'>): EtiquetaPago {
   if (!m.liberado) return { texto: 'No liberado', tono: 'bad', detalle: 'Registra el cobro o pide crédito a Dirección' }
-  if (m.estado_pago === 'paid' && !m.credito_autorizado) return { texto: 'Liberado por cobro', tono: 'ok' }
-  if (m.credito_autorizado) {
+  if (m.estado_pago === 'paid' || !creditoAbierto(m)) return { texto: 'Liberado por cobro', tono: 'ok' }
+  {
     return m.vencido
       ? { texto: 'Crédito VENCIDO', tono: 'bad', detalle: `Venció el ${fecha(m.due_date)} · debe ${m.saldo}` }
       : { texto: 'Crédito autorizado', tono: 'warn', detalle: `Vence ${fecha(m.due_date)} · debe ${m.saldo}` }
@@ -48,8 +53,8 @@ export const esPorCobrar = (m: Pick<OrderMoney, 'saldo' | 'order_status'>): bool
 
 // Antigüedad del saldo para el aging de cobranza (días desde el vencimiento del crédito;
 // sin crédito, la deuda es exigible desde el primer día).
-export function diasVencido(m: Pick<OrderMoney, 'credito_autorizado' | 'due_date'>, hoy: string): number {
-  if (!m.credito_autorizado || !m.due_date) return 0
+export function diasVencido(m: Pick<OrderMoney, 'credito_autorizado' | 'due_date' | 'saldo'>, hoy: string): number {
+  if (!creditoAbierto(m) || !m.due_date) return 0
   const ms = Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${m.due_date.slice(0, 10)}T00:00:00Z`)
   return Math.max(0, Math.round(ms / 86400000))
 }

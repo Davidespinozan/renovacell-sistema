@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { etiquetaPago, etiquetaLiberacion, esPorCobrar, reembolsoPendiente, diasVencido } from './moneyView'
+import { etiquetaPago, etiquetaLiberacion, esPorCobrar, reembolsoPendiente, diasVencido, creditoAbierto, creditoVencido } from './moneyView'
 import type { OrderMoney } from './money'
 
 const base: OrderMoney = {
@@ -69,5 +69,26 @@ describe('cobranza', () => {
     expect(diasVencido(con({ credito_autorizado: true, due_date: '2026-09-20' }), '2026-09-29')).toBe(9)
     expect(diasVencido(con({ credito_autorizado: true, due_date: '2026-10-30' }), '2026-09-29')).toBe(0)
     expect(diasVencido(base, '2026-09-29')).toBe(0)
+  })
+})
+
+describe('crédito saldado — se dio a crédito y después se cobró completo (S991699)', () => {
+  const saldado = con({ credito_autorizado: true, due_date: '2026-10-25', vencido: true, liberado: true, estado_pago: 'paid', cobrado: 1000, cobrado_neto: 1000, saldo: 0 })
+  it('ya no cuenta como crédito abierto ni vencido aunque la fecha haya pasado', () => {
+    expect(creditoAbierto(saldado)).toBe(false)
+    expect(creditoVencido(saldado)).toBe(false)
+  })
+  it('se presenta como liberado por cobro, no como crédito vencido', () => {
+    expect(etiquetaLiberacion(saldado)).toMatchObject({ texto: 'Liberado por cobro', tono: 'ok' })
+    expect(etiquetaPago(saldado).texto).toBe('Pagado')
+  })
+  it('sin días de atraso en la cobranza', () => {
+    expect(diasVencido(saldado, '2026-10-28')).toBe(0)
+  })
+  it('un abono parcial deja el crédito abierto (y vencido si ya pasó la fecha)', () => {
+    const parcial = { ...saldado, estado_pago: 'parcial' as const, cobrado: 400, cobrado_neto: 400, saldo: 600 }
+    expect(creditoAbierto(parcial)).toBe(true)
+    expect(creditoVencido(parcial)).toBe(true)
+    expect(etiquetaLiberacion(parcial).texto).toBe('Crédito VENCIDO')
   })
 })

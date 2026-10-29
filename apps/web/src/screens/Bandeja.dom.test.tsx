@@ -78,12 +78,18 @@ describe('la cola es estado del servidor, no memoria del navegador', () => {
 describe('Dirección ve lo que espera SU decisión', () => {
   it('reembolso pendiente, crédito vencido y pago de más — del estado canónico del dinero', () => {
     srv.byOrder = {
-      o1: dinero({ reembolso_pendiente: 350 }), o2: dinero({ vencido: true }), o3: dinero({ sobrepago: true }), o4: dinero({}),
+      o1: dinero({ reembolso_pendiente: 350 }), o2: dinero({ credito_autorizado: true, vencido: true, saldo: 700 }), o3: dinero({ sobrepago: true }), o4: dinero({}),
     }
     render(<Bandeja />)
     expect(screen.getByText('Reembolsos por resolver')).toBeInTheDocument()
     expect(screen.getByText('Crédito vencido')).toBeInTheDocument()
     expect(screen.getByText('Pagos de más')).toBeInTheDocument()
+  })
+
+  it('REGRESIÓN S991699: un crédito que después se cobró completo no aparece como vencido', () => {
+    srv.byOrder = { o2: dinero({ credito_autorizado: true, vencido: true, saldo: 0, estado_pago: 'paid' }) }
+    render(<Bandeja />)
+    expect(screen.queryByText('Crédito vencido')).toBeNull()
   })
 
   it('devolución ya inspeccionada sin destino → espera a Dirección', () => {

@@ -15,7 +15,7 @@ describe('cobranza automática legacy: cero consumidores', () => {
   })
   it('la bandeja deriva cobranza del libro', () => {
     const c = codigo(bandejaSrc)
-    expect(c).toMatch(/const vencidos = dinero\.filter\(\(m\) => m\.vencido\)/)
+    expect(c).toMatch(/const vencidos = dinero\.filter\(creditoVencido\)/)   // vencido del libro, y solo con saldo (un crédito ya cobrado no se cobra)
     expect(c).toMatch(/byOrder\[o\.id\]\?\.saldo/)
     expect(c).not.toMatch(/notifications/)
   })

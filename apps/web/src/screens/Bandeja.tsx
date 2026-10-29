@@ -27,6 +27,7 @@ import { useRevisionEconomica } from '../data/hooks/useRevisionEconomica'
 import { useSolicitudesCancelacion } from '../data/ops/cancelacionSolicitud'
 import { hasSupabase } from '../lib/supabase'
 import { isSurtible, diagnoseShipment } from '../data/ops/seguimiento'
+import { creditoVencido } from '../data/ops/moneyView'
 import { daysUntil, severity } from './warehouse/expiry'
 import { hoyNegocio } from '../data/periodo'
 
@@ -99,7 +100,7 @@ function useTareasBase(): Task[] {
       const dinero = Object.values(byOrder)
       const reembolsos = dinero.filter((m) => m.reembolso_pendiente > 0.0001)
       if (reembolsos.length) t.push({ id: 'reembolso', icon: 'receipt', title: 'Reembolsos por resolver', detail: 'Pedidos cancelados o devueltos con dinero por regresar al cliente.', count: reembolsos.length, tone: 'dang', screen: 'av_ventas' })
-      const vencidos = dinero.filter((m) => m.vencido)
+      const vencidos = dinero.filter(creditoVencido)
       if (vencidos.length) t.push({ id: 'vencido', icon: 'clock', title: 'Crédito vencido', detail: 'Pedidos a crédito cuya fecha de pago ya pasó.', count: vencidos.length, tone: 'dang', screen: 'av_fin' })
       const sobrepagos = dinero.filter((m) => m.sobrepago)
       if (sobrepagos.length) t.push({ id: 'sobrepago', icon: 'receipt', title: 'Pagos de más', detail: 'Se cobró más que el total del pedido: revisa y regresa la diferencia.', count: sobrepagos.length, tone: 'warn', screen: 'av_ventas' })

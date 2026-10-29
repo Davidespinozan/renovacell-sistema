@@ -8,7 +8,7 @@ import { statusView } from './orderStatus'
 import { Trk } from './Trk'
 import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { trackingUrl } from '../../data/shipping/provider'
-import { etiquetaLiberacion } from '../../data/ops/moneyView'
+import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/ops/moneyView'
 import type { OrderMoney } from '../../data/ops/money'
 import type { ProductSafe } from '../../data/types'
 import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
@@ -37,7 +37,7 @@ export function OrderCard({
   const saldo = dinero ? dinero.saldo : (order.payment_status === 'paid' ? 0 : (order.total ?? 0))
   const unpaid = saldo > 0.0001 && order.status !== 'cancelled'
   const pagado = dinero ? dinero.estado_pago === 'paid' : order.payment_status === 'paid'
-  const credito = dinero?.credito_autorizado ? etiquetaLiberacion(dinero) : null
+  const credito = dinero && creditoAbierto(dinero) ? etiquetaLiberacion(dinero) : null
 
   return (
     <div className="card">
@@ -46,7 +46,7 @@ export function OrderCard({
         <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
         {pagado && <span className="pill p-ok">Pagado</span>}
         {!pagado && dinero && dinero.cobrado_neto > 0.0001 && <span className="pill p-warn">Pago parcial · falta {money(dinero.saldo)}</span>}
-        {credito && <span className={'pill ' + (dinero?.vencido ? 'p-dang' : 'p-warn')}>{credito.texto}{dinero?.due_date ? ` · vence ${fmtDate(dinero.due_date)}` : ''}</span>}
+        {credito && <span className={'pill ' + (dinero && creditoVencido(dinero) ? 'p-dang' : 'p-warn')}>{credito.texto}{dinero?.due_date ? ` · vence ${fmtDate(dinero.due_date)}` : ''}</span>}
         {pagoReportado && !pagado && <span className="pill p-neu">Pago en revisión</span>}
         {order.invoice_requested && <span className="pill p-neu">CFDI</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(order.created_at)}</span>

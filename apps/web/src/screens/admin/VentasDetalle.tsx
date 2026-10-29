@@ -15,7 +15,7 @@ import { useOpId } from '../../data/hooks/useOpId'
 import { autorizarCreditoDePedido, revocarCreditoDePedido } from '../../data/store/ordersStore'
 import { useIntentoVentas, consumirIntentoVentas } from '../../data/store/ventasIntentStore'   // PAY-EXP-01A-3
 import { METODOS, reembolsoPagado, type OrderMoney, type PaymentEntry, type PaymentMethod } from '../../data/ops/money'
-import { etiquetaLiberacion } from '../../data/ops/moneyView'
+import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
 import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
@@ -38,7 +38,7 @@ function payInfo(o: OrderWithItems, m?: OrderMoney | null): PayInfo {
     return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
   }
   if (m.estado_pago === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
-  if (m.credito_autorizado) return { key: 'contra', label: m.vencido ? 'Crédito vencido' : 'A crédito', pill: m.vencido ? 'p-dang' : 'p-warn' }
+  if (creditoAbierto(m)) return { key: 'contra', label: creditoVencido(m) ? 'Crédito vencido' : 'A crédito', pill: creditoVencido(m) ? 'p-dang' : 'p-warn' }
   if (m.estado_pago === 'parcial') return { key: 'parcial', label: 'Pago parcial', pill: 'p-warn' }
   if (m.estado_pago === 'refunded') return { key: 'pendiente', label: 'Reembolsado', pill: 'p-neu' }
   return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
@@ -495,11 +495,20 @@ function CreditoAcciones({ order, dinero }: { order: OrderWithItems; dinero: Ord
 
   const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 
+  // Crédito que después se cobró completo: quedó saldado. Ya no se debe nada ni hay qué revocar.
+  if (dinero.credito_autorizado && !creditoAbierto(dinero)) {
+    return (
+      <div className="sysnote" style={{ marginBottom: 14 }} data-testid="credito-saldado">
+        <span style={{ flex: 1 }}><b>Crédito saldado.</b> Se autorizó a crédito y ya se cobró completo.</span>
+      </div>
+    )
+  }
+
   if (dinero.credito_autorizado) {
     return (
       <div className="sysnote" style={{ marginBottom: 14, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
         <span style={{ flex: 1 }}>
-          <b>Crédito autorizado{dinero.vencido ? ' y VENCIDO' : ''}.</b> El pedido se puede surtir, pero <b>sigue debiendo {money(dinero.saldo)}</b>
+          <b>Crédito autorizado{creditoVencido(dinero) ? ' y VENCIDO' : ''}.</b> El pedido se puede surtir, pero <b>sigue debiendo {money(dinero.saldo)}</b>
           {dinero.due_date ? ` · fecha límite ${fmtDate(dinero.due_date)}` : ''}.
         </span>
         <button className="btn ghost sm" type="button" onClick={() => void revocar()}>Revocar crédito</button>
