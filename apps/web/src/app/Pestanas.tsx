@@ -26,7 +26,8 @@ export function Pestanas({ grupo, pestanas, inicial }: { grupo: string; pestanas
           </button>
         ))}
       </div>
-      <div role="tabpanel" key={actual.key}>{actual.render()}</div>
+      {/* PERF · las pestañas cargan bajo demanda: mientras llega una, la barra de pestañas se queda. */}
+      <div role="tabpanel" key={actual.key}><React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{actual.render()}</React.Suspense></div>
     </div>
   )
 }

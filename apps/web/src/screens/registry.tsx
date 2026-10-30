@@ -1,77 +1,84 @@
 // Registro de pantallas: mapea pantalla -> componente.
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
-import { Seguimientos } from './Seguimientos'
-import { ClasificarCartera } from './ClasificarCartera'
-import { ProductosClientes } from './sales/ProductosClientes'
 import { BotonAvisos } from '../app/BotonAvisos'
-import { MiVerificacion } from './doctor/MiVerificacion'
 import React, { useEffect } from 'react'
 import { useRole } from '../auth/RoleContext'
 import { Placeholder } from './Placeholder'
-import { Bandeja } from './Bandeja'
-import { Solicitudes } from './Solicitudes'
-import { Calendario } from './Calendario'
-import { Clientes } from './Clientes'
-import { CommonView } from './CommonView'
-import { Chat } from './hub/Chat'
-import { StryvCare } from './stryv/StryvCare'
-import { Catalogo, CatalogoPantalla } from './doctor/Catalogo'
-import { MisPedidos } from './doctor/MisPedidos'
-import { Historial } from './doctor/Historial'
-import { Existencias } from './warehouse/Existencias'
-import { Surtido } from './warehouse/Surtido'
-import { HoyAlmacen } from './warehouse/HoyAlmacen'
-import { Caducidades } from './warehouse/Caducidades'
-import { Entradas } from './warehouse/Entradas'
-import { Devoluciones } from './warehouse/Devoluciones'
-import { Cola } from './packing/Cola'
-import { Guias } from './packing/Guias'
-import { Seguimiento } from './logistics/Seguimiento'
-import { Despacho } from './logistics/Despacho'
-import { MisEntregas } from './driver/MisEntregas'
-import { AgendaEntregas } from './logistics/AgendaEntregas'
 // Pantallas con recharts: lazy para que la librería no cargue hasta abrirlas.
-const Tablero = React.lazy(() => import('./admin/Tablero').then((m) => ({ default: m.Tablero })))
-const Ventas = React.lazy(() => import('./admin/Ventas').then((m) => ({ default: m.Ventas })))
-import { Trazabilidad } from './admin/Trazabilidad'
-import { DoctoresDirectorio } from './admin/DoctoresDirectorio'
-import { Doctores } from './admin/Doctores' // cockpit de verificación (av_verif); av_doc queda como directorio comercial
-import { Facturacion } from './admin/Facturacion'
-import { PagosPorValidar } from './admin/PagosPorValidar'
-import { RevisionEconomica } from './admin/RevisionEconomica'   // PAY-EXP-01A-3
-import { Finanzas } from './admin/Finanzas'
-import { CierreCaja } from './admin/CierreCaja'
-import { Bitacora } from './admin/Bitacora'
-import { Reabastecimiento } from './admin/Reabastecimiento'
-import { ControlInventario } from './admin/ControlInventario'
-import { Equipo } from './admin/Equipo'
-import { CatalogoAdmin, SitioWeb } from './admin/Contenido'
-import { Precios } from './admin/Precios'
-import { Promociones } from './admin/Promociones'
-import { RevisionFiscal } from './admin/RevisionFiscal'
-import { Comunicaciones } from './admin/Comunicaciones'
-import { InvitarClientes } from './admin/InvitarClientes'   // INVITA-1
-import { Comisiones } from './admin/Comisiones'
-import { Configuracion } from './admin/Configuracion'
+const Tablero = lazyPantalla(() => import('./admin/Tablero').then((m) => m.Tablero))
+const Ventas = lazyPantalla(() => import('./admin/Ventas').then((m) => m.Ventas))
 import { Pestanas } from '../app/Pestanas'
-import { Conocimiento } from './admin/Conocimiento' // CC-3
-import { ManualVentas } from './admin/ManualVentas' // R4-C10
-import { AtencionComercialPantalla, CarteraHorarioPantalla } from './admin/AtencionComercial' // CC-7
-import { Mermas } from './admin/Mermas'
-import { Importar } from './admin/Importar'
-import { Eventos } from './pos/Eventos'
-import { MiCustodia } from './sales/MiCustodia'
-import { Custodia } from './warehouse/Custodia'
-import { Custodias } from './admin/Custodias'
-import { Caja } from './pos/Caja'
-import { VentasEvento } from './pos/VentasEvento'
 import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
-import { ChatCanonico } from './chat/ChatCanonico'
-import { AsesoriasPantalla } from './chat/Asesorias'
 import { RoleHome } from './home/RoleHome'   // CHV2-B · Inicio por rol
+import { lazyPantalla } from '../app/lazyPantalla'
+
+// PERF · pantallas bajo demanda (antes todas viajaban en el paquete inicial, ~460 KB gz). Inicio y Placeholder quedan
+// directos: son lo primero que se ve.
+const Seguimientos = lazyPantalla(() => import('./Seguimientos').then((m) => m.Seguimientos))
+const ClasificarCartera = lazyPantalla(() => import('./ClasificarCartera').then((m) => m.ClasificarCartera))
+const ProductosClientes = lazyPantalla(() => import('./sales/ProductosClientes').then((m) => m.ProductosClientes))
+const MiVerificacion = lazyPantalla(() => import('./doctor/MiVerificacion').then((m) => m.MiVerificacion))
+const Bandeja = lazyPantalla(() => import('./Bandeja').then((m) => m.Bandeja))
+const Solicitudes = lazyPantalla(() => import('./Solicitudes').then((m) => m.Solicitudes))
+const Calendario = lazyPantalla(() => import('./Calendario').then((m) => m.Calendario))
+const Clientes = lazyPantalla(() => import('./Clientes').then((m) => m.Clientes))
+const CommonView = lazyPantalla(() => import('./CommonView').then((m) => m.CommonView))
+const Chat = lazyPantalla(() => import('./hub/Chat').then((m) => m.Chat))
+const StryvCare = lazyPantalla(() => import('./stryv/StryvCare').then((m) => m.StryvCare))
+const Catalogo = lazyPantalla(() => import('./doctor/Catalogo').then((m) => m.Catalogo))
+const CatalogoPantalla = lazyPantalla(() => import('./doctor/Catalogo').then((m) => m.CatalogoPantalla))
+const MisPedidos = lazyPantalla(() => import('./doctor/MisPedidos').then((m) => m.MisPedidos))
+const Historial = lazyPantalla(() => import('./doctor/Historial').then((m) => m.Historial))
+const Existencias = lazyPantalla(() => import('./warehouse/Existencias').then((m) => m.Existencias))
+const Surtido = lazyPantalla(() => import('./warehouse/Surtido').then((m) => m.Surtido))
+const HoyAlmacen = lazyPantalla(() => import('./warehouse/HoyAlmacen').then((m) => m.HoyAlmacen))
+const Caducidades = lazyPantalla(() => import('./warehouse/Caducidades').then((m) => m.Caducidades))
+const Entradas = lazyPantalla(() => import('./warehouse/Entradas').then((m) => m.Entradas))
+const Devoluciones = lazyPantalla(() => import('./warehouse/Devoluciones').then((m) => m.Devoluciones))
+const Cola = lazyPantalla(() => import('./packing/Cola').then((m) => m.Cola))
+const Guias = lazyPantalla(() => import('./packing/Guias').then((m) => m.Guias))
+const Seguimiento = lazyPantalla(() => import('./logistics/Seguimiento').then((m) => m.Seguimiento))
+const Despacho = lazyPantalla(() => import('./logistics/Despacho').then((m) => m.Despacho))
+const MisEntregas = lazyPantalla(() => import('./driver/MisEntregas').then((m) => m.MisEntregas))
+const AgendaEntregas = lazyPantalla(() => import('./logistics/AgendaEntregas').then((m) => m.AgendaEntregas))
+const Trazabilidad = lazyPantalla(() => import('./admin/Trazabilidad').then((m) => m.Trazabilidad))
+const DoctoresDirectorio = lazyPantalla(() => import('./admin/DoctoresDirectorio').then((m) => m.DoctoresDirectorio))
+const Doctores = lazyPantalla(() => import('./admin/Doctores').then((m) => m.Doctores)) // cockpit de verificación (av_verif); av_doc queda como directorio comercial
+const Facturacion = lazyPantalla(() => import('./admin/Facturacion').then((m) => m.Facturacion))
+const PagosPorValidar = lazyPantalla(() => import('./admin/PagosPorValidar').then((m) => m.PagosPorValidar))
+const RevisionEconomica = lazyPantalla(() => import('./admin/RevisionEconomica').then((m) => m.RevisionEconomica))   // PAY-EXP-01A-3
+const Finanzas = lazyPantalla(() => import('./admin/Finanzas').then((m) => m.Finanzas))
+const CierreCaja = lazyPantalla(() => import('./admin/CierreCaja').then((m) => m.CierreCaja))
+const Bitacora = lazyPantalla(() => import('./admin/Bitacora').then((m) => m.Bitacora))
+const Reabastecimiento = lazyPantalla(() => import('./admin/Reabastecimiento').then((m) => m.Reabastecimiento))
+const ControlInventario = lazyPantalla(() => import('./admin/ControlInventario').then((m) => m.ControlInventario))
+const Equipo = lazyPantalla(() => import('./admin/Equipo').then((m) => m.Equipo))
+const CatalogoAdmin = lazyPantalla(() => import('./admin/Contenido').then((m) => m.CatalogoAdmin))
+const SitioWeb = lazyPantalla(() => import('./admin/Contenido').then((m) => m.SitioWeb))
+const Precios = lazyPantalla(() => import('./admin/Precios').then((m) => m.Precios))
+const Promociones = lazyPantalla(() => import('./admin/Promociones').then((m) => m.Promociones))
+const RevisionFiscal = lazyPantalla(() => import('./admin/RevisionFiscal').then((m) => m.RevisionFiscal))
+const Comunicaciones = lazyPantalla(() => import('./admin/Comunicaciones').then((m) => m.Comunicaciones))
+const InvitarClientes = lazyPantalla(() => import('./admin/InvitarClientes').then((m) => m.InvitarClientes))   // INVITA-1
+const Comisiones = lazyPantalla(() => import('./admin/Comisiones').then((m) => m.Comisiones))
+const Configuracion = lazyPantalla(() => import('./admin/Configuracion').then((m) => m.Configuracion))
+const Conocimiento = lazyPantalla(() => import('./admin/Conocimiento').then((m) => m.Conocimiento)) // CC-3
+const ManualVentas = lazyPantalla(() => import('./admin/ManualVentas').then((m) => m.ManualVentas)) // R4-C10
+const AtencionComercialPantalla = lazyPantalla(() => import('./admin/AtencionComercial').then((m) => m.AtencionComercialPantalla)) // CC-7
+const CarteraHorarioPantalla = lazyPantalla(() => import('./admin/AtencionComercial').then((m) => m.CarteraHorarioPantalla)) // CC-7
+const Mermas = lazyPantalla(() => import('./admin/Mermas').then((m) => m.Mermas))
+const Importar = lazyPantalla(() => import('./admin/Importar').then((m) => m.Importar))
+const Eventos = lazyPantalla(() => import('./pos/Eventos').then((m) => m.Eventos))
+const MiCustodia = lazyPantalla(() => import('./sales/MiCustodia').then((m) => m.MiCustodia))
+const Custodia = lazyPantalla(() => import('./warehouse/Custodia').then((m) => m.Custodia))
+const Custodias = lazyPantalla(() => import('./admin/Custodias').then((m) => m.Custodias))
+const Caja = lazyPantalla(() => import('./pos/Caja').then((m) => m.Caja))
+const VentasEvento = lazyPantalla(() => import('./pos/VentasEvento').then((m) => m.VentasEvento))
+const ChatCanonico = lazyPantalla(() => import('./chat/ChatCanonico').then((m) => m.ChatCanonico))
+const AsesoriasPantalla = lazyPantalla(() => import('./chat/Asesorias').then((m) => m.AsesoriasPantalla))
 
 // Pantallas reales ya construidas (por key de pantalla).
 const SCREENS: Record<string, () => React.ReactNode> = {
@@ -161,21 +168,23 @@ function RedirigirChat() {
   return null
 }
 
+const conCarga = (el: React.ReactNode) => <React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{el}</React.Suspense>
+
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
   if (screen === COMMON_SCREEN.key) {
-    if (FEATURES.comunicacionInterna) return <CommonView />
+    if (FEATURES.comunicacionInterna) return conCarga(<CommonView />)
     return <AddOnInactive title="Vista común" addon="Comunicación interna" />
   }
   if (screen === CHAT_SCREEN.key) {
     // Chat = comunicación interna: solo staff. Los doctores (clientes) no lo ven.
     if (!getRole(role).isStaff) return <Placeholder role={role} screen={screen} />
-    if (FEATURES.comunicacionInterna) return <Chat />
+    if (FEATURES.comunicacionInterna) return conCarga(<Chat />)
     return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }
   // STRYV Care: solo Dirección (la Edge también lo exige; aquí no se muestra a nadie más).
-  if (screen === 'stryv_care') return role === 'admin' ? <StryvCare /> : <Placeholder role={role} screen={screen} />
+  if (screen === 'stryv_care') return role === 'admin' ? conCarga(<StryvCare />) : <Placeholder role={role} screen={screen} />
   const real = SCREENS[screen]
-  if (real) return <React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{real()}</React.Suspense>
+  if (real) return conCarga(real())
   return <Placeholder role={role} screen={screen} />
 }
 

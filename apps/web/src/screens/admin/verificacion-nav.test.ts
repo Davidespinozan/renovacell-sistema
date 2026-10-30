@@ -13,7 +13,7 @@ import doctorsSrc from '../../data/store/doctorsStore.ts?raw'
 describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
   it('el registry monta el cockpit Doctores en av_verif', () => {
     expect(registrySrc).toMatch(/av_verif: \(\) => <Doctores \/>/)
-    expect(registrySrc).toMatch(/import \{ Doctores \} from '\.\/admin\/Doctores'/)
+    expect(registrySrc).toMatch(/const Doctores = lazyPantalla\(\(\) => import\('\.\/admin\/Doctores'\)\.then\(\(m\) => m\.Doctores\)\)/)   // PERF · bajo demanda
   })
   it('av_doc SIGUE siendo el directorio comercial (customers), no el cockpit', () => {
     expect(registrySrc).toMatch(/av_doc: \(\) => <DoctoresDirectorio \/>/)

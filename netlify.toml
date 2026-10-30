@@ -106,6 +106,13 @@
   from = "/*"
   to = "/landing/index.html"
   status = 200
+# PERF · /assets/* son archivos de Vite con hash en el nombre (otro contenido ⇒ otro nombre): el navegador los guarda un
+# año y no vuelve a preguntar en cada visita. index.html no entra aquí: sigue revalidándose y apunta a los nombres nuevos.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # VERSIÓN PUBLICADA · /version.json nunca se cachea: la app abierta y scripts/verificar-despliegue.sh leen la real.
 [[headers]]
   for = "/version.json"

@@ -40,11 +40,15 @@ export default defineConfig({
       // Dos páginas, una aplicación: el sistema y el enlace de contacto (su propio título y vista previa al compartir).
       input: { main: 'index.html', contacto: 'contacto.html', invitacion: 'invitacion.html' },
       output: {
-        // Separa librerías pesadas en chunks propios (mejor cacheo y carga).
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          charts: ['recharts'],
-          icons: ['lucide-react'],
+        // Separa librerías pesadas en chunks propios (mejor cacheo y carga). PERF: como función y por ruta de
+        // node_modules: la forma de objeto metía react-dom/scheduler en `charts`, y el index.html cargaba recharts
+        // (≈146 KB gz) en TODAS las pantallas aunque Tablero/Ventas son lazy.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react'
+          if (/node_modules\/(recharts|recharts-scale|d3-[^/]+|victory-vendor|internmap|decimal\.js-light|react-smooth|react-transition-group|eventemitter3|lodash)\//.test(id)) return 'charts'
+          if (id.includes('node_modules/lucide-react/')) return 'icons'
+          return undefined
         },
       },
     },
