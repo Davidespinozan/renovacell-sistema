@@ -1,16 +1,16 @@
-// CX-ENLACE · Página del ENLACE DE CONTACTO (/contacto): el enlace único que el equipo comparte en grupos.
-// Es el MISMO chat del sistema (ChatCanonico, misma conversación canónica) con piel de mensajería. Para conversar
-// no hace falta estar verificado, pero sí dejar un prerregistro mínimo. Desde aquí se llega a la landing y a la
-// verificación; al registrarse desde este mismo navegador y entrar al sistema, la conversación continúa.
-// Quién atiende (su vendedor o Dirección) lo decide el servidor; esta página nunca lo sabe.
+// CX-ENLACE · Página del ENLACE DE CONTACTO (/contacto): el MISMO chat del sistema (ChatCanonico, misma conversación
+// canónica) con piel de mensajería. Desde aquí se llega a la landing y a la verificación; al registrarse desde este mismo
+// navegador y entrar al sistema, la conversación continúa. Quién atiende lo decide el servidor; esta página nunca lo sabe.
 // ENLACE-VENDEDOR · /contacto/<código>: el enlace de un vendedor o la recomendación de un cliente. Para que quien lo recibe
-// confíe en abrir un chat que no es WhatsApp, la página dice desde el inicio con qué asesor va a hablar, quién lo
-// recomendó, que es Renovacell y que no hay nada que descargar.
+// confíe en abrir un chat que no es WhatsApp, el hilo empieza diciendo con qué asesor va a hablar, quién lo recomendó, que
+// es Renovacell y que no hay nada que descargar.
+// CONTACTO CONVERSACIONAL (dueño, 30 oct): sin formulario. Se entra directo al chat; el asistente ya saludó y pide el
+// nombre, y luego celular y correo, platicando (los registra el servidor). El aviso de privacidad queda bajo el redactor.
 import React, { useEffect, useState } from 'react'
 import { BadgeCheck, Globe, Heart, Lock, Send, ShieldCheck, Smartphone } from 'lucide-react'
 import { BrandLogo } from '../../app/BrandLogo'
 import { supabase, hasSupabase } from '../../lib/supabase'
-import { abrirVisitante, estadoVisitante, prerregistrar, validarPrerregistro, type CampoPrerregistro, type DatosPrerregistro } from '../../data/ops/visitante'
+import { abrirVisitante } from '../../data/ops/visitante'
 import { ChatCanonico } from './ChatCanonico'
 import { TarjetaVerificarme } from './TarjetaVerificarme'
 import { BotonAvisos } from '../../app/BotonAvisos'
@@ -19,16 +19,16 @@ import { aplicarEnlace as aplicarPorDefecto, codigoDeRuta, verEnlace as verPorDe
 import type { ClienteChat } from '../../data/ops/chat'
 
 export const URL_LANDING = '/'
-export const URL_VERIFICACION = '/#contacto'       // formulario de verificación de la landing (mismo origen: reusa el prerregistro)
+export const URL_VERIFICACION = '/#contacto'       // formulario de verificación de la landing (mismo origen)
 export const URL_PRIVACIDAD = '/landing/privacidad.html'
 
-type Paso = 'cargando' | 'formulario' | 'chat' | 'personal'
+type Paso = 'cargando' | 'chat' | 'personal'
 export type SesionContacto = 'ninguna' | 'cliente' | 'personal'
-interface Deps { estado?: typeof estadoVisitante; abrir?: typeof abrirVisitante; registrar?: typeof prerregistrar; conSesion?: () => Promise<SesionContacto>; cliente?: ClienteChat
+interface Deps { abrir?: typeof abrirVisitante; conSesion?: () => Promise<SesionContacto>; cliente?: ClienteChat
   codigo?: string | null; ver?: typeof verPorDefecto; aplicar?: typeof aplicarPorDefecto }
 
 // ¿Quién abre el enlace? Sin sesión: un visitante. Con sesión de doctor: su cuenta. Con sesión del PERSONAL: no es un
-// cliente; este enlace no es su lugar de trabajo (ahí no puede pedir asesor ni se le pide prerregistro).
+// cliente; este enlace no es su lugar de trabajo (ahí no puede pedir asesor).
 async function haySesion(): Promise<SesionContacto> {
   if (!hasSupabase) return 'ninguna'
   try {
@@ -40,7 +40,23 @@ async function haySesion(): Promise<SesionContacto> {
   } catch { return 'ninguna' }
 }
 
-export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, registrar = prerregistrar, conSesion = haySesion, cliente,
+/** Al inicio del hilo: con quién habla, quién lo recomendó y que es Renovacell (confianza para abrir un chat que no es WhatsApp). */
+export function TarjetaConfianza({ enlace }: { enlace: EnlacePublico | null }) {
+  const asesor = enlace?.asesor ?? null
+  return (
+    <div className="rc-confianza" data-testid="contacto-confianza">
+      {enlace?.recomienda && <div className="rc-conf-rec"><Heart size={15} aria-hidden /> <span><b>{enlace.recomienda}</b> te recomendó con nosotros</span></div>}
+      <div className="rc-conf-marca"><BrandLogo alt="" className="rc-logo" /><span><b>Renovacell · Tecnologías Antiedad</b><small>renovacell.mx · Culiacán, Sinaloa</small></span></div>
+      <ul>
+        <li><ShieldCheck size={14} aria-hidden /> {asesor ? `Hablas directo con ${asesor.primer_nombre ?? asesor.nombre}, de nuestro equipo` : 'Hablas directo con nuestro equipo'}</li>
+        <li><Smartphone size={14} aria-hidden /> Sin descargar nada ni crear cuenta</li>
+        <li><Lock size={14} aria-hidden /> <span>Tus datos están protegidos (<a href={URL_PRIVACIDAD} target="_blank" rel="noopener">aviso de privacidad</a>)</span></li>
+      </ul>
+    </div>
+  )
+}
+
+export function Contacto({ abrir = abrirVisitante, conSesion = haySesion, cliente,
   codigo = typeof window !== 'undefined' ? codigoDeRuta(window.location.pathname) : null, ver = verPorDefecto, aplicar = aplicarPorDefecto }: Deps) {
   const [paso, setPaso] = useState<Paso>('cargando')
   const [conCuenta, setConCuenta] = useState(false)
@@ -56,18 +72,18 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
       if (sesion !== 'ninguna') { if (vivo) { setConCuenta(sesion === 'cliente'); setPaso(sesion === 'cliente' ? 'chat' : 'personal') } return }
       await abrir()
       if (codigo) { const e = await aplicar(codigo); if (vivo && e.valido) setEnlace(e) }   // queda de dónde llegó (gana el primero)
-      const e = await estado()
-      if (vivo) setPaso(e.prerregistrado ? 'chat' : 'formulario')
+      if (vivo) setPaso('chat')   // sin formulario: directo al chat; el asistente pide los datos platicando
     })()
     return () => { vivo = false }
-  }, [abrir, estado, conSesion, codigo, ver, aplicar])
+  }, [abrir, conSesion, codigo, ver, aplicar])
   const asesor = enlace?.asesor ?? null
-  const recomienda = enlace?.recomienda ?? null
 
   return (
     <div className="rc-contacto" data-testid="contacto">
       {paso === 'chat' ? (
         <ChatCanonico estilo="mensajeria" conCarrito={false} cliente={cliente} autoFoco
+          inicioHilo={conCuenta ? null : <TarjetaConfianza enlace={enlace} />}
+          notaRedactor={conCuenta ? null : <>Al escribirnos aceptas nuestro <a href={URL_PRIVACIDAD} target="_blank" rel="noopener">aviso de privacidad</a>.</>}
           tarjetaFinal={verificando && !conCuenta ? <TarjetaVerificarme onCerrar={() => setVerificando(false)} /> : null}
           barra={<>
             {conCuenta
@@ -78,8 +94,6 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
             <a href={URL_LANDING} data-testid="ir-landing"><Globe size={15} /> Conocer Renovacell</a>
           </>} />
       ) : (
-        // Antes del prerregistro YA se ve el chat: el asistente saluda y pide los datos dentro del hilo. No es un
-        // trámite previo, es el primer paso de la conversación; el redactor espera abajo.
         <div className="rc-chat rc-chat--pagina rc-chat--wa" data-testid="contacto-antesala">
           <header className="rc-head">
             {asesor
@@ -92,26 +106,13 @@ export function Contacto({ estado = estadoVisitante, abrir = abrirVisitante, reg
           </header>
           <div className="rc-thread">
             <div className="rc-day"><span>Hoy</span></div>
-            {paso === 'cargando' && !enlace ? <div className="rc-sys" role="status">Cargando…</div> : paso === 'personal' ? <AvisoPersonal url={codigo ? window.location.href.split(/[?#]/)[0] : undefined} /> : (<>
-              {/* Quien recibe un enlace que no es de WhatsApp necesita saber, antes de escribir, con quién habla. */}
-              <div className="rc-confianza" data-testid="contacto-confianza">
-                {recomienda && <div className="rc-conf-rec"><Heart size={15} aria-hidden /> <span><b>{recomienda}</b> te recomendó con nosotros</span></div>}
-                <div className="rc-conf-marca"><BrandLogo alt="" className="rc-logo" /><span><b>Renovacell · Tecnologías Antiedad</b><small>renovacell.mx · Culiacán, Sinaloa</small></span></div>
-                <ul>
-                  <li><ShieldCheck size={14} aria-hidden /> {asesor ? `Hablas directo con ${asesor.primer_nombre ?? asesor.nombre}, de nuestro equipo` : 'Hablas directo con nuestro equipo'}</li>
-                  <li><Smartphone size={14} aria-hidden /> Sin descargar nada ni crear cuenta</li>
-                  <li><Lock size={14} aria-hidden /> <span>Tus datos están protegidos (<a href={URL_PRIVACIDAD} target="_blank" rel="noopener">aviso de privacidad</a>)</span></li>
-                </ul>
-              </div>
-              {paso === 'cargando' ? <div className="rc-sys" role="status">Cargando…</div> : (<>
-              <div className="rc-msg rc-msg--ai rc-msg--inicio"><div className="rc-bubble-wrap"><div className="rc-meta">Renovacell</div><div className="rc-bubble">{asesor ? `Hola, te damos la bienvenida. ${asesor.primer_nombre ?? asesor.nombre} es tu asesor y te va a atender por aquí.` : 'Hola, te damos la bienvenida. Ya estamos aquí para atenderte.'}</div></div></div>
-              <div className="rc-msg rc-msg--ai"><div className="rc-bubble-wrap"><div className="rc-bubble">Solo dinos quién eres para empezar. Es un momento y no te lo volvemos a pedir.</div></div></div>
-              <Prerregistro registrar={registrar} onListo={() => setPaso('chat')} />
-              </>)}
+            {paso === 'personal' ? <AvisoPersonal url={codigo ? window.location.href.split(/[?#]/)[0] : undefined} /> : (<>
+              <TarjetaConfianza enlace={enlace} />
+              <div className="rc-sys" role="status">Conectando…</div>
             </>)}
           </div>
           <div className="rc-composer" aria-hidden>
-            <div className="rc-input rc-input--espera">{paso === 'formulario' ? 'Completa tus datos para escribir…' : 'Escribe tu mensaje…'}</div>
+            <div className="rc-input rc-input--espera">Escribe tu mensaje…</div>
             <button type="button" className="rc-send" disabled tabIndex={-1}><Send size={18} /></button>
           </div>
         </div>
@@ -134,46 +135,5 @@ function AvisoPersonal({ url: urlPropia }: { url?: string }) {
       <button type="button" className="rc-pre-enviar" onClick={() => void copiar()} data-testid="copiar-enlace-contacto">{copiado ? 'Enlace copiado' : 'Copiar enlace para compartir'}</button>
       <p className="rc-pre-nota">Las conversaciones que lleguen por este enlace las atiendes en <a href="/sistema">el sistema</a>, en Conversaciones.</p>
     </div>
-  )
-}
-
-function Prerregistro({ registrar, onListo }: { registrar: typeof prerregistrar; onListo: () => void }) {
-  const [d, setD] = useState<DatosPrerregistro>({ nombre: '', telefono: '', email: '', es_medico: false, cedula: '' })
-  const [acepta, setAcepta] = useState(false)
-  const [fallo, setFallo] = useState<{ campo?: CampoPrerregistro; mensaje: string } | null>(null)
-  const [enviando, setEnviando] = useState(false)
-  const pon = (k: keyof DatosPrerregistro) => (e: React.ChangeEvent<HTMLInputElement>) => { setD((x) => ({ ...x, [k]: e.target.value })); setFallo(null) }
-  const enviar = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (enviando) return
-    const v = validarPrerregistro(d, acepta)
-    if (v) { setFallo(v); return }
-    setEnviando(true); setFallo(null)
-    const r = await registrar(d)
-    setEnviando(false)
-    if (r.ok) onListo(); else setFallo({ campo: r.campo, mensaje: r.mensaje })
-  }
-  const mal = (c: CampoPrerregistro) => (fallo?.campo === c ? ' rc-campo--mal' : '')
-  const aviso = (c: CampoPrerregistro) => (fallo?.campo === c ? <small role="alert">{fallo.mensaje}</small> : null)
-  return (
-    <form className="rc-pre-tarjeta rc-pre-enhilo" onSubmit={enviar} noValidate data-testid="prerregistro" aria-label="Tus datos para empezar a chatear">
-      <div className={'rc-campo' + mal('nombre')}><label htmlFor="pre-nombre">Nombre completo</label>
-        <input id="pre-nombre" value={d.nombre} onChange={pon('nombre')} autoComplete="name" maxLength={120} placeholder="Nombre y apellidos" />{aviso('nombre')}</div>
-      <div className={'rc-campo' + mal('telefono')}><label htmlFor="pre-telefono">Celular</label>
-        <input id="pre-telefono" value={d.telefono} onChange={pon('telefono')} type="tel" inputMode="numeric" autoComplete="tel" maxLength={16} placeholder="10 dígitos" />{aviso('telefono')}</div>
-      <div className={'rc-campo' + mal('email')}><label htmlFor="pre-email">Correo</label>
-        <input id="pre-email" value={d.email} onChange={pon('email')} type="email" inputMode="email" autoComplete="email" maxLength={160} placeholder="ejemplo@correo.com" />{aviso('email')}</div>
-      <label className="rc-casilla"><input type="checkbox" checked={d.es_medico} onChange={(e) => { setD((x) => ({ ...x, es_medico: e.target.checked })); setFallo(null) }} data-testid="es-medico" />
-        <span>Soy profesional de la salud</span></label>
-      {d.es_medico && (
-        <div className={'rc-campo' + mal('cedula')}><label htmlFor="pre-cedula">Cédula profesional (opcional)</label>
-          <input id="pre-cedula" value={d.cedula} onChange={pon('cedula')} inputMode="numeric" maxLength={40} placeholder="Número de cédula" />{aviso('cedula')}</div>
-      )}
-      <label className="rc-casilla"><input type="checkbox" checked={acepta} onChange={(e) => { setAcepta(e.target.checked); setFallo(null) }} data-testid="acepta-aviso" />
-        <span>He leído y acepto el <a href={URL_PRIVACIDAD} target="_blank" rel="noopener">Aviso de privacidad</a>.</span></label>
-      {fallo && (!fallo.campo || fallo.campo === 'consentimiento') && <div role="alert" className="rc-error rc-error--inline">{fallo.mensaje}</div>}
-      <button type="submit" className="rc-pre-enviar" disabled={enviando} data-testid="iniciar-conversacion">{enviando ? 'Un momento…' : 'Empezar a chatear'}</button>
-      <p className="rc-pre-nota">¿Ya tienes cuenta? <a href="/sistema">Inicia sesión</a></p>
-    </form>
   )
 }

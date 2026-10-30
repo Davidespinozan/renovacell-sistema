@@ -12,6 +12,7 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'ver_carrito' | 'agregar_al_carrito' | 'actualizar_carrito' | 'quitar_del_carrito' | 'vaciar_carrito' | 'declinar_asesor'   // CC-5
   | 'preparar_checkout'   // CC-6 (lectura; confirmar es SOLO por el botón del usuario)
   | 'enlace_portal'   // LIVE C1 · URL pública oficial del portal (sin tokens ni datos): la ofrece a audiencias públicas y canales
+  | 'registrar_contacto'   // CONTACTO CONVERSACIONAL · solo el visitante del enlace que aún no deja sus datos
 export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
@@ -73,9 +74,19 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
 ]
 export const NOMBRES = new Set<string>(HERRAMIENTAS.map((h) => h.name))
 
+// CONTACTO CONVERSACIONAL · sin formulario: la IA pide nombre, celular y correo platicando y los registra con esta
+// herramienta. Solo existe para el visitante del portal (enlace del chat) que aún no los deja; la base valida igual que el
+// formulario y un dato inválido regresa como `campo` para pedirlo de nuevo.
+export const REGISTRAR_CONTACTO: DefinicionHerramienta = { name: 'registrar_contacto', autoridad: 'cualquiera', mutante: true,
+  description: 'Guarda los datos de contacto que la persona te dio en ESTA conversación (nombre completo, celular a 10 dígitos y correo) para que su asesor la atienda. Úsala en cuanto tengas los tres, con lo que ella escribió (no inventes ni completes). Si responde registrado:false, pide de nuevo solo el dato indicado en `campo`.',
+  input_schema: { type: 'object', properties: {
+    nombre: texto('Nombre completo como lo escribió (nombre y apellido).', 120), telefono: texto('Celular como lo escribió.', 30), email: texto('Correo como lo escribió.', 160),
+    es_medico: { type: 'boolean', description: 'true solo si dijo ser profesional de la salud.' }, cedula: texto('Cédula profesional, solo si la dio.', 40),
+  }, required: ['nombre', 'telefono', 'email'], additionalProperties: false } }
+
 /** Herramientas expuestas al modelo según el actor (los pedidos solo con cuenta). */
-export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal'): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
-  return HERRAMIENTAS
+export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
+  return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : [])]
     .filter((h) => h.autoridad === 'cualquiera' || conCuenta)
     .filter((h) => canal === 'portal' || !SOLO_PORTAL.includes(h.name))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal
     .filter((h) => h.name !== 'enlace_portal' || !conCuenta || canal !== 'portal')   // el enlace solo tiene sentido sin sesión en el portal
@@ -88,7 +99,15 @@ const str = (v: unknown, max: number): string | null => typeof v === 'string' &&
 const uuid = (v: unknown): string | null => typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null
 
 /** Valida nombre, forma y AUTORIDAD de una llamada del modelo. Los product_id deben venir de retrieval autorizado en este turno. */
-export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalIA }): Validada {
+export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalIA; contactoPendiente?: boolean }): Validada {
+  if (nombre === 'registrar_contacto') {
+    if (!ctx.contactoPendiente || ctx.conCuenta || (ctx.canal ?? 'portal') !== 'portal') return { ok: false, motivo: 'no_autorizada' }
+    const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
+    const nom = str(i.nombre, 120); const tel = str(i.telefono, 30); const email = str(i.email, 160)
+    if (!nom || !tel || !email || (i.es_medico !== undefined && typeof i.es_medico !== 'boolean')) return { ok: false, motivo: 'argumentos' }
+    const cedula = i.cedula === undefined || i.cedula === null || i.cedula === '' ? null : str(i.cedula, 40)
+    return { ok: true, nombre: 'registrar_contacto', args: { nombre: nom, telefono: tel, email, es_medico: i.es_medico === true, cedula }, ids: [] }
+  }
   if (typeof nombre !== 'string' || !NOMBRES.has(nombre)) return { ok: false, motivo: 'desconocida' }
   const def = HERRAMIENTAS.find((h) => h.name === nombre)!
   if (def.autoridad === 'cuenta' && !ctx.conCuenta) return { ok: false, motivo: 'no_autorizada' }
@@ -207,6 +226,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
     case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
     case 'enlace_portal': return o.url === URL_PORTAL_PUBLICA ? ['PORTAL_LINK_EVIDENCE'] : []
+    case 'registrar_contacto': return []   // datos de contacto: no son evidencia comercial
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'

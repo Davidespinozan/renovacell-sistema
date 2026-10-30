@@ -51,6 +51,8 @@ interface Props {
   tira?: React.ReactNode
   acciones?: AccionChat[]
   hoja?: React.ReactNode
+  inicioHilo?: React.ReactNode       // ENLACE · al inicio del hilo (p. ej. con quién hablas y quién te recomendó)
+  notaRedactor?: React.ReactNode     // CONTACTO CONVERSACIONAL · línea bajo el redactor (aviso de privacidad)
 }
 
 /** Una acción del menú «+» del redactor (solo personal). */
@@ -124,7 +126,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -484,6 +486,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       )}
 
       <div className="rc-thread" aria-live="polite">
+        {inicioHilo}
         {cargando && <div className="rc-sys">Cargando conversación…</div>}
         {!cargando && anterior && (
           <div className="rc-anterior" data-testid="tarjeta-anterior">
@@ -560,6 +563,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         />
         <button type="submit" className="rc-send" disabled={!puedoEscribir || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>
       </form>
+      {notaRedactor && <div className="rc-nota-redactor">{notaRedactor}</div>}
       {!asesor && conv && !cerrada && (modo === 'ai_active' || modo === 'human_offered') && (
         <div className="rc-foot"><button type="button" className="rc-link" onClick={() => accion(() => cliente.solicitarAsesor(convId!))} data-testid="btn-asesor">¿Prefieres hablar con un asesor?</button></div>
       )}

@@ -5,8 +5,9 @@
 //     verificación) el doctor con verificación PENDIENTE también conversa con su asesor; lo que no tiene es precios
 //     ni compras, y eso lo deciden la base (puede_ver_precio, crear_pedido) y la audiencia de la IA.
 //   · Enlace de contacto (CX-ENLACE): quien entra por el enlace que se comparte en grupos conversa SIN estar
-//     verificado, pero solo después de dejar su prerregistro (nombre, celular, correo, aviso de privacidad).
-//     Un token de visitante sin prerregistro no abre nada.
+//     verificado. CONTACTO CONVERSACIONAL (20270212): sin formulario; el visitante SIN datos conversa con el asistente,
+//     que se los pide platicando y los registra (registrar_contacto). Hasta entonces solo conversa con la IA: no manda
+//     fotos ni pide asesor. Un token que no es de un visitante no abre nada.
 // La landing no usa esta función: ahí atiende el agente de orientación (`assistant`).
 // El actor lo deriva el servidor: perfil+rol del JWT. Nunca se acepta actor_type,
 // actor_id, profile_id ni seller_profile_id del cliente. La autoridad está en los comandos
@@ -41,6 +42,8 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 const ACCIONES = new Set(['adjuntar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo'])   // + Chat V2-C1
+// CONTACTO CONVERSACIONAL · lo único que puede hacer un visitante que aún no deja sus datos: conversar con el asistente.
+const SOLO_CONVERSAR = new Set(['abrir', 'leer', 'enviar', 'leido', 'escribiendo', 'sesiones', 'leer_sesion'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(conCors(async (req) => {
@@ -64,16 +67,18 @@ Deno.serve(conCors(async (req) => {
     if (!q.ok) return json(q.status, q.body)
     quien = { uid: q.quien.uid, role: q.quien.role, verified: q.quien.verified }
   }
-  // Puerta de acceso. Se decide ANTES de cualquier comando o del limitador: sin sesión solo pasa un visitante CON
-  // prerregistro (lo dice la base, cc_puerta_chat). Con sesión, la cuenta manda.
+  // Puerta de acceso. Se decide ANTES de cualquier comando o del limitador: sin sesión solo pasa un visitante (lo dice la
+  // base, cc_puerta_chat); si aún no deja sus datos, solo conversa con el asistente. Con sesión, la cuenta manda.
   const hash: string | null = quien ? null : await hashToken(p.token)
+  let sinDatos = false
   if (!quien) {
     if (!quien && !hash) return json(401, { error: 'sin_identidad', message: 'Abre la conversación desde el enlace de contacto de Renovacell o inicia sesión.' })
     const { data: puerta, error: ePuerta } = await admin.rpc('cc_puerta_chat', { p_hash: hash, p_profile: null })
     if (ePuerta || !puerta) return json(503, { error: 'no_disponible', message: 'No se pudo completar la operación. Intenta más tarde.' })
     const pu = puerta as { visitante: boolean; prerregistrado: boolean }
     if (!pu.visitante) return json(401, { error: 'sin_identidad', message: 'Tu sesión expiró. Abre de nuevo el enlace de contacto de Renovacell.' })
-    if (!pu.prerregistrado) return json(403, { error: 'prerregistro_requerido', message: 'Antes de conversar, déjanos tus datos de contacto.' })
+    sinDatos = !pu.prerregistrado
+    if (sinDatos && !SOLO_CONVERSAR.has(action)) return json(403, { error: 'prerregistro_requerido', message: 'Antes, compártenos en el chat tu nombre, celular y correo para que tu asesor te atienda.' })
   }
   const actor = derivarActor(quien, hash)
   if (!actor) return json(401, { error: 'sin_identidad', message: 'Inicia sesión o abre la conversación desde el enlace de contacto.' })
@@ -98,6 +103,9 @@ Deno.serve(conCors(async (req) => {
     if (!v.permitido) return respuestaLimite(v)
     const { data, error } = await admin.rpc('cc_abrir_conversacion', { p_visitor_hash: hash, p_profile: actor.profile })
     if (error) return falla(error)
+    // CONTACTO CONVERSACIONAL · quien entra sin datos encuentra al asistente ya saludando y preguntando su nombre.
+    const abierta = (data as { conversation_id?: string } | null)?.conversation_id
+    if (sinDatos && abierta) await admin.rpc('cc_bienvenida_contacto', { p_conv: abierta, p_hash: hash }).then(() => {}, () => {})
     return json(200, data)
   }
 
@@ -176,7 +184,9 @@ Deno.serve(conCors(async (req) => {
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
     let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {
-      ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto) : 'silenciada'
+      // CONTACTO CONVERSACIONAL · al visitante sin datos la IA se los pide y los registra (con quién va a hablar, si llegó por un enlace).
+      const contacto = sinDatos ? ((await admin.rpc('cc_ia_contacto_pendiente', { p_hash: hash }).then((x: { data: unknown }) => x.data, () => null)) ?? null) as { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null : null
+      ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto, 'portal', null, contacto) : 'silenciada'
     }
     if (ia === 'respondio') enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // WA-2 / META · la respuesta de la IA, si la conversación es de un canal
     return json(200, { ...r, ia })

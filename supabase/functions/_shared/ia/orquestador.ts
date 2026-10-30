@@ -21,7 +21,7 @@ export interface DepsOrquestador {
   proveedor: { nombre: string; modelo: string; generar: (s: Solicitud) => Promise<Respuesta> }
   config: { maxTokens: number; timeoutMs: number; maxRondas: number; historial: number }
   politica: {
-    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalTurno }) => string
+    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalTurno; contacto?: EntradaTurno['contacto'] }) => string
     clasificarIntencion: (t: string) => string; esLimiteClinico: (t: string) => boolean
     historialParaModelo: (m: Array<{ actor: string; content: string }>, maximo?: number) => Array<{ role: 'user' | 'assistant'; content: string }>
     envolverDatos: (etiqueta: string, contenido: string) => string
@@ -30,8 +30,8 @@ export interface DepsOrquestador {
     prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
   }
   herramientas: {
-    herramientasPara: (conCuenta: boolean, canal?: CanalTurno) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
-    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno }) => Validada
+    herramientasPara: (conCuenta: boolean, canal?: CanalTurno, contactoPendiente?: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
+    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno; contactoPendiente?: boolean }) => Validada
     ejecutarEnlacePortal?: () => { url: string; uso: string }
     acotarSalida: (v: unknown) => string; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
@@ -52,7 +52,9 @@ export interface DepsOrquestador {
 // vinculación comercial (cartera, asesor) se conserva en la conversación; la elevación de permisos solo existe con sesión.
 export type CanalTurno = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
 // R4-C13 · `adjunto`: imagen o PDF del cliente en ESTE turno (canal); va junto a su último mensaje y no se persiste.
-export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno; adjunto?: { tipo: 'image' | 'document'; media_type: string; data: string } }
+export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno; adjunto?: { tipo: 'image' | 'document'; media_type: string; data: string }
+  // CONTACTO CONVERSACIONAL · visitante del enlace del chat sin datos todavía (lo dice el servidor): la IA los pide y los registra
+  contacto?: { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null }
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number }; clase?: string; motivoValidacion?: string
@@ -104,7 +106,8 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const nombresCatalogo = Array.isArray(cat.data) ? (cat.data as Array<{ nombre?: string }>).map((p) => String(p.nombre ?? '')).filter(Boolean) : []
 
   const conCuenta = ctx.actor !== 'visitor'
-  const tools = d.herramientas.herramientasPara(conCuenta, canal)
+  const contactoPendiente = !!e.contacto?.pendiente && e.actor === 'visitor' && canal === 'portal'
+  const tools = d.herramientas.herramientasPara(conCuenta, canal, contactoPendiente)
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
@@ -153,7 +156,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal }) + productosMencionados + notaCorreccion
+    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null }) + productosMencionados + notaCorreccion
     const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
@@ -179,7 +182,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     messages.push({ role: 'assistant', content: r.bloques })
     const resultados: Bloque[] = []
     for (const ll of r.llamadas) {
-      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal })
+      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente })
       if (!v.ok) {
         await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: String(ll.name).slice(0, 60), p_status: v.motivo === 'no_autorizada' || v.motivo === 'id_no_autorizado' ? 'no_autorizada' : 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
@@ -239,6 +242,8 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: t.perfilIA, p_product: a.product_id })
     case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: t.perfilIA, p_folio: a.folio })
     case 'enlace_portal': return { data: t.enlace ? t.enlace() : null, error: t.enlace ? null : 'desconocida' }   // puro: sin base, sin tokens
+    // CONTACTO CONVERSACIONAL · solo el visitante de ESTA conversación (la base lo verifica); un dato malo vuelve como `campo`.
+    case 'registrar_contacto': return rpc('cc_ia_registrar_contacto', { p_conv: e.conv, p_hash: e.visitorHash, p_nombre: a.nombre, p_telefono: a.telefono, p_email: a.email, p_es_medico: a.es_medico, p_cedula: a.cedula })
     case 'solicitar_asesor': {
       // R4-C15 · canal: cuando la IA decide pasar la conversación, el traspaso se registra con el aviso interno (prefijo
       // 'comercial', solo para el equipo) y la IA se lo dice al cliente en SU respuesta; así nunca sale "Pediste hablar con un

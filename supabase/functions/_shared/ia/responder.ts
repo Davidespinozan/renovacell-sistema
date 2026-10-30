@@ -76,9 +76,9 @@ export function dependenciasPortal(n: politica.DatosNegocio) {
 // deno-lint-ignore no-explicit-any
 type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
 // R4-B2-IA1 · 'transferida' solo existe en canales: el portal conserva exactamente su contrato anterior.
-export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal?: 'portal'): Promise<ResultadoIA>
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal?: 'portal', adjunto?: null, contacto?: EntradaTurno['contacto']): Promise<ResultadoIA>
 export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, adjunto?: EntradaTurno['adjunto'] | null): Promise<ResultadoIA | 'transferida'>
-export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal', adjunto: EntradaTurno['adjunto'] | null = null): Promise<ResultadoIA | 'transferida'> {
+export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno = 'portal', adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null): Promise<ResultadoIA | 'transferida'> {
   // R4-B2-IA1 · en canales (WhatsApp/Instagram/Messenger): una solicitud EXPLÍCITA de persona o un asunto de pedido o
   // reclamación se transfiere de inmediato con la herramienta existente (cc_solicitar_asesor, idempotente), sin llamar al
   // modelo: el cliente recibe UN aviso (el del sistema, con la disponibilidad real) y no una respuesta duplicada de la IA.
@@ -101,7 +101,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
       }
     }
   }
-  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto)
+  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto, canal === 'portal' ? contacto : null)
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
@@ -117,7 +117,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
 }
 
 // deno-lint-ignore no-explicit-any
-async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null): Promise<ResultadoIA> {
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
   const cfg0 = configurar(env)
   // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
@@ -141,7 +141,7 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const canalDeps = portalDeps ?? dependenciasCanal(negocio, { comercial })
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
-    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}) },
+    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}), ...(contacto ? { contacto } : {}) },
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),

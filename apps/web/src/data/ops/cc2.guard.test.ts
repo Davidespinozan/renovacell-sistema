@@ -135,14 +135,18 @@ describe('frontend', () => {
   })
   // Decisiones del dueño (10 y 13 oct 2026): conversan las cuentas con acceso y, por el enlace de contacto, quien
   // dejó su prerregistro. La puerta la decide la BASE (cc_puerta_chat) antes del limitador y de cualquier otro comando.
-  it('Edge chat: la puerta va primero; sin sesión solo pasa un visitante con prerregistro; con sesión manda la cuenta (el doctor pendiente también conversa)', () => {
+  // CONTACTO CONVERSACIONAL (dueño, 30 oct): el visitante SIN datos también pasa, pero solo a conversar con el asistente (que
+  // se los pide); no manda fotos, no pide asesor ni toca carrito hasta dejarlos.
+  it('Edge chat: la puerta va primero; sin sesión solo pasa un visitante (sin datos, solo a conversar); con sesión manda la cuenta (el doctor pendiente también conversa)', () => {
     const c = codigo(chatSrc)
     const iPuerta = c.indexOf("admin.rpc('cc_puerta_chat'")
     const otros = ['limitarTodas(', 'limitar(', 'caller.rpc(', "admin.rpc('cc_abrir_conversacion'", "admin.rpc('cc_enviar_mensaje'", "admin.rpc('cc_solicitar_asesor'"].map((x) => c.indexOf(x)).filter((n) => n >= 0)
     expect(iPuerta).toBeGreaterThan(0); expect(Math.min(...otros)).toBeGreaterThan(iPuerta)
     expect(c).toMatch(/if \(!quien\) \{\s*\n\s*if \(!quien && !hash\) return json\(401, \{ error: 'sin_identidad'/)
     expect(c).toMatch(/if \(!pu\.visitante\) return json\(401/)
-    expect(c).toMatch(/if \(!pu\.prerregistrado\) return json\(403, \{ error: 'prerregistro_requerido'/)
+    expect(c).toMatch(/sinDatos = !pu\.prerregistrado\s*\n\s*if \(sinDatos && !SOLO_CONVERSAR\.has\(action\)\) return json\(403, \{ error: 'prerregistro_requerido'/)
+    const solo = /const SOLO_CONVERSAR = new Set\(\[([^\]]*)\]\)/.exec(c)?.[1] ?? ''
+    expect(solo).toContain("'enviar'"); for (const x of ['adjuntar', 'solicitar_asesor', 'asignar', 'iniciar', 'cola']) expect(solo).not.toContain(`'${x}'`)
     expect(c).toMatch(/if \(ePuerta \|\| !puerta\) return json\(503/)
     expect(c).toMatch(/const hash: string \| null = quien \? null : await hashToken\(p\.token\)/)
     expect(c).not.toMatch(/sin_acceso/)                                                                    // CUENTA ≠ VERIFICACIÓN: el pendiente conversa

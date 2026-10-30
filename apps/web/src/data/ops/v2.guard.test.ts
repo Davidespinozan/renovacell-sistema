@@ -87,9 +87,12 @@ describe('IA · contexto', () => {
     expect(p).toMatch(/m\.actor === 'ai' \? 'assistant' : m\.actor === 'visitor' \|\| m\.actor === 'doctor' \? 'user' : null/)
     expect(p).toMatch(/if \(!role\) continue/)
   })
-  it('26 · el registro de herramientas no cambió (17 nombres: 16 + enlace_portal de LIVE C1; sin confirmar pedido)', () => {
+  // CONTACTO CONVERSACIONAL · + registrar_contacto, fuera de la lista general: solo para el visitante del portal sin datos.
+  it('26 · el registro de herramientas no cambió (18 nombres: 16 + enlace_portal de LIVE C1 + registrar_contacto; sin confirmar pedido)', () => {
     const h = codigo(herramientasSrc)
-    expect((h.match(/name: '/g) ?? []).length).toBe(17)
+    expect((h.match(/name: '/g) ?? []).length).toBe(18)
+    expect(h).toMatch(/export const REGISTRAR_CONTACTO: DefinicionHerramienta = \{ name: 'registrar_contacto'/)
+    expect(h).toMatch(/contactoPendiente && !conCuenta && canal === 'portal' \? \[REGISTRAR_CONTACTO\]/)
     expect(h).not.toContain("name: 'confirmar_checkout'")
   })
 })

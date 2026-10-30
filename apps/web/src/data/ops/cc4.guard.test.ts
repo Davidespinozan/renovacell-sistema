@@ -82,7 +82,7 @@ describe('módulos de IA (puros) y Edge chat', () => {
   })
   it('Edge chat: orquesta con el perfil del servidor; límites CC-0B antes del proveedor; costo diario en tokens; el adaptador legacy por HTTP a `assistant` desapareció', () => {
     const s = codigo(chatSrc) + codigo(responderSrc)
-    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? await responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto\) : 'silenciada'/)
+    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? await responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\) : 'silenciada'/)   // CONTACTO CONVERSACIONAL
     expect(s).toMatch(/profile: actor === 'doctor' \? profile : null/)
     expect(s).not.toMatch(/functions\/v1\/assistant/); expect(s).not.toMatch(/historialParaIA/)
     for (const sc of ['ia_turno', 'ia_turno_uid', 'ia_turno_hora', 'ia_turno_global', 'ia_tokens_dia', 'ia_tokens_dia_uid']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }

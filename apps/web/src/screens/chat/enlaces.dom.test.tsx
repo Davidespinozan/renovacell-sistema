@@ -28,24 +28,23 @@ describe('enlace del chat', () => {
   it('quien recibe una recomendación ve, antes de escribir, quién la recomendó, con qué asesor habla y que es Renovacell', async () => {
     const aplicar = vi.fn(async () => ROBERTO)
     render(<Contacto codigo="lourdes-k7m2" ver={async () => ROBERTO} aplicar={aplicar} abrir={vi.fn(async () => 'nuevo' as const)} conSesion={async () => 'ninguna' as const}
-      estado={async () => ({ visitante: true, prerregistrado: false, nombre: null })} cliente={cliente()} />)
-    expect(await screen.findByTestId('contacto-asesor')).toHaveTextContent('Roberto Ibarra')
-    const conf = screen.getByTestId('contacto-confianza')
+      cliente={cliente()} />)
+    expect(await screen.findByTestId('te-atiende')).toHaveTextContent('Te atiende Roberto')
+    const conf = await screen.findByTestId('contacto-confianza')
     expect(conf).toHaveTextContent('Lourdes te recomendó con nosotros')
     expect(conf).toHaveTextContent('Renovacell · Tecnologías Antiedad')
     expect(conf).toHaveTextContent('Hablas directo con Roberto')
     expect(conf).toHaveTextContent('Sin descargar nada ni crear cuenta')
-    await screen.findByTestId('prerregistro')
-    expect(screen.getByTestId('contacto-antesala')).toHaveTextContent('Roberto es tu asesor y te va a atender por aquí')
+    expect(screen.queryByTestId('prerregistro')).toBeNull()   // sin formulario: el asistente pide los datos platicando
     expect(aplicar).toHaveBeenCalledWith('lourdes-k7m2')   // queda registrado por qué enlace llegó
   })
 
   it('sin código (enlace general) se ve como siempre', async () => {
     const ver = vi.fn(async () => ROBERTO)
     render(<Contacto codigo={null} ver={ver} abrir={vi.fn(async () => 'nuevo' as const)} conSesion={async () => 'ninguna' as const}
-      estado={async () => ({ visitante: true, prerregistrado: false, nombre: null })} cliente={cliente()} />)
-    expect(await screen.findByTestId('contacto-asesor')).toHaveTextContent('Renovacell')
-    expect(screen.queryByText(/te recomendó/)).toBeNull()
+      cliente={cliente()} />)
+    await screen.findByTestId('chat-canonico')
+    expect(screen.queryByTestId('te-atiende')).toBeNull(); expect(screen.queryByText(/te recomendó/)).toBeNull()
     expect(ver).not.toHaveBeenCalled()
   })
 

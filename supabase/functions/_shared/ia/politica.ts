@@ -123,13 +123,30 @@ export function contextoCanal(canal: CanalPolitica): string {
     'R4-B2 · TRANSFERENCIA: solo cuando hace falta (pide una persona; pedido, envío, devolución o reclamación; no puede usar el portal; o no puedes resolver con lo aprobado). Usa solicitar_asesor sin pedir confirmación y avisa UNA sola vez, sin prometer tiempos ni disponibilidad. La compra, la recompra y las condiciones especiales (mayoreo, crédito, cotización, descuento) las transfiere el sistema por su cuenta después de tu respuesta: ahí no uses solicitar_asesor. Los asesores son del equipo comercial de Renovacell, no personal clínico. Si ya resolviste la duda, no ofrezcas un asesor por costumbre ni presiones la compra.',
   ].join('\n')
 }
-export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica }
+export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica
+  contacto?: ContactoPendiente | null }
+/** CONTACTO CONVERSACIONAL · visitante del enlace del chat que aún no deja sus datos (lo dice el servidor). */
+export interface ContactoPendiente { pendiente: boolean; asesor?: string | null; recomienda?: string | null }
+
+// CONTACTO CONVERSACIONAL · el dueño no quiere formulario: la IA pide los datos platicando, como lo haría una persona.
+export function tareaContacto(c: ContactoPendiente): string | null {
+  if (!c.pendiente) return null
+  return [
+    'DATOS DE CONTACTO PENDIENTES (lo dice el servidor): esta persona entró por el enlace del chat y todavía no nos deja su nombre, celular y correo. Ya la saludaste y le preguntaste su nombre en tu primer mensaje.',
+    'Obtenlos conversando, con calidez y sin sonar a trámite: primero su nombre; luego, en un solo mensaje natural, su celular y su correo (explica en pocas palabras que son para que ' + (c.asesor ? c.asesor + ', su asesor,' : 'su asesor') + ' pueda darle seguimiento). Si dice ser profesional de la salud puedes preguntarle su cédula, pero es opcional.',
+    'Mientras tanto responde sus dudas generales brevemente (sin precios: esos requieren cuenta verificada) y retoma lo que falte. No digas "formulario", "registro" ni "prerregistro"; nunca inventes ni completes un dato.',
+    'En cuanto tengas nombre completo, celular y correo, usa registrar_contacto con lo que escribió. Si regresa registrado:false, pide de nuevo SOLO el dato de `campo` con amabilidad (telefono: 10 dígitos; email: correo válido; nombre: nombre y apellido). Al quedar registrado, agradécele y sigue ayudándole' + (c.asesor ? '; puedes decir que ' + c.asesor + ' ya tiene su conversación.' : '.'),
+    ...(c.recomienda ? [`${c.recomienda}, cliente de Renovacell, le recomendó escribirnos: puedes mencionarlo con naturalidad.`] : []),
+  ].join(' ')
+}
 export function construirSistema(e: EntradaSistema): string {
   const enCanal = !!e.canal && e.canal !== 'portal'
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '',
     enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
   const canal = contextoCanal(e.canal ?? 'portal')
   if (canal) partes.push('', canal)
+  const contacto = e.contacto ? tareaContacto(e.contacto) : null
+  if (contacto) partes.push('', contacto)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
   else partes.push('', 'EVIDENCIA DISPONIBLE EN ESTE TURNO: ninguna todavía. Usa herramientas antes de afirmar.')
   const atencion = atencionHumana(e.evidencia)
