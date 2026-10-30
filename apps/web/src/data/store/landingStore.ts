@@ -12,6 +12,7 @@
 // La firma de useLanding NO cambia al conectar; solo el cuerpo de estas funciones.
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 import type { Json } from '../database.types'
 import { mensajeDeError, reportarFallo } from './escritura'
 
@@ -183,7 +184,7 @@ async function hydrate() {
 }
 if (hasSupabase) {
   hydrate()
-  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') hydrate() })
+  alCambiarSesion(() => { hydrate() })
 }
 
 export function saveLanding(next: LandingContent) {

@@ -8,6 +8,7 @@ import { CURRENT_USER as MOCK_ME, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../m
 import { isStaffUser } from '../mock/users'
 import { getSnapshot as directorySnapshot, subscribe as directorySubscribe } from './directoryStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 import { notify } from './notificationsStore'
 import { CHAT_SCREEN } from '../../app/roles'
 import { mensajeDeError, reportarFallo } from './escritura'
@@ -144,9 +145,9 @@ if (hasSupabase) {
   directorySubscribe(() => emit())
   hydrate()
   ensureRealtime()
-  supabase.auth.onAuthStateChange((ev) => {
-    if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') { hydrate(); ensureRealtime() }
-    else if (ev === 'SIGNED_OUT') { conversations = []; messages = {}; emit() }
+  alCambiarSesion((_e, uid) => {
+    if (uid) { hydrate(); ensureRealtime() }
+    else { conversations = []; messages = {}; emit() }
   })
 }
 

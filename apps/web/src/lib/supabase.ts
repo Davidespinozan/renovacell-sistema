@@ -4,6 +4,7 @@
 // apps/web/.env.local (gitignoreado); en producción se inyectan en el build.
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../data/database.types'
+import { fetchConRegion } from './supabase.region'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -21,6 +22,7 @@ export const hasSupabase = Boolean(url && anonKey)
 // hasSupabase=false nadie usa este cliente: todos los stores checan la bandera.
 export const supabase = createClient<Database>(url || 'http://localhost:54321', anonKey || 'anon-placeholder', {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  global: { fetch: fetchConRegion },
 })
 
 // Cache SÍNCRONO del id del usuario en sesión (para escribir doctor_id = auth.uid()

@@ -13,9 +13,9 @@ import { payOrder, reloadOrders } from '../../data/store/ordersStore'
 import { AvisoEnvioGratisVista, useAvisoEnvioGratis } from '../../app/AvisoEnvioGratis'   // ENT-P · mismo aviso que el Catálogo
 import { hasSupabase } from '../../lib/supabase'
 
-interface Props { conversationId?: string | null; cartId?: string | null; soloLectura?: boolean; cliente?: ClienteCarrito; intervaloMs?: number; compacto?: boolean }
+interface Props { conversationId?: string | null; cartId?: string | null; soloLectura?: boolean; cliente?: ClienteCarrito; intervaloMs?: number; compacto?: boolean; senal?: unknown }
 
-export function CarritoPanel({ conversationId, cartId, soloLectura = false, cliente = clientePorDefecto, intervaloMs = 6000, compacto = true }: Props) {
+export function CarritoPanel({ conversationId, cartId, soloLectura = false, cliente = clientePorDefecto, intervaloMs = 20_000, compacto = true, senal }: Props) {
   const [cart, setCart] = useState<Carrito | null>(null)
   const [abierto, setAbierto] = useState(!compacto)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +38,14 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
     document.addEventListener('visibilitychange', tick)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
   }, [cargar, intervaloMs])
+
+  // PERF: en vez de sondear cada 6 s, el chat avisa con `senal` (último mensaje) y el carrito se relee solo entonces:
+  // así un producto que agrega la IA o el asesor aparece junto con su mensaje.
+  const primeraSenal = useRef(true)
+  useEffect(() => {
+    if (primeraSenal.current) { primeraSenal.current = false; return }
+    void cargar()
+  }, [senal, cargar])
 
   const mutar = async (fn: () => Promise<{ ok: boolean; error?: { mensaje: string } }>) => {
     if (ocupado || !cart) return

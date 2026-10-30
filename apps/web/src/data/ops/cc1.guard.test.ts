@@ -120,7 +120,8 @@ describe('frontend · integración silenciosa', () => {
   it('RoleContext: sin sesión abre, con sesión adopta; SIGNED_IN adopta', () => {
     const r = codigo(roleSrc)
     expect(r).toMatch(/if \(active\) void \(s \? adoptarVisitante\(\) : abrirVisitante\(\)\)/)
-    expect(r).toMatch(/else if \(event === 'SIGNED_IN'\) void adoptarVisitante\(\)/)
+    // PERF: SIGNED_IN también llega al volver a la pestaña; solo adopta cuando cambia la cuenta.
+    expect(r).toMatch(/else if \(event === 'SIGNED_IN'\) \{ if \(uid !== uidAdoptado\) \{ uidAdoptado = uid; void adoptarVisitante\(\) \} \}/)
   })
   it('ops: nunca manda profile_id/visitor_id; usa localStorage con la llave rc_visitor', () => {
     const o = codigo(opsSrc)

@@ -435,7 +435,7 @@ function PestanaWhatsApp({ cliente, chat, canalOp }: { cliente: ClienteAtencion;
   const [filtro, setFiltro] = useState<CanalBandeja | 'todos'>('todos')
   const cargar = useCallback(async () => { const r = await cliente.canales(); if (r.ok) { setBandeja(r.data); setError(null) } else setError(r.error) }, [cliente])
   useEffect(() => { void cargar() }, [cargar])
-  useEffect(() => { const t = setInterval(() => { if (!abierta) void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, abierta])
+  useEffect(() => { const t = setInterval(() => { if (!abierta && document.visibilityState === 'visible') void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, abierta])
 
   // R4-B2-4 · desde el panel (atención por personas) se abre la conversación de la bandeja por su id
   const abrirPorId = (id: string) => { const c = bandeja?.chats.find((x) => x.conversation_id === id); if (c) { setControl(null); setAbierta(c) } }

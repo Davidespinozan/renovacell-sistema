@@ -110,9 +110,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         if (active) void (s ? adoptarVisitante() : abrirVisitante())
       })
     }
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    // PERF: SIGNED_IN también llega al volver a la pestaña; adoptar solo cuando cambia la cuenta.
+    let uidAdoptado = currentUserId()
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const uid = session?.user?.id ?? null
       if (event === 'PASSWORD_RECOVERY') setMode('reset')
-      else if (event === 'SIGNED_IN') void adoptarVisitante()
+      else if (event === 'SIGNED_IN') { if (uid !== uidAdoptado) { uidAdoptado = uid; void adoptarVisitante() } }
       else if (event === 'SIGNED_OUT') {
         setUser(null)
         setCapabilities([])

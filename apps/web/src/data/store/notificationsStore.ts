@@ -6,6 +6,7 @@
 // Realtime; el "leído" es POR USUARIO (`notification_reads`). Sin backend, mock.
 import type { RoleKey } from '../../app/roles'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 
 export interface Notif {
   id: string
@@ -111,9 +112,9 @@ async function ensureRealtime() {
 if (hasSupabase && supabase.auth) {
   hydrate().catch((e) => console.warn('[notif] hydrate', e))
   ensureRealtime().catch((e) => console.warn('[notif] realtime', e))
-  supabase.auth.onAuthStateChange?.((ev) => {
-    if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') { hydrate(); ensureRealtime() }
-    else if (ev === 'SIGNED_OUT') { items = []; readSet.clear(); emit() }
+  alCambiarSesion((_e, uid) => {
+    if (uid) { hydrate(); ensureRealtime() }
+    else { items = []; readSet.clear(); emit() }
   })
 }
 

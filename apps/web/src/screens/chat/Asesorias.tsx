@@ -34,7 +34,7 @@ import type { Mensaje } from '../../data/ops/chat'
 
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
-export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esDireccion = false, onAtencion, contactoDe = contactoPorDefecto }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void; contactoDe?: typeof contactoPorDefecto }) {
+export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, esDireccion = false, onAtencion, contactoDe = contactoPorDefecto }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void; contactoDe?: typeof contactoPorDefecto }) {
   const [cola, setCola] = useState<ColaItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)

@@ -117,7 +117,7 @@ describe('extensión CC-4 (IA)', () => {
 
 describe('frontend', () => {
   it('AE · panel compacto dentro de ChatCanonico (dueño muta, asesor solo lectura); cliente sin autoridad; sin checkout', () => {
-    expect(codigo(chatPantalla)).toMatch(/<CarritoPanel conversationId=\{asesor \? null : convId\} cartId=\{asesor \? conv\.cart_id \?\? null : null\} soloLectura=\{asesor\}/)
+    expect(codigo(chatPantalla)).toMatch(/<CarritoPanel senal=\{[^}]+\} conversationId=\{asesor \? null : convId\} cartId=\{asesor \? conv\.cart_id \?\? null : null\} soloLectura=\{asesor\}/)
     const p = codigo(panelSrc)
     expect(p).toMatch(/const puedeMutar = !soloLectura && cart\.rol !== 'asesor' && cart\.rol !== 'supervisor' && cart\.estado === 'active'/)
     expect(p).not.toMatch(/crear_pedido|createOrder|supabase\./)   // (CC-6 añadió el pago con Stripe tras crear el pedido; el panel sigue sin crear pedidos)

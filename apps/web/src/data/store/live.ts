@@ -3,6 +3,7 @@
 // sesión (para que el catálogo cargue tras el login) y tras cada mutación
 // (write-through). Sin backend (hasSupabase=false) opera sobre el fallback mock.
 import { supabase, hasSupabase } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 
 export interface Live<T> {
   subscribe: (cb: () => void) => () => void
@@ -41,9 +42,9 @@ export function makeLive<T>(load: () => Promise<T[]>, fallback: T[]): Live<T> {
     // al inicializar el cliente, y hacerlo aquí solo añade una carrera pre-sesión.
     // `?.` a propósito: en pruebas unitarias el cliente puede estar simulado sin `auth`.
     // Sin suscripción el store sigue funcionando (se hidrata con reload()).
-    supabase.auth?.onAuthStateChange?.((ev) => {
-      if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') { loaded = false; reload() }
-      else if (ev === 'TOKEN_REFRESHED') reload()
+    alCambiarSesion((e) => {
+      if (e === 'cambio') loaded = false
+      reload()
     })
   }
 

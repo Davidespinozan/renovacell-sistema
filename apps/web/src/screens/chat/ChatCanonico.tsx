@@ -59,8 +59,8 @@ interface Props {
 export interface AccionChat { clave: string; etiqueta: string; detalle?: string; icono?: React.ReactNode; onElegir: () => void }
 
 // CHAT PRO · "escribiendo…": se avisa al servidor como mucho cada 3 s mientras se teclea; la marca vence sola en 6 s.
-const PING_ESCRIBIENDO_MS = 3000
-const SONDEO_ESCRIBIENDO_MS = 1500
+const PING_ESCRIBIENDO_MS = 5000
+const SONDEO_ESCRIBIENDO_MS = 3000
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
 export const ETIQUETA_ASESOR = 'Asesoría'
@@ -126,7 +126,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -221,7 +221,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     return suscribir(convId, () => { void cargar(convId, ultimoSeq.current) })
   }, [convId, finAtencion, suscribir, cargar])
 
-  // Polling acotado, solo con la pestaña visible.
+  // Polling de respaldo, solo con la pestaña visible. PERF: Realtime ya despierta la lectura al llegar un mensaje;
+  // a 4 s cada pestaña abierta hacía ~15 llamadas/min a la Edge.
   useEffect(() => {
     if (!convId || finAtencion) return   // D4-FIX · terminada o sin acceso: sin sondeo
     const tick = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void cargar(convId, ultimoSeq.current) }
@@ -234,7 +235,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const otroEscribiendo = !!conv?.escribiendo_otro
   useEffect(() => {
     if (!convId || finAtencion || !otroEscribiendo) return
-    const t = setInterval(() => { void cargar(convId, ultimoSeq.current) }, SONDEO_ESCRIBIENDO_MS)
+    const t = setInterval(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void cargar(convId, ultimoSeq.current) }, SONDEO_ESCRIBIENDO_MS)
     return () => clearInterval(t)
   }, [convId, finAtencion, otroEscribiendo, cargar])
 
@@ -482,7 +483,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       ) : (<>
       {conCarrito && convId && conv && (
         // Dueño: su carrito activo ligado a esta conversación. Asesor/Dirección: el carrito del dueño, solo lectura (el servidor lo decide).
-        <CarritoPanel conversationId={asesor ? null : convId} cartId={asesor ? conv.cart_id ?? null : null} soloLectura={asesor} cliente={clienteCarrito} />
+        <CarritoPanel senal={conv.mensajes[conv.mensajes.length - 1]?.seq} conversationId={asesor ? null : convId} cartId={asesor ? conv.cart_id ?? null : null} soloLectura={asesor} cliente={clienteCarrito} />
       )}
 
       <div className="rc-thread" aria-live="polite">

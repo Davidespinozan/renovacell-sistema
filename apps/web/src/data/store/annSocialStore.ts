@@ -2,6 +2,7 @@
 // lectura, PERSISTENTES por usuario (antes eran solo estado local). Hidrata de
 // announcement_comments/reactions/reads y escribe write-through. Sin backend, mock.
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 import { mensajeDeError, reportarFallo } from './escritura'
 
 export interface AnnComment { id: string; announcement_id: string; author: string; body: string; created_at: string }
@@ -39,7 +40,7 @@ async function hydrate() {
 }
 if (hasSupabase) {
   hydrate()
-  supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'TOKEN_REFRESHED') hydrate() })
+  alCambiarSesion(() => { hydrate() })
 }
 
 export function addComment(announcementId: string, body: string, author: string) {

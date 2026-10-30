@@ -101,7 +101,7 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
     if (p.ok) setPanel(p.data); else setError(p.error)
   }, [cliente, canal])
   useEffect(() => { void cargar() }, [cargar])
-  useEffect(() => { const t = setInterval(() => { if (!accion) void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, accion])
+  useEffect(() => { const t = setInterval(() => { if (!accion && document.visibilityState === 'visible') void cargar() }, 30_000); return () => clearInterval(t) }, [cargar, accion])
 
   const c = estado?.canales.find((x) => x.canal === canal) ?? null
   const otros = (estado?.canales ?? []).filter((x) => x.canal !== canal)
@@ -315,7 +315,7 @@ export function BarraTomaCanal({ conversationId, cliente = clientePorDefecto, on
     setError(null); setCtl(r.data); onControl?.(r.data)
   }, [cliente, conversationId, onControl])
   useEffect(() => { void cargar() }, [cargar])
-  useEffect(() => { const t = setInterval(() => { if (!confirmar) void cargar() }, intervaloMs); return () => clearInterval(t) }, [cargar, confirmar, intervaloMs])
+  useEffect(() => { const t = setInterval(() => { if (!confirmar && document.visibilityState === 'visible') void cargar() }, intervaloMs); return () => clearInterval(t) }, [cargar, confirmar, intervaloMs])
 
   const tomar = async (motivo: string): Promise<string | null> => {
     const r = await cliente.tomar(conversationId, motivo)

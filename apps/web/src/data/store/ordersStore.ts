@@ -19,6 +19,7 @@ import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
+import { alCambiarSesion } from '../../lib/sesion'
 import type { Json } from '../database.types'
 import { runW1Command, newOpId, codigoConocido, isAmbiguous } from '../ops/w1Command'
 import { confirmar, mensajeDeError, reportarFallo, type Escritura } from './escritura'
@@ -108,11 +109,11 @@ async function hydrate() {
   emit()
 }
 if (hasSupabase) {
-  supabase.auth.onAuthStateChange((ev) => {
+  alCambiarSesion((e) => {
     // En login / cambio de sesión volvemos a "no hidratado" para no mostrar un
-    // vacío falso; el refresco de token recarga en silencio.
-    if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') { hydrated = false; hydrate() }
-    else if (ev === 'TOKEN_REFRESHED') hydrate()
+    // vacío falso; el refresco recarga en silencio.
+    if (e === 'cambio') hydrated = false
+    hydrate()
   })
 }
 
