@@ -456,3 +456,54 @@
 .pc-cot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
 .pc-cot b{font-variant-numeric:tabular-nums}
 .pc-cot .pc-cot-acc{margin-left:auto;display:flex;gap:4px}
+
+/* EXPEDIENTE EN EL CHAT · el cliente se trabaja dentro de la conversación: franja bajo el encabezado (quién es), menú «+»
+   del redactor (qué hacer) y la hoja de la acción sobre el redactor, con el hilo a la vista arriba. */
+.rc-tira{display:grid;gap:6px;padding:8px 10px;background:var(--cp-surface);border-bottom:1px solid var(--line);position:relative;z-index:1}
+.rc-tira:empty{display:none}
+.pc-tira{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:4px 6px;border:0;border-radius:10px;background:none;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+button.pc-tira:hover{background:var(--hueso)}
+.pc-tira[aria-expanded="true"]{background:var(--hueso)}
+.pc-tira--fija{cursor:default}
+.pc-tira-tx{flex:1;min-width:0;display:grid;gap:1px}
+.pc-tira-tx b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-tira-tx small{font-size:12.5px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-tira-tx small a{color:var(--green-deep);font-weight:600;text-decoration:none}
+.pc-tira-cta{flex:none;font-size:13px;font-weight:600;color:var(--green-deep);padding:0 4px}
+.pc-tira--quien .pc-av,.pc-tira--verif .pc-av{background:var(--warn-bg);color:var(--warn)}
+.pc-av--sm{width:34px;height:34px;font-size:12.5px}
+.pc-tira-msg{font-size:13px;color:var(--danger)}
+.rc-tira .pc-msg{padding:0 6px}
+
+.rc-hoja{flex:none;max-height:min(62%,520px);overflow-y:auto;overscroll-behavior:contain;background:var(--cp-surface);border-top:1px solid var(--line);
+  box-shadow:0 -10px 28px rgba(11,20,14,.14);border-radius:16px 16px 0 0;position:relative;z-index:2;animation:rc-hoja-sube .18s ease-out}
+@keyframes rc-hoja-sube{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.rc-hoja{animation:none}}
+.hj{display:grid}
+.hj-h{position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;gap:8px;padding:12px 12px 8px 16px;background:var(--cp-surface);border-bottom:1px solid var(--line)}
+.hj-h-tx{flex:1;min-width:0;display:grid;gap:2px}
+.hj-h-tx b{font-size:15px;color:var(--ink)}
+.hj-h-tx span{font-size:12.5px;color:var(--mid);line-height:1.4}
+.hj-b{display:grid;gap:10px;padding:12px 16px 14px}
+.pc-form{display:grid;gap:8px}
+.pc-form .pc-acciones,.hj-b>.pc-acciones{justify-content:flex-end}
+.pc-fotos{display:flex;gap:8px;flex-wrap:wrap}
+.pc-foto{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 10px 4px 4px;border:1px dashed var(--line);border-radius:10px;color:var(--mid);font-size:12.5px}
+.pc-foto img{width:52px;height:36px;object-fit:cover;border-radius:6px}
+.pc-foto svg{margin-left:6px}
+.pc-foto.ok{border-style:solid;border-color:var(--green-soft);color:var(--green-deep);font-weight:600;background:var(--ok-bg)}
+.pc-foto--ancha{flex:1}
+.pc-previa{padding:10px 12px;border-radius:9px;background:#d8f5cf;color:#111b21;font-size:13.5px;line-height:1.45;box-shadow:0 1px .5px rgba(11,20,14,.13)}
+.pc-sec{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mid)}
+.hj-b .pc-cots:first-child{border-top:0;padding-top:0;margin-top:0}
+
+.rc-acc-menu{flex:none;display:grid;gap:2px;padding:6px;max-height:min(360px,50vh);overflow-y:auto;background:var(--cp-surface);border-top:1px solid var(--line);
+  box-shadow:0 -10px 28px rgba(11,20,14,.14);border-radius:16px 16px 0 0;position:relative;z-index:2;animation:rc-hoja-sube .14s ease-out}
+.rc-acc-item{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:8px 10px;border:0;border-radius:12px;background:none;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.rc-acc-item:hover,.rc-acc-item:focus-visible{background:var(--hueso);outline:none}
+.rc-acc-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--green-deep)}
+.rc-acc-tx{display:grid;gap:1px;min-width:0}
+.rc-acc-tx b{font-size:14px;font-weight:600}
+.rc-acc-tx small{font-size:12.5px;color:var(--mid)}
+.rc-chat--wa .rc-mas{color:var(--green-deep)}
+.rc-chat--wa .rc-composer .rc-ico--on{background:var(--ok-bg);color:var(--green-deep)}

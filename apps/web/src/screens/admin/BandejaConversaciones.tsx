@@ -14,7 +14,7 @@ import { recargarAtencion } from '../../data/store/atencionStore'
 import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
-import { PanelCliente, accionesIneVisitante } from '../chat/PanelCliente'
+import { usePanelCliente, accionesIneVisitante } from '../chat/PanelCliente'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
 import { EnlaceContacto, EnlaceContactoBotones } from '../../app/EnlaceContacto'
@@ -176,6 +176,7 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
     setMsg({ ok: true, texto: `Asignada a ${vendedores.find((v) => v.id === sel)?.nombre ?? 'el vendedor'}.` }); setSel(''); onCambio()
   }
   const ine = useIne(id)   // ALTA-DESDE-CONVERSACIÓN · fotos marcadas como INE para el alta
+  const pc = usePanelCliente({ conversationId: id, chat, onCambio, activo: !!c && !c.profile_id })
   const bloqueo = canal ? (control ? (control.canal && !control.puede_escribir ? (MOTIVO_NO_ESCRIBIR[control.motivo_no_escribir ?? ''] ?? 'Solo lectura.') : null) : 'Comprobando quién atiende…') : null
   const e = c ? estadoLinea(c) : null
   return (
@@ -204,11 +205,11 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
       )}
       {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ fontSize: 13, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }} data-testid="bq-msg">{msg.texto}</div>}
       {canal && <BarraTomaCanal conversationId={id} cliente={canalOp} onControl={setControl} />}
-      {/* VINCULAR-CLIENTE · ¿quién es? ficha, sugerencias y acceso al portal. */}
-      {c && !c.profile_id && <PanelCliente conversationId={id} chat={chat} onCambio={onCambio} />}
       <div className="bq-chat">
+        {/* EXPEDIENTE EN EL CHAT · ¿quién es?, vincular, alta verificada, acceso, cotizar, pago y recibo: dentro de la conversación. */}
         <ChatCanonico embebido asesor puedeEmpresa conversationId={id} cliente={chat} nombreCliente={nombre} bloqueoEscritura={bloqueo}
-          accionesAdjunto={c && !c.profile_id ? accionesIneVisitante(id, ine, (lado, a) => elegirIne(id, lado, a)) : undefined}
+          tira={pc.tira} acciones={pc.acciones} hoja={pc.hoja}
+          accionesAdjunto={c && !c.profile_id ? accionesIneVisitante(id, ine, (lado, a, url) => elegirIne(id, lado, a, url)) : undefined}
           etiquetaSalir="Cerrar" onSalir={onCerrar} onFin={() => { onCambio(); onCerrar() }} />
       </div>
       {modal === 'solicitud' && c && <ModalReasignarSolicitud p={c} vendedores={vendedores} carteraNombre={null} cliente={cliente} onCerrar={() => setModal(null)}

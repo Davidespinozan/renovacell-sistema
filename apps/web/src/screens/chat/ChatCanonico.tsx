@@ -7,7 +7,7 @@ import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
 import { TarjetaPromoChat } from './TarjetaPromoChat'
 import { MARCA_PROMO } from '../../data/ops/promociones'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, Check, CheckCheck, ChevronDown, History, Send, X, Zap } from 'lucide-react'
+import { Camera, Check, CheckCheck, ChevronDown, History, Plus, Send, X, Zap } from 'lucide-react'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
@@ -46,7 +46,15 @@ interface Props {
   respuestas?: ClienteRespuestas | null                // CHAT PRO · respuestas rápidas (solo personal; null las apaga)
   puedeEmpresa?: boolean                               // CHAT PRO · Dirección administra las de la empresa
   bloqueoEscritura?: string | null                     // R4-B2-4 · canal: el servidor dice que aún no puedes escribir (p. ej. falta tomarla); el texto es el porqué
+  // EXPEDIENTE EN EL CHAT · el personal trabaja al cliente SIN salir del hilo: quién es (franja bajo el encabezado), qué
+  // puede hacer (menú «+» del redactor) y la hoja de la acción elegida (sobre el redactor). Los arma quien monta.
+  tira?: React.ReactNode
+  acciones?: AccionChat[]
+  hoja?: React.ReactNode
 }
+
+/** Una acción del menú «+» del redactor (solo personal). */
+export interface AccionChat { clave: string; etiqueta: string; detalle?: string; icono?: React.ReactNode; onElegir: () => void }
 
 // CHAT PRO · "escribiendo…": se avisa al servidor como mucho cada 3 s mientras se teclea; la marca vence sola en 6 s.
 const PING_ESCRIBIENDO_MS = 3000
@@ -116,7 +124,7 @@ type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 4000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -269,6 +277,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const rrVisibles = useMemo(() => filtrar(rrLista, rrFiltro), [rrLista, rrFiltro])
   useEffect(() => { setRrActiva(0) }, [rrFiltro, rrAbierto])
   const cerrarRespuestas = () => { setRrBoton(false); if (texto.startsWith('/')) setTexto('') }
+  // EXPEDIENTE EN EL CHAT · menú «+»: abre la hoja de la acción dentro del mismo chat.
+  const [accAbierto, setAccAbierto] = useState(false)
+  const conAcciones = asesor && !!acciones?.length && !finAtencion
+  useEffect(() => { if (!conAcciones) setAccAbierto(false) }, [conAcciones])
   const elegirRespuesta = (r: RespuestaRapida) => {
     const t = aplicarNombre(r.texto, nombreCliente)
     setRrBoton(false); setTexto(t)
@@ -443,6 +455,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         </div>
       </header>
       {barra && <div className="rc-barra" data-testid="chat-barra">{barra}</div>}
+      {tira && !finAtencion && vista.tipo === 'actual' && <div className="rc-tira" data-testid="chat-tira">{tira}</div>}
 
       {finAtencion ? (
         <div className="rc-thread" data-testid="asesoria-fin">
@@ -511,14 +524,30 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por {NOMBRE_CANAL[canal.canal]} hace más de 24 horas: lo que escribas queda aquí pero no le llega por {NOMBRE_CANAL[canal.canal]} hasta que vuelva a escribir (regla de Meta).</div>
           : null)}
 
+      {hoja && !finAtencion && <div className="rc-hoja" data-testid="chat-hoja">{hoja}</div>}
+      {accAbierto && conAcciones && (
+        <div className="rc-acc-menu" role="menu" aria-label="Acciones con este cliente" data-testid="menu-acciones"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAccAbierto(false) } }}>
+          {acciones!.map((a) => (
+            <button key={a.clave} type="button" role="menuitem" className="rc-acc-item" onClick={() => { setAccAbierto(false); a.onElegir() }} data-testid={`accion-${a.clave}`}>
+              {a.icono && <span className="rc-acc-ico" aria-hidden>{a.icono}</span>}
+              <span className="rc-acc-tx"><b>{a.etiqueta}</b>{a.detalle && <small>{a.detalle}</small>}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {rrAbierto && respuestas && (
         <RespuestasRapidas lista={rrVisibles} activa={rrActiva} filtro={rrFiltro} onElegir={elegirRespuesta} onCerrar={cerrarRespuestas}
           onCambio={cargarRespuestas} cliente={respuestas} puedeEmpresa={puedeEmpresa} nombre={nombreCliente} />
       )}
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
         <input ref={archivo} type="file" accept="image/jpeg,image/png,image/*" hidden onChange={(e) => void mandarImagen(e.target.files?.[0])} data-testid="input-imagen" />
+        {conAcciones && (
+          <button type="button" className={`rc-ico rc-adjuntar rc-mas${accAbierto ? ' rc-ico--on' : ''}`} onClick={() => { setRrBoton(false); setAccAbierto((v) => !v) }}
+            aria-label="Acciones con este cliente" aria-expanded={accAbierto} aria-haspopup="menu" title="Verificar, mandar acceso, cotizar, registrar pago…" data-testid="btn-acciones"><Plus size={21} /></button>
+        )}
         {conRespuestas && (
-          <button type="button" className={`rc-ico rc-adjuntar${rrBoton ? ' rc-ico--on' : ''}`} onClick={() => setRrBoton((v) => !v)} disabled={!puedoEscribir}
+          <button type="button" className={`rc-ico rc-adjuntar${rrBoton ? ' rc-ico--on' : ''}`} onClick={() => { setAccAbierto(false); setRrBoton((v) => !v) }} disabled={!puedoEscribir}
             aria-label="Respuestas rápidas" aria-expanded={rrAbierto} title="Respuestas rápidas (o escribe /)" data-testid="btn-respuestas"><Zap size={19} /></button>
         )}
         <button type="button" className="rc-ico rc-adjuntar" onClick={() => archivo.current?.click()} disabled={!puedoEscribir || subiendo} aria-label={subiendo ? 'Subiendo imagen' : 'Mandar una foto'} title="Mandar una foto" data-testid="btn-imagen"><Camera size={20} /></button>

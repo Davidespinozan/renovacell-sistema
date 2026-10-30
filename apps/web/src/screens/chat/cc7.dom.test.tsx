@@ -10,7 +10,7 @@ import { HorarioAtencion } from '../admin/HorarioAtencion'
 import type { ClienteChat, Conversacion, ColaItem } from '../../data/ops/chat'
 import type { BandejaCanales, ClienteAtencion, Horario, Pendientes } from '../../data/ops/atencion'
 
-vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'admin', setScreen: vi.fn() }) }))
+vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'admin', setScreen: vi.fn() }), useRoleOpcional: () => null }))
 beforeEach(cleanup)
 
 const ok = <T,>(data: T) => ({ ok: true as const, data })

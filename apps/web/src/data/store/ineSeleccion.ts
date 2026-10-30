@@ -6,17 +6,20 @@ import { useSyncExternalStore } from 'react'
 
 export type LadoIne = 'frente' | 'reverso'
 export type UsoFoto = LadoIne | 'comprobante'
-type Sel = Partial<Record<UsoFoto, string>> & { vinculada?: boolean }
+type Sel = Partial<Record<UsoFoto, string>> & { vinculada?: boolean; url?: Partial<Record<UsoFoto, string>> }
 let porConv: Record<string, Sel> = {}
 const oyentes = new Set<() => void>()
 const emitir = () => { porConv = { ...porConv }; oyentes.forEach((f) => f()) }
 
-export function elegirIne(conv: string, lado: UsoFoto, adjuntoId: string) { porConv[conv] = { ...porConv[conv], [lado]: adjuntoId }; emitir() }
+export function elegirIne(conv: string, lado: UsoFoto, adjuntoId: string, url?: string | null) {
+  const s = porConv[conv] ?? {}
+  porConv[conv] = { ...s, [lado]: adjuntoId, url: { ...s.url, [lado]: url ?? undefined } }; emitir()
+}
 export function olvidarIne(conv: string) {
   const s = porConv[conv]
-  if (s && (s.frente || s.reverso)) { porConv[conv] = { vinculada: s.vinculada, comprobante: s.comprobante }; emitir() }
+  if (s && (s.frente || s.reverso)) { porConv[conv] = { vinculada: s.vinculada, comprobante: s.comprobante, url: { comprobante: s.url?.comprobante } }; emitir() }
 }
-export function olvidarComprobante(conv: string) { const s = porConv[conv]; if (s?.comprobante) { porConv[conv] = { ...s, comprobante: undefined }; emitir() } }
+export function olvidarComprobante(conv: string) { const s = porConv[conv]; if (s?.comprobante) { porConv[conv] = { ...s, comprobante: undefined, url: { ...s.url, comprobante: undefined } }; emitir() } }
 export function marcarVinculada(conv: string, vinculada: boolean) { if (!!porConv[conv]?.vinculada !== vinculada) { porConv[conv] = { ...porConv[conv], vinculada }; emitir() } }
 export const ineDe = (conv: string): Sel => porConv[conv] ?? {}
 export function useIne(conv: string): Sel {

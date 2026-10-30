@@ -18,12 +18,16 @@ import { useRole } from '../../auth/RoleContext'
 import { contactoDe as contactoPorDefecto, urlVerificacionMedica, type ContactoEnlace } from '../../data/ops/contactoEnlace'
 import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
-import { PanelCliente, accionesIneVisitante } from './PanelCliente'
+import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
+import { HojaMarco } from './HojaChat'
+import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
+import type { AccionChat } from './ChatCanonico'
+import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
 import { Vacio } from '../../app/EmptyState'
-import { usarFotoComoIne } from '../../data/ops/verificacion'
+import { usarFotoComoIne, pendienteDeConversacion } from '../../data/ops/verificacion'
 import type { DoctorPendiente } from '../../data/ops/verificacion'
 import type { Mensaje } from '../../data/ops/chat'
 
@@ -54,10 +58,18 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     if (!m.adjunto) return
     const r = await usarFotoComoIne(m.adjunto.id, clave)
     setHerr(r.ok ? `Foto guardada como ${clave === 'ine-front' ? 'INE frente' : 'INE reverso'} en su verificación.` : r.mensaje)
-    if (r.ok) setVersionPanel((n) => n + 1)
+    if (r.ok) { setVersionPanel((n) => n + 1); if (abierta) abrirHoja(abierta, 'verif') }
   }
+  // EXPEDIENTE EN EL CHAT · ¿quien escribe es un doctor con cuenta por verificar? (franja + hoja de verificación)
+  useEffect(() => {
+    setPendiente(null)
+    if (!abierta) return
+    let vivo = true
+    void pendienteDeConversacion(abierta).then((d) => { if (vivo) setPendiente(d) }).catch(() => {})
+    return () => { vivo = false }
+  }, [abierta])
   const ineVisitante = useIne(abierta ?? '')
-  const accionesVisitante = abierta ? accionesIneVisitante(abierta, ineVisitante, (lado, a) => elegirIne(abierta, lado, a)) : () => null
+  const accionesVisitante = abierta ? accionesIneVisitante(abierta, ineVisitante, (lado, a, url) => elegirIne(abierta, lado, a, url)) : () => null
   const accionesAdjunto = (m: Mensaje) => (m.actor === 'visitor' ? accionesVisitante(m) : pendiente && m.actor === 'doctor' && m.adjunto && !m.adjunto.uso ? (
     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine">
       <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-front')}>Usar como INE frente</button>
@@ -121,28 +133,51 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
     return () => { vivo = false }
   }, [intento, cargar, atender, esDireccion])
 
+  // EXPEDIENTE EN EL CHAT · todo se trabaja dentro de la conversación: franja (quién es), menú «+» y hoja de la acción.
+  const pc = usePanelCliente({ conversationId: abierta ?? '', chat: cliente, activo: !!abierta, onCambio: () => { void cargar(); void recargarAtencion() } })
+  const hojaAbierta = useHoja(abierta ?? '')
+  const tira = abierta ? <>
+    {pendiente && (
+      <button type="button" className="pc-tira pc-tira--verif" onClick={() => (hojaAbierta === 'verif' ? cerrarHoja(abierta) : abrirHoja(abierta, 'verif'))} aria-expanded={hojaAbierta === 'verif'} data-testid="tira-verificacion">
+        <span className="pc-av pc-av--sm" aria-hidden><ShieldCheck size={16} /></span>
+        <span className="pc-tira-tx"><b>{capitalizarNombre(pendiente.nombre ?? 'Doctor')} · verificación pendiente</b><small>{pendiente.cedula ? `Cédula ${pendiente.cedula}` : 'Sin cédula'} · tú puedes verificarlo aquí</small></span>
+        <span className="pc-tira-cta">Revisar</span>
+      </button>
+    )}
+    {contacto && (
+      <div className="pc-tira pc-tira--fija" data-testid="contacto-enlace">
+        <span className="pc-av pc-av--sm" aria-hidden><LinkIco size={16} /></span>
+        <span className="pc-tira-tx">
+          <b>{contacto.nombre}{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</b>
+          <small><a href={`tel:${contacto.telefono}`}>{contacto.telefono}</a> · <a href={`mailto:${contacto.email}`}>{contacto.email}</a> · llegó por el enlace de contacto</small>
+        </span>
+      </div>
+    )}
+    {contacto?.posible_cliente && !contacto.confirmado && (
+      <div className="rc-contacto-ojo" role="note">Sus datos coinciden con el cliente <b>{contacto.posible_cliente}</b>, pero <b>no está confirmado</b>: no compartas historial, precios ni pedidos hasta que inicie sesión.</div>
+    )}
+    {herr && <div className="pc-msg ok" role="status" data-testid="herramienta-aviso">{herr}</div>}
+    {pc.tira}
+  </> : null
+  const acciones: AccionChat[] = abierta ? [
+    ...(pendiente ? [{ clave: 'verificar', etiqueta: `Verificar a ${capitalizarNombre(pendiente.nombre ?? 'este doctor')}`, detalle: 'Su cédula y las fotos de su INE; apruebas o rechazas', icono: <ShieldCheck size={18} />, onElegir: () => abrirHoja(abierta, 'verif') }] : []),
+    ...(contacto && !contacto.confirmado ? [
+      { clave: 'registro', etiqueta: 'Mandar enlace de registro', detalle: 'Para que se verifique sin salir de este chat', icono: <LinkIco size={18} />, onElegir: mandarRegistro },
+      ...(contacto.posible_cliente_id ? [{ clave: 'invitacion', etiqueta: 'Ya es cliente: mandar invitación', detalle: `Cuenta verificada ligada a ${contacto.posible_cliente ?? contacto.nombre}`, icono: <Llave size={18} />, onElegir: () => void mandarInvitacion(contacto.posible_cliente_id!, contacto.posible_cliente ?? contacto.nombre) }] : []),
+    ] : []),
+    ...pc.acciones,
+  ] : []
+  const hoja = abierta && hojaAbierta === 'verif' ? (
+    <HojaMarco titulo="Verificación" sub="Revisa su cédula y su INE; sin verificación automática." onCerrar={() => cerrarHoja(abierta)} testid="hoja-verificacion">
+      <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} onDoctor={setPendiente} version={versionPanel} />
+    </HojaMarco>
+  ) : pc.hoja
+
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
-      <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} onDoctor={setPendiente} version={versionPanel} />
-      <PanelCliente conversationId={abierta} chat={cliente} onCambio={() => { void cargar(); void recargarAtencion() }} />
-      {contacto && (
-        <div className="rc-contacto-ficha" data-testid="contacto-enlace">
-          <div><b>{contacto.nombre}</b>{contacto.es_medico ? ' · profesional de la salud' : ''}{contacto.cedula ? ` · cédula ${contacto.cedula}` : ''}</div>
-          <div className="rc-contacto-datos"><a href={`tel:${contacto.telefono}`}>{contacto.telefono}</a><a href={`mailto:${contacto.email}`}>{contacto.email}</a><span>Llegó por el enlace de contacto</span></div>
-          {contacto.posible_cliente && !contacto.confirmado && (
-            <div className="rc-contacto-ojo" role="note">Sus datos coinciden con el cliente <b>{contacto.posible_cliente}</b>, pero <b>no está confirmado</b>: no compartas historial, precios ni pedidos hasta que inicie sesión.</div>
-          )}
-          {!contacto.confirmado && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <button type="button" className="btn ghost sm" onClick={mandarRegistro} data-testid="btn-mandar-registro">Mandar enlace de registro</button>
-              {contacto.posible_cliente_id && <button type="button" className="btn ghost sm" onClick={() => void mandarInvitacion(contacto.posible_cliente_id!, contacto.posible_cliente ?? contacto.nombre)} data-testid="btn-mandar-invitacion">Ya es cliente: mandar invitación</button>}
-            </div>
-          )}
-          {herr && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="herramienta-aviso">{herr}</div>}
-        </div>
-      )}
       <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
+        tira={tira} acciones={acciones} hoja={hoja}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )
