@@ -507,3 +507,30 @@ button.pc-tira:hover{background:var(--hueso)}
 .rc-acc-tx small{font-size:12.5px;color:var(--mid)}
 .rc-chat--wa .rc-mas{color:var(--green-deep)}
 .rc-chat--wa .rc-composer .rc-ico--on{background:var(--ok-bg);color:var(--green-deep)}
+
+/* ENLACE-VENDEDOR · quien recibe el enlace sabe, antes de escribir, con quién habla y que es Renovacell. */
+.rc-confianza{align-self:center;width:min(100%,420px);margin:4px 0 10px;padding:12px 14px;border-radius:12px;background:#fff;box-shadow:0 1px .5px rgba(11,20,14,.13);display:grid;gap:10px;font-size:13px;color:#3b4a54}
+.rc-conf-rec{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#fdf6d8;color:#54401a;font-size:13.5px}
+.rc-conf-rec svg{color:#c2410c;flex:none}
+.rc-conf-marca{display:flex;align-items:center;gap:10px}
+.rc-conf-marca .rc-logo{width:34px;height:34px;flex:none}
+.rc-conf-marca span{display:grid;gap:1px}
+.rc-conf-marca b{font-size:14px;color:#111b21}
+.rc-conf-marca small{font-size:12px;color:var(--wa-meta,#667781)}
+.rc-confianza ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rc-confianza li{display:flex;align-items:center;gap:8px}
+.rc-confianza li svg{color:var(--green-deep);flex:none}
+.rc-confianza a{color:var(--green-deep)}
+.rc-mark--foto{overflow:hidden;padding:0}
+.rc-mark--foto img{width:100%;height:100%;object-fit:cover}
+.rc-barra .rc-barra-asesor{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:var(--pill);background:var(--ok-bg);color:var(--green-deep);font-size:13px;font-weight:600;white-space:nowrap}
+.enlace-barra-cifras{margin-left:6px;padding:1px 7px;border-radius:999px;background:var(--ok-bg);font-size:11.5px;font-weight:600}
+.enlace-equipo{display:grid;gap:2px;padding-top:6px;border-top:1px solid var(--line)}
+.enlace-equipo-h{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mid);margin-bottom:2px}
+.enlace-equipo-fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0}
+.enlace-equipo-tx{flex:1 1 220px;min-width:0;display:grid;gap:1px}
+.enlace-equipo-tx b{font-size:13.5px}
+.enlace-equipo-tx small{font-size:12px;color:var(--mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.enlace-equipo-cif{font-size:12.5px;color:var(--ink-2)}
+.rc-origen{display:inline-flex;align-items:center;gap:6px;justify-self:start;margin:0 6px;padding:3px 10px;border-radius:999px;background:var(--ok-bg);color:var(--green-deep);font-size:12.5px;font-weight:600}
+.rc-origen--rec{background:#fdf6d8;color:#7a4a0c}

@@ -3,6 +3,7 @@
 -- inciertos o descartados (protección de producción), así que aquí se neutralizan antes.
 update public.cc_wa_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');
 update public.cc_meta_salida set estado = 'fallido' where estado in ('retenido', 'incierto', 'descartado');
+\ir ../../../../rollback/enlace_vendedor/99_down.sql   -- ENLACE-VENDEDOR (20270211) se baja primero (redefine ruteo, prerregistro y vendedor del doctor)
 \ir ../../../../rollback/vincular_cliente/99_down.sql   -- VINCULAR-CLIENTE (20270206) se baja primero (redefine bandeja, cola, ruteo y nombre)
 \ir ../../../../rollback/bandeja_origen/99_down.sql
 \ir ../../../../rollback/whatsapp_compuerta_abierta/99_down.sql

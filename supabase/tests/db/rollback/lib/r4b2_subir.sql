@@ -8,3 +8,4 @@
 \ir ../../../../migrations/20270124120000_whatsapp_compuerta_abierta.sql
 \ir ../../../../migrations/20270125120000_bandeja_origen.sql
 \ir ../../../../migrations/20270206120000_vincular_cliente.sql   -- VINCULAR-CLIENTE se reaplica al final
+\ir ../../../../migrations/20270211120000_enlace_vendedor_referidos.sql   -- ENLACE-VENDEDOR se reaplica al final

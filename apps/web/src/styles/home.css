@@ -226,3 +226,15 @@
 .rc-al-ctas{justify-content:flex-end;padding-left:0;padding-top:10px;border-top:1px solid var(--line)}
 .rc-al .rh-btn{min-height:38px;border-radius:var(--pill);padding:0 16px}
 .rc-al-nota{padding-left:0;text-align:right}
+
+/* REFERIDOS · recomendar Renovacell con su enlace del chat */
+.rh-recomendar{display:grid;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--cp-surface);box-shadow:var(--sh-sm)}
+.rh-rec-h{display:flex;gap:12px;align-items:flex-start}
+.rh-rec-h>div{display:grid;gap:2px}
+.rh-rec-h b{font-size:15px;color:var(--ink)}
+.rh-rec-h span{font-size:13px;color:var(--mid);line-height:1.45}
+.rh-rec-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#fdecec;color:#c2410c}
+.rh-rec-previa{padding:10px 12px;border-radius:9px;background:#d8f5cf;color:#111b21;font-size:13.5px;line-height:1.45;word-break:break-word}
+.rh-rec-acc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rh-rec-aviso{font-size:12.5px;color:var(--green-deep);font-weight:600}
+@media (max-width:640px){.rh-rec-acc .btn{flex:1;justify-content:center;min-height:44px}}

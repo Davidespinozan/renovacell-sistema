@@ -11,6 +11,10 @@
 //   mis_datos — sin sesión. Nombre, correo y celular de SU prerregistro (para mostrarlos al verificarse en el chat).
 //   verificarme — sin sesión. Crea su cuenta desde el chat con su cédula, las fotos del INE y una contraseña; el
 //             correo es el del prerregistro. Queda PENDIENTE (la aprueba una persona) y ligada a su visitante.
+//   ver_enlace — sin sesión. Lo público de un enlace (renovacell.mx/contacto/<código>): con qué asesor va a hablar y
+//             quién lo recomendó (solo su primer nombre). Sirve para que quien recibe el enlace sepa con quién habla.
+//   enlace  — sin sesión, con token. El visitante llegó por ese enlace: se registra (gana el primero) y devuelve lo
+//             mismo que ver_enlace. Quién atiende lo sigue decidiendo la base (la cartera gana).
 //   adoptar — con sesión (JWT). La cuenta autenticada se apropia del visitante cuyo token
 //             posee, o de los visitantes que su propio registro dejó vinculados. El perfil
 //             se deriva del JWT; el cliente NO manda profile_id ni visitor_id.
@@ -54,7 +58,7 @@ Deno.serve(conCors(async (req) => {
   // deno-lint-ignore no-explicit-any
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
-  const action = ['abrir', 'adoptar', 'estado', 'prerregistrar', 'mis_datos', 'verificarme'].includes(p?.action) ? p.action as string : null
+  const action = ['abrir', 'adoptar', 'estado', 'prerregistrar', 'mis_datos', 'verificarme', 'ver_enlace', 'enlace'].includes(p?.action) ? p.action as string : null
   if (!action) return json(400, { error: 'Acción no reconocida.' })
 
   // El hash del token que trae el cliente (null si no trae uno con forma válida).
@@ -73,6 +77,20 @@ Deno.serve(conCors(async (req) => {
     const r = data as { visitor_id: string; nuevo: boolean; estado: string }
     // El token SOLO viaja cuando se acaba de crear; un token válido reanuda sin reemitirse.
     return json(200, r.nuevo ? { visitor_id: r.visitor_id, nuevo: true, token: nuevoToken } : { visitor_id: r.visitor_id, nuevo: false })
+  }
+
+  // ENLACE-VENDEDOR · el código del enlace (vendedor o recomendación). Forma acotada aquí; la base decide.
+  if (action === 'ver_enlace' || action === 'enlace') {
+    const codigo = typeof p.codigo === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/i.test(p.codigo) && p.codigo.length <= 40 ? p.codigo.toLowerCase() : null
+    if (!codigo) return json(200, { valido: false })
+    const v = await limitarTodas(admin, [{ scope: 'visitor_estado', sujeto: await sujetoPublico(req) }])
+    if (!v.permitido) return respuestaLimite(v)
+    if (action === 'enlace' && !hash) return json(400, { error: 'sesion_invalida', message: 'Tu sesión expiró. Recarga la página.' })
+    const { data, error } = action === 'enlace'
+      ? await admin.rpc('cc_visitante_enlace', { p_hash: hash, p_codigo: codigo })
+      : await admin.rpc('cc_enlace_publico', { p_codigo: codigo })
+    if (error || !data) return json(503, { error: 'no_disponible', message: 'No se pudo consultar el enlace.' })
+    return json(200, data)
   }
 
   // CX-ENLACE · estado: solo dice si ESTE token ya tiene prerregistro (y su nombre, que él mismo escribió).

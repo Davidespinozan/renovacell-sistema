@@ -20,6 +20,7 @@ import { EnlaceContactoBotones } from '../../app/EnlaceContacto'
 import { crearInvitacion } from '../../data/ops/invitacion'
 import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
 import { HojaMarco } from './HojaChat'
+import { OrigenChip } from './OrigenConversacion'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
 import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
@@ -137,6 +138,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 8000, esD
   const pc = usePanelCliente({ conversationId: abierta ?? '', chat: cliente, activo: !!abierta, onCambio: () => { void cargar(); void recargarAtencion() } })
   const hojaAbierta = useHoja(abierta ?? '')
   const tira = abierta ? <>
+    <OrigenChip conversationId={abierta} />
     {pendiente && (
       <button type="button" className="pc-tira pc-tira--verif" onClick={() => (hojaAbierta === 'verif' ? cerrarHoja(abierta) : abrirHoja(abierta, 'verif'))} aria-expanded={hojaAbierta === 'verif'} data-testid="tira-verificacion">
         <span className="pc-av pc-av--sm" aria-hidden><ShieldCheck size={16} /></span>

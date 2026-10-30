@@ -35,11 +35,13 @@ import { flyersVigentes as flyersPorDefecto, type Flyer } from '../../data/ops/f
 import { subscribePromos, getPromosSnapshot } from '../../data/store/promosStore'
 import { promoTarjeta as promoTarjetaPorDefecto, type DatosPromoDifusion } from '../../data/ops/promociones'
 import { TarjetaPromo } from '../../app/TarjetaPromo'
+import { Recomendar } from './Recomendar'
+import { miEnlace, type MiEnlace } from '../../data/ops/enlaces'
 
 // Solo el estado de la conversación: se pide desde un seq muy alto para no traer el historial.
 const SIN_HISTORIAL = 2_000_000_000
 // Pruebas / vista previa local: clientes por defecto inyectables (en producción, los reales).
-let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito; flyers: typeof flyersPorDefecto; promoTarjeta: typeof promoTarjetaPorDefecto } = { chat: chatPorDefecto, carrito: carritoPorDefecto, flyers: flyersPorDefecto, promoTarjeta: promoTarjetaPorDefecto }
+let porDefecto: { chat: ClienteChat; carrito: ClienteCarrito; flyers: typeof flyersPorDefecto; promoTarjeta: typeof promoTarjetaPorDefecto; recomendar: () => Promise<MiEnlace | null> } = { chat: chatPorDefecto, carrito: carritoPorDefecto, flyers: flyersPorDefecto, promoTarjeta: promoTarjetaPorDefecto, recomendar: () => miEnlace() }
 export function configurarClientesInicioDoctor(c: Partial<typeof porDefecto>) { porDefecto = { ...porDefecto, ...c } }
 
 /** Fila de "Continúa donde te quedaste": ícono, título, detalle, estado opcional y chevron; toda la fila navega. */
@@ -57,7 +59,7 @@ function Fila({ icono, titulo, detalle, estado, pill, onClick, testid }: { icono
   )
 }
 
-export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito, flyers = porDefecto.flyers, promoTarjeta = porDefecto.promoTarjeta }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito; flyers?: typeof flyersPorDefecto; promoTarjeta?: typeof promoTarjetaPorDefecto }) {
+export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefecto.carrito, flyers = porDefecto.flyers, promoTarjeta = porDefecto.promoTarjeta, recomendar = porDefecto.recomendar }: { cliente?: ClienteChat; clienteCarrito?: ClienteCarrito; flyers?: typeof flyersPorDefecto; promoTarjeta?: typeof promoTarjetaPorDefecto; recomendar?: () => Promise<MiEnlace | null> }) {
   const { user, setScreen, verified } = useRole()
   const { priceFor } = usePricing()
   const stockMap = useStock()
@@ -169,6 +171,8 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           <div className="tasklist" data-testid="doctor-continuar">{filas}</div>
         </Seccion>
       )}
+      {/* REFERIDOS · recomendar con su enlace del chat (con su asesor), en vez de pasar un WhatsApp. */}
+      <Recomendar cargar={recomendar} />
       {tarjetas.length > 0 && (
         <Seccion titulo="Promociones vigentes" nivel="info" id="promos">
           <div className="rh-promos" data-testid="doctor-promos">

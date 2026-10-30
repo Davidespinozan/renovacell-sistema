@@ -15,6 +15,7 @@ import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
 import { usePanelCliente, accionesIneVisitante } from '../chat/PanelCliente'
+import { OrigenChip } from '../chat/OrigenConversacion'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
 import { EnlaceContacto, EnlaceContactoBotones } from '../../app/EnlaceContacto'
@@ -208,7 +209,7 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
       <div className="bq-chat">
         {/* EXPEDIENTE EN EL CHAT · ¿quién es?, vincular, alta verificada, acceso, cotizar, pago y recibo: dentro de la conversación. */}
         <ChatCanonico embebido asesor puedeEmpresa conversationId={id} cliente={chat} nombreCliente={nombre} bloqueoEscritura={bloqueo}
-          tira={pc.tira} acciones={pc.acciones} hoja={pc.hoja}
+          tira={<><OrigenChip conversationId={id} />{pc.tira}</>} acciones={pc.acciones} hoja={pc.hoja}
           accionesAdjunto={c && !c.profile_id ? accionesIneVisitante(id, ine, (lado, a, url) => elegirIne(id, lado, a, url)) : undefined}
           etiquetaSalir="Cerrar" onSalir={onCerrar} onFin={() => { onCambio(); onCerrar() }} />
       </div>

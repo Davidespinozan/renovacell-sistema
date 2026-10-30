@@ -1,6 +1,7 @@
 -- VINCULAR-CLIENTE (20270206) · el down devuelve ruteo/nombre/bandeja/cola exactos y quita columna, historial y comandos;
 -- la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/enlace_vendedor/99_down.sql   -- ENLACE-VENDEDOR (20270211) redefine funciones de esta: se baja antes de la foto inicial
 create temp table _vc as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/vincular_cliente/99_down.sql
 do $t$ begin
