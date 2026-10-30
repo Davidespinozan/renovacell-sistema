@@ -3,7 +3,7 @@
 // permiso y no llegaba nada) y dice qué avisa; Inicio recuerda activarlas hasta que estén activas.
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
 import { leerAbrir, aplicarAbrir } from './abrirAviso'
 import { intentoActual, consumirIntento } from '../store/navIntentStore'
 import { Ajustes } from '../../screens/Ajustes'
@@ -61,5 +61,47 @@ describe('recordatorio en Inicio', () => {
     render(<RecordatorioAvisos estado={async () => 'activo'} />)
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.queryByTestId('recordatorio-avisos')).toBeNull()
+  })
+})
+
+describe('pantalla "Activa las notificaciones" (siempre)', async () => {
+  const { PuertaAvisos } = await import('../../app/PuertaAvisos')
+  const { pedirAvisos, cerrarPuertaAvisos } = await import('../store/puertaAvisos')
+  afterEach(() => { cerrarPuertaAvisos(); try { sessionStorage.clear() } catch { /* */ } })
+
+  it('al entrar se abre sola; activar la cierra; "Ahora no" no la vuelve a abrir en la sesión', async () => {
+    const activar = vi.fn(async () => ({ ok: true as const }))
+    render(<PuertaAvisos doctor={false} estado={async () => 'inactivo'} activar={activar} sincronizar={async () => false} />)
+    fireEvent.click(await screen.findByTestId('puerta-activar'))
+    await waitFor(() => expect(screen.queryByTestId('puerta-avisos')).toBeNull())
+    expect(activar).toHaveBeenCalled()
+    cleanup(); sessionStorage.clear()
+    render(<PuertaAvisos doctor={false} estado={async () => 'inactivo'} activar={activar} sincronizar={async () => false} />)
+    fireEvent.click(await screen.findByTestId('puerta-ahora-no'))
+    expect(screen.queryByTestId('puerta-avisos')).toBeNull()
+    pedirAvisos('entrada')
+    expect(screen.queryByTestId('puerta-avisos')).toBeNull()   // ya se pidió en esta sesión
+  })
+  it('con el permiso ya dado, registra el dispositivo en silencio y no abre nada', async () => {
+    const sincronizar = vi.fn(async () => true)
+    render(<PuertaAvisos doctor={false} estado={async () => 'activo'} sincronizar={sincronizar} />)
+    await waitFor(() => expect(sincronizar).toHaveBeenCalled())
+    expect(screen.queryByTestId('puerta-avisos')).toBeNull()
+  })
+  it('doctor: tras escribirle a su asesor vuelve a pedirlo con su motivo; al equipo no', async () => {
+    sessionStorage.setItem('rc_puerta_avisos_entrada', '1')
+    render(<PuertaAvisos doctor estado={async () => 'inactivo'} sincronizar={async () => false} />)
+    await new Promise((r) => setTimeout(r, 0))
+    act(() => pedirAvisos('chat'))
+    expect(await screen.findByText('¿Te avisamos cuando te respondan?')).toBeTruthy()
+    cleanup(); cerrarPuertaAvisos(); sessionStorage.clear(); sessionStorage.setItem('rc_puerta_avisos_entrada', '1')
+    render(<PuertaAvisos doctor={false} estado={async () => 'inactivo'} sincronizar={async () => false} />)
+    await new Promise((r) => setTimeout(r, 0))
+    act(() => pedirAvisos('pedido'))
+    expect(screen.queryByTestId('puerta-avisos')).toBeNull()
+  })
+  it('iPhone sin instalar: explica cómo agregarlo a inicio', async () => {
+    render(<PuertaAvisos doctor estado={async () => 'requiere_instalar'} sincronizar={async () => false} />)
+    expect(await screen.findByTestId('puerta-instalar')).toHaveTextContent('Agregar a inicio')
   })
 })

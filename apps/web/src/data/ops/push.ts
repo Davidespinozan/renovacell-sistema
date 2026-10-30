@@ -48,3 +48,24 @@ export async function activarAvisos(invocar: Invocar = invocarPorDefecto): Promi
     return error ? { ok: false, mensaje: 'No se pudieron activar los avisos en este dispositivo.' } : { ok: true }
   } catch { return { ok: false, mensaje: 'No se pudieron activar los avisos en este dispositivo.' } }
 }
+
+/**
+ * PUSH SIEMPRE · si el navegador YA dio permiso, deja este dispositivo registrado a la cuenta actual sin pedir nada:
+ * repara el botón viejo de Ajustes (pedía permiso y no registraba), un registro que el navegador dio de baja o un cambio
+ * de cuenta en el mismo dispositivo. Sin permiso no hace nada (el navegador exige que lo pida la persona). Nunca lanza.
+ */
+export async function sincronizarAvisos(invocar: Invocar = invocarPorDefecto): Promise<boolean> {
+  if (!hasSupabase && invocar === invocarPorDefecto) return false
+  try {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return false
+    if (Notification.permission !== 'granted') return false
+    const { data: k } = await invocar('push', { body: { action: 'clave' } })
+    const clave = (k as { clave?: string | null } | null)?.clave
+    if (!clave) return false
+    const reg = (await navigator.serviceWorker.getRegistration('/')) ?? await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    await navigator.serviceWorker.ready
+    const sub = (await reg.pushManager.getSubscription()) ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: llaveBytes(clave) as BufferSource })
+    const { error } = await invocar('push', { body: { action: 'suscribir', suscripcion: sub.toJSON(), token: leerTokenVisitante() } })
+    return !error
+  } catch { return false }
+}

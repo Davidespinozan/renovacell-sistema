@@ -63,3 +63,19 @@ begin
   perform tests.throws(format('select public._equipo_destinatarios(%L, null)', dm), 'permission denied', '4 · ni se consulta a quién');
 end $t$;
 rollback;
+
+-- PUSH SIEMPRE (20270221) · Dirección ve quién tiene avisos y en cuántos dispositivos; nadie más.
+begin;
+do $t$
+declare a1 uuid := tests.user('admin'); s1 uuid := tests.user('pos'); s2 uuid := tests.user('pos'); r jsonb;
+begin
+  perform tests.act_as_service();
+  perform public.push_suscribir(s1, null, 'https://push.example/s1a', repeat('k', 87), repeat('s', 22));
+  perform public.push_suscribir(s1, null, 'https://push.example/s1b', repeat('k', 87), repeat('s', 22));
+  perform tests.act_as(a1);
+  r := public.push_estado_cuentas();
+  perform tests.ok((r -> s1::text ->> 'dispositivos')::int = 2 and r -> s2::text is null and not (r -> s1::text) ? 'endpoint', '5 · Dirección: 2 dispositivos de uno, nada del otro, sin direcciones');
+  perform tests.act_as(s1);
+  perform tests.throws('select public.push_estado_cuentas()', 'NO_AUTORIZADO', '5 · un vendedor no lo ve');
+end $t$;
+rollback;

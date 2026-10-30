@@ -9,6 +9,7 @@ import { ExportButton } from '../../app/ExportButton'
 import { useTeam, type TeamUser } from '../../data/hooks/useTeam'
 import { suggestCompanyEmail } from '../../data/store/teamStore'
 import { getRole, ROLES, CAPABILITIES, type RoleKey } from '../../app/roles'
+import { usePushEstado, EtiquetaPush } from '../../data/hooks/usePushEstado'
 
 const STAFF_ROLES = ROLES.filter((r) => r.isStaff)
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }
@@ -22,6 +23,7 @@ const randomPass = () => {
 
 export function Equipo() {
   const { data: users, addUser, updateUser, removeUser, setPassword, toggleCapability, setActive } = useTeam()
+  const push = usePushEstado()   // PUSH SIEMPRE · quién recibe notificaciones
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<TeamUser | null>(null)
   const [pwFor, setPwFor] = useState<TeamUser | null>(null)
@@ -70,6 +72,7 @@ export function Equipo() {
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{u.email}</div>
             </div>
             <span className="pill p-neu">{getRole(u.role).label}</span>
+            {u.active && <EtiquetaPush estado={push} id={u.id} />}
             {!u.active && <span className="pill p-dang">{u.baja ? 'Baja' : 'Suspendido'}</span>}
           </div>
 

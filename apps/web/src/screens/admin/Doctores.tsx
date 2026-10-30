@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { statusView } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
+import { usePushEstado, EtiquetaPush } from '../../data/hooks/usePushEstado'   // PUSH SIEMPRE
 
 // ---- Identificación (INE) que el doctor subió: la revisa una persona (sin verificación automática). ----
 interface IdentityRecord {
@@ -39,6 +40,7 @@ const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim
 
 export function Doctores() {
   const { data: doctors, approve, reject, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
+  const push = usePushEstado()   // PUSH SIEMPRE · qué doctores reciben notificaciones
   const { data: customers } = useCustomers()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
   // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
@@ -134,6 +136,7 @@ export function Doctores() {
               </span>
             ) })()}
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
+            <EtiquetaPush estado={push} id={d.id} />
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>

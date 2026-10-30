@@ -23,6 +23,7 @@ import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type 
 import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
 import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
 import { avisoInvalidada, claveDireccion, elegirEnIntencion, intencionInicial, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad, type Intencion, type Tarjeta } from './entregaUx'   // CX-V2-A/B/C
+import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 
 /** Motor local (solo modo demo, sin backend): líneas con su precio efectivo previsto y creación local. */
 export interface MotorLocal {
@@ -232,6 +233,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     if (!r.ok) { setErrorPedido(r.error); return }
     setOrder(r.order); setAviso(r.aviso ?? null)
     olvidarEleccionCheckout()   // CX-V2-C · la siguiente compra empieza de cero
+    pedirAvisos('pedido')       // PUSH SIEMPRE · tras su pedido, el doctor activa avisos (al equipo no se le abre)
     onDone?.() // solo con el pedido confirmado
   }
 

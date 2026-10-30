@@ -22,6 +22,7 @@ import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
+import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 
 interface Props {
   /** PROMO-6 · la tarjeta de una promoción puede llevar al catálogo (lo define quien monta el chat del doctor). */
@@ -321,6 +322,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (r.data.ia === 'en_curso') setEsperaIA({ seq: r.data.seq, desde: Date.now() })
     await cargar(convId, ultimoSeq.current)
     setPendiente(null); setEnviando(false)
+    if (!asesor) pedirAvisos('chat')   // PUSH SIEMPRE · el doctor acaba de escribir: que se entere cuando le respondan
   }
   const enviar = async () => {
     const t = texto.trim()
