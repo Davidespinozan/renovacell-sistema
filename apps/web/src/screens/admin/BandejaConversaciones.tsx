@@ -15,6 +15,7 @@ import { onNuevaNotificacion } from '../../data/store/notificationsStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico } from '../chat/ChatCanonico'
 import { usePanelCliente, accionesIneVisitante } from '../chat/PanelCliente'
+import { ResultadosMensajes } from '../chat/BuscarMensajes'
 import { OrigenChip } from '../chat/OrigenConversacion'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { BarraTomaCanal, PanelOperativoCanal } from './CanalOperacion'
@@ -108,6 +109,8 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
       <div className="bq-cuerpo">
         <aside className="bq-lista card" aria-label="Conversaciones">
           <div className="bq-busca"><Search size={15} /><input placeholder="Buscar nombre, número o mensaje" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversación" data-testid="bq-busca" /></div>
+          {/* HERRAMIENTAS DEL VENDEDOR · la palabra también se busca DENTRO de todas las conversaciones, no solo en el último mensaje */}
+          <ResultadosMensajes q={busca} onAbrir={(id) => { setBusca(''); setAbierta(id) }} />
           <div className="seg bq-vistas" role="tablist" aria-label="Qué conversaciones ver">
             {VISTAS.map((v) => (
               <button key={v.k} type="button" role="tab" aria-selected={vista === v.k} className={vista === v.k ? 'active' : undefined} onClick={() => setVista(v.k)} title={v.ayuda} data-testid={`bq-vista-${v.k}`}>

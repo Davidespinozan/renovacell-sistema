@@ -247,3 +247,30 @@ export function valorEnRiesgo(lots: { quantity: number; unit_cost?: number | nul
   r.completo = r.lotesSinCosto === 0
   return r
 }
+
+// HERRAMIENTAS DEL VENDEDOR · el jefe de ventas ve los productos MÁS y MENOS movidos del periodo (por piezas). Los menos
+// movidos incluyen los activos que no se vendieron nada (0 piezas): son los que más conviene empujar.
+export interface MovimientoProducto { id: string; name: string; units: number; revenue: number }
+type PedidoMin = { status: string | null; created_at: string | null; items: Array<{ product_id: string | null; qty: number; unit_price: number | null }> }
+export function movimientoProductos(pedidos: PedidoMin[], productos: Array<{ id: string; name: string; active?: boolean | null; sellable?: boolean | null; parent_product_id?: string | null }>,
+  periodo: { desde: string | null; hasta: string | null }, n = 5): { mas: MovimientoProducto[]; menos: MovimientoProducto[] } {
+  const m = new Map<string, { units: number; revenue: number }>()
+  for (const o of pedidos) {
+    if (!o.status || ['cancelled', 'draft', 'pending_payment'].includes(o.status) || !o.created_at) continue
+    const dia = diaNegocio(o.created_at)
+    if ((periodo.desde && dia < periodo.desde) || (periodo.hasta && dia > periodo.hasta)) continue
+    for (const it of o.items) {
+      if (it.unit_price == null || !it.product_id) continue   // cotizaciones no cuentan como venta
+      const cur = m.get(it.product_id) ?? { units: 0, revenue: 0 }
+      cur.units += it.qty; cur.revenue += it.unit_price * it.qty; m.set(it.product_id, cur)
+    }
+  }
+  const nombre = new Map(productos.map((p) => [p.id, p.name]))
+  const vendidos = [...m.entries()].map(([id, v]) => ({ id, name: nombre.get(id) ?? 'Producto', ...v }))
+  const mas = [...vendidos].sort((a, b) => b.units - a.units || b.revenue - a.revenue).slice(0, n)
+  const enCatalogo = productos.filter((p) => p.active !== false && p.sellable !== false && !p.parent_product_id)
+    .map((p) => ({ id: p.id, name: p.name, units: m.get(p.id)?.units ?? 0, revenue: m.get(p.id)?.revenue ?? 0 }))
+  const masIds = new Set(mas.map((x) => x.id))
+  const menos = enCatalogo.filter((x) => !masIds.has(x.id)).sort((a, b) => a.units - b.units || a.revenue - b.revenue || a.name.localeCompare(b.name)).slice(0, n)
+  return { mas, menos }
+}

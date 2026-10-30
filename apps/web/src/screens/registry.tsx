@@ -1,6 +1,7 @@
 // Registro de pantallas: mapea pantalla -> componente.
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
+import { ProductosClientes } from './sales/ProductosClientes'
 import { BotonAvisos } from '../app/BotonAvisos'
 import { MiVerificacion } from './doctor/MiVerificacion'
 import React, { useEffect } from 'react'
@@ -132,7 +133,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   // CC-2 · conversación canónica
   chat_cc: () => <ChatCanonico embebido barra={<BotonAvisos />} />,
   mi_verificacion: () => <MiVerificacion />,   // cuenta ≠ verificación
-  asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
+  asesorias: () => <AsesoriasPantalla />,
+  productos_clientes: () => <ProductosClientes />,   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto   // CC-7 · Dirección vs vendedor
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
   g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }]} />,

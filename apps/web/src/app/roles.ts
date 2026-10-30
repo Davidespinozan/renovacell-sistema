@@ -133,6 +133,7 @@ export const ROLES: RoleDef[] = [
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
+      { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
     ],
   },
   {

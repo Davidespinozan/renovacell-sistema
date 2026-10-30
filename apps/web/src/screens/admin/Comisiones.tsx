@@ -5,7 +5,8 @@
 // La pantalla solo LEE: no congela tasas, no reconstruye vendedores, no aplica reversas
 // y no escribe ningún movimiento de dinero. Toda la regla vive en `data/comisiones.ts`.
 import React, { useMemo, useState } from 'react'
-import { Target, Percent, Trophy, Receipt, Info } from 'lucide-react'
+import { Target, Percent, Trophy, Receipt, Info, TrendingUp, TrendingDown } from 'lucide-react'
+import { movimientoProductos } from '../../data/metrics'
 import { money } from '../../lib/format'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -61,6 +62,8 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
     tasaVigente: { cosm: rateCosm, prof: rateProf },
   }, periodo), [datos, pedidos, asientos, refunds, sellers, lineOf, rateCosm, rateProf, periodo])
 
+  // HERRAMIENTAS DEL VENDEDOR · productos más y menos movidos del periodo (por piezas; los menos incluyen los que no se vendieron).
+  const mov = useMemo(() => movimientoProductos(pedidos as Parameters<typeof movimientoProductos>[0], products, periodo, 5), [pedidos, products, periodo])
   const rows = useMemo(() => est.filas.map((f) => {
     const meta = metaDe(f.email)
     return { ...f, meta, avance: meta > 0 ? (f.vendido / meta) * 100 : 0 }
@@ -139,6 +142,21 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
               {rows.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>Sin vendedores activos.</td></tr>}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="grid pmov" data-testid="productos-movimiento">
+        <div className="card">
+          <div className="eyebrow pmov-h"><TrendingUp size={15} /> Más vendidos · {periodo.etiqueta}</div>
+          {mov.mas.length === 0 ? <div className="pmov-vacio">Sin ventas en el periodo.</div> : (
+            <ol className="pmov-lista">{mov.mas.map((p) => <li key={p.id}><span>{p.name}</span><b className="mono">{p.units} pz</b><small className="mono">{money(p.revenue)}</small></li>)}</ol>
+          )}
+        </div>
+        <div className="card">
+          <div className="eyebrow pmov-h"><TrendingDown size={15} /> Menos vendidos · {periodo.etiqueta}</div>
+          {mov.menos.length === 0 ? <div className="pmov-vacio">Sin productos en el catálogo.</div> : (
+            <ol className="pmov-lista">{mov.menos.map((p) => <li key={p.id}><span>{p.name}</span><b className="mono">{p.units} pz</b><small className="mono">{p.units ? money(p.revenue) : 'sin ventas'}</small></li>)}</ol>
+          )}
         </div>
       </div>
 

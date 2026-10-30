@@ -7,7 +7,8 @@ import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
 import { TarjetaPromoChat } from './TarjetaPromoChat'
 import { MARCA_PROMO } from '../../data/ops/promociones'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, Check, CheckCheck, ChevronDown, History, Plus, Send, X, Zap } from 'lucide-react'
+import { Camera, Check, CheckCheck, ChevronDown, ChevronUp, History, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
@@ -354,6 +355,21 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
 
   const mensajes = useMemo(() => mensajesActuales(conv), [conv])
+  // HERRAMIENTAS DEL VENDEDOR · buscar una palabra en ESTE chat: resalta cada coincidencia y salta entre ellas.
+  const [busq, setBusq] = useState<string | null>(null)
+  const [busqIdx, setBusqIdx] = useState(0)
+  const raiz = useRef<HTMLDivElement | null>(null)
+  const hallados = useMemo(() => {
+    const b = normalizar((busq ?? '').trim())
+    return b.length < 2 ? [] : mensajes.filter((m) => !m.adjunto && m.actor !== 'system' && normalizar(m.content).includes(b)).map((m) => m.id)
+  }, [busq, mensajes])
+  useEffect(() => { setBusqIdx(hallados.length ? hallados.length - 1 : 0) }, [hallados.length, busq])   // empieza por la más reciente
+  const actualHallado = hallados[busqIdx] ?? null
+  useEffect(() => {
+    if (!actualHallado) return
+    raiz.current?.querySelector(`[data-msg-id="${actualHallado}"]`)?.scrollIntoView?.({ block: 'center' })
+  }, [actualHallado])
+  const cerrarBusqueda = () => { setBusq(null); setBusqIdx(0) }
   // PALOMITAS · azul = el otro lado ya lo vio: su cursor de lectura lo alcanzó, o ya respondió después (incluye al asistente).
   const ultimoAjeno = useMemo(() => mensajes.reduce((s, m) => (!m.propio && m.actor !== 'system' ? Math.max(s, m.seq) : s), 0), [mensajes])
   const visto = (seq: number): boolean => seq <= Math.max(conv?.leido_otro ?? 0, ultimoAjeno)
@@ -397,7 +413,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     actorPrevio = clave
     const etiqueta = etiquetaActor(m, visor, { nombreCliente, nombreAsesor, etiquetaAsesor: ETIQUETA_ASESOR })
     hilo.push(
-      <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}`} data-testid={`msg-${m.actor}`}>
+      <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}${m.id === actualHallado ? ' rc-msg--hallado' : ''}`} data-testid={`msg-${m.actor}`} data-msg-id={m.id}>
         {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span>}
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
@@ -410,7 +426,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               {m.adjunto.uso && <span className="rc-img-uso">Usada como {m.adjunto.uso === 'ine-front' ? 'INE frente' : 'INE reverso'}</span>}
               {accionesAdjunto?.(m)}
             </div>
-          ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{conEnlaces(m.content)}</div>}
+          ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{busq && hallados.includes(m.id)
+                ? partesResaltadas(m.content, busq).map((p, i) => (p.hallado ? <mark key={i} className="rc-mark-busq">{p.t}</mark> : <React.Fragment key={i}>{p.t}</React.Fragment>))
+                : conEnlaces(m.content)}</div>}
           <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && (visto(m.seq)
             ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tick-visto" />
             : <CheckCheck className="rc-tick" size={15} aria-label="Entregado" data-testid="tick-entregado" />)}</time>
@@ -422,7 +440,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   if (!asesor && conv && !cerrada && modo === 'human_active') hilo.push(<div key="join" className="rc-join" data-testid="aviso-asesor-activo"><span>{nombreAsesor ?? 'Tu asesor'} está contigo</span></div>)
 
   return (
-    <div className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico"
+    <div ref={raiz} className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico"
       onKeyDown={(e) => { if (e.key === 'Escape' && vista.tipo === 'historial') { e.stopPropagation(); volverActual() } }}>
       <header className="rc-head">
         {/* Como en un mensajero: el personal ve la inicial de su cliente; el cliente ve el logo de Renovacell. */}
@@ -434,6 +452,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : `${canal ? NOMBRE_CANAL[canal.canal] + ' · ' : ''}${subtituloDe(conv, asesor)}`}</div>
         </div>
         <div className="rc-actions">
+          {conv && vista.tipo === 'actual' && !finAtencion && (
+            <button type="button" className={`rc-ico${busq !== null ? ' rc-ico--on' : ''}`} onClick={() => (busq !== null ? cerrarBusqueda() : setBusq(''))}
+              aria-label="Buscar en esta conversación" aria-pressed={busq !== null} title="Buscar en esta conversación" data-testid="btn-buscar-chat"><Search size={18} /></button>
+          )}
           {conv?.sesion && convId && (
             <button type="button" ref={botonHist} className={`rc-ico rc-ico--hist${vista.tipo === 'historial' ? ' rc-ico--on' : ''}`} onClick={() => (vista.tipo === 'historial' ? volverActual() : abrirHistorial(null))}
               aria-label="Conversaciones anteriores" aria-pressed={vista.tipo === 'historial'} title="Conversaciones anteriores" data-testid="btn-historial"><History size={18} /></button>
@@ -457,6 +479,18 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           {onSalir && <button type="button" className="rc-ico" onClick={onSalir} aria-label={etiquetaSalir} title={etiquetaSalir} data-testid="btn-salir"><X size={18} /></button>}
         </div>
       </header>
+      {busq !== null && vista.tipo === 'actual' && (
+        <div className="rc-busq" role="search" data-testid="chat-busqueda"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); cerrarBusqueda() } }}>
+          <Search size={15} aria-hidden />
+          <input autoFocus value={busq} onChange={(e) => setBusq(e.target.value)} placeholder="Buscar en esta conversación" aria-label="Buscar en esta conversación" data-testid="chat-busqueda-q"
+            onKeyDown={(e) => { if (e.key === 'Enter' && hallados.length) { e.preventDefault(); setBusqIdx((i) => (e.shiftKey ? (i + 1) % hallados.length : (i - 1 + hallados.length) % hallados.length)) } }} />
+          <span className="rc-busq-n" data-testid="chat-busqueda-n">{busq.trim().length < 2 ? '' : hallados.length ? `${hallados.length - busqIdx} de ${hallados.length}` : 'Sin resultados'}</span>
+          <button type="button" className="rc-ico" disabled={!hallados.length} onClick={() => setBusqIdx((i) => (i - 1 + hallados.length) % hallados.length)} aria-label="Anterior (más antigua)"><ChevronUp size={17} /></button>
+          <button type="button" className="rc-ico" disabled={!hallados.length} onClick={() => setBusqIdx((i) => (i + 1) % hallados.length)} aria-label="Siguiente (más reciente)"><ChevronDown size={17} /></button>
+          <button type="button" className="rc-ico" onClick={cerrarBusqueda} aria-label="Cerrar búsqueda"><X size={17} /></button>
+        </div>
+      )}
       {barra && <div className="rc-barra" data-testid="chat-barra">{barra}</div>}
       {tira && !finAtencion && vista.tipo === 'actual' && <div className="rc-tira" data-testid="chat-tira">{tira}</div>}
 

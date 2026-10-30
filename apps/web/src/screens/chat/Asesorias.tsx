@@ -21,6 +21,7 @@ import { crearInvitacion } from '../../data/ops/invitacion'
 import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
 import { HojaMarco } from './HojaChat'
 import { OrigenChip } from './OrigenConversacion'
+import { BuscadorConversaciones } from './BuscarMensajes'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
 import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
@@ -208,6 +209,8 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
           <EnlaceContactoBotones />
         </div>
       </div>
+      {/* HERRAMIENTAS DEL VENDEDOR · buscar una palabra en todas sus conversaciones (no se acuerda de con quién habló) */}
+      <BuscadorConversaciones onAbrir={(id) => { setAviso(null); setLlegada(id); setEnfocar(true); setAbierta(id) }} />
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {cargando && <div style={{ color: 'var(--ink-3, #667)' }}>Cargando…</div>}
