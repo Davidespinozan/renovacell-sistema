@@ -46,13 +46,14 @@ begin
   perform tests.ok((select source = 'Enlace de contacto' and status = 'nuevo' and visitor_id = vA and assigned_to is null and meta -> 'consentimiento' ->> 'privacidad' = 'true' from public.prospects where id = p1), '3 · prospecto creado y ligado al visitante, con constancia del aviso');
   perform tests.ok(exists (select 1 from public.cc_visitor_events where visitor_id = vA and tipo = 'prerregistro'), '3 · queda en la bitácora del visitante');
   perform tests.eq(public.cc_puerta_chat(hA, null), '{"visitante": true, "prerregistrado": true, "nombre": "Ana Ruiz"}'::jsonb, '3 · puerta abierta');
-  perform tests.ok(exists (select 1 from public.notifications where kind = 'contacto_enlace' and roles = array['admin'] and user_ids is null and screen = 'av_prosp' and body = 'Nuevo contacto por el enlace, sin vendedor: Ana Ruiz'), '3 · Dirección recibe el aviso para asignarle vendedor');
+  -- REPARTO-VERIF (20270213): sin vendedor ya no se avisa a Dirección; su conversación entra al reparto al azar.
+  perform tests.ok(not exists (select 1 from public.notifications where kind = 'contacto_enlace' and event_key = 'prerregistro:' || vA::text), '3 · sin vendedor: nada a Dirección (lo toma el reparto)');
   -- idempotente e inmutable: nadie se re-rutea tecleando los datos de otro
   r := public.cc_visitante_prerregistrar(hA, 'Otra Persona', '6691110001', 'dra.cartera@test.local', false, null, true);
   perform tests.eq(r ->> 'estado', 'ya_registrado', '3 · segundo intento: ya registrado');
   perform tests.ok((select email = 'ana@test.local' and posible_seller_id is null from public.cc_prerregistros where visitor_id = vA), '3 · el contacto NO cambia');
   perform tests.eq((select count(*)::int from public.prospects where visitor_id = vA), 1, '3 · un solo prospecto');
-  perform tests.eq((select count(*)::int from public.notifications where event_key = 'prerregistro:' || vA::text), 1, '3 · un solo aviso por visitante');
+  perform tests.eq((select count(*)::int from public.notifications where event_key = 'prerregistro:' || vA::text), 0, '3 · tampoco al reintentar');
 
   -- ══ 4 · coincidencias ══
   r := public.cc_visitante_prerregistrar(hB, 'Quien Dice Ser', '6699999999', 'dra.cartera@test.local', false, null, true);   -- correo de un cliente con cartera

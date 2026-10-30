@@ -80,13 +80,13 @@ function useTareasBase(): Task[] {
     }
 
     if (role === 'admin') {
-      const docsPend = doctors.filter((d) => !d.verified)
       const atorados = orders.filter((o) => ['packed', 'shipped'].includes(o.status ?? '') && diagnoseShipment(o, shipments.find((s) => s.order_id === o.id)).stuck)
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 
       if (cancelaciones.length) t.push({ id: 'cancelaciones', icon: 'receipt', title: 'Solicitudes de cancelación', detail: 'Alguien del equipo pidió cancelar un pedido: apruébalo o recházalo con nota.', count: cancelaciones.length, tone: 'dang', screen: 'av_ventas' })
-      if (docsPend.length) t.push({ id: 'verificar', icon: 'usercheck', title: 'Doctores por verificar', detail: 'Habilita su canal en el Portal.', count: docsPend.length, tone: 'warn', screen: 'av_verif' })
+      // REPARTO-VERIF (dueño, 30 oct): la verificación de doctores ya no es trabajo de Dirección; la hacen los vendedores (su
+      // cartera o, sin vendedor, al azar). Dirección la supervisa en Clientes › Doctores si hace falta.
       // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
       // PAY-EXP-01A-3 · MISMO universo que la lista de "Pagos por validar" (los de pedidos cancelados → Revisión económica).
       const transferPend = clasificarDeclaraciones(claims, orders).vigentes

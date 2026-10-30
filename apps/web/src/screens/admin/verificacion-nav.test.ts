@@ -42,9 +42,9 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
 })
 
 describe('Ninguna señal "por verificar" apunta al directorio read-only (av_doc)', () => {
-  it('la tarea del tablero "Doctores por verificar" va a av_verif', () => {
-    expect(bandejaSrc).toMatch(/Doctores por verificar[\s\S]*?screen: 'av_verif'/)
-    expect(bandejaSrc).not.toMatch(/Doctores por verificar[\s\S]*?screen: 'av_doc'/)
+  // REPARTO-VERIF (dueño, 30 oct): verificar ya no es trabajo de Dirección; su Inicio no tiene esa tarea.
+  it('el Inicio de Dirección ya no tiene la tarea "Doctores por verificar" (la hacen los vendedores)', () => {
+    expect(bandejaSrc).not.toMatch(/title: 'Doctores por verificar'/)
   })
   it('la notificación semilla de verificación va a av_verif', () => {
     expect(notifSrc).toMatch(/Doctores esperando verificación[\s\S]*?screen: 'av_verif'/)

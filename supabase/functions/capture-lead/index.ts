@@ -20,7 +20,6 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const OPEN_EXCLUDED = ['convertido', 'descartado']
 
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
@@ -71,17 +70,10 @@ Deno.serve(conCors(async (req) => {
     return json(200, { ok: true }) // no revela que ya existía
   }
 
-  // 3) Auto-asignación balanceada: vendedor (role_id='pos') con menos prospectos abiertos.
-  const [{ data: sellers }, { data: openRows }] = await Promise.all([
-    admin.from('profiles').select('id').eq('role_id', 'pos'),
-    admin.from('prospects').select('assigned_to').not('status', 'in', `(${OPEN_EXCLUDED.join(',')})`),
-  ])
-  let assigned: string | null = null
-  if (sellers && sellers.length > 0) {
-    const load: Record<string, number> = {}
-    ;(openRows ?? []).forEach((r) => { const a = r.assigned_to as string | null; if (a) load[a] = (load[a] ?? 0) + 1 })
-    assigned = sellers.map((s) => s.id as string).sort((a, b) => (load[a] ?? 0) - (load[b] ?? 0))[0]
-  }
+  // 3) REPARTO-VERIF (dueño, 30 oct): el lead es de un vendedor AL AZAR entre los que reciben clientes nuevos (los mismos del
+  //    reparto de conversaciones); si ya es cliente con vendedor, de ese vendedor (se resuelve abajo, con su ficha).
+  const { data: azar } = await admin.rpc('_cc_vendedor_azar', { p_excluir: [] })
+  let assigned: string | null = typeof azar === 'string' ? azar : null
 
   // CUSTOMER 360: ¿esta persona YA es un customer? Resuelve identidad ANTES de crear el prospect
   // para no fabricar una identidad comercial paralela en silencio. EXACT/MATCH → liga el prospect al
@@ -92,6 +84,10 @@ Deno.serve(conCors(async (req) => {
     const { data: r } = await admin.rpc('resolve_customer_identity', { p_email: email || null, p_phone: phone || null, p_name: name })
     const res = r as { status?: string; customer_id?: string | null } | null
     if (res?.status === 'EXACT' || res?.status === 'MATCH') customerId = res.customer_id ?? null
+    if (customerId) {   // ya es cliente: el lead es de su vendedor de cartera (si sigue atendiendo)
+      const { data: suyo } = await admin.rpc('_cc_vendedor_de_cliente', { p_customer: customerId })
+      if (typeof suyo === 'string') assigned = suyo
+    }
     else if (res?.status === 'AMBIGUOUS') meta.identity_review = true
   } catch { /* el lead no debe fallar por el resolver */ }
 
@@ -106,16 +102,11 @@ Deno.serve(conCors(async (req) => {
   const visitorHash = await hashToken(payload.visitor_token)
   if (visitorHash) await admin.rpc('cc_visitante_prospecto', { p_hash: visitorHash, p_prospect: creado.id }).then(() => {}, () => {})
 
-  // 4) Aviso a Dirección (best-effort; no bloquea la respuesta al lead).
-  await admin.from('notifications').insert({
-    body: `Lead nuevo desde el sitio: ${name}`, roles: ['admin'], screen: 'av_prosp',
-  }).then(() => {}, () => {})
-
-  // 5) Aviso DIRIGIDO al vendedor asignado (user_ids: solo él lo ve). Antes solo se
+  // 4) Aviso DIRIGIDO al vendedor asignado (user_ids: solo él lo ve). Antes solo se
   // avisaba a admin y el vendedor asignado nunca se enteraba de su lead.
   if (assigned) {
     await admin.from('notifications').insert({
-      body: `Lead nuevo para ti: ${name}`, user_ids: [assigned], screen: 'av_prosp',
+      body: `Lead nuevo para ti: ${name}`, user_ids: [assigned], screen: 'clientes',
     }).then(() => {}, () => {})
   }
 

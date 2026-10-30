@@ -93,7 +93,8 @@ describe('capture-lead · límite antes de la base, dedupe indexado', () => {
   it('ya no lee toda la tabla; no revela duplicados; conserva asignación y resolutor', () => {
     expect(s).not.toMatch(/from\('prospects'\)\.select\('id, name, email, phone, meta'\)/)
     expect(s).toMatch(/return json\(200, \{ ok: true \}\) \/\/ no revela que ya existía/)
-    expect(s).toMatch(/resolve_customer_identity/); expect(s).toMatch(/role_id', 'pos'/)
+    expect(s).toMatch(/resolve_customer_identity/)
+    expect(s).toMatch(/admin\.rpc\('_cc_vendedor_azar'/); expect(s).not.toMatch(/roles: \['admin'\]/)   // REPARTO-VERIF · al azar entre vendedores; nada a Dirección
     expect(s).not.toMatch(/'Access-Control-Allow-Origin': '\*'/); expect(s).toMatch(/Deno\.serve\(conCors\(/)
     expect(s).not.toMatch(/_shared\/observa/)
   })

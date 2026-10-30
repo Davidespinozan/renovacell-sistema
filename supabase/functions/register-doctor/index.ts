@@ -142,9 +142,10 @@ Deno.serve(conCors(async (req) => {
   // ya autenticada, confirme la adopción). Posesión probada aquí, confirmación después.
   if (visitorHash) await admin.rpc('cc_visitante_vincular_registro', { p_hash: visitorHash, p_profile: uid }).then(() => {}, () => {})
 
-  // Aviso a su vendedora (cartera, o quien lo atendió por el enlace) para que lo verifique ella; sin vendedora, a Dirección.
-  if (conIne) avisarAVendedora(admin, uid)
-  else await admin.from('notifications').insert({ body: `Doctor nuevo por verificar: ${name} — falta su INE`, roles: ['admin'], screen: 'av_verif' }).then(() => {}, () => {})
+  // Aviso a su vendedora (cartera, o quien lo atendió por el enlace) para que lo verifique ella. REPARTO-VERIF: sin
+  // vendedora le toca AL AZAR a un vendedor (verificacion_avisar); Dirección ya no verifica. Aunque falte su INE: el
+  // vendedor se la pide (en "Por verificar" aparece sin fotos).
+  avisarAVendedora(admin, uid)
 
   return json(200, { decision: 'pending', reasons: conIne ? [] : ['Para terminar tu verificación sube tu INE en "Mi verificación" al entrar.'] })
 }))

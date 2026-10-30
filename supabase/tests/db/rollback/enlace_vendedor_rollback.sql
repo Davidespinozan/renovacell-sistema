@@ -1,6 +1,7 @@
 -- ENLACE-VENDEDOR (20270211) · el down devuelve ruteo, prerregistro y vendedor del doctor EXACTAMENTE a producción, retira
 -- enlaces y atribución, y la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/reparto_verificacion/99_down.sql   -- REPARTO-VERIF (20270213) redefine funciones de esta cadena: se baja antes de la foto inicial
 create temp table _ev as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/enlace_vendedor/99_down.sql
 do $t$ begin

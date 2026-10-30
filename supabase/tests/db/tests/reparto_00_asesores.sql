@@ -1,5 +1,5 @@
 -- REPARTO DE ASESORÍAS (181) · sin vendedor de cartera, la solicitud se reparte al azar entre los vendedores elegibles para
--- nuevos; si nadie la inicia en el plazo, el evaluador la pasa a otro; agotados, Dirección. Quien la toma se queda con la
+-- nuevos; si nadie la inicia en el plazo, el evaluador la pasa a otro; agotados, nueva vuelta (sin vendedores, Dirección). Quien la toma se queda con la
 -- cartera. Con el reparto apagado, todo sigue como en CC-7/CHV2-A (Dirección). Horario 24/7 para medir minutos hábiles.
 begin;
 do $t$
@@ -75,16 +75,29 @@ begin
   select seller_profile_id into v3 from public.cc_conversations where id = c1;
   perform tests.ok(v3 in (s1, s2, s3) and v3 <> v1 and v3 <> v2 and (select cardinality(reparto_probados) = 3 from public.cc_conversations where id = c1), '4 · tercer vendedor distinto');
 
-  -- ══ 5 · agotados los vendedores: vuelve a la cola de Dirección (nunca al que no recibe nuevos) ════
+  -- ══ 5 · REPARTO-VERIF (dueño, 30 oct) · agotados los vendedores: NUEVA VUELTA entre vendedores (Dirección solo se entera) ══
   update public.cc_conversations set asesoria_asignada_at = now() - interval '6 minutes' where id = c1;
   perform tests.act_as_service(); r := public.cc_atencion_evaluar(); perform tests.act_as_owner();
-  perform tests.eq((r ->> 'agotados')::int, 1, '5 · agotado');
-  perform tests.ok((select modo = 'human_requested' and seller_profile_id is null and ruteo_motivo = 'sin_vendedor' from public.cc_conversations where id = c1), '5 · human_requested para Dirección; sNo nunca la recibió');
+  perform tests.eq((r ->> 'agotados')::int, 0, '5 · ya no se agota hacia Dirección');
+  select seller_profile_id into v1 from public.cc_conversations where id = c1;
+  perform tests.ok(v1 in (s1, s2, s3) and v1 <> v3 and (select modo = 'human_assigned' and ruteo_motivo = 'reparto' and reparto_probados = array[v3, v1] from public.cc_conversations where id = c1), '5 · nueva vuelta: otro vendedor (no el último); sNo nunca la recibe');
+  perform tests.ok((select asesoria_asignada_at > now() - interval '1 minute' from public.cc_conversations where id = c1), '5 · reloj nuevo para la vuelta');
+  perform tests.eq((select count(*)::int from public.notifications where conversation_id = c1 and kind = 'handoff_escalado' and roles = array['admin'] and body like 'Nadie tomó la solicitud en su vuelta%'), 1, '5 · Dirección solo se entera');
+  perform tests.eq((select count(*)::int from public.notifications where conversation_id = c1 and kind = 'handoff_sin_vendedor'), 0, '5 · no le llega como trabajo');
+  perform tests.act_as_service(); r := public.cc_atencion_evaluar(); perform tests.act_as_owner();
+  perform tests.eq((r ->> 'repartos')::int, 0, '5 · antes del plazo no vuelve a rotar');
+  -- sin NINGÚN vendedor que reciba clientes nuevos: entonces sí, a Dirección
+  perform tests.act_as_service(); update public.profiles set meta = meta - 'capabilities' where id in (s1, s2, s3); perform tests.act_as_owner();
+  update public.cc_conversations set asesoria_asignada_at = now() - interval '6 minutes' where id = c1;
+  perform tests.act_as_service(); r := public.cc_atencion_evaluar(); perform tests.act_as_owner();
+  perform tests.eq((r ->> 'agotados')::int, 1, '5 · sin vendedores: agotado');
+  perform tests.ok((select modo = 'human_requested' and seller_profile_id is null and ruteo_motivo = 'sin_vendedor' from public.cc_conversations where id = c1), '5 · human_requested para Dirección');
   perform tests.eq((select count(*)::int from public.notifications where conversation_id = c1 and kind = 'handoff_sin_vendedor' and roles = array['admin']), 1, '5 · UNA alerta a Dirección');
   perform tests.eq(public._cc_atencion(c1) ->> 'estado', 'solicitado_sin_vendedor', '5 · estado derivado');
   perform tests.ok(not exists (select 1 from public.cc_participants where conversation_id = c1 and rol = 'asesor' and left_at is null), '5 · ningún asesor sigue como participante');
   perform tests.act_as_service(); r := public.cc_atencion_evaluar(); perform tests.act_as_owner();
   perform tests.eq((select count(*)::int from public.notifications where conversation_id = c1 and kind = 'handoff_sin_vendedor'), 1, '5 · el evaluador no repite la alerta');
+  perform tests.act_as_service(); update public.profiles set meta = coalesce(meta, '{}') || '{"capabilities":["conversaciones","nuevos_clientes"]}' where id in (s1, s2, s3); perform tests.act_as_owner();
 
   -- ══ 6 · quien la toma se queda con la cartera; la próxima solicitud ya le llega directo ═════════
   perform tests.act_as_service();
