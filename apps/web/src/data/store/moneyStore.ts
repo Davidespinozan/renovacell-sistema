@@ -45,6 +45,28 @@ export async function reloadMoney(): Promise<void> {
   await Promise.all([moneyLive.reload(), claimsLive.reload(), entriesLive.reload()])
 }
 
+// PERF: tras un comando sobre UN pedido se releen solo sus filas, en paralelo (antes: las tres lecturas completas,
+// por páginas, con el botón esperando). Si algo falla se cae a la recarga completa: el servidor sigue siendo la autoridad.
+const porFecha = <T extends { id: string }>(campo: keyof T) => (a: T, b: T) =>
+  String(a[campo]) < String(b[campo]) ? 1 : String(a[campo]) > String(b[campo]) ? -1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+function fusionar<T extends { order_id: string }>(lista: T[], orderId: string, nuevos: T[], orden: (a: T, b: T) => number): T[] {
+  return [...lista.filter((x) => x.order_id !== orderId), ...nuevos].sort(orden)
+}
+export async function reloadMoneyDe(orderId: string): Promise<void> {
+  if (!hasSupabase) return
+  const [m, c, e] = await Promise.all([
+    supabase.from('v_order_money').select(MONEY_COLS).eq('order_id', orderId),
+    supabase.from('payment_claims').select(CLAIM_COLS).eq('order_id', orderId),
+    supabase.from('payment_entries').select(ENTRY_COLS).eq('order_id', orderId),
+  ])
+  if (m.error || c.error || e.error) return reloadMoney()
+  moneyLive.setLocal(fusionar(moneyLive.current(), orderId, (m.data ?? []) as unknown as OrderMoney[], (a, b) => (a.order_id < b.order_id ? -1 : a.order_id > b.order_id ? 1 : 0)))
+  claimsLive.setLocal(fusionar(claimsLive.current(), orderId, (c.data ?? []) as unknown as PaymentClaim[], porFecha<PaymentClaim>('declared_at')))
+  entriesLive.setLocal(fusionar(entriesLive.current(), orderId, (e.data ?? []) as unknown as PaymentEntry[], porFecha<PaymentEntry>('created_at')))
+}
+/** Pedido de una declaración ya cargada (para releer solo ese pedido). */
+export const pedidoDeDeclaracion = (claimId: string): string | null => claimsLive.current().find((c) => c.id === claimId)?.order_id ?? null
+
 // --- MODO DEMO (sin backend) --------------------------------------------------
 // En demo no hay tablas: el crédito autorizado vive aquí para que el flujo se pueda
 // mostrar. En producción esto NUNCA se usa (la autoridad es `credit_grants`).

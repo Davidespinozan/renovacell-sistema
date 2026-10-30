@@ -82,7 +82,9 @@ describe('módulos de IA (puros) y Edge chat', () => {
   })
   it('Edge chat: orquesta con el perfil del servidor; límites CC-0B antes del proveedor; costo diario en tokens; el adaptador legacy por HTTP a `assistant` desapareció', () => {
     const s = codigo(chatSrc) + codigo(responderSrc)
-    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? await responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\) : 'silenciada'/)   // CONTACTO CONVERSACIONAL
+    // PERF · la IA corre en segundo plano tras la misma compuerta; el envío responde 'en_curso' al instante.
+    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? 'en_curso' : 'silenciada'\n\s+if \(ia === 'en_curso'\) enSegundoPlano\(\(async \(\) => \{/)
+    expect(s).toMatch(/const res = await responderIA\(admin, conv, r\.seq, dueno, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\)/)   // CONTACTO CONVERSACIONAL
     expect(s).toMatch(/profile: actor === 'doctor' \? profile : null/)
     expect(s).not.toMatch(/functions\/v1\/assistant/); expect(s).not.toMatch(/historialParaIA/)
     for (const sc of ['ia_turno', 'ia_turno_uid', 'ia_turno_hora', 'ia_turno_global', 'ia_tokens_dia', 'ia_tokens_dia_uid']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }

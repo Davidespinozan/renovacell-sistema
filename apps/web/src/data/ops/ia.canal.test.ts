@@ -158,7 +158,7 @@ describe('LIVE C1 · guardas de fuente: el canal viaja hasta la política y el p
   it('meta-webhook pasa el canal real; el chat del portal NO pasa canal (por defecto portal); responder lo reenvía al orquestador', () => {
     expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, r\.actor, r\.profile_id, r\.visitor_hash, m\.texto, 'wa:' \+ m\.wa_id, 'whatsapp', adjunto\)/)   // R4-C13: + la imagen/PDF que la IA ve
     expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, 'visitor', null, r\.visitor_hash, m\.texto, 'meta:' \+ m\.psid, m\.canal\)/)
-    expect(sin(chatEdge)).toMatch(/responderIA\(admin, conv, r\.seq, actor\.actor, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\)/)   // portal explícito + datos de contacto pendientes
+    expect(sin(chatEdge)).toMatch(/responderIA\(admin, conv, r\.seq, dueno, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\)/)   // portal explícito + datos de contacto pendientes
     expect(sin(responderSrc)).toMatch(/canal: CanalTurno = 'portal', adjunto: EntradaTurno\['adjunto'\] \| null = null, contacto: EntradaTurno\['contacto'\] = null\)/); expect(sin(responderSrc)).toMatch(/textoUsuario: texto, canal, \.\.\.\(adjunto \? \{ adjunto \} : \{\}\), \.\.\.\(contacto \? \{ contacto \} : \{\}\) \}/)   // R4-C13 + CONTACTO CONVERSACIONAL
     expect(sin(responderSrc)).toMatch(/canal === 'portal' \? contacto : null\)/)   // los datos de contacto solo existen en el portal
     expect(sin(orqSrc)).toMatch(/const perfilIA: string \| null = canal === 'portal' \? e\.profile : null/)

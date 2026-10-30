@@ -182,13 +182,20 @@ Deno.serve(conCors(async (req) => {
     if (!r.idempotente && (actor.actor === 'seller' || actor.actor === 'admin')) enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // WA-2 / META · si es de un canal, sale ya
     enSegundoPlano(Promise.resolve(admin.rpc('cc_escribiendo', { ...base, p_activo: false })))         // CHAT PRO · ya envió: deja de "escribir"
     // Adaptador de IA (solo tras un mensaje del dueño, no idempotente, en modo con IA).
-    let ia: 'respondio' | 'no_disponible' | 'silenciada' | 'omitida' | 'descartada' | 'en_curso' | 'limitada' = 'omitida'
+    // PERF: la IA corre en SEGUNDO PLANO (como WhatsApp/Meta): el mensaje se confirma al instante con ia='en_curso' y la
+    // respuesta llega como un mensaje más (Realtime con sesión; el cliente sondea rápido mientras espera). Antes el
+    // usuario quedaba trabado los 3–20 s del turno completo.
+    let ia: 'silenciada' | 'omitida' | 'en_curso' = 'omitida'
     if (!r.idempotente && (actor.actor === 'visitor' || actor.actor === 'doctor')) {
-      // CONTACTO CONVERSACIONAL · al visitante sin datos la IA se los pide y los registra (con quién va a hablar, si llegó por un enlace).
-      const contacto = sinDatos ? ((await admin.rpc('cc_ia_contacto_pendiente', { p_hash: hash }).then((x: { data: unknown }) => x.data, () => null)) ?? null) as { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null : null
-      ia = IA_PUEDE(r.modo) ? await responderIA(admin, conv, r.seq, actor.actor, actor.profile, hash, c.texto, sujeto, 'portal', null, contacto) : 'silenciada'
+      const dueno = actor.actor   // ya acotado a visitor | doctor (el cierre async no conserva el acotamiento)
+      ia = IA_PUEDE(r.modo) ? 'en_curso' : 'silenciada'
+      if (ia === 'en_curso') enSegundoPlano((async () => {
+        // CONTACTO CONVERSACIONAL · al visitante sin datos la IA se los pide y los registra (con quién va a hablar, si llegó por un enlace).
+        const contacto = sinDatos ? ((await admin.rpc('cc_ia_contacto_pendiente', { p_hash: hash }).then((x: { data: unknown }) => x.data, () => null)) ?? null) as { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null : null
+        const res = await responderIA(admin, conv, r.seq, dueno, actor.profile, hash, c.texto, sujeto, 'portal', null, contacto)
+        if (res === 'respondio') await Promise.all([despacharWhatsApp(admin), despacharMeta(admin)])   // WA-2 / META · la respuesta de la IA, si la conversación es de un canal
+      })())
     }
-    if (ia === 'respondio') enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // WA-2 / META · la respuesta de la IA, si la conversación es de un canal
     return json(200, { ...r, ia })
   }
   // ── FOTOS · imagen en la conversación: se sube con service_role al bucket privado `chat` y viaja como un mensaje

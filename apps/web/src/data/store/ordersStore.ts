@@ -28,7 +28,7 @@ import {
   autorizarCredito as cmdAutorizarCredito, revocarCredito as cmdRevocarCredito,
   type PaymentMethod,
 } from '../ops/money'
-import { reloadMoney, setDemoCredit } from './moneyStore'
+import { reloadMoney, reloadMoneyDe, pedidoDeDeclaracion, setDemoCredit } from './moneyStore'
 import { solicitarCFDI } from '../ops/fiscalIntent'
 import { leerTodo } from './lectura'
 
@@ -55,8 +55,11 @@ let items: OrderItem[] = hasSupabase ? [] : [...MOCK_ORDER_ITEMS]
 const listeners = new Set<() => void>()
 
 function withItems(list: Order[]): OrderWithItems[] {
+  // PERF: agrupar una vez (antes: un filter de TODAS las partidas por cada pedido, en cada emit).
+  const porPedido = new Map<string, OrderItem[]>()
+  for (const it of items) { const l = porPedido.get(it.order_id); if (l) l.push(it); else porPedido.set(it.order_id, [it]) }
   return list
-    .map((o) => ({ ...o, items: items.filter((it) => it.order_id === o.id) }))
+    .map((o) => ({ ...o, items: porPedido.get(o.id) ?? [] }))
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
 }
 
@@ -87,6 +90,24 @@ export const ready = (): boolean => hydrated
 export function reloadOrders() { if (hasSupabase) hydrate() }
 
 // ---- Hidratación desde Supabase (RLS acota el resultado por rol) ----
+const ORDER_COLS = 'id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, shipping_cost, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)'
+
+// PERF: tras un comando sobre UN pedido se relee solo ese pedido con sus partidas (antes: todos los pedidos, por
+// páginas, con el botón esperando). Si la lectura falla se cae a la hidratación completa.
+async function refrescarPedido(orderId: string): Promise<void> {
+  if (!hasSupabase) return
+  const { data, error } = await supabase.from('orders').select(ORDER_COLS).eq('id', orderId).maybeSingle()
+  if (error) return hydrate()
+  orders = orders.filter((o) => o.id !== orderId)
+  items = items.filter((it) => it.order_id !== orderId)
+  if (data) {
+    const { order_items: oi, ...o } = data as Record<string, unknown>
+    orders = [o as unknown as Order, ...orders]
+    items = [...items, ...((oi as OrderItem[] | undefined) ?? [])]
+  }
+  emit()
+}
+const refrescarDinero = (orderId: string) => Promise.all([reloadMoneyDe(orderId), refrescarPedido(orderId)])
 let hgen = 0 // guard de generación: una hidratación obsoleta no pisa la más nueva
 async function hydrate() {
   if (!hasSupabase) return
@@ -95,7 +116,7 @@ async function hydrate() {
   // avisar, y las colas y la cobranza se calculaban sobre un historial incompleto.
   const { data, error } = await leerTodo('los pedidos', (desde, hasta) => supabase
     .from('orders')
-    .select('id, external_ref, doctor_id, customer_id, total, currency, status, payment_method, payment_ref, payment_status, stripe_payment_id, invoice_requested, invoice_meta, shipping_meta, shipping_cost, created_at, order_items(id, order_id, product_id, lot_id, qty, unit_price, created_at)')
+    .select(ORDER_COLS)
     .order('created_at', { ascending: false }).order('id').range(desde, hasta))
   if (g !== hgen) return // llegó una hidratación más nueva; ignora esta
   if (error) { console.warn('[orders] hydrate', error.message); hydrated = true; emit(); return }
@@ -242,7 +263,7 @@ export async function createOrder(input: {
       const ver = await supabase.from('orders').select('id, total').eq('id', id).maybeSingle()
       if (!ver.error && ver.data) {
         const creado = asentar(Number(ver.data.total))
-        hydrate()
+        void refrescarPedido(id)
         return { ok: true, order: creado }
       }
       if (!ver.error) {
@@ -261,7 +282,7 @@ export async function createOrder(input: {
   }
 
   const creado = asentar(Number((data as { total?: number }).total))
-  hydrate() // trae unit_price/total AUTORITATIVOS del servidor
+  void refrescarPedido(creado.id) // trae unit_price/total AUTORITATIVOS del servidor
   return { ok: true, order: creado, ...((data as { idempotent?: boolean }).idempotent ? { repetido: true } : {}) }
 }
 
@@ -293,7 +314,7 @@ async function crearConReceptor(
     const d = data as { total?: number; folio?: string; idempotent?: boolean }
     const creado = asentar(Number(d.total))
     const o = d.folio && d.folio !== folio ? { ...creado, external_ref: d.folio } : creado
-    hydrate()
+    void refrescarPedido(o.id)
     return d.idempotent ? { ok: true, order: o, repetido: true } : { ok: true, order: o }
   }
   const e = error ?? { message: 'respuesta vacía del servidor' }
@@ -357,7 +378,7 @@ export async function cancelarPedido(orderId: string, opts: { opId: string; reas
   const r = await runW1Command<{ refund_review?: 'no_aplica' | 'pendiente_revision'; reingreso_pendiente?: boolean }>(
     'cancelar_pedido', { p_op_id: opts.opId, p_order: orderId, p_reason: opts.reason?.trim() || undefined }, opts.opId)
   if (!r.ok) return { ok: false, error: r.error, code: r.code, ambiguous: r.ambiguous }
-  await hydrate()
+  await refrescarDinero(orderId)   // PERF · solo este pedido (la cancelación puede dejar reembolso por revisar)
   if (r.status === 'applied') {
     notify({ text: `Pedido ${folioOf(orderId)} cancelado${r.data.reingreso_pendiente ? ' · reingreso por confirmar' : ''}`, roles: ['admin', 'warehouse'], screen: r.data.reingreso_pendiente ? 'devoluciones' : 'av_ventas' })
     logAudit({ actor: opts.actor ?? 'Administración', action: 'Pedido cancelado', resource: folioOf(orderId), detail: opts.reason ?? undefined })
@@ -440,7 +461,7 @@ export async function markShipped(orderId: string, shipping_meta: Record<string,
   if (hasSupabase && isUuid(orderId)) {
     const r = await confirmar(`marcar el pedido ${folioOf(orderId)} como enviado`,
       supabase.from('orders').update({ status: 'shipped', shipping_meta: nextMeta as unknown as Json }).eq('id', orderId))
-    if (!r.ok) { hydrate(); return r }
+    if (!r.ok) { void refrescarPedido(orderId); return r }
   }
   // Recién ahora, con el servidor confirmado: estado, aviso y bitácora.
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped', shipping_meta: nextMeta } : o))
@@ -461,7 +482,7 @@ export async function markDelivered(orderId: string, opts: { remote?: boolean } 
   if (opts.remote !== false && hasSupabase && isUuid(orderId)) {
     const r = await confirmar(`marcar el pedido ${folioOf(orderId)} como entregado`,
       supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId))
-    if (!r.ok) { hydrate(); return r }
+    if (!r.ok) { void refrescarPedido(orderId); return r }
   }
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o))
   emit()
@@ -480,7 +501,7 @@ export async function entregarRecoge(orderId: string, recogio: string): Promise<
   if (hasSupabase && isUuid(orderId)) {
     const r = await confirmar(`entregar el pedido ${folioOf(orderId)} al cliente`,
       supabase.from('orders').update({ status: 'delivered', shipping_meta: nextMeta as unknown as Json }).eq('id', orderId))
-    if (!r.ok) { hydrate(); return r }
+    if (!r.ok) { void refrescarPedido(orderId); return r }
   }
   orders = orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered', shipping_meta: nextMeta } : o))
   emit()
@@ -513,8 +534,8 @@ export async function setOrderFiscalSnapshot(orderId: string, receiver: FiscalPr
   if (hasSupabase && isUuid(orderId)) {
     const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
     const { error } = await rpc('set_order_fiscal_snapshot', { p_order_id: orderId, p_receiver: clean })
-    if (error) { hydrate(); return { ok: false, error: error.message } }
-    hydrate()
+    if (error) { void refrescarPedido(orderId); return { ok: false, error: error.message } }
+    void refrescarPedido(orderId)
   }
   return { ok: true }
 }
@@ -551,7 +572,7 @@ export async function markInvoiced(orderId: string): Promise<{ ok: boolean; erro
   const r = await solicitarCFDI(orderId)
   if (!r.ok) {
     notify({ text: `Factura · ${r.error}`, roles: ['admin'], screen: 'av_fin' })
-    await hydrate()
+    await refrescarPedido(orderId)
     return { ok: false, error: r.error }
   }
   // El servidor decide qué pasó. `already_stamped` significa que el CFDI YA existe: no se
@@ -561,7 +582,7 @@ export async function markInvoiced(orderId: string): Promise<{ ok: boolean; erro
     : `Factura solicitada · ${folioOf(orderId)} · el timbrado se habilita al completar W3-B`
   notify({ text: texto, roles: ['admin'], screen: 'av_fin' })
   logAudit({ actor: 'Administración', action: 'Solicitud de CFDI registrada', resource: folioOf(orderId) })
-  await hydrate()
+  await refrescarPedido(orderId)
   return { ok: true, status: r.data.status }
 }
 
@@ -587,8 +608,7 @@ export async function registrarCobroDePedido(opId: string, a: {
 
   const r = await cmdRegistrarCobro(opId, a)
   if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
-  await reloadMoney()
-  await hydrate()
+  await refrescarDinero(a.orderId)
   if (r.status === 'applied') {
     logAudit({ actor: a.actor ?? 'Administración', action: 'Cobro registrado', resource: folioOf(a.orderId), detail: `$${a.amount} · ${a.method}` })
     // Solo se avisa "listo para surtir" cuando el servidor dice que ya quedó pagado.
@@ -625,8 +645,7 @@ export async function reportarPagoDePedido(opId: string, a: {
   if (!hasSupabase || !isUuid(a.orderId)) return { ok: true }
   const r = await cmdReportarPago(opId, a)
   if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
-  await reloadMoney()
-  await hydrate()
+  await refrescarDinero(a.orderId)
   if (r.status === 'applied') {
     logAudit({ actor: a.actor ?? 'Portal del Doctor', action: 'Pago reportado', resource: folioOf(a.orderId), detail: `$${a.amount} · ${a.method}` })
     notify({ text: `Pago informado · ${folioOf(a.orderId)} · verifica que cayó`, roles: ['admin'], screen: 'av_pagos' })
@@ -661,8 +680,7 @@ export async function reviewTransfer(
       motivo: reason ?? null,
     })
     if (!r.ok) return { ok: false, error: r.error }
-    await reloadMoney()
-    await hydrate()
+    await refrescarDinero(orderId)
     const nuevo = r.status === 'applied'
     if (action === 'confirm') {
       if (nuevo) {
@@ -703,8 +721,7 @@ export async function revisarDeclaracion(
   if (accion === 'rechazar' && !motivo?.trim()) return { ok: false, error: 'El rechazo necesita un motivo.' }
   const r = await cmdRevisarPago(opId, { claimId, accion, motivo: motivo ?? null })
   if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
-  await reloadMoney()
-  await hydrate()
+  { const pid = pedidoDeDeclaracion(claimId); if (pid) await refrescarDinero(pid); else { await reloadMoney(); await hydrate() } }
   if (r.status === 'applied') logAudit({ actor: 'Administración', action: accion === 'verificar' ? 'Declaración verificada (revisión económica)' : 'Declaración rechazada (revisión económica)', resource: claimId, detail: motivo ?? undefined })
   return { ok: true, status: r.status }
 }
@@ -748,8 +765,7 @@ export async function autorizarCreditoDePedido(opId: string, a: { orderId: strin
   }
   const r = await cmdAutorizarCredito(opId, a)
   if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
-  await reloadMoney()
-  await hydrate()
+  await refrescarDinero(a.orderId)
   if (r.status === 'applied') {
     logAudit({ actor: 'Dirección', action: 'Crédito autorizado', resource: folioOf(a.orderId), detail: `vence ${a.dueDate} · ${a.motivo}` })
     notify({ text: `Crédito autorizado · ${o.external_ref ?? folioOf(a.orderId)} · puedes surtir (el pedido sigue por cobrar)`, roles: ['warehouse'], screen: 'surtido' })
@@ -762,8 +778,7 @@ export async function revocarCreditoDePedido(opId: string, a: { orderId: string;
   if (!hasSupabase || !isUuid(a.orderId)) { setDemoCredit(a.orderId, null); emit(); return { ok: true } }
   const r = await cmdRevocarCredito(opId, a)
   if (!r.ok) return { ok: false, error: r.error, ambiguous: r.ambiguous }
-  await reloadMoney()
-  await hydrate()
+  await refrescarDinero(a.orderId)
   if (r.status === 'applied') logAudit({ actor: 'Dirección', action: 'Crédito revocado', resource: folioOf(a.orderId), detail: a.motivo })
   return { ok: true }
 }

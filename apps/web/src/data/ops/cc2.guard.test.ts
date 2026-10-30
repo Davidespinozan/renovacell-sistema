@@ -90,7 +90,8 @@ describe('Edge chat + módulo compartido', () => {
     }
   })
   it('S · la IA escribe solo desde el servidor como actor ai, idempotente, tras comprobar IA_PUEDE (re-anclado en CC-4: el adaptador temporal hacia `assistant` fue sustituido por el orquestador; el client_id ai:<seq> ahora lo fija la base en cc_ia_turno_responder)', () => {
-    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? await responderIA\(/)
+    expect(s).toMatch(/ia = IA_PUEDE\(r\.modo\) \? 'en_curso' : 'silenciada'/)   // PERF · en segundo plano
+    expect(s).toMatch(/if \(ia === 'en_curso'\) enSegundoPlano\([\s\S]{0,400}await responderIA\(/)
     expect(s).toMatch(/ejecutarTurno\(/)
     expect(s).not.toMatch(/p_actor_type: 'ai'/)   // ningún INSERT/RPC directo como ai desde la Edge: solo el comando canónico de CC-4
     expect(s).not.toMatch(/api\.anthropic\.com/)

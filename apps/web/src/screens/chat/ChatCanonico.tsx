@@ -62,6 +62,10 @@ export interface AccionChat { clave: string; etiqueta: string; detalle?: string;
 // CHAT PRO · "escribiendo…": se avisa al servidor como mucho cada 3 s mientras se teclea; la marca vence sola en 6 s.
 const PING_ESCRIBIENDO_MS = 5000
 const SONDEO_ESCRIBIENDO_MS = 3000
+// PERF: la IA responde en segundo plano; mientras tanto se lee seguido (también sin Realtime, p. ej. el visitante)
+// y se deja de esperar al llegar su mensaje, si la conversación sale del modo con IA o tras ESPERA_IA_MAX_MS.
+const SONDEO_IA_MS = 1500
+const ESPERA_IA_MAX_MS = 45_000
 
 // Etiqueta del asesor humano. Una sola fuente (la pidió el dueño así); si cambia la persona, cambia aquí.
 export const ETIQUETA_ASESOR = 'Asesoría'
@@ -133,6 +137,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const [texto, setTexto] = useState('')
   const [cargando, setCargando] = useState(true)
   const [enviando, setEnviando] = useState(false)
+  const [esperaIA, setEsperaIA] = useState<{ seq: number; desde: number } | null>(null)   // PERF · turno de IA en curso tras mi mensaje
   const [pendiente, setPendiente] = useState<Pendiente | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fin = useRef<HTMLDivElement | null>(null)
@@ -240,6 +245,19 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     return () => clearInterval(t)
   }, [convId, finAtencion, otroEscribiendo, cargar])
 
+  // PERF · mientras la IA responde en segundo plano: lectura rápida y acotada; termina con su respuesta.
+  const modoConv = conv?.modo
+  const respondioIA = !!esperaIA && !!conv?.mensajes.some((m) => m.seq > esperaIA.seq && !m.propio)
+  useEffect(() => {
+    if (!esperaIA) return
+    if (respondioIA || finAtencion || (modoConv && !IA_PUEDE(modoConv))) { setEsperaIA(null); return }
+    const t = setInterval(() => {
+      if (Date.now() - esperaIA.desde > ESPERA_IA_MAX_MS) { setEsperaIA(null); return }
+      if (convId && (typeof document === 'undefined' || document.visibilityState === 'visible')) void cargar(convId, ultimoSeq.current)
+    }, SONDEO_IA_MS)
+    return () => clearInterval(t)
+  }, [esperaIA, respondioIA, finAtencion, modoConv, convId, cargar])
+
   // Al final del hilo tras cada cambio (y de nuevo tras el layout/fuentes): el último elemento siempre visible.
   const alFinal = useCallback(() => { fin.current?.scrollIntoView?.({ block: 'end' }) }, [])
   useEffect(() => {
@@ -298,6 +316,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     setPendiente({ clientId, texto: t, error: null })
     const r = await cliente.enviar(convId, t, clientId)
     if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
+    if (r.data.ia === 'en_curso') setEsperaIA({ seq: r.data.seq, desde: Date.now() })
     await cargar(convId, ultimoSeq.current)
     setPendiente(null); setEnviando(false)
   }
@@ -377,7 +396,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // La tarjeta de handoff ocupa el lugar del último aviso del sistema (el servidor lo publica junto con el
   // handoff): así no hay banner + aviso duplicados. Si no hubiera aviso, la tarjeta va al final del hilo.
   const seqTarjeta = useMemo(() => (handoffVivo ? mensajes.filter((m) => m.actor === 'system').reduce((s, m) => Math.max(s, m.seq), 0) : 0), [handoffVivo, mensajes])
-  const esperandoIA = enviando && !pendiente?.error && !asesor && IA_PUEDE(modo)
+  const esperandoIA = (enviando || !!esperaIA) && !pendiente?.error && !asesor && IA_PUEDE(modo)
   const quienEscribe = (asesor ? primerNombre(nombreCliente) : primerNombre(nombreAsesor)) ?? (asesor ? 'Cliente' : ETIQUETA_ASESOR)
 
   const tarjetaHandoff = conv && handoffVivo ? (() => {
