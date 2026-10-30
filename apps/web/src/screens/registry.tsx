@@ -17,6 +17,7 @@ import { lazyPantalla } from '../app/lazyPantalla'
 
 // PERF · pantallas bajo demanda (antes todas viajaban en el paquete inicial, ~460 KB gz). Inicio y Placeholder quedan
 // directos: son lo primero que se ve.
+const Difusiones = lazyPantalla(() => import('./sales/Difusiones').then((m) => m.Difusiones))
 const Seguimientos = lazyPantalla(() => import('./Seguimientos').then((m) => m.Seguimientos))
 const ClasificarCartera = lazyPantalla(() => import('./ClasificarCartera').then((m) => m.ClasificarCartera))
 const ProductosClientes = lazyPantalla(() => import('./sales/ProductosClientes').then((m) => m.ProductosClientes))
@@ -142,11 +143,12 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   // CC-2 · conversación canónica
   chat_cc: () => <ChatCanonico embebido barra={<BotonAvisos />} />,
   mi_verificacion: () => <MiVerificacion />,   // cuenta ≠ verificación
-  asesorias: () => <AsesoriasPantalla />,
-  productos_clientes: () => <ProductosClientes />,
-  seguimientos: () => <Seguimientos />,   // HERRAMIENTAS DEL VENDEDOR · pendientes por retomar   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto   // CC-7 · Dirección vs vendedor
+  asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
+  productos_clientes: () => <ProductosClientes />,   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
+  seguimientos: () => <Seguimientos />,   // HERRAMIENTAS DEL VENDEDOR · pendientes por retomar
+  difusiones: () => <Difusiones />,   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
-  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }]} />,
+  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }, { key: 'seguimientos', label: 'Pendientes', render: () => <Seguimientos /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   av_existencias: () => <Existencias />,

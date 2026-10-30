@@ -1,5 +1,5 @@
 // W4-05 · Plantillas de la comunicación transaccional. Vocabulario CERRADO: son los
-// mismos seis hechos que la base sabe encolar. No hay plantillas de mercadotecnia.
+// mismos seis hechos que la base sabe encolar, más promociones, cotizaciones y difusiones del vendedor.
 //
 // El texto se arma con la FOTO del hecho que guardó el buzón (folio, monto, rastreo),
 // no con el estado actual del pedido: el correo dice lo que pasó, no lo que pasa ahora.
@@ -9,6 +9,7 @@ export const PLANTILLAS = [
   'registro_recibido', 'cuenta_verificada', 'verificacion_rechazada',   // CORREOS-AUTO (165) · su cuenta
   'promocion',   // PROMO-4 (175) · difusión de una promoción a los doctores
   'cotizacion',  // COTIZACIONES (20270209) · cotización que el vendedor le manda a su cliente
+  'difusion',    // DIFUSIONES (20270217) · lo que un vendedor manda a sus listas (texto, enlace, imagen), con baja
 ] as const
 export type Plantilla = (typeof PLANTILLAS)[number]
 
@@ -140,6 +141,7 @@ export function nombreBonito(n?: string | null): string {
 export function renderizar(plantilla: string, datos: Record<string, unknown>, nombre?: string | null): Render {
   if (!esPlantilla(plantilla)) throw new Error(`PLANTILLA_DESCONOCIDA: ${plantilla}`)
   if (plantilla === 'promocion') return correoPromocion(datos ?? {}, nombre)   // PROMO-6 · diseño propio (fotos y precios)
+  if (plantilla === 'difusion') return correoDifusion(datos ?? {}, nombre)     // DIFUSIONES · texto, imagen, enlace y baja
   const c = cuerpo(plantilla, datos ?? {})
   const quien = nombreBonito(nombre)
   const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
@@ -204,7 +206,8 @@ export function correoPromocion(datos: Record<string, unknown>, nombre?: string 
  * saludo, párrafos, recuadro de datos, botones (el primero es el principal) y pie. Tablas y estilos en línea: así se ve
  * igual en Gmail, Outlook y Apple Mail. Todo el texto se escapa.
  */
-export function marcoCorreo(o: { asunto: string; titulo: string; saludo: string; parrafos: string[]; datos?: Array<[string, string]>; botones: Array<{ href: string; label: string }>; nota?: string; pie: string }): string {
+export function marcoCorreo(o: { asunto: string; titulo: string; saludo: string; parrafos: string[]; datos?: Array<[string, string]>; botones: Array<{ href: string; label: string }>; nota?: string; pie: string
+  imagen?: string | null; baja?: string | null }): string {
   const filas = (o.datos ?? []).map(([k, v]) => `<tr><td style="padding:8px 0;color:#667085;font-size:13px">${esc(k)}</td><td style="padding:8px 0;text-align:right;font-weight:600;font-size:14px;color:#111b21">${esc(v)}</td></tr>`).join('')
   const boton = (href: string, label: string, primario: boolean) => `<a href="${esc(href)}" style="display:inline-block;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;${primario ? 'background:#007311;color:#ffffff' : 'background:#ffffff;color:#005a0d;border:1px solid #cfd8d1'}">${esc(label)}</a>`
   const p = (x: string) => `<p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#344054">${esc(x)}</p>`
@@ -219,10 +222,12 @@ export function marcoCorreo(o: { asunto: string; titulo: string; saludo: string;
     + `</tr></table></td></tr>`
     + `<tr><td style="padding:28px 28px 8px"><div style="font-size:22px;font-weight:700;color:#111b21;margin-bottom:14px">${esc(o.titulo)}</div>`
     + p(o.saludo) + o.parrafos.map(p).join('') + `</td></tr>`
+    + (o.imagen && /^https:\/\//.test(o.imagen) ? `<tr><td style="padding:4px 28px 8px"><img src="${esc(o.imagen)}" width="504" alt="" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px"></td></tr>` : '')
     + (filas ? `<tr><td style="padding:8px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8f6;border-radius:12px;padding:6px 16px">${filas}</table></td></tr>` : '')
     + `<tr><td style="padding:20px 28px ${o.nota ? '8px' : '28px'}">` + o.botones.map((b, i) => boton(b.href, b.label, i === 0)).join('&nbsp;&nbsp;') + `</td></tr>`
     + (o.nota ? `<tr><td style="padding:0 28px 24px;font-size:13px;color:#667085">${esc(o.nota)}</td></tr>` : '')
-    + `<tr><td style="padding:16px 28px 24px;border-top:1px solid #eef1ee;font-size:12px;line-height:1.5;color:#98a2b3">Renovacell · Tecnologías Antiedad<br>${esc(o.pie)}</td></tr>`
+    + `<tr><td style="padding:16px 28px 24px;border-top:1px solid #eef1ee;font-size:12px;line-height:1.5;color:#98a2b3">Renovacell · Tecnologías Antiedad<br>${esc(o.pie)}`
+    + (o.baja && /^https:\/\//.test(o.baja) ? `<br>¿Prefieres no recibir estos mensajes? <a href="${esc(o.baja)}" style="color:#667085">Dejar de recibirlos</a>` : '') + `</td></tr>`
     + `</table></td></tr></table></body></html>`
 }
 
@@ -255,4 +260,23 @@ export const PLANTILLAS_AUTH: Record<string, { asunto: string; html: string }> =
   confirmation: { asunto: 'Confirma tu cuenta de Renovacell', html: marcoCorreo({ asunto: 'Confirma tu cuenta de Renovacell', titulo: 'Confirma tu correo', saludo: 'Hola:',
     parrafos: ['Toca el botón para confirmar tu correo y activar tu cuenta Renovacell.'],
     botones: [{ href: '{{ .ConfirmationURL }}', label: 'Confirmar mi correo' }], pie: 'Recibes este correo porque se creó una cuenta con esta dirección.' }) },
+}
+
+/** DIFUSIONES · lo que un vendedor manda a sus listas: título, texto, imagen opcional, botón al enlace (un video va como
+ *  enlace) y, siempre, "dejar de recibir" (la prueba al propio vendedor no la lleva). */
+export function correoDifusion(datos: Record<string, unknown>, nombre?: string | null): Render {
+  const d = datos as { titulo?: string; texto?: string; enlace?: string | null; imagen_url?: string | null; vendedor?: string | null; baja_url?: string | null; prueba?: boolean }
+  const asunto = (d.prueba ? '[Prueba] ' : '') + (String(d.titulo ?? '').trim() || 'Renovacell')
+  const quien = nombreBonito(nombre)
+  const saludo = quien ? `Hola, ${quien}:` : 'Hola:'
+  const parrafos = String(d.texto ?? '').split(/\n+/).map((x) => x.trim()).filter(Boolean)
+  const enlace = d.enlace && /^https:\/\//.test(d.enlace) ? d.enlace : null
+  const vend = nombreBonito(d.vendedor)
+  const nota = vend ? `Te escribe ${vend}, tu asesor en Renovacell. Si tienes dudas, responde este correo o escríbenos en el portal.` : undefined
+  const botones = enlace ? [{ href: enlace, label: /youtu|vimeo|video/i.test(enlace) ? 'Ver el video' : 'Ver más' }] : [{ href: URL_SISTEMA, label: 'Ir a Renovacell' }]
+  const texto = [saludo, '', ...parrafos, ...(enlace ? ['', enlace] : []), ...(nota ? ['', nota] : []), '', 'Renovacell · Tecnologías Antiedad',
+    ...(d.baja_url ? ['', `Dejar de recibir estos mensajes: ${d.baja_url}`] : [])].join('\n')
+  const html = marcoCorreo({ asunto, titulo: String(d.titulo ?? '').trim() || 'Renovacell', saludo, parrafos, botones, nota, pie: 'Recibes este correo porque eres cliente de Renovacell.',
+    imagen: d.imagen_url ?? null, baja: d.baja_url ?? null })
+  return { asunto, texto, html }
 }

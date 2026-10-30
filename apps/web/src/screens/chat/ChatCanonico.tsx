@@ -6,6 +6,8 @@
 import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
 import { TarjetaPromoChat } from './TarjetaPromoChat'
 import { MARCA_PROMO } from '../../data/ops/promociones'
+import { MARCA_DIFUSION } from '../../data/ops/difusiones'
+import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Check, CheckCheck, ChevronDown, ChevronUp, History, Plus, Search, Send, X, Zap } from 'lucide-react'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
@@ -423,6 +425,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (m.actor === 'system') {
       if (handoffVivo && m.seq === seqTarjeta) hilo.push(<React.Fragment key={m.id}>{tarjetaHandoff}</React.Fragment>)
       else if (MARCA_PROMO.test(m.content)) hilo.push(<TarjetaPromoChat key={m.id} content={m.content} onCatalogo={!asesor ? onIrCatalogo : undefined} />)   // PROMO-6
+      else if (MARCA_DIFUSION.test(m.content)) hilo.push(<TarjetaDifusion key={m.id} content={m.content} />)   // DIFUSIONES del vendedor
       else hilo.push(<div key={m.id} className="rc-sys" data-testid="msg-system">{m.content}</div>)
       actorPrevio = null
       continue

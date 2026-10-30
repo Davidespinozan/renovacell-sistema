@@ -86,6 +86,13 @@
   status = 200
   force = true
 
+# 2e) DIFUSIONES · /baja: "dejar de recibir" de los correos de difusión (página propia, sin sesión; misma app).
+[[redirects]]
+  from = "/baja"
+  to = "/invitacion.html"
+  status = 200
+  force = true
+
 # 2d) INVITACIONES · /invitacion: el cliente existente crea su cuenta (página propia: título del negocio).
 [[redirects]]
   from = "/invitacion"

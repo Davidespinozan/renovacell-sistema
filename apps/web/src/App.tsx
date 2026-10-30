@@ -6,6 +6,7 @@ import { Login } from './screens/Login'
 import { ResetPassword } from './screens/ResetPassword'
 import { Contacto } from './screens/chat/Contacto'
 import { Invitacion } from './screens/Invitacion'
+import { BajaCorreo } from './screens/BajaCorreo'
 
 // `/chat` YA NO es una ruta pública (decisión del dueño, 10 oct 2026): la conversación con Renovacell
 // —y con un asesor humano— existe DENTRO del sistema, una vez que el doctor envió su verificación y tiene
@@ -17,6 +18,8 @@ import { Invitacion } from './screens/Invitacion'
 const esRutaContacto = typeof window !== 'undefined' && /^\/contacto(\/|$)/.test(window.location.pathname)
 // `/invitacion` es pública: el cliente existente crea su cuenta con el enlace que le mandó su asesor.
 const esRutaInvitacion = typeof window !== 'undefined' && /^\/invitacion(\/|$)/.test(window.location.pathname)
+// `/baja` es pública: "dejar de recibir" de los correos de difusión (con el token del correo).
+const esRutaBaja = typeof window !== 'undefined' && /^\/baja\/?$/.test(window.location.pathname)
 const esRutaChat = typeof window !== 'undefined' && /^\/chat(\/|$)/.test(window.location.pathname)
 // Vista previa visual del chat, SOLO en desarrollo (no existe en producción).
 const esPreviewChat = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'chat'
@@ -40,6 +43,7 @@ function Root() {
   else if (esPreviewHome && HomePreview) view = <React.Suspense fallback={null}><HomePreview /></React.Suspense>
   else if (esRutaContacto) view = <Contacto />
   else if (esRutaInvitacion) view = <Invitacion />
+  else if (esRutaBaja) view = <BajaCorreo />
   else if (mode === 'landing') view = <LandingPreview />
   else if (mode === 'reset') view = <ResetPassword />
   else if (mode === 'login') view = <Login />
