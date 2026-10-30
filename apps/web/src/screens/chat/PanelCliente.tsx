@@ -21,6 +21,8 @@ import { NuevoPedido } from '../sales/NuevoPedido'
 import { useRoleOpcional } from '../../auth/RoleContext'
 import { HojaMarco, type PiezasChat } from './HojaChat'
 import { PerfilComercialEditor } from '../../app/PerfilComercialEditor'
+import { ESTADOS_SEGUIMIENTO, ETIQUETA_ESTADO, PLAZOS, cuandoRetomar, enDias, seguimientos as segPorDefecto, type ClienteSeguimientos, type EstadoSeguimiento, type Seguimiento } from '../../data/ops/seguimientos'
+import { ClipboardList } from 'lucide-react'
 import type { AccionChat } from './ChatCanonico'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
@@ -36,10 +38,11 @@ interface Props {
   cliente?: ClienteExpediente
   buscador?: BuscadorClientes
   activo?: boolean                // false: esta conversación no se trabaja aquí (p. ej. doctor con cuenta en la Bandeja)
+  seg?: ClienteSeguimientos       // HERRAMIENTAS DEL VENDEDOR · seguimientos (inyectable en pruebas)
 }
 
 /** Franja, acciones y hojas del cliente de esta conversación, para montarlas en el chat. */
-export function usePanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto, pagos = pagosConversacion, activo = true }: Props): PiezasChat {
+export function usePanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto, pagos = pagosConversacion, activo = true, seg: segCli = segPorDefecto }: Props): PiezasChat {
   const [ficha, setFicha] = useState<FichaConversacion | null>(null)
   const [sug, setSug] = useState<SugerenciaCliente[]>([])
   const [q, setQ] = useState('')
@@ -64,6 +67,10 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const [pedidos, setPedidos] = useState<PedidoCliente[]>([])
   const [pago, setPago] = useState<{ orderId: string; folio: string | null; monto: string; metodo: MetodoPago; ref: string; opId: string } | null>(null)
   const cargarPedidos = useCallback(async () => { const r = await pagos.pedidos(conversationId); setPedidos(r.ok ? r.data : []) }, [pagos, conversationId])
+  // SEGUIMIENTOS · en qué quedó con este cliente y cuándo retomarlo.
+  const [seg, setSeg] = useState<Seguimiento | null>(null)
+  const [segForm, setSegForm] = useState<{ estado: EstadoSeguimiento | null; nota: string; recordar: string }>({ estado: null, nota: '', recordar: enDias(3) })
+  const cargarSeg = useCallback(async (customer?: string | null) => { const r = await segCli.de(customer ?? null, conversationId); setSeg(r.ok ? r.data : null) }, [segCli, conversationId])
   const bus = useMemo(() => buscador ?? new BuscadorClientes(), [buscador])
   useEffect(() => () => bus.limpiar(), [bus])
 
@@ -73,11 +80,12 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     setFicha(f.data)
     marcarVinculada(conversationId, !!(f.data.vinculado && f.data.es_tuyo))
     if (f.data.vinculado && f.data.es_tuyo) { void cargarCots(f.data.customer_id); void cargarPedidos() } else setPedidos([])
+    if (!(f.data.con_cuenta && !f.data.vinculado)) void cargarSeg(f.data.vinculado ? f.data.customer_id : null)
     if (!f.data.vinculado && !f.data.con_cuenta) {
       const s = await cliente.sugerencias(conversationId)
       setSug(s.ok ? s.data : [])
     }
-  }, [cliente, conversationId, cargarCots, cargarPedidos])
+  }, [cliente, conversationId, cargarCots, cargarPedidos, cargarSeg])
   useEffect(() => { setFicha(null); setMsg(null); setRes(null); setQ(''); setPago(null); setRevisado(false); if (activo) void cargar() }, [cargar, activo])
 
   const porCobrar = pedidos.filter((p) => p.saldo > 0 && !p.en_revision)
@@ -166,6 +174,21 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     cerrarHoja(conversationId)
     setMsg({ ok: true, texto: `Le mandaste el recibo de ${p.folio ?? 'su pedido'}.` })
   }
+  const guardarSeg = async () => {
+    if (!segForm.estado) { setMsg({ ok: false, texto: 'Elige en qué quedó.' }); return }
+    setOcupado(true); setMsg(null)
+    const r = await segCli.guardar({ customer: ficha?.vinculado ? ficha.customer_id ?? null : null, conv: conversationId, estado: segForm.estado, nota: segForm.nota.trim(), recordar: segForm.recordar })
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    setSeg(r.data); cerrarHoja(conversationId)
+    setMsg({ ok: true, texto: `Seguimiento guardado: ${ETIQUETA_ESTADO[r.data.estado]} · ${cuandoRetomar(r.data.recordar_el).texto}. Te aviso ese día.` })
+  }
+  const segHecho = async () => {
+    if (!seg) return
+    setOcupado(true); const r = await segCli.hecho(seg.id); setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    setSeg(null); cerrarHoja(conversationId); setMsg({ ok: true, texto: 'Seguimiento marcado como hecho.' })
+  }
   const mandarAcceso = async () => {
     if (!ficha?.customer_id || !chat) return
     const nombre = capitalizarNombre(ficha.nombre ?? '')
@@ -224,7 +247,13 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
         onCreado={(pedido) => { if (typeof modal === 'object' && modal && pedido) void cot.convertida(modal.convertir.id, pedido.id).then(() => cargarCots(ficha.customer_id)) }} />
     )}
   </>
-  const tira = <>{tiraFicha}{!hoja && aviso}{modales}</>
+  const segCuando = seg ? cuandoRetomar(seg.recordar_el) : null
+  const tiraSeg = seg && segCuando ? (
+    <button type="button" className={`pc-seg pc-seg--${segCuando.tono}`} onClick={() => abrir('pc:seguimiento')} data-testid="pc-seguimiento-tira">
+      <ClipboardList size={14} aria-hidden /> <b>{ETIQUETA_ESTADO[seg.estado]}</b> · {segCuando.texto}{seg.nota ? <span> · {seg.nota}</span> : null}
+    </button>
+  ) : null
+  const tira = <>{tiraFicha}{tiraSeg}{!hoja && aviso}{modales}</>
 
   // ── Menú «+»: lo que se puede hacer con este cliente ────────────────────────────────────────────────
   const acciones: AccionChat[] = []
@@ -239,6 +268,9 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     if (conRecibo.length && chat) acciones.push({ clave: 'recibo', etiqueta: 'Mandar recibo', detalle: 'Del pago que ya validó Dirección', icono: <Receipt size={18} />, onElegir: () => abrir('pc:recibo') })
     acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', detalle: 'Datos, pedidos y cotizaciones', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
   } else acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
+
+  acciones.push({ clave: 'seguimiento', etiqueta: seg ? 'Actualizar seguimiento' : 'Dejar seguimiento', detalle: 'En qué quedó y cuándo retomarlo (te aviso ese día)', icono: <ClipboardList size={18} />,
+    onElegir: () => { setSegForm({ estado: seg?.estado ?? null, nota: seg?.nota ?? '', recordar: seg && seg.recordar_el >= enDias(0) ? seg.recordar_el : enDias(3) }); abrir('pc:seguimiento') } })
 
   // ── Hojas ───────────────────────────────────────────────────────────────────────────────────────────
   const Fila = ({ id, nombre: n, sub, extra }: { id: string; nombre: string; sub: string; extra?: React.ReactNode }) => (
@@ -349,6 +381,24 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
         ))}
       </ul>
       {aviso}
+    </HojaMarco>
+  )
+  else if (hoja === 'pc:seguimiento') cuerpo = (
+    <HojaMarco titulo="Seguimiento" sub="En qué quedó la plática y cuándo retomarla. Ese día te llega un aviso y aparece en Pendientes." onCerrar={cerrar} testid="pc-hoja-seguimiento">
+      {seg && <div className="pc-nota">Vigente: <b>{ETIQUETA_ESTADO[seg.estado]}</b> · {cuandoRetomar(seg.recordar_el).texto}{seg.nota ? ` · ${seg.nota}` : ''}</div>}
+      <div className="pc-chips" role="group" aria-label="En qué quedó">
+        {ESTADOS_SEGUIMIENTO.map((e) => <button key={e.clave} type="button" className={'pc-chip' + (segForm.estado === e.clave ? ' on' : '')} aria-pressed={segForm.estado === e.clave} onClick={() => setSegForm({ ...segForm, estado: e.clave })} data-testid={`seg-estado-${e.clave}`}>{e.etiqueta}</button>)}
+      </div>
+      <textarea className="pc-campo" rows={2} maxLength={500} value={segForm.nota} onChange={(e) => setSegForm({ ...segForm, nota: e.target.value })} placeholder="Nota (opcional): qué le prometiste, qué le interesa…" aria-label="Nota del seguimiento" />
+      <div className="pc-chips" role="group" aria-label="Cuándo retomar">
+        {PLAZOS.map((p) => <button key={p.dias} type="button" className={'pc-chip' + (segForm.recordar === enDias(p.dias) ? ' on' : '')} onClick={() => setSegForm({ ...segForm, recordar: enDias(p.dias) })} data-testid={`seg-plazo-${p.dias}`}>{p.etiqueta}</button>)}
+        <input type="date" className="pc-campo pc-fecha" min={enDias(0)} value={segForm.recordar} onChange={(e) => e.target.value && setSegForm({ ...segForm, recordar: e.target.value })} aria-label="Fecha para retomar" />
+      </div>
+      {aviso}
+      <div className="pc-acciones">
+        {seg && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void segHecho()} data-testid="seg-hecho">Ya quedó (hecho)</button>}
+        <button type="button" className="btn" disabled={ocupado || !segForm.estado} onClick={() => void guardarSeg()} data-testid="seg-guardar">Guardar seguimiento</button>
+      </div>
     </HojaMarco>
   )
   else if (hoja === 'pc:ficha' && ficha.vinculado) cuerpo = (

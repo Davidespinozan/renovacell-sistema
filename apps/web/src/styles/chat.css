@@ -617,3 +617,26 @@ button.pc-tira:hover{background:var(--hueso)}
 .ccar-nom small{font-size:12px;color:var(--mid)}
 .ccar-pag{display:flex;align-items:center;justify-content:center;gap:12px;font-size:12.5px;color:var(--mid)}
 @media (max-width:640px){.ccar-barra{display:none}.ccar-fila{align-items:flex-start}}
+/* HERRAMIENTAS DEL VENDEDOR · seguimientos */
+.pc-seg{display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;border:0;border-radius:8px;background:var(--hueso);font:inherit;font-size:12.5px;color:var(--ink-2);text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pc-seg span{overflow:hidden;text-overflow:ellipsis}
+.pc-seg--warn{background:var(--warn-bg);color:#8a5a00}
+.pc-seg--dang{background:var(--danger-bg);color:var(--danger)}
+.pc-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pc-chip{min-height:34px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--cp-surface);font:inherit;font-size:13px;color:var(--ink-2);cursor:pointer}
+.pc-chip.on{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
+.pc-fecha{width:auto;min-height:34px;padding:0 10px}
+.sgs{display:grid;gap:10px}
+.sgs-h{display:flex;align-items:baseline;gap:10px}
+.sgs-h h2{margin:0;font-size:18px}
+.sgs-h span,.sgs-sub{font-size:13px;color:var(--mid)}
+.sgs-sub{margin:0}
+.sgs-grupo h3{margin:6px 0;font-size:14px}
+.sgs-grupo h3 small{color:var(--mid);font-weight:500}
+.sgs-grupo ul{list-style:none;margin:0;padding:0;display:grid}
+.sgs-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)}
+.sgs-tx{display:grid;gap:3px;min-width:200px;flex:1}
+.sgs-tx b{font-size:14.5px}
+.sgs-tx span{font-size:13px;color:var(--ink-2)}
+.sgs-tx small{font-size:12.5px;color:var(--mid)}
+.sgs-acc{display:flex;gap:6px;flex-wrap:wrap}
