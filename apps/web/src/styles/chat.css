@@ -586,3 +586,34 @@ button.pc-tira:hover{background:var(--hueso)}
 .pmov-lista{margin:0;padding-left:20px;display:grid;gap:6px;font-size:13.5px}
 .pmov-lista li{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline}
 .pmov-lista small{color:var(--ink-3);font-size:12px}
+/* HERRAMIENTAS DEL VENDEDOR · clasificación: doctor/clínica y especialidad */
+.pce-caja{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pce{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pce-tipos{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.pce-tipo{border:0;background:var(--cp-surface);padding:0 14px;min-height:36px;font:inherit;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.pce-tipo+.pce-tipo{border-left:1px solid var(--line)}
+.pce-tipo.on{background:var(--green-deep);color:#fff}
+.pce-esp,.pce-otra{min-height:36px;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:13px;background:var(--cp-surface);color:var(--ink)}
+.pce-otra{width:150px}
+.pce--compacto .pce-tipo{min-height:32px;padding:0 11px}
+.pce--compacto .pce-esp,.pce--compacto .pce-otra{min-height:32px}
+.pce-ok{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--green-deep);font-weight:600}
+.pce-error{font-size:12.5px;color:var(--danger)}
+.ccar{padding:0 !important;overflow:hidden}
+.ccar-h{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:0;background:none;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.ccar-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--ok-bg);color:var(--green-deep)}
+.ccar-tx{flex:1;min-width:0;display:grid;gap:2px}
+.ccar-tx b{font-size:14.5px}
+.ccar-tx small{font-size:12.5px;color:var(--mid)}
+.ccar-barra{flex:none;width:120px;height:7px;border-radius:5px;background:var(--line);overflow:hidden}
+.ccar-barra span{display:block;height:100%;background:var(--green-soft)}
+.ccar-b{display:grid;gap:10px;padding:0 16px 14px;border-top:1px solid var(--line)}
+.ccar-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-top:12px}
+.ccar-vacio{font-size:13px;color:var(--mid)}
+.ccar-lista{list-style:none;margin:0;padding:0;display:grid}
+.ccar-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.ccar-nom{display:grid;gap:1px;min-width:180px;flex:1}
+.ccar-nom b{font-size:14px}
+.ccar-nom small{font-size:12px;color:var(--mid)}
+.ccar-pag{display:flex;align-items:center;justify-content:center;gap:12px;font-size:12.5px;color:var(--mid)}
+@media (max-width:640px){.ccar-barra{display:none}.ccar-fila{align-items:flex-start}}

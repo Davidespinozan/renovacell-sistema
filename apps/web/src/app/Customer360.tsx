@@ -2,6 +2,7 @@
 // Lee del servidor (`cliente_360`, redacción por rol) y edita SOLO con comandos (cliente_*); la cartera se
 // asigna con los comandos de CC-7. Pestañas solo con datos canónicos para el rol; divulgación progresiva.
 // Lo profesional/verificación se muestra (sin evidencia biométrica); no se edita aquí.
+import { PerfilComercialEditor } from './PerfilComercialEditor'
 import { InvitarCliente } from './InvitarCliente'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Mail, Phone, MapPin, UserCheck, UserX, IdCard, Building2, ShoppingBag, Receipt, FileText, Clock, MessageCircle, ShieldCheck } from 'lucide-react'
@@ -140,6 +141,8 @@ function Resumen({ d, irA }: { d: Cliente360; irA: (t: Pestana) => void }) {
         {conv && <Field label="Conversación" value={`${ETIQUETA_MODO[conv.modo as ModoConversacion] ?? conv.modo}${conv.asesor ? ` · ${conv.asesor}` : ''}`} />}
         {d.comercial?.carrito && <Field label="Carrito" value={`${d.comercial.carrito.n_items} producto(s)`} />}
       </div>
+      {/* HERRAMIENTAS DEL VENDEDOR · doctor o clínica y su especialidad (solo lo ve quien la puede editar) */}
+      <PerfilComercialEditor customerId={d.customer_id} />
       {d.profesional && (
         <Section icon={<IdCard size={15} />} title="Profesional y verificación" aside={<ShieldCheck size={14} />}>
           <div style={grid2}>

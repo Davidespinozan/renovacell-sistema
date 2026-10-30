@@ -5,11 +5,13 @@
 // debería basarse en un id estable de vendedor (seller/profile id), no en comparación de nombres.
 import { CustomerDirectory } from '../app/CustomerDirectory'
 import { PorVerificar } from './PorVerificar'   // AVISO-VERIF · los que mandaron su verificación
+import { ClasificarCartera } from './ClasificarCartera'   // HERRAMIENTAS DEL VENDEDOR · doctor/clínica y especialidad
 
 export function Clientes() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PorVerificar />
+      <ClasificarCartera />
       <CustomerDirectory title="Clientes" scope="all" carteraToggle />
     </div>
   )

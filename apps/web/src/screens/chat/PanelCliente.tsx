@@ -20,6 +20,7 @@ import { NuevaCotizacion } from '../sales/NuevaCotizacion'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { useRoleOpcional } from '../../auth/RoleContext'
 import { HojaMarco, type PiezasChat } from './HojaChat'
+import { PerfilComercialEditor } from '../../app/PerfilComercialEditor'
 import type { AccionChat } from './ChatCanonico'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
@@ -352,6 +353,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   )
   else if (hoja === 'pc:ficha' && ficha.vinculado) cuerpo = (
     <HojaMarco titulo={nombre} sub={[ficha.ciudad, ficha.vendedor_nombre ? `Vendedor: ${ficha.vendedor_nombre}` : 'Sin vendedor', ficha.por === 'personal' ? 'vinculada por el equipo' : null].filter(Boolean).join(' · ')} onCerrar={cerrar} testid="pc-hoja-ficha">
+      {ficha.es_tuyo && ficha.customer_id && <PerfilComercialEditor customerId={ficha.customer_id} compacto />}
       {ficha.es_tuyo && (
         <div className="pc-datos">
           {ficha.telefono && <a href={`tel:${ficha.telefono}`}>{ficha.telefono}</a>}
