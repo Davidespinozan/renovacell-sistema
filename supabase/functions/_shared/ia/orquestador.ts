@@ -131,6 +131,18 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       for (const id of d.herramientas.idsDe(pre)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pre)) nombresAutorizados.add(n)
     }
   }
+  // IA-VENDEDORA · perfil comercial del cliente (solo portal y con precio autorizado: doctor verificado). Lo arma el servidor:
+  // tipo de cliente, especialidad, lo que compra, su carrito con oportunidades y lo que buscó en el catálogo. Sus productos
+  // cuentan como consultados en este turno y sus montos como precio autorizado (vienen de la misma autoridad que obtener_precio).
+  let perfilComercial = ''
+  if (canal === 'portal' && ctx.puede_precio && perfilIA) {
+    const pc = await rpc('cc_ia_perfil_comercial', { p_profile: perfilIA })
+    if (!pc.error && pc.data && typeof pc.data === 'object') {
+      for (const id of d.herramientas.idsDe(pc.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pc.data)) nombresAutorizados.add(n)
+      addEv(['PRICE_EVIDENCE'])
+      perfilComercial = '\n\n' + d.politica.envolverDatos('perfil_comercial_del_cliente', d.herramientas.acotarSalida(pc.data))
+    }
+  }
   // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
   if (d.herramientas.evidenciaHandoff) {
     const hs = await rpc('cc_ia_estado_handoff', { p_conv: e.conv })
@@ -156,7 +168,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null }) + productosMencionados + notaCorreccion
+    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null }) + productosMencionados + perfilComercial + notaCorreccion
     const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
@@ -239,6 +251,9 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'candidatos_comerciales': return rpc('cc_candidatos_recomendacion', { p_categoria: a.categoria, p_familia: a.familia, p_terminos: a.terminos, p_limite: LIMITE_RPC.candidatos_comerciales, p_audiencia: ctx.audiencia })
     // LIVE C1 · precio/disponibilidad/pedidos con el perfil que la IA tiene AUTORIZADO (null fuera del portal), nunca e.profile directo.
     case 'obtener_precio': return rpc('cc_ia_precio', { p_profile: t.perfilIA, p_product: a.product_id, p_qty: a.cantidad })
+    // IA-VENDEDORA · cotización con reglas del pedido y recomendaciones: el servidor decide precio y candidatos (perfil autorizado)
+    case 'cotizar': return rpc('cc_ia_cotizar', { p_profile: t.perfilIA, p_lineas: a.lineas })
+    case 'recomendar_productos': return rpc('cc_ia_recomendaciones', { p_profile: t.perfilIA, p_product: a.product_id, p_limite: 6 })
     case 'obtener_disponibilidad': return rpc('cc_ia_disponibilidad', { p_profile: t.perfilIA, p_product: a.product_id })
     case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: t.perfilIA, p_folio: a.folio })
     case 'enlace_portal': return { data: t.enlace ? t.enlace() : null, error: t.enlace ? null : 'desconocida' }   // puro: sin base, sin tokens

@@ -66,6 +66,11 @@ export function useSolicitudApertura(): SolicitudApertura | null {
 // CHAT PRO · apertura pedida por la PERSONA desde otro lugar del portal (p. ej. "Hablar con mi asesor" en la franja de
 // verificación). Es un clic suyo, así que cuenta como apertura manual; el lanzador decide si puede abrir.
 export const EVENTO_ABRIR_CHAT = 'rc:abrir-chat'
-export function pedirAbrirChat(): void {
+// IA-VENDEDORA · "Preguntar por este producto": el chat se abre con la pregunta YA escrita (borrador); la persona la envía.
+let borrador: string | null = null
+export function pedirAbrirChat(textoSugerido?: string): void {
+  borrador = textoSugerido?.trim() || null
   try { window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CHAT)) } catch { /* sin ventana: nada que abrir */ }
 }
+/** El redactor del dueño lo toma una sola vez. */
+export function tomarBorrador(): string | null { const b = borrador; borrador = null; return b }

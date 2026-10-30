@@ -620,6 +620,8 @@ button.pc-tira:hover{background:var(--hueso)}
 /* HERRAMIENTAS DEL VENDEDOR · seguimientos */
 .pc-seg{display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;border:0;border-radius:8px;background:var(--hueso);font:inherit;font-size:12.5px;color:var(--ink-2);text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .pc-seg span{overflow:hidden;text-overflow:ellipsis}
+.pc-interes{display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;border-radius:8px;background:var(--hueso);font-size:12.5px;color:var(--ink-2);overflow:hidden;white-space:nowrap}   /* IA-VENDEDORA */
+.pc-interes span{overflow:hidden;text-overflow:ellipsis}
 .pc-seg--warn{background:var(--warn-bg);color:#8a5a00}
 .pc-seg--dang{background:var(--danger-bg);color:var(--danger)}
 .pc-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}

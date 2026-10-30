@@ -1,5 +1,6 @@
 -- CC-4 · El rollback retira libro de turnos, traza y herramientas de IA sin tocar CC-2/CC-3.
 begin;
+\ir ../../../rollback/ia_vendedora/99_down.sql   -- IA-VENDEDORA (20270223) añade funciones cc_ia_*: se baja antes de la foto inicial
 \ir ../../../rollback/reparto_verificacion/99_down.sql   -- REPARTO-VERIF (20270213) redefine funciones de esta cadena: se baja antes de la foto inicial
 \ir ../../../rollback/contacto_conversacional/99_down.sql   -- CONTACTO-CONV (20270212) añade funciones cc_ia_*: se baja antes
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)

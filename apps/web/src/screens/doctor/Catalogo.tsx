@@ -25,6 +25,8 @@ import { reloadOrders } from '../../data/store/ordersStore'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
 import { CheckoutCanonico, domicilioLegadoDelDoctor, type MotorLocal } from '../checkout/CheckoutCanonico'
 import { BarraCarrito } from './BarraCarrito'
+import { FichaProducto } from './FichaProducto'   // IA-VENDEDORA · ficha + precio por cantidad + preguntar
+import { registrarActividad } from '../../data/ops/actividadCatalogo'
 import { AvisoEnvioGratisVista, useAvisoEnvioGratis } from '../../app/AvisoEnvioGratis'   // ENT-P · mismo aviso en todas las ventas
 import type { AvisoEnvioGratis as AvisoEnvio } from '../../data/ops/entrega'
 import type { ConfigServidor, ResultadoPedido } from '../checkout/checkoutMotor'
@@ -116,12 +118,26 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
     [products, filter],
   )
   const [openFamily, setOpenFamily] = useState<ProductSafe | null>(null)
+  const [fichaDe, setFichaDe] = useState<ProductSafe | null>(null)   // IA-VENDEDORA · ficha abierta
+  // IA-VENDEDORA · "Promociones": productos (o familias con alguna presentación) en una promoción vigente.
+  const [soloPromos, setSoloPromos] = useState(false)
+  const enPromo = useMemo(() => new Set(volRules.filter((r) => r.promo && r.active).map((r) => r.product_id)), [volRules])
+  const tienePromo = (e: CatalogEntry) => enPromo.has(e.product.id) || (e.kind === 'family' && e.variants.some((v) => enPromo.has(v.id)))
   // Búsqueda por nombre o categoría (sin acentos). Disponibles primero; lo agotado va aparte y compacto.
   const plano = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const visibles = useMemo(() => {
     const k = plano(busca.trim())
-    return k ? entries.filter((e) => plano(e.product.name).includes(k) || plano(e.product.category).includes(k)) : entries
-  }, [entries, busca])
+    const base = soloPromos ? entries.filter(tienePromo) : entries
+    return k ? base.filter((e) => plano(e.product.name).includes(k) || plano(e.product.category).includes(k)) : base
+  }, [entries, busca, soloPromos, enPromo]) // eslint-disable-line react-hooks/exhaustive-deps
+  // IA-VENDEDORA · la búsqueda es señal: al dejar de escribir (1.5 s), se registra; sin resultados avisa a la IA.
+  const sinResultados = busca.trim().length >= 3 && visibles.length === 0
+  useEffect(() => {
+    const t = busca.trim()
+    if (!verified || t.length < 3) return
+    const id = window.setTimeout(() => registrarActividad(sinResultados ? 'sin_resultados' : 'busqueda', { termino: t }), 1500)
+    return () => window.clearTimeout(id)
+  }, [busca, sinResultados, verified])
   const hayExistencia = (e: CatalogEntry): boolean => {
     if (e.kind === 'family') return e.variants.some((v) => isSellableVariant(v) && stockInfoFor(stockMap, v.id).qty > 0)
     const st = stockInfoFor(stockMap, e.product.id)
@@ -132,7 +148,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
     <FamilyCard key={e.product.id} entry={e} cart={cart} priceOf={priceOf} onOpen={() => setOpenFamily(e.product)} />
   ) : (
-    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0, vq[e.product.id])} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+    <ProductCard key={e.product.id} onVer={() => setFichaDe(e.product)} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0, vq[e.product.id])} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
   )
 
   const lines: CartLine[] = useMemo(
@@ -210,6 +226,11 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
               </button>
             ))}
           </div>
+          {enPromo.size > 0 && (
+            <button type="button" className={'fchip' + (soloPromos ? ' on' : '')} aria-pressed={soloPromos} onClick={() => setSoloPromos((v) => !v)} data-testid="catalogo-promos">
+              <Icon name="megaphone" /> Promociones
+            </button>
+          )}
           <label className="dcat-buscar">
             <Icon name="search" />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar producto" aria-label="Buscar producto" data-testid="catalogo-buscar" />
@@ -231,8 +252,13 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
         </>)}
       </div>
 
+      {fichaDe && (
+        <FichaProducto p={fichaDe} precio={priceOf(fichaDe)} verificado={verified} reglas={volRules} qty={cart[fichaDe.id] ?? 0}
+          puedeAgregar={fichaDe.sellable !== false && stockInfoFor(stockMap, fichaDe.id).qty > 0 && !products.some((v) => v.parent_product_id === fichaDe.id)}
+          onAdd={() => add(fichaDe.id)} onDec={() => dec(fichaDe.id)} onClose={() => setFichaDe(null)} />
+      )}
       {openFamily && (
-        <VariantModal
+        <VariantModal onVerFicha={() => { const f = openFamily; setOpenFamily(null); setFichaDe(f) }}
           parent={openFamily}
           variants={products.filter((v) => v.parent_product_id === openFamily.id && isPortalProduct(v))}
           cart={cart} priceOf={priceOf} stockMap={stockMap}
@@ -270,21 +296,22 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
 // Tarjeta de producto del portal: foto completa en un cuadro limpio, línea y categoría como texto discreto, precio
 // al frente y la promoción como un chip. Lo agotado se ve compacto y sin botón (no hay nada que hacer ahí).
-function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDec, pendiente = false }: { pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; nivel?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDec, onVer, pendiente = false }: { onVer?: () => void; pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; nivel?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
   const discounted = effPrice != null && price != null && effPrice < price // volumen aplicado a esta cantidad
   return (
     <div className={'pcard dcat-card' + (sellable ? '' : ' dcat-card--agotado')}>
-      <div className="dcat-foto">
+      <div className="dcat-foto" role={onVer ? 'button' : undefined} tabIndex={onVer ? 0 : undefined} aria-label={onVer ? `Ver ficha de ${p.name}` : undefined}
+        onClick={onVer} onKeyDown={onVer ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onVer() } } : undefined} style={onVer ? { cursor: 'pointer' } : undefined} data-testid="ver-ficha">
         {p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Icon name="leaf" />}
         {!sellable && <span className="dcat-estado">Agotado</span>}
         {sellable && stock.status === 'low' && <span className="dcat-estado dcat-estado--pocas">Quedan {stock.qty}</span>}
       </div>
       <div className="pb">
         <div className={'dcat-linea ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}{p.category ? <span> · {p.category}</span> : null}</div>
-        <h5>{p.name}</h5>
+        <h5>{onVer ? <button type="button" className="dcat-nombre" onClick={onVer}>{p.name}</button> : p.name}</h5>
         {!pendiente && price != null && (
           <div className="pr dcat-precio">
             {discounted ? (<><span>{money(effPrice)}</span><s>{money(price)}</s></>) : money(price)}
@@ -353,7 +380,8 @@ function FamilyCard({ entry, cart, onOpen, priceOf }: { entry: CatalogEntry; car
 }
 
 // Selector de variantes de una familia. Al agregar, SIEMPRE usa el id de la VARIANTE.
-function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec, onClose }: {
+function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec, onClose, onVerFicha }: {
+  onVerFicha?: () => void
   parent: ProductSafe
   variants: ProductSafe[]
   cart: Cart
@@ -377,7 +405,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
         <div className="mhead">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {parent.image_url && <img src={parent.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', backgroundColor: 'var(--cp-surface)', border: '1px solid var(--line)' }} />}
-            <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} {variants.length === 1 ? 'presentación' : 'presentaciones'} · elige una</div></div>
+            <div><h3 style={{ margin: 0 }}>{parent.name}</h3><div className="ms">{variants.length} {variants.length === 1 ? 'presentación' : 'presentaciones'} · elige una{onVerFicha && <> · <button type="button" className="dcat-nombre" onClick={onVerFicha} data-testid="variantes-ver-ficha">Ver ficha</button></>}</div></div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
         </div>

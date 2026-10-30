@@ -82,6 +82,8 @@ export class ClienteConocimiento {
       p_product: p.product_id, p_seccion: p.seccion, p_contenido: p.contenido, p_datos: null, p_source: p.source_id ?? null, p_audiencia: null, p_id: p.id ?? null, p_rev: p.rev ?? null,
     })
   }
+  // FICHAS POR FAMILIA · todos los borradores del producto en un paso (mismas reglas; lo que no pasa vuelve con su motivo)
+  aprobarFicha(product_id: string, confirmarClinico = false) { return this.llamar<{ aprobadas: number; pendientes: Array<{ seccion: string; motivo: string }> }>('cc_conocimiento_aprobar_ficha', { p_product: product_id, p_confirmar_clinico: confirmarClinico }) }
   aprobar(id: string, confirmarClinico = false) { return this.llamar<{ id: string; estado: string; retirada?: string | null; claims?: Claim[] }>('cc_conocimiento_aprobar', { p_id: id, p_confirmar_clinico: confirmarClinico }) }
   retirar(id: string, motivo: string) { return this.llamar<{ id: string; estado: string }>('cc_conocimiento_retirar', { p_id: id, p_motivo: motivo }) }
   restaurar(id: string) { return this.llamar<{ id: string; version: number }>('cc_conocimiento_restaurar', { p_id: id }) }

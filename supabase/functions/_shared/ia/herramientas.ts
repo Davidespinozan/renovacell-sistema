@@ -13,6 +13,7 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'preparar_checkout'   // CC-6 (lectura; confirmar es SOLO por el botón del usuario)
   | 'enlace_portal'   // LIVE C1 · URL pública oficial del portal (sin tokens ni datos): la ofrece a audiencias públicas y canales
   | 'registrar_contacto'   // CONTACTO CONVERSACIONAL · solo el visitante del enlace que aún no deja sus datos
+  | 'cotizar' | 'recomendar_productos'   // IA-VENDEDORA · combinaciones con las reglas del pedido y recomendaciones con motivo
 export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
@@ -47,6 +48,11 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
     input_schema: { type: 'object', properties: { categoria: texto('Categoría', 80), familia: texto('Familia', 80), terminos: { type: 'array', items: texto('término', 40), maxItems: 5 } }, additionalProperties: false } },
   { name: 'obtener_precio', autoridad: 'cualquiera', mutante: false, description: 'Precio autorizado de un producto para este usuario (su lista y cantidad). Si el usuario no está verificado, devuelve que requiere verificación.',
     input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'integer', minimum: 1, maximum: 999, description: 'Cantidad (default 1)' } }, required: ['product_id'], additionalProperties: false } },
+  // IA-VENDEDORA · la IA cotiza combinaciones con las reglas del pedido (lo que se cobraría) y recomienda con motivo.
+  { name: 'cotizar', autoridad: 'cualquiera', mutante: false, description: 'Cotiza varios productos juntos con las reglas de precio del pedido (juntar piezas para medio mayoreo, todo a mayoreo si uno llega a mayoreo, promociones). Devuelve precio por línea, nivel aplicado, total, ahorro y OPORTUNIDADES (cuántas piezas faltan para el siguiente nivel y cuánto ahorraría). Úsala para "¿cuánto me queda si llevo…?", combinaciones y para proponer cómo ahorrar. Nunca calcules tú.',
+    input_schema: { type: 'object', properties: { lineas: { type: 'array', minItems: 1, maxItems: 20, items: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'integer', minimum: 1, maximum: 999 } }, required: ['product_id', 'cantidad'], additionalProperties: false } } }, required: ['lineas'], additionalProperties: false } },
+  { name: 'recomendar_productos', autoridad: 'cualquiera', mutante: false, description: 'Recomendaciones con motivo para este cliente: complementos curados por Renovacell, lo que otros compran junto, lo que usa su especialidad, recompra de lo que ya compró y similares del producto del que hablan. Excluye lo que ya lleva en su carrito. Solo puedes recomendar lo que regrese aquí o en candidatos_comerciales.',
+    input_schema: { type: 'object', properties: { product_id: texto('product_id del producto del que hablan (opcional)', 36) }, additionalProperties: false } },
   { name: 'obtener_disponibilidad', autoridad: 'cualquiera', mutante: false, description: 'Disponibilidad comercial de un producto (disponible / no disponible) para usuarios verificados.',
     input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36) }, required: ['product_id'], additionalProperties: false } },
   { name: 'obtener_estado_pedido', autoridad: 'cuenta', mutante: false, description: 'Estado de los pedidos del propio usuario (últimos 5 o por folio).',
@@ -128,6 +134,25 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
       const c = Number(i.cantidad ?? 1); const cantidad = Number.isInteger(c) && c >= 1 && c <= 999 ? c : (i.cantidad === undefined ? 1 : null)
       if (cantidad === null) return { ok: false, motivo: 'argumentos' }
       return { ok: true, nombre: n, args: { product_id: id, cantidad }, ids: [id] }
+    }
+    case 'cotizar': {
+      const arr = Array.isArray(i.lineas) ? i.lineas : []
+      if (arr.length < 1 || arr.length > 20) return { ok: false, motivo: 'argumentos' }
+      const lineas: Array<{ product_id: string; cantidad: number }> = []
+      for (const l of arr) {
+        const x = (l && typeof l === 'object' ? l : {}) as Record<string, unknown>
+        const id = uuid(x.product_id); const c = Number(x.cantidad)
+        if (!id || !Number.isInteger(c) || c < 1 || c > 999) return { ok: false, motivo: 'argumentos' }
+        if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
+        lineas.push({ product_id: id, cantidad: c })
+      }
+      return { ok: true, nombre: n, args: { lineas }, ids: [...new Set(lineas.map((l) => l.product_id))] }
+    }
+    case 'recomendar_productos': {
+      if (i.product_id === undefined || i.product_id === null || i.product_id === '') return { ok: true, nombre: n, args: { product_id: null }, ids: [] }
+      const id = uuid(i.product_id); if (!id) return { ok: false, motivo: 'argumentos' }
+      if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
+      return { ok: true, nombre: n, args: { product_id: id }, ids: [id] }
     }
     case 'comparar_productos': {
       const arr = Array.isArray(i.product_ids) ? i.product_ids.map(uuid) : []
@@ -211,7 +236,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
   const o = (salida && typeof salida === 'object' ? salida : {}) as Record<string, unknown>
   const noVacia = Array.isArray(salida) ? salida.length > 0 : !!salida && (Array.isArray(o.productos) ? o.productos.length > 0 : Object.keys(o).length > 0)
   switch (nombre) {
-    case 'obtener_precio': return o.autorizado === true ? ['PRICE_EVIDENCE'] : []
+    case 'obtener_precio': case 'cotizar': return o.autorizado === true ? ['PRICE_EVIDENCE'] : []
     case 'obtener_disponibilidad': return o.autorizado === true ? ['STOCK_EVIDENCE'] : []
     case 'obtener_estado_pedido': return o.autorizado === true ? ['ORDER_EVIDENCE'] : []
     case 'solicitar_asesor': return o.modo ? (['HUMAN_REQUESTED', 'HANDOFF_EN_CURSO', ...(o.asesor === true ? ['ASESOR_ASIGNADO'] : ['ASESOR_SIN_ASIGNAR'])] as Evidencia[]) : []

@@ -22,7 +22,8 @@ import { useRoleOpcional } from '../../auth/RoleContext'
 import { HojaMarco, type PiezasChat } from './HojaChat'
 import { PerfilComercialEditor } from '../../app/PerfilComercialEditor'
 import { ESTADOS_SEGUIMIENTO, ETIQUETA_ESTADO, PLAZOS, cuandoRetomar, enDias, seguimientos as segPorDefecto, type ClienteSeguimientos, type EstadoSeguimiento, type Seguimiento } from '../../data/ops/seguimientos'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, Eye } from 'lucide-react'
+import { interesReciente as interesPorDefecto, resumenInteres, type InteresReciente } from '../../data/ops/actividadCatalogo'   // IA-VENDEDORA
 import type { AccionChat } from './ChatCanonico'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
@@ -39,10 +40,11 @@ interface Props {
   buscador?: BuscadorClientes
   activo?: boolean                // false: esta conversación no se trabaja aquí (p. ej. doctor con cuenta en la Bandeja)
   seg?: ClienteSeguimientos       // HERRAMIENTAS DEL VENDEDOR · seguimientos (inyectable en pruebas)
+  interes?: typeof interesPorDefecto   // IA-VENDEDORA · lo que buscó y miró en el catálogo (inyectable en pruebas)
 }
 
 /** Franja, acciones y hojas del cliente de esta conversación, para montarlas en el chat. */
-export function usePanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto, pagos = pagosConversacion, activo = true, seg: segCli = segPorDefecto }: Props): PiezasChat {
+export function usePanelCliente({ conversationId, chat, onCambio, cliente = expedientePorDefecto, buscador, cot = cotPorDefecto, pagos = pagosConversacion, activo = true, seg: segCli = segPorDefecto, interes: leerInteres = interesPorDefecto }: Props): PiezasChat {
   const [ficha, setFicha] = useState<FichaConversacion | null>(null)
   const [sug, setSug] = useState<SugerenciaCliente[]>([])
   const [q, setQ] = useState('')
@@ -71,6 +73,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const [seg, setSeg] = useState<Seguimiento | null>(null)
   const [segForm, setSegForm] = useState<{ estado: EstadoSeguimiento | null; nota: string; recordar: string }>({ estado: null, nota: '', recordar: enDias(3) })
   const cargarSeg = useCallback(async (customer?: string | null) => { const r = await segCli.de(customer ?? null, conversationId); setSeg(r.ok ? r.data : null) }, [segCli, conversationId])
+  const [interes, setInteres] = useState<InteresReciente[]>([])
   const bus = useMemo(() => buscador ?? new BuscadorClientes(), [buscador])
   useEffect(() => () => bus.limpiar(), [bus])
 
@@ -80,12 +83,13 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     setFicha(f.data)
     marcarVinculada(conversationId, !!(f.data.vinculado && f.data.es_tuyo))
     if (f.data.vinculado && f.data.es_tuyo) { void cargarCots(f.data.customer_id); void cargarPedidos() } else setPedidos([])
+    if (f.data.vinculado && f.data.customer_id) void leerInteres(f.data.customer_id).then(setInteres); else setInteres([])
     if (!(f.data.con_cuenta && !f.data.vinculado)) void cargarSeg(f.data.vinculado ? f.data.customer_id : null)
     if (!f.data.vinculado && !f.data.con_cuenta) {
       const s = await cliente.sugerencias(conversationId)
       setSug(s.ok ? s.data : [])
     }
-  }, [cliente, conversationId, cargarCots, cargarPedidos, cargarSeg])
+  }, [cliente, conversationId, cargarCots, cargarPedidos, cargarSeg, leerInteres])
   useEffect(() => { setFicha(null); setMsg(null); setRes(null); setQ(''); setPago(null); setRevisado(false); if (activo) void cargar() }, [cargar, activo])
 
   const porCobrar = pedidos.filter((p) => p.saldo > 0 && !p.en_revision)
@@ -253,7 +257,11 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
       <ClipboardList size={14} aria-hidden /> <b>{ETIQUETA_ESTADO[seg.estado]}</b> · {segCuando.texto}{seg.nota ? <span> · {seg.nota}</span> : null}
     </button>
   ) : null
-  const tira = <>{tiraFicha}{tiraSeg}{!hoja && aviso}{modales}</>
+  // IA-VENDEDORA · lo que el cliente estuvo buscando o mirando en el catálogo: pie para ofrecerle algo concreto.
+  const tiraInteres = interes.length ? (
+    <div className="pc-interes" data-testid="pc-interes"><Eye size={14} aria-hidden /> <span>En el catálogo: {resumenInteres(interes)}</span></div>
+  ) : null
+  const tira = <>{tiraFicha}{tiraSeg}{tiraInteres}{!hoja && aviso}{modales}</>
 
   // ── Menú «+»: lo que se puede hacer con este cliente ────────────────────────────────────────────────
   const acciones: AccionChat[] = []

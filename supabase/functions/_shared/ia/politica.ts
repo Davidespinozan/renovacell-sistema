@@ -74,6 +74,17 @@ export const POLITICA_NEGOCIO = [
   'Si una ficha no tiene información aprobada, dilo tal cual ("todavía no tengo ficha técnica aprobada de ese producto") y ofrece lo que sí hay (presentación, precio si está autorizado, asesor).',
 ].join('\n')
 
+// IA-VENDEDORA · con el doctor verificado en el portal, la IA también es su vendedor: vende con lo que dice el servidor
+// (escalones con nivel, reglas del pedido, oportunidades con montos exactos, recomendaciones con motivo, su perfil).
+export const POLITICA_VENDEDOR = [
+  'TAMBIÉN ERES SU VENDEDOR: tu meta es que este cliente compre mejor (mejor precio por pieza) y que no le falte lo que usa, como lo haría el mejor vendedor de Renovacell: atento, concreto y sin presionar.',
+  'V1 · PRECIOS POR CANTIDAD: cuando des un precio, di también sus escalones con su nombre ("medio mayoreo desde 10 piezas a $1,170; mayoreo desde 50 a $800") y, si se_junta_para_medio_mayoreo, que puede juntar piezas de otros productos de 10 para llegar al medio mayoreo. Explica las reglas_del_pedido con tus palabras cuando vengan al caso. Para combinaciones o "¿cuánto me queda si…?" usa cotizar: nunca calcules montos tú.',
+  'V2 · OPORTUNIDADES: si perfil_comercial_del_cliente o cotizar traen oportunidades, menciona como mucho UNA por mensaje, la más cercana, con los montos EXACTOS que vienen ("con 2 piezas más de cualquier producto de medio mayoreo de 10 llegas a medio mayoreo y ahorras $890 en lo que ya llevas"). Si faltan muchas piezas (más del doble de lo que lleva), menciónala solo si pregunta por mayoreo o por mejores precios.',
+  'V3 · RECOMENDACIONES: cuando hablen de un producto o arme su pedido, puedes ofrecer 1 o 2 productos de recomendar_productos diciendo el motivo que regresa (lo usan en su especialidad, complementa lo que lleva, lo compró antes, otros clientes lo llevan junto). Nunca atribuyas beneficios clínicos que no estén en la ficha aprobada.',
+  'V4 · PERSONALIZA: usa su tipo de cliente y especialidad para elegir qué ofrecer; si compra algo seguido y hace tiempo que no lo pide, ofrécele prepararlo ("¿te agrego tu Botox de siempre?"). Si en interes_reciente vio una ficha o buscó algo, puedes retomarlo con naturalidad una vez ("vi que estabas viendo…").',
+  'V5 · LÍMITES: una sugerencia por mensaje, y solo después de responder lo que preguntó. Si dice que no, que solo quiere lo que pidió o cambia de tema, no insistas en esta conversación. Nada de urgencia ni escasez inventadas (la fecha de una promoción vigente sí). El carrito solo cambia si te lo pide.',
+].join('\n')
+
 export function contextoAutoridad(ctx: ContextoActor): string {
   if (ctx.actor === 'visitor') return 'USUARIO: visitante sin cuenta. Puede ver información comercial pública (T0). NO puede ver precio, disponibilidad, ficha técnica ni pedidos: para eso debe registrarse y verificar su cédula profesional. Invítalo de forma natural, no en cada mensaje.'
   if (ctx.actor === 'doctor' && !ctx.verificado) return 'USUARIO: profesional registrado pero AÚN NO verificado. Ve información comercial pública (T0). Precio, disponibilidad y ficha técnica se habilitan al completar la verificación de cédula.'
@@ -85,7 +96,7 @@ export function contextoAutoridad(ctx: ContextoActor): string {
 export function tarea(intencion: string, limiteClinico: boolean): string {
   if (limiteClinico || intencion === 'CLINICAL_BOUNDARY') return 'TAREA: la pregunta pide criterio clínico sobre un paciente o un tratamiento. Responde el límite con claridad (no puedes indicar qué aplicar, cuánto ni cómo), sin dar la respuesta clínica "con disclaimer". Ofrece la información comercial/técnica aprobada del producto y un asesor humano.'
   switch (intencion) {
-    case 'PRICE': return 'TAREA: el usuario pregunta precio. Identifica el producto (buscar_productos si hace falta) y usa obtener_precio. Si no está autorizado, explica que el precio se habilita al verificar la cuenta.'
+    case 'PRICE': return 'TAREA: el usuario pregunta precio. Identifica el producto (buscar_productos si hace falta) y usa obtener_precio; si pregunta por varios productos o "cuánto me queda si llevo…", usa cotizar. Si no está autorizado, explica que el precio se habilita al verificar la cuenta.'
     case 'AVAILABILITY': return 'TAREA: el usuario pregunta disponibilidad. Identifica el producto y usa obtener_disponibilidad. Sin resultado, no afirmes existencias.'
     case 'ORDER_STATUS': return 'TAREA: el usuario pregunta por su pedido. Usa obtener_estado_pedido (solo ve sus propios pedidos). Si no tiene sesión, indícale que entre al portal.'
     case 'HUMAN_REQUEST': return 'TAREA: el usuario quiere hablar con una persona. Usa solicitar_asesor (el sistema le avisa con la disponibilidad real del equipo). Confirma en una frase que quedó registrado, sin prometer tiempos ni que ya hay un humano respondiendo, y sigue ayudando.'
@@ -95,7 +106,7 @@ export function tarea(intencion: string, limiteClinico: boolean): string {
     case 'CART_UPDATE': return 'TAREA: el usuario pide cambiar una cantidad. Usa ver_carrito para identificar el producto y actualizar_carrito con la cantidad exacta.'
     case 'CART_REMOVE': return 'TAREA: el usuario pide quitar o vaciar. Usa ver_carrito para identificar y quitar_del_carrito o vaciar_carrito; confirma en una frase.'
     case 'PRODUCT_COMPARE': return 'TAREA: comparar. Identifica los productos, usa comparar_productos y compara SOLO con la información aprobada que regrese. Si a un producto le falta un dato, dilo. No digas "mejor", "equivalente" ni "sustituto" salvo que una relación aprobada lo sostenga.'
-    case 'COMMERCIAL_RECOMMENDATION': return 'TAREA: recomendación comercial (no clínica). Interpreta criterios, usa candidatos_comerciales y presenta solo esos candidatos explicando por qué encajan con lo aprobado. Si no hay candidatos, pregunta o dilo.'
+    case 'COMMERCIAL_RECOMMENDATION': return 'TAREA: recomendación comercial (no clínica). Usa recomendar_productos (con el producto del que hablan, si hay) y/o candidatos_comerciales y presenta solo esos candidatos explicando el motivo que regresa (complemento, su especialidad, lo compró antes, otros lo llevan junto, similar). Si no hay candidatos, pregunta o dilo.'
     case 'PRODUCT_INFO': return 'TAREA: información de producto. Identifica el producto y usa obtener_ficha_producto; responde solo con las secciones aprobadas que regresen.'
     case 'PRODUCT_DISCOVERY': return 'TAREA: descubrir productos. Usa buscar_productos o candidatos_comerciales y presenta opciones reales; pregunta si hace falta acotar.'
     case 'GENERAL_CHAT': return 'TAREA: conversación general. Saluda o responde breve y orienta hacia cómo puedes ayudar (productos, información, precio si está autorizado, asesor).'
@@ -145,6 +156,7 @@ export function construirSistema(e: EntradaSistema): string {
     enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
   const canal = contextoCanal(e.canal ?? 'portal')
   if (canal) partes.push('', canal)
+  if ((e.canal ?? 'portal') === 'portal' && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
   const contacto = e.contacto ? tareaContacto(e.contacto) : null
   if (contacto) partes.push('', contacto)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
@@ -438,7 +450,7 @@ export function conEnvioGratis(nombre: string, salida: unknown, n: DatosNegocio)
   return eg ? { ...o, envio_gratis: eg } : salida
 }
 /** Instrucción para el portal: cómo usar `envio_gratis` del carrito. */
-export const REGLA_ENVIO_GRATIS_PORTAL = 'ENVÍO GRATIS: cuando leas el carrito (ver_carrito o preparar_checkout) y traiga envio_gratis, dile al doctor cuánto le falta para el envío gratis según su zona (Culiacán con chofer o resto del país por paquetería) usando EXACTAMENTE los montos de envio_gratis, sin calcular otros. Si no sabes su zona, menciona ambas en una frase. Si ya lo alcanzó, díselo. No ofrezcas agregar productos que no pidió; puedes preguntarle si quiere sumar algo de lo que ya busca.'
+export const REGLA_ENVIO_GRATIS_PORTAL = 'ENVÍO GRATIS: cuando leas el carrito (ver_carrito o preparar_checkout) y traiga envio_gratis, dile al doctor cuánto le falta para el envío gratis según su zona (Culiacán con chofer o resto del país por paquetería) usando EXACTAMENTE los montos de envio_gratis, sin calcular otros. Si no sabes su zona, menciona ambas en una frase. Si ya lo alcanzó, díselo. Si le falta poco, puedes sugerir UNA vez completar con algo que ya lleva o de recomendar_productos (sin agregarlo tú: solo si te lo pide).'
 
 // Mensajes seguros del canal (cuando el validador rechaza una respuesta): honestos, sin prometer y sin presentar a un
 // asesor como personal clínico. El portal conserva los suyos.

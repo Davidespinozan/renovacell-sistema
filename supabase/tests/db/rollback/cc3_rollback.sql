@@ -1,5 +1,6 @@
 -- CC-3 · El rollback retira el dominio de conocimiento sin tocar products ni CC-1/CC-2.
 begin;
+\ir ../../../rollback/fichas_familia/99_down.sql   -- FICHAS POR FAMILIA (20270225) añade cc_conocimiento_aprobar_ficha: se baja antes
 \ir ../../../rollback/cc3/99_down.sql
 do $t$
 begin

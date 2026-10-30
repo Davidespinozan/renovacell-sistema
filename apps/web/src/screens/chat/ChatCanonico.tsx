@@ -23,6 +23,7 @@ import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
+import { EVENTO_ABRIR_CHAT, tomarBorrador } from '../../data/store/chatUiStore'   // IA-VENDEDORA
 
 interface Props {
   /** PROMO-6 · la tarjeta de una promoción puede llevar al catálogo (lo define quien monta el chat del doctor). */
@@ -138,6 +139,14 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
+  // IA-VENDEDORA · pregunta sugerida desde el catálogo (solo el dueño; el asesor nunca la recibe)
+  useEffect(() => {
+    if (asesor) return
+    const tomar = () => { const b = tomarBorrador(); if (b) setTexto(b) }
+    tomar()
+    window.addEventListener(EVENTO_ABRIR_CHAT, tomar)
+    return () => window.removeEventListener(EVENTO_ABRIR_CHAT, tomar)
+  }, [asesor])
   const [cargando, setCargando] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [esperaIA, setEsperaIA] = useState<{ seq: number; desde: number } | null>(null)   // PERF · turno de IA en curso tras mi mensaje

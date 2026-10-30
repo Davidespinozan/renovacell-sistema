@@ -1,5 +1,6 @@
 -- HERRAMIENTAS DEL VENDEDOR · bloque B (20270215) · el down retira clasificación y catálogo; se reaplica idéntica.
 begin;
+\ir ../../../rollback/ia_vendedora/99_down.sql   -- IA-VENDEDORA (20270223) liga productos a especialidades: se baja antes de la foto inicial
 create temp table _pcm as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/perfil_comercial/99_down.sql
 do $t$ begin

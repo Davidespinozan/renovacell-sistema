@@ -63,6 +63,19 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
     if (!r.ok) { setError(r.error); return }
     setError(null); setAviso(`Aprobada ${etiquetaSeccion(v.seccion)} v${v.version}${r.data.retirada ? ' (la versión anterior quedó retirada)' : ''}.`); await refrescar()
   }
+  // FICHAS POR FAMILIA · aprobar la ficha completa (borradores revisados). Lo clínico pide la misma confirmación.
+  const aprobarFicha = async () => {
+    if (!sel) return
+    const hayClinico = versiones.some((v) => v.estado === 'draft' && v.nivel === 'T2')
+    if (!window.confirm(`Se aprueban todos los borradores de ${sel.nombre}. ¿Ya los revisaste?`)) return
+    const confirmar = hayClinico && t2 ? window.confirm('Incluye contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?') : false
+    const r = await cliente.aprobarFicha(sel.product_id, confirmar)
+    if (!r.ok) { setError(r.error); return }
+    const MOTIVO: Record<string, string> = { FUENTE_REQUERIDA: 'falta su fuente', T2_BLOQUEADO: 'es información clínica (actívala y confirma)', CLAIM_PROHIBIDO: 'tiene una afirmación prohibida', CLAIM_REQUIERE_T2: 'tiene lenguaje clínico' }
+    setError(null)
+    setAviso(`Aprobadas ${r.data.aprobadas}.` + (r.data.pendientes.length ? ' Quedan en borrador: ' + r.data.pendientes.map((p) => `${etiquetaSeccion(p.seccion)} (${MOTIVO[p.motivo] ?? p.motivo})`).join(', ') + '.' : ''))
+    await refrescar()
+  }
   const retirar = async (v: Version) => {
     const motivo = window.prompt('Motivo del retiro:'); if (!motivo) return
     const r = await cliente.retirar(v.id, motivo); if (!r.ok) { setError(r.error); return }
@@ -136,7 +149,10 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
           <section data-testid="detalle">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <h3 style={{ margin: 0 }}>{sel.nombre}</h3>
-              <button type="button" className="btn ghost sm" onClick={() => { setSel(null); setEditor(null) }}>Cerrar</button>
+              <span style={{ display: 'flex', gap: 6 }}>
+                {versiones.some((v) => v.estado === 'draft') && <button type="button" className="btn sm" onClick={() => void aprobarFicha()} data-testid="btn-aprobar-ficha">Aprobar ficha completa</button>}
+                <button type="button" className="btn ghost sm" onClick={() => { setSel(null); setEditor(null) }}>Cerrar</button>
+              </span>
             </div>
             <div style={{ ...sutil, margin: '4px 0 12px' }}>Falta lo general: {(sel.faltantes_t0 ?? []).map(etiquetaSeccion).join(', ') || 'nada'} · Falta lo técnico: {(sel.faltantes_t1 ?? []).map(etiquetaSeccion).join(', ') || 'nada'}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>

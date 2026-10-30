@@ -75,3 +75,9 @@ a.pp-tel:focus-visible{outline:3px solid var(--green-soft);outline-offset:2px}
   .dcat-card .pp-fam-pr{white-space:normal;line-height:1.3}
   .dcat-promo{white-space:normal;text-overflow:clip;line-height:1.3}
 }
+
+/* IA-VENDEDORA · nombre del producto como enlace a su ficha (sin parecer botón) y ficha legible en móvil */
+.dcat-nombre{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.dcat-nombre:hover,.dcat-nombre:focus-visible{text-decoration:underline;text-underline-offset:3px}
+.dcat-ficha{max-width:560px;width:100%}
+.dcat-ficha .mbody{max-height:min(78vh,760px);overflow:auto}
