@@ -8,6 +8,7 @@ import { UserAvatar } from '../../app/UserAvatar'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
 import { useRole } from '../../auth/RoleContext'
+import { useIntento, consumirIntento } from '../../data/store/navIntentStore'
 import { conEnlaces } from '../chat/ChatCanonico'
 import { cuandoLista, diaDe, horaDe } from '../../lib/cuando'
 import type { Conversation, Message } from '../../data/types'
@@ -46,6 +47,12 @@ export function Chat() {
   const [buscar, setBuscar] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const conv = conversations.find((c) => c.id === selectedId) ?? null
+  // PUSH DEL EQUIPO · al llegar desde un aviso, abre ese chat en cuanto aparece en SUS conversaciones.
+  const intento = useIntento('chat')
+  useEffect(() => {
+    if (!intento || !conversations.some((c) => c.id === intento.conversationId)) return
+    setSelectedId(intento.conversationId); consumirIntento(intento.id)
+  }, [intento, conversations])
   const msgs = useMemo(() => (conv ? messagesByConv[conv.id] ?? [] : []), [messagesByConv, conv])
 
   const [leido, setLeido] = useState<Record<string, string>>(() => leerLeido(me.id))

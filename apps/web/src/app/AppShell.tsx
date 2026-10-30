@@ -12,6 +12,7 @@ import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
 import { instalarRefresco, refrescarDatos } from '../data/store/refrescar'
 import { regresoDeStripe, CLAVE_REGRESO_CARE } from '../data/ops/stryvCare'
+import { useAbrirDesdeAviso } from '../data/ops/abrirAviso'
 
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
@@ -34,6 +35,8 @@ export function AppShell() {
   // Datos al día: al llegar un aviso, al volver a la pestaña y al abrir otra pantalla (antes: solo al iniciar sesión).
   useEffect(() => { instalarRefresco() }, [])
   useEffect(() => { refrescarDatos() }, [screen])
+  // PUSH DEL EQUIPO · tocar un aviso abre ese chat del equipo o Avisos del equipo.
+  useAbrirDesdeAviso(!!user && !!role && role !== 'doctor', setScreen)
   // Al volver de Stripe (?care=ok|cancel|volver) se abre STRYV Care una vez, ya con la sesión de Dirección resuelta.
   useEffect(() => {
     const r = regresoDeStripe(); if (!r || !user || role !== 'admin') return

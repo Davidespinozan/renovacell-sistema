@@ -4,6 +4,8 @@
 //   baja       — este dispositivo deja de recibir avisos.
 //   promo      — PROMO-8 · Dirección/Facturación: avisa (push) a los doctores que recibieron una promoción por el chat y
 //                tienen avisos activados; una sola vez por doctor (promocion_avisos_pendientes / _marcar).
+//   equipo     — PUSH DEL EQUIPO (20270220) · lo llama el trigger de la base (x-cron-secret) al guardar un mensaje del chat
+//                del equipo o un aviso; la base dice a quién y qué (equipo_push_carga), aquí solo se manda.
 // El envío de avisos del chat lo hace la función `chat` cuando alguien escribe; aquí se administra el dispositivo y la promo.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
@@ -16,6 +18,15 @@ import webpush from 'npm:web-push@3.6.7'
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
+// Comparación de tiempo constante (por hash) para el secreto de la tarea programada (igual que comm-dispatch).
+async function iguales(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  const h = async (t: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))
+  const [x, y] = await Promise.all([h(a), h(b)])
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]
+  return d === 0
+}
+
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
   const url = Deno.env.get('SUPABASE_URL')!
@@ -25,6 +36,24 @@ Deno.serve(conCors(async (req) => {
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const cfg = configPush((k) => Deno.env.get(k))
   if (p?.action === 'clave') return json(200, { clave: cfg?.publica ?? null })
+  if (p?.action === 'equipo') {
+    const secreto = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+    if (secreto.length < 32 || !(await iguales(req.headers.get('x-cron-secret') ?? '', secreto))) return json(401, { error: 'no_autorizado' })
+    const tipo = p.tipo === 'mensaje' || p.tipo === 'aviso' ? p.tipo : null
+    const id = typeof p.id === 'string' && /^[0-9a-f-]{36}$/.test(p.id) ? p.id : null
+    if (!tipo || !id) return json(400, { error: 'datos_invalidos' })
+    if (!cfg) return json(200, { enviados: 0, configurado: false })
+    const { data: carga } = await admin.rpc('equipo_push_carga', { p_tipo: tipo, p_id: id })
+    const c = carga as { perfiles?: string[]; title: string; body: string; url: string; tag: string } | null
+    if (!c?.perfiles?.length) return json(200, { enviados: 0 })
+    const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: c.perfiles, p_visitors: [] })
+    const lista = (destinos ?? []) as Array<{ id: string; endpoint: string; p256dh: string; auth: string }>
+    if (!lista.length) return json(200, { enviados: 0 })
+    webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+    const enviados = await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: tipo === 'mensaje' ? 3600 : 86_400, urgency: 'high' }), lista,
+      { title: c.title, body: c.body, url: c.url, tag: c.tag })
+    return json(200, { enviados })
+  }
   if (p?.action === 'promo') {
     // PROMO-8 · solo Dirección o Facturación con su sesión; el servidor decide a quién (pendientes) y marca a quién avisó.
     const authHeader = req.headers.get('Authorization') ?? ''

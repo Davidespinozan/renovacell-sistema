@@ -1,82 +1,61 @@
-// AJUSTES de la app. Hoy: activar NOTIFICACIONES (permiso real del navegador +
-// preferencia local). La ENTREGA real de push (service worker + web-push desde
-// el backend) entra en la fase Supabase; aquí queda el opt-in real y la
-// preferencia. Disponible para todos los usuarios.
-import React, { useState } from 'react'
+// AJUSTES de la app: activar los AVISOS de este dispositivo (Web Push real: permiso del navegador + registro del
+// dispositivo en el servidor con activarAvisos). Antes solo pedía el permiso y el dispositivo nunca quedaba registrado,
+// así que no llegaba nada. El texto dice exactamente qué avisa hoy. Disponible para todos los usuarios.
+import React, { useEffect, useState } from 'react'
 import { X, Bell, BellOff, Check } from 'lucide-react'
+import { activarAvisos as activarPorDefecto, estadoAvisos as estadoPorDefecto, type EstadoAvisos } from '../data/ops/push'
+import { useRoleOpcional } from '../auth/RoleContext'
 
-const KEY = 'rc.notif.pref'
-type Perm = 'default' | 'granted' | 'denied' | 'unsupported'
+export const QUE_AVISA_EQUIPO = 'mensajes del Chat del equipo, Avisos del equipo, mensajes de tus clientes (portal y WhatsApp) y doctores por verificar'
+export const QUE_AVISA_DOCTOR = 'respuestas de tu asesor y promociones'
 
-export const notifPermission = (): Perm => (typeof Notification === 'undefined' ? 'unsupported' : (Notification.permission as Perm))
-export const notifPref = (): boolean => { try { return localStorage.getItem(KEY) === '1' } catch { return false } }
-export const setNotifPref = (on: boolean) => { try { localStorage.setItem(KEY, on ? '1' : '0') } catch { /* ignore */ } }
-
-export function Ajustes({ onClose }: { onClose: () => void }) {
-  const [perm, setPerm] = useState<Perm>(notifPermission())
-  const [pref, setPref] = useState<boolean>(notifPref())
+export function Ajustes({ onClose, estado = estadoPorDefecto, activar = activarPorDefecto }: { onClose: () => void; estado?: typeof estadoPorDefecto; activar?: typeof activarPorDefecto }) {
+  const role = useRoleOpcional()?.role
+  const [e, setE] = useState<EstadoAvisos | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  useEffect(() => { void estado().then(setE) }, [estado])
 
-  const activar = async () => {
-    if (perm === 'unsupported') return
-    setBusy(true)
-    try {
-      const res = await Notification.requestPermission()
-      setPerm(res as Perm)
-      if (res === 'granted') {
-        setNotifPref(true); setPref(true)
-        try { new Notification('Renovacell', { body: 'Notificaciones activadas ✓' }) } catch { /* ignore */ }
-      }
-    } finally { setBusy(false) }
+  const tocar = async () => {
+    if (busy) return
+    setBusy(true); setMsg(null)
+    const r = await activar()
+    setBusy(false)
+    if (r.ok) setE('activo'); else { setMsg(r.mensaje); void estado().then(setE) }
   }
-
-  const togglePref = () => { const v = !pref; setPref(v); setNotifPref(v) }
-
-  const fld: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line)' }
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(ev) => ev.stopPropagation()}>
         <div className="mhead">
           <div><h3>Ajustes</h3><div className="ms">Preferencias de tu cuenta en este dispositivo.</div></div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
           <div className="eyebrow" style={{ margin: '0 0 4px' }}>Notificaciones</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 8 }}>
-            Recibe avisos de <b>mensajes nuevos</b>, pedidos, tareas asignadas y stock bajo — sin tener que estar revisando.
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 8 }} data-testid="ajustes-que-avisa">
+            Te avisamos en este dispositivo, aunque tengas el sistema cerrado, de: {role === 'doctor' ? QUE_AVISA_DOCTOR : QUE_AVISA_EQUIPO}.
           </div>
 
-          {perm === 'granted' ? (
-            <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
-              <Check size={18} /><span>Notificaciones permitidas en este dispositivo.</span>
+          {e === 'activo' ? (
+            <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }} data-testid="ajustes-avisos-activos">
+              <Check size={18} /><span>Avisos activados en este dispositivo.</span>
             </div>
-          ) : perm === 'denied' ? (
+          ) : e === 'denegado' ? (
             <div className="sysnote" style={{ background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }}>
-              <BellOff size={18} /><span>Están bloqueadas en el navegador. Actívalas desde el candado de la barra de direcciones para recibirlas.</span>
+              <BellOff size={18} /><span>Están bloqueados en el navegador. Actívalos desde el candado de la barra de direcciones y vuelve aquí.</span>
             </div>
-          ) : perm === 'unsupported' ? (
-            <div className="sysnote"><BellOff size={18} /><span>Este navegador no soporta notificaciones.</span></div>
-          ) : (
-            <button className="btn" type="button" onClick={activar} disabled={busy} style={{ marginTop: 4 }}>
-              <Bell size={15} /> {busy ? 'Pidiendo permiso…' : 'Activar notificaciones'}
+          ) : e === 'no_soportado' ? (
+            <div className="sysnote"><BellOff size={18} /><span>Este navegador no permite avisos.</span></div>
+          ) : e === 'requiere_instalar' ? (
+            <div className="sysnote"><BellOff size={18} /><span>En iPhone, primero agrega Renovacell a tu pantalla de inicio (Compartir → Agregar a inicio) y ábrelo desde ahí.</span></div>
+          ) : e ? (
+            <button className="btn" type="button" onClick={() => void tocar()} disabled={busy} style={{ marginTop: 4 }} data-testid="ajustes-activar-avisos">
+              <Bell size={15} /> {busy ? 'Activando…' : 'Activar notificaciones'}
             </button>
-          )}
-
-          {perm === 'granted' && (
-            <label style={{ ...fld, marginTop: 8, cursor: 'pointer', borderBottom: 'none' }}>
-              <Bell size={16} style={{ color: 'var(--green-deep)' }} />
-              <span style={{ flex: 1 }}>
-                <span style={{ fontWeight: 600 }}>Mensajes y actividad</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Avísame de mensajes y pendientes nuevos.</span>
-              </span>
-              <input type="checkbox" checked={pref} onChange={togglePref} />
-            </label>
-          )}
-
-          <div className="sysnote" style={{ marginTop: 14, alignItems: 'flex-start' }}>
-            <span>Aquí das el permiso. El <b>envío</b> de las notificaciones (incluso con la app cerrada) se activa al conectar el backend; la base ya queda lista.</span>
-          </div>
+          ) : null}
+          {msg && <div role="status" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{msg}</div>}
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Se activa por dispositivo: hazlo en tu teléfono y en tu computadora.</div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cerrar</button>

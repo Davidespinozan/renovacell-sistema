@@ -27,11 +27,16 @@ import { deliveryOf } from '../../data/mock/profiles'
 import { AtajosMovil, Bienvenida, Cargando, ErrorLectura, Nota, Seccion, TarjetaAtencion, Tarjetas, Vacio, type Acceso } from './primitives'
 import { capitalizarNombre, saludo } from '../../lib/nombres'
 import { HomeDoctor } from './HomeDoctor'
+import { RecordatorioAvisos } from '../../app/RecordatorioAvisos'
 import { abrirPestanaAtencion } from '../admin/AtencionComercial'
 
 export function RoleHome() {
   const { role } = useRole()
   if (role === 'doctor') return <HomeDoctor />
+  // PUSH DEL EQUIPO · el equipo ve arriba "Activa las notificaciones" hasta que este dispositivo las tenga.
+  return <><RecordatorioAvisos />{homeEquipo(role)}</>
+}
+function homeEquipo(role: string | null) {
   if (role === 'driver') return <HomeChofer />
   if (role === 'warehouse') return <HomeAlmacen />
   if (role === 'packing') return <HomeAlmacen etiqueta="Empaque y despacho" />

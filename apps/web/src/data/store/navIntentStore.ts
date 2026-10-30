@@ -4,7 +4,7 @@
 // ajeno o resuelto no revela nada: se informa que ya no está disponible.
 import { useSyncExternalStore } from 'react'
 
-export type DestinoIntento = 'asesorias' | 'av_atencion'
+export type DestinoIntento = 'asesorias' | 'av_atencion' | 'chat'   // 'chat' = Chat del equipo (aviso push)
 export interface Intento {
   id: number
   destino: DestinoIntento

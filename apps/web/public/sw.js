@@ -23,7 +23,12 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil((async () => {
     const abiertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const c of abiertas) {
-      try { if (new URL(c.url).pathname === new URL(destino, self.location.origin).pathname && 'focus' in c) return c.focus() } catch (_) { /* sigue */ }
+      try {
+        if (new URL(c.url).pathname === new URL(destino, self.location.origin).pathname && 'focus' in c) {
+          c.postMessage({ tipo: 'rc-abrir', url: destino })   // el sistema ya abierto navega a lo que avisó
+          return c.focus()
+        }
+      } catch (_) { /* sigue */ }
     }
     return self.clients.openWindow(destino)
   })())

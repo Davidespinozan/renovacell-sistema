@@ -23,7 +23,7 @@ no(){ echo "FAIL: $1 ($2)"; FAILED=1; }
 "${P[@]}" -v ON_ERROR_STOP=1 -f "$HERE/00_supabase_shim.sql" >/dev/null 2>&1 || { echo "FAIL: shim"; exit 1; }
 for m in "$ROOT"/supabase/migrations/*.sql; do
   b=$(basename "$m")
-  case "$b" in 20260930120000_*|20261001120000_*|20261003120000_*|20261004120000_*) continue;; esac
+  case "$b" in 20260930120000_*|20261001120000_*|20261003120000_*|20261004120000_*|20270218120000_*) continue;; esac
   "${P[@]}" -v ON_ERROR_STOP=1 -f "$m" >/dev/null 2>&1 || { echo "FAIL: migración $b"; exit 1; }
 done
 

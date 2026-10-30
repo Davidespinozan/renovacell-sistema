@@ -55,6 +55,7 @@ DATA_ONLY_SKIP=(
   20261003120000_volume_rules_sep2026.sql
   20261004120000_cleanup_mayoreo_legacy.sql
   20270104120000_reparto_activar.sql
+  20270218120000_mayoreo_oct2026.sql
 )
 nmig=0; nskip=0
 for m in "$ROOT"/supabase/migrations/*.sql; do
