@@ -19,11 +19,12 @@ interface PvpQuery {
 const pvp = (): PvpQuery => (supabase.from as unknown as (t: string) => PvpQuery)('product_volume_prices')
 
 const live = makeLive<VolumeRule>(async () => {
-  const { data, error } = await pvp().select('id, product_id, min_quantity, price, discount_percent, active').order('product_id').order('min_quantity')
+  const { data, error } = await pvp().select('id, product_id, min_quantity, price, discount_percent, active, nivel').order('product_id').order('min_quantity')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r) => ({
     id: r.id as string, product_id: r.product_id as string, min_quantity: Number(r.min_quantity),
     price: Number(r.price), discount_percent: r.discount_percent == null ? null : Number(r.discount_percent), active: !!r.active,
+    nivel: r.nivel === 'mayoreo' ? 'mayoreo' as const : 'medio' as const,
   }))
 }, [])
 
@@ -37,32 +38,34 @@ const genId = (): string => globalThis.crypto?.randomUUID?.() ?? `vp-${Date.now(
 // auditaban antes de confirmar. Ahora la respuesta `ok` significa lo que dice.
 type Resultado = { ok: boolean; error?: string; id?: string }
 
-export async function createVolumeRule(input: { product_id: string; product_name?: string; min_quantity: number; price: number; discount_percent?: number | null }): Promise<Resultado> {
+export async function createVolumeRule(input: { product_id: string; product_name?: string; min_quantity: number; price: number; discount_percent?: number | null; nivel?: 'medio' | 'mayoreo' }): Promise<Resultado> {
   const err = validateVolumeRule(live.current(), input)
   if (err) return { ok: false, error: err }
   const id = genId()
-  const row: VolumeRule = { id, product_id: input.product_id, min_quantity: input.min_quantity, price: input.price, discount_percent: input.discount_percent ?? null, active: true }
+  // MAYOREO-REGLAS · sin nivel explícito: si el producto ya tiene un escalón menor, este es el mayoreo.
+  const nivel = input.nivel ?? (live.current().some((r) => r.product_id === input.product_id && r.active && r.min_quantity < input.min_quantity) ? 'mayoreo' : 'medio')
+  const row: VolumeRule = { id, product_id: input.product_id, min_quantity: input.min_quantity, price: input.price, discount_percent: input.discount_percent ?? null, active: true, nivel }
   if (hasSupabase) {
     const r = await confirmar('crear el descuento por cantidad',
-      pvp().insert({ id, product_id: input.product_id, min_quantity: input.min_quantity, price: input.price, discount_percent: input.discount_percent ?? null, active: true }))
+      pvp().insert({ id, product_id: input.product_id, min_quantity: input.min_quantity, price: input.price, discount_percent: input.discount_percent ?? null, active: true, nivel }))
     if (!r.ok) return { ok: false, error: r.error }
   }
   live.setLocal([...live.current(), row])
-  logAudit({ actor: 'Administración', action: 'Regla de volumen creada', resource: input.product_name ?? input.product_id, detail: `desde ${input.min_quantity} → $${input.price}` })
+  logAudit({ actor: 'Administración', action: 'Regla de volumen creada', resource: input.product_name ?? input.product_id, detail: `${nivel === 'mayoreo' ? 'Mayoreo' : 'Medio mayoreo'} desde ${input.min_quantity} → $${input.price}` })
   return { ok: true, id }
 }
 
-export async function updateVolumeRule(id: string, patch: { min_quantity?: number; price?: number; discount_percent?: number | null }, productName?: string): Promise<Resultado> {
+export async function updateVolumeRule(id: string, patch: { min_quantity?: number; price?: number; discount_percent?: number | null; nivel?: 'medio' | 'mayoreo' }, productName?: string): Promise<Resultado> {
   const cur = live.current().find((r) => r.id === id)
   if (!cur) return { ok: false, error: 'Regla no encontrada.' }
   const next = { product_id: cur.product_id, min_quantity: patch.min_quantity ?? cur.min_quantity, price: patch.price ?? cur.price }
   const err = validateVolumeRule(live.current(), next, id)
   if (err) return { ok: false, error: err }
   const before = `desde ${cur.min_quantity} → $${cur.price}`
-  const merged: VolumeRule = { ...cur, ...next, discount_percent: patch.discount_percent !== undefined ? patch.discount_percent : cur.discount_percent }
+  const merged: VolumeRule = { ...cur, ...next, discount_percent: patch.discount_percent !== undefined ? patch.discount_percent : cur.discount_percent, nivel: patch.nivel ?? cur.nivel ?? 'medio' }
   if (hasSupabase) {
     const r = await confirmar('guardar el descuento por cantidad',
-      pvp().update({ min_quantity: merged.min_quantity, price: merged.price, discount_percent: merged.discount_percent, updated_at: new Date().toISOString() }).eq('id', id))
+      pvp().update({ min_quantity: merged.min_quantity, price: merged.price, discount_percent: merged.discount_percent, nivel: merged.nivel, updated_at: new Date().toISOString() }).eq('id', id))
     if (!r.ok) return { ok: false, error: r.error }
   }
   live.setLocal(live.current().map((r) => (r.id === id ? merged : r)))

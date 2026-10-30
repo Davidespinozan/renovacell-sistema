@@ -14,7 +14,7 @@ import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
+import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
@@ -51,13 +51,15 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   // aparte con `effOf(qty)`; el servidor (precio_de) es la autoridad del cobro final.
   const priceOf = (p: ProductSafe): number | null => (verified ? priceFor(p.id, p.price) : null)
   // Precio unitario EFECTIVO previsto para una cantidad = LEAST(lista, volumen aplicable).
-  const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty)
+  const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty, vq[p.id])
 
   const [filter, setFilter] = useState<LineFilter>('all')
   const [busca, setBusca] = useState('')
   const canon = useCarritoCanonico(hasSupabase)            // CC-7 · carrito canónico (servidor)
   const [cartLocal, setCartLocal] = useState<Cart>({})      // solo modo demo (sin backend)
   const cart: Cart = hasSupabase ? canon.qty : cartLocal
+  // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
   const setQty = (id: string, n: number) => {
     if (hasSupabase) { void canon.fijar(id, n); return }
     setCartLocal((c) => { if (n <= 0) { const { [id]: _d, ...rest } = c; return rest } return { ...c, [id]: n } })
@@ -130,7 +132,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
     <FamilyCard key={e.product.id} entry={e} cart={cart} priceOf={priceOf} onOpen={() => setOpenFamily(e.product)} />
   ) : (
-    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0, vq[e.product.id])} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
   )
 
   const lines: CartLine[] = useMemo(
@@ -143,7 +145,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
   // Total con descuento por volumen previsualizado (el servidor recalcula al crear el pedido).
   const total = lines.reduce((sum, l) => sum + (effOf(l.product, l.qty) ?? 0) * l.qty, 0)
-  const savings = lines.reduce((sum, l) => sum + volumeSavings(priceOf(l.product), volRules, l.product.id, l.qty), 0)
+  const savings = lines.reduce((sum, l) => sum + volumeSavings(priceOf(l.product), volRules, l.product.id, l.qty, vq[l.product.id]), 0)
   // ENT-P · cuánto falta para el envío gratis (regla y zona del servidor, con la dirección predeterminada del doctor).
   const envio = useAvisoEnvioGratis(lines.length ? total : null, { activo: verified && hasSupabase })
 
@@ -460,6 +462,10 @@ function CartPanel({
               <span>Ahorro por volumen</span><span>−{money(savings)}</span>
             </div>
           )}
+          {/* MAYOREO-REGLAS · cómo se arma el precio por cantidad del pedido */}
+          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="reglas-mayoreo">
+            Puedes juntar piezas de distintos productos para llegar al medio mayoreo de 10. Si un producto llega a su mayoreo, todo tu pedido va a precio de mayoreo.
+          </div>
           <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
             <span>Total</span>
             <b>{money(total)}</b>

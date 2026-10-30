@@ -1,6 +1,7 @@
 -- PROMOCIONES (173) · el down retira las promociones y precio_de/3 vuelve al texto de la 135; se reaplica igual; con
 -- promociones capturadas se niega salvo bandera.
 begin;
+\ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _pr as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 set app.promociones_rollback_forzado = 'on';

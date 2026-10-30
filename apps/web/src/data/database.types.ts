@@ -5414,6 +5414,7 @@ export type Database = {
           discount_percent: number | null
           id: string
           min_quantity: number
+          nivel: string
           price: number
           product_id: string
           updated_at: string
@@ -5424,6 +5425,7 @@ export type Database = {
           discount_percent?: number | null
           id?: string
           min_quantity: number
+          nivel?: string
           price: number
           product_id: string
           updated_at?: string
@@ -5434,6 +5436,7 @@ export type Database = {
           discount_percent?: number | null
           id?: string
           min_quantity?: number
+          nivel?: string
           price?: number
           product_id?: string
           updated_at?: string

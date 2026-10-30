@@ -27,7 +27,7 @@ export function Precios() {
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Precios">
         <b>General</b> es el precio normal de cada producto. En <b>Descuentos por cantidad</b> viven el
-        <b> medio mayoreo</b> (primer nivel) y el <b>mayoreo</b> (segundo nivel), desde N piezas del mismo producto; el sistema cobra el menor.
+        <b> medio mayoreo</b> y el <b>mayoreo</b>, desde N piezas del mismo producto. Reglas del pedido: si un producto llega a su mayoreo, todo el pedido va a mayoreo; los productos con medio mayoreo de 10 piezas se pueden juntar (5 + 5) para el medio mayoreo.
       </PageHead>
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
@@ -123,8 +123,8 @@ function VolumenTab({ skus }: { skus: ProductSafe[] }) {
       )}
       {list.map((p) => (
         <VolumeCard key={p.id} product={p} tiers={volumeTiers(rules, p.id).length ? rules.filter((r) => r.product_id === p.id).sort((a, b) => a.min_quantity - b.min_quantity) : rules.filter((r) => r.product_id === p.id)}
-          onCreate={(min, price) => createVolumeRule({ product_id: p.id, product_name: p.name, min_quantity: min, price })}
-          onUpdate={(id, min, price) => updateVolumeRule(id, { min_quantity: min, price }, p.name)}
+          onCreate={(min, price, nivel) => createVolumeRule({ product_id: p.id, product_name: p.name, min_quantity: min, price, nivel })}
+          onUpdate={(id, min, price, nivel) => updateVolumeRule(id, { min_quantity: min, price, nivel }, p.name)}
           onToggle={(id, active) => setVolumeActive(id, active, p.name)}
           onDelete={(id) => deleteVolumeRule(id, p.name)} />
       ))}
@@ -135,17 +135,18 @@ function VolumenTab({ skus }: { skus: ProductSafe[] }) {
 function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: {
   product: ProductSafe
   tiers: VolumeRule[]
-  onCreate: (min: number, price: number) => Promise<{ ok: boolean; error?: string }>
-  onUpdate: (id: string, min: number, price: number) => Promise<{ ok: boolean; error?: string }>
+  onCreate: (min: number, price: number, nivel: Nivel) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, min: number, price: number, nivel: Nivel) => Promise<{ ok: boolean; error?: string }>
   onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
   onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [addMin, setAddMin] = useState('')
+  const [addNivel, setAddNivel] = useState<Nivel>(tiers.some((t) => t.active) ? 'mayoreo' : 'medio')
   const [addPrice, setAddPrice] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const add = async () => {
     setErr(null)
-    const r = await onCreate(Number(addMin), Number(addPrice))
+    const r = await onCreate(Number(addMin), Number(addPrice), addNivel)
     if (!r.ok) { setErr(r.error ?? 'No se guardó'); return }
     setAddMin(''); setAddPrice('')
   }
@@ -164,7 +165,7 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
             {tiers.map((t) => { const act = tiers.filter((x) => x.active); const i = act.indexOf(t)
               return <TierRow key={t.id} nivel={i >= 0 ? nombreNivel(act, i) : 'Apagado'} tier={t} base={product.price} onUpdate={onUpdate} onToggle={onToggle} onDelete={onDelete} /> })}
             <tr>
-              <td data-label="Nivel" style={{ color: 'var(--ink-3)' }}>Nuevo</td>
+              <td data-label="Nivel"><SelectorNivel value={addNivel} onChange={setAddNivel} /></td>
               <td data-label="Desde"><input value={addMin} onChange={(e) => setAddMin(e.target.value)} inputMode="numeric" placeholder="5" style={inp(70)} /></td>
               <td data-label="Precio c/u"><input value={addPrice} onChange={(e) => setAddPrice(e.target.value)} inputMode="decimal" placeholder="0.00" style={inp(110)} /></td>
               <td data-label="Descuento" className="mono" style={{ color: 'var(--ink-3)' }}>{addPrice && product.price ? (tierDiscountPct(product.price, Number(addPrice)) ?? 0) + '%' : '—'}</td>
@@ -179,9 +180,21 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
   )
 }
 
+type Nivel = 'medio' | 'mayoreo'
+// MAYOREO-REGLAS · el nivel decide las reglas del pedido: llegar a un MAYOREO pasa todo el pedido a mayoreo; los MEDIO
+// mayoreo de 10 piezas se juntan entre productos.
+function SelectorNivel({ value, onChange }: { value: Nivel; onChange: (n: Nivel) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value as Nivel)} aria-label="Nivel" style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, backgroundColor: 'var(--cp-surface)' }}>
+      <option value="medio">Medio mayoreo</option>
+      <option value="mayoreo">Mayoreo</option>
+    </select>
+  )
+}
+
 function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
   nivel: string; tier: VolumeRule; base: number | null
-  onUpdate: (id: string, min: number, price: number) => Promise<{ ok: boolean; error?: string }>
+  onUpdate: (id: string, min: number, price: number, nivel: Nivel) => Promise<{ ok: boolean; error?: string }>
   onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
   onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
 }) {
@@ -191,10 +204,11 @@ function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
   const [err, setErr] = useState<string | null>(null)
   const pct = tierDiscountPct(base, tier.price)
   // La fila solo sale del modo edición si el servidor guardó el cambio.
-  const save = async () => { setErr(null); const r = await onUpdate(tier.id!, Number(min), Number(price)); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
+  const [niv, setNiv] = useState<Nivel>(tier.nivel ?? 'medio')
+  const save = async () => { setErr(null); const r = await onUpdate(tier.id!, Number(min), Number(price), niv); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
   return (
     <tr style={{ opacity: tier.active ? 1 : 0.55 }}>
-      <td data-label="Nivel"><b>{nivel}</b></td>
+      <td data-label="Nivel">{edit ? <SelectorNivel value={niv} onChange={setNiv} /> : <b>{nivel}</b>}</td>
       <td data-label="Desde">{edit ? <input value={min} onChange={(e) => setMin(e.target.value)} inputMode="numeric" style={inp(70)} /> : <span className="mono">{tier.min_quantity}</span>}</td>
       <td data-label="Precio c/u">{edit ? <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" style={inp(110)} /> : <span className="mono">{money(tier.price)}</span>}</td>
       <td data-label="Descuento" className="mono" style={{ color: pct ? 'var(--green-deep)' : 'var(--ink-3)' }}>{pct ? pct + '%' : '—'}</td>

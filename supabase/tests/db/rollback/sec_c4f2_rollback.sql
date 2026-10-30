@@ -2,6 +2,7 @@
 -- (misma huella, dueño, permisos y forma), elimina las auxiliares y no toca datos. Revertir REABRE los dos hallazgos
 -- (se demuestra abajo). Después se vuelve a aplicar la 146 sobre el estado revertido y queda igual que antes.
 begin;
+\ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _f2 as select (select count(*) from public.orders) n_o, (select count(*) from public.fiscal_documents) n_f, (select count(*) from public.customer_fiscal_profiles) n_p,
   md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) vp, md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) wr;
 \ir ../../../rollback/sec_c4_fiscal3/99_down.sql   -- SEC-C4-FISCAL-3 (147) se baja primero (su función usa la validación de la 146)

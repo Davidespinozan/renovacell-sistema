@@ -12,7 +12,7 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
@@ -75,7 +75,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     return sellable.filter((p) => cartIds.has(p.id) || `${p.name} ${p.category ?? ''} ${p.sku ?? ''}`.toLowerCase().includes(s))
   }, [sellable, buscar, cartIds])
   // Precio unitario efectivo previsto = LEAST(base, volumen). El servidor (crear_pedido) es la autoridad.
-  const effOf = (p: { id: string; price: number | null }, qty: number): number | null => effectiveUnitPrice(p.price, volRules, p.id, qty)
+  const effOf = (p: { id: string; price: number | null }, qty: number): number | null => effectiveUnitPrice(p.price, volRules, p.id, qty, vq[p.id])
 
   // Domicilio base SOLO aplica al flujo doctor (perfil legacy). Customer captura dirección one-off.
   const ci = !isCustomer && doctor ? clientOf(doctor.id) : null
@@ -84,6 +84,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     : null
 
   const [cart, setCart] = useState<Record<string, number>>(() => initialCart ?? {})
+  // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
   const [invoice, setInvoice] = useState(false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo
@@ -154,7 +156,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
 
   const lines = Object.entries(cart).map(([id, qty]) => ({ p: sellable.find((x) => x.id === id), qty })).filter((l) => l.p)
   const total = lines.reduce((s, l) => s + (effOf(l.p!, l.qty) ?? l.p!.price ?? 0) * l.qty, 0)
-  const savings = lines.reduce((s, l) => s + volumeSavings(l.p!.price, volRules, l.p!.id, l.qty), 0)
+  const savings = lines.reduce((s, l) => s + volumeSavings(l.p!.price, volRules, l.p!.id, l.qty, vq[l.p!.id]), 0)
 
   const solicitudActual = (): Solicitud => ({
     lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
@@ -257,7 +259,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                           {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(effOf(p, qty))}</b> : money(p.price)}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${stock.qty}` : ''}
                         </div>
-                        {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
+                        {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}
                       {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>}

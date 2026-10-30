@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { volumeTiers, bestVolumeRule, effectiveUnitPrice, tierDiscountPct, volumeSavings, volumePromoLabel, nivelVolumen, etiquetaNivel, type VolumeRule } from './volumePricing'
+import { volumeTiers, bestVolumeRule, effectiveUnitPrice, tierDiscountPct, volumeSavings, volumePromoLabel, nivelVolumen, etiquetaNivel, cantidadesVolumen, type VolumeRule } from './volumePricing'
 
 const rules: VolumeRule[] = [
   { product_id: 'X', min_quantity: 5, price: 4370, active: true },
@@ -70,5 +70,34 @@ describe('mayoreo y medio mayoreo (hoja oct 2026)', () => {
   })
   it('el catálogo anuncia los dos niveles', () => {
     expect(volumePromoLabel(1300, r, 'N')).toBe('Medio mayoreo desde 10 pzas · Mayoreo desde 50 $800')
+  })
+})
+
+describe('reglas del pedido (espejo de _qty_volumen)', () => {
+  const r: VolumeRule[] = [
+    { product_id: 'A', min_quantity: 10, price: 1170, active: true, nivel: 'medio' }, { product_id: 'A', min_quantity: 50, price: 800, active: true, nivel: 'mayoreo' },
+    { product_id: 'B', min_quantity: 10, price: 720, active: true, nivel: 'medio' }, { product_id: 'B', min_quantity: 50, price: 400, active: true, nivel: 'mayoreo' },
+    { product_id: 'C', min_quantity: 5, price: 4370, active: true, nivel: 'medio' }, { product_id: 'C', min_quantity: 10, price: 3900, active: true, nivel: 'mayoreo' },
+    { product_id: 'F', min_quantity: 20, price: 1200, active: true, nivel: 'mayoreo' },
+  ]
+  const precio = (lines: Array<{ product_id: string; qty: number }>, pid: string, base: number) => {
+    const vq = cantidadesVolumen(lines, r); return effectiveUnitPrice(base, r, pid, lines.find((l) => l.product_id === pid)!.qty, vq[pid])
+  }
+  it('5 + 5 de medio en 10: los dos a medio mayoreo; 5 + 4 no', () => {
+    expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 5 }], 'B', 800)).toBe(720)
+    expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 4 }], 'B', 800)).toBe(800)
+    expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'C', qty: 5 }], 'A', 1300)).toBe(1300)   // el de 5 no se junta
+    expect(precio([{ product_id: 'A', qty: 25 }, { product_id: 'B', qty: 25 }], 'A', 1300)).toBe(1170)  // juntar no llega a mayoreo
+  })
+  it('uno en mayoreo: todo el pedido a su mayoreo', () => {
+    const L = [{ product_id: 'A', qty: 50 }, { product_id: 'B', qty: 1 }, { product_id: 'C', qty: 1 }]
+    expect(precio(L, 'B', 800)).toBe(400); expect(precio(L, 'C', 4600)).toBe(3900)
+    expect(precio([{ product_id: 'F', qty: 20 }, { product_id: 'A', qty: 1 }], 'A', 1300)).toBe(800)
+  })
+  it('la etiqueta dice por qué', () => {
+    const L = [{ product_id: 'A', qty: 50 }, { product_id: 'B', qty: 1 }]
+    expect(etiquetaNivel(800, r, 'B', 1, cantidadesVolumen(L, r).B)).toBe('Mayoreo por tu pedido')
+    const J = [{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 5 }]
+    expect(etiquetaNivel(800, r, 'B', 5, cantidadesVolumen(J, r).B)).toBe('Medio mayoreo juntando piezas')
   })
 })

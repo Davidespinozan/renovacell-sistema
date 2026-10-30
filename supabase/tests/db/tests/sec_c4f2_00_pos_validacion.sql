@@ -1,4 +1,5 @@
 -- SEC-C4-FISCAL-2 (146) · El receptor fiscal de una venta POS lo valida y lo normaliza el SERVIDOR.
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Con factura: solo {receiver:{6 campos de texto}}; cualquier otra clave (status, uuid, fechas…), tipo, tamaño o formato
 -- inválido rechaza la venta ANTES de crear pedido, cobro, inventario, custodia u operación. Sin factura: lo recibido se
 -- ignora y no se persiste. La idempotencia sigue sobre la ENTRADA recibida. Un receptor capturado e inválido ya no se
@@ -36,11 +37,11 @@ begin
   select v.sql into sql from _v v;
 
   -- ══ 0 · FORMA: huellas, internas, sin cambios colaterales ══════════════════════════════════
-  perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '643cda22dcd76283ae8225ebb6afd188' and md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) = 'bb7b1d1a51edd1cbf4e8427045fb0dcb',
+  perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '5bc6ea55dd22b90e04648833d7263831' and md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) = 'bb7b1d1a51edd1cbf4e8427045fb0dcb',
     '0.1 · vender_pos y _w3_receptor son las de la 146');
   perform tests.ok(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = 'd27eba9834466d71e5a3439614801bb7'
                and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '4ee1daa01dd51d5187bc46fbc2397e3d'
-               and md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = 'bee5aa3614e2b9e0327ebec6a1b38e2e'
+               and md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and md5(pg_get_functiondef('public._fiscal_error(jsonb)'::regprocedure)) = 'e8ff16dba9165213c6ad8d69f4a7d81f'
                and md5(pg_get_functiondef('public._fiscal_clean(jsonb)'::regprocedure)) = '1e8d88c21e6a1fd469ea101126c658f6',
     '0.2 · set_order_fiscal_snapshot, solicitar_cfdi, crear_pedido, _fiscal_error y _fiscal_clean NO cambiaron (FISCAL-1 y FISCAL-3 no se tocan)');

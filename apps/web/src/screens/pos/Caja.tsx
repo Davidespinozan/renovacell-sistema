@@ -19,7 +19,7 @@ import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
 import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodyStore'
 import { currentUserId } from '../../lib/supabase'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { SelectorClienteVentas } from './SelectorCliente'
@@ -57,7 +57,7 @@ export function Caja() {
   useEffect(() => () => { buscadorRef.current?.limpiar() }, [])
   // Precio unitario efectivo previsto = LEAST(precio base, volumen por cantidad). El servidor
   // (vender_pos → precio_de) es la autoridad del cobro; esto es previsualización para el vendedor.
-  const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty) ?? (p.price ?? 0)
+  const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty, vq[p.id]) ?? (p.price ?? 0)
   const uid = currentUserId()
   const misCustodias = useMemo(
     () => custodias.filter((c) => c.status === 'abierta' && c.holder_user_id === uid),
@@ -92,6 +92,8 @@ export function Caja() {
   }, [sellable, buscar])
 
   const [cart, setCart] = useState<Record<string, number>>({})
+  // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
   const [method, setMethod] = useState<PayMethod>('efectivo')
   // ENT-POS (dueño, 17 oct 2026): desde el Punto de venta también se levantan pedidos CON ENTREGA (domicilio del cliente,
   // local/foráneo/recoger, flete y fecha). 'ahora' = venta de mostrador (cobro inmediato, como siempre); 'entrega' = pedido.
@@ -152,7 +154,7 @@ export function Caja() {
   const total = lines.reduce((s, l) => s + effOf(l.product, l.qty) * l.qty, 0)
   const unidades = lines.reduce((s, l) => s + l.qty, 0)
   const ticketRef = useRef<HTMLDivElement>(null)
-  const savings = lines.reduce((s, l) => s + volumeSavings(l.product.price, volRules, l.product.id, l.qty), 0)
+  const savings = lines.reduce((s, l) => s + volumeSavings(l.product.price, volRules, l.product.id, l.qty, vq[l.product.id]), 0)
   const recibidoN = Math.max(0, Number(recibido) || 0)
   const cambio = recibidoN - total
   // En efectivo, no se cobra hasta que el recibido alcance el total (evita cambio negativo).
@@ -283,7 +285,7 @@ export function Caja() {
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
                 <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(effOf(p, qty)) : money(p.price)}</div>
-                {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0); const nivel = etiquetaNivel(p.price, volRules, p.id, qty)
+                {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0); const nivel = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id])
                   return promo ? <div className="pos-promo" title={promo}>{nivel ?? (disc ? 'Precio por volumen' : promo)}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
                   : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}

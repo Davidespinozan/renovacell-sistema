@@ -2,6 +2,7 @@
 -- huella, no cambian datos ni permisos de otras funciones, y los pedidos creados con la función conservan su receptor.
 -- Después se vuelve a aplicar la 147 y el estado final es el mismo.
 begin;
+\ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 do $t$
 declare posA uuid := tests.user('pos'); p uuid := tests.product(100); c uuid; o uuid := gen_random_uuid();
 begin

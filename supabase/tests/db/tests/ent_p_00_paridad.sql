@@ -1,4 +1,5 @@
 -- ENT-P · PARIDAD DE REGLAS DE VENTA. El doctor no puede pedir chofer local abajo del mínimo; el personal sí, pero solo como
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- cortesía CON MOTIVO (queda marcada en el pedido). Todo lo demás de la entrega (recoger, DHL, ajuste de flete, horario,
 -- regla del doctor) no cambia.
 begin;
@@ -20,7 +21,7 @@ begin
 
   -- ══ 0 · lo que NO cambia ═════════════════════════════════════════════════════════════════════════
   perform tests.act_as_owner();
-  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = 'bee5aa3614e2b9e0327ebec6a1b38e2e'
+  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and md5(pg_get_functiondef('public.crear_pedido_con_receptor(uuid,text,uuid,jsonb,jsonb,boolean,uuid,jsonb)'::regprocedure)) = '5769c551e6ca60003ba0fcf9390d80d1', '0.1 · crear_pedido y crear_pedido_con_receptor no cambiaron');
   perform tests.ok(not has_function_privilege('authenticated', 'public._entrega_normalizar(text,numeric,text,jsonb,timestamptz)', 'execute'), '0.2 · _entrega_normalizar sigue siendo interna');
   perform tests.act_as(v_doc);

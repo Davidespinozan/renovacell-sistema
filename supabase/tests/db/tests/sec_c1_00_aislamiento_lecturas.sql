@@ -1,4 +1,5 @@
 -- SEC-C1 · Para POS, lo que se ve de una tabla hija o de una RPC nunca excede lo que se ve del pedido en orders.
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Equivalencia: POS_VE_ESTADO(pedido) ⇔ POS_VE_PEDIDO(pedido) para cada ruta de visibilidad (cartera, correo heredado,
 -- meta.owner, venta de mostrador propia) y cada ruta que NO da visibilidad (capturista, histórico Odoo, ajeno).
 -- Cortes y arqueo: POS solo su corte de cajero. Dirección, Facturación, Almacén, Empaque, doctor y service_role intactos.
@@ -72,9 +73,9 @@ begin
     'G3b · helpers de política: invoker / sin anon, y ninguna política depende de pedido_visible (rollback CC-0A)');
   perform tests.ok((select string_agg(proname || '=' || md5(pg_get_functiondef(oid)), ',' order by proname) from pg_proc where pronamespace = 'public'::regnamespace
                     and proname in ('pedido_visible','_cx0c_venta_pos_propia','order_vendor_email','vender_pos','crear_pedido','registrar_cobro','reportar_pago','registrar_corte_caja'))
-    = '_cx0c_venta_pos_propia=d367994ba8540919115663de4605825a,crear_pedido=bee5aa3614e2b9e0327ebec6a1b38e2e,order_vendor_email=58a350df9c9582768d78a0ec1de00dde,'
+    = '_cx0c_venta_pos_propia=d367994ba8540919115663de4605825a,crear_pedido=62039cc835b93f7c0119b1c54c774495,order_vendor_email=58a350df9c9582768d78a0ec1de00dde,'
       'pedido_visible=dd2c4bfe38132e221e0860ecc77e2020,registrar_cobro=0283a2987642a72f1fca89d6691e3c71,registrar_corte_caja=818494eef08f5fa91ac06e649541be41,'
-      'reportar_pago=a41ef8615e80f0834c2e6b48e75d4004,vender_pos=643cda22dcd76283ae8225ebb6afd188', 'G4 · dependencias y escrituras (CX-0c, SEC-A, SEC-B) intactas');
+      'reportar_pago=a41ef8615e80f0834c2e6b48e75d4004,vender_pos=5bc6ea55dd22b90e04648833d7263831', 'G4 · dependencias y escrituras (CX-0c, SEC-A, SEC-B) intactas');
 
   -- ══ EQUIVALENCIA · POS_VE_ESTADO ⇔ POS_VE_PEDIDO (positivos y negativos) ═════════════════════
   ve_esperado := jsonb_build_object('posA', jsonb_build_array(oA, oA2, oCanc, oLeg, oSaleA), 'posB', jsonb_build_array(oSaleB), 'posC', jsonb_build_array(oC));

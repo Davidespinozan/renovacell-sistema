@@ -1,4 +1,5 @@
 -- ENT-0 (171) · ENTREGA DEL PEDIDO. La regla vive en el servidor: doctor en su portal (foráneo ≥ $5,000 gratis, si no $600;
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- local ≥ $500 chofer gratis, si no recoge), personal en punto de venta (todas las opciones, flete propuesto y ajustable con
 -- motivo); corte 15:30 hora local (antes sale hoy); días de salida y tránsito; la promesa (salida, llega desde/hasta) siempre
 -- viaja con el pedido; el flete entra al total y solo lo escribe el servidor; recoger no exige dirección; permisos.
@@ -35,7 +36,7 @@ begin
   perform tests.act_as_owner();
 
   -- ══ 0 · forma y permisos ════════════════════════════════════════════════════════════════════════
-  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = 'bee5aa3614e2b9e0327ebec6a1b38e2e'
+  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and md5(pg_get_functiondef('public.crear_pedido_con_receptor(uuid,text,uuid,jsonb,jsonb,boolean,uuid,jsonb)'::regprocedure)) = '5769c551e6ca60003ba0fcf9390d80d1', '0.1 · crear_pedido y crear_pedido_con_receptor NO cambiaron');
   select count(*) into function_count from pg_proc where pronamespace = 'public'::regnamespace and proname in ('cc_checkout_revisar', 'cc_checkout_confirmar');
   perform tests.eq(function_count, 2, '0.2 · una sola firma de revisar y de confirmar');

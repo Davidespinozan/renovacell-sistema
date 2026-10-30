@@ -1,4 +1,5 @@
 -- W1 · Componentes que DEBEN quedar sin cambios (md5 de pg_get_functiondef capturado antes de W1,
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- idéntico a producción: ver supabase/rollback/w1/00_prod_snapshot.sql).
 begin;
 do $t$
@@ -15,7 +16,7 @@ begin
     -- CX-0b (autorizado): la cuenta comercial del pedido la decide el servidor (doctor = su cuenta; personal = pareja
     -- coherente) y el snapshot del cliente solo lo escribe el servidor. Precio, folio y contrato intactos. Prod previo 408d0b2d… (rollback cx0b).
     -- CX-0c (autorizado): además, vendedor (cartera), su origen y el capturista los decide el servidor. CX-0b previo 0de9f17f… (rollback cx0c).
-    ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', 'bee5aa3614e2b9e0327ebec6a1b38e2e'),
+    ('crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)', '62039cc835b93f7c0119b1c54c774495'),
     ('finalize_shipment(uuid,jsonb)',                         'a1cf5c01877e87f41ee0e9635b478e34'),
     ('freeze_movement_cost()',                                'f1eb88ca3b5969cbd4d15a67754542ce'),
     ('handle_new_user()',                                     'd31936c0f165c984cd4cf28362d91a52'),
@@ -29,7 +30,7 @@ begin
     -- CX-0A (autorizado): precio_de/3 recibe la barrera de autorización (mismo alcance que la RLS de product_prices);
     -- PROMO-1 (173, autorizado por el dueño 18 oct 2026): + promoción vigente (LEAST); la barrera no cambia.
     -- el cálculo no cambia. Hash re-anclado; el de producción previo (9efe1950…) lo restaura supabase/rollback/cx0.
-    ('precio_de(uuid,uuid,integer)',                          'bde4fe6598efe8d5eee2540ec4fbc52e'),
+    ('precio_de(uuid,uuid,integer)',                          '5b2ebee254be4bad0043b658629a6d70'),
     -- CC-0A (autorizado): profiles_guard protege además la evidencia de verificación y la
     -- autoridad comercial en meta (META_PROTEGIDA). Hash re-anclado; el resto sigue intacto.
     ('profiles_guard()',                                      'e6267b13b03215e08fefce7fdb417024'),

@@ -12,6 +12,7 @@ export interface VolumeRule {
   price: number            // precio UNITARIO desde min_quantity
   discount_percent?: number | null
   active: boolean
+  nivel?: 'medio' | 'mayoreo'   // MAYOREO-REGLAS · qué nivel es el escalón (lo dice el servidor)
   promo?: { nombre: string; hasta: string }   // PROMO-1 · escalón de una promoción vigente (no es regla de volumen)
 }
 
@@ -36,9 +37,30 @@ function mejor(rules: readonly VolumeRule[], productId: string, qty: number, pro
 export function bestVolumeRule(rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null { return mejor(rules, productId, qty, false) }
 export function bestPromoRule(rules: readonly VolumeRule[], productId: string, qty: number): VolumeRule | null { return mejor(rules, productId, qty, true) }
 
-// Precio UNITARIO efectivo = LEAST(base, volumen aplicable, promoción vigente aplicable). Espeja precio_de/3.
-export function effectiveUnitPrice(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): number | null {
-  const candidatos = [base, bestVolumeRule(rules, productId, qty)?.price ?? null, bestPromoRule(rules, productId, qty)?.price ?? null].filter((x): x is number => x != null)
+/**
+ * MAYOREO-REGLAS · espeja _qty_volumen: con TODO el pedido, cuántas piezas cuentan para el volumen de cada producto.
+ *   1. Si un producto llega a su escalón de mayoreo → todos cuentan como su escalón más alto (cada uno a su mejor precio).
+ *   2. Los de medio mayoreo en 10 se juntan: si suman 10 o más, cada uno cuenta al menos 10 (solo medio, nunca mayoreo).
+ */
+export function cantidadesVolumen(lines: ReadonlyArray<{ product_id: string; qty: number }>, rules: readonly VolumeRule[]): Record<string, number> {
+  const q: Record<string, number> = {}
+  for (const l of lines) if (l.qty > 0) q[l.product_id] = (q[l.product_id] ?? 0) + l.qty
+  const datos = Object.entries(q).map(([pid, n]) => {
+    const t = rules.filter((r) => r.product_id === pid && r.active && !r.promo)
+    const min = (f: (r: VolumeRule) => boolean) => { const xs = t.filter(f).map((r) => r.min_quantity); return xs.length ? Math.min(...xs) : null }
+    return { pid, n, max: t.length ? Math.max(...t.map((r) => r.min_quantity)) : null, medio: min((r) => (r.nivel ?? 'medio') === 'medio'), mayoreo: min((r) => r.nivel === 'mayoreo') }
+  })
+  const enMayoreo = datos.some((d) => d.mayoreo != null && d.n >= d.mayoreo)
+  const junta10 = datos.filter((d) => d.medio === 10).reduce((s, d) => s + d.n, 0)
+  const out: Record<string, number> = {}
+  for (const d of datos) out[d.pid] = Math.max(d.n, enMayoreo ? d.max ?? 0 : 0, d.medio === 10 && junta10 >= 10 ? 10 : 0)
+  return out
+}
+
+// Precio UNITARIO efectivo = LEAST(base, volumen aplicable, promoción vigente aplicable). Espeja precio_de/4: el volumen se
+// busca con las piezas que cuentan en el pedido (`qtyVolumen`, ver cantidadesVolumen) y la promoción con las reales.
+export function effectiveUnitPrice(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number, qtyVolumen?: number): number | null {
+  const candidatos = [base, bestVolumeRule(rules, productId, Math.max(qty, qtyVolumen ?? qty))?.price ?? null, bestPromoRule(rules, productId, qty)?.price ?? null].filter((x): x is number => x != null)
   return candidatos.length ? Math.min(...candidatos) : null
 }
 /** PROMO-1 · si para `qty` el precio efectivo viene de una promoción, cuál (para la etiqueta "Promo X · hasta el…"). */
@@ -56,9 +78,9 @@ export function tierDiscountPct(base: number | null, price: number): number | nu
 }
 
 // Ahorro total para qty (base*qty - efectivo*qty). 0 si no aplica descuento.
-export function volumeSavings(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): number {
+export function volumeSavings(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number, qtyVolumen?: number): number {
   if (base == null) return 0
-  const eff = effectiveUnitPrice(base, rules, productId, qty)
+  const eff = effectiveUnitPrice(base, rules, productId, qty, qtyVolumen)
   if (eff == null || eff >= base) return 0
   return Math.round((base - eff) * qty)
 }
@@ -82,6 +104,7 @@ export function validateVolumeRule(
 // MAYOREO (hoja oct 2026) · niveles con nombre: el primer escalón es MEDIO MAYOREO y el último MAYOREO (con un solo
 // escalón, ese es medio mayoreo). Lo intermedio, si un día existe, se llama por su cantidad.
 export function nombreNivel(tiers: readonly VolumeRule[], i: number): string {
+  if (tiers[i]?.nivel) return tiers[i].nivel === 'mayoreo' ? 'Mayoreo' : 'Medio mayoreo'   // lo que dice el servidor manda
   if (i === 0) return 'Medio mayoreo'
   return i === tiers.length - 1 ? 'Mayoreo' : `Desde ${tiers[i].min_quantity} pzas`
 }
@@ -97,9 +120,15 @@ export function nivelVolumen(base: number | null, rules: readonly VolumeRule[], 
     siguiente: sig && qty > 0 ? { nombre: nombreNivel(tiers, i + 1), faltan: sig.min_quantity - qty, precio: sig.price } : null,
   }
 }
-/** Etiqueta del producto en el carrito: "Precio de mayoreo" o "Faltan 3 para medio mayoreo ($1,170)". */
-export function etiquetaNivel(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): string | null {
+/** Etiqueta del producto en el carrito: "Precio de mayoreo" o "Faltan 3 para medio mayoreo ($1,170)". Con `qtyVolumen` (las
+ *  reglas del pedido subieron el nivel) dice por qué: "Mayoreo por tu pedido" / "Medio mayoreo juntando piezas". */
+export function etiquetaNivel(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number, qtyVolumen?: number): string | null {
   if (promoAplicada(base, rules, productId, qty)) return null   // manda la promoción vigente
+  if (qtyVolumen != null && qtyVolumen > qty && qty > 0) {
+    const sube = nivelVolumen(base, rules, productId, qtyVolumen).actual
+    const propio = nivelVolumen(base, rules, productId, qty).actual
+    if (sube && sube.precio < (propio?.precio ?? Infinity)) return sube.nombre === 'Mayoreo' ? 'Mayoreo por tu pedido' : 'Medio mayoreo juntando piezas'
+  }
   const { actual, siguiente } = nivelVolumen(base, rules, productId, qty)
   if (siguiente && siguiente.faltan <= Math.max(5, Math.ceil(qty / 2))) return `Faltan ${siguiente.faltan} para ${siguiente.nombre.toLowerCase()} (${money0(siguiente.precio)} c/u)`
   return actual ? `Precio de ${actual.nombre.toLowerCase()}` : null

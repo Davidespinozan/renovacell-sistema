@@ -1,4 +1,5 @@
 -- ENT-H (189) · HORARIO DE ENTREGA LOCAL. La entrega por chofer se agenda en un horario disponible (bloques 10:30–13:30 y
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- 15:30–17:30 cada 30 min, configurables); el horario elegido se valida y se RESERVA en la misma transacción del pedido
 -- (cupo 1 = al elegirlo se bloquea); cancelar libera; Almacén/Dirección reprograman con motivo; Dirección, Almacén y Chofer
 -- ven la agenda; el doctor en su portal elige el horario igual que el vendedor; el resto de la 171 no cambia.
@@ -30,7 +31,7 @@ begin
   perform tests.ok((select to_char(min(inicio), 'HH24:MI') = '10:30' and to_char(max(inicio), 'HH24:MI') = '17:00' and to_char(max(fin), 'HH24:MI') = '17:30' from public._entrega_horario_slots()), '0.2 · del 10:30 al 17:00–17:30');
   perform tests.ok(not exists (select 1 from public._entrega_horario_slots() where to_char(inicio, 'HH24:MI') in ('13:30', '14:00', '14:30', '15:00')), '0.3 · entre 13:30 y 15:30 no hay entregas');
   perform tests.ok((select horario_cupo = 1 and horario_margen_min = 60 and horario_dias_adelante = 7 and horario_intervalo_min = 30 from public.entrega_config), '0.4 · cupo 1, margen 60 min, 7 días, cada 30 min');
-  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = 'bee5aa3614e2b9e0327ebec6a1b38e2e'
+  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and md5(pg_get_functiondef('public.crear_pedido_con_receptor(uuid,text,uuid,jsonb,jsonb,boolean,uuid,jsonb)'::regprocedure)) = '5769c551e6ca60003ba0fcf9390d80d1', '0.5 · crear_pedido y la 147 NO cambiaron');
   perform tests.ok(not has_table_privilege('authenticated', 'public.entrega_horarios', 'select') and not has_function_privilege('authenticated', 'public._entrega_horario_validar(text,text,timestamptz,boolean)', 'execute')
                and has_function_privilege('authenticated', 'public.entrega_horarios_disponibles(timestamptz)', 'execute'), '0.6 · la agenda solo se lee por funciones; lo interno no es de authenticated');

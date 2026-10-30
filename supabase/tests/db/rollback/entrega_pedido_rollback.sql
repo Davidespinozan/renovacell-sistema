@@ -1,6 +1,7 @@
 -- ENTREGA DEL PEDIDO (171) · el down retira la entrega (tabla, columnas, funciones, guarda) y el checkout vuelve a la 119/137;
 -- se reaplica idéntica. Con pedidos que ya llevan entrega o flete, el down se niega (no destruye información).
 begin;
+\ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _ent as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 set app.entrega_rollback_forzado = 'on';

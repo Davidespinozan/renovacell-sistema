@@ -5,7 +5,7 @@ import { X, Plus, Minus, Search, Send, Mail } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'
-import { effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
+import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
 import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import type { ClienteChat } from '../../data/ops/chat'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
@@ -23,6 +23,8 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
   const vendibles = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
   const [buscar, setBuscar] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
+  // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
   const [notas, setNotas] = useState('')
   const [hecha, setHecha] = useState<Cotizacion | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -32,7 +34,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
     return (s ? vendibles.filter((p) => cart[p.id] || `${p.name} ${p.category ?? ''} ${p.sku ?? ''}`.toLowerCase().includes(s)) : vendibles).slice(0, 80)
   }, [vendibles, buscar, cart])
   const lineas = Object.entries(cart).filter(([, q]) => q > 0)
-  const eff = (id: string, q: number) => { const p = vendibles.find((x) => x.id === id); return p ? effectiveUnitPrice(p.price, volRules, p.id, q) ?? p.price ?? 0 : 0 }
+  const eff = (id: string, q: number) => { const p = vendibles.find((x) => x.id === id); return p ? effectiveUnitPrice(p.price, volRules, p.id, q, vq[p.id]) ?? p.price ?? 0 : 0 }
   const total = lineas.reduce((s, [id, q]) => s + eff(id, q) * q, 0)
   const cambiar = (id: string, d: number) => setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(999, (c[id] ?? 0) + d)) }))
 
@@ -73,7 +75,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
               <ul className="cot-lista">
                 {visibles.map((p) => {
                   const q = cart[p.id] ?? 0
-                  const promo = etiquetaNivel(p.price, volRules, p.id, q) ?? volumePromoLabel(p.price, volRules, p.id)
+                  const promo = etiquetaNivel(p.price, volRules, p.id, q, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id)
                   return (
                     <li key={p.id} className={'cot-prod' + (q ? ' on' : '')}>
                       <span className="cot-prod-tx"><b>{p.name}</b><small>{money(q ? eff(p.id, q) : p.price ?? 0)}{promo ? ` · ${promo}` : ''}</small></span>

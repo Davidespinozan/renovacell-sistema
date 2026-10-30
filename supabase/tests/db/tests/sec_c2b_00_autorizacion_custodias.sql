@@ -1,4 +1,5 @@
 -- SEC-C2b (142) · estado_custodia y vender_pos autorizan con comparación NULL-safe.
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Lee una custodia: Dirección, Facturación, Almacén, Empaque o su titular-usuario (holder_user_id = auth.uid()).
 -- Vende de una custodia: Dirección o su titular-usuario. Un titular "tercero" (holder_customer_id) NO tiene vía propia.
 -- Correo, teléfono, vendedor de Odoo, capturista, cartera o customers.profile_id NO autorizan. Una venta rechazada no deja NADA.
@@ -55,7 +56,7 @@ begin
 
   -- ══ FORMA ════════════════════════════════════════════════════════════════════════════════════
   perform tests.ok(md5(pg_get_functiondef('public.estado_custodia(uuid)'::regprocedure)) = '79e390a5879eb28c1ef28c2645a0169b'
-               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '643cda22dcd76283ae8225ebb6afd188',
+               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '5bc6ea55dd22b90e04648833d7263831',
     'G1 · estado_custodia con la definición SEC-C2b y vender_pos con la vigente (SEC-C2b + SEC-C4-FISCAL-2, 146: solo cambió el receptor fiscal)');
   perform tests.ok((select count(*) = 2 and bool_and(proowner = 'postgres'::regrole and prosecdef and proconfig = array['search_path=public'])
                     from pg_proc where pronamespace = 'public'::regnamespace and proname in ('estado_custodia', 'vender_pos'))

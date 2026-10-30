@@ -1,4 +1,5 @@
 -- SEC-C4-FISCAL-3 (147) · crear_pedido_con_receptor: pedido + receptor fiscal inicial en UNA transacción.
+-- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- crear_pedido NO cambia (única implementación comercial). Con factura el receptor es obligatorio y válido ANTES de crear
 -- nada; sin factura se ignora. Un pedido existente solo se confirma a QUIEN LO CREÓ y si la solicitud es la MISMA,
 -- comparada contra el alta original; en cualquier otro caso, conflicto sin datos y sin escribir. Sin acceso nuevo.
@@ -50,7 +51,7 @@ begin
 
   -- ══ 0 · FORMA ══════════════════════════════════════════════════════════════════════════════
   perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '5769c551e6ca60003ba0fcf9390d80d1', '0.1 · la función es la de la 147');
-  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = 'bee5aa3614e2b9e0327ebec6a1b38e2e'
+  perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'crear_pedido') = 1
                and md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = 'd27eba9834466d71e5a3439614801bb7'
                and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '4ee1daa01dd51d5187bc46fbc2397e3d'

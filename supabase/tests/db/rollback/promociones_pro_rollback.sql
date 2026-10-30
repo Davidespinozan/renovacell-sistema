@@ -1,5 +1,6 @@
 -- PROMOCIONES PRO (174) · el down devuelve cc_ia_precio, promos_vigentes y _promo_json a su versión anterior; se reaplica igual.
 begin;
+\ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _pp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/flyers/99_down.sql   -- FLYERS (180) se baja primero
 \ir ../../../rollback/promocion_avisos/99_down.sql   -- PROMO-AVISOS (179) se baja primero
