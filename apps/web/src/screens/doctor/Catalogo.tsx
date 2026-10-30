@@ -14,7 +14,7 @@ import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
+import { effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
@@ -130,7 +130,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
     <FamilyCard key={e.product.id} entry={e} cart={cart} priceOf={priceOf} onOpen={() => setOpenFamily(e.product)} />
   ) : (
-    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+    <ProductCard key={e.product.id} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0)} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
   )
 
   const lines: CartLine[] = useMemo(
@@ -268,7 +268,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
 // Tarjeta de producto del portal: foto completa en un cuadro limpio, línea y categoría como texto discreto, precio
 // al frente y la promoción como un chip. Lo agotado se ve compacto y sin botón (no hay nada que hacer ahí).
-function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec, pendiente = false }: { pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDec, pendiente = false }: { pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; nivel?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
@@ -288,8 +288,8 @@ function ProductCard({ p, price, qty, stock, promo, effPrice, onAdd, onDec, pend
             {discounted ? (<><span>{money(effPrice)}</span><s>{money(price)}</s></>) : money(price)}
           </div>
         )}
-        {sellable && !pendiente && (promo || discounted) && (
-          <div className="dcat-promo">{discounted ? 'Precio por volumen aplicado' : promo}</div>
+        {sellable && !pendiente && (promo || discounted || nivel) && (
+          <div className="dcat-promo">{nivel ?? (discounted ? 'Precio por volumen aplicado' : promo)}</div>
         )}
         {pendiente ? (
           <button className="addb" type="button" disabled style={{ cursor: 'not-allowed' }} title="Los precios se habilitan al aprobar tu verificación" data-testid="precio-al-verificar">

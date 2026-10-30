@@ -5,7 +5,7 @@ import { X, Plus, Minus, Search, Send, Mail } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'
-import { effectiveUnitPrice, volumePromoLabel } from '../../data/ops/volumePricing'
+import { effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
 import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import type { ClienteChat } from '../../data/ops/chat'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
@@ -73,7 +73,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
               <ul className="cot-lista">
                 {visibles.map((p) => {
                   const q = cart[p.id] ?? 0
-                  const promo = volumePromoLabel(p.price, volRules, p.id)
+                  const promo = etiquetaNivel(p.price, volRules, p.id, q) ?? volumePromoLabel(p.price, volRules, p.id)
                   return (
                     <li key={p.id} className={'cot-prod' + (q ? ' on' : '')}>
                       <span className="cot-prod-tx"><b>{p.name}</b><small>{money(q ? eff(p.id, q) : p.price ?? 0)}{promo ? ` · ${promo}` : ''}</small></span>

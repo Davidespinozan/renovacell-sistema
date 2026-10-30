@@ -12,7 +12,7 @@ import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
@@ -257,7 +257,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                           {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(effOf(p, qty))}</b> : money(p.price)}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${stock.qty}` : ''}
                         </div>
-                        {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
+                        {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}
                       {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>}

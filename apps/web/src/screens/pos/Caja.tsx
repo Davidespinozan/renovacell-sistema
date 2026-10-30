@@ -19,7 +19,7 @@ import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
 import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodyStore'
 import { currentUserId } from '../../lib/supabase'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { effectiveUnitPrice, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { SelectorClienteVentas } from './SelectorCliente'
@@ -283,8 +283,8 @@ export function Caja() {
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
                 <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(effOf(p, qty)) : money(p.price)}</div>
-                {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0)
-                  return promo ? <div className="pos-promo" title={promo}>{disc ? 'Precio por volumen' : promo}</div> : null })()}
+                {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0); const nivel = etiquetaNivel(p.price, volRules, p.id, qty)
+                  return promo ? <div className="pos-promo" title={promo}>{nivel ?? (disc ? 'Precio por volumen' : promo)}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
                   : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
                 {qty > 0 && (

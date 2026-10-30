@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { volumeTiers, bestVolumeRule, effectiveUnitPrice, tierDiscountPct, volumeSavings, volumePromoLabel, type VolumeRule } from './volumePricing'
+import { volumeTiers, bestVolumeRule, effectiveUnitPrice, tierDiscountPct, volumeSavings, volumePromoLabel, nivelVolumen, etiquetaNivel, type VolumeRule } from './volumePricing'
 
 const rules: VolumeRule[] = [
   { product_id: 'X', min_quantity: 5, price: 4370, active: true },
@@ -43,7 +43,32 @@ describe('volumePricing — previsualización (espeja precio_de LEAST)', () => {
     expect(volumeTiers(rules, 'X').map((t) => t.min_quantity)).toEqual([5, 10])
   })
   it('volumePromoLabel arma la etiqueta del primer tier', () => {
-    expect(volumePromoLabel(4600, rules, 'X')).toBe('5% menos desde 5 pzas')
+    expect(volumePromoLabel(4600, rules, 'X')).toBe('Medio mayoreo desde 5 pzas · Mayoreo desde 10 $4,100')
+    expect(volumePromoLabel(1000, rules, 'Y')).toBe('10% menos desde 5 pzas')
     expect(volumePromoLabel(1000, [], 'X')).toBeNull()
+  })
+})
+
+describe('mayoreo y medio mayoreo (hoja oct 2026)', () => {
+  const r: VolumeRule[] = [
+    { product_id: 'N', min_quantity: 10, price: 1170, active: true },   // medio mayoreo
+    { product_id: 'N', min_quantity: 50, price: 800, active: true },    // mayoreo
+  ]
+  it('nombra los niveles y dice cuánto falta para el siguiente', () => {
+    expect(nivelVolumen(1300, r, 'N', 3)).toEqual({ actual: null, siguiente: { nombre: 'Medio mayoreo', faltan: 7, precio: 1170 } })
+    expect(nivelVolumen(1300, r, 'N', 12).actual).toEqual({ nombre: 'Medio mayoreo', precio: 1170 })
+    expect(nivelVolumen(1300, r, 'N', 50)).toEqual({ actual: { nombre: 'Mayoreo', precio: 800 }, siguiente: null })
+    expect(effectiveUnitPrice(1300, r, 'N', 50)).toBe(800)
+  })
+  it('etiquetas: lejos del siguiente nivel no estorba; cerca, empuja', () => {
+    expect(etiquetaNivel(1300, r, 'N', 1)).toBeNull()
+    expect(etiquetaNivel(1300, r, 'N', 8)).toBe('Faltan 2 para medio mayoreo ($1,170 c/u)')
+    expect(etiquetaNivel(1300, r, 'N', 12)).toBe('Precio de medio mayoreo')
+    expect(etiquetaNivel(1300, r, 'N', 30)).toBe('Precio de medio mayoreo')
+    expect(etiquetaNivel(1300, r, 'N', 40)).toBe('Faltan 10 para mayoreo ($800 c/u)')
+    expect(etiquetaNivel(1300, r, 'N', 60)).toBe('Precio de mayoreo')
+  })
+  it('el catálogo anuncia los dos niveles', () => {
+    expect(volumePromoLabel(1300, r, 'N')).toBe('Medio mayoreo desde 10 pzas · Mayoreo desde 50 $800')
   })
 })

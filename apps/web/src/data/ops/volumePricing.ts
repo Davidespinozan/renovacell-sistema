@@ -79,7 +79,33 @@ export function validateVolumeRule(
   return null
 }
 
-// Etiqueta corta de promo para el catálogo ("Promo Allergan · hasta el 25 oct" / "5% menos desde 5 pzas").
+// MAYOREO (hoja oct 2026) · niveles con nombre: el primer escalón es MEDIO MAYOREO y el último MAYOREO (con un solo
+// escalón, ese es medio mayoreo). Lo intermedio, si un día existe, se llama por su cantidad.
+export function nombreNivel(tiers: readonly VolumeRule[], i: number): string {
+  if (i === 0) return 'Medio mayoreo'
+  return i === tiers.length - 1 ? 'Mayoreo' : `Desde ${tiers[i].min_quantity} pzas`
+}
+/** Nivel que aplica a `qty` y el siguiente por alcanzar (cuántas piezas faltan y a qué precio). */
+export function nivelVolumen(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): {
+  actual: { nombre: string; precio: number } | null; siguiente: { nombre: string; faltan: number; precio: number } | null
+} {
+  const tiers = volumeTiers(rules, productId).filter((t) => base == null || t.price < base)
+  const i = tiers.reduce((k, t, j) => (t.min_quantity <= qty ? j : k), -1)
+  const sig = tiers[i + 1]
+  return {
+    actual: i >= 0 ? { nombre: nombreNivel(tiers, i), precio: tiers[i].price } : null,
+    siguiente: sig && qty > 0 ? { nombre: nombreNivel(tiers, i + 1), faltan: sig.min_quantity - qty, precio: sig.price } : null,
+  }
+}
+/** Etiqueta del producto en el carrito: "Precio de mayoreo" o "Faltan 3 para medio mayoreo ($1,170)". */
+export function etiquetaNivel(base: number | null, rules: readonly VolumeRule[], productId: string, qty: number): string | null {
+  if (promoAplicada(base, rules, productId, qty)) return null   // manda la promoción vigente
+  const { actual, siguiente } = nivelVolumen(base, rules, productId, qty)
+  if (siguiente && siguiente.faltan <= Math.max(5, Math.ceil(qty / 2))) return `Faltan ${siguiente.faltan} para ${siguiente.nombre.toLowerCase()} (${money0(siguiente.precio)} c/u)`
+  return actual ? `Precio de ${actual.nombre.toLowerCase()}` : null
+}
+
+// Etiqueta corta de promo para el catálogo ("Promo Allergan · hasta el 25 oct" / "Medio mayoreo desde 10 pzas · Mayoreo desde 50").
 export function volumePromoLabel(base: number | null, rules: readonly VolumeRule[], productId: string): string | null {
   const pt = promoTiers(rules, productId)
   if (pt.length && pt[0].promo) {   // PROMO-1 · la promoción vigente manda sobre la escalera de volumen
@@ -90,6 +116,7 @@ export function volumePromoLabel(base: number | null, rules: readonly VolumeRule
   const tiers = volumeTiers(rules, productId)
   if (!tiers.length) return null
   const t = tiers[0]
+  if (tiers.length > 1) { const u = tiers[tiers.length - 1]; return `Medio mayoreo desde ${t.min_quantity} pzas · Mayoreo desde ${u.min_quantity} ${money0(u.price)}` }
   const pct = tierDiscountPct(base, t.price)
   return pct ? `${pct}% menos desde ${t.min_quantity} pzas` : `Desde ${t.min_quantity} pzas · precio especial`
 }

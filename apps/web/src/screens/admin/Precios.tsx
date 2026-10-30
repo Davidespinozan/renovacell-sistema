@@ -15,7 +15,7 @@ import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { createList, renameList, deleteList, setListPrice } from '../../data/store/pricingStore'
 import { setBasePrice } from '../../data/store/productsStore'
-import { volumeTiers, tierDiscountPct, type VolumeRule } from '../../data/ops/volumePricing'
+import { volumeTiers, tierDiscountPct, nombreNivel, type VolumeRule } from '../../data/ops/volumePricing'
 import type { ProductSafe } from '../../data/types'
 
 type Tab = 'general' | 'mayoreo' | 'volumen'
@@ -31,7 +31,7 @@ export function Precios() {
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Precios">
         Tres cosas distintas: <b>General</b> (precio base del SKU), <b>Mayoreo</b> (tarifa por cliente) y
-        <b> Descuentos por cantidad</b> (promos desde N piezas del mismo SKU). El sistema cobra el menor entre el precio de lista y el de volumen.
+        <b> Descuentos por cantidad</b> (desde N piezas del mismo SKU: el primer nivel es <b>medio mayoreo</b> y el segundo <b>mayoreo</b>). El sistema cobra el menor entre el precio de lista y el de volumen.
       </PageHead>
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
@@ -263,10 +263,12 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
 
       <div className="tbl-scroll" style={{ marginTop: 10 }}>
         <table className="tbl-cards">
-          <thead><tr><th>Desde (pzas)</th><th>Precio c/u</th><th>Descuento</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Nivel</th><th>Desde (pzas)</th><th>Precio c/u</th><th>Descuento</th><th>Estado</th><th></th></tr></thead>
           <tbody>
-            {tiers.map((t) => <TierRow key={t.id} tier={t} base={product.price} onUpdate={onUpdate} onToggle={onToggle} onDelete={onDelete} />)}
+            {tiers.map((t) => { const act = tiers.filter((x) => x.active); const i = act.indexOf(t)
+              return <TierRow key={t.id} nivel={i >= 0 ? nombreNivel(act, i) : 'Apagado'} tier={t} base={product.price} onUpdate={onUpdate} onToggle={onToggle} onDelete={onDelete} /> })}
             <tr>
+              <td data-label="Nivel" style={{ color: 'var(--ink-3)' }}>Nuevo</td>
               <td data-label="Desde"><input value={addMin} onChange={(e) => setAddMin(e.target.value)} inputMode="numeric" placeholder="5" style={inp(70)} /></td>
               <td data-label="Precio c/u"><input value={addPrice} onChange={(e) => setAddPrice(e.target.value)} inputMode="decimal" placeholder="0.00" style={inp(110)} /></td>
               <td data-label="Descuento" className="mono" style={{ color: 'var(--ink-3)' }}>{addPrice && product.price ? (tierDiscountPct(product.price, Number(addPrice)) ?? 0) + '%' : '—'}</td>
@@ -281,8 +283,8 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
   )
 }
 
-function TierRow({ tier, base, onUpdate, onToggle, onDelete }: {
-  tier: VolumeRule; base: number | null
+function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
+  nivel: string; tier: VolumeRule; base: number | null
   onUpdate: (id: string, min: number, price: number) => Promise<{ ok: boolean; error?: string }>
   onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
   onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
@@ -296,6 +298,7 @@ function TierRow({ tier, base, onUpdate, onToggle, onDelete }: {
   const save = async () => { setErr(null); const r = await onUpdate(tier.id!, Number(min), Number(price)); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
   return (
     <tr style={{ opacity: tier.active ? 1 : 0.55 }}>
+      <td data-label="Nivel"><b>{nivel}</b></td>
       <td data-label="Desde">{edit ? <input value={min} onChange={(e) => setMin(e.target.value)} inputMode="numeric" style={inp(70)} /> : <span className="mono">{tier.min_quantity}</span>}</td>
       <td data-label="Precio c/u">{edit ? <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" style={inp(110)} /> : <span className="mono">{money(tier.price)}</span>}</td>
       <td data-label="Descuento" className="mono" style={{ color: pct ? 'var(--green-deep)' : 'var(--ink-3)' }}>{pct ? pct + '%' : '—'}</td>
