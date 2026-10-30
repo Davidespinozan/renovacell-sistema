@@ -11,7 +11,6 @@ import { ExportButton } from '../../app/ExportButton'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useCustomers } from '../../data/hooks/useCustomers'
 import { useAllOrders } from '../../data/hooks/useOrders'
-import { usePricing } from '../../data/hooks/usePricing'
 import { findCustomerCandidates, type CustomerCandidate } from '../../data/ops/customerMatch'
 import { findVerifiedOrphans } from '../../data/ops/orphans'
 import { deriveVerificationStatus, VERIF_LABEL, VERIF_PILL } from '../../data/ops/verification'
@@ -39,7 +38,7 @@ const specialtyOf = (d: Profile): string => (d.meta?.specialty as string) ?? ''
 const cedulaOf = (d: Profile): string => ((d.meta?.cedula as string) ?? '').trim()
 
 export function Doctores() {
-  const { data: doctors, approve, reject, revoke, setCedula, setPriceList, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
+  const { data: doctors, approve, reject, revoke, setCedula, inviteDoctor, updateDoctor, deleteDoctor } = useDoctors()
   const { data: customers } = useCustomers()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
   // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
@@ -48,7 +47,6 @@ export function Doctores() {
     if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
   }
   const { data: orders } = useAllOrders()
-  const { lists } = usePricing()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [pedidoFor, setPedidoFor] = useState<{ id: string; name: string } | null>(null)
   const [delDoctor, setDelDoctor] = useState<{ id: string; name: string } | null>(null)
@@ -138,14 +136,6 @@ export function Doctores() {
             <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
-              Precios:
-              <select value={d.price_list_id ?? ''} onChange={(e) => setPriceList(d.id, e.target.value || null)}
-                style={{ padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 12, outline: 'none', backgroundColor: 'var(--cp-surface)' }}>
-                <option value="">General (base)</option>
-                {lists.filter((l) => !l.is_default).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </label>
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
             <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setDelDoctor({ id: d.id, name: d.full_name ?? 'este doctor' })}><Trash2 size={14} /> Eliminar</button>

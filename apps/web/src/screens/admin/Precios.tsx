@@ -1,24 +1,20 @@
-// ADMIN · PRECIOS — herramienta operable, tres conceptos SEPARADOS:
+// ADMIN · PRECIOS — herramienta operable, dos conceptos SEPARADOS:
 //  GENERAL  = precio base comercial del SKU (products.price).
-//  MAYOREO  = lista/tarifa contractual por cliente (product_prices por lista). NO son promos.
+//  (La lista "Mayoreo" por cliente se retiró el 30 oct 2026: el mayoreo es ahora el 2º nivel por cantidad.)
 //  DESCUENTOS POR CANTIDAD = reglas por MISMO SKU desde N unidades (product_volume_prices).
 // El servidor es la AUTORIDAD del cobro: precio_de(product, list, qty) = LEAST(base, volumen).
 // Aquí solo se administran los datos; toda mutación se audita. RLS admin es la autoridad de escritura.
 import React, { useMemo, useState } from 'react'
-import { Plus, Trash2, Pencil, Tag, Check, X, Layers, DollarSign } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Layers, DollarSign } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
-import { ExportButton } from '../../app/ExportButton'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
-import { usePricing } from '../../data/hooks/usePricing'
 import { useVolumePrices } from '../../data/hooks/useVolumePrices'
-import { useDoctors } from '../../data/hooks/useDoctors'
-import { createList, renameList, deleteList, setListPrice } from '../../data/store/pricingStore'
 import { setBasePrice } from '../../data/store/productsStore'
 import { volumeTiers, tierDiscountPct, nombreNivel, type VolumeRule } from '../../data/ops/volumePricing'
 import type { ProductSafe } from '../../data/types'
 
-type Tab = 'general' | 'mayoreo' | 'volumen'
+type Tab = 'general' | 'volumen'
 // SKU comercial = producto vendible (no tarjeta visual/variante padre) y activo.
 const isSellableSku = (p: ProductSafe): boolean => isActiveProduct(p) && p.sellable !== false
 
@@ -30,18 +26,17 @@ export function Precios() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Precios">
-        Tres cosas distintas: <b>General</b> (precio base del SKU), <b>Mayoreo</b> (tarifa por cliente) y
-        <b> Descuentos por cantidad</b> (desde N piezas del mismo SKU: el primer nivel es <b>medio mayoreo</b> y el segundo <b>mayoreo</b>). El sistema cobra el menor entre el precio de lista y el de volumen.
+        <b>General</b> es el precio normal de cada producto. En <b>Descuentos por cantidad</b> viven el
+        <b> medio mayoreo</b> (primer nivel) y el <b>mayoreo</b> (segundo nivel), desde N piezas del mismo producto; el sistema cobra el menor.
       </PageHead>
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
-        {([['general', 'General'], ['mayoreo', 'Mayoreo'], ['volumen', 'Descuentos por cantidad']] as const).map(([k, lbl]) => (
+        {([['general', 'General'], ['volumen', 'Descuentos por cantidad']] as const).map(([k, lbl]) => (
           <button key={k} type="button" className={tab === k ? 'active' : undefined} onClick={() => setTab(k)}>{lbl}</button>
         ))}
       </div>
 
       {tab === 'general' && <GeneralTab skus={skus} />}
-      {tab === 'mayoreo' && <MayoreoTab skus={skus} />}
       {tab === 'volumen' && <VolumenTab skus={skus} />}
     </div>
   )
@@ -98,105 +93,6 @@ function GeneralRow({ p }: { p: ProductSafe }) {
         </span>
       </td>
       <td data-label="Estado"><span className="pill p-ok" style={{ fontSize: 10.5 }}>Activo</span></td>
-    </tr>
-  )
-}
-
-// ============================ MAYOREO ============================
-function MayoreoTab({ skus }: { skus: ProductSafe[] }) {
-  const { lists, priceFor } = usePricing()
-  const { data: doctors } = useDoctors()
-  const [newName, setNewName] = useState('')
-  // Listas de cliente = todas menos la General (base).
-  const clientLists = useMemo(() => lists.filter((l) => !l.is_default).sort((a, b) => a.sort - b.sort), [lists])
-  const [activeId, setActiveId] = useState('')
-  const active = clientLists.find((l) => l.id === activeId) ?? clientLists[0]
-  const assigned = useMemo(() => (active ? doctors.filter((d) => d.price_list_id === active.id).length : 0), [doctors, active])
-  const overrides = useMemo(() => (active ? skus.filter((p) => { const c = priceFor(p.id, p.price, active.id); return c != null && c !== p.price }) : []), [skus, active, priceFor])
-  const addList = async () => {
-    const n = newName.trim(); if (!n) return
-    const r = await createList(n)
-    // Si no se creó, el nombre se queda escrito para reintentar (el motivo va en la franja de avisos).
-    if (r.ok && r.id) { setNewName(''); setActiveId(r.id) }
-  }
-
-  return (
-    <div className="grid" style={{ gap: 16 }}>
-      <div className="sysnote" style={{ display: 'block' }}>
-        <b>Mayoreo = tarifa contractual por cliente</b>, no una promoción por cantidad. Un cliente se asigna a una lista desde
-        <b> Doctores → (detalle) → lista de precios</b>. Los descuentos por volumen viven en la pestaña “Descuentos por cantidad”.
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {clientLists.length === 0 && <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>No hay listas de cliente todavía.</span>}
-          {clientLists.map((l) => (
-            <button key={l.id} type="button" className={'btn sm ' + (active?.id === l.id ? '' : 'ghost')} onClick={() => setActiveId(l.id)}><Tag size={13} /> {l.name}</button>
-          ))}
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addList()} placeholder="Nueva lista (ej. Mayoreo)"
-              style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
-            <button className="btn sm" type="button" onClick={addList} disabled={!newName.trim()}><Plus size={14} /> Crear</button>
-          </span>
-        </div>
-        {active && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{assigned} {assigned === 1 ? 'cliente asignado' : 'clientes asignados'}</span>
-            <span className="pill p-neu" style={{ fontSize: 11.5 }}>{overrides.length} {overrides.length === 1 ? 'precio especial' : 'precios especiales'}</span>
-            <button className="btn ghost sm" type="button" onClick={() => { const n = window.prompt('Nuevo nombre', active.name); if (n && n.trim()) renameList(active.id, n.trim()) }}><Pencil size={13} /> Renombrar</button>
-            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { if (window.confirm(`¿Eliminar "${active.name}"? Los clientes en ella vuelven al precio base.`)) { deleteList(active.id); setActiveId('') } }}><Trash2 size={13} /> Eliminar</button>
-          </div>
-        )}
-      </div>
-
-      {active && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '14px 16px 0' }} className="eyebrow">{active.name}: General vs Mayoreo</div>
-          <div className="tbl-scroll">
-            <table className="tbl-cards">
-              <thead><tr><th>Producto</th><th>General</th><th>{active.name}</th><th>Diferencia</th></tr></thead>
-              <tbody>
-                {skus.map((p) => (
-                  <MayoreoRow key={active.id + ':' + p.id} name={p.name} base={p.price}
-                    current={priceFor(p.id, p.price, active.id)} onSet={(v) => setListPrice(p.id, active.id, v)} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MayoreoRow({ name, base, current, onSet }: { name: string; base: number | null; current: number | null; onSet: (v: number | null) => Promise<{ ok: boolean; error?: string }> }) {
-  const hasOverride = current != null && current !== base
-  const [val, setVal] = useState(hasOverride ? String(current) : '')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const save = async () => {
-    const t = val.trim()
-    setMsg(null)
-    const r = await onSet(t === '' ? null : Number(t))
-    setMsg(r.ok ? { ok: true, text: 'Guardado ✓' } : { ok: false, text: r.error ?? 'No se guardó' })
-    if (r.ok) setTimeout(() => setMsg(null), 2000)
-  }
-  const diff = hasOverride && base != null && current != null ? current - base : null
-  return (
-    <tr>
-      <td data-label="Producto">{name}</td>
-      <td data-label="General" className="mono" style={{ color: 'var(--ink-3)' }}>{money(base)}</td>
-      <td data-label="Mayoreo">
-        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-          <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} inputMode="decimal" placeholder={base != null ? String(base) : '—'}
-            style={{ width: 110, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
-          <button className="btn ghost sm" type="button" title="Guardar" onClick={save}><Check size={13} /></button>
-          {hasOverride && <span className="pill p-ok" style={{ fontSize: 10.5 }}>override</span>}
-          {msg && <span style={{ fontSize: 12, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
-        </span>
-      </td>
-      <td data-label="Diferencia" className="mono" style={{ color: diff == null ? 'var(--ink-3)' : diff < 0 ? 'var(--green-deep)' : 'var(--warn)' }}>
-        {diff == null ? '—' : (diff < 0 ? '' : '+') + money(diff)}
-      </td>
     </tr>
   )
 }

@@ -9,19 +9,15 @@ import cajaSrc from '../pos/Caja.tsx?raw'
 import nuevoPedidoSrc from '../sales/NuevoPedido.tsx?raw'
 import volumeEngineSrc from '../../../../../supabase/migrations/20261002120000_volume_pricing_engine.sql?raw'
 
-describe('Admin Precios — 3 conceptos separados', () => {
-  it('tiene tabs General | Mayoreo | Descuentos por cantidad', () => {
-    expect(preciosSrc).toMatch(/'general'/); expect(preciosSrc).toMatch(/'mayoreo'/); expect(preciosSrc).toMatch(/'volumen'/)
-    expect(preciosSrc).toMatch(/Descuentos por cantidad/)
+describe('Admin Precios — 2 conceptos separados', () => {
+  it('tiene tabs General | Descuentos por cantidad (la lista Mayoreo se retiró: el mayoreo es el 2º nivel)', () => {
+    expect(preciosSrc).toMatch(/'general'/); expect(preciosSrc).toMatch(/'volumen'/); expect(preciosSrc).not.toMatch(/MayoreoTab/)
+    expect(preciosSrc).toMatch(/Descuentos por cantidad/); expect(preciosSrc).toMatch(/medio mayoreo/)
   })
   it('General edita products.price vía setBasePrice; excluye no-vendibles/parents (isSellableSku)', () => {
     expect(preciosSrc).toMatch(/setBasePrice/)
     expect(preciosSrc).toMatch(/isSellableSku/)
     expect(preciosSrc).toMatch(/sellable !== false/)
-  })
-  it('Mayoreo se explica como tarifa por cliente y NO como promoción por cantidad', () => {
-    expect(preciosSrc).toMatch(/tarifa contractual por cliente/)
-    expect(preciosSrc).toMatch(/no una promoci/)
   })
   it('Descuentos por cantidad usa el store de volumen (no recrea la lógica de precio)', () => {
     expect(preciosSrc).toMatch(/useVolumePrices/)
