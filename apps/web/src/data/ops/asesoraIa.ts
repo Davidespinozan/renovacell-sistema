@@ -33,6 +33,12 @@ export interface DoctorExamen { id: string; full_name: string | null; email: str
 export interface ConfigSeguimiento { carrito: boolean; recompra: boolean; promo: boolean; horas_entre: number; por_semana: number; hora_desde: number; hora_hasta: number; updated_at: string | null }
 export interface ResumenTipo { enviados: number; respondieron: number; con_pedido: number; vendido: number }
 export type ResumenSeguimiento = Partial<Record<'carrito' | 'recompra' | 'promo', ResumenTipo>>
+export interface Adopcion {
+  dias: number
+  clientes: { activos: number; con_cuenta: number; entraron: number; con_avisos: number; compraron_sin_cuenta: number }
+  pedidos: Partial<Record<'whatsapp_ia' | 'portal' | 'caja' | 'vendedor', number>>
+  verificados_por_whatsapp: number
+}
 
 type Res<T> = { ok: true; data: T } | { ok: false; error: string }
 const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Promise<Res<T>> => {
@@ -52,6 +58,7 @@ export const asesoraIa = {
   seguimiento: () => rpc<ConfigSeguimiento>('seguimiento_config'),
   guardarSeguimiento: (cambios: Partial<ConfigSeguimiento>) => rpc<ConfigSeguimiento>('seguimiento_config_guardar', { p: cambios }),
   resumenSeguimiento: (dias: number) => rpc<ResumenSeguimiento>('seguimiento_resumen', { p_dias: dias }),
+  adopcion: (dias: number) => rpc<Adopcion>('adopcion_resumen', { p_dias: dias }),
   // el examen lo corre el servidor (cola + cron): aquí solo se continúa o se detiene
   continuar: (corrida: string) => rpc<number>('ia_examen_continuar', { p_corrida: corrida }),
   detener: (corrida: string) => rpc<null>('ia_examen_detener', { p_corrida: corrida }),

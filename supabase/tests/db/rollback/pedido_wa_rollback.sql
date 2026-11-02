@@ -1,5 +1,6 @@
 -- PEDIDO POR WHATSAPP (20270307) · el down retira lo nuevo; se reaplica idéntica.
 begin;
+\ir ../../../rollback/adopcion_portal/99_down.sql   -- ADOPCIÓN (20270308) redefine el cierre de la verificación y la confirmación por WhatsApp: se baja antes de la foto inicial
 create temp table _pw as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/pedido_wa/99_down.sql
 do $t$ begin

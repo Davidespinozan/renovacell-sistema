@@ -3,7 +3,7 @@
 // orquestador del portal y calificadas por un juez, para elegir modelo y no empeorar con cada cambio; 3) qué modelo usa
 // la IA del portal. El examen corre caso por caso desde aquí (la Edge no escribe conversaciones ni carritos).
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { asesoraIa as clientePorDefecto, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
+import { asesoraIa as clientePorDefecto, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Adopcion as AdopcionDatos, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
 
 const sutil: React.CSSProperties = { fontSize: 12, color: 'var(--ink-3, #667)' }
 const input: React.CSSProperties = { padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -42,6 +42,7 @@ export function AsesoraIA({ cliente = clientePorDefecto }: { cliente?: ClienteAs
       <Examen cliente={cliente} corridas={corridas} config={config} onCambio={cargar} onDetalle={async (k) => { const r = await cliente.resultados(k.id); if (r.ok) setDetalle({ corrida: k, filas: r.data ?? [] }) }} onAviso={setAviso} />
       {detalle && <Detalle corrida={detalle.corrida} filas={detalle.filas} onCerrar={() => setDetalle(null)} />}
       <Seguimiento cliente={cliente} />
+      <Adopcion cliente={cliente} />
       <ModeloPortal cliente={cliente} config={config} corridas={corridas} onGuardado={(c) => { setConfig(c); setAviso(`La IA del portal ahora usa ${nombreModelo(c.modelo_portal)}.`) }} />
     </div>
   )
@@ -210,6 +211,35 @@ const TIPOS_SEG: Array<{ key: 'carrito' | 'recompra' | 'promo'; titulo: string; 
   { key: 'recompra', titulo: 'Le toca volver a pedir', texto: 'Por su ritmo de compra (o el típico de la categoría) ya se le debe estar acabando: le ofrece prepararle lo de siempre con el precio de esa cantidad.' },
   { key: 'promo', titulo: 'Promoción de lo que compra', texto: 'Hay una promoción vigente de algo que ya compró: se la avisa con sus precios. No le llega a quien se dio de baja de difusiones.' },
 ]
+
+// ADOPCIÓN (2 nov 2026): WhatsApp es la puerta, el portal su casa. Cuántos clientes ya tienen cuenta y la usan, y por dónde compran.
+const CANALES: Array<{ key: keyof AdopcionDatos['pedidos']; titulo: string }> = [
+  { key: 'whatsapp_ia', titulo: 'WhatsApp con la IA' }, { key: 'portal', titulo: 'Portal' }, { key: 'vendedor', titulo: 'Vendedor' }, { key: 'caja', titulo: 'Caja' },
+]
+const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)} %` : '—')
+function Adopcion({ cliente }: { cliente: ClienteAsesoraIa }) {
+  const [d, setD] = useState<AdopcionDatos | null>(null)
+  useEffect(() => { void cliente.adopcion(30).then((r) => { if (r.ok) setD(r.data) }) }, [cliente])
+  if (!d) return null
+  const c = d.clientes
+  return (
+    <section className="card" data-testid="adopcion-portal">
+      <h2 style={{ margin: '0 0 4px' }}>¿Tus clientes ya usan el portal?</h2>
+      <p style={{ margin: '0 0 12px', ...sutil }}>WhatsApp es la puerta y el portal su casa: al verificarlos por WhatsApp reciben su acceso, cada pedido les lleva el enlace y la IA los invita cuando viene al caso. Últimos {d.dias} días.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+        <Cifra titulo="Con cuenta" valor={String(c.con_cuenta)} detalle={`${pct(c.con_cuenta, c.activos)} de ${c.activos} clientes`} />
+        <Cifra titulo="Entraron al portal" valor={String(c.entraron)} detalle={`${pct(c.entraron, c.con_cuenta)} de los que tienen cuenta`} />
+        <Cifra titulo="Con avisos activos" valor={String(c.con_avisos)} detalle="reciben notificaciones" />
+        <Cifra titulo="Verificados por WhatsApp" valor={String(d.verificados_por_whatsapp)} detalle="ya con su acceso" />
+        <Cifra titulo="Compraron sin cuenta" valor={String(c.compraron_sin_cuenta)} detalle="a invitar al portal" />
+      </div>
+      <div style={{ marginTop: 12, fontSize: 13 }} data-testid="adopcion-canales">
+        <b>Pedidos por dónde llegaron:</b>{' '}
+        {CANALES.map((k, i) => <span key={k.key}>{i > 0 && ' · '}{k.titulo} {d.pedidos[k.key] ?? 0}</span>)}
+      </div>
+    </section>
+  )
+}
 
 function Seguimiento({ cliente }: { cliente: ClienteAsesoraIa }) {
   const [cfg, setCfg] = useState<ConfigSeguimiento | null>(null)

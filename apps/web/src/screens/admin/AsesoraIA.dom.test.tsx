@@ -24,6 +24,7 @@ function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
     seguimiento: async () => ({ ok: true, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null } }),
     guardarSeguimiento: vi.fn(async (c) => ({ ok: true as const, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null, ...c } })),
     resumenSeguimiento: async () => ({ ok: true, data: { carrito: { enviados: 12, respondieron: 5, con_pedido: 3, vendido: 24500 } } }),
+    adopcion: async () => ({ ok: true, data: { dias: 30, clientes: { activos: 200, con_cuenta: 50, entraron: 20, con_avisos: 8, compraron_sin_cuenta: 6 }, pedidos: { whatsapp_ia: 4, portal: 3 }, verificados_por_whatsapp: 2 } }),
     doctores: async () => ({ ok: true, data: [{ id: 'd1', full_name: 'Dra. Prueba', email: null }] }),
     ...over,
   }
@@ -70,5 +71,12 @@ describe('<AsesoraIA>', () => {
     expect(await screen.findByText('corriendo 7/60…')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('examen-continuar')); await waitFor(() => expect(c.continuar).toHaveBeenCalledWith('k3'))
     fireEvent.click(screen.getByTestId('examen-detener')); await waitFor(() => expect(c.detener).toHaveBeenCalledWith('k4'))
+  })
+  it('adopción del portal: cuántos tienen cuenta, la usan y por dónde compran', async () => {
+    render(<AsesoraIA cliente={falso()} />)
+    const a = await screen.findByTestId('adopcion-portal')
+    expect(a).toHaveTextContent('25 % de 200 clientes')
+    expect(a).toHaveTextContent('40 % de los que tienen cuenta')
+    expect(screen.getByTestId('adopcion-canales')).toHaveTextContent('WhatsApp con la IA 4 · Portal 3 · Vendedor 0 · Caja 0')
   })
 })
