@@ -36,7 +36,8 @@ describe('portal: idéntico a su línea base (antes de R4-B2-IA1)', () => {
     // re-anclada por el EXAMEN (2 nov 2026): regla V6 de vendedor (producto exacto: buscar y preguntar si es ambiguo)
     // re-anclada (2 nov 2026, caso Éclat de Vie): regla NUNCA DESECHES A UN CLIENTE
     // re-anclada (2 nov 2026, caché + examen): marca de la parte variable, 3d promociones, V7 recomendar, breve y un solo trato
-    expect(h.digest('hex')).toBe('33c36dcbc7d0048fa9e4b716cd568c66')
+    // re-anclada (2 nov 2026, V7 con búsqueda de respaldo cuando las recomendaciones vienen vacías)
+    expect(h.digest('hex')).toBe('c13141978964766cdc8ae9c9b0897976')
     expect(createHash('md5').update(politica.MENSAJE_SIN_RESPUESTA + '|' + politica.MENSAJE_LIMITE_CLINICO).digest('hex')).toBe('a80fa072fa6a2330676fe4a1716d30d1')
   })
 })
