@@ -137,7 +137,7 @@ const NOMBRE_CANAL: Record<Exclude<CanalPolitica, 'portal'>, string> = { whatsap
 // IA MEJOR QUE EL HUMANO · E · WhatsApp vinculado de forma explícita a un doctor verificado (lo decide la base).
 export const CANAL_IDENTIFICADO = [
   'CANAL: el usuario escribe por WhatsApp, fuera del portal. El sistema YA LO RECONOCIÓ: este WhatsApp está vinculado a la cuenta de un médico verificado (él mismo lo conectó desde su cuenta o lo confirmó Dirección). Atiéndelo como a su cliente: puedes darle SUS precios, cotizarle, recomendarle y decirle cómo van SUS pedidos con las herramientas. No le pidas datos para identificarse.',
-  'Aquí no hay carrito ni botón de compra: cuando quiera comprar, cotiza lo que pidió con cotizar (total exacto y su nivel de precio) y una persona del equipo comercial cierra la venta en este mismo chat (el sistema la avisa). Si prefiere hacerlo él mismo, el portal con enlace_portal.',
+  'Aquí puedes cerrar su pedido completo: su carrito es el mismo de su cuenta; revisas con revisar_pedido (entrega, flete y fecha del servidor) y confirmas con confirmar_pedido solo tras su sí explícito. Su asesor se entera por el sistema. Si prefiere hacerlo él mismo, el portal con enlace_portal.',
 ]
 export function contextoCanal(canal: CanalPolitica, identificado = false): string {
   if (canal === 'portal') return ''
@@ -361,9 +361,15 @@ export function tareaCanalIdentificado(intencion: string, limiteClinico: boolean
     case 'PRICE': case 'AVAILABILITY': return tarea(intencion, false)
     case 'ORDER_STATUS': return 'TAREA: su pedido. Si pregunta cómo va, usa obtener_estado_pedido y dile estado, guía y entrega estimada tal cual vengan. Si es devolución, reclamación o un problema, usa solicitar_asesor y dilo en una frase, sin prometer tiempos.'
     case 'CHECKOUT': case 'CART_VIEW': case 'CART_ADD': case 'CART_UPDATE': case 'CART_REMOVE':
-      return 'TAREA: quiere comprar y ya lo reconoces. Identifica productos y cantidades (buscar_productos), cotiza con cotizar y dale el total exacto con su nivel de precio y la oportunidad más cercana si la hay. Pregunta solo lo que falte (presentación, cantidad, entrega). Su asesor ya está enterado (lo avisa el sistema) y confirma el pedido contigo por aquí; tú sigues atendiendo. Nunca digas que registraste o confirmaste un pedido.'
+      return 'TAREA: quiere comprar y ya lo reconoces: CIERRA LA VENTA TÚ, aquí mismo. (1) Productos y cantidades: buscar_productos y agrégalos a su carrito (agregar_al_carrito / actualizar_carrito); usa cotizar si duda entre cantidades y dile la oportunidad más cercana. (2) Entrega: revisar_pedido sin entrega para ver sus opciones; si no tiene dirección y quiere envío, pídesela y usa guardar_direccion; luego revisar_pedido con la opción que eligió (y el horario si es local). (3) Dale un resumen claro: productos, total con envío y cuándo llega, y pregúntale si lo confirmas. (4) Solo cuando responda con un sí claro, usa confirmar_pedido y dale su folio, el total y los datos de pago (transferencia con el folio como referencia; que mande aquí la foto del comprobante). Su asesor está enterado por el sistema; tú sigues atendiendo. Nunca digas que el pedido quedó hecho si confirmar_pedido no regresó confirmado.'
     default: return tareaCanal(intencion, limiteClinico)
   }
+}
+/** PEDIDO POR WHATSAPP · ¿su ÚLTIMO mensaje es un sí claro? (determinista; una duda, una pregunta o un "no" no confirman) */
+export function esConfirmacionExplicita(texto: string): boolean {
+  const t = (texto ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+  if (!t || t.length > 120 || /\?|\bno\b|\bnel\b|\bespera|\btodavia|\baun no|\bmejor no|\bcambia|\bquita|\bagrega/.test(t)) return false
+  return /^(si|sip|si+|claro|confirmo|confirmalo|confirmado|dale|adelante|de acuerdo|ok|okey|okay|va|perfecto|listo|hazlo|procede|correcto|asi esta bien|esta bien|si,? confirmalo|si por favor|si porfa)\b/.test(t)
 }
 export function tareaCanal(intencion: string, limiteClinico: boolean): string {
   if (limiteClinico || intencion === 'CLINICAL_BOUNDARY') return 'TAREA: pregunta clínica sobre un paciente o un tratamiento. Explica con claridad el límite (no puedes indicar qué aplicar, cuánto ni cómo) y ofrece la información comercial o técnica pública aprobada. Si el usuario quiere seguimiento, usa solicitar_asesor y aclara que lo atenderá un asesor del equipo comercial de Renovacell (no personal clínico).'

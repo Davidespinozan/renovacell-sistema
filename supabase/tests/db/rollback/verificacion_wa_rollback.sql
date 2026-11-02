@@ -1,5 +1,6 @@
 -- VERIFICACIÓN POR WHATSAPP (20270306) · el down retira lo nuevo y regresa la carga del push; se reaplica idéntica.
 begin;
+\ir ../../../rollback/pedido_wa/99_down.sql   -- PEDIDO-WA (20270307) redefine el disparador de alertas y cuelga de la identidad del canal: se baja antes de la foto inicial
 create temp table _vw as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/verificacion_wa/99_down.sql
 do $t$ begin

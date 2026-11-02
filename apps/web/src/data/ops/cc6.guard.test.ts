@@ -71,10 +71,13 @@ describe('Edge cart + IA + frontend', () => {
     expect(s).not.toMatch(/p\.total|p\.price|p\.precio|p\.discount|p\.price_list|p\.doctor|p\.customer|p\.seller/)
     for (const sc of ['checkout_revisar_uid', 'checkout_confirmar_uid', 'checkout_global']) { expect(s).toContain(`'${sc}'`); expect(codigo(limiteSrc)).toContain(`${sc}:`) }
   })
-  it('Y/Z · la IA solo tiene preparar_checkout (lectura); no hay confirmar; "pedido creado" bloqueado; política explícita', () => {
+  // PEDIDO POR WHATSAPP (2 nov 2026, dueño): en el PORTAL sigue confirmando solo el botón del doctor; confirmar_pedido existe
+  // SOLO en WhatsApp con el doctor vinculado y tras su "sí" explícito; "pedido creado" solo con la evidencia del servidor.
+  it('Y/Z · portal: la IA solo prepara (lectura); confirmar solo en WhatsApp vinculado; "pedido creado" exige evidencia del servidor', () => {
     const h = codigo(herSrc)
     expect(h).toContain("name: 'preparar_checkout'"); expect(h).not.toContain("name: 'confirmar_checkout'")
-    expect(codigo(valSrc)).toMatch(/if \(RE_PEDIDO_CREADO\.test\(t\)\) return \{ ok: false, motivo: 'pedido_sin_evidencia' \}/)
+    expect(h).toMatch(/canal === 'whatsapp' && identificado \? HERRAMIENTAS_PEDIDO_WA : \[\]/)
+    expect(codigo(valSrc)).toMatch(/if \(!ctx\.evidencia\.includes\('PEDIDO_CREADO_EVIDENCE'\) && RE_PEDIDO_CREADO\.test\(t\)\) return \{ ok: false, motivo: 'pedido_sin_evidencia' \}/)
     expect(codigo(polSrc)).toMatch(/NUNCA afirmas que un pedido fue creado/)
   })
   it('AD · UI (MC-2): el chat abre el checkout CANÓNICO compartido → pedido → pago DESPUÉS y solo si el usuario elige; misma clave en reintentos', () => {

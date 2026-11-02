@@ -42,7 +42,7 @@ export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Valid
   if (ctx.limiteClinico && RE_CLINICO.test(t)) return { ok: false, motivo: 'clinico' }
   // IA-CLÍNICA · fuera del límite, una cifra clínica (unidades, ml, dosis, protocolo) solo con una sección clínica aprobada del turno
   if (!ctx.limiteClinico && RE_CLINICO.test(t) && !ctx.evidencia.includes('CLINICAL_EVIDENCE')) return { ok: false, motivo: 'clinico_sin_evidencia' }
-  if (RE_PEDIDO_CREADO.test(t)) return { ok: false, motivo: 'pedido_sin_evidencia' }
+  if (!ctx.evidencia.includes('PEDIDO_CREADO_EVIDENCE') && RE_PEDIDO_CREADO.test(t)) return { ok: false, motivo: 'pedido_sin_evidencia' }   // PEDIDO POR WHATSAPP: solo si el servidor lo creó en este turno
   if (!(ctx.evidencia.includes('EN_HORARIO') && ctx.evidencia.includes('ASESOR_ASIGNADO')) && RE_PROMESA_HUMANO.test(t)) return { ok: false, motivo: 'promesa_humano_sin_evidencia' }
   if (!ctx.evidencia.includes('ASESOR_ASIGNADO') && RE_ASIGNADO.test(t)) return { ok: false, motivo: 'promesa_humano_sin_evidencia' }
   if (!ctx.evidencia.includes('CART_MUTATION_EVIDENCE') && RE_CART_MUT.test(t)) return { ok: false, motivo: 'carrito_mutacion_sin_evidencia' }

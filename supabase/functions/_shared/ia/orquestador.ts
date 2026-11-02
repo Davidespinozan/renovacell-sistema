@@ -27,6 +27,7 @@ export interface DepsOrquestador {
     envolverDatos: (etiqueta: string, contenido: string) => string
     MENSAJE_SIN_RESPUESTA: string; MENSAJE_LIMITE_CLINICO: string
     // R4-C14 · opcional: pre-búsqueda determinista de los productos que nombró el cliente (canal)
+    esConfirmacionExplicita?: (texto: string) => boolean   // PEDIDO POR WHATSAPP · el "sí" del doctor (determinista)
     prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
   }
   herramientas: {
@@ -227,7 +228,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
         continue
       }
-      const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal })
+      const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal, confirmacion: d.politica.esConfirmacionExplicita?.(e.textoUsuario) ?? false })
       const ej = !ej0.error && d.herramientas.complementar ? { ...ej0, data: d.herramientas.complementar(v.nombre, ej0.data) } : ej0
       const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : ej.data
       if (!ej.error) { for (const id of d.herramientas.idsDe(ej.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(ej.data)) nombresAutorizados.add(n); addEv(d.herramientas.evidenciaDe(v.nombre, ej.data)) }
@@ -244,13 +245,16 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   return await persistir(d.validacion.respuestaSegura('rondas', { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), d.config.maxRondas, 'rondas')
 }
 
-async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string } }): Promise<{ data: unknown; error: string | null }> {
+async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string }; confirmacion?: boolean }): Promise<{ data: unknown; error: string | null }> {
   const a = v.args
-  const dueno = { p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: e.actor === 'doctor' ? e.profile : null }
+  // PEDIDO POR WHATSAPP · con el doctor vinculado, el dueño del carrito es SU cuenta (el mismo carrito del portal), sin ligarlo a la
+  // conversación del contacto; si no, como siempre.
+  const vinculado = (e.canal ?? 'portal') !== 'portal' && !!t.perfilIA
+  const dueno = vinculado ? { p_actor_type: 'doctor', p_visitor_hash: null, p_profile: t.perfilIA } : { p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: e.actor === 'doctor' ? e.profile : null }
   // CC-5 · carrito del dueño ligado a la conversación; operation_id estable = turno + llamada (un reintento no duplica).
   const abrirCarrito = async (): Promise<string | null> => {
     if (t.carrito.id) return t.carrito.id
-    const r = await rpc('cc_carrito_abrir', { ...dueno, p_conv: e.conv })
+    const r = await rpc('cc_carrito_abrir', { ...dueno, p_conv: vinculado ? null : e.conv })
     const id = (r.data as { cart_id?: string } | null)?.cart_id ?? null
     if (id) t.carrito.id = id
     return id
@@ -263,10 +267,10 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     const cart = await abrirCarrito(); if (!cart) return { data: null, error: 'carrito' }
     switch (v.nombre) {
       case 'ver_carrito': return rpc('cc_carrito_ver', { p_cart: cart, ...dueno })
-      case 'agregar_al_carrito': return rpc('cc_carrito_agregar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_product: a.product_id, p_qty: a.cantidad, p_op: op })
-      case 'actualizar_carrito': return rpc('cc_carrito_actualizar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_product: a.product_id, p_qty: a.cantidad, p_op: op })
-      case 'quitar_del_carrito': return rpc('cc_carrito_quitar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_product: a.product_id, p_op: op })
-      case 'vaciar_carrito': return rpc('cc_carrito_vaciar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile, p_op: op })
+      case 'agregar_al_carrito': return rpc('cc_carrito_agregar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: dueno.p_visitor_hash, p_profile: dueno.p_profile, p_product: a.product_id, p_qty: a.cantidad, p_op: op })
+      case 'actualizar_carrito': return rpc('cc_carrito_actualizar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: dueno.p_visitor_hash, p_profile: dueno.p_profile, p_product: a.product_id, p_qty: a.cantidad, p_op: op })
+      case 'quitar_del_carrito': return rpc('cc_carrito_quitar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: dueno.p_visitor_hash, p_profile: dueno.p_profile, p_product: a.product_id, p_op: op })
+      case 'vaciar_carrito': return rpc('cc_carrito_vaciar', { p_cart: cart, p_actor_type: 'ai', p_visitor_hash: dueno.p_visitor_hash, p_profile: dueno.p_profile, p_op: op })
       case 'preparar_checkout': return rpc('cc_carrito_preparar_checkout', { p_cart: cart, ...dueno })   // CC-6 · lectura; confirmar NO es una herramienta
     }
   }
@@ -298,6 +302,12 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'obtener_estado_pedido': return rpc('cc_ia_estado_pedido', { p_profile: t.perfilIA, p_folio: a.folio })
     case 'enlace_portal': return { data: t.enlace ? t.enlace() : null, error: t.enlace ? null : 'desconocida' }   // puro: sin base, sin tokens
     // CONTACTO CONVERSACIONAL · solo el visitante de ESTA conversación (la base lo verifica); un dato malo vuelve como `campo`.
+    // PEDIDO POR WHATSAPP · la base exige que ESTE WhatsApp esté vinculado a ESA cuenta; confirmar exige además su "sí" explícito
+    case 'guardar_direccion': return rpc('cc_ia_direccion_guardar', { p_conv: e.conv, p_profile: t.perfilIA, p_d: a })
+    case 'revisar_pedido': return rpc('cc_ia_pedido_revisar', { p_conv: e.conv, p_profile: t.perfilIA, p_entrega: a.entrega ?? null, p_horario: a.horario ?? null })
+    case 'confirmar_pedido':
+      if (!t.confirmacion) return { data: { confirmado: false, motivo: 'FALTA_CONFIRMACION_EXPLICITA', nota: 'Su último mensaje no es un sí claro: dale el resumen y pregúntale si lo confirmas.' }, error: null }
+      return rpc('cc_ia_pedido_confirmar', { p_conv: e.conv, p_profile: t.perfilIA })
     // VERIFICACIÓN POR WHATSAPP · la solicitud es de ESTA conversación (la base revisa que siga sin identificar)
     case 'solicitar_verificacion': return rpc('cc_ia_solicitar_alta', { p_conv: e.conv, p_nombre: a.nombre, p_cedula: a.cedula, p_email: a.email, p_especialidad: a.especialidad, p_ciudad: a.ciudad })
     case 'registrar_contacto': return rpc('cc_ia_registrar_contacto', { p_conv: e.conv, p_hash: e.visitorHash, p_nombre: a.nombre, p_telefono: a.telefono, p_email: a.email, p_es_medico: a.es_medico, p_cedula: a.cedula })
@@ -310,7 +320,7 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
       return rpc('cc_solicitar_asesor', { p_conv: e.conv, p_actor_type: e.actor, p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
     }
     // CC-7 · rechazo del asesor para ESTA compra (no toca la cartera ni impone enfriamiento global).
-    case 'declinar_asesor': return rpc('cc_handoff_rechazar', { p_conv: e.conv, p_actor_type: 'ai', p_visitor_hash: e.visitorHash, p_profile: dueno.p_profile })
+    case 'declinar_asesor': return rpc('cc_handoff_rechazar', { p_conv: e.conv, p_actor_type: 'ai', p_visitor_hash: dueno.p_visitor_hash, p_profile: dueno.p_profile })
     default: return { data: null, error: 'desconocida' }
   }
 }

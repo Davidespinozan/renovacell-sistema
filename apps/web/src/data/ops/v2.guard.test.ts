@@ -88,9 +88,9 @@ describe('IA · contexto', () => {
     expect(p).toMatch(/if \(!role\) continue/)
   })
   // CONTACTO CONVERSACIONAL · + registrar_contacto, fuera de la lista general: solo para el visitante del portal sin datos.
-  it('26 · el registro de herramientas no cambió (21 nombres: 16 + enlace_portal de LIVE C1 + registrar_contacto + cotizar y recomendar_productos de IA-VENDEDORA + solicitar_verificacion; sin confirmar pedido)', () => {
+  it('26 · el registro de herramientas no cambió (24 nombres: 16 + enlace_portal + registrar_contacto + cotizar y recomendar_productos + solicitar_verificacion + guardar_direccion, revisar_pedido y confirmar_pedido SOLO para WhatsApp vinculado; el portal no confirma)', () => {
     const h = codigo(herramientasSrc)
-    expect((h.match(/name: '/g) ?? []).length).toBe(21)
+    expect((h.match(/name: '/g) ?? []).length).toBe(24)
     expect(h).toMatch(/export const REGISTRAR_CONTACTO: DefinicionHerramienta = \{ name: 'registrar_contacto'/)
     expect(h).toMatch(/contactoPendiente && !conCuenta && canal === 'portal' \? \[REGISTRAR_CONTACTO\]/)
     expect(h).not.toContain("name: 'confirmar_checkout'")

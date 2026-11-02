@@ -7,7 +7,7 @@ import * as herramientas from '../../../../../supabase/functions/_shared/ia/herr
 import * as politica from '../../../../../supabase/functions/_shared/ia/politica'
 import * as validacion from '../../../../../supabase/functions/_shared/ia/validacion'
 import { ejecutarTurno } from '../../../../../supabase/functions/_shared/ia/orquestador'
-import { crearProveedorFalso, respuestaTexto } from '../../../../../supabase/functions/_shared/ia/proveedor'
+import { crearProveedorFalso, respuestaHerramientas, respuestaTexto } from '../../../../../supabase/functions/_shared/ia/proveedor'
 import webhookSrc from '../../../../../supabase/functions/meta-webhook/index.ts?raw'
 
 const DOC = '55555555-5555-4555-8555-555555555555'
@@ -28,18 +28,22 @@ describe('código de vínculo', () => {
 })
 
 describe('herramientas y prompt', () => {
-  it('con vínculo: sus pedidos sí; carrito y checkout no', () => {
+  it('con vínculo: sus pedidos, su carrito y el cierre por WhatsApp; sin vínculo, nada de eso', () => {
     const con = herramientasPara(true, 'whatsapp', false, true).map((h) => h.name)
-    expect(con).toContain('obtener_estado_pedido'); expect(con).toContain('cotizar'); expect(con).not.toContain('agregar_al_carrito'); expect(con).not.toContain('preparar_checkout')
+    expect(con).toContain('obtener_estado_pedido'); expect(con).toContain('cotizar'); expect(con).toContain('agregar_al_carrito')
+    for (const n of ['guardar_direccion', 'revisar_pedido', 'confirmar_pedido']) expect(con).toContain(n)
+    expect(con).not.toContain('preparar_checkout')
+    expect(herramientasPara(true, 'whatsapp').map((h) => h.name)).not.toContain('confirmar_pedido')
     expect(herramientasPara(true, 'whatsapp').map((h) => h.name)).not.toContain('obtener_estado_pedido')
     expect(validarLlamada('obtener_estado_pedido', {}, { conCuenta: true, idsAutorizados: new Set(), canal: 'whatsapp', identificado: true }).ok).toBe(true)
     expect(validarLlamada('obtener_estado_pedido', {}, { conCuenta: true, idsAutorizados: new Set(), canal: 'whatsapp' })).toEqual({ ok: false, motivo: 'no_autorizada' })
-    expect(validarLlamada('agregar_al_carrito', {}, { conCuenta: true, idsAutorizados: new Set(), canal: 'whatsapp', identificado: true })).toEqual({ ok: false, motivo: 'no_autorizada' })
+    expect(validarLlamada('confirmar_pedido', {}, { conCuenta: true, idsAutorizados: new Set(), canal: 'whatsapp' })).toEqual({ ok: false, motivo: 'no_autorizada' })
+    expect(validarLlamada('confirmar_pedido', {}, { conCuenta: true, idsAutorizados: new Set(), canal: 'portal', identificado: true })).toEqual({ ok: false, motivo: 'no_autorizada' })
   })
-  it('el prompt lo reconoce, vende y cotiza antes de pasar la compra a una persona', () => {
+  it('el prompt lo reconoce, vende y cierra la venta él mismo (resumen → sí explícito → confirmar_pedido)', () => {
     const s = politica.construirSistema({ ctx: doctor, intencion: 'CHECKOUT', limiteClinico: false, reglasConocimiento: [], evidencia: [], canal: 'whatsapp' })
     expect(s).toContain('El sistema YA LO RECONOCIÓ'); expect(s).not.toMatch(/Trátalo como contacto NO verificado/)
-    expect(s).toContain('TAMBIÉN ERES SU VENDEDOR'); expect(s).toMatch(/cotiza con cotizar y dale el total exacto/)
+    expect(s).toContain('TAMBIÉN ERES SU VENDEDOR'); expect(s).toMatch(/CIERRA LA VENTA TÚ/); expect(s).toMatch(/Solo cuando responda con un sí claro, usa confirmar_pedido/)
     const anon = politica.construirSistema({ ctx: { ...doctor, actor: 'visitor', audiencia: 'public', verificado: false, puede_precio: false }, intencion: 'PRICE', limiteClinico: false, reglasConocimiento: [], evidencia: [], canal: 'whatsapp' })
     expect(anon).toMatch(/Trátalo como contacto NO verificado/); expect(anon).not.toContain('YA LO RECONOCIÓ')
   })
@@ -72,5 +76,34 @@ describe('turno en WhatsApp', () => {
     const r = await correr(null)
     expect(r.llamadas.find(([f]) => f === 'cc_ia_contexto_actor')?.[1]).toEqual({ p_profile: null })
     expect(r.llamadas.some(([f]) => f === 'cc_ia_perfil_comercial')).toBe(false)
+  })
+})
+
+describe('cierre del pedido por WhatsApp', () => {
+  it('solo un sí claro confirma; una duda, una pregunta o un no, no', async () => {
+    const { esConfirmacionExplicita } = await import('../../../../../supabase/functions/_shared/ia/politica')
+    for (const t of ['Sí', 'si confírmalo', 'Dale', 'ok', 'Va, adelante', 'Perfecto', 'De acuerdo']) expect(esConfirmacionExplicita(t), t).toBe(true)
+    for (const t of ['¿y el envío?', 'no', 'si pero agrega otro', 'espera', 'mejor no', 'todavía no', 'quiero 10 botox']) expect(esConfirmacionExplicita(t), t).toBe(false)
+  })
+  it('sin "sí" explícito, confirmar_pedido no llega al servidor', async () => {
+    const llamadas: string[] = []
+    const rpc = async (fn: string, args: Record<string, unknown>) => {
+      llamadas.push(fn)
+      if (fn === 'cc_ia_identidad_canal') return { data: DOC, error: null }
+      if (fn === 'cc_ia_contexto_actor') return { data: args.p_profile ? doctor : null, error: null }
+      if (fn === 'cc_ia_turno_reclamar') return { data: { estado: 'reclamado', turn_id: 't1' }, error: null }
+      if (fn === 'cc_ia_turno_responder') return { data: { persistido: true }, error: null }
+      if (fn === 'cc_ia_pedido_confirmar') return { data: { confirmado: true, folio: 'S9' }, error: null }
+      return { data: null, error: null }
+    }
+    const correr = async (texto: string) => {
+      llamadas.length = 0
+      const proveedor = crearProveedorFalso([respuestaHerramientas([{ name: 'confirmar_pedido', input: {} }]), respuestaTexto('Listo.')])
+      await ejecutarTurno({ conv: 'c1', triggerSeq: 1, actor: 'visitor', profile: null, visitorHash: 'h', textoUsuario: texto, canal: 'whatsapp' },
+        { rpc, leerMensajes: async () => [], proveedor, config: { maxTokens: 600, timeoutMs: 20_000, maxRondas: 3, historial: 6 }, politica, herramientas, validacion, reglasConocimiento: [] })
+      return llamadas.includes('cc_ia_pedido_confirmar')
+    }
+    expect(await correr('¿cuánto es de envío?')).toBe(false)
+    expect(await correr('Sí, confírmalo')).toBe(true)
   })
 })

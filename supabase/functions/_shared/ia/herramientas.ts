@@ -15,7 +15,8 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'registrar_contacto'   // CONTACTO CONVERSACIONAL · solo el visitante del enlace que aún no deja sus datos
   | 'cotizar' | 'recomendar_productos'   // IA-VENDEDORA · combinaciones con las reglas del pedido y recomendaciones con motivo
   | 'solicitar_verificacion'   // VERIFICACIÓN POR WHATSAPP (2 nov 2026) · un contacto aún no reconocido pide verificarse para comprar
-export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
+  | 'guardar_direccion' | 'revisar_pedido' | 'confirmar_pedido'   // PEDIDO POR WHATSAPP (2 nov 2026) · solo con el doctor vinculado
+export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'PEDIDO_CREADO_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
 export interface DefinicionHerramienta { name: NombreHerramienta; description: string; input_schema: Record<string, unknown>; autoridad: 'cualquiera' | 'cuenta'; mutante: boolean }
@@ -101,12 +102,22 @@ export const SOLICITAR_VERIFICACION: DefinicionHerramienta = { name: 'solicitar_
   }, required: ['nombre', 'cedula', 'email'], additionalProperties: false } }
 
 /** Herramientas expuestas al modelo según el actor (los pedidos solo con cuenta). */
-// IA MEJOR QUE EL HUMANO · E · un WhatsApp vinculado a un doctor verificado también consulta SUS pedidos (lectura); carrito y
-// checkout siguen siendo del portal.
-const SOLO_PORTAL_SIN_VINCULO: readonly NombreHerramienta[] = ['obtener_estado_pedido']
+// IA MEJOR QUE EL HUMANO · E + PEDIDO POR WHATSAPP · con el doctor vinculado, su carrito (el mismo del portal) y sus pedidos
+// también se manejan aquí; el cierre va por revisar_pedido / confirmar_pedido (no por el botón del portal).
+const SOLO_PORTAL_SIN_VINCULO: readonly NombreHerramienta[] = ['obtener_estado_pedido', 'ver_carrito', 'agregar_al_carrito', 'actualizar_carrito', 'quitar_del_carrito', 'vaciar_carrito']
+const DIRECCION = { type: 'object', properties: {
+  calle: texto('Calle.', 200), numero: texto('Número exterior.', 20), interior: texto('Número interior, si hay.', 20), colonia: texto('Colonia.', 120),
+  cp: texto('Código postal (5 dígitos).', 10), ciudad: texto('Ciudad.', 120), estado: texto('Estado.', 120), referencias: texto('Referencias para encontrarlo, si las dio.', 300),
+  recibe: texto('Quién recibe, si lo dijo.', 120), telefono: texto('Teléfono de quien recibe, si lo dio.', 20),
+}, required: ['calle', 'numero', 'cp', 'ciudad', 'estado'], additionalProperties: false }
+export const HERRAMIENTAS_PEDIDO_WA: DefinicionHerramienta[] = [
+  { name: 'guardar_direccion', autoridad: 'cuenta', mutante: true, description: 'Guarda en su perfil la dirección de entrega que el doctor te dictó en ESTE chat (queda como su dirección predeterminada). Úsala solo con lo que él escribió; si regresa guardada:false, pide de nuevo solo el dato de `campo`.', input_schema: DIRECCION },
+  { name: 'revisar_pedido', autoridad: 'cuenta', mutante: false, description: 'Revisa su carrito para cerrar el pedido, con la misma regla del portal: precio y total, disponibilidad, opciones de entrega con flete y fecha prometida (y horarios si es entrega local), y lo que falte. Llámala sin `entrega` para ver las opciones; luego con la opción que él eligió (id: recoge, local_chofer, foraneo_dhl…) y, si es local, el horario {fecha, inicio}.', input_schema: { type: 'object', properties: { entrega: texto('Id de la opción de entrega elegida.', 30), horario: { type: 'object', properties: { fecha: texto('AAAA-MM-DD', 10), inicio: texto('HH:MM', 5) }, required: ['fecha', 'inicio'], additionalProperties: false } }, additionalProperties: false } },
+  { name: 'confirmar_pedido', autoridad: 'cuenta', mutante: true, description: 'Confirma el pedido de la última revisión (lista y vigente). SOLO después de que el doctor, en su último mensaje, confirmó con un sí claro el resumen que le diste (productos, total con envío y entrega). Regresa folio, total y datos de pago.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+]
 const soloPortal = (n: NombreHerramienta, identificado: boolean) => SOLO_PORTAL.includes(n) && !(identificado && SOLO_PORTAL_SIN_VINCULO.includes(n))
 export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false, identificado = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
-  return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : []), ...(canal !== 'portal' && !identificado && !conCuenta ? [SOLICITAR_VERIFICACION] : [])]
+  return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : []), ...(canal !== 'portal' && !identificado && !conCuenta ? [SOLICITAR_VERIFICACION] : []), ...(canal === 'whatsapp' && identificado ? HERRAMIENTAS_PEDIDO_WA : [])]
     .filter((h) => h.autoridad === 'cualquiera' || conCuenta)
     .filter((h) => canal === 'portal' || !soloPortal(h.name, identificado))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal (pedidos sí con vínculo)
     .filter((h) => h.name !== 'enlace_portal' || !conCuenta || canal !== 'portal')   // el enlace solo tiene sentido sin sesión en el portal
@@ -134,6 +145,22 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     const nom = str(i.nombre, 120); const ced = str(i.cedula, 40); const email = str(i.email, 160)
     if (!nom || !ced || !email) return { ok: false, motivo: 'argumentos' }
     return { ok: true, nombre: 'solicitar_verificacion', args: { nombre: nom, cedula: ced, email, especialidad: str(i.especialidad, 80), ciudad: str(i.ciudad, 80) }, ids: [] }
+  }
+  if (nombre === 'guardar_direccion' || nombre === 'revisar_pedido' || nombre === 'confirmar_pedido') {
+    if (ctx.canal !== 'whatsapp' || !ctx.identificado) return { ok: false, motivo: 'no_autorizada' }
+    const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
+    if (nombre === 'confirmar_pedido') return { ok: true, nombre, args: {}, ids: [] }
+    if (nombre === 'revisar_pedido') {
+      const ent = i.entrega === undefined || i.entrega === null ? null : (typeof i.entrega === 'string' && /^[a-z_]{3,30}$/.test(i.entrega) ? i.entrega : undefined)
+      if (ent === undefined) return { ok: false, motivo: 'argumentos' }
+      const h = i.horario as { fecha?: unknown; inicio?: unknown } | undefined
+      const horario = h && typeof h.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(h.fecha) && typeof h.inicio === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(h.inicio) ? { fecha: h.fecha, inicio: h.inicio } : null
+      return { ok: true, nombre, args: { entrega: ent, horario }, ids: [] }
+    }
+    const d: Record<string, string> = {}
+    for (const [k, max] of [['calle', 200], ['numero', 20], ['interior', 20], ['colonia', 120], ['cp', 10], ['ciudad', 120], ['estado', 120], ['referencias', 300], ['recibe', 120], ['telefono', 20]] as const) { const v = str(i[k], max); if (v) d[k] = v }
+    if (!d.calle || !d.numero || !d.cp || !d.ciudad || !d.estado) return { ok: false, motivo: 'argumentos' }
+    return { ok: true, nombre, args: d, ids: [] }
   }
   if (typeof nombre !== 'string' || !NOMBRES.has(nombre)) return { ok: false, motivo: 'desconocida' }
   const def = HERRAMIENTAS.find((h) => h.name === nombre)!
@@ -276,7 +303,10 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
     case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
     case 'enlace_portal': return o.url === URL_PORTAL_PUBLICA ? ['PORTAL_LINK_EVIDENCE'] : []
-    case 'registrar_contacto': case 'solicitar_verificacion': return []   // datos de contacto/verificación: no son evidencia comercial
+    case 'registrar_contacto': case 'solicitar_verificacion': case 'guardar_direccion': return []   // datos: no son evidencia comercial
+    // PEDIDO POR WHATSAPP · la revisión trae total del servidor; la confirmación, el pedido creado (solo entonces puede decirlo)
+    case 'revisar_pedido': return o.review_id || o.total ? (['CHECKOUT_REVIEW_EVIDENCE', 'PRICE_EVIDENCE'] as Evidencia[]) : []
+    case 'confirmar_pedido': return o.confirmado === true ? (['PEDIDO_CREADO_EVIDENCE', 'PRICE_EVIDENCE', 'ORDER_EVIDENCE'] as Evidencia[]) : []
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'
