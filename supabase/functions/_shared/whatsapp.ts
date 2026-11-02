@@ -65,6 +65,13 @@ export function configWA(env: (k: string) => string | undefined): ConfigWA | nul
 export function cuerpoTexto(para: string, texto: string): Record<string, unknown> {
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: 'text', text: { preview_url: true, body: texto.slice(0, 4096) } }
 }
+/** FOTOS AL CLIENTE (2 nov 2026) · imagen o PDF por enlace temporal: Meta la descarga y se la entrega como foto/documento.
+ *  El pie es el texto del mensaje, salvo el marcador "Envió una imagen." (ese no se le manda al cliente). */
+export function cuerpoMedia(para: string, tipo: 'image' | 'document', enlace: string, pie?: string | null, nombre?: string | null): Record<string, unknown> {
+  const p = (pie ?? '').trim().slice(0, 1024)
+  const media: Record<string, unknown> = { link: enlace, ...(p ? { caption: p } : {}), ...(tipo === 'document' ? { filename: (nombre || 'documento.pdf').slice(0, 240) } : {}) }
+  return { messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: tipo, [tipo]: media }
+}
 /** R4-C8 · marca el mensaje del cliente como leído y muestra "escribiendo…" (hasta 25 s o hasta la respuesta). No es un mensaje. */
 export function cuerpoEscribiendo(wamid: string): Record<string, unknown> {
   return { messaging_product: 'whatsapp', status: 'read', message_id: wamid, typing_indicator: { type: 'text' } }
