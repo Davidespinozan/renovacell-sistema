@@ -11,15 +11,17 @@ export const LECTURAS = new Set(['cc_ia_contexto_actor', 'cc_catalogo_para_ia', 
   'cc_candidatos_recomendacion', 'cc_ia_precio', 'cc_ia_cotizar', 'cc_ia_recomendaciones', 'cc_ia_disponibilidad', 'cc_ia_estado_pedido', 'cc_ia_perfil_comercial'])
 
 /** Precio por millón de tokens (USD), página oficial de Anthropic consultada el 2 nov 2026. */
-export const PRECIOS: Record<string, { entrada: number; salida: number }> = {
-  'claude-haiku-4-5-20251001': { entrada: 1, salida: 5 },
-  'claude-haiku-5-5': { entrada: 0.10, salida: 0.50 },
-  'claude-sonnet-5-5': { entrada: 2, salida: 10 },
-  'claude-opus-5-5': { entrada: 4, salida: 20 },
+// USD por millón de tokens. CACHÉ (docs oficiales, 2 nov 2026): escribir 1.25× la entrada; leer 0.1× (0.05× en Sonnet/Opus 5.5).
+export const PRECIOS: Record<string, { entrada: number; salida: number; lectura: number }> = {
+  'claude-haiku-4-5-20251001': { entrada: 1, salida: 5, lectura: 0.1 },
+  'claude-haiku-5-5': { entrada: 0.10, salida: 0.50, lectura: 0.1 },
+  'claude-sonnet-5-5': { entrada: 2, salida: 10, lectura: 0.05 },
+  'claude-opus-5-5': { entrada: 4, salida: 20, lectura: 0.05 },
 }
-export const costoUsd = (modelo: string, uso: { input: number; output: number }): number | null => {
+export const costoUsd = (modelo: string, uso: { input: number; output: number; cacheRead?: number; cacheWrite?: number }): number | null => {
   const p = PRECIOS[modelo]; if (!p) return null
-  return Math.round(((uso.input * p.entrada + uso.output * p.salida) / 1e6) * 1e6) / 1e6
+  const leido = uso.cacheRead ?? 0, escrito = uso.cacheWrite ?? 0, normal = Math.max(0, uso.input - leido - escrito)
+  return Math.round(((normal * p.entrada + escrito * p.entrada * 1.25 + leido * p.entrada * p.lectura + uso.output * p.salida) / 1e6) * 1e6) / 1e6
 }
 
 export interface Caso { id: string; categoria: string; historial: Array<{ actor: string; content: string }>; pregunta: string; debe: string[]; no_debe: string[]; ideal?: string | null }

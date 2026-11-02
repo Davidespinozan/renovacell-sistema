@@ -16,14 +16,17 @@ export type BloqueEntrada =
 // Los mensajes aceptan bloques genéricos (el orquestador los arma); los bloques que ESTE módulo produce son BloqueEntrada.
 export type BloqueGenerico = { type: string; [k: string]: unknown }
 export interface MensajeModelo { role: 'user' | 'assistant'; content: string | BloqueGenerico[] }
-export interface SolicitudModelo { system: string; messages: MensajeModelo[]; tools: Array<{ name: string; description: string; input_schema: Record<string, unknown> }>; max_tokens: number; timeoutMs: number }
+// CACHÉ (2 nov 2026): `systemFijo` = cuántos caracteres del inicio de `system` no cambian en todo el turno (políticas, tarea,
+// perfil); esa parte y las herramientas se guardan en el caché de Anthropic y las rondas/turnos siguientes la leen al 5 %.
+export interface SolicitudModelo { system: string; systemFijo?: number; messages: MensajeModelo[]; tools: Array<{ name: string; description: string; input_schema: Record<string, unknown> }>; max_tokens: number; timeoutMs: number }
 export interface LlamadaHerramienta { id: string; name: string; input: Record<string, unknown> }
 export type ClaseError = 'provider_timeout' | 'provider_rate_limited' | 'provider_error' | 'provider_auth' | 'provider_malformed' | 'provider_unavailable'
 export type RespuestaModelo =
   | { tipo: 'texto'; texto: string; usage: Uso; stop: string }
   | { tipo: 'herramientas'; texto: string; llamadas: LlamadaHerramienta[]; bloques: BloqueEntrada[]; usage: Uso; stop: string }
   | { tipo: 'error'; clase: ClaseError; usage: Uso; ambiguo: boolean }
-export interface Uso { input: number; output: number }
+/** `input` = TODA la entrada (sin caché + leída + escrita en caché), como siempre; el desglose sirve para el costo real. */
+export interface Uso { input: number; output: number; cacheRead?: number; cacheWrite?: number }
 export interface Proveedor { nombre: string; modelo: string; generar: (s: SolicitudModelo) => Promise<RespuestaModelo> }
 
 export interface ConfigIA { provider: 'anthropic'; model: string; timeoutMs: number; maxTokens: number; maxRondas: number; historial: number }
@@ -44,7 +47,8 @@ export function configurar(env: (k: string) => string | undefined): { ok: true; 
 export function parsearAnthropic(status: number, data: unknown): RespuestaModelo {
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
   const u = (d.usage && typeof d.usage === 'object' ? d.usage : {}) as Record<string, unknown>
-  const usage: Uso = { input: Number(u.input_tokens ?? 0) || 0, output: Number(u.output_tokens ?? 0) || 0 }
+  const n = (k: string) => Number(u[k] ?? 0) || 0
+  const usage: Uso = { input: n('input_tokens') + n('cache_read_input_tokens') + n('cache_creation_input_tokens'), output: n('output_tokens'), cacheRead: n('cache_read_input_tokens'), cacheWrite: n('cache_creation_input_tokens') }
   if (status === 401 || status === 403) return { tipo: 'error', clase: 'provider_auth', usage, ambiguo: false }
   if (status === 429) return { tipo: 'error', clase: 'provider_rate_limited', usage, ambiguo: false }
   if (status === 529 || status === 503) return { tipo: 'error', clase: 'provider_unavailable', usage, ambiguo: false }
@@ -79,8 +83,12 @@ export function parsearAnthropic(status: number, data: unknown): RespuestaModelo
 export interface OpcionesModelo { effort?: 'low' | 'medium' | 'high'; fallbacks?: boolean }
 export const esModeloConPensamiento = (m: string) => /^claude-(opus|sonnet|haiku|fable)-5/.test(m)
 export function cuerpoAnthropic(model: string, s: SolicitudModelo, o: OpcionesModelo = {}): { body: Record<string, unknown>; betas: string[] } {
-  const body: Record<string, unknown> = { model, max_tokens: s.max_tokens, system: s.system, messages: s.messages }
-  if (s.tools.length) body.tools = s.tools
+  const corte = s.systemFijo && s.systemFijo > 0 && s.systemFijo < s.system.length ? s.systemFijo : 0
+  const system = corte
+    ? [{ type: 'text', text: s.system.slice(0, corte), cache_control: { type: 'ephemeral' } }, { type: 'text', text: s.system.slice(corte) }]
+    : s.system
+  const body: Record<string, unknown> = { model, max_tokens: s.max_tokens, system, messages: s.messages }
+  if (s.tools.length) body.tools = s.tools.map((t, i) => (i === s.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t))
   const betas: string[] = []
   if (esModeloConPensamiento(model)) {
     body.thinking = { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } }; betas.push('thinking-binding-controls-2026-08-01')

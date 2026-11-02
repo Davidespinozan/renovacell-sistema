@@ -131,7 +131,7 @@ describe('proveedor', () => {
     expect(configurar((k) => ({ ANTHROPIC_API_KEY: 'k', AI_MODEL: 'claude-sonnet-5-5' })[k])).toMatchObject({ ok: true, config: { model: 'claude-sonnet-5-5' } })
   })
   it('parseo estricto de Anthropic: texto, tool_use, errores por status, malformado', () => {
-    expect(parsearAnthropic(200, { content: [{ type: 'text', text: 'hola' }], usage: { input_tokens: 10, output_tokens: 5 }, stop_reason: 'end_turn' })).toEqual({ tipo: 'texto', texto: 'hola', usage: { input: 10, output: 5 }, stop: 'end_turn' })
+    expect(parsearAnthropic(200, { content: [{ type: 'text', text: 'hola' }], usage: { input_tokens: 10, output_tokens: 5 }, stop_reason: 'end_turn' })).toEqual({ tipo: 'texto', texto: 'hola', usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0 }, stop: 'end_turn' })
     const h = parsearAnthropic(200, { content: [{ type: 'text', text: 'busco' }, { type: 'tool_use', id: 'tu_1', name: 'buscar_productos', input: { consulta: 'hyalux' } }], stop_reason: 'tool_use' })
     expect(h).toMatchObject({ tipo: 'herramientas', texto: 'busco', llamadas: [{ id: 'tu_1', name: 'buscar_productos', input: { consulta: 'hyalux' } }] })
     expect(parsearAnthropic(429, {})).toMatchObject({ tipo: 'error', clase: 'provider_rate_limited' })

@@ -7,11 +7,11 @@
 type Rpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 interface Bloque { type: string; [k: string]: unknown }
 interface Mensaje { role: 'user' | 'assistant'; content: string | Bloque[] }
-interface Solicitud { system: string; messages: Mensaje[]; tools: Array<{ name: string; description: string; input_schema: Record<string, unknown> }>; max_tokens: number; timeoutMs: number }
+interface Solicitud { system: string; systemFijo?: number; messages: Mensaje[]; tools: Array<{ name: string; description: string; input_schema: Record<string, unknown> }>; max_tokens: number; timeoutMs: number }
 type Respuesta =
-  | { tipo: 'texto'; texto: string; usage: { input: number; output: number }; stop: string }
-  | { tipo: 'herramientas'; texto: string; llamadas: Array<{ id: string; name: string; input: Record<string, unknown> }>; bloques: Bloque[]; usage: { input: number; output: number }; stop: string }
-  | { tipo: 'error'; clase: string; usage: { input: number; output: number }; ambiguo: boolean }
+  | { tipo: 'texto'; texto: string; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; stop: string }
+  | { tipo: 'herramientas'; texto: string; llamadas: Array<{ id: string; name: string; input: Record<string, unknown> }>; bloques: Bloque[]; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; stop: string }
+  | { tipo: 'error'; clase: string; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; ambiguo: boolean }
 interface Ctx { actor: string; audiencia: string; puede_precio: boolean; puede_stock: boolean; puede_pedidos: boolean; verificado: boolean; clinico?: boolean }
 type Validada = { ok: true; nombre: string; args: Record<string, unknown>; ids: string[] } | { ok: false; motivo: string }
 
@@ -26,6 +26,7 @@ export interface DepsOrquestador {
     historialParaModelo: (m: Array<{ actor: string; content: string }>, maximo?: number) => Array<{ role: 'user' | 'assistant'; content: string }>
     envolverDatos: (etiqueta: string, contenido: string) => string
     MENSAJE_SIN_RESPUESTA: string; MENSAJE_LIMITE_CLINICO: string
+    MARCA_VARIABLE?: string   // CACHÉ · dónde empieza lo que cambia en cada ronda
     // R4-C14 · opcional: pre-búsqueda determinista de los productos que nombró el cliente (canal)
     esConfirmacionExplicita?: (texto: string) => boolean   // PEDIDO POR WHATSAPP · el "sí" del doctor (determinista)
     prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
@@ -58,7 +59,7 @@ export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visito
   contacto?: { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null }
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
-  turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number }; clase?: string; motivoValidacion?: string
+  turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; clase?: string; motivoValidacion?: string
 }
 
 // Qué no puede afirmar sin evidencia, dicho al modelo en la corrección interna (una sola por turno).
@@ -76,7 +77,7 @@ const LIMITE_RPC: Record<string, number> = { buscar_productos: 10, buscar_conoci
 
 export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promise<ResultadoTurno> {
   const ahora = d.ahora ?? (() => Date.now()); const inicio = ahora()
-  const usage = { input: 0, output: 0 }
+  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
   const obs = d.observar ?? (() => {})
   const rpc = async (fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: string | null }> => {
     try { const r = await d.rpc(fn, args); return { data: r.data, error: r.error ? (r.error.message ?? 'error') : null } } catch (x) { return { data: null, error: (x as Error)?.message ?? 'error' } }
@@ -188,9 +189,16 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
     if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
-    const system = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null }) + productosMencionados + perfilComercial + notaCorreccion
-    const r = await d.proveedor.generar({ system, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
+    // CACHÉ (2 nov 2026): lo fijo del turno (políticas, tarea, productos mencionados, perfil) va primero y se guarda en caché;
+    // lo que cambia en cada ronda (evidencia, atención humana, corrección) va al final, fuera del caché.
+    const base = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null })
+    const marca = d.politica.MARCA_VARIABLE ? base.indexOf(d.politica.MARCA_VARIABLE) : -1
+    const fijo = (marca >= 0 ? base.slice(0, marca) : base) + productosMencionados + perfilComercial
+    const variable = (marca >= 0 ? base.slice(marca + d.politica.MARCA_VARIABLE!.length) : '') + notaCorreccion
+    const system = fijo + variable
+    const r = await d.proveedor.generar({ system, systemFijo: marca >= 0 ? fijo.length : undefined, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
+    usage.cacheRead += r.usage?.cacheRead ?? 0; usage.cacheWrite += r.usage?.cacheWrite ?? 0
     if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
 
     if (r.tipo === 'texto') {

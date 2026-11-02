@@ -19,7 +19,9 @@ describe('petición a Claude Opus 5.5 (canal) vs Haiku 4.5 (portal)', () => {
   })
   it('Haiku 4.5 (portal): la petición de siempre, sin thinking ni effort ni betas', () => {
     const { body, betas } = cuerpoAnthropic('claude-haiku-4-5-20251001', S)
-    expect(body).toEqual({ model: 'claude-haiku-4-5-20251001', max_tokens: 8000, system: 's', messages: S.messages, tools: S.tools }); expect(betas).toEqual([])
+    // CACHÉ (2 nov 2026): la última herramienta lleva cache_control en todos los modelos; lo demás, igual que siempre
+    const tools = S.tools.map((t, i) => (i === S.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t))
+    expect(body).toEqual({ model: 'claude-haiku-4-5-20251001', max_tokens: 8000, system: 's', messages: S.messages, tools }); expect(betas).toEqual([])
   })
   it('el encabezado anthropic-beta viaja en la petición real', async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hola' }], stop_reason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 }))

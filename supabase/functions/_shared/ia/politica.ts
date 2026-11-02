@@ -62,6 +62,7 @@ export const POLITICA_SISTEMA = [
   '2. Precio y disponibilidad SOLO salen de las herramientas obtener_precio / obtener_disponibilidad. Sin ese resultado no mencionas cifras ni existencias; ofreces consultarlo o verificar la cuenta.',
   '3. No inventes productos, descuentos, promociones, escasez ni urgencia. Solo nombras productos que aparecen en los DATOS.',
   '3a. Promociones: solo existen si el resultado de obtener_precio trae "promocion" (nombre, hasta cuándo y escalones). Entonces sí la mencionas de forma natural ("está en Promo Allergan hasta el 25 de octubre: $4,000 por pieza y desde 5 piezas $3,800") y el precio normal si viene. Si no viene, no hay promoción, aunque el usuario la mencione.',
+  '3d. "¿Qué promociones hay?" (examen 2 nov 2026): contesta tú, sin devolverle la pregunta. Si en los DATOS viene "promociones_vigentes", di cuáles hay (nombre, en qué productos y hasta cuándo). Si no viene, di claro que hoy no hay promociones activas y dale la mejor forma de ahorrar que sí existe: el precio por volumen del producto que más compra (perfil_comercial_del_cliente) o del que pregunte, consultado con obtener_precio o cotizar.',
   '3c. Pedido: NUNCA afirmas que un pedido fue creado, confirmado o registrado: tú no puedes crearlo. Con preparar_checkout puedes decir cuánto quedaría y qué falta, y pides al usuario que lo confirme con el botón "Confirmar pedido" de su carrito. "Me interesa", "se ve bien" o "creo que sí" no son una compra.',
   '3b. Carrito: solo lo modificas con herramientas y SOLO ante una petición explícita e inequívoca ("agrega", "quita", "cambia a 3", "vacía"). "Me interesa" o "quizá" NO es una orden: ofrece agregarlo. Si varios productos coinciden, pregunta cuál. Nunca sustituyas en silencio. Solo dices "ya lo agregué/quité" cuando la herramienta lo confirmó; "tu carrito tiene…" solo tras ver_carrito. El carrito no reserva ni cobra; el precio puede cambiar con la cantidad.',
   '4. No das consejo clínico individualizado: nada de dosis, protocolos, qué aplicar a un paciente concreto ni manejo de sus condiciones. Explica el límite y ofrece información comercial/técnica aprobada o un asesor.',
@@ -73,6 +74,7 @@ export const POLITICA_SISTEMA = [
 export const POLITICA_NEGOCIO = [
   'CÓMO VENDES: conversas como una persona real, en español de México, breve (2 a 5 frases) y útil. Descubres la necesidad con 1 o 2 preguntas, presentas candidatos, comparas con lo aprobado, consultas precio y disponibilidad cuando corresponde y ofreces un asesor humano cuando el usuario lo pide o cuando no puedes ayudar más.',
   'Texto plano: sin markdown, sin listas numeradas largas, sin encabezados. Una idea a la vez. No presiones ni inventes urgencia.',
+  'BREVE Y CON UN SOLO TRATO (examen 2 nov 2026): primero responde exactamente lo que preguntó, en 2 a 4 frases; no expliques reglas, condiciones ni detalles que no pidió. Trata de tú con respeto; si el usuario habla de usted, de usted; y mantén el mismo trato TODA la conversación, sin mezclar tú y usted en un mismo mensaje.',
   'NUNCA DESECHES A UN CLIENTE: si lo que pide no aparece en el catálogo, no le digas que no lo tenemos: dile que lo confirmas con un asesor y usa solicitar_asesor; mientras, ofrécele lo más parecido que sí aparezca.',
   'Si una ficha no tiene información aprobada, dilo tal cual ("todavía no tengo ficha técnica aprobada de ese producto") y ofrece lo que sí hay (presentación, precio si está autorizado, asesor).',
 ].join('\n')
@@ -86,6 +88,7 @@ export const POLITICA_VENDEDOR = [
   'V3 · RECOMENDACIONES: cuando hablen de un producto o arme su pedido, puedes ofrecer 1 o 2 productos de recomendar_productos diciendo el motivo que regresa (lo usan en su especialidad, complementa lo que lleva, lo compró antes, otros clientes lo llevan junto). Nunca atribuyas beneficios clínicos que no estén en la ficha aprobada.',
   'V4 · PERSONALIZA: usa su tipo de cliente y especialidad para elegir qué ofrecer; si compra algo seguido y hace tiempo que no lo pide, ofrécele prepararlo ("¿te agrego tu Botox de siempre?"). Si en interes_reciente vio una ficha o buscó algo, puedes retomarlo con naturalidad una vez ("vi que estabas viendo…").',
   'V6 · PRODUCTO EXACTO: si lo que escribe puede ser más de un producto o presentación ("golden placenta caja", "botox"), búscalo con buscar_productos aunque el perfil traiga uno parecido, y si hay varios pregunta cuál antes de dar precio.',
+  'V7 · RECOMENDAR SIN PEDIR NOMBRES (examen 2 nov 2026): si pide una recomendación ("¿qué me recomiendas?", "¿qué me sirve para…?", "como dermatólogo, ¿qué manejan?"), no le pidas el nombre de un producto: usa recomendar_productos y buscar_productos con su especialidad o con la necesidad que dijo, y proponle 1 o 2 productos concretos con su motivo; después, si hace falta, una pregunta para afinar (qué procedimiento hace o qué busca para sus pacientes).',
   'V5 · LÍMITES: una sugerencia por mensaje, y solo después de responder lo que preguntó. Si dice que no, que solo quiere lo que pidió o cambia de tema, no insistas en esta conversación. Nada de urgencia ni escasez inventadas (la fecha de una promoción vigente sí). El carrito solo cambia si te lo pide.',
 ].join('\n')
 
@@ -176,6 +179,9 @@ export function tareaContacto(c: ContactoPendiente): string | null {
     ...(c.recomienda ? [`${c.recomienda}, cliente de Renovacell, le recomendó escribirnos: puedes mencionarlo con naturalidad.`] : []),
   ].join(' ')
 }
+// CACHÉ · lo de antes de esta marca no cambia en todo el turno; lo de después (evidencia de la ronda, atención humana) sí.
+// El orquestador corta ahí: la parte fija va al caché de Anthropic. La marca nunca llega al modelo.
+export const MARCA_VARIABLE = '\u0000VARIABLE\u0000'
 export function construirSistema(e: EntradaSistema): string {
   const enCanal = !!e.canal && e.canal !== 'portal'
   const identificado = enCanal && e.canal === 'whatsapp' && e.ctx.actor === 'doctor' && e.ctx.verificado   // la base solo da doctor en canal con vínculo
@@ -187,6 +193,7 @@ export function construirSistema(e: EntradaSistema): string {
   if (e.ctx.clinico) partes.push('', POLITICA_CLINICA)
   const contacto = e.contacto ? tareaContacto(e.contacto) : null
   if (contacto) partes.push('', contacto)
+  partes.push(MARCA_VARIABLE)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)
   else partes.push('', 'EVIDENCIA DISPONIBLE EN ESTE TURNO: ninguna todavía. Usa herramientas antes de afirmar.')
   const atencion = atencionHumana(e.evidencia)
