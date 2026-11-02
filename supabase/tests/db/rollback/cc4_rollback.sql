@@ -1,5 +1,7 @@
 -- CC-4 · El rollback retira libro de turnos, traza y herramientas de IA sin tocar CC-2/CC-3.
 begin;
+\ir ../../../rollback/aviso_ruidoso/99_down.sql   -- AVISO-RUIDOSO (20270305) cuelga de notifications.kind y cc_messages: se baja antes de la foto inicial
+\ir ../../../rollback/asesor_retoma/99_down.sql   -- RETOMA (20270304) cuelga de conversaciones y mensajes: se baja antes de la foto inicial
 \ir ../../../rollback/wa_vinculo/99_down.sql   -- WA-VÍNCULO (20270302) añade cc_ia_identidad_canal: se baja antes de la foto inicial
 \ir ../../../rollback/ia_vendedora/99_down.sql   -- IA-VENDEDORA (20270223) añade funciones cc_ia_*: se baja antes de la foto inicial
 \ir ../../../rollback/reparto_verificacion/99_down.sql   -- REPARTO-VERIF (20270213) redefine funciones de esta cadena: se baja antes de la foto inicial

@@ -1,5 +1,7 @@
 -- CC-2 · El rollback retira el dominio de conversación y devuelve adopción/purga al texto CC-1.
 begin;
+\ir ../../../rollback/aviso_ruidoso/99_down.sql   -- AVISO-RUIDOSO (20270305) cuelga de notifications.kind y cc_messages: se baja antes de la foto inicial
+\ir ../../../rollback/asesor_retoma/99_down.sql   -- RETOMA (20270304) cuelga de conversaciones y mensajes: se baja antes de la foto inicial
 \ir ../../../rollback/seguimientos/99_down.sql   -- SEGUIMIENTOS (20270216) apunta a cc_conversations: se baja primero
 \ir ../../../rollback/cotizaciones/99_down.sql   -- COTIZACIONES (20270209) apunta a cc_conversations: se baja primero
 \ir ../../../rollback/vincular_cliente/99_down.sql   -- VINCULAR-CLIENTE (20270206) se baja primero (redefine _cc_rutear, _cc_nombre_dueno, bandeja y cola)

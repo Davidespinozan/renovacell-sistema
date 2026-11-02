@@ -17,8 +17,8 @@ import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
-import { diaEtiqueta, etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
-import { HistorialConversacion, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
+import { diaEtiqueta, etiquetaActor, quienAtendio, rangoSesion, type Visor } from '../../data/ops/sesionesPresentacion'
+import { HistorialConversacion, HiloSoloLectura, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
@@ -290,6 +290,33 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
 
+  // CONVERSACIÓN CONTINUA (2 nov 2026, dueño: "te sale sin mensajes todavía porque tienes que ir al relojito a picarle a
+  // la conversación anterior, eso está mal"). La sesión anterior se muestra AQUÍ, arriba, en solo lectura y con su
+  // separador; el relojito queda para sesiones más viejas. Una sesión cerrada no cambia: se lee una vez (caché).
+  const [previa, setPrevia] = useState<CacheSesion | null>(null)
+  const sesionActual = conv?.sesion?.id ?? null
+  useEffect(() => {
+    let vivo = true
+    setPrevia(null)
+    if (!convId || !conv) return
+    void (async () => {
+      let id: string | null = anterior?.id ?? null
+      if (!id && conv.sesion?.estado === 'abierta' && (conv.sesion.ordinal ?? 1) > 1 && cliente.sesiones) {
+        const l = await cliente.sesiones(convId)
+        if (l.ok) id = (l.data.sesiones ?? []).filter((s) => s.estado === 'cerrada' && s.n_mensajes > 0).sort((a, b) => b.ordinal - a.ordinal)[0]?.id ?? null
+      }
+      if (!id || !cliente.leerSesion) return
+      const hit = cache.current.get(id)
+      if (hit) { if (vivo) setPrevia(hit); return }
+      const r = await cliente.leerSesion(id)
+      if (!r.ok || !vivo) return
+      const c: CacheSesion = { meta: r.data.sesion, mensajes: r.data.mensajes, completa: r.data.mensajes.length < 100 }   // 100 = página de leer_sesion
+      cache.current.set(id, c); setPrevia(c)
+    })()
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId, sesionActual, anterior?.id])
+
   // CHAT PRO · avisar "escribiendo…" (sin texto). Las pruebas pueden usar clientes sin este método.
   const ultimoPing = useRef(0)
   const avisarEscribiendo = (t: string) => {
@@ -556,13 +583,21 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       <div className="rc-thread" aria-live="polite">
         {inicioHilo}
         {cargando && <div className="rc-sys">Cargando conversación…</div>}
-        {!cargando && anterior && (
+        {!cargando && previa && (
+          <div className="rc-previa" data-testid="sesion-previa">
+            <div className="rc-day rc-day--previa"><span>Antes · {rangoSesion(previa.meta)} · {quienAtendio(previa.meta.asesor_nombre)}</span></div>
+            <HiloSoloLectura mensajes={previa.mensajes.slice(-40)} visor={visor} nombreCliente={nombreCliente} nombreAsesor={previa.meta.asesor_nombre} />
+            {previa.mensajes.length > 40 && <button type="button" className="rc-link" onClick={() => abrirHistorial(previa.meta.id)} data-testid="previa-ver-todo">Ver toda la conversación anterior</button>}
+            <div className="rc-day rc-day--ahora"><span>{mensajes.length ? 'Ahora' : 'Ahora · todavía no escribe de nuevo'}</span></div>
+          </div>
+        )}
+        {!cargando && anterior && !previa && (
           <div className="rc-anterior" data-testid="tarjeta-anterior">
             <span>{asesor ? 'Conversación anterior' : 'Tu conversación anterior'}{diaEtiqueta(anterior.closed_at ?? anterior.opened_at) ? ` · ${diaEtiqueta(anterior.closed_at ?? anterior.opened_at)}` : ''}</span>
             <button type="button" className="rc-link" onClick={() => abrirHistorial(anterior.id)} data-testid="tarjeta-anterior-ver">Ver</button>
           </div>
         )}
-        {!cargando && mensajes.length === 0 && !error && !pendiente && (
+        {!cargando && !previa && mensajes.length === 0 && !error && !pendiente && (
           <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="msg-bienvenida"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-meta">Asistente</div><div className="rc-bubble">{asesor ? 'Sin mensajes todavía.' : 'Hola, soy el asistente de Renovacell. ¿En qué te ayudo?'}</div></div></div>
         )}
         {hilo}

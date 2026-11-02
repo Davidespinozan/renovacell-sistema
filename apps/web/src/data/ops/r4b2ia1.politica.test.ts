@@ -34,7 +34,8 @@ describe('portal: idéntico a su línea base (antes de R4-B2-IA1)', () => {
       h.update(politica.construirSistema({ ctx: c, intencion: i, limiteClinico: i === 'CLINICAL_BOUNDARY', reglasConocimiento: ['R1', 'R2'], evidencia: e }))
     // re-anclada por IA-VENDEDORA (20270223): el doctor verificado en el portal recibe las reglas de vendedor y PRICE usa cotizar
     // re-anclada por el EXAMEN (2 nov 2026): regla V6 de vendedor (producto exacto: buscar y preguntar si es ambiguo)
-    expect(h.digest('hex')).toBe('9fcb2a997f10af37b9256a93825c0e1e')
+    // re-anclada (2 nov 2026, caso Éclat de Vie): regla NUNCA DESECHES A UN CLIENTE
+    expect(h.digest('hex')).toBe('7f8a8ed151185088a466d7be901a325c')
     expect(createHash('md5').update(politica.MENSAJE_SIN_RESPUESTA + '|' + politica.MENSAJE_LIMITE_CLINICO).digest('hex')).toBe('a80fa072fa6a2330676fe4a1716d30d1')
   })
 })

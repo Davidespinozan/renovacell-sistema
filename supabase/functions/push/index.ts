@@ -54,6 +54,25 @@ Deno.serve(conCors(async (req) => {
       { title: c.title, body: c.body, url: c.url, tag: c.tag })
     return json(200, { enviados })
   }
+  if (p?.action === 'aviso') {
+    // AVISO RUIDOSO (2 nov 2026): una alerta comercial de la campana (te asignaron un cliente, retoma, escribe, escalada)
+    // también sale al teléfono como URGENTE (no se quita sola y vibra). La base decide a quién y con qué texto.
+    const secreto = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+    if (secreto.length < 32 || !(await iguales(req.headers.get('x-cron-secret') ?? '', secreto))) return json(401, { error: 'no_autorizado' })
+    const id = typeof p.id === 'string' && /^[0-9a-f-]{36}$/.test(p.id) ? p.id : null
+    if (!id) return json(400, { error: 'datos_invalidos' })
+    if (!cfg) return json(200, { enviados: 0, configurado: false })
+    const { data: carga } = await admin.rpc('aviso_push_carga', { p_id: id })
+    const c = carga as { perfiles?: string[]; title: string; body: string; conversation_id: string | null; kind: string } | null
+    if (!c?.perfiles?.length) return json(200, { enviados: 0 })
+    const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: c.perfiles, p_visitors: [] })
+    const lista = (destinos ?? []) as Array<{ id: string; endpoint: string; p256dh: string; auth: string }>
+    if (!lista.length) return json(200, { enviados: 0 })
+    webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+    const enviados = await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 3600, urgency: 'high' }), lista,
+      { title: c.title, body: c.body, url: 'https://sistema.renovacell.mx/sistema', tag: `rc-aviso-${c.conversation_id ?? id}`, urgente: true })
+    return json(200, { enviados })
+  }
   if (p?.action === 'ia_proactivo') {
     // IA mejor que el humano · D: la IA le escribió al doctor por su cuenta (seguimiento o interés en el catálogo) desde el
     // servidor; el disparador de cc_messages avisa aquí con el secreto del cron. La base decide a quién y con qué texto.

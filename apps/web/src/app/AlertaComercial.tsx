@@ -4,7 +4,8 @@
 //   3. Solo si la solicitud SIGUE accionable se muestra la tarjeta; si se resolvió, desaparece sola.
 // Descartar NO resuelve el trabajo: la solicitud sigue en Inicio, Mi bandeja y Conversaciones /
 // Atención comercial. Entre pestañas solo una presenta la misma señal (dedupe de presentación; la
-// idempotencia real es event_key único en la base). Sin sonido ni notificaciones del navegador.
+// idempotencia real es event_key único en la base). AVISO RUIDOSO (2 nov 2026): toda alerta que pide actuar YA suena
+// fuerte y hace parpadear la pestaña (lib/alarma), aunque la tarjeta no aplique; el push urgente llega aparte.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { capitalizarNombre } from '../lib/nombres'
 import { Icon } from './icons'
@@ -16,6 +17,7 @@ import { alertaAccionable, lineasSolicitud, KINDS_COMERCIALES, type AlertaAccion
 import { irAConversacion, irASolicitud } from '../data/store/navIntentStore'
 import { claseEspera, partirLineas } from '../screens/home/primitives'
 import { escucharPestanas, limpiarVencidos, marcar, reclamar, yaPresentado } from '../lib/avisosPestanas'
+import { KINDS_ALARMA, parpadearTitulo, prepararAlarma, sonarAlarma, textoAlarma } from '../lib/alarma'
 
 interface Senal { clave: string; notifId: string; kind: string; conversationId: string }
 const MAX_VISIBLES = 3
@@ -38,7 +40,10 @@ export function AlertaComercial() {
   useEffect(() => {
     if (!fuente) return
     limpiarVencidos()
+    prepararAlarma()
     const quitarSenal = onNuevaNotificacion((n: Notif) => {
+      // Suena para TODA alerta que pide actuar ya (también "tu cliente está escribiendo" y la retoma); una sola pestaña suena.
+      if (n.kind && KINDS_ALARMA.has(n.kind) && reclamar('alarma:' + (n.eventKey ?? n.id))) { sonarAlarma(); parpadearTitulo(textoAlarma(n.kind)) }
       if (!n.kind || !KINDS_COMERCIALES.has(n.kind) || !n.conversationId) return
       const s: Senal = { clave: n.eventKey ?? n.id, notifId: n.id, kind: n.kind, conversationId: n.conversationId }
       // La verdad se relee ANTES de decidir (el store colapsa lecturas simultáneas).

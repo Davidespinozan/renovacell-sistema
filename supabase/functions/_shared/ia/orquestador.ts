@@ -271,7 +271,20 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     }
   }
   switch (v.nombre) {
-    case 'buscar_productos': return rpc('cc_buscar_productos', { p_q: a.consulta, p_limite: LIMITE_RPC.buscar_productos, p_audiencia: ctx.audiencia })
+    case 'buscar_productos': {
+      const r = await rpc('cc_buscar_productos', { p_q: a.consulta, p_limite: LIMITE_RPC.buscar_productos, p_audiencia: ctx.audiencia })
+      // NUNCA DESECHAR (2 nov 2026, caso Éclat de Vie: "no tengo Nabota 200" a una clínica que quería 3): un contacto sin
+      // verificar solo ve lo publicado en la landing; si lo que pide existe en el catálogo profesional, se le dice que SÍ se
+      // maneja (solo el nombre: sin id, precio ni existencias) para que la IA lo pase con un asesor en vez de negarlo.
+      if (!r.error && ctx.audiencia === 'public' && !(Array.isArray(r.data) && r.data.length)) {
+        const pro = await rpc('cc_buscar_productos', { p_q: a.consulta, p_limite: 5, p_audiencia: 'verified' })
+        if (!pro.error && Array.isArray(pro.data) && pro.data.length) {
+          return { data: { productos: [], solo_para_profesionales: (pro.data as Array<{ nombre?: string }>).map((p) => ({ nombre: String(p.nombre ?? '') })).filter((p) => p.nombre),
+            nota: 'Sí lo manejamos: es de venta exclusiva para profesionales verificados. Confírmale que lo tenemos y pásalo con un asesor (solicitar_asesor) para su precio y su pedido.' }, error: null }
+        }
+      }
+      return r
+    }
     case 'obtener_ficha_producto': return rpc('cc_ficha_producto', { p_product: a.product_id, p_audiencia: ctx.audiencia })
     case 'comparar_productos': return rpc('cc_comparar_productos', { p_ids: a.product_ids, p_audiencia: ctx.audiencia })
     case 'buscar_conocimiento': return rpc('cc_buscar_conocimiento', { p_q: a.consulta, p_limite: LIMITE_RPC.buscar_conocimiento, p_audiencia: ctx.audiencia })

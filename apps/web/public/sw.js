@@ -13,6 +13,8 @@ self.addEventListener('push', (e) => {
     badge: '/brand/icon-192.png',
     tag: typeof d.tag === 'string' ? d.tag : 'rc-chat',
     renotify: true,
+    // AVISO RUIDOSO (2 nov 2026): lo del equipo comercial no se quita solo y vibra fuerte hasta que lo tocan
+    ...(d.urgente ? { requireInteraction: true, vibrate: [500, 200, 500, 200, 900], silent: false } : {}),
     data: { url: typeof d.url === 'string' ? d.url : '/sistema' },
   }))
 })

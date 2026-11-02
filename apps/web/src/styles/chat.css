@@ -681,3 +681,8 @@ button.pc-tira:hover{background:var(--hueso)}
 .baja-card h1{margin:0;font-size:22px}
 .baja-card p{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink-2)}
 .baja-link{margin-top:6px;color:var(--green-deep);font-weight:600}
+/* CONVERSACIÓN CONTINUA (2 nov 2026): la sesión anterior se ve aquí, atenuada, con su separador; abajo, lo de ahora */
+.rc-previa{display:contents}
+.rc-previa .rc-msg{opacity:.78}
+.rc-day--previa span,.rc-day--ahora span{font-weight:600}
+.rc-day--ahora span{background:var(--ok-bg, #e8f3ec);color:var(--green-deep, #1f5134)}

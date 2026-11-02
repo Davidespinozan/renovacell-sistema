@@ -30,7 +30,7 @@ describe('Avisos push · servidor', () => {
     const a = armarAviso({ para: 'cliente', remitente: 'Lucía', texto: 'x'.repeat(200), conv: 'C1', visitante: true })
     expect(a.title).toBe('Renovacell'); expect(a.body.startsWith('Lucía: xxx')).toBe(true); expect(a.body.length).toBeLessThanOrEqual(120)
     expect(a.url).toBe('https://renovacell.mx/contacto'); expect(a.tag).toBe('rc-chat-C1')
-    expect(armarAviso({ para: 'personal', remitente: 'Magaly', texto: 'Hola', conv: 'C1', visitante: false })).toMatchObject({ title: 'Mensaje de un cliente', body: 'Magaly: Hola', url: 'https://sistema.renovacell.mx/sistema' })
+    expect(armarAviso({ para: 'personal', remitente: 'Magaly', texto: 'Hola', conv: 'C1', visitante: false })).toMatchObject({ title: '💬 Mensaje de un cliente', body: 'Magaly: Hola', url: 'https://sistema.renovacell.mx/sistema' })
   })
   it('manda a cada dispositivo; una dirección que ya no existe (410) se apaga; nunca lanza', async () => {
     const rpc = vi.fn().mockResolvedValue({}); const admin = { rpc }

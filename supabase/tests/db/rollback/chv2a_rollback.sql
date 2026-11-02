@@ -1,6 +1,8 @@
 -- CHV2-A (123) · El rollback restaura las funciones de 122 y retira configuración/evaluador/columnas; no borra
 -- conversaciones, mensajes, eventos, cartera ni las notificaciones ya emitidas.
 begin;
+\ir ../../../rollback/aviso_ruidoso/99_down.sql   -- AVISO-RUIDOSO (20270305) cuelga de notifications.kind y cc_messages: se baja antes de la foto inicial
+\ir ../../../rollback/asesor_retoma/99_down.sql   -- RETOMA (20270304) cuelga de conversaciones y mensajes: se baja antes de la foto inicial
 do $t$
 declare s1 uuid := tests.user('pos'); d1 uuid := tests.user('doctor'); p uuid; k uuid;
 begin

@@ -18,12 +18,13 @@ export function destinosDe(actor: string, c: { profile_id: string | null; visito
   return null   // asistente y sistema: no se avisa (la persona suele estar en la conversación)
 }
 
-export interface Aviso { title: string; body: string; url: string; tag: string }
+export interface Aviso { title: string; body: string; url: string; tag: string; urgente?: boolean }   // urgente: no se quita sola y vibra (equipo)
 export function armarAviso(o: { para: 'cliente' | 'personal'; remitente: string; texto: string; conv: string; visitante: boolean }): Aviso {
   const recorte = o.texto.replace(/\s+/g, ' ').trim()
   const body = `${o.remitente.trim() || 'Renovacell'}: ${recorte.length > 110 ? recorte.slice(0, 107) + '…' : recorte}`
   const url = o.para === 'personal' ? 'https://sistema.renovacell.mx/sistema' : o.visitante ? 'https://renovacell.mx/contacto' : 'https://sistema.renovacell.mx/sistema'
-  return { title: o.para === 'personal' ? 'Mensaje de un cliente' : 'Renovacell', body, url, tag: `rc-chat-${o.conv}` }
+  // AVISO RUIDOSO · el mensaje de un cliente al personal es urgente (no se quita solo y vibra)
+  return { title: o.para === 'personal' ? '💬 Mensaje de un cliente' : 'Renovacell', body, url, tag: `rc-chat-${o.conv}`, ...(o.para === 'personal' ? { urgente: true } : {}) }
 }
 
 export type EnviarPush = (sub: { endpoint: string; keys: { p256dh: string; auth: string } }, carga: string) => Promise<{ statusCode?: number }>

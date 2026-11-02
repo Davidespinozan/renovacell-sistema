@@ -65,3 +65,24 @@ describe('corrección interna antes del texto seguro', () => {
     expect(persistidos[0]).toBe('En tu carrito tienes 2 Golden Placenta Mask. ¿Lo terminamos?')
   })
 })
+
+describe('nunca desechar al cliente (caso Éclat de Vie)', () => {
+  it('un contacto sin verificar que pide algo del catálogo profesional recibe "sí lo manejamos", sin id ni precio', async () => {
+    const llamadas: Array<[string, Record<string, unknown>]> = []
+    const rpc = async (fn: string, args: Record<string, unknown>) => {
+      llamadas.push([fn, args])
+      if (fn === 'cc_ia_contexto_actor') return { data: { actor: 'visitor', audiencia: 'public', puede_precio: false, puede_stock: false, puede_pedidos: false, verificado: false }, error: null }
+      if (fn === 'cc_ia_turno_reclamar') return { data: { estado: 'reclamado', turn_id: 't1' }, error: null }
+      if (fn === 'cc_ia_turno_responder') return { data: { persistido: true }, error: null }
+      if (fn === 'cc_buscar_productos') return { data: args.p_audiencia === 'verified' ? [{ product_id: A, nombre: 'NABOTA 200 UI' }] : [], error: null }
+      return { data: null, error: null }
+    }
+    const proveedor = crearProveedorFalso([respuestaHerramientas([{ name: 'buscar_productos', input: { consulta: 'nabota 200' } }]), respuestaTexto('¡Sí manejamos NABOTA 200 UI! Te paso con un asesor para tu precio.')])
+    const r = await ejecutarTurno({ conv: 'c1', triggerSeq: 1, actor: 'visitor', profile: null, visitorHash: 'h', textoUsuario: 'quiero 3 nabota 200', canal: 'whatsapp' },
+      { rpc, leerMensajes: async () => [], proveedor, config: { maxTokens: 600, timeoutMs: 20_000, maxRondas: 4, historial: 6 }, politica, herramientas, validacion, reglasConocimiento: [] })
+    expect(r.estado).toBe('respondio'); expect(r.motivoValidacion).toBeUndefined()
+    const resultado = JSON.stringify(proveedor.solicitudes[1].messages)
+    expect(resultado).toMatch(/solo_para_profesionales/); expect(resultado).toMatch(/NABOTA 200 UI/); expect(resultado).not.toContain(A)
+    expect(proveedor.solicitudes[0].system).toMatch(/NUNCA DESECHES A UN CLIENTE/)
+  })
+})
