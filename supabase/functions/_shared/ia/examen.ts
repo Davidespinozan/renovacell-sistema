@@ -85,19 +85,20 @@ export function mensajesDelCaso(c: Caso): Array<{ actor: string; content: string
 export const SISTEMA_JUEZ = [
   'Eres el evaluador más exigente de asesores comerciales de Renovacell (distribuidor de medicina estética en Culiacán que vende solo a médicos verificados).',
   'Calificas UNA respuesta de su asesora de IA a un médico, contra la rúbrica del caso y contra lo que el mejor asesor humano respondería.',
-  'Tienes las salidas reales de las herramientas que la IA consultó: todo monto, escalón, dato técnico o clínico de la respuesta debe coincidir con ellas; un dato que no esté ahí es inventado.',
+  'Tienes las salidas reales de las herramientas que la IA consultó y los DATOS DEL NEGOCIO que la IA recibe en cada turno (entrega, horario, manual de ventas aprobado, promociones vigentes): todo monto, escalón, dato técnico, clínico o del negocio debe coincidir con ellos; un dato que no esté en ninguno de los dos es inventado.',
   'Criterios: (1) exactitud y apego a lo que devolvieron las herramientas; (2) cumple cada punto de "debe" y ninguno de "no_debe"; (3) calidad de venta: resuelve lo que preguntó, propone el siguiente paso, una sugerencia útil como mucho, sin presionar; (4) tono: cálido, breve, español de México natural.',
   'Puntaje de 0 a 10 (10 = mejor que el mejor asesor humano). Aprobado si puntaje ≥ 7 y no viola ningún "no_debe". Una cifra inventada o un dato clínico fuera de la ficha = máximo 3.',
   'Responde SOLO un objeto JSON, sin texto alrededor: {"puntaje": número, "aprobado": booleano, "cumple": [..], "falla": [..], "comentario": "una o dos frases"}.',
 ].join('\n')
 
-export function mensajeJuez(c: Caso, respuesta: string, traza: Traza[]): string {
+export function mensajeJuez(c: Caso, respuesta: string, traza: Traza[], negocio = ''): string {
   const corta = (v: unknown) => { const s = JSON.stringify(v); return s.length > 6000 ? s.slice(0, 6000) + '…' : s }
   return [
     `CASO ${c.id} (${c.categoria})`,
     c.historial?.length ? 'HISTORIAL:\n' + c.historial.map((m) => `${m.actor === 'ai' ? 'IA' : 'Médico'}: ${m.content}`).join('\n') : '',
     `PREGUNTA DEL MÉDICO: ${c.pregunta}`,
     `DEBE: ${JSON.stringify(c.debe)}`, `NO DEBE: ${JSON.stringify(c.no_debe)}`, c.ideal ? `RESPUESTA IDEAL (referencia, los [..] los llena la herramienta): ${c.ideal}` : '',
+    negocio ? 'DATOS DEL NEGOCIO QUE LA IA RECIBE:\n' + negocio.slice(0, 8000) : '',
     'HERRAMIENTAS CONSULTADAS (salida real):\n' + (traza.length ? traza.map((t) => `- ${t.herramienta} ${JSON.stringify(t.args)} → ${corta(t.salida)}`).join('\n') : '(ninguna)'),
     `RESPUESTA DE LA IA:\n${respuesta || '(sin respuesta)'}`,
   ].filter(Boolean).join('\n\n')
@@ -115,3 +116,19 @@ export function parsearJuicio(texto: string): Juicio | null {
     return { puntaje: Math.round(puntaje * 10) / 10, aprobado: o.aprobado === true && puntaje >= 7, cumple: lista(o.cumple), falla: lista(o.falla), comentario: String(o.comentario ?? '').slice(0, 600) }
   } catch { return null }
 }
+
+/** El examen guarda POR QUÉ falló el proveedor (estado HTTP y tipo de error de la API; sin llaves ni contenido). */
+export function capturarErrores(f: typeof fetch): { fetch: typeof fetch; ultimo: () => string | null } {
+  let ultimo: string | null = null
+  const envuelto = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const r = await f(url, init)
+    if (!r.ok) {
+      const cuerpo = await r.clone().json().catch(() => null) as { error?: { type?: string; message?: string } } | null
+      ultimo = `${r.status} ${cuerpo?.error?.type ?? ''}: ${String(cuerpo?.error?.message ?? '').slice(0, 180)}`.trim()
+    }
+    return r
+  }) as typeof fetch
+  return { fetch: envuelto, ultimo: () => ultimo }
+}
+/** ¿Vale la pena reintentar? Saturación, límite o caída sí; una petición inválida o un modelo sin acceso no. */
+export const reintentable = (detalle: string | null): boolean => !detalle || /^(429|5\d\d)\b/.test(detalle)

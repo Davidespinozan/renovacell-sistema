@@ -60,6 +60,17 @@ export interface ResultadoTurno {
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number }; clase?: string; motivoValidacion?: string
 }
 
+// Qué no puede afirmar sin evidencia, dicho al modelo en la corrección interna (una sola por turno).
+const CORRECCION: Record<string, string> = {
+  stock_sin_evidencia: 'afirmaba existencias o disponibilidad sin consultar obtener_disponibilidad en este turno. Si no hace falta para responder, no hables de existencias.',
+  carrito_mutacion_sin_evidencia: 'decía que agregaste, quitaste o cambiaste algo en el carrito sin que la herramienta del carrito lo confirmara. Si quieres ofrecerlo, pregúntale si lo agregas.',
+  carrito_lectura_sin_evidencia: 'describía su carrito sin haberlo consultado con ver_carrito.',
+  precio_sin_evidencia: 'mencionaba montos que no vienen de obtener_precio, cotizar o del perfil del cliente en este turno. Consulta el precio antes de dar cifras.',
+  clinico_sin_evidencia: 'daba cifras clínicas (unidades, ml, dosis) sin haber consultado la ficha aprobada con obtener_ficha_producto en este turno.',
+  pedido_sin_evidencia: 'decía que un pedido quedó creado o confirmado, y tú no creas pedidos.',
+  promesa_humano_sin_evidencia: 'prometía que un asesor ya atiende o responderá, y eso solo lo dice el servidor.',
+}
+
 const LIMITE_RPC: Record<string, number> = { buscar_productos: 10, buscar_conocimiento: 6, candidatos_comerciales: 8 }
 
 export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promise<ResultadoTurno> {
@@ -146,6 +157,8 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     if (!pc.error && pc.data && typeof pc.data === 'object') {
       for (const id of d.herramientas.idsDe(pc.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pc.data)) nombresAutorizados.add(n)
       addEv(['PRICE_EVIDENCE'])
+      // su carrito viene en el perfil (lo arma el servidor): describirlo no es inventarlo
+      if (Array.isArray((pc.data as { carrito?: unknown }).carrito) && ((pc.data as { carrito: unknown[] }).carrito.length > 0)) addEv(['CART_READ_EVIDENCE'])
       perfilComercial = '\n\n' + d.politica.envolverDatos('perfil_comercial_del_cliente', d.herramientas.acotarSalida(pc.data))
     }
   }
@@ -191,6 +204,14 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         // El intento rechazado NO entra al historial: se vuelve a generar con los mismos mensajes y una nota en el sistema
         // (si se le presentara como mensaje, el modelo le contestaría: "Entendido, corrijo mi respuesta…").
         notaCorreccion = `\n\nANTES DE RESPONDER (instrucción interna, no la menciones ni pidas disculpas): no puedes nombrar «${String(v.detalle ?? 'un producto')}» sin haberlo consultado en este turno. Si ese producto no hace falta para responder su último mensaje, no lo menciones; si sí hace falta, consúltalo primero con buscar_productos. Responde directo al usuario, como si fuera tu primera respuesta.`
+        continue
+      }
+      // EXAMEN (2 nov 2026) · una afirmación sin evidencia ya no tira toda la respuesta: UNA corrección interna explicando qué
+      // no puede afirmar (el usuario no ve el intento); si vuelve a fallar, el texto seguro de siempre.
+      const nota = CORRECCION[v.motivo]
+      if (nota && !corregido && ronda < d.config.maxRondas - 1) {
+        corregido = true
+        notaCorreccion = `\n\nANTES DE RESPONDER (instrucción interna, no la menciones ni pidas disculpas): tu respuesta anterior se descartó porque ${nota} Vuelve a responder su último mensaje con los datos que ya consultaste (o consulta lo que falte), directo y como si fuera tu primera respuesta.`
         continue
       }
       return await persistir(d.validacion.respuestaSegura(v.motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), ronda, v.motivo)

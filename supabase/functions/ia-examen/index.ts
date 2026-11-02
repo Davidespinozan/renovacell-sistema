@@ -11,7 +11,8 @@ import { ejecutarTurno } from '../_shared/ia/orquestador.ts'
 import { configurar, crearProveedorAnthropic, esModeloConPensamiento } from '../_shared/ia/proveedor.ts'
 import { configPortal, dependenciasPortal, leerNegocio } from '../_shared/ia/responder.ts'
 import { REGLAS_IA } from '../_shared/conocimiento.ts'
-import { costoUsd, mensajeJuez, mensajesDelCaso, parsearJuicio, rpcExamen, SISTEMA_JUEZ, type Caso } from '../_shared/ia/examen.ts'
+import { capturarErrores, costoUsd, mensajeJuez, mensajesDelCaso, parsearJuicio, reintentable, rpcExamen, SISTEMA_JUEZ, type Caso } from '../_shared/ia/examen.ts'
+import * as politica from '../_shared/ia/politica.ts'
 
 const MODELO_JUEZ = 'claude-opus-5-5'
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
@@ -56,9 +57,12 @@ async function correrCaso(admin: any, corridaId: string, casoId: string): Promis
   const cfg0 = configurar(env)
   if (!cfg0.ok) return { status: 503, body: { error: 'IA no configurada.' } }
   const config = configPortal(cfg0.config, corrida.modelo, env)
-  const proveedor = crearProveedorAnthropic({ key: cfg0.key, model: corrida.modelo, fetch: globalThis.fetch.bind(globalThis),
+  const red = capturarErrores(globalThis.fetch.bind(globalThis))
+  const proveedor = crearProveedorAnthropic({ key: cfg0.key, model: corrida.modelo, fetch: red.fetch,
     opciones: esModeloConPensamiento(corrida.modelo) ? { effort: corrida.esfuerzo, fallbacks: true } : undefined })
-  const deps = dependenciasPortal(await leerNegocio(admin))
+  const negocio = await leerNegocio(admin)
+  const deps = dependenciasPortal(negocio)
+  const datosNegocio = [politica.textoNegocio(negocio), politica.textoManual(negocio), politica.textoPromociones(negocio)].filter(Boolean).join('\n\n')
   const ex = rpcExamen((fn, args) => admin.rpc(fn, args), corrida.perfil_id)
   const mensajes = mensajesDelCaso(corrida.caso)
 
@@ -72,7 +76,7 @@ async function correrCaso(admin: any, corridaId: string, casoId: string): Promis
 
   // Juez: Opus 5.5 con esfuerzo medio, sin herramientas; ve la respuesta y las salidas reales de las herramientas.
   const juez = crearProveedorAnthropic({ key: cfg0.key, model: MODELO_JUEZ, fetch: globalThis.fetch.bind(globalThis), opciones: { effort: 'medium', fallbacks: true } })
-  const j = respuesta ? await juez.generar({ system: SISTEMA_JUEZ, messages: [{ role: 'user', content: mensajeJuez(corrida.caso, respuesta, ex.traza) }], tools: [], max_tokens: 6000, timeoutMs: 60_000 }) : null
+  const j = respuesta ? await juez.generar({ system: SISTEMA_JUEZ, messages: [{ role: 'user', content: mensajeJuez(corrida.caso, respuesta, ex.traza, datosNegocio) }], tools: [], max_tokens: 6000, timeoutMs: 60_000 }) : null
   const juicio = j && j.tipo === 'texto' ? parsearJuicio(j.texto) : null
 
   const resultado = {
@@ -80,10 +84,11 @@ async function correrCaso(admin: any, corridaId: string, casoId: string): Promis
     herramientas: ex.traza.map((t) => ({ herramienta: t.herramienta, args: t.args })), evidencia: r.evidencia ?? [],
     latencia_ms: latencia, tokens_in: r.usage.input, tokens_out: r.usage.output, costo_usd: costoUsd(corrida.modelo, r.usage),
     puntaje: juicio?.puntaje ?? (respuesta ? null : 0), aprobado: juicio?.aprobado ?? false, juicio,
-    error: ex.capturado.falla ?? (juicio || !respuesta ? null : 'juez_sin_veredicto'),
+    error: ex.capturado.falla ? `${ex.capturado.falla}${red.ultimo() ? ' · ' + red.ultimo() : ''}` : (juicio || !respuesta ? null : 'juez_sin_veredicto'),
   }
   // Un fallo del proveedor (sin respuesta) no se registra: el caso sigue en la cola y el cron lo reintenta.
-  if (!respuesta && ex.capturado.falla) return { status: 502, body: { error: 'El modelo no respondió; se reintenta.' } }
+  // (un error permanente —petición inválida, modelo sin acceso— se registra de una vez con su detalle)
+  if (!respuesta && ex.capturado.falla && reintentable(red.ultimo())) { console.error('ia-examen ' + JSON.stringify({ caso: casoId, falla: ex.capturado.falla, detalle: red.ultimo() })); return { status: 502, body: { error: 'El modelo no respondió; se reintenta.' } } }
   const { error: er } = await admin.rpc('ia_examen_registrar', { p_corrida: corridaId, p_caso: casoId, p_r: resultado })
   if (er) return { status: 500, body: { error: 'No se pudo registrar el resultado.' } }
   return { status: 200, body: { caso_id: casoId, ...resultado } }

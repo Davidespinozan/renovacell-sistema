@@ -10,7 +10,9 @@ export type Validacion = { ok: true; texto: string } | { ok: false; motivo: Moti
 
 export const MAX_RESPUESTA = 2500
 const RE_PRECIO = /(\$\s?\d[\d,]*(\.\d+)?)|(\b\d[\d,]*(\.\d+)?\s?(mxn|pesos|usd|d[oó]lares)\b)|(\bcuesta[n]?\s+\d)|(\bprecio (es|de|sería|seria) (de )?\$?\d)/i
-const RE_STOCK = /\b(hay|tenemos|contamos con|queda[n]?|disponemos de)\b[^.!?]{0,40}\b(existencia|existencias|stock|inventario|piezas|unidades|en almac[eé]n)\b|\bagotad[oa]s?\b|\bsin (existencia|existencias|stock)\b|\ben (existencia|stock|inventario)\b|\bs[ií] (hay|tenemos) disponib|\best[aá] disponible (ahora|de inmediato|para env[ií]o)|\bno (hay|tenemos) disponib/i
+// EXAMEN (2 nov 2026) · antes "piezas/unidades" y "queda" bastaban: "si llevas 5 piezas te queda a $4,370" se rechazaba como
+// afirmación de existencias y el doctor recibía un texto genérico. Ahora solo cuenta una afirmación de inventario real.
+const RE_STOCK = /\b(hay|tenemos|contamos con|disponemos de)\b[^.!?]{0,40}\b(existencia|existencias|stock|inventario|en almac[eé]n)\b|\b(hay|tenemos|quedan|nos quedan)\s+\d+\s+(piezas|unidades|cajas|frascos|viales)\b|\bagotad[oa]s?\b|\bsin (existencia|existencias|stock)\b|\ben (existencia|stock|inventario)\b|\bs[ií] (hay|tenemos) disponib|\best[aá] disponible (ahora|de inmediato|para env[ií]o)|\bno (hay|tenemos) disponib/i
 const RE_HERRAMIENTAS = /tool_use|tool_result|"input_schema"|<\/?tool|<<<DATOS|DATOS>>>|\bfunction_call\b|\binput_schema\b/i
 const RE_SISTEMA = /REGLAS NO NEGOCIABLES|POLITICA_SISTEMA|system prompt|mis instrucciones (son|dicen)|instrucciones del sistema/i
 // CC-5 · afirmaciones de carrito: "ya lo agregué/quité/cambié/vacié" exige CART_MUTATION_EVIDENCE; "tu carrito tiene/llevas en el carrito" exige CART_READ_EVIDENCE (o mutación, que también devuelve estado).

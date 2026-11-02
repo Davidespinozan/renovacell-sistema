@@ -33,7 +33,8 @@ describe('portal: idéntico a su línea base (antes de R4-B2-IA1)', () => {
     for (const c of ctxs) for (const i of ['GENERAL_CHAT', 'PRICE', 'HUMAN_REQUEST', 'CHECKOUT', 'ORDER_STATUS', 'UNKNOWN', 'CLINICAL_BOUNDARY']) for (const e of [[], ['HANDOFF_EN_CURSO', 'FUERA_DE_HORARIO'], ['PRICE_EVIDENCE']])
       h.update(politica.construirSistema({ ctx: c, intencion: i, limiteClinico: i === 'CLINICAL_BOUNDARY', reglasConocimiento: ['R1', 'R2'], evidencia: e }))
     // re-anclada por IA-VENDEDORA (20270223): el doctor verificado en el portal recibe las reglas de vendedor y PRICE usa cotizar
-    expect(h.digest('hex')).toBe('deb87572609cd6432c8dea91f9da38cc')
+    // re-anclada por el EXAMEN (2 nov 2026): regla V6 de vendedor (producto exacto: buscar y preguntar si es ambiguo)
+    expect(h.digest('hex')).toBe('9fcb2a997f10af37b9256a93825c0e1e')
     expect(createHash('md5').update(politica.MENSAJE_SIN_RESPUESTA + '|' + politica.MENSAJE_LIMITE_CLINICO).digest('hex')).toBe('a80fa072fa6a2330676fe4a1716d30d1')
   })
 })

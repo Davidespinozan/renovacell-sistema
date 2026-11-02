@@ -1,7 +1,7 @@
 // IA MEJOR QUE EL HUMANO · A · el examen corre el orquestador real con lecturas reales y escrituras simuladas: ningún
 // turno, mensaje, carrito ni asesor se toca; la respuesta, el motivo de validación y lo consultado quedan capturados.
 import { describe, it, expect } from 'vitest'
-import { rpcExamen, LECTURAS, costoUsd, parsearJuicio, mensajesDelCaso, mensajeJuez, type Caso } from '../../../../../supabase/functions/_shared/ia/examen'
+import { rpcExamen, LECTURAS, costoUsd, parsearJuicio, mensajesDelCaso, mensajeJuez, capturarErrores, reintentable, type Caso } from '../../../../../supabase/functions/_shared/ia/examen'
 import { ejecutarTurno } from '../../../../../supabase/functions/_shared/ia/orquestador'
 import * as politica from '../../../../../supabase/functions/_shared/ia/politica'
 import * as herramientas from '../../../../../supabase/functions/_shared/ia/herramientas'
@@ -89,6 +89,22 @@ describe('lo corre el servidor', () => {
     expect(edgeSrc).toMatch(/if \(!tieneRol\(q\.quien, \['admin'\]\)\) return json\(403/)
     expect(edgeSrc).toMatch(/iguales\(req\.headers\.get\('x-cron-secret'\)/)
     // un fallo del modelo no se registra: el cron lo reintenta
-    expect(edgeSrc).toMatch(/if \(!respuesta && ex\.capturado\.falla\) return \{ status: 502/)
+    expect(edgeSrc).toMatch(/if \(!respuesta && ex\.capturado\.falla && reintentable\(red\.ultimo\(\)\)\) \{[^\n]*return \{ status: 502/)
+  })
+})
+
+describe('el examen sabe por qué falló y el juez ve lo mismo que la IA', () => {
+  it('guarda estado y tipo de error de la API; solo reintenta saturación, límite o caída', async () => {
+    const f = (async () => new Response(JSON.stringify({ error: { type: 'not_found_error', message: 'model: claude-x' } }), { status: 404 })) as unknown as typeof fetch
+    const red = capturarErrores(f)
+    const r = await red.fetch('https://api.anthropic.com/v1/messages')
+    expect(r.status).toBe(404)
+    expect(red.ultimo()).toBe('404 not_found_error: model: claude-x')
+    expect(reintentable(red.ultimo())).toBe(false)
+    expect(reintentable('429 rate_limit_error: x')).toBe(true); expect(reintentable('529 overloaded_error: x')).toBe(true); expect(reintentable(null)).toBe(true)
+  })
+  it('el juez recibe los datos del negocio (entrega, horario, manual) para no castigar lo que sí está', () => {
+    const m = mensajeJuez(caso, 'Te lo llevamos el mismo día si confirmas antes de las 15:30.', [], 'Entrega local: corte 15:30, mismo día')
+    expect(m).toMatch(/DATOS DEL NEGOCIO QUE LA IA RECIBE:\nEntrega local: corte 15:30/)
   })
 })
