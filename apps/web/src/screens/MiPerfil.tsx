@@ -84,6 +84,11 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             </label>
           </div>
 
+          {user?.email && (
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }} data-testid="perfil-cuenta">
+              Entraste con la cuenta <b style={{ color: 'var(--ink)' }}>{user.email}</b>. Si no es la tuya, cierra sesión y entra con tu correo: todo lo que hagas queda a nombre de esta cuenta.
+            </div>
+          )}
           <label style={label}>Nombre visible</label>
           <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
 

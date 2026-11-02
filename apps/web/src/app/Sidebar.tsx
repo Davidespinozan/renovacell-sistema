@@ -114,7 +114,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 : <span className="su-av">{initials(user.name)}</span>}
               <span className="su-meta">
                 <span className="su-name">{user.name.split('·')[0].trim()}</span>
-                <span className="su-role">Editar perfil</span>
+                <span className="su-role" title={user.email}>{user.email || 'Editar perfil'}</span>   {/* MULTIUSUARIO (2 nov 2026): con qué cuenta entró, no solo su nombre */}
               </span>
             </button>
             <button className="su-ic" type="button" aria-label="Ajustes" title="Ajustes" onClick={() => setAjustesOpen(true)}>
