@@ -14,6 +14,7 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'enlace_portal'   // LIVE C1 · URL pública oficial del portal (sin tokens ni datos): la ofrece a audiencias públicas y canales
   | 'registrar_contacto'   // CONTACTO CONVERSACIONAL · solo el visitante del enlace que aún no deja sus datos
   | 'cotizar' | 'recomendar_productos'   // IA-VENDEDORA · combinaciones con las reglas del pedido y recomendaciones con motivo
+  | 'solicitar_verificacion'   // VERIFICACIÓN POR WHATSAPP (2 nov 2026) · un contacto aún no reconocido pide verificarse para comprar
 export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
@@ -90,13 +91,22 @@ export const REGISTRAR_CONTACTO: DefinicionHerramienta = { name: 'registrar_cont
     es_medico: { type: 'boolean', description: 'true solo si dijo ser profesional de la salud.' }, cedula: texto('Cédula profesional, solo si la dio.', 40),
   }, required: ['nombre', 'telefono', 'email'], additionalProperties: false } }
 
+// VERIFICACIÓN POR WHATSAPP (2 nov 2026, dueño: la IA atiende de punta a punta; precios solo a verificados). La IA junta
+// los datos en el chat; el personal verifica y aprueba (la verificación sigue siendo manual).
+export const SOLICITAR_VERIFICACION: DefinicionHerramienta = { name: 'solicitar_verificacion', autoridad: 'cualquiera', mutante: true,
+  description: 'Registra la solicitud de verificación de un profesional que escribe por este canal y aún no está reconocido, para que el equipo la apruebe y puedas darle sus precios y venderle aquí mismo. Úsala cuando tengas su nombre completo, su número de cédula profesional y su correo (pídele también una foto de su cédula profesional; si ya la mandó, se adjunta sola). Si responde registrada:false, pide de nuevo solo el dato de `campo` (nombre: nombre y apellido; cedula: 7 u 8 dígitos; email: correo válido).',
+  input_schema: { type: 'object', properties: {
+    nombre: texto('Nombre completo como lo escribió.', 120), cedula: texto('Número de cédula profesional como lo escribió.', 40), email: texto('Correo como lo escribió.', 160),
+    especialidad: texto('Especialidad o tipo de práctica, si la dijo.', 80), ciudad: texto('Ciudad, si la dijo.', 80),
+  }, required: ['nombre', 'cedula', 'email'], additionalProperties: false } }
+
 /** Herramientas expuestas al modelo según el actor (los pedidos solo con cuenta). */
 // IA MEJOR QUE EL HUMANO · E · un WhatsApp vinculado a un doctor verificado también consulta SUS pedidos (lectura); carrito y
 // checkout siguen siendo del portal.
 const SOLO_PORTAL_SIN_VINCULO: readonly NombreHerramienta[] = ['obtener_estado_pedido']
 const soloPortal = (n: NombreHerramienta, identificado: boolean) => SOLO_PORTAL.includes(n) && !(identificado && SOLO_PORTAL_SIN_VINCULO.includes(n))
 export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false, identificado = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
-  return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : [])]
+  return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : []), ...(canal !== 'portal' && !identificado && !conCuenta ? [SOLICITAR_VERIFICACION] : [])]
     .filter((h) => h.autoridad === 'cualquiera' || conCuenta)
     .filter((h) => canal === 'portal' || !soloPortal(h.name, identificado))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal (pedidos sí con vínculo)
     .filter((h) => h.name !== 'enlace_portal' || !conCuenta || canal !== 'portal')   // el enlace solo tiene sentido sin sesión en el portal
@@ -117,6 +127,13 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     if (!nom || !tel || !email || (i.es_medico !== undefined && typeof i.es_medico !== 'boolean')) return { ok: false, motivo: 'argumentos' }
     const cedula = i.cedula === undefined || i.cedula === null || i.cedula === '' ? null : str(i.cedula, 40)
     return { ok: true, nombre: 'registrar_contacto', args: { nombre: nom, telefono: tel, email, es_medico: i.es_medico === true, cedula }, ids: [] }
+  }
+  if (nombre === 'solicitar_verificacion') {
+    if ((ctx.canal ?? 'portal') === 'portal' || ctx.identificado || ctx.conCuenta) return { ok: false, motivo: 'no_autorizada' }
+    const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
+    const nom = str(i.nombre, 120); const ced = str(i.cedula, 40); const email = str(i.email, 160)
+    if (!nom || !ced || !email) return { ok: false, motivo: 'argumentos' }
+    return { ok: true, nombre: 'solicitar_verificacion', args: { nombre: nom, cedula: ced, email, especialidad: str(i.especialidad, 80), ciudad: str(i.ciudad, 80) }, ids: [] }
   }
   if (typeof nombre !== 'string' || !NOMBRES.has(nombre)) return { ok: false, motivo: 'desconocida' }
   const def = HERRAMIENTAS.find((h) => h.name === nombre)!
@@ -259,7 +276,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
     case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
     case 'enlace_portal': return o.url === URL_PORTAL_PUBLICA ? ['PORTAL_LINK_EVIDENCE'] : []
-    case 'registrar_contacto': return []   // datos de contacto: no son evidencia comercial
+    case 'registrar_contacto': case 'solicitar_verificacion': return []   // datos de contacto/verificación: no son evidencia comercial
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'

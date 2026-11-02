@@ -1,5 +1,6 @@
 -- CC-7 · El rollback retira horario/cartera/handoff y devuelve EXACTAMENTE el comportamiento CC-2/5/6 previo.
 begin;
+\ir ../../../rollback/verificacion_wa/99_down.sql   -- VERIFICACIÓN-WA (20270306) redefine la carga del push de alertas: se baja antes de la foto inicial
 \ir ../../../rollback/aviso_ruidoso/99_down.sql   -- AVISO-RUIDOSO (20270305) cuelga de notifications.kind y cc_messages: se baja antes de la foto inicial
 \ir ../../../rollback/asesor_retoma/99_down.sql   -- RETOMA (20270304) cuelga de conversaciones y mensajes: se baja antes de la foto inicial
 set app.chatv2c1_rollback_forzado = 'on';   -- prueba estructural de la cadena completa (la frontera se prueba en chatv2c1_rollback.sql)

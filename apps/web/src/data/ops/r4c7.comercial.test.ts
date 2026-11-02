@@ -96,9 +96,10 @@ describe('B · compra, recompra y negociación → la IA confirma y un asesor ci
   it('negación de compra con pregunta de producto → sigue como información', () => {
     expect(politica.clasificarIntencionCanal('No quiero comprar todavía, ¿qué es el Nabota?')).toBe('PRODUCT_INFO')
   })
-  it('la tarea de compra: confirmar con el catálogo, pedir presentación y cantidad, asesor por aquí, sin precios ni portal por defecto, sin solicitar_asesor', () => {
+  // VERIFICACIÓN POR WHATSAPP (2 nov 2026): la IA sigue atendiendo (verifica aquí); el asesor se entera por la señal del sistema.
+  it('la tarea de compra: confirmar con el catálogo, verificar aquí, anotar presentación y cantidad, sin solicitar_asesor salvo que pida una persona', () => {
     const t = politica.tareaCanal('CHECKOUT', false)
-    for (const x of ['buscar_productos', 'presentación y cantidad', 'continuará contigo por aquí', 'NO uses solicitar_asesor', 'Sin precios, existencias ni tiempos', 'No mandes al portal salvo que lo pida', 'FUERA_DE_HORARIO']) expect(t, x).toContain(x)
+    for (const x of ['buscar_productos', 'presentación y cantidad', 'solicitar_verificacion', 'Su asesor ya está enterado', 'No uses solicitar_asesor salvo que pida una persona', 'Nunca digas que registraste']) expect(t, x).toContain(x)
   })
 })
 

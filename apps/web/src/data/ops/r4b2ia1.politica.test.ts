@@ -78,11 +78,12 @@ describe('canal: falsos positivos eliminados y solicitudes explícitas reconocid
 describe('canal: tarea, contexto y mensajes', () => {
   const ctxV = { actor: 'visitor', audiencia: 'public', puede_precio: false, puede_stock: false, puede_pedidos: false, verificado: false }
   const sys = (intencion: string, limiteClinico = false) => politica.construirSistema({ ctx: ctxV, intencion, limiteClinico, reglasConocimiento: [], evidencia: [], canal: 'whatsapp' })
-  it('precio: orienta al portal con enlace_portal, sin cifras y sin transferir por defecto; condiciones especiales → asesor', () => {
-    const s = sys('PRICE'); expect(s).toContain('enlace_portal'); expect(s).toContain('NO transfieras solo porque pregunta el precio'); expect(s).toContain('mayoreo, crédito, cotización formal')
+  // VERIFICACIÓN POR WHATSAPP (2 nov 2026, dueño): sin cifras hasta verificar, pero lo verifica AQUÍ y sigue atendiendo.
+  it('precio: sin cifras a un contacto sin verificar; lo verifica aquí mismo (solicitar_verificacion); el portal solo si lo prefiere', () => {
+    const s = sys('PRICE'); expect(s).toContain('no le das cifras'); expect(s).toContain('solicitar_verificacion'); expect(s).toContain('No lo mandes al portal salvo que lo prefiera')
   })
-  it('compra (R4-C7): confirma el producto con el catálogo y la cierra un asesor; nunca confirma pedidos; sin botón de checkout', () => {
-    const s = sys('CHECKOUT'); expect(s).toContain('cerrará la venta en este mismo chat'); expect(s).toContain('NO uses solicitar_asesor'); expect(s).toContain('Nunca digas que registraste'); expect(politica.tareaCanal('CHECKOUT', false)).not.toContain('Confirmar pedido')
+  it('compra: confirma que lo manejamos, lo verifica aquí, sigue atendiendo (su asesor ya está enterado); nunca confirma pedidos', () => {
+    const s = sys('CHECKOUT'); expect(s).toContain('confírmale que SÍ lo manejamos'); expect(s).toContain('solicitar_verificacion'); expect(s).toContain('Su asesor ya está enterado'); expect(s).toContain('Nunca digas que registraste'); expect(politica.tareaCanal('CHECKOUT', false)).not.toContain('Confirmar pedido')
   })
   it('pedido/reclamación: no inventa estado y transfiere; clínico: límite y asesor COMERCIAL (no clínico)', () => {
     expect(sys('ORDER_STATUS')).toContain('no inventes estados'); expect(sys('ORDER_STATUS')).toContain('solicitar_asesor')
@@ -128,13 +129,13 @@ const entrada = (texto: string) => ({ conv: CONV, triggerSeq: 5, actor: 'visitor
 const persistido = (db: ReturnType<typeof base>) => String(db.llamadas.find((l) => l.fn === 'cc_ia_turno_responder')?.args.p_content ?? '')
 
 describe('canal: conversaciones simuladas (orquestador real + proveedor falso)', () => {
-  it('«¿Cuánto cuesta el Hyalux Deep?» → orienta al portal con el enlace oficial; sin cifras; SIN transferencia', async () => {
+  it('«¿Cuánto cuesta el Hyalux Deep?» → sin cifras; ofrece verificarse (o el portal si lo prefiere); SIN transferencia', async () => {
     const db = base()
     const d = deps(db, [respuestaHerramientas([{ name: 'buscar_productos', input: { consulta: 'hyalux deep' } }, { name: 'enlace_portal', input: {} }]),
       respuestaTexto('El precio de Hyalux Deep 1 ml se consulta en el portal para profesionales verificados: ' + URL_SISTEMA + ' ¿Te cuento algo más del producto?')])
     const r = await ejecutarTurno(entrada('¿Cuánto cuesta el Hyalux Deep?'), d)
     expect(r.estado).toBe('respondio')
-    expect(d.proveedor.solicitudes[0].system).toContain('TAREA: precio o condiciones comerciales')
+    expect(d.proveedor.solicitudes[0].system).toContain('TAREA: precio o condiciones. A un contacto aún no verificado no le das cifras')
     expect(db.llamadas.some((l) => l.fn === 'cc_solicitar_asesor')).toBe(false)
     expect(persistido(db)).toContain(URL_SISTEMA); expect(persistido(db)).not.toMatch(/\$\s?\d/)
   })

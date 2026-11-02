@@ -107,6 +107,13 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
   // R4-C8 · un solo mensaje armonioso: si la IA respondió (ya dijo que un asesor continúa), el aviso del servidor queda
   // solo para el equipo (prefijo 'comercial': no sale por el canal); si no respondió, el aviso SÍ le llega al cliente.
+  // SEÑAL DE INTERÉS → HUMANO, SIEMPRE (2 nov 2026, dueño): si la IA respondió, la conversación SIGUE con la IA (la atiende de
+  // punta a punta) y el responsable comercial recibe la señal con alarma; solo si la IA no pudo responder, se transfiere
+  // como antes para que ningún comprador quede sin atención.
+  if (comercial && canal !== 'portal' && r === 'respondio') {
+    await admin.rpc('cc_senal_interes', { p_conv: conv, p_motivo: comercial }).then(() => {}, () => {})
+    return r
+  }
   if (comercial && canal !== 'portal') {
     const prefijo = r === 'respondio' ? 'comercial' : canal === 'whatsapp' ? 'wa' : canal
     const { data, error } = await admin.rpc('_cc_canal_transferir', { p_conv: conv, p_origen: canal, p_prefijo: prefijo, p_motivo: 'atencion_comercial', p_respiro: true })

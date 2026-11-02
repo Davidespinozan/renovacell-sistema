@@ -53,5 +53,5 @@ export function detenerParpadeo(): void {
 }
 
 /** Avisos que suenan: lo que pide que alguien del equipo actúe YA. */
-export const KINDS_ALARMA: ReadonlySet<string> = new Set(['handoff_asignado', 'handoff_aviso', 'handoff_escalado', 'handoff_sin_vendedor', 'retoma', 'cliente_escribe'])
-export const textoAlarma = (kind: string) => (kind === 'cliente_escribe' ? '💬 Tu cliente está escribiendo' : kind === 'retoma' ? '🔔 Tu cliente volvió' : '🔔 Cliente esperando')
+export const KINDS_ALARMA: ReadonlySet<string> = new Set(['handoff_asignado', 'handoff_aviso', 'handoff_escalado', 'handoff_sin_vendedor', 'retoma', 'cliente_escribe', 'senal_compra', 'verificacion_wa'])
+export const textoAlarma = (kind: string) => (kind === 'cliente_escribe' ? '💬 Tu cliente está escribiendo' : kind === 'retoma' ? '🔔 Tu cliente volvió' : kind === 'senal_compra' ? '🛒 Señal de compra' : kind === 'verificacion_wa' ? '🪪 Verificar a un cliente' : '🔔 Cliente esperando')

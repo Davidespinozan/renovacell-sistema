@@ -138,7 +138,7 @@ describe('LIVE C1 · identidad por canal: fuera del portal la IA es audiencia p�
   })
   it('contexto de canal en la política: texto plano, límite por canal, sin documentos; nada en portal', () => {
     expect(politica.contextoCanal('portal')).toBe('')
-    const ig = politica.contextoCanal('instagram'); expect(ig).toContain('Instagram'); expect(ig).toContain('900 caracteres'); expect(ig).toContain('sin Markdown'); expect(ig).toContain('nunca pidas cédula, INE')
+    const ig = politica.contextoCanal('instagram'); expect(ig).toContain('Instagram'); expect(ig).toContain('900 caracteres'); expect(ig).toContain('sin Markdown'); expect(ig).toContain('Nunca pidas contraseñas, datos bancarios ni tarjetas'); expect(ig).toContain('solicitar_verificacion')   // VERIFICACIÓN POR WHATSAPP (2 nov 2026): la cédula sí, para verificar aquí
     expect(politica.contextoCanal('whatsapp')).toContain('WhatsApp'); expect(politica.contextoCanal('messenger')).toContain('Facebook Messenger')
     const sys = politica.construirSistema({ ctx: { actor: 'visitor', audiencia: 'public', puede_precio: false, puede_stock: false, puede_pedidos: false, verificado: false }, intencion: 'PRICE', limiteClinico: false, reglasConocimiento: REGLAS_IA, evidencia: [], canal: 'whatsapp' })
     expect(sys).toContain('CANAL: el usuario escribe por WhatsApp'); expect(sys.indexOf('CANAL:')).toBeGreaterThan(sys.indexOf('TAREA:'))

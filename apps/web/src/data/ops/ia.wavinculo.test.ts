@@ -39,7 +39,7 @@ describe('herramientas y prompt', () => {
   it('el prompt lo reconoce, vende y cotiza antes de pasar la compra a una persona', () => {
     const s = politica.construirSistema({ ctx: doctor, intencion: 'CHECKOUT', limiteClinico: false, reglasConocimiento: [], evidencia: [], canal: 'whatsapp' })
     expect(s).toContain('El sistema YA LO RECONOCIÓ'); expect(s).not.toMatch(/Trátalo como contacto NO verificado/)
-    expect(s).toContain('TAMBIÉN ERES SU VENDEDOR'); expect(s).toMatch(/antes cotiza con cotizar lo que pidió/)
+    expect(s).toContain('TAMBIÉN ERES SU VENDEDOR'); expect(s).toMatch(/cotiza con cotizar y dale el total exacto/)
     const anon = politica.construirSistema({ ctx: { ...doctor, actor: 'visitor', audiencia: 'public', verificado: false, puede_precio: false }, intencion: 'PRICE', limiteClinico: false, reglasConocimiento: [], evidencia: [], canal: 'whatsapp' })
     expect(anon).toMatch(/Trátalo como contacto NO verificado/); expect(anon).not.toContain('YA LO RECONOCIÓ')
   })

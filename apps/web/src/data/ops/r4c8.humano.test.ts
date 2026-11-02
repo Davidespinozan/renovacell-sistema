@@ -63,13 +63,14 @@ describe('compra: un solo mensaje armonioso', () => {
     vi.stubGlobal('Deno', { env: { get: (k: string) => (k === 'ANTHROPIC_API_KEY' ? 'k-falsa' : undefined) } })
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: '¡Claro! ¿Qué presentación y cuántas piezas necesitas? Un asesor continuará contigo por aquí para completar tu compra.' }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 10 } }), { status: 200 })))
   })
-  it('la IA respondió → el aviso del servidor queda para el equipo (prefijo comercial, no sale por WhatsApp)', async () => {
+  // SEÑAL DE INTERÉS → HUMANO (2 nov 2026, dueño): la IA respondió → sigue atendiendo; el asesor recibe la señal (no hay transferencia)
+  it('la IA respondió → señal de compra al responsable, sin transferir (la IA sigue atendiendo)', async () => {
     const a = admin()
     expect(await responderIA(a, CONV, 17, 'visitor', null, 'h'.repeat(64), 'Quisiera comprar', 'wa:1', 'whatsapp')).toBe('respondio')
-    const t = a.llamadas.filter((l) => l.fn === '_cc_canal_transferir')
-    expect(t).toHaveLength(1); expect(t[0].args).toMatchObject({ p_prefijo: 'comercial', p_motivo: 'atencion_comercial', p_respiro: true })
-    // el aviso se registra DESPUÉS de la respuesta de la IA
-    expect(a.llamadas.findIndex((l) => l.fn === 'cc_ia_turno_responder')).toBeLessThan(a.llamadas.findIndex((l) => l.fn === '_cc_canal_transferir'))
+    expect(a.llamadas.filter((l) => l.fn === '_cc_canal_transferir')).toHaveLength(0)
+    const s = a.llamadas.filter((l) => l.fn === 'cc_senal_interes')
+    expect(s).toHaveLength(1); expect(s[0].args).toMatchObject({ p_conv: CONV })
+    expect(a.llamadas.findIndex((l) => l.fn === 'cc_ia_turno_responder')).toBeLessThan(a.llamadas.findIndex((l) => l.fn === 'cc_senal_interes'))
   })
 })
 

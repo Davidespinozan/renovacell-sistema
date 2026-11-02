@@ -1,5 +1,6 @@
 -- CC-5 · El rollback retira el carrito y devuelve adopción/purga a CC-2 sin tocar CC-1..CC-4.
 begin;
+\ir ../../../rollback/verificacion_wa/99_down.sql   -- VERIFICACIÓN-WA (20270306) redefine la carga del push de alertas: se baja antes de la foto inicial
 \ir ../../../rollback/aviso_ruidoso/99_down.sql   -- AVISO-RUIDOSO (20270305) cuelga de notifications.kind y cc_messages: se baja antes de la foto inicial
 \ir ../../../rollback/asesor_retoma/99_down.sql   -- RETOMA (20270304) cuelga de conversaciones y mensajes: se baja antes de la foto inicial
 -- CC-6 (revisiones/operaciones → cc_carts) baja primero.

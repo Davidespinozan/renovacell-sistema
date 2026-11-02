@@ -1,5 +1,6 @@
 -- AVISO RUIDOSO (20270305) · el down retira disparadores y funciones; se reaplica idéntica.
 begin;
+\ir ../../../rollback/verificacion_wa/99_down.sql   -- VERIFICACIÓN-WA (20270306) redefine la carga del push de alertas: se baja antes de la foto inicial
 create temp table _av as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/aviso_ruidoso/99_down.sql
 do $t$ begin

@@ -25,6 +25,7 @@ import { ESTADOS_SEGUIMIENTO, ETIQUETA_ESTADO, PLAZOS, cuandoRetomar, enDias, se
 import { ClipboardList, Eye } from 'lucide-react'
 import { interesReciente as interesPorDefecto, resumenInteres, type InteresReciente } from '../../data/ops/actividadCatalogo'   // IA-VENDEDORA
 import type { AccionChat } from './ChatCanonico'
+import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
@@ -56,6 +57,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const [form, setForm] = useState({ nombre: '', cedula: '', email: '', ciudad: '' })
   const [revisado, setRevisado] = useState(false)
   const ine = useIne(conversationId)
+  const tiraVerificacion = useSolicitudVerificacion(conversationId, undefined, onCambio)   // VERIFICACIÓN POR WHATSAPP · antes de cualquier return
   const hojaAbierta = useHoja(conversationId)
   const hoja = hojaAbierta?.startsWith('pc:') ? hojaAbierta : null
   const abrir = useCallback((k: string) => { setMsg(null); abrirHoja(conversationId, k) }, [conversationId])
@@ -261,7 +263,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const tiraInteres = interes.length ? (
     <div className="pc-interes" data-testid="pc-interes"><Eye size={14} aria-hidden /> <span>En el catálogo: {resumenInteres(interes)}</span></div>
   ) : null
-  const tira = <>{tiraFicha}{tiraSeg}{tiraInteres}{!hoja && aviso}{modales}</>
+  const tira = <>{tiraVerificacion}{tiraFicha}{tiraSeg}{tiraInteres}{!hoja && aviso}{modales}</>
 
   // ── Menú «+»: lo que se puede hacer con este cliente ────────────────────────────────────────────────
   const acciones: AccionChat[] = []
