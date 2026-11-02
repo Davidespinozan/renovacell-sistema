@@ -10,6 +10,8 @@ import { recargarPromos } from '../../data/store/promosStore'
 import { hoyNegocio } from '../../data/periodo'
 import { TarjetaPromo } from '../../app/TarjetaPromo'
 import { Flyers } from './Flyers'   // PROMO-9 · flyers del portal
+import { leerFlyerPromo, type FlyerLeido } from '../../data/ops/promociones'   // PROMOCIÓN DESDE UN FLYER (2 nov 2026)
+import { guardarFlyer, subirImagenFlyer } from '../../data/ops/flyers'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
 import { ETIQUETA_ESTADO, PILL_ESTADO, avisarPromoPush, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
@@ -32,7 +34,7 @@ export function emparejarProducto(texto: string, productos: Array<{ id: string; 
   return porPalabra.length === 1 ? porPalabra[0].id : null
 }
 
-export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion, avisar = avisarPromoPush, flyers = true }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion; avisar?: typeof avisarPromoPush; flyers?: boolean }) {
+export function Promociones({ listar = listarPromociones, guardar = guardarPromocion, cambiarEstado = estadoPromocion, previa = previaDifusion, difundir = difundirPromocion, eliminar = eliminarPromocion, prueba = pruebaCorreoPromocion, avisar = avisarPromoPush, flyers = true, leerFlyer = leerFlyerPromo, publicarFlyer = async (f: File, titulo: string, promocion: string) => { const u = await subirImagenFlyer(f); return u.ok ? guardarFlyer({ titulo, imagen_url: u.data, promocion_id: promocion }) : u } }: { listar?: typeof listarPromociones; guardar?: typeof guardarPromocion; cambiarEstado?: typeof estadoPromocion; previa?: typeof previaDifusion; difundir?: typeof difundirPromocion; eliminar?: typeof eliminarPromocion; prueba?: typeof pruebaCorreoPromocion; avisar?: typeof avisarPromoPush; flyers?: boolean; leerFlyer?: typeof leerFlyerPromo; publicarFlyer?: (f: File, titulo: string, promocion: string) => Promise<{ ok: boolean; error?: string }> }) {
   const { data: productos } = useProducts()
   const { lists: listas } = usePricing()
   const vendibles = useMemo(() => productos.filter((p) => isActiveProduct(p)).sort((a, b) => a.name.localeCompare(b.name)), [productos])
@@ -40,6 +42,9 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   const [form, setForm] = useState<Form | null>(null)
   const [texto, setTexto] = useState('')
   const [pegar, setPegar] = useState(false)
+  // PROMOCIÓN DESDE UN FLYER · la imagen leída; al guardar, opcionalmente también queda como flyer del portal ligado a la promo
+  const [flyerImg, setFlyerImg] = useState<{ archivo: File; publicar: boolean } | null>(null)
+  const [leyendo, setLeyendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -96,7 +101,13 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
     const r = await guardar(d)
     setOcupado(false)
     if (!r.ok) { setError(r.error); return }
-    setForm(null); setAviso(`"${r.data.nombre}" guardada · ${ETIQUETA_ESTADO[r.data.estado].toLowerCase()} ${vigenciaTexto(r.data)}.`)
+    let extra = ''
+    if (flyerImg?.publicar && !form.id) {
+      const f = await publicarFlyer(flyerImg.archivo, r.data.nombre, r.data.id)
+      extra = f.ok ? ' El flyer ya aparece en el Inicio del portal mientras dure.' : ` No se pudo publicar el flyer: ${f.error ?? 'intenta desde Flyers'}.`
+    }
+    setFlyerImg(null)
+    setForm(null); setAviso(`"${r.data.nombre}" guardada · ${ETIQUETA_ESTADO[r.data.estado].toLowerCase()} ${vigenciaTexto(r.data)}.${extra}`)
     await cargar(); void recargarPromos()
   }
   const pausar = async (p: Promocion) => {
@@ -113,6 +124,19 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
     const sinProducto = lineas.filter((x) => !x.product_id).length
     setAviso(`Leí ${lineas.length} ${lineas.length === 1 ? 'renglón' : 'renglones'}${sinProducto ? `; ${sinProducto} sin producto emparejado: elígelo en la lista` : ''}${l.sinLeer.length ? `; no entendí: ${l.sinLeer.join(' / ')}` : ''}. Revisa y guarda.`)
   }
+  const leerImagen = async (f: File | undefined) => {
+    if (!f || leyendo) return
+    setLeyendo(true); setError(null); setAviso(null); setPegar(false); setForm(null)
+    const r = await leerFlyer(f)
+    setLeyendo(false)
+    if (!r.ok) { setError(r.error); return }
+    const l: FlyerLeido = r.data
+    const lineas: Renglon[] = l.lineas.map((x) => ({ product_id: (x.producto_id && vendibles.some((p) => p.id === x.producto_id) ? x.producto_id : emparejarProducto(x.texto, vendibles)) ?? '', min_qty: x.min_qty, precio: x.precio, texto: x.texto }))
+    setForm({ nombre: l.nombre, descripcion: l.condiciones ?? '', desde: l.desde ?? hoyIso(), hasta: l.hasta ?? l.desde ?? hoyIso(), listas: null, lineas })
+    setFlyerImg({ archivo: f, publicar: true })
+    const sinProducto = lineas.filter((x) => !x.product_id).length
+    setAviso(`Leí el flyer: ${lineas.length} ${lineas.length === 1 ? 'renglón' : 'renglones'}${sinProducto ? `; ${sinProducto} sin producto emparejado: elígelo en la lista` : ''}${!l.desde || !l.hasta ? '; el flyer no dice la vigencia completa: revísala' : ''}${l.sin_leer.length ? `; no entendí: ${l.sin_leer.join(' / ')}` : ''}. Revisa y guarda.`)
+  }
   const editar = (p: Promocion) => setForm({ id: p.id, nombre: p.nombre, descripcion: p.descripcion ?? '', desde: p.desde.slice(0, 10), hasta: p.hasta.slice(0, 10), listas: p.listas, lineas: p.lineas.map((l) => ({ product_id: l.product_id, min_qty: l.min_qty, precio: l.precio })) })
   const setLinea = (i: number, patch: Partial<Renglon>) => setForm((f) => f && ({ ...f, lineas: f.lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)) }))
 
@@ -123,8 +147,12 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Promociones</h4>
           <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Varios productos, un periodo. Se aplican solas en el portal, la caja y el chat mientras duran; nunca se cobra más que el precio normal del cliente.</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button className="btn ghost sm" type="button" onClick={() => { setPegar((v) => !v); setForm(null) }} data-testid="promo-pegar">Pegar texto</button>
-            <button className="btn sm" type="button" onClick={() => { setForm(VACIO()); setPegar(false) }} data-testid="promo-nueva"><Plus size={14} /> Nueva promoción</button>
+            <label className="btn ghost sm" style={{ cursor: leyendo ? 'wait' : 'pointer' }} data-testid="promo-flyer">
+              {leyendo ? 'Leyendo flyer…' : 'Subir flyer'}
+              <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={leyendo} onChange={(e) => { void leerImagen(e.target.files?.[0]); e.target.value = '' }} data-testid="promo-flyer-input" />
+            </label>
+            <button className="btn ghost sm" type="button" onClick={() => { setPegar((v) => !v); setForm(null); setFlyerImg(null) }} data-testid="promo-pegar">Pegar texto</button>
+            <button className="btn sm" type="button" onClick={() => { setForm(VACIO()); setPegar(false); setFlyerImg(null) }} data-testid="promo-nueva"><Plus size={14} /> Nueva promoción</button>
           </div>
         </div>
         {aviso && <div role="status" className="ms" style={{ color: 'var(--green-deep)', marginTop: 8 }} data-testid="promo-aviso">{aviso}</div>}
@@ -142,6 +170,12 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
               <label style={{ fontSize: 12 }}>Desde<input style={input} type="date" value={form.desde} onChange={(e) => setForm({ ...form, desde: e.target.value })} aria-label="Desde" /></label>
               <label style={{ fontSize: 12 }}>Hasta<input style={input} type="date" value={form.hasta} onChange={(e) => setForm({ ...form, hasta: e.target.value })} aria-label="Hasta" /></label>
             </div>
+            {flyerImg && !form.id && (
+              <label style={{ fontSize: 12.5, display: 'flex', gap: 8, alignItems: 'center' }} data-testid="promo-flyer-publicar">
+                <input type="checkbox" checked={flyerImg.publicar} onChange={(e) => setFlyerImg({ ...flyerImg, publicar: e.target.checked })} />
+                Publicar también esta imagen como flyer del portal (vive y termina con la promoción)
+              </label>
+            )}
             <label style={{ fontSize: 12 }}>Nota (opcional)<input style={input} value={form.descripcion} maxLength={500} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} aria-label="Nota" /></label>
             {listas.length > 1 && (
               <div style={{ fontSize: 12.5, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }} data-testid="promo-listas">

@@ -150,3 +150,17 @@ export function leerPromoTexto(texto: string, anio = Number(hoyNegocio().slice(0
   if (!out.nombre && out.lineas.length) out.nombre = 'Promoción'
   return out
 }
+
+// PROMOCIÓN DESDE UN FLYER (2 nov 2026) · la imagen la lee Claude (Edge promo-flyer) con el catálogo a la vista; regresa lo
+// que dice el flyer y la pantalla lo pone en el formulario para revisarlo. Nada se guarda aquí.
+export interface FlyerLeido { nombre: string; desde: string | null; hasta: string | null; condiciones: string | null; lineas: Array<{ producto_id: string | null; texto: string; min_qty: number; precio: number }>; sin_leer: string[] }
+export const FLYER_LECTURA_MAX_MB = 3.5
+export async function leerFlyerPromo(f: File): Promise<Resultado<FlyerLeido>> {
+  if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) return { ok: false, error: 'Sube una imagen JPG, PNG o WebP.' }
+  if (f.size > FLYER_LECTURA_MAX_MB * 1024 * 1024) return { ok: false, error: `La imagen debe pesar menos de ${FLYER_LECTURA_MAX_MB} MB.` }
+  const imagen = await new Promise<string>((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => mal(r.error); r.readAsDataURL(f) })
+  const { data, error } = await supabase.functions.invoke('promo-flyer', { body: { imagen, media_type: f.type } })
+  if (!error) return { ok: true, data: data as FlyerLeido }
+  const cuerpo = await (error as { context?: Response }).context?.json?.().catch(() => null) as { message?: string } | null
+  return { ok: false, error: cuerpo?.message ?? 'No se pudo leer el flyer; intenta de nuevo.' }
+}
