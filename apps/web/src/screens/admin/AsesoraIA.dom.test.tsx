@@ -8,7 +8,7 @@ import type { ClienteAsesoraIa, Corrida } from '../../data/ops/asesoraIa'
 
 beforeEach(cleanup)
 
-const corrida: Corrida = { id: 'k1', modelo: 'claude-opus-5-5', esfuerzo: 'low', nota: null, created_at: '2026-11-02T18:00:00Z', perfil: 'Dra. Prueba', casos: 60, corridos: 60, puntaje: 8.4, aprobados: 52,
+const corrida: Corrida = { id: 'k1', modelo: 'claude-opus-5-5', esfuerzo: 'low', estado: 'terminada', pendientes: 0, nota: null, created_at: '2026-11-02T18:00:00Z', perfil: 'Dra. Prueba', casos: 60, corridos: 60, puntaje: 8.4, aprobados: 52,
   rechazos_validacion: 2, errores: 0, latencia_p50: 6200, latencia_p90: 11000, costo_promedio_usd: 0.031, por_categoria: { precio: 8.9, clinico: 7.1 } }
 
 function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
@@ -19,7 +19,8 @@ function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
     resultados: async () => ({ ok: true, data: [{ caso_id: 'P01', categoria: 'precio', pregunta: 'cuanto el botox', historial: [], ideal: null, respuesta: 'Está en $3,900.', estado: 'respondio', motivo_validacion: null, herramientas: [], latencia_ms: 5000, costo_usd: 0.02, puntaje: 9, aprobado: true, juicio: { puntaje: 9, aprobado: true, cumple: [], falla: [], comentario: 'Preciso.' }, error: null }] }),
     crearCorrida: vi.fn(async () => ({ ok: true as const, data: 'k2' })),
     vsHumano: async () => ({ ok: true, data: { dias: 30, respuestas: { ia: { n: 40, mediana_seg: 6, p90_seg: 12, en_5_min: 100 }, equipo: { n: 10, mediana_seg: 1800, p90_seg: 7200, en_5_min: 20 } }, conversaciones: { ia: { n: 20, con_pedido: 4, conversion: 20, ticket_promedio: 8000, pidieron_asesor: 3 } }, muestra_suficiente: true } }),
-    correrCaso: vi.fn(async () => ({ ok: true as const, data: { puntaje: 9 } })),
+    continuar: vi.fn(async () => ({ ok: true as const, data: 5 })),
+    detener: vi.fn(async () => ({ ok: true as const, data: null })),
     seguimiento: async () => ({ ok: true, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null } }),
     guardarSeguimiento: vi.fn(async (c) => ({ ok: true as const, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null, ...c } })),
     resumenSeguimiento: async () => ({ ok: true, data: { carrito: { enviados: 12, respondieron: 5, con_pedido: 3, vendido: 24500 } } }),
@@ -39,12 +40,12 @@ describe('<AsesoraIA>', () => {
     expect(screen.getByText('$0.031')).toBeInTheDocument()
     expect(screen.getByText('Clínico (7.1)')).toBeInTheDocument()
   })
-  it('corre el examen caso por caso y muestra las respuestas con el juicio', async () => {
+  it('iniciar el examen lo deja al servidor (se puede cerrar la página) y muestra las respuestas con el juicio', async () => {
     const c = falso(); render(<AsesoraIA cliente={c} />)
     await screen.findByText('Dra. Prueba', { selector: 'option' })
     fireEvent.click(screen.getByTestId('examen-correr'))
-    await waitFor(() => expect(c.correrCaso).toHaveBeenCalledWith('k2', 'P01'))
-    expect(c.crearCorrida).toHaveBeenCalledWith('claude-opus-5-5', 'd1', 'low', null, null)
+    await waitFor(() => expect(c.crearCorrida).toHaveBeenCalledWith('claude-opus-5-5', 'd1', 'low', null, null))
+    expect(await screen.findByText(/lo corre el servidor, puedes cerrar esta página/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('Ver respuestas'))
     expect(await screen.findByText(/Juez: Preciso\./)).toBeInTheDocument()
   })
@@ -61,5 +62,13 @@ describe('<AsesoraIA>', () => {
     expect(await screen.findByTestId('seg-res-carrito')).toHaveTextContent('12 enviados · 5 respondieron3 compraron · $24,500')
     fireEvent.click(screen.getByTestId('seg-promo'))
     await waitFor(() => expect(c.guardarSeguimiento).toHaveBeenCalledWith({ promo: false }))
+  })
+  it('una corrida a medias se continúa y una en curso se detiene', async () => {
+    const aMedias = { ...corrida, id: 'k3', estado: 'detenida' as const, corridos: 20 }
+    const enCurso = { ...corrida, id: 'k4', estado: 'en_curso' as const, corridos: 7, pendientes: 53 }
+    const c = falso({ corridas: async () => ({ ok: true, data: [enCurso, aMedias] }) }); render(<AsesoraIA cliente={c} />)
+    expect(await screen.findByText('corriendo 7/60…')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('examen-continuar')); await waitFor(() => expect(c.continuar).toHaveBeenCalledWith('k3'))
+    fireEvent.click(screen.getByTestId('examen-detener')); await waitFor(() => expect(c.detener).toHaveBeenCalledWith('k4'))
   })
 })

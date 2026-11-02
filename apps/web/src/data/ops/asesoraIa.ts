@@ -15,6 +15,7 @@ export const nombreModelo = (id: string | null | undefined) => MODELOS.find((m) 
 export interface ConfigIA { modelo_portal: string | null; esfuerzo_portal: Esfuerzo; updated_at: string | null; modelos: string[] }
 export interface Corrida {
   id: string; modelo: string; esfuerzo: Esfuerzo; nota: string | null; created_at: string; perfil: string | null
+  estado: 'en_curso' | 'terminada' | 'detenida'; pendientes: number
   casos: number; corridos: number; puntaje: number | null; aprobados: number; rechazos_validacion: number; errores: number
   latencia_p50: number | null; latencia_p90: number | null; costo_promedio_usd: number | null; por_categoria: Record<string, number> | null
 }
@@ -51,11 +52,9 @@ export const asesoraIa = {
   seguimiento: () => rpc<ConfigSeguimiento>('seguimiento_config'),
   guardarSeguimiento: (cambios: Partial<ConfigSeguimiento>) => rpc<ConfigSeguimiento>('seguimiento_config_guardar', { p: cambios }),
   resumenSeguimiento: (dias: number) => rpc<ResumenSeguimiento>('seguimiento_resumen', { p_dias: dias }),
-  async correrCaso(corrida: string, caso: string): Promise<Res<{ puntaje: number | null }>> {
-    const { data, error } = await supabase.functions.invoke('ia-examen', { body: { corrida_id: corrida, caso_id: caso } })
-    if (error) return { ok: false, error: 'El caso no se pudo correr.' }
-    return { ok: true, data: data as { puntaje: number | null } }
-  },
+  // el examen lo corre el servidor (cola + cron): aquí solo se continúa o se detiene
+  continuar: (corrida: string) => rpc<number>('ia_examen_continuar', { p_corrida: corrida }),
+  detener: (corrida: string) => rpc<null>('ia_examen_detener', { p_corrida: corrida }),
   async doctores(q: string): Promise<Res<DoctorExamen[]>> {
     let s = supabase.from('profiles').select('id, full_name, email').eq('role_id', 'doctor').eq('verified', true).eq('active', true).order('full_name').limit(30)
     if (q.trim()) s = s.or(`full_name.ilike.%${q.trim().replace(/[%,()]/g, '')}%,email.ilike.%${q.trim().replace(/[%,()]/g, '')}%`)
@@ -64,18 +63,3 @@ export const asesoraIa = {
   },
 }
 export type ClienteAsesoraIa = typeof asesoraIa
-
-/** Corre los casos de una corrida de a `paralelo` a la vez; avisa el avance. Un caso que falla no detiene a los demás. */
-export async function correrCorrida(cliente: Pick<ClienteAsesoraIa, 'correrCaso'>, corrida: string, casos: string[], alAvanzar: (hechos: number, fallidos: number) => void, paralelo = 3): Promise<{ hechos: number; fallidos: number }> {
-  let i = 0; let hechos = 0; let fallidos = 0
-  const trabajador = async () => {
-    while (i < casos.length) {
-      const c = casos[i++]
-      const r = await cliente.correrCaso(corrida, c)
-      if (r.ok) hechos++; else fallidos++
-      alAvanzar(hechos, fallidos)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(paralelo, casos.length) }, trabajador))
-  return { hechos, fallidos }
-}

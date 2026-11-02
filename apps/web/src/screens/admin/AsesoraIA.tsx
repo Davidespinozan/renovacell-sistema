@@ -3,7 +3,7 @@
 // orquestador del portal y calificadas por un juez, para elegir modelo y no empeorar con cada cambio; 3) qué modelo usa
 // la IA del portal. El examen corre caso por caso desde aquí (la Edge no escribe conversaciones ni carritos).
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { asesoraIa as clientePorDefecto, correrCorrida, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
+import { asesoraIa as clientePorDefecto, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
 
 const sutil: React.CSSProperties = { fontSize: 12, color: 'var(--ink-3, #667)' }
 const input: React.CSSProperties = { padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -72,40 +72,45 @@ function Examen({ cliente, corridas, config, onCambio, onDetalle, onAviso }: { c
   const [q, setQ] = useState('')
   const [doctores, setDoctores] = useState<DoctorExamen[]>([])
   const [doctor, setDoctor] = useState<string>('')
-  const [avance, setAvance] = useState<{ total: number; hechos: number; fallidos: number } | null>(null)
+  const [creando, setCreando] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => {
     let vivo = true
     const t = setTimeout(() => { void cliente.doctores(q).then((r) => { if (vivo && r.ok) { setDoctores(r.data); if (!doctor && r.data[0]) setDoctor(r.data[0].id) } }) }, 250)
     return () => { vivo = false; clearTimeout(t) }
   }, [cliente, q, doctor])
+  // El servidor corre el examen: mientras haya una corrida en curso, la tabla se refresca sola (se puede cerrar la página).
+  const enCurso = corridas.some((k) => k.estado === 'en_curso')
+  useEffect(() => {
+    if (!enCurso) return
+    const t = setInterval(onCambio, 5000)
+    return () => clearInterval(t)
+  }, [enCurso, onCambio])
 
   const correr = async () => {
-    if (!doctor || avance) return
-    setErr(null); onAviso(null)
+    if (!doctor || creando) return
+    setErr(null); onAviso(null); setCreando(true)
     const c = await cliente.crearCorrida(modelo, doctor, esfuerzo, null, null)
+    setCreando(false)
     if (!c.ok) { setErr(c.error); return }
-    const filas = await cliente.resultados(c.data)
-    const casos = filas.ok ? filas.data.map((f) => f.caso_id) : []
-    setAvance({ total: casos.length, hechos: 0, fallidos: 0 })
-    const r = await correrCorrida(cliente, c.data, casos, (hechos, fallidos) => setAvance({ total: casos.length, hechos, fallidos }))
-    setAvance(null); onCambio()
-    onAviso(`Examen terminado con ${nombreModelo(modelo)}: ${r.hechos} casos${r.fallidos ? `, ${r.fallidos} no se pudieron correr` : ''}.`)
+    onAviso(`Examen con ${nombreModelo(modelo)} en curso: lo corre el servidor, puedes cerrar esta página y volver luego.`)
+    onCambio()
   }
+  const continuar = async (k: Corrida) => { const r = await cliente.continuar(k.id); if (r.ok) onCambio(); else setErr(r.error) }
+  const detener = async (k: Corrida) => { const r = await cliente.detener(k.id); if (r.ok) onCambio(); else setErr(r.error) }
 
   return (
     <section className="card" data-testid="examen-ia">
       <h2 style={{ margin: '0 0 4px' }}>Examen de la asesora</h2>
-      <p style={{ margin: '0 0 12px', ...sutil }}>60 preguntas como las de los doctores (precios, reglas del pedido, promociones, recomendación, técnico, clínico, objeciones, entrega y límites). La IA responde con el mismo sistema que usa el portal, con los datos reales del doctor que elijas, sin escribir nada; un juez califica de 0 a 10 contra lo que haría el mejor asesor. Tarda unos minutos.</p>
+      <p style={{ margin: '0 0 12px', ...sutil }}>60 preguntas como las de los doctores (precios, reglas del pedido, promociones, recomendación, técnico, clínico, objeciones, entrega y límites). La IA responde con el mismo sistema que usa el portal, con los datos reales del doctor que elijas, sin escribir nada; un juez califica de 0 a 10 contra lo que haría el mejor asesor. Lo corre el servidor (unos 10 minutos): puedes cerrar esta página y volver.</p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <select style={input} value={modelo} onChange={(e) => setModelo(e.target.value)} aria-label="Modelo" data-testid="examen-modelo">{MODELOS.map((m) => <option key={m.id} value={m.id}>{m.nombre} · {m.nota}</option>)}</select>
         <select style={input} value={esfuerzo} onChange={(e) => setEsfuerzo(e.target.value as Esfuerzo)} aria-label="Esfuerzo">{(Object.keys(ESFUERZO) as Esfuerzo[]).map((k) => <option key={k} value={k}>{ESFUERZO[k]}</option>)}</select>
         <input style={{ ...input, minWidth: 160 }} placeholder="Buscar doctor" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar doctor" />
         <select style={{ ...input, maxWidth: 260 }} value={doctor} onChange={(e) => setDoctor(e.target.value)} aria-label="Doctor" data-testid="examen-doctor">{doctores.map((d) => <option key={d.id} value={d.id}>{d.full_name || d.email}</option>)}</select>
-        <button className="btn" type="button" onClick={() => void correr()} disabled={!doctor || !!avance} data-testid="examen-correr">{avance ? `Corriendo ${avance.hechos + avance.fallidos}/${avance.total}…` : 'Correr examen'}</button>
+        <button className="btn" type="button" onClick={() => void correr()} disabled={!doctor || creando} data-testid="examen-correr">{creando ? 'Iniciando…' : 'Correr examen'}</button>
       </div>
       {err && <div role="alert" style={{ color: 'var(--danger)', fontSize: 13, marginTop: 8 }}>{err}</div>}
-      {avance && <div style={{ height: 6, borderRadius: 3, background: 'var(--line)', marginTop: 10, overflow: 'hidden' }}><div style={{ width: `${(100 * (avance.hechos + avance.fallidos)) / Math.max(avance.total, 1)}%`, height: '100%', background: 'var(--green-deep)' }} /></div>}
 
       <div style={{ overflowX: 'auto', marginTop: 14 }}>
         <table className="tbl-cards" style={{ width: "100%", fontSize: 13 }} data-testid="examen-corridas">
@@ -119,11 +124,15 @@ function Examen({ cliente, corridas, config, onCambio, onDetalle, onAviso }: { c
                 <tr key={k.id}>
                   <td><b>{nombreModelo(k.modelo)}</b>{actual && <span style={{ ...sutil, marginLeft: 6 }}>· en uso</span>}<div style={sutil}>{ESFUERZO[k.esfuerzo]} · {new Date(k.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}</div></td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: colorPuntaje(k.puntaje) }}>{k.puntaje ?? '—'}</td>
-                  <td style={{ textAlign: 'center' }}>{k.aprobados}/{k.casos}{k.corridos < k.casos && <div style={sutil}>{k.corridos} corridos</div>}</td>
+                  <td style={{ textAlign: 'center' }}>{k.aprobados}/{k.casos}{k.corridos < k.casos && <div style={sutil} data-testid="examen-avance">{k.estado === 'en_curso' ? `corriendo ${k.corridos}/${k.casos}…` : `${k.corridos} de ${k.casos} corridos`}</div>}</td>
                   <td style={{ textAlign: 'center' }}>{k.latencia_p50 != null ? seg(k.latencia_p50 / 1000) : '—'}</td>
                   <td style={{ textAlign: 'center' }}>{usd(k.costo_promedio_usd)}</td>
                   <td>{peor ? `${CATEGORIA[peor[0]] ?? peor[0]} (${peor[1]})` : '—'}</td>
-                  <td><button className="btn ghost sm" type="button" onClick={() => onDetalle(k)}>Ver respuestas</button></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn ghost sm" type="button" onClick={() => onDetalle(k)}>Ver respuestas</button>
+                    {k.estado === 'en_curso' && <button className="btn ghost sm" type="button" onClick={() => void detener(k)} data-testid="examen-detener">Detener</button>}
+                    {k.estado !== 'en_curso' && k.corridos < k.casos && <button className="btn ghost sm" type="button" onClick={() => void continuar(k)} data-testid="examen-continuar">Continuar</button>}
+                  </td>
                 </tr>
               )
             })}

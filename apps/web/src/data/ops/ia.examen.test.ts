@@ -7,6 +7,7 @@ import * as politica from '../../../../../supabase/functions/_shared/ia/politica
 import * as herramientas from '../../../../../supabase/functions/_shared/ia/herramientas'
 import * as validacion from '../../../../../supabase/functions/_shared/ia/validacion'
 import { crearProveedorFalso, respuestaHerramientas, respuestaTexto } from '../../../../../supabase/functions/_shared/ia/proveedor'
+import edgeSrc from '../../../../../supabase/functions/ia-examen/index.ts?raw'
 
 const DOC = '33333333-3333-4333-8333-333333333333'; const BOTOX = '44444444-4444-4444-8444-444444444444'
 const caso: Caso = { id: 'P01', categoria: 'precio', historial: [{ actor: 'doctor', content: 'hola' }, { actor: 'ai', content: '¡Hola!' }], pregunta: 'cuanto el botox', debe: ['da el precio'], no_debe: ['inventa'], ideal: '...' }
@@ -79,5 +80,15 @@ describe('juez y costo', () => {
     expect(costoUsd('claude-opus-5-5', { input: 10_000, output: 1_000 })).toBe(0.06)
     expect(costoUsd('claude-haiku-4-5-20251001', { input: 10_000, output: 1_000 })).toBe(0.015)
     expect(costoUsd('otro', { input: 1, output: 1 })).toBeNull()
+  })
+})
+
+describe('lo corre el servidor', () => {
+  it('con el secreto del cron responde 202 y trabaja en segundo plano; sin él exige Dirección', () => {
+    expect(edgeSrc).toMatch(/if \(delCron\) \{ enSegundoPlano\(correrCaso\(admin, body\.corrida_id!, body\.caso_id!\)\); return json\(202/)
+    expect(edgeSrc).toMatch(/if \(!tieneRol\(q\.quien, \['admin'\]\)\) return json\(403/)
+    expect(edgeSrc).toMatch(/iguales\(req\.headers\.get\('x-cron-secret'\)/)
+    // un fallo del modelo no se registra: el cron lo reintenta
+    expect(edgeSrc).toMatch(/if \(!respuesta && ex\.capturado\.falla\) return \{ status: 502/)
   })
 })
