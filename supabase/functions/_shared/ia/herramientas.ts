@@ -16,6 +16,7 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'cotizar' | 'recomendar_productos'   // IA-VENDEDORA · combinaciones con las reglas del pedido y recomendaciones con motivo
   | 'solicitar_verificacion'   // VERIFICACIÓN POR WHATSAPP (2 nov 2026) · un contacto aún no reconocido pide verificarse para comprar
   | 'guardar_direccion' | 'revisar_pedido' | 'confirmar_pedido'   // PEDIDO POR WHATSAPP (2 nov 2026) · solo con el doctor vinculado
+  | 'pedir_link_pago'   // LINK DE PAGO (2 nov 2026) · su vendedor le manda el link de BanBajío
 export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'PEDIDO_CREADO_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
@@ -114,6 +115,7 @@ export const HERRAMIENTAS_PEDIDO_WA: DefinicionHerramienta[] = [
   { name: 'guardar_direccion', autoridad: 'cuenta', mutante: true, description: 'Guarda en su perfil la dirección de entrega que el doctor te dictó en ESTE chat (queda como su dirección predeterminada). Úsala solo con lo que él escribió; si regresa guardada:false, pide de nuevo solo el dato de `campo`.', input_schema: DIRECCION },
   { name: 'revisar_pedido', autoridad: 'cuenta', mutante: false, description: 'Revisa su carrito para cerrar el pedido, con la misma regla del portal: precio y total, disponibilidad, opciones de entrega con flete y fecha prometida (y horarios si es entrega local), y lo que falte. Llámala sin `entrega` para ver las opciones; luego con la opción que él eligió (id: recoge, local_chofer, foraneo_dhl…) y, si es local, el horario {fecha, inicio}.', input_schema: { type: 'object', properties: { entrega: texto('Id de la opción de entrega elegida.', 30), horario: { type: 'object', properties: { fecha: texto('AAAA-MM-DD', 10), inicio: texto('HH:MM', 5) }, required: ['fecha', 'inicio'], additionalProperties: false } }, additionalProperties: false } },
   { name: 'confirmar_pedido', autoridad: 'cuenta', mutante: true, description: 'Confirma el pedido de la última revisión (lista y vigente). SOLO después de que el doctor, en su último mensaje, confirmó con un sí claro el resumen que le diste (productos, total con envío y entrega). Regresa folio, total y datos de pago.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'pedir_link_pago', autoridad: 'cuenta', mutante: true, description: 'Pide a su vendedor un link de pago con tarjeta (BanBajío) por el saldo de su pedido: úsala cuando el doctor quiera pagar con tarjeta. Sin folio usa su pedido más reciente con saldo. El link NO lo das tú: se lo manda el sistema por este chat en cuanto su vendedor lo genere (estado enviado = ya está arriba en este chat).', input_schema: { type: 'object', properties: { folio: texto('Folio del pedido (p. ej. S123456), solo si lo dijo.', 20) }, additionalProperties: false } },
 ]
 const soloPortal = (n: NombreHerramienta, identificado: boolean) => SOLO_PORTAL.includes(n) && !(identificado && SOLO_PORTAL_SIN_VINCULO.includes(n))
 export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false, identificado = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
@@ -146,10 +148,14 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     if (!nom || !ced || !email) return { ok: false, motivo: 'argumentos' }
     return { ok: true, nombre: 'solicitar_verificacion', args: { nombre: nom, cedula: ced, email, especialidad: str(i.especialidad, 80), ciudad: str(i.ciudad, 80) }, ids: [] }
   }
-  if (nombre === 'guardar_direccion' || nombre === 'revisar_pedido' || nombre === 'confirmar_pedido') {
+  if (nombre === 'guardar_direccion' || nombre === 'revisar_pedido' || nombre === 'confirmar_pedido' || nombre === 'pedir_link_pago') {
     if (ctx.canal !== 'whatsapp' || !ctx.identificado) return { ok: false, motivo: 'no_autorizada' }
     const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
     if (nombre === 'confirmar_pedido') return { ok: true, nombre, args: {}, ids: [] }
+    if (nombre === 'pedir_link_pago') {
+      const folio = i.folio === undefined || i.folio === null || i.folio === '' ? null : (typeof i.folio === 'string' && /^[A-Za-z0-9-]{3,20}$/.test(i.folio.trim()) ? i.folio.trim().toUpperCase() : undefined)
+      return folio === undefined ? { ok: false, motivo: 'argumentos' } : { ok: true, nombre, args: { folio }, ids: [] }
+    }
     if (nombre === 'revisar_pedido') {
       const ent = i.entrega === undefined || i.entrega === null ? null : (typeof i.entrega === 'string' && /^[a-z_]{3,30}$/.test(i.entrega) ? i.entrega : undefined)
       if (ent === undefined) return { ok: false, motivo: 'argumentos' }
@@ -307,6 +313,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
     // PEDIDO POR WHATSAPP · la revisión trae total del servidor; la confirmación, el pedido creado (solo entonces puede decirlo)
     case 'revisar_pedido': return o.review_id || o.total ? (['CHECKOUT_REVIEW_EVIDENCE', 'PRICE_EVIDENCE'] as Evidencia[]) : []
     case 'confirmar_pedido': return o.confirmado === true ? (['PEDIDO_CREADO_EVIDENCE', 'PRICE_EVIDENCE', 'ORDER_EVIDENCE'] as Evidencia[]) : []
+    case 'pedir_link_pago': return o.solicitado === true ? (['ORDER_EVIDENCE', 'PRICE_EVIDENCE'] as Evidencia[]) : []   // folio y monto del servidor
     case 'preparar_checkout': {
       const proy = (o.proyeccion && typeof o.proyeccion === 'object' ? o.proyeccion : {}) as Record<string, unknown>
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'

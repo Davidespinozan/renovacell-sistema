@@ -1,5 +1,6 @@
 -- CC-2 · El rollback retira el dominio de conversación y devuelve adopción/purga al texto CC-1.
 begin;
+\ir ../../../rollback/link_pago/99_down.sql   -- LINK DE PAGO (20270309) redefine el push de avisos y usa helpers de pedido por WhatsApp: se baja antes
 \ir ../../../rollback/adopcion_portal/99_down.sql   -- ADOPCIÓN (20270308) redefine el cierre de la verificación y la confirmación por WhatsApp: se baja antes de la foto inicial
 \ir ../../../rollback/pedido_wa/99_down.sql   -- PEDIDO-WA (20270307) redefine el disparador de alertas y cuelga de la identidad del canal: se baja antes de la foto inicial
 \ir ../../../rollback/verificacion_wa/99_down.sql   -- VERIFICACIÓN-WA (20270306) redefine la carga del push de alertas: se baja antes de la foto inicial

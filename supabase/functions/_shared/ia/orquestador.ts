@@ -316,6 +316,8 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
     case 'confirmar_pedido':
       if (!t.confirmacion) return { data: { confirmado: false, motivo: 'FALTA_CONFIRMACION_EXPLICITA', nota: 'Su último mensaje no es un sí claro: dale el resumen y pregúntale si lo confirmas.' }, error: null }
       return rpc('cc_ia_pedido_confirmar', { p_conv: e.conv, p_profile: t.perfilIA })
+    // LINK DE PAGO · la base exige el vínculo; regresa folio, monto y estado (nunca la URL: la entrega el sistema)
+    case 'pedir_link_pago': return rpc('cc_ia_link_pago', { p_conv: e.conv, p_profile: t.perfilIA, p_folio: a.folio ?? null })
     // VERIFICACIÓN POR WHATSAPP · la solicitud es de ESTA conversación (la base revisa que siga sin identificar)
     case 'solicitar_verificacion': return rpc('cc_ia_solicitar_alta', { p_conv: e.conv, p_nombre: a.nombre, p_cedula: a.cedula, p_email: a.email, p_especialidad: a.especialidad, p_ciudad: a.ciudad })
     case 'registrar_contacto': return rpc('cc_ia_registrar_contacto', { p_conv: e.conv, p_hash: e.visitorHash, p_nombre: a.nombre, p_telefono: a.telefono, p_email: a.email, p_es_medico: a.es_medico, p_cedula: a.cedula })

@@ -131,6 +131,7 @@ export const ROLES: RoleDef[] = [
     modules: [
       // MENÚ (dueño, 17 oct 2026): Inicio ES la bandeja y el seguimiento de su cartera; menos pestañas.
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
+      { key: 'links_pago', label: 'Links de pago', icon: 'receipt', section: 'Vender' },   // LINK DE PAGO (2 nov 2026) · el cliente pide pagar con tarjeta; el vendedor pega el de BanBajío
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
       { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
@@ -235,7 +236,7 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }],
   g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }],
   g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],
-  g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_revision', label: 'Revisión económica' }],
+  g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_links', label: 'Links de pago' }, { key: 'av_revision', label: 'Revisión económica' }],
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
   g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }],

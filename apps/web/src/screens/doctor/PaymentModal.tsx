@@ -21,6 +21,7 @@ import { MicroformTarjeta, type TokenTarjeta } from './MicroformTarjeta'
 import { useTarjetaEnLinea } from '../../data/ops/pagosEnLinea'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { Autenticacion3DS, type Fase } from './Autenticacion3DS'
 import { ConfirmacionPago, type FasePago } from './ConfirmacionPago'
+import { LinkPagoTarjeta } from './LinkPagoTarjeta'   // LINK DE PAGO (2 nov 2026) · tarjeta por link de BanBajío
 
 // Mensaje real de la Edge Function (su cuerpo trae `error`), no un genérico.
 async function motivoDeFalla(e: unknown): Promise<string> {
@@ -172,6 +173,7 @@ export function PaymentModal({
                   Por ahora el pago es por <b>transferencia</b>, o en efectivo o con tarjeta en sucursal. El pago con tarjeta en línea estará disponible pronto.
                 </div>
               )}
+              {!tarjetaEnLinea && hasSupabase && orderId && <LinkPagoTarjeta orderId={orderId} />}
               <div className="seg" style={{ marginBottom: 4, ...(tarjetaEnLinea ? {} : { display: 'none' }) }}>
                 <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
                 <button type="button" className={method === 'transferencia' ? 'active' : undefined} onClick={() => setMethod('transferencia')}>Transferencia</button>

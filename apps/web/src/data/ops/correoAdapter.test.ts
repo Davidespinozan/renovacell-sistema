@@ -16,6 +16,7 @@ import mig165 from '../../../../../supabase/migrations/20261218120000_correos_au
 import mig175 from '../../../../../supabase/migrations/20261228120000_promociones_difusion.sql?raw'   // PROMO-4 · plantilla 'promocion'
 import migCot from '../../../../../supabase/migrations/20270209120000_cotizaciones.sql?raw'   // COTIZACIONES · plantilla 'cotizacion'
 import migDif from '../../../../../supabase/migrations/20270217120000_difusiones.sql?raw'   // DIFUSIONES · + difusion
+import migLink from '../../../../../supabase/migrations/20270309120000_link_pago.sql?raw'   // LINK DE PAGO (2 nov 2026) · + link_pago
 
 const soloCodigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 const CFG: ConfigCorreo = { proveedor: 'resend', apiKey: 're_SECRETO_123', remitente: 'Renovacell <pedidos@renovacell.mx>' }
@@ -148,10 +149,10 @@ describe('las credenciales no salen del adaptador', () => {
 })
 
 describe('plantillas: vocabulario cerrado y texto limpio', () => {
-  it('las plantillas son exactamente las que la base sabe encolar (6 de pedido + 3 de cuenta, 165; + promocion, 175; + cotizacion, 20270209; + difusion, 20270217)', () => {
-    const enBase = [...(migSrc + mig165 + mig175 + migCot + migDif).matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado|registro_recibido|cuenta_verificada|verificacion_rechazada|promocion|cotizacion|difusion)'/g)].map((m) => m[1])
+  it('las plantillas son exactamente las que la base sabe encolar (6 de pedido + 3 de cuenta, 165; + promocion, 175; + cotizacion, 20270209; + difusion, 20270217; + link_pago, 20270309)', () => {
+    const enBase = [...(migSrc + mig165 + mig175 + migCot + migDif + migLink).matchAll(/'(pedido_\w+|pago_recibido|reembolso_realizado|registro_recibido|cuenta_verificada|verificacion_rechazada|promocion|cotizacion|difusion|link_pago)'/g)].map((m) => m[1])
     for (const p of PLANTILLAS) expect(enBase).toContain(p)
-    expect(PLANTILLAS).toHaveLength(12)
+    expect(PLANTILLAS).toHaveLength(13)
   })
   it('todas se arman, incluso sin datos, sin dejar "undefined", "null" ni "NaN"', () => {
     for (const p of PLANTILLAS) {

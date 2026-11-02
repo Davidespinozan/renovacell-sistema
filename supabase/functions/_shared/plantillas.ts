@@ -10,6 +10,7 @@ export const PLANTILLAS = [
   'promocion',   // PROMO-4 (175) · difusión de una promoción a los doctores
   'cotizacion',  // COTIZACIONES (20270209) · cotización que el vendedor le manda a su cliente
   'difusion',    // DIFUSIONES (20270217) · lo que un vendedor manda a sus listas (texto, enlace, imagen), con baja
+  'link_pago',   // LINK DE PAGO (2 nov 2026) · el link de BanBajío que sacó su vendedor
 ] as const
 export type Plantilla = (typeof PLANTILLAS)[number]
 
@@ -114,6 +115,14 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
         'Revisamos tus datos pero todavía no pudimos verificar tu cuenta.',
         'Corrígelo en "Mi verificación" y lo revisamos de nuevo. Si tienes dudas, responde a este correo.',
       ], datos: motivo ? [['Motivo', motivo]] : [], boton: { label: 'Corregir mis datos', href: URL_SISTEMA }, pie: 'Recibes este correo por tu cuenta en Renovacell.' }
+    }
+    case 'link_pago': {   // el link lo pegó su vendedor (BanBajío); solo https (lo exige la base)
+      const url = String(d.url ?? '').trim(); const monto = dinero(d.monto)
+      return { asunto: `Tu link de pago · ${ref}`, titulo: 'Tu link de pago con tarjeta', parrafos: [
+        'Aquí está el link para pagar con tarjeta tu pedido. Es de BanBajío, el banco de Renovacell.',
+        'En cuanto se refleje el pago te avisamos y preparamos tu pedido.',
+      ], datos: [...fila('Pedido', folio), ...fila('Monto', monto)], ...(/^https:\/\//.test(url) ? { boton: { label: 'Pagar con tarjeta', href: url } } : {}),
+        pie: 'Si tú no pediste este link, no lo uses y avísanos respondiendo a este correo.' }
     }
     case 'reembolso_realizado': {
       const monto = dinero(d.monto)
