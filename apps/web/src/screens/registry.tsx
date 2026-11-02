@@ -68,6 +68,7 @@ const Comisiones = lazyPantalla(() => import('./admin/Comisiones').then((m) => m
 const Configuracion = lazyPantalla(() => import('./admin/Configuracion').then((m) => m.Configuracion))
 const Conocimiento = lazyPantalla(() => import('./admin/Conocimiento').then((m) => m.Conocimiento)) // CC-3
 const ManualVentas = lazyPantalla(() => import('./admin/ManualVentas').then((m) => m.ManualVentas)) // R4-C10
+const AsesoraIA = lazyPantalla(() => import('./admin/AsesoraIA').then((m) => m.AsesoraIA)) // IA mejor que el humano
 const AtencionComercialPantalla = lazyPantalla(() => import('./admin/AtencionComercial').then((m) => m.AtencionComercialPantalla)) // CC-7
 const CarteraHorarioPantalla = lazyPantalla(() => import('./admin/AtencionComercial').then((m) => m.CarteraHorarioPantalla)) // CC-7
 const Mermas = lazyPantalla(() => import('./admin/Mermas').then((m) => m.Mermas))
@@ -127,6 +128,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_comisiones: () => <Comisiones />,
   av_conocimiento: () => <Conocimiento />,
   av_manual_ventas: () => <ManualVentas />,   // R4-C10
+  av_ia: () => <AsesoraIA />,
   av_atencion: () => <AtencionComercialPantalla />,   // CC-7 · Conversaciones → Bandeja
   av_cartera: () => <CarteraHorarioPantalla />,       // REORG CRM · Equipo → Cartera y horario
   av_config: () => <Configuracion />,
@@ -149,7 +151,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   difusiones: () => <Difusiones />,   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
   g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
-  g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }, { key: 'seguimientos', label: 'Pendientes', render: () => <Seguimientos /> }]} />,
+  g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }, { key: 'seguimientos', label: 'Pendientes', render: () => <Seguimientos /> }, { key: 'av_ia', label: 'Asesora IA', render: () => <AsesoraIA /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   av_existencias: () => <Existencias />,
   av_entradas: () => <Entradas />,

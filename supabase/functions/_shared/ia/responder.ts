@@ -121,7 +121,8 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const env = (k: string) => Deno.env.get(k)
   const cfg0 = configurar(env)
   // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
-  const cfg = cfg0.ok && canal !== 'portal' ? { ...cfg0, config: configCanal(cfg0.config, env) } : cfg0
+  const mp = cfg0.ok && canal === 'portal' ? await leerModeloPortal(admin) : null
+  const cfg = cfg0.ok && canal !== 'portal' ? { ...cfg0, config: configCanal(cfg0.config, env) } : cfg0.ok && mp ? { ...cfg0, config: configPortal(cfg0.config, mp.modelo, env) } : cfg0
   const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }
   if (!cfg.ok) { await aviso(); return 'no_disponible' }
   // CC-0B · ráfaga/hora por sujeto y techo global: sin cupo NO se llama al proveedor.
@@ -134,7 +135,7 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const costo = await limitarTodas(admin, [{ scope: 'ia_tokens_dia', sujeto: 'global', costo: estimado }, ...(actor === 'doctor' ? [{ scope: 'ia_tokens_dia_uid', sujeto, costo: estimado }] : [])])
   if (!costo.permitido) return 'limitada'
 
-  const opciones: OpcionesModelo | undefined = canal === 'portal' ? undefined : { effort: esfuerzoCanal(env), fallbacks: true }
+  const opciones: OpcionesModelo | undefined = canal === 'portal' ? (mp && esModeloConPensamiento(mp.modelo) ? { effort: mp.esfuerzo, fallbacks: true } : undefined) : { effort: esfuerzoCanal(env), fallbacks: true }
   const proveedor = crearProveedorAnthropic({ key: cfg.key, model: cfg.config.model, fetch: globalThis.fetch.bind(globalThis), opciones })
   const negocio = await leerNegocio(admin)
   const portalDeps = canal === 'portal' ? dependenciasPortal(negocio) : null
@@ -171,6 +172,23 @@ export function configCanal(base: { model: string; timeoutMs: number; maxTokens:
   return esModeloConPensamiento(model)
     ? { ...base, model, maxTokens: num('AI_MAX_TOKENS_CANAL', 8000, 1000, 32000), timeoutMs: num('AI_TIMEOUT_MS_CANAL', 45_000, 5_000, 120_000) }
     : { ...base, model }
+}
+// IA MEJOR QUE EL HUMANO · B (2 nov 2026): el modelo del PORTAL lo elige Dirección en cc_ia_config (lista cerrada, la
+// misma que usa el examen); vacío = AI_MODEL / Haiku de siempre. Un modelo 5.x piensa antes de responder: más salida y
+// más tiempo, igual que el canal.
+export function configPortal(base: { model: string; timeoutMs: number; maxTokens: number; maxRondas: number; historial: number; provider: 'anthropic' }, modelo: string, env: (k: string) => string | undefined) {
+  const num = (k: string, d: number, min: number, max: number) => { const v = Number(env(k)); return Number.isFinite(v) && v >= min && v <= max ? Math.floor(v) : d }
+  return esModeloConPensamiento(modelo)
+    ? { ...base, model: modelo, maxTokens: num('AI_MAX_TOKENS_PORTAL', 8000, 1000, 32000), timeoutMs: num('AI_TIMEOUT_MS_PORTAL', 45_000, 5_000, 120_000) }
+    : { ...base, model: modelo }
+}
+// deno-lint-ignore no-explicit-any
+export async function leerModeloPortal(admin: any): Promise<{ modelo: string; esfuerzo: 'low' | 'medium' | 'high' } | null> {
+  try {
+    const { data, error } = await admin.from('cc_ia_config').select('modelo_portal, esfuerzo_portal').eq('id', true).maybeSingle()
+    if (error || !data?.modelo_portal) return null
+    return { modelo: String(data.modelo_portal), esfuerzo: ['medium', 'high'].includes(data.esfuerzo_portal) ? data.esfuerzo_portal : 'low' }
+  } catch { return null }   // sin la tabla o sin lectura: el portal sigue con el modelo de siempre
 }
 export function esfuerzoCanal(env: (k: string) => string | undefined): 'low' | 'medium' | 'high' {
   const e = (env('AI_EFFORT_CANAL') ?? '').trim().toLowerCase()

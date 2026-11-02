@@ -39,7 +39,7 @@ export function AvisoVerificacion({ leer = leerPorDefecto, intervaloMs = 45_000 
           : <><b>Tu verificación está en revisión.</b> Ya puedes conocer el catálogo y hablar con tu asesor. Los precios y las compras se habilitan en cuanto aprobemos tu cédula{faltan.length ? <>; para avanzar nos falta {textoFaltan(faltan)}</> : null}.</>}
         {(rechazado || faltan.length > 0) && <> <button type="button" className="rc-link" onClick={() => setScreen('mi_verificacion')} data-testid="ir-mi-verificacion">Ir a Mi verificación</button></>}
         {/* CHAT PRO · mientras lo revisan no se queda sin salida: su asesor le contesta por el chat. */}
-        {!PANTALLAS_CHAT.has(screen) && <>{' '}<button type="button" className="rc-link" onClick={pedirAbrirChat} data-testid="hablar-asesor">Hablar con mi asesor</button></>}
+        {!PANTALLAS_CHAT.has(screen) && <>{' '}<button type="button" className="rc-link" onClick={() => pedirAbrirChat()} data-testid="hablar-asesor">Hablar con mi asesor</button></>}
       </span>
     </div>
   )

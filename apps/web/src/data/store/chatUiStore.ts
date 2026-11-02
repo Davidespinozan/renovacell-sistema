@@ -69,7 +69,8 @@ export const EVENTO_ABRIR_CHAT = 'rc:abrir-chat'
 // IA-VENDEDORA · "Preguntar por este producto": el chat se abre con la pregunta YA escrita (borrador); la persona la envía.
 let borrador: string | null = null
 export function pedirAbrirChat(textoSugerido?: string): void {
-  borrador = textoSugerido?.trim() || null
+  // solo texto: un evento de clic pasado por error como handler no debe romper la apertura
+  borrador = typeof textoSugerido === 'string' ? textoSugerido.trim() || null : null
   try { window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CHAT)) } catch { /* sin ventana: nada que abrir */ }
 }
 /** El redactor del dueño lo toma una sola vez. */

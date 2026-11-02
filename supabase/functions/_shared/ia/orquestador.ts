@@ -12,7 +12,7 @@ type Respuesta =
   | { tipo: 'texto'; texto: string; usage: { input: number; output: number }; stop: string }
   | { tipo: 'herramientas'; texto: string; llamadas: Array<{ id: string; name: string; input: Record<string, unknown> }>; bloques: Bloque[]; usage: { input: number; output: number }; stop: string }
   | { tipo: 'error'; clase: string; usage: { input: number; output: number }; ambiguo: boolean }
-interface Ctx { actor: string; audiencia: string; puede_precio: boolean; puede_stock: boolean; puede_pedidos: boolean; verificado: boolean }
+interface Ctx { actor: string; audiencia: string; puede_precio: boolean; puede_stock: boolean; puede_pedidos: boolean; verificado: boolean; clinico?: boolean }
 type Validada = { ok: true; nombre: string; args: Record<string, unknown>; ids: string[] } | { ok: false; motivo: string }
 
 export interface DepsOrquestador {
@@ -33,7 +33,7 @@ export interface DepsOrquestador {
     herramientasPara: (conCuenta: boolean, canal?: CanalTurno, contactoPendiente?: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
     validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno; contactoPendiente?: boolean }) => Validada
     ejecutarEnlacePortal?: () => { url: string; uso: string }
-    acotarSalida: (v: unknown) => string; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
+    acotarSalida: (v: unknown, max?: number) => string; limiteSalida?: (nombre: string) => number; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
     evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
     // ENT-P · opcional: completa la salida de una herramienta con datos del negocio (p. ej. envío gratis del carrito)
@@ -91,7 +91,9 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
 
   // 3) Contexto de conversación acotado + intención determinista.
   const intencion = d.politica.clasificarIntencion(e.textoUsuario)
-  const limiteClinico = d.politica.esLimiteClinico(e.textoUsuario)
+  // IA-CLÍNICA · con información clínica habilitada para ESTE actor (lo dice la base) la pregunta de etiqueta se responde con
+  // las secciones aprobadas; el límite fijo queda para quien no puede verlas.
+  const limiteClinico = d.politica.esLimiteClinico(e.textoUsuario) && !ctx.clinico
   let historial: Array<{ actor: string; content: string }> = []
   try { historial = await d.leerMensajes(e.conv, e.triggerSeq, 30) } catch { historial = [] }
   const messages: Mensaje[] = d.politica.historialParaModelo(historial, d.config.historial)
@@ -207,7 +209,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       const ev = ej.error ? [] : d.herramientas.evidenciaDe(v.nombre, ej.data)
       await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: v.nombre, p_status: ej.error ? 'error' : (ev.length ? 'ok' : 'vacia'), p_product_ids: v.ids, p_detalle: ej.error ? { motivo: 'rpc' } : { n: d.herramientas.idsDe(ej.data).length, evidencia: ev } })
       if (ej.error) obs('herramienta', 'internal_error', { code: v.nombre })
-      resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado_' + v.nombre, d.herramientas.acotarSalida(salida)) })
+      resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado_' + v.nombre, d.herramientas.acotarSalida(salida, d.herramientas.limiteSalida?.(v.nombre))) })
     }
     if (ronda === d.config.maxRondas - 1) resultados.push({ type: 'text', text: 'Ya no hay más herramientas disponibles en este turno. Responde ahora al usuario con lo que tienes.' })
     messages.push({ role: 'user', content: resultados })

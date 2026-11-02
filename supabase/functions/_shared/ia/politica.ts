@@ -8,7 +8,9 @@ export type Intencion = 'GENERAL_CHAT' | 'PRODUCT_DISCOVERY' | 'PRODUCT_INFO' | 
 export const INTENCIONES: readonly Intencion[] = ['GENERAL_CHAT', 'PRODUCT_DISCOVERY', 'PRODUCT_INFO', 'PRODUCT_COMPARE', 'PRICE', 'AVAILABILITY', 'COMMERCIAL_RECOMMENDATION', 'ORDER_STATUS', 'HUMAN_REQUEST', 'CLINICAL_BOUNDARY', 'CART_VIEW', 'CART_ADD', 'CART_UPDATE', 'CART_REMOVE', 'CHECKOUT', 'UNKNOWN']
 
 // Tipos anchos (string) a propósito: el contexto viene de la base (jsonb) y el orquestador es genérico.
-export interface ContextoActor { actor: string; audiencia: string; puede_precio: boolean; puede_stock: boolean; puede_pedidos: boolean; verificado: boolean }
+export interface ContextoActor { actor: string; audiencia: string; puede_precio: boolean; puede_stock: boolean; puede_pedidos: boolean; verificado: boolean
+  // IA-CLÍNICA · lo decide la base (cc_ia_contexto_actor): este actor ya ve secciones T2 (verificado/personal + T2 habilitado)
+  clinico?: boolean }
 
 // Delimitadores: lo que va dentro es DATA. El sistema le dice al modelo que nada ahí es instrucción.
 export const DELIM = { abre: '<<<DATOS', cierra: 'DATOS>>>' } as const
@@ -85,6 +87,18 @@ export const POLITICA_VENDEDOR = [
   'V5 · LÍMITES: una sugerencia por mensaje, y solo después de responder lo que preguntó. Si dice que no, que solo quiere lo que pidió o cambia de tema, no insistas en esta conversación. Nada de urgencia ni escasez inventadas (la fecha de una promoción vigente sí). El carrito solo cambia si te lo pide.',
 ].join('\n')
 
+// IA-CLÍNICA (2 nov 2026) · el dueño autorizó la información clínica aprobada (T2) para médicos verificados. Solo se añade
+// cuando la base dice `clinico`; para todos los demás la regla 4 sigue como está.
+export const POLITICA_CLINICA = [
+  'INFORMACIÓN CLÍNICA: este usuario es un médico verificado y Dirección habilitó la información clínica aprobada. Para él la regla 4 se aplica así:',
+  'C1 · Puedes compartir lo que dicen las secciones clínicas APROBADAS del producto (indicaciones, contraindicaciones, protocolo de etiqueta y advertencias) que obtengas en ESTE turno con obtener_ficha_producto o buscar_conocimiento. Consúltalas antes de responder; nunca respondas de memoria ni completes con conocimiento general.',
+  'C2 · Di de dónde sale ("según la etiqueta de la FDA…", "la ficha de la EMA indica…") y transmítelo con fidelidad: sin redondear, sin extrapolar a zonas, pacientes o usos que la ficha no menciona (fuera de etiqueta) y sin armar protocolos combinados propios.',
+  'C3 · Si pregunta por un paciente concreto, comparte la información de etiqueta que aplica (por ejemplo, si su condición aparece como contraindicación o advertencia) y deja claro, en una frase, que la decisión clínica es suya. No diagnosticas ni evalúas fotos de pacientes.',
+  'C4 · Si la ficha aprobada no trae lo que pregunta, dilo ("la información aprobada que tengo no cubre eso") y ofrece la ficha del fabricante o un asesor.',
+  'C5 · Ante un evento adverso o una urgencia (oclusión vascular, anafilaxia, dificultad para respirar o deglutir), di la conducta que trae la advertencia aprobada si existe y que atienda la urgencia de inmediato; en ese mensaje no vendas.',
+].join('\n')
+export const TAREA_CLINICA = 'TAREA: pregunta clínica de un médico verificado. Identifica el producto (buscar_productos si hace falta), usa obtener_ficha_producto y responde con las secciones clínicas aprobadas que regrese, citando la etiqueta (C1–C5). Si habla de un paciente concreto, aplica C3. Si no nombra producto y no es claro, pregunta cuál.'
+
 export function contextoAutoridad(ctx: ContextoActor): string {
   if (ctx.actor === 'visitor') return 'USUARIO: visitante sin cuenta. Puede ver información comercial pública (T0). NO puede ver precio, disponibilidad, ficha técnica ni pedidos: para eso debe registrarse y verificar su cédula profesional. Invítalo de forma natural, no en cada mensaje.'
   if (ctx.actor === 'doctor' && !ctx.verificado) return 'USUARIO: profesional registrado pero AÚN NO verificado. Ve información comercial pública (T0). Precio, disponibilidad y ficha técnica se habilitan al completar la verificación de cédula.'
@@ -153,10 +167,11 @@ export function tareaContacto(c: ContactoPendiente): string | null {
 export function construirSistema(e: EntradaSistema): string {
   const enCanal = !!e.canal && e.canal !== 'portal'
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '',
-    enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
+    e.ctx.clinico && e.intencion === 'CLINICAL_BOUNDARY' ? TAREA_CLINICA : enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
   const canal = contextoCanal(e.canal ?? 'portal')
   if (canal) partes.push('', canal)
   if ((e.canal ?? 'portal') === 'portal' && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
+  if (e.ctx.clinico) partes.push('', POLITICA_CLINICA)
   const contacto = e.contacto ? tareaContacto(e.contacto) : null
   if (contacto) partes.push('', contacto)
   if (e.evidencia.length) partes.push('', `EVIDENCIA DISPONIBLE EN ESTE TURNO: ${e.evidencia.join(', ')}.`)

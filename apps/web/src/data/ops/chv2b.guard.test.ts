@@ -22,7 +22,7 @@ describe('navegación por rol', () => {
     expect(admin).toContainEqual(['comun', 'Avisos del equipo'])
     expect(admin).toContainEqual(['chat', 'Chat del equipo'])
     expect(admin).toContainEqual(['g_conversaciones', 'Conversaciones'])   // MENÚ AGRUPADO · Bandeja · Asignadas · Correos en una entrada
-    expect(SUBPANTALLAS.g_conversaciones.map((x) => x.key)).toEqual(['av_atencion', 'asesorias', 'av_mensajes'])   // las keys no cambian (avisos y enlaces)
+    expect(SUBPANTALLAS.g_conversaciones.map((x) => x.key)).toEqual(['av_atencion', 'asesorias', 'av_mensajes', 'av_ia'])   // las keys no cambian (avisos y enlaces); IA mejor que el humano (2 nov 2026) agrega Asesora IA al final
     expect(resolverDestino(getNav(getRole('admin')), 'av_atencion')).toEqual({ screen: 'g_conversaciones', pestana: 'av_atencion' })
     expect(resolverDestino(getNav(getRole('admin')), 'bandeja')).toEqual({ screen: 'inicio' })   // Inicio ES la bandeja
     expect(getNav(getRole('doctor')).map((s) => s.key)).toEqual(['inicio', 'catalogo', 'g_pedidosdr', 'chat_cc', 'mi_verificacion'])   // MENÚ · Mis pedidos = En curso · Historial

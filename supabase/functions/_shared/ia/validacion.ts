@@ -4,7 +4,7 @@
 // existencias sin evidencia, con nombres de catálogo fuera del conjunto autorizado del turno, ni
 // con lenguaje clínico individualizado.
 
-export type MotivoRechazo = 'vacia' | 'larga' | 'fuga_herramientas' | 'fuga_sistema' | 'precio_sin_evidencia' | 'stock_sin_evidencia' | 'producto_no_autorizado' | 'clinico' | 'carrito_mutacion_sin_evidencia' | 'carrito_lectura_sin_evidencia' | 'pedido_sin_evidencia' | 'promesa_humano_sin_evidencia'
+export type MotivoRechazo = 'vacia' | 'larga' | 'fuga_herramientas' | 'fuga_sistema' | 'precio_sin_evidencia' | 'stock_sin_evidencia' | 'producto_no_autorizado' | 'clinico' | 'carrito_mutacion_sin_evidencia' | 'carrito_lectura_sin_evidencia' | 'pedido_sin_evidencia' | 'promesa_humano_sin_evidencia' | 'clinico_sin_evidencia'
 export interface ContextoValidacion { evidencia: readonly string[]; nombresAutorizados: readonly string[]; nombresCatalogo: readonly string[]; limiteClinico: boolean }
 export type Validacion = { ok: true; texto: string } | { ok: false; motivo: MotivoRechazo; detalle?: string }
 
@@ -38,6 +38,8 @@ export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Valid
   if (!ctx.evidencia.includes('PRICE_EVIDENCE') && RE_PRECIO.test(t)) return { ok: false, motivo: 'precio_sin_evidencia' }
   if (!ctx.evidencia.includes('STOCK_EVIDENCE') && RE_STOCK.test(t)) return { ok: false, motivo: 'stock_sin_evidencia' }
   if (ctx.limiteClinico && RE_CLINICO.test(t)) return { ok: false, motivo: 'clinico' }
+  // IA-CLÍNICA · fuera del límite, una cifra clínica (unidades, ml, dosis, protocolo) solo con una sección clínica aprobada del turno
+  if (!ctx.limiteClinico && RE_CLINICO.test(t) && !ctx.evidencia.includes('CLINICAL_EVIDENCE')) return { ok: false, motivo: 'clinico_sin_evidencia' }
   if (RE_PEDIDO_CREADO.test(t)) return { ok: false, motivo: 'pedido_sin_evidencia' }
   if (!(ctx.evidencia.includes('EN_HORARIO') && ctx.evidencia.includes('ASESOR_ASIGNADO')) && RE_PROMESA_HUMANO.test(t)) return { ok: false, motivo: 'promesa_humano_sin_evidencia' }
   if (!ctx.evidencia.includes('ASESOR_ASIGNADO') && RE_ASIGNADO.test(t)) return { ok: false, motivo: 'promesa_humano_sin_evidencia' }
@@ -77,6 +79,8 @@ export function sinMontosDeEnvio(texto: string, montos: readonly number[]): stri
 // R4-C11 · el cliente nunca ve frases de "sistema" del modelo ("Entendido, corrijo mi respuesta:", "Tienes razón. Respondo
 // correctamente:"): se quitan del inicio antes de validar.
 const RE_META_INICIO = /^\s*(?:entendido|de acuerdo|tienes raz[oó]n|perd[oó]n|disculpa|ok)[.,!:]?\s*(?:[^\n.!?]{0,40}\b(?:corrijo|corregir|correcci[oó]n|respondo correctamente|reformulo|mi respuesta anterior)\b[^\n]*?[:.!]\s*)/i
+// IA-CLÍNICA · respaldo cuando el modelo dio una cifra clínica sin haber consultado una sección clínica aprobada
+export const MENSAJE_CLINICO_SIN_FICHA = 'Para darte ese dato clínico necesito la información de etiqueta aprobada y no la tengo a la mano en este momento. ¿Me confirmas el producto exacto y la reviso?'
 export const sinFrasesDeSistema = (t: string): string => { const s = t.replace(RE_META_INICIO, ''); return s === t ? t : s.charAt(0).toUpperCase() + s.slice(1) }
 
 /** Texto seguro cuando el modelo no produjo una respuesta válida: nunca inventa; usa la evidencia o se limita. */
@@ -89,6 +93,7 @@ export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; e
   if (motivo === 'pedido_sin_evidencia') return 'Yo no creo pedidos: cuando quieras, confirma el tuyo con el botón "Confirmar pedido" de tu carrito y ahí verás el total actual.'
   if (motivo === 'promesa_humano_sin_evidencia') return 'Tu solicitud de asesor quedó registrada y te avisaremos aquí cuando se una. Mientras tanto, sigo ayudándote con lo que necesites.'
   if (motivo === 'carrito_lectura_sin_evidencia') return 'Déjame revisar tu carrito antes de confirmarte su contenido. ¿Quieres que lo muestre?'
+  if (motivo === 'clinico_sin_evidencia') return MENSAJE_CLINICO_SIN_FICHA
   return ctx.textoGenerico
 }
 
@@ -102,6 +107,7 @@ export function respuestaSeguraCanal(motivo: string, ctx: { limiteClinico: boole
   // EXPEDIENTE · antes preguntaba "¿me dices el nombre exacto?" aunque el cliente no hablara de productos (p. ej. al dar
   // su cédula): ahora, la respuesta general del canal.
   if (motivo === 'producto_no_autorizado') return ctx.textoGenerico
+  if (motivo === 'clinico_sin_evidencia') return MENSAJE_CLINICO_SIN_FICHA
   if (motivo === 'pedido_sin_evidencia' || motivo === 'carrito_mutacion_sin_evidencia' || motivo === 'carrito_lectura_sin_evidencia')
     return 'Por este medio no registro pedidos ni carritos: las compras se hacen en el portal para profesionales verificados. Si necesitas ayuda para completarla, un asesor de Renovacell puede atenderte.'
   if (motivo === 'promesa_humano_sin_evidencia') {

@@ -14,7 +14,7 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
   | 'enlace_portal'   // LIVE C1 · URL pública oficial del portal (sin tokens ni datos): la ofrece a audiencias públicas y canales
   | 'registrar_contacto'   // CONTACTO CONVERSACIONAL · solo el visitante del enlace que aún no deja sus datos
   | 'cotizar' | 'recomendar_productos'   // IA-VENDEDORA · combinaciones con las reglas del pedido y recomendaciones con motivo
-export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
+export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
 export interface DefinicionHerramienta { name: NombreHerramienta; description: string; input_schema: Record<string, unknown>; autoridad: 'cualquiera' | 'cuenta'; mutante: boolean }
@@ -205,6 +205,10 @@ export function filtrarProhibidas<T>(valor: T): T {
 }
 
 /** Acota la salida de una herramienta a texto JSON para el modelo. */
+// IA-CLÍNICA · una ficha completa (general, técnica y clínica, con sus fuentes) mide hasta ~9k: con el tope general se
+// cortaban secciones enteras. La ficha y la comparación tienen su propio tope; lo demás sigue igual.
+export const MAX_SALIDA_FICHA = 20_000
+export const limiteSalida = (nombre: string): number => (nombre === 'obtener_ficha_producto' || nombre === 'comparar_productos' ? MAX_SALIDA_FICHA : MAX_SALIDA_CHARS)
 export function acotarSalida(valor: unknown, max = MAX_SALIDA_CHARS): string {
   let s: string
   try { s = JSON.stringify(filtrarProhibidas(valor) ?? null) } catch { s = 'null' }
@@ -257,7 +261,8 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       const conPrecio = proy.puede_precio === true && (proy.total as Record<string, unknown> | undefined)?.estado === 'completo'
       return o.cart_id ? (['CHECKOUT_REVIEW_EVIDENCE', ...(conPrecio ? ['PRICE_EVIDENCE', 'STOCK_EVIDENCE'] : [])] as Evidencia[]) : []
     }
-    default: return noVacia ? ['KNOWLEDGE_EVIDENCE'] : []
+    // IA-CLÍNICA · una sección T2 aprobada en la salida (la base solo la entrega a quien puede verla) sostiene cifras clínicas
+    default: return noVacia ? (['KNOWLEDGE_EVIDENCE', ...(JSON.stringify(salida).includes('"nivel":"T2"') ? ['CLINICAL_EVIDENCE'] : [])] as Evidencia[]) : []
   }
 }
 
