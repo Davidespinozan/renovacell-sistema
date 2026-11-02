@@ -94,3 +94,12 @@ export function extraerEstados(payload: unknown): Array<{ wamid: string; estado:
   }
   return out
 }
+
+// IA MEJOR QUE EL HUMANO · E · código de vínculo que el doctor manda desde SU WhatsApp ("Conectar mi WhatsApp RC-123456").
+// Solo un mensaje corto que trae el código cuenta (no cualquier número dentro de una conversación larga).
+export function codigoVinculo(texto: string): string | null {
+  const t = (texto ?? '').trim()
+  if (t.length > 80) return null
+  const m = t.match(/\bRC-?\s?(\d{6})\b/i)
+  return m ? 'RC-' + m[1] : null
+}

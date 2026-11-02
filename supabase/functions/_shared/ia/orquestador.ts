@@ -30,8 +30,8 @@ export interface DepsOrquestador {
     prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
   }
   herramientas: {
-    herramientasPara: (conCuenta: boolean, canal?: CanalTurno, contactoPendiente?: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
-    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno; contactoPendiente?: boolean }) => Validada
+    herramientasPara: (conCuenta: boolean, canal?: CanalTurno, contactoPendiente?: boolean, identificado?: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
+    validarLlamada: (nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalTurno; contactoPendiente?: boolean; identificado?: boolean }) => Validada
     ejecutarEnlacePortal?: () => { url: string; uso: string }
     acotarSalida: (v: unknown, max?: number) => string; limiteSalida?: (nombre: string) => number; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
@@ -73,7 +73,11 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   // 1) Contexto del actor: la ÚNICA fuente de audiencia y permisos.
   //    LIVE C1 · fuera del portal el perfil no se entrega: la IA habla con audiencia pública, sin excepciones.
   const canal: CanalTurno = e.canal ?? 'portal'
-  const perfilIA: string | null = canal === 'portal' ? e.profile : null
+  // IA MEJOR QUE EL HUMANO · E (2 nov 2026): en WhatsApp, SOLO con vínculo explícito (código desde su sesión o Dirección) la base
+  // dice qué doctor es (cc_ia_identidad_canal); un número que coincide no prueba nada (R4-B1). Instagram/Messenger, nunca.
+  let perfilIA: string | null = canal === 'portal' ? e.profile : null
+  if (canal === 'whatsapp') { const idc = await rpc('cc_ia_identidad_canal', { p_conv: e.conv }); if (!idc.error && typeof idc.data === 'string') perfilIA = idc.data }
+  const identificado = canal !== 'portal' && !!perfilIA
   const cx = await rpc('cc_ia_contexto_actor', { p_profile: perfilIA })
   const ctx = (cx.data ?? null) as Ctx | null
   if (cx.error || !ctx || ctx.actor === 'suspendido') return { estado: 'no_autorizado', usage }
@@ -109,7 +113,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
 
   const conCuenta = ctx.actor !== 'visitor'
   const contactoPendiente = !!e.contacto?.pendiente && e.actor === 'visitor' && canal === 'portal'
-  const tools = d.herramientas.herramientasPara(conCuenta, canal, contactoPendiente)
+  const tools = d.herramientas.herramientasPara(conCuenta, canal, contactoPendiente, identificado)
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
@@ -137,7 +141,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   // tipo de cliente, especialidad, lo que compra, su carrito con oportunidades y lo que buscó en el catálogo. Sus productos
   // cuentan como consultados en este turno y sus montos como precio autorizado (vienen de la misma autoridad que obtener_precio).
   let perfilComercial = ''
-  if (canal === 'portal' && ctx.puede_precio && perfilIA) {
+  if ((canal === 'portal' || identificado) && ctx.puede_precio && perfilIA) {
     const pc = await rpc('cc_ia_perfil_comercial', { p_profile: perfilIA })
     if (!pc.error && pc.data && typeof pc.data === 'object') {
       for (const id of d.herramientas.idsDe(pc.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pc.data)) nombresAutorizados.add(n)
@@ -196,7 +200,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     messages.push({ role: 'assistant', content: r.bloques })
     const resultados: Bloque[] = []
     for (const ll of r.llamadas) {
-      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente })
+      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente, identificado })
       if (!v.ok) {
         await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: String(ll.name).slice(0, 60), p_status: v.motivo === 'no_autorizada' || v.motivo === 'id_no_autorizado' ? 'no_autorizada' : 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })

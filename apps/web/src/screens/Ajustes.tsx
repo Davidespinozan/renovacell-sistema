@@ -5,11 +5,12 @@ import React, { useEffect, useState } from 'react'
 import { X, Bell, BellOff, Check } from 'lucide-react'
 import { activarAvisos as activarPorDefecto, estadoAvisos as estadoPorDefecto, type EstadoAvisos } from '../data/ops/push'
 import { useRoleOpcional } from '../auth/RoleContext'
+import { whatsappVinculo as vinculoPorDefecto, type ClienteWhatsappVinculo, type CodigoVinculo, type EstadoVinculo } from '../data/ops/whatsappVinculo'
 
 export const QUE_AVISA_EQUIPO = 'mensajes del Chat del equipo, Avisos del equipo, mensajes de tus clientes (portal y WhatsApp) y doctores por verificar'
 export const QUE_AVISA_DOCTOR = 'respuestas de tu asesor y promociones'
 
-export function Ajustes({ onClose, estado = estadoPorDefecto, activar = activarPorDefecto }: { onClose: () => void; estado?: typeof estadoPorDefecto; activar?: typeof activarPorDefecto }) {
+export function Ajustes({ onClose, estado = estadoPorDefecto, activar = activarPorDefecto, vinculo = vinculoPorDefecto }: { onClose: () => void; estado?: typeof estadoPorDefecto; activar?: typeof activarPorDefecto; vinculo?: ClienteWhatsappVinculo }) {
   const role = useRoleOpcional()?.role
   const [e, setE] = useState<EstadoAvisos | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -57,11 +58,54 @@ export function Ajustes({ onClose, estado = estadoPorDefecto, activar = activarP
           {msg && <div role="status" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{msg}</div>}
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>Se activa por dispositivo: hazlo en tu teléfono y en tu computadora.</div>
 
+          {role === 'doctor' && <WhatsappVinculo cliente={vinculo} />}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cerrar</button>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// IA MEJOR QUE EL HUMANO · E · conectar su WhatsApp: código de 20 min que se manda desde SU WhatsApp (abre el chat con el texto listo).
+function WhatsappVinculo({ cliente }: { cliente: ClienteWhatsappVinculo }) {
+  const [e, setE] = useState<EstadoVinculo | null>(null)
+  const [cod, setCod] = useState<CodigoVinculo | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const cargar = () => { void cliente.estado().then((r) => { if (r.ok) setE(r.data) }) }
+  useEffect(cargar, [cliente])
+  // mientras espera el código, revisa cada 5 s si ya quedó (el doctor lo mandó desde WhatsApp)
+  useEffect(() => {
+    if (!cod || e?.vinculado) return
+    const t = setInterval(() => { void cliente.estado().then((r) => { if (r.ok && r.data.vinculado) { setE(r.data); setCod(null) } }) }, 5000)
+    return () => clearInterval(t)
+  }, [cod, e?.vinculado, cliente])
+  if (!e) return null
+  const pedir = async () => { setMsg(null); const r = await cliente.codigo(); if (r.ok) setCod(r.data); else setMsg(r.error) }
+  const quitar = async () => { const r = await cliente.quitar(); if (r.ok) { setE({ vinculado: false }); setCod(null) } else setMsg(r.error) }
+  return (
+    <div style={{ marginTop: 18 }} data-testid="ajustes-whatsapp">
+      <div className="eyebrow" style={{ margin: '0 0 4px' }}>WhatsApp</div>
+      {e.vinculado ? (
+        <div className="sysnote" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)', color: 'var(--green-deep)' }}>
+          <Check size={18} /><span>Tu WhatsApp ({e.numero}) está conectado: por ahí te atendemos con tus precios y te decimos cómo van tus pedidos.
+            {' '}<button type="button" className="rc-link" onClick={() => void quitar()} data-testid="whatsapp-quitar">Desconectar</button></span>
+        </div>
+      ) : cod ? (
+        <div style={{ fontSize: 13 }} data-testid="whatsapp-codigo">
+          Manda este código desde tu WhatsApp a Renovacell: <b className="mono" style={{ fontSize: 16 }}>{cod.codigo}</b> (vence en 20 min).
+          <div style={{ marginTop: 8 }}><a className="btn" href={cod.enlace} target="_blank" rel="noreferrer">Abrir WhatsApp con el código</a></div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>En cuanto llegue, aquí se marca como conectado.</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 8 }}>Conecta tu WhatsApp para que la asesora de Renovacell te reconozca ahí: tus precios, cotizaciones y el estado de tus pedidos, sin entrar al portal.</div>
+          <button className="btn ghost" type="button" onClick={() => void pedir()} data-testid="whatsapp-conectar">Conectar mi WhatsApp</button>
+        </>
+      )}
+      {msg && <div role="status" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{msg}</div>}
     </div>
   )
 }

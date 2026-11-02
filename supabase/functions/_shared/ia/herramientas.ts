@@ -91,10 +91,14 @@ export const REGISTRAR_CONTACTO: DefinicionHerramienta = { name: 'registrar_cont
   }, required: ['nombre', 'telefono', 'email'], additionalProperties: false } }
 
 /** Herramientas expuestas al modelo según el actor (los pedidos solo con cuenta). */
-export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
+// IA MEJOR QUE EL HUMANO · E · un WhatsApp vinculado a un doctor verificado también consulta SUS pedidos (lectura); carrito y
+// checkout siguen siendo del portal.
+const SOLO_PORTAL_SIN_VINCULO: readonly NombreHerramienta[] = ['obtener_estado_pedido']
+const soloPortal = (n: NombreHerramienta, identificado: boolean) => SOLO_PORTAL.includes(n) && !(identificado && SOLO_PORTAL_SIN_VINCULO.includes(n))
+export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false, identificado = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
   return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : [])]
     .filter((h) => h.autoridad === 'cualquiera' || conCuenta)
-    .filter((h) => canal === 'portal' || !SOLO_PORTAL.includes(h.name))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal
+    .filter((h) => canal === 'portal' || !soloPortal(h.name, identificado))          // LIVE C1 · sin carrito/checkout/pedidos fuera del portal (pedidos sí con vínculo)
     .filter((h) => h.name !== 'enlace_portal' || !conCuenta || canal !== 'portal')   // el enlace solo tiene sentido sin sesión en el portal
     .map(({ name, description, input_schema }) => ({ name, description, input_schema }))
 }
@@ -105,7 +109,7 @@ const str = (v: unknown, max: number): string | null => typeof v === 'string' &&
 const uuid = (v: unknown): string | null => typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null
 
 /** Valida nombre, forma y AUTORIDAD de una llamada del modelo. Los product_id deben venir de retrieval autorizado en este turno. */
-export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalIA; contactoPendiente?: boolean }): Validada {
+export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta: boolean; idsAutorizados: Set<string>; canal?: CanalIA; contactoPendiente?: boolean; identificado?: boolean }): Validada {
   if (nombre === 'registrar_contacto') {
     if (!ctx.contactoPendiente || ctx.conCuenta || (ctx.canal ?? 'portal') !== 'portal') return { ok: false, motivo: 'no_autorizada' }
     const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
@@ -117,7 +121,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
   if (typeof nombre !== 'string' || !NOMBRES.has(nombre)) return { ok: false, motivo: 'desconocida' }
   const def = HERRAMIENTAS.find((h) => h.name === nombre)!
   if (def.autoridad === 'cuenta' && !ctx.conCuenta) return { ok: false, motivo: 'no_autorizada' }
-  if ((ctx.canal ?? 'portal') !== 'portal' && SOLO_PORTAL.includes(def.name)) return { ok: false, motivo: 'no_autorizada' }   // LIVE C1 · defensa aunque el modelo la pida
+  if ((ctx.canal ?? 'portal') !== 'portal' && soloPortal(def.name, !!ctx.identificado)) return { ok: false, motivo: 'no_autorizada' }   // LIVE C1 · defensa aunque el modelo la pida
   const i = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>
   const n = nombre as NombreHerramienta
   switch (n) {

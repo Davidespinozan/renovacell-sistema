@@ -65,10 +65,10 @@ describe('META-02 · guardas de fuente de meta-webhook', () => {
     expect(src).toMatch(/if \(error\) \{ obs\('meta', 'internal_error', \{ code: 'cc_meta_entrante', error \}\); diag\(\{ canal: m\.canal, etapa: 'meta_entrante', \.\.\.clasificarError\(error\), http: 500, correlacion: correlacion\(m\.mid\), cuenta \}\); return new Response\('reintentar', \{ status: 500 \}\)/)
     expect(src).toMatch(/diag\(\{ canal, etapa: 'procesar', \.\.\.clasificarError\(e\), http: 500, cuenta \}\)\n\s*obs\('procesar', 'internal_error', \{ code: 'exception', error: e \}\)\n\s*throw e/)
     expect(src).toMatch(/diag\(\{ canal, etapa: 'recibido', causa: 'ok', codigo: 'ok', http: 200, cuenta, conteo: \{ wa: wa\.length, estados: estados\.length, meta: mt\.length \} \}\)\n\s*return new Response\(JSON\.stringify\(\{ received: true \}\), \{ status: 200/)
-    expect(diags).toHaveLength(8)
+    expect(diags).toHaveLength(9)   // E (2 nov 2026) · + wa_vincular (200, no bloquea)
   })
   it('ninguna línea de diagnóstico lleva contenido ni identificadores de personas; los códigos HTTP y el orden firma→parseo→proceso no cambian', () => {
-    expect(diags).toHaveLength(8)
+    expect(diags).toHaveLength(9)   // E (2 nov 2026) · + wa_vincular (200, no bloquea)
     for (const l of diags) expect(l).not.toMatch(/m\.texto|m\.wa_id|m\.nombre|m\.psid|e\.error\b|\bbody\b|payload\b|JSON\.stringify|error\.message|error\.details|appSecret|verifyToken|Authorization|\.estado\b/)
     expect(src).not.toMatch(/console\.(log|error)\([^\n]*(m\.texto|m\.wa_id|m\.psid|m\.nombre|body)/)
     const iFirma = src.indexOf('validSignature(body'), iParse = src.indexOf('payload = JSON.parse(body)'), iCanal = src.indexOf('const canal = canalDe(payload), cuenta = cuentaDe(payload)'), iTry = src.indexOf('try {\n', iCanal)

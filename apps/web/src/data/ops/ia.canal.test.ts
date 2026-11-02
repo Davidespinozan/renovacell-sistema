@@ -161,7 +161,9 @@ describe('LIVE C1 · guardas de fuente: el canal viaja hasta la política y el p
     expect(sin(chatEdge)).toMatch(/responderIA\(admin, conv, r\.seq, dueno, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\)/)   // portal explícito + datos de contacto pendientes
     expect(sin(responderSrc)).toMatch(/canal: CanalTurno = 'portal', adjunto: EntradaTurno\['adjunto'\] \| null = null, contacto: EntradaTurno\['contacto'\] = null\)/); expect(sin(responderSrc)).toMatch(/textoUsuario: texto, canal, \.\.\.\(adjunto \? \{ adjunto \} : \{\}\), \.\.\.\(contacto \? \{ contacto \} : \{\}\) \}/)   // R4-C13 + CONTACTO CONVERSACIONAL
     expect(sin(responderSrc)).toMatch(/canal === 'portal' \? contacto : null\)/)   // los datos de contacto solo existen en el portal
-    expect(sin(orqSrc)).toMatch(/const perfilIA: string \| null = canal === 'portal' \? e\.profile : null/)
+    // E (2 nov 2026) · fuera del portal el perfil solo llega con vínculo explícito de WhatsApp que valida la base (R4-B1 en pie)
+    expect(sin(orqSrc)).toMatch(/let perfilIA: string \| null = canal === 'portal' \? e\.profile : null/)
+    expect(sin(orqSrc)).toMatch(/if \(canal === 'whatsapp'\) \{ const idc = await rpc\('cc_ia_identidad_canal', \{ p_conv: e\.conv \}\); if \(!idc\.error && typeof idc\.data === 'string'\) perfilIA = idc\.data \}/)
     expect(sin(orqSrc)).toMatch(/rpc\('cc_ia_contexto_actor', \{ p_profile: perfilIA \}\)/)
     for (const fn of ['cc_ia_precio', 'cc_ia_disponibilidad', 'cc_ia_estado_pedido']) expect(sin(orqSrc)).toMatch(new RegExp(`rpc\\('${fn}', \\{ p_profile: t\\.perfilIA`))
     expect(sin(orqSrc)).not.toMatch(/rpc\('cc_ia_(precio|disponibilidad|estado_pedido)', \{ p_profile: e\.profile/)

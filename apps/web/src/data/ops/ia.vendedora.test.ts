@@ -30,7 +30,9 @@ describe('reglas de vendedor', () => {
   it('solo con el doctor verificado en el portal', () => {
     expect(construirSistema({ ...base, ctx: doctor })).toContain(POLITICA_VENDEDOR)
     expect(construirSistema({ ...base, ctx: visitante })).not.toContain('TAMBIÉN ERES SU VENDEDOR')
-    expect(construirSistema({ ...base, ctx: doctor, canal: 'whatsapp' })).not.toContain('TAMBIÉN ERES SU VENDEDOR')
+    // E (2 nov 2026) · en canal la base solo entrega contexto de doctor con WhatsApp vinculado: ahí también vende; Instagram/Messenger nunca
+    expect(construirSistema({ ...base, ctx: doctor, canal: 'whatsapp' })).toContain('TAMBIÉN ERES SU VENDEDOR')
+    expect(construirSistema({ ...base, ctx: doctor, canal: 'instagram' })).not.toContain('TAMBIÉN ERES SU VENDEDOR')
   })
   it('vende con montos del servidor, una sugerencia a la vez y sin insistir', () => {
     expect(POLITICA_VENDEDOR).toMatch(/usa cotizar: nunca calcules montos tú/)
@@ -39,6 +41,6 @@ describe('reglas de vendedor', () => {
     expect(REGLA_ENVIO_GRATIS_PORTAL).not.toMatch(/No ofrezcas agregar productos/)
   })
   it('el perfil comercial entra al turno solo en el portal y con precio autorizado', () => {
-    expect(orquestadorSrc).toMatch(/if \(canal === 'portal' && ctx\.puede_precio && perfilIA\) \{\n    const pc = await rpc\('cc_ia_perfil_comercial'/)
+    expect(orquestadorSrc).toMatch(/if \(\(canal === 'portal' \|\| identificado\) && ctx\.puede_precio && perfilIA\) \{\n    const pc = await rpc\('cc_ia_perfil_comercial'/)
   })
 })

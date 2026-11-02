@@ -17,7 +17,7 @@
 // IMPORTANTE al desplegar: --no-verify-jwt (Meta no manda JWT de Supabase).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
-import { extraerWhatsApp, extraerEstados } from '../_shared/whatsapp.ts'
+import { extraerWhatsApp, extraerEstados, codigoVinculo } from '../_shared/whatsapp.ts'
 import { descargarMedia, despacharWhatsApp, mostrarEscribiendo } from '../_shared/whatsappEnvio.ts'
 import { guardarImagenWA } from '../_shared/adjuntos.ts'
 import { extraerMeta } from '../_shared/meta.ts'
@@ -109,7 +109,16 @@ Deno.serve(async (req) => {
       const { data, error } = await admin.rpc('cc_wa_entrante', { p_wa_id: m.wa_id, p_nombre: m.nombre || null, p_wamid: m.wamid, p_texto: m.texto, p_encolar: false })
       if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); diag({ canal: 'whatsapp', etapa: 'wa_entrante', ...clasificarError(error), http: 500, correlacion: correlacion(m.wamid), cuenta }); return new Response('reintentar', { status: 500 }) }
       const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string; message_id?: string }
-      if (r.duplicado || !r.activo) continue
+      if (r.duplicado) continue
+      // E · "Conectar mi WhatsApp RC-123456": el servidor vincula (o explica por qué no) y contesta; la IA no toma este turno.
+      const cod = codigoVinculo(m.texto)
+      if (cod) {
+        const { error: ev } = await admin.rpc('cc_wa_vincular', { p_wa_id: m.wa_id, p_codigo: cod, p_conv: r.conversation_id })
+        if (ev) diag({ canal: 'whatsapp', etapa: 'wa_vincular', ...clasificarError(ev), http: 200, correlacion: correlacion(m.wamid), cuenta })
+        else if (r.activo) enSegundoPlano(despacharWhatsApp(admin))
+        continue
+      }
+      if (!r.activo) continue
       enSegundoPlano((async () => {
         // ALTA-DESDE-CONVERSACIÓN · la imagen se descarga UNA vez: queda guardada en la conversación (INE, comprobante,
         // producto) aunque atienda una persona, y la misma descarga la ve la IA si le toca responder.

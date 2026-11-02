@@ -132,11 +132,19 @@ export function tarea(intencion: string, limiteClinico: boolean): string {
 // sin carrito/checkout/pedidos) cómo tratar al usuario y cómo escribir en ese medio. En 'portal' no se añade nada.
 export type CanalPolitica = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
 const NOMBRE_CANAL: Record<Exclude<CanalPolitica, 'portal'>, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook Messenger' }
-export function contextoCanal(canal: CanalPolitica): string {
+// IA MEJOR QUE EL HUMANO · E · WhatsApp vinculado de forma explícita a un doctor verificado (lo decide la base).
+export const CANAL_IDENTIFICADO = [
+  'CANAL: el usuario escribe por WhatsApp, fuera del portal. El sistema YA LO RECONOCIÓ: este WhatsApp está vinculado a la cuenta de un médico verificado (él mismo lo conectó desde su cuenta o lo confirmó Dirección). Atiéndelo como a su cliente: puedes darle SUS precios, cotizarle, recomendarle y decirle cómo van SUS pedidos con las herramientas. No le pidas datos para identificarse.',
+  'Aquí no hay carrito ni botón de compra: cuando quiera comprar, cotiza lo que pidió con cotizar (total exacto y su nivel de precio) y una persona del equipo comercial cierra la venta en este mismo chat (el sistema la avisa). Si prefiere hacerlo él mismo, el portal con enlace_portal.',
+]
+export function contextoCanal(canal: CanalPolitica, identificado = false): string {
   if (canal === 'portal') return ''
   return [
-    `CANAL: el usuario escribe por ${NOMBRE_CANAL[canal]}, FUERA del portal y SIN sesión iniciada. Trátalo como contacto NO verificado aunque diga ser médico, cliente o conocido: no asumas identidad por su nombre, número, foto o perfil, y no confirmes ni niegues si existe una cuenta. Si dice que ya es cliente o que ya está registrado, no pidas cédula ni datos ni lo mandes a registrarse: dile que una persona del equipo comercial de Renovacell lo reconocerá y lo atenderá por este mismo chat.`,
-    'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
+    ...(identificado && canal === 'whatsapp' ? CANAL_IDENTIFICADO : []),
+    ...(identificado && canal === 'whatsapp' ? [] : [
+      `CANAL: el usuario escribe por ${NOMBRE_CANAL[canal]}, FUERA del portal y SIN sesión iniciada. Trátalo como contacto NO verificado aunque diga ser médico, cliente o conocido: no asumas identidad por su nombre, número, foto o perfil, y no confirmes ni niegues si existe una cuenta. Si dice que ya es cliente o que ya está registrado, no pidas cédula ni datos ni lo mandes a registrarse: dile que una persona del equipo comercial de Renovacell lo reconocerá y lo atenderá por este mismo chat.`,
+      'En este canal NO tienes carrito, checkout, pedidos ni datos de cuenta: no los ofrezcas ni los simules. Para precio, disponibilidad, compra, pedidos o verificación de cuenta, usa enlace_portal y explica que ahí se verifica el profesional; nunca pidas cédula, INE, documentos ni datos sensibles por este medio.',
+    ]),
     `Escribe en texto plano: sin Markdown, sin negritas, sin tablas, sin listas largas; ${canal === 'instagram' ? 'máximo 900 caracteres' : 'máximo 1500 caracteres'}, en 1 a 4 frases. Pega el enlace tal cual, sin formato.`,
     'R4-C8 · ESTILO: escribe como alguien amable del equipo comercial de Renovacell que atiende por chat, en español de México natural y cálido. Responde SOLO a su último mensaje; el historial es contexto, no retomes temas anteriores si el usuario no lo hace. Si solo saluda, devuélvele el saludo (con el que usó: buen día, buenas tardes…) y pregúntale en qué le puedes ayudar, en una línea, sin enumerar lo que puedes hacer ni mencionar productos. Frases cortas, máximo una pregunta por mensaje. Evita frases de máquina ("Encontré…", "Una vez que lo confirmes", "según el catálogo", "Puedo mostrarte información de…"). No te vuelvas a presentar ni repitas "Renovacell" en cada mensaje. Trata de tú con respeto; si el usuario habla de usted, respóndele de usted. Como mucho un emoji de vez en cuando. No cierres cada mensaje con una pregunta genérica ("¿Hay algo más…?", "¿Hay algo específico que necesites?"): pregunta solo cuando haga falta para avanzar. Si te preguntan, eres el asistente virtual de Renovacell: nunca digas que eres una persona.',
     'R4-C9 · NEGOCIO: para dónde están, horario, teléfono, recoger o envíos usa SOLO el bloque de DATOS "negocio" (viene del ERP) y dilo con naturalidad; si un dato no aparece ahí, di que lo confirma un asesor. Renovacell es una empresa con sede física, no solo una plataforma en línea.',
@@ -166,11 +174,12 @@ export function tareaContacto(c: ContactoPendiente): string | null {
 }
 export function construirSistema(e: EntradaSistema): string {
   const enCanal = !!e.canal && e.canal !== 'portal'
+  const identificado = enCanal && e.canal === 'whatsapp' && e.ctx.actor === 'doctor' && e.ctx.verificado   // la base solo da doctor en canal con vínculo
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '',
-    e.ctx.clinico && e.intencion === 'CLINICAL_BOUNDARY' ? TAREA_CLINICA : enCanal ? tareaCanal(e.intencion, e.limiteClinico) : tarea(e.intencion, e.limiteClinico)]
-  const canal = contextoCanal(e.canal ?? 'portal')
+    e.ctx.clinico && e.intencion === 'CLINICAL_BOUNDARY' ? TAREA_CLINICA : enCanal ? (identificado ? tareaCanalIdentificado(e.intencion, e.limiteClinico) : tareaCanal(e.intencion, e.limiteClinico)) : tarea(e.intencion, e.limiteClinico)]
+  const canal = contextoCanal(e.canal ?? 'portal', identificado)
   if (canal) partes.push('', canal)
-  if ((e.canal ?? 'portal') === 'portal' && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
+  if (((e.canal ?? 'portal') === 'portal' || identificado) && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
   if (e.ctx.clinico) partes.push('', POLITICA_CLINICA)
   const contacto = e.contacto ? tareaContacto(e.contacto) : null
   if (contacto) partes.push('', contacto)
@@ -343,6 +352,15 @@ export function clasificarIntencionCanal(texto: string): Intencion {
 }
 
 /** Tarea del turno en canal: orienta y resuelve; transfiere solo ante necesidad real (sin carrito, checkout ni pedidos aquí). */
+/** E · tarea en WhatsApp vinculado: precio, existencias y pedidos con sus herramientas; la compra la cierra una persona. */
+export function tareaCanalIdentificado(intencion: string, limiteClinico: boolean): string {
+  switch (intencion) {
+    case 'PRICE': case 'AVAILABILITY': return tarea(intencion, false)
+    case 'ORDER_STATUS': return 'TAREA: su pedido. Si pregunta cómo va, usa obtener_estado_pedido y dile estado, guía y entrega estimada tal cual vengan. Si es devolución, reclamación o un problema, usa solicitar_asesor y dilo en una frase, sin prometer tiempos.'
+    case 'CHECKOUT': return tareaCanal(intencion, limiteClinico) + ' Como ya lo reconoces, antes cotiza con cotizar lo que pidió y dale el total exacto con su nivel de precio.'
+    default: return tareaCanal(intencion, limiteClinico)
+  }
+}
 export function tareaCanal(intencion: string, limiteClinico: boolean): string {
   if (limiteClinico || intencion === 'CLINICAL_BOUNDARY') return 'TAREA: pregunta clínica sobre un paciente o un tratamiento. Explica con claridad el límite (no puedes indicar qué aplicar, cuánto ni cómo) y ofrece la información comercial o técnica pública aprobada. Si el usuario quiere seguimiento, usa solicitar_asesor y aclara que lo atenderá un asesor del equipo comercial de Renovacell (no personal clínico).'
   switch (intencion) {

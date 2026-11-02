@@ -4,7 +4,7 @@
 // tokens, secretos ni identificadores personales completos: solo canal, etapa, causa, código técnico, un hash corto
 // de correlación y la cola del identificador de la cuenta de negocio (WABA / página), que no identifica personas.
 export type CanalDiag = 'whatsapp' | 'instagram' | 'messenger' | 'desconocido'
-export type EtapaDiag = 'firma' | 'json' | 'wa_estado' | 'wa_entrante' | 'meta_entrante' | 'procesar' | 'recibido'
+export type EtapaDiag = 'firma' | 'json' | 'wa_estado' | 'wa_entrante' | 'wa_vincular' | 'meta_entrante' | 'procesar' | 'recibido'
 export type CausaDiag = 'validacion' | 'autorizacion' | 'base_datos' | 'excepcion' | 'ok'
 export interface Diagnostico {
   canal: CanalDiag; etapa: EtapaDiag; causa: CausaDiag; codigo: string; http: number
