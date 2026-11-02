@@ -22,7 +22,8 @@ import { useRoleOpcional } from '../../auth/RoleContext'
 import { HojaMarco, type PiezasChat } from './HojaChat'
 import { PerfilComercialEditor } from '../../app/PerfilComercialEditor'
 import { ESTADOS_SEGUIMIENTO, ETIQUETA_ESTADO, PLAZOS, cuandoRetomar, enDias, seguimientos as segPorDefecto, type ClienteSeguimientos, type EstadoSeguimiento, type Seguimiento } from '../../data/ops/seguimientos'
-import { ClipboardList, Eye } from 'lucide-react'
+import { ClipboardList, Eye, Trash2 } from 'lucide-react'
+import { eliminarConversacion } from '../../data/ops/expediente'   // ELIMINAR CONVERSACIÓN (2 nov 2026)
 import { interesReciente as interesPorDefecto, resumenInteres, type InteresReciente } from '../../data/ops/actividadCatalogo'   // IA-VENDEDORA
 import type { AccionChat } from './ChatCanonico'
 import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
@@ -64,6 +65,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const cerrar = useCallback(() => { setMsg(null); cerrarHoja(conversationId) }, [conversationId])
   // COTIZACIONES · las del cliente, para cotizar, reenviar, convertir en pedido o cancelar desde aquí.
   const user = useRoleOpcional()?.user ?? null
+  const esDireccion = useRoleOpcional()?.role === 'admin'   // ELIMINAR CONVERSACIÓN · solo Dirección
+  const [elim, setElim] = useState({ motivo: '', olvidar: true, seguro: false })
   const [cots, setCots] = useState<Cotizacion[]>([])
   const [modal, setModal] = useState<null | 'cotizar' | 'pedido' | { convertir: Cotizacion }>(null)
   const cargarCots = useCallback(async (customer?: string) => { if (!customer) { setCots([]); return } const r = await cot.deCliente(customer); setCots(r.ok ? r.data : []) }, [cot])
@@ -281,6 +284,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
 
   acciones.push({ clave: 'seguimiento', etiqueta: seg ? 'Actualizar seguimiento' : 'Dejar seguimiento', detalle: 'En qué quedó y cuándo retomarlo (te aviso ese día)', icono: <ClipboardList size={18} />,
     onElegir: () => { setSegForm({ estado: seg?.estado ?? null, nota: seg?.nota ?? '', recordar: seg && seg.recordar_el >= enDias(0) ? seg.recordar_el : enDias(3) }); abrir('pc:seguimiento') } })
+  if (esDireccion) acciones.push({ clave: 'eliminar', etiqueta: 'Eliminar conversación', detalle: 'Pruebas, spam o duplicados (queda respaldo y constancia)', icono: <Trash2 size={18} />, onElegir: () => { setElim({ motivo: '', olvidar: true, seguro: false }); abrir('pc:eliminar') } })
 
   // ── Hojas ───────────────────────────────────────────────────────────────────────────────────────────
   const Fila = ({ id, nombre: n, sub, extra }: { id: string; nombre: string; sub: string; extra?: React.ReactNode }) => (
@@ -391,6 +395,27 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
         ))}
       </ul>
       {aviso}
+    </HojaMarco>
+  )
+  else if (hoja === 'pc:eliminar' && esDireccion) cuerpo = (
+    <HojaMarco titulo="Eliminar conversación" sub="Se borran todos sus mensajes y avisos. Queda una copia de respaldo y la constancia de quién la eliminó y por qué." onCerrar={cerrar} testid="pc-hoja-eliminar">
+      <textarea className="pc-campo" rows={2} maxLength={300} value={elim.motivo} onChange={(e) => setElim({ ...elim, motivo: e.target.value })} placeholder="¿Por qué se elimina? (prueba, spam, duplicada…)" aria-label="Motivo" data-testid="elim-motivo" />
+      <label className="pc-nota" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <input type="checkbox" checked={elim.olvidar} onChange={(e) => setElim({ ...elim, olvidar: e.target.checked })} data-testid="elim-olvidar" />
+        <span>Olvidar también este contacto (pruebas o spam): si vuelve a escribir, entra como contacto nuevo.</span>
+      </label>
+      <label className="pc-nota" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <input type="checkbox" checked={elim.seguro} onChange={(e) => setElim({ ...elim, seguro: e.target.checked })} data-testid="elim-seguro" />
+        <span>Entiendo que la conversación desaparece para todo el equipo.</span>
+      </label>
+      {aviso}
+      <div className="pc-acciones">
+        <button type="button" className="btn" style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={ocupado || elim.motivo.trim().length < 3 || !elim.seguro}
+          onClick={async () => { setOcupado(true); const r = await eliminarConversacion(conversationId, elim.motivo.trim(), elim.olvidar); setOcupado(false)
+            if (!r.ok) { setMsg({ ok: false, texto: r.error }); return }
+            cerrarHoja(conversationId); setMsg({ ok: true, texto: 'Conversación eliminada.' }); onCambio?.() }}
+          data-testid="elim-confirmar"><Trash2 size={15} /> Eliminar</button>
+      </div>
     </HojaMarco>
   )
   else if (hoja === 'pc:seguimiento') cuerpo = (

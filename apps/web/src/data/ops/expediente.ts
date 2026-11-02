@@ -73,3 +73,11 @@ export function textoVinculo(r: ResultadoVinculo, nombre: string): string {
   if (r.reasignada && r.vendedor_nombre) partes.push(`La conversación pasó a ${r.vendedor_nombre}, su vendedor.`)
   return partes.join(' ')
 }
+
+// ELIMINAR CONVERSACIÓN (2 nov 2026) · solo Dirección, con motivo; con `olvidar` también su contacto (pruebas/spam).
+// La base copia todo a su archivo y deja constancia de quién, cuándo y por qué.
+export async function eliminarConversacion(conv: string, motivo: string, olvidar: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase.rpc('cc_conversacion_eliminar' as never, { p_conv: conv, p_motivo: motivo, p_olvidar_contacto: olvidar } as never)
+  if (!error) return { ok: true }
+  return { ok: false, error: /NO_AUTORIZADO|insufficient/i.test(error.message) ? 'Solo Dirección puede eliminar conversaciones.' : /MOTIVO_REQUERIDO/.test(error.message) ? 'Escribe por qué se elimina.' : 'No se pudo eliminar. Intenta de nuevo.' }
+}
