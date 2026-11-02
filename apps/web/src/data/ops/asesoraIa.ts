@@ -28,6 +28,10 @@ export interface Metrica { n: number; mediana_seg: number | null; p90_seg: numbe
 export interface MetricaConv { n: number; con_pedido: number; conversion: number | null; ticket_promedio: number | null; pidieron_asesor: number }
 export interface IaVsHumano { dias: number; respuestas: Partial<Record<'ia' | 'equipo', Metrica>>; conversaciones: Partial<Record<'ia' | 'equipo' | 'sin_respuesta', MetricaConv>>; muestra_suficiente: boolean }
 export interface DoctorExamen { id: string; full_name: string | null; email: string | null }
+// D · seguimiento proactivo (carrito abandonado, recompra, promoción)
+export interface ConfigSeguimiento { carrito: boolean; recompra: boolean; promo: boolean; horas_entre: number; por_semana: number; hora_desde: number; hora_hasta: number; updated_at: string | null }
+export interface ResumenTipo { enviados: number; respondieron: number; con_pedido: number; vendido: number }
+export type ResumenSeguimiento = Partial<Record<'carrito' | 'recompra' | 'promo', ResumenTipo>>
 
 type Res<T> = { ok: true; data: T } | { ok: false; error: string }
 const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Promise<Res<T>> => {
@@ -44,6 +48,9 @@ export const asesoraIa = {
   crearCorrida: (modelo: string, perfil: string, esfuerzo: Esfuerzo, casos: string[] | null, nota: string | null) =>
     rpc<string>('ia_examen_crear', { p_modelo: modelo, p_perfil: perfil, p_esfuerzo: esfuerzo, p_casos: casos, p_nota: nota }),
   vsHumano: (dias: number) => rpc<IaVsHumano>('ia_vs_humano', { p_dias: dias }),
+  seguimiento: () => rpc<ConfigSeguimiento>('seguimiento_config'),
+  guardarSeguimiento: (cambios: Partial<ConfigSeguimiento>) => rpc<ConfigSeguimiento>('seguimiento_config_guardar', { p: cambios }),
+  resumenSeguimiento: (dias: number) => rpc<ResumenSeguimiento>('seguimiento_resumen', { p_dias: dias }),
   async correrCaso(corrida: string, caso: string): Promise<Res<{ puntaje: number | null }>> {
     const { data, error } = await supabase.functions.invoke('ia-examen', { body: { corrida_id: corrida, caso_id: caso } })
     if (error) return { ok: false, error: 'El caso no se pudo correr.' }

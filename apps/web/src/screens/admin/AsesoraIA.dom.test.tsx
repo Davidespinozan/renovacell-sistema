@@ -20,6 +20,9 @@ function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
     crearCorrida: vi.fn(async () => ({ ok: true as const, data: 'k2' })),
     vsHumano: async () => ({ ok: true, data: { dias: 30, respuestas: { ia: { n: 40, mediana_seg: 6, p90_seg: 12, en_5_min: 100 }, equipo: { n: 10, mediana_seg: 1800, p90_seg: 7200, en_5_min: 20 } }, conversaciones: { ia: { n: 20, con_pedido: 4, conversion: 20, ticket_promedio: 8000, pidieron_asesor: 3 } }, muestra_suficiente: true } }),
     correrCaso: vi.fn(async () => ({ ok: true as const, data: { puntaje: 9 } })),
+    seguimiento: async () => ({ ok: true, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null } }),
+    guardarSeguimiento: vi.fn(async (c) => ({ ok: true as const, data: { carrito: true, recompra: true, promo: true, horas_entre: 24, por_semana: 2, hora_desde: 10, hora_hasta: 19, updated_at: null, ...c } })),
+    resumenSeguimiento: async () => ({ ok: true, data: { carrito: { enviados: 12, respondieron: 5, con_pedido: 3, vendido: 24500 } } }),
     doctores: async () => ({ ok: true, data: [{ id: 'd1', full_name: 'Dra. Prueba', email: null }] }),
     ...over,
   }
@@ -52,5 +55,11 @@ describe('<AsesoraIA>', () => {
     fireEvent.click(screen.getByTestId('portal-guardar'))
     await waitFor(() => expect(c.guardarConfig).toHaveBeenCalledWith('claude-opus-5-5', 'low'))
     expect(await screen.findByText('La IA del portal ahora usa Claude Opus 5.5.')).toBeInTheDocument()
+  })
+  it('seguimiento: qué pasó después de cada tipo y Dirección lo apaga', async () => {
+    const c = falso(); render(<AsesoraIA cliente={c} />)
+    expect(await screen.findByTestId('seg-res-carrito')).toHaveTextContent('12 enviados · 5 respondieron3 compraron · $24,500')
+    fireEvent.click(screen.getByTestId('seg-promo'))
+    await waitFor(() => expect(c.guardarSeguimiento).toHaveBeenCalledWith({ promo: false }))
   })
 })

@@ -3,7 +3,7 @@
 // orquestador del portal y calificadas por un juez, para elegir modelo y no empeorar con cada cambio; 3) qué modelo usa
 // la IA del portal. El examen corre caso por caso desde aquí (la Edge no escribe conversaciones ni carritos).
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { asesoraIa as clientePorDefecto, correrCorrida, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
+import { asesoraIa as clientePorDefecto, correrCorrida, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
 
 const sutil: React.CSSProperties = { fontSize: 12, color: 'var(--ink-3, #667)' }
 const input: React.CSSProperties = { padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -41,6 +41,7 @@ export function AsesoraIA({ cliente = clientePorDefecto }: { cliente?: ClienteAs
       <VsEquipo vs={vs} />
       <Examen cliente={cliente} corridas={corridas} config={config} onCambio={cargar} onDetalle={async (k) => { const r = await cliente.resultados(k.id); if (r.ok) setDetalle({ corrida: k, filas: r.data ?? [] }) }} onAviso={setAviso} />
       {detalle && <Detalle corrida={detalle.corrida} filas={detalle.filas} onCerrar={() => setDetalle(null)} />}
+      <Seguimiento cliente={cliente} />
       <ModeloPortal cliente={cliente} config={config} corridas={corridas} onGuardado={(c) => { setConfig(c); setAviso(`La IA del portal ahora usa ${nombreModelo(c.modelo_portal)}.`) }} />
     </div>
   )
@@ -191,6 +192,44 @@ function ModeloPortal({ cliente, config, corridas, onGuardado }: { cliente: Clie
         <select style={input} value={esfuerzo} onChange={(e) => setEsfuerzo(e.target.value as Esfuerzo)} aria-label="Esfuerzo del portal" disabled={!modelo}>{(Object.keys(ESFUERZO) as Esfuerzo[]).map((k) => <option key={k} value={k}>{ESFUERZO[k]}</option>)}</select>
         <button className="btn" type="button" onClick={() => void guardar()} disabled={ocupado || (modelo === (config?.modelo_portal ?? '') && esfuerzo === config?.esfuerzo_portal)} data-testid="portal-guardar">Guardar</button>
       </div>
+    </section>
+  )
+}
+
+const TIPOS_SEG: Array<{ key: 'carrito' | 'recompra' | 'promo'; titulo: string; texto: string }> = [
+  { key: 'carrito', titulo: 'Carrito sin terminar', texto: 'Dejó productos en su carrito y no lo movió en 20 h: se lo recuerda con su total y cuánto le falta para el siguiente precio.' },
+  { key: 'recompra', titulo: 'Le toca volver a pedir', texto: 'Por su ritmo de compra (o el típico de la categoría) ya se le debe estar acabando: le ofrece prepararle lo de siempre con el precio de esa cantidad.' },
+  { key: 'promo', titulo: 'Promoción de lo que compra', texto: 'Hay una promoción vigente de algo que ya compró: se la avisa con sus precios. No le llega a quien se dio de baja de difusiones.' },
+]
+
+function Seguimiento({ cliente }: { cliente: ClienteAsesoraIa }) {
+  const [cfg, setCfg] = useState<ConfigSeguimiento | null>(null)
+  const [res, setRes] = useState<ResumenSeguimiento>({})
+  useEffect(() => {
+    void cliente.seguimiento().then((r) => { if (r.ok) setCfg(r.data) })
+    void cliente.resumenSeguimiento(30).then((r) => { if (r.ok) setRes(r.data ?? {}) })
+  }, [cliente])
+  if (!cfg) return null
+  const cambiar = async (k: 'carrito' | 'recompra' | 'promo', v: boolean) => { const r = await cliente.guardarSeguimiento({ [k]: v }); if (r.ok) setCfg(r.data) }
+  return (
+    <section className="card" data-testid="seguimiento-ia">
+      <h2 style={{ margin: '0 0 4px' }}>La IA le da seguimiento a tus clientes</h2>
+      <p style={{ margin: '0 0 12px', ...sutil }}>Como lo haría el mejor asesor, sin que nadie se lo pida. Un mensaje por cliente cada {cfg.horas_entre} h y como mucho {cfg.por_semana} por semana; solo de lunes a sábado de {cfg.hora_desde} a {cfg.hora_hasta} h; nunca si un asesor lo está atendiendo (entonces solo le avisa al vendedor). Al doctor le llega notificación.</p>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {TIPOS_SEG.map((t) => {
+          const x = res[t.key]
+          return (
+            <label key={t.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12 }}>
+              <input type="checkbox" checked={cfg[t.key]} onChange={(e) => void cambiar(t.key, e.target.checked)} data-testid={`seg-${t.key}`} style={{ marginTop: 3 }} />
+              <span style={{ flex: 1 }}><b>{t.titulo}</b><span style={{ display: 'block', ...sutil }}>{t.texto}</span></span>
+              <span style={{ textAlign: 'right', fontSize: 12, minWidth: 120 }} data-testid={`seg-res-${t.key}`}>
+                {x ? <>{x.enviados} enviados · {x.respondieron} respondieron<br /><b>{x.con_pedido} compraron · {pesos(x.vendido)}</b></> : <span style={sutil}>aún sin envíos</span>}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+      <div style={{ ...sutil, marginTop: 8 }}>"Compraron": pedido en los 7 días siguientes al mensaje (últimos 30 días).</div>
     </section>
   )
 }

@@ -12,7 +12,7 @@ import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, esSesionDeUsuario, tieneRol } from '../_shared/quien.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
-import { configPush, enviarAvisos } from '../_shared/push.ts'
+import { configPush, enviarAvisos, armarAviso } from '../_shared/push.ts'
 import webpush from 'npm:web-push@3.6.7'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
@@ -52,6 +52,25 @@ Deno.serve(conCors(async (req) => {
     webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
     const enviados = await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: tipo === 'mensaje' ? 3600 : 86_400, urgency: 'high' }), lista,
       { title: c.title, body: c.body, url: c.url, tag: c.tag })
+    return json(200, { enviados })
+  }
+  if (p?.action === 'ia_proactivo') {
+    // IA mejor que el humano · D: la IA le escribió al doctor por su cuenta (seguimiento o interés en el catálogo) desde el
+    // servidor; el disparador de cc_messages avisa aquí con el secreto del cron. La base decide a quién y con qué texto.
+    const secreto = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+    if (secreto.length < 32 || !(await iguales(req.headers.get('x-cron-secret') ?? '', secreto))) return json(401, { error: 'no_autorizado' })
+    const id = typeof p.id === 'string' && /^[0-9a-f-]{36}$/.test(p.id) ? p.id : null
+    if (!id) return json(400, { error: 'datos_invalidos' })
+    if (!cfg) return json(200, { enviados: 0, configurado: false })
+    const { data: carga } = await admin.rpc('ia_proactivo_push_carga', { p_msg: id })
+    const c = carga as { perfiles?: string[]; conversation_id: string; texto: string } | null
+    if (!c?.perfiles?.length) return json(200, { enviados: 0 })
+    const { data: destinos } = await admin.rpc('push_destinos', { p_profiles: c.perfiles, p_visitors: [] })
+    const lista = (destinos ?? []) as Array<{ id: string; endpoint: string; p256dh: string; auth: string }>
+    if (!lista.length) return json(200, { enviados: 0 })
+    webpush.setVapidDetails(cfg.sujeto, cfg.publica, cfg.privada)
+    const enviados = await enviarAvisos(admin, (sub, carga) => webpush.sendNotification(sub, carga, { TTL: 86_400, urgency: 'normal' }), lista,
+      armarAviso({ para: 'cliente', remitente: 'Renovacell', texto: c.texto, conv: c.conversation_id, visitante: false }))
     return json(200, { enviados })
   }
   if (p?.action === 'promo') {
