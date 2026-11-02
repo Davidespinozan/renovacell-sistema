@@ -1,9 +1,20 @@
-# cfdi — CONTENIDA (W3-A). Esta función ya no timbra.
+# cfdi — TIMBRADO REAL (2 nov 2026)
 
-> **No intentes "activarla" metiendo secrets.** El timbrado se rehace en **W3-B** sobre la
-> intención fiscal durable. Esta función responde **423 `w3_contencion`** y no sale a la red.
+Timbra sobre el camino seguro de W3 (intención durable → reclamo con serie/folio/Date → PAC con timeout →
+`timbrado | fallido | incierto`). Acciones: `preparar` (vista previa, no escribe), `timbrar`, `conciliar`.
 
-## Por qué se contuvo
+- **Compuerta por pedido:** se timbra solo si `cfdi_preparar` no reporta faltantes: pagado, emisor completo, cada
+  producto (y el envío, si se cobró) con configuración fiscal **validada por una persona**, y total cuadrado.
+  Si falta algo NO se reclama folio.
+- **IVA desde el precio final** (`_shared/cfdiConceptos.ts`): base a 2 decimales si cuadra, si no a 6 (el SAT lo admite
+  en el concepto). Exento, objeto 03 y público en general se rechazan hasta confirmarlos en sandbox.
+- **Forma de pago:** la del cobro dominante; si fue tarjeta, quien timbra elige crédito (04) o débito (28).
+- **Incierto no se reintenta:** `conciliar` busca por serie+folio (adopta si existe) o reenvía con la misma identidad
+  dentro de la ventana de 66 h.
+- **Entorno explícito:** `FACTURAMA_ENV` = `sandbox` | `produccion` (sin default) + `FACTURAMA_USER` / `FACTURAMA_PASSWORD`.
+
+## Historia: por qué se contuvo (W3-A)
+
 
 La versión anterior tenía este camino, y bastaba un **timeout** para recorrerlo:
 

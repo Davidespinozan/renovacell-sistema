@@ -2,6 +2,7 @@
 -- hay validación humana: sin la coherencia estructural, una decisión ya validada
 -- quedaría sin red.
 begin;
+\ir ../../../rollback/cfdi_timbrado/99_down.sql   -- TIMBRADO (20270310) usa la coherencia objeto/IVA y la autorización fiscal: se baja antes
 
 -- ── 1) LA GUARDA ────────────────────────────────────────────────────────────
 savepoint antes;

@@ -1,5 +1,6 @@
 -- W3-C · C1 · El rollback devuelve el estado de W3-B y ABORTA si hay validación humana.
 begin;
+\ir ../../../rollback/cfdi_timbrado/99_down.sql   -- TIMBRADO (20270310) usa la coherencia objeto/IVA y la autorización fiscal: se baja antes
 
 -- ── 1) LA GUARDA: con trabajo del contador registrado, se niega ──────────────────────
 savepoint antes;

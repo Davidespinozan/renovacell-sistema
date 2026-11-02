@@ -33,9 +33,9 @@ describe('GATE CFDI · no se timbra un pedido sin pagar', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.message).toBe('El pedido debe estar pagado antes de facturarse.')
   })
-  it('y la función que timbraba ya no puede hacerlo, pagado o no', () => {
-    expect(cfdiSrc).not.toMatch(/fetch\s*\(/)
-    expect(cfdiSrc).toMatch(/w3_contencion/)
+  it('y la función que timbra lo respeta: arma desde cfdi_preparar (que exige pagado) ANTES de reclamar folio', () => {
+    expect(cfdiSrc).toMatch(/caller\.rpc\('cfdi_preparar'/)
+    expect(cfdiSrc.indexOf('armarConceptos(prep, b.forma_pago)')).toBeLessThan(cfdiSrc.indexOf("caller.rpc('reclamar_cfdi'"))
   })
 })
 

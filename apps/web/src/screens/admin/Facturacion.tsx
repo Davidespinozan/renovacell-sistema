@@ -23,6 +23,7 @@ import { todoElHistorico, diaNegocio, diasEntre, hoyNegocio } from '../../data/p
 import { cifra } from '../../app/Kpi'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
 import { estadoFiscalPedido, mensajeEstadoFiscal, SIN_SOLICITUD, type EstadoFiscalPedido } from '../../data/ops/fiscalIntent'
+import { TimbrarCFDI } from './TimbrarCFDI'   // TIMBRADO REAL (2 nov 2026)
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
@@ -590,18 +591,24 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
             ) : fis.status === 'incierto' ? (
               // Sin acción. Ni "reintentar", ni "emitir": de un estado ambiguo no se
               // vuelve a emitir, y la UI no debe ofrecer lo que el servidor prohíbe.
-              <span className="ms" style={{ color: 'var(--warn)', maxWidth: 420, textAlign: 'right' }}>
-                ⚠ {mensajeEstadoFiscal(fis)}
-              </span>
+              // TIMBRADO REAL · tampoco aquí se reintenta: "Conciliar" primero busca la factura por su serie y folio.
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                <span className="ms" style={{ color: 'var(--warn)', maxWidth: 420, textAlign: 'right' }}>⚠ {mensajeEstadoFiscal(fis)}</span>
+                {fis.doc_id && <TimbrarCFDI docId={fis.doc_id} modo="conciliar" onCambio={() => { void estadoFiscalPedido(order.id).then(setFis) }} />}
+              </div>
             ) : fis.status === 'en_proceso' ? (
-              <span className="ms" style={{ color: 'var(--ink-3)' }}>{mensajeEstadoFiscal(fis)}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                <span className="ms" style={{ color: 'var(--ink-3)' }}>{mensajeEstadoFiscal(fis)}</span>
+                {fis.doc_id && <TimbrarCFDI docId={fis.doc_id} modo="conciliar" onCambio={() => { void estadoFiscalPedido(order.id).then(setFis) }} />}
+              </div>
             ) : !paid ? (
               <span className="ms" style={{ color: 'var(--ink-3)' }}>El pedido debe estar pagado antes de facturarse.</span>
             ) : !snapOk ? (
               <span className="ms" style={{ color: 'var(--warn)' }}>Completa los datos fiscales del pedido antes de solicitar la factura.</span>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                <button className="btn" type="button" disabled={solicitando} onClick={solicitarFactura}>
+                {fis.status === 'pendiente' && fis.doc_id && <TimbrarCFDI docId={fis.doc_id} modo="timbrar" onCambio={() => { void estadoFiscalPedido(order.id).then(setFis) }} />}
+                <button className={fis.status === 'pendiente' ? 'btn ghost sm' : 'btn'} type="button" disabled={solicitando} onClick={solicitarFactura}>
                   <FileText size={15} /> {solicitando ? 'Registrando…' : fis.status === 'pendiente' ? 'Actualizar solicitud' : 'Solicitar factura'}
                 </button>
                 <span className="ms" style={{ color: 'var(--ink-3)', maxWidth: 360, textAlign: 'right' }}>

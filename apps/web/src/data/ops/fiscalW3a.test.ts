@@ -62,19 +62,23 @@ describe('P0 · el cliente ya no puede destruir evidencia fiscal', () => {
   })
 })
 
-describe('CONTENCIÓN · la función cfdi no puede llegar al PAC', () => {
-  it('no contiene ninguna salida de red', () => {
-    expect(cfdiSrc).not.toMatch(/fetch\s*\(/)
+// TIMBRADO REAL (2 nov 2026): la contención se levantó a propósito. Lo que la sostenía se conserva como invariante del
+// camino seguro: al PAC solo por el adaptador (pac.ts) con entorno explícito, nunca escribiendo el pedido, y todo lo
+// que no demuestra "no hubo efecto" queda incierto y se concilia.
+describe('CAMINO SEGURO · la función cfdi llega al PAC solo por el adaptador', () => {
+  it('timbra con timbrarEnPAC (timeout y clasificación) y concilia por serie+folio', () => {
+    expect(cfdiSrc).toMatch(/timbrarEnPAC\(deps, comprobante\(/)
+    expect(cfdiSrc).toMatch(/buscarPorSerieFolio\(deps, i\.serie, i\.folio\)/)
   })
-  it('no lee credenciales de Facturama', () => {
-    expect(cfdiSrc).not.toMatch(/FACTURAMA_/)
+  it('entorno explícito y credenciales solo del servidor; sin URL libre', () => {
+    expect(cfdiSrc).toMatch(/resolverFacturama\(Deno\.env\.get\('FACTURAMA_ENV'\)\)/)
+    expect(cfdiSrc).not.toMatch(/FACTURAMA_URL/)
   })
   it('no escribe nada sobre el pedido', () => {
     expect(cfdiSrc).not.toMatch(/\.update\(/)
   })
-  it('responde bloqueado con un código explícito', () => {
-    expect(cfdiSrc).toMatch(/423/)
-    expect(cfdiSrc).toMatch(/w3_contencion/)
+  it('sin configuración responde 501 explícito, nunca asume producción', () => {
+    expect(cfdiSrc).toMatch(/json\(501, \{ error: 'config_incompleta'/)
   })
   it('conserva el control de acceso (no es un endpoint abierto)', () => {
     expect(cfdiSrc).toMatch(/tieneRol\(q\.quien, \['admin', 'billing'\]\)/)
