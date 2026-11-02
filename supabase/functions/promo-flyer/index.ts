@@ -36,7 +36,11 @@ Deno.serve(conCors(async (req) => {
       body: JSON.stringify(peticionFlyer(b.imagen, mt, catalogo, hoy, Deno.env.get('PROMO_FLYER_MODEL')?.trim() || MODELO_FLYER)),
     })
     const body = await r.json().catch(() => null)
-    if (!r.ok) return json(502, { error: 'ia', message: r.status === 429 ? 'La IA está ocupada; intenta en un minuto.' : 'No se pudo leer el flyer; intenta de nuevo.' })
+    if (!r.ok) {
+      const det = String((body as { error?: { type?: string; message?: string } } | null)?.error?.message ?? '').slice(0, 300)
+      console.error('[promo-flyer] anthropic', r.status, (body as { error?: { type?: string } } | null)?.error?.type ?? '', det)
+      return json(502, { error: 'ia', status: r.status, detalle: det, message: r.status === 429 ? 'La IA está ocupada; intenta en un minuto.' : `No se pudo leer el flyer (${r.status}${det ? ': ' + det : ''}).` })
+    }
     const leido = leerRespuestaFlyer(body, catalogo)
     return leido.ok ? json(200, leido.promo) : json(422, { error: 'lectura', message: leido.error })
   } catch {

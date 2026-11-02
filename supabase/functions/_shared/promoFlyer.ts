@@ -2,6 +2,8 @@
 // Deno): arma la petición a Claude con la imagen y el catálogo vendible, y valida lo que responde. La herramienta es
 // OBLIGATORIA (tool_choice) para que la respuesta siempre tenga la misma forma; nada se guarda aquí: la pantalla
 // muestra lo leído en el formulario de siempre y Dirección lo revisa antes de guardar.
+// (2 nov) tool_choice 'auto': los modelos 5.x piensan por defecto y la API rechaza (400) forzar una herramienta con
+// pensamiento; la instrucción pide usarla y, si no la usa, la respuesta se rechaza abajo.
 export interface ProductoCatalogo { id: string; nombre: string }
 export interface LineaFlyer { producto_id: string | null; texto: string; min_qty: number; precio: number }
 export interface PromoFlyer { nombre: string; desde: string | null; hasta: string | null; condiciones: string | null; lineas: LineaFlyer[]; sin_leer: string[] }
@@ -42,11 +44,11 @@ const HERRAMIENTA = {
 export function peticionFlyer(imagenB64: string, mediaType: string, catalogo: ProductoCatalogo[], hoy: string, modelo = MODELO_FLYER): Record<string, unknown> {
   const lista = catalogo.map((p) => `${p.id} | ${p.nombre}`).join('\n')
   return {
-    model: modelo, max_tokens: 4000, tools: [HERRAMIENTA], tool_choice: { type: 'tool', name: HERRAMIENTA.name },
+    model: modelo, max_tokens: 8000, tools: [HERRAMIENTA], tool_choice: { type: 'auto' },
     system: `Lees flyers de promociones de Renovacell (productos médicos y estéticos para profesionales). Hoy es ${hoy}. Transcribe EXACTAMENTE lo que dice el flyer: no inventes productos, precios ni fechas. Si una fecha no trae año, usa el año de hoy (o el siguiente si ya pasó). Cada escalón de precio por cantidad es un renglón distinto. Para producto_id elige del catálogo solo si es claramente el mismo producto (misma marca y presentación); si dudas, null.`,
     messages: [{ role: 'user', content: [
       { type: 'image', source: { type: 'base64', media_type: mediaType, data: imagenB64 } },
-      { type: 'text', text: `CATÁLOGO (id | nombre):\n${lista}\n\nRegistra la promoción de este flyer con registrar_promocion.` },
+      { type: 'text', text: `CATÁLOGO (id | nombre):\n${lista}\n\nRegistra la promoción de este flyer con la herramienta registrar_promocion (úsala siempre, una sola vez).` },
     ] }],
   }
 }

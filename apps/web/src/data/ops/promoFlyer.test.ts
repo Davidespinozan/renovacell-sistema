@@ -1,4 +1,4 @@
-// PROMOCIÓN DESDE UN FLYER (2 nov 2026) · la petición lleva la imagen y el catálogo con la herramienta forzada; la
+// PROMOCIÓN DESDE UN FLYER (2 nov 2026) · la petición lleva la imagen y el catálogo con la herramienta (auto: los 5.x piensan y no admiten forzarla); la
 // respuesta se valida (solo ids del catálogo, precios > 0, fechas válidas) y nada inventado pasa.
 import { describe, it, expect } from 'vitest'
 import { leerRespuestaFlyer, peticionFlyer } from '../../../../../supabase/functions/_shared/promoFlyer'
@@ -8,9 +8,9 @@ const cat = [{ id: 'p-botox', nombre: 'Botox 100 UI' }, { id: 'p-dys', nombre: '
 const resp = (input: Record<string, unknown>) => ({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'registrar_promocion', input }] })
 
 describe('petición', () => {
-  it('imagen + catálogo + herramienta forzada, sin pensamiento', () => {
+  it('imagen + catálogo + herramienta (auto)', () => {
     const p = peticionFlyer('QUJD', 'image/png', cat, '2026-11-02') as { tool_choice: unknown; messages: Array<{ content: Array<Record<string, unknown>> }>; thinking?: unknown; system: string }
-    expect(p.tool_choice).toEqual({ type: 'tool', name: 'registrar_promocion' }); expect(p.thinking).toBeUndefined()
+    expect(p.tool_choice).toEqual({ type: 'auto' }); expect(p.thinking).toBeUndefined()
     expect(p.messages[0].content[0]).toMatchObject({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'QUJD' } })
     expect(String(p.messages[0].content[1].text)).toContain('p-botox | Botox 100 UI'); expect(p.system).toContain('Hoy es 2026-11-02')
   })
