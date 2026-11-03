@@ -1,5 +1,6 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
+\ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes
 \ir ../../../rollback/vincular_cliente/99_down.sql   -- VINCULAR-CLIENTE (20270206) se baja primero (redefine _cc_rutear, _cc_nombre_dueno, bandeja y cola)
 \ir ../../../rollback/ensayo_golive/99_down.sql
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)

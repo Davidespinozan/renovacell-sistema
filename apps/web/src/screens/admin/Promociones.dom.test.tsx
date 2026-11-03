@@ -78,7 +78,7 @@ describe('PROMO-2 · Promociones', () => {
     expect(screen.getByTestId('promo-envio')).toHaveTextContent(/42/); expect(screen.getByTestId('promo-envio')).toHaveTextContent(/3 sin correo registrado/)
     fireEvent.click(screen.getByTestId('promo-canal-chat'))   // solo correo
     fireEvent.click(screen.getByTestId('promo-envio-confirmar'))
-    await waitFor(() => expect(difundir).toHaveBeenCalledWith('P1', ['correo']))
+    await waitFor(() => expect(difundir).toHaveBeenCalledWith('P1', ['correo'], null))   // sin rol de vendedor: a todos
     expect(await screen.findByTestId('promo-envio-resultado')).toHaveTextContent(/Audiencia: 42 doctores · correo: 39 en cola · chat: 42 entregados · 3 sin correo/)
   })
   it('PROMO-7 · "Enviarme una prueba": manda el correo real a la dirección escrita por el comando y lo confirma', async () => {

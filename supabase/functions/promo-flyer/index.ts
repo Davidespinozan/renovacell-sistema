@@ -17,7 +17,7 @@ Deno.serve(conCors(async (req) => {
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
   const q = await resolverQuien(caller, admin)
   if (!q.ok) return json(q.status, q.body)
-  if (!tieneRol(q.quien, ['admin', 'billing'])) return json(403, { error: 'no_autorizado', message: 'Solo Dirección o Facturación crean promociones.' })
+  if (!tieneRol(q.quien, ['admin', 'billing', 'warehouse', 'pos'])) return json(403, { error: 'no_autorizado', message: 'Solo Dirección, Facturación, Almacén o Ventas crean promociones.' })   // REPARTO-TURNO (2 nov 2026)
   const key = Deno.env.get('ANTHROPIC_API_KEY')?.trim()
   if (!key) return json(501, { error: 'sin_ia', message: 'La lectura de flyers no está configurada.' })
 

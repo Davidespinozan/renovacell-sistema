@@ -97,6 +97,7 @@ export const ROLES: RoleDef[] = [
       // ENTRA (una compra se pide en Compras a proveedores y se vuelve inventario al Recibir mercancía).
       { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
+      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Inventario' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
       { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
@@ -137,6 +138,7 @@ export const ROLES: RoleDef[] = [
       { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
       { key: 'seguimientos', label: 'Pendientes', icon: 'clock', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · seguimientos por retomar
       { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
+      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Mi cartera' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers
     ],
   },
   {

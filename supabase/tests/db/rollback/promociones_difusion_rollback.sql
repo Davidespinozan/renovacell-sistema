@@ -1,5 +1,6 @@
 -- DIFUSIÓN DE PROMOCIONES (175) · el down retira envíos, funciones y la plantilla 'promocion'; _promo_json vuelve a la 174; se reaplica igual.
 begin;
+\ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes
 create temp table _pd as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') n_tablas;
 \ir ../../../rollback/flyers/99_down.sql   -- FLYERS (180) se baja primero

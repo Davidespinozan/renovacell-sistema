@@ -1,5 +1,6 @@
 -- CUENTAS INTERNAS · el down devuelve funciones, políticas y la tabla profiles a como estaban; se reaplica idéntica.
 begin;
+\ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes
 \ir ../../../rollback/internas_solo_si_mismas/99_down.sql   -- INTERNAS-2 se baja antes (redefine políticas, cc_vendedores y comisiones_equipo)
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE depende de _es_interna: se baja antes de tomar la foto
 create temp table _ci as select

@@ -19,8 +19,10 @@ begin
 
   -- ══ 1 · permisos ═════════════════════════════════════════════════════════════════════════════════
   perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.flyer_guardar(%L)', jsonb_build_object('titulo', 'Hoy último día', 'imagen_url', 'https://x.test/f1.jpg')), 'NO_AUTORIZADO', '1 · Ventas no sube flyers');
-  perform tests.eq(jsonb_array_length(public.flyers_lista()), 0, '1 · Ventas no ve la administración (vacía)');
+  perform tests.lives(format('select public.flyer_guardar(%L)', jsonb_build_object('titulo', 'Hoy último día', 'imagen_url', 'https://x.test/f1.jpg')), '1 · Ventas también sube flyers (dueño, 2 nov 2026)');
+  perform tests.eq(jsonb_array_length(public.flyers_lista()), 1, '1 · Ventas ve la administración (su flyer)');
+  perform public.flyer_eliminar((public.flyers_lista() -> 0 ->> 'id')::uuid);
+  perform tests.eq(jsonb_array_length(public.flyers_lista()), 0, '1 · y lo puede borrar');
   perform tests.act_as_anon();
   perform tests.throws('select public.flyers_vigentes()', 'permission denied', '1 · anónimo no ve flyers');
   perform tests.act_as(v_doc);

@@ -1,5 +1,6 @@
 -- PROMO-6 (177) · el down devuelve _promo_texto/difundir/previa a la 175 y retira promo_tarjeta; se reaplica igual.
 begin;
+\ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes
 create temp table _pm as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/flyers/99_down.sql   -- FLYERS (180) se baja primero
 \ir ../../../rollback/promocion_avisos/99_down.sql   -- PROMO-AVISOS (179) se baja primero

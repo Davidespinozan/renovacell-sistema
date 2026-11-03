@@ -60,15 +60,15 @@ export async function estadoPromocion(id: string, activa: boolean): Promise<Resu
   return { ok: true, data: data as unknown as Promocion }
 }
 // PROMO-4 · difusión por correo y por el chat del sistema (Dirección o Facturación).
-export async function previaDifusion(id: string): Promise<Resultado<PreviaDifusion>> {
+export async function previaDifusion(id: string, vendedor?: string | null): Promise<Resultado<PreviaDifusion>> {   // REPARTO-TURNO · un vendedor: solo su cartera
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
-  const { data, error } = await supabase.rpc('promocion_difusion_previa', { p_id: id })
+  const { data, error } = await supabase.rpc('promocion_difusion_previa', { p_id: id, ...(vendedor ? { p_vendedor: vendedor } : {}) } as never)
   if (error) return { ok: false, error: traducir(error.message) }
   return { ok: true, data: data as unknown as PreviaDifusion }
 }
-export async function difundirPromocion(id: string, canales: CanalDifusion[]): Promise<Resultado<ResultadoDifusion>> {
+export async function difundirPromocion(id: string, canales: CanalDifusion[], vendedor?: string | null): Promise<Resultado<ResultadoDifusion>> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
-  const { data, error } = await supabase.rpc('promocion_difundir', { p_id: id, p_canales: canales })
+  const { data, error } = await supabase.rpc('promocion_difundir', { p_id: id, p_canales: canales, ...(vendedor ? { p_vendedor: vendedor } : {}) } as never)
   if (error) return { ok: false, error: /PROMO_NO_VIGENTE/.test(error.message) ? 'Solo se manda una promoción activa y que no haya terminado.' : /CANAL_INVALIDO/.test(error.message) ? 'Elige correo, chat o los dos.' : traducir(error.message) }
   return { ok: true, data: data as unknown as ResultadoDifusion }
 }

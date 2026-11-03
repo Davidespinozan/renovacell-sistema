@@ -1,6 +1,7 @@
 -- REPARTO-VERIF (20270213) · el down devuelve verificación, permiso, evaluador de atención y prerregistro EXACTOS a
 -- producción y retira el reparto de verificaciones y su cron; la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes
 create temp table _rv as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/reparto_verificacion/99_down.sql
 do $t$ begin

@@ -31,8 +31,8 @@ describe('respuesta', () => {
 })
 
 describe('Edge promo-flyer', () => {
-  it('solo Dirección/Facturación, tipos y tamaño acotados, y no guarda nada', () => {
-    expect(edgeSrc).toMatch(/tieneRol\(q\.quien, \['admin', 'billing'\]\)/)
+  it('Dirección, Facturación, Almacén y Ventas; tipos y tamaño acotados, y no guarda nada', () => {
+    expect(edgeSrc).toMatch(/tieneRol\(q\.quien, \['admin', 'billing', 'warehouse', 'pos'\]\)/)   // Almacén y Ventas también (2 nov 2026)
     expect(edgeSrc).toMatch(/TIPOS_IMAGEN[\s\S]*MAX_IMAGEN_FLYER/)
     expect(edgeSrc).not.toMatch(/\.insert\(|\.update\(|rpc\(/)
   })

@@ -20,8 +20,10 @@ begin
 
   -- ══ 1 · permisos de administración ═══════════════════════════════════════════════════════════════
   perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.promocion_guardar(%L)', jsonb_build_object('nombre', 'xx', 'desde', hoy, 'hasta', hoy, 'lineas', jsonb_build_array(jsonb_build_object('product_id', botox, 'precio', 1)))), 'NO_AUTORIZADO', '1 · Ventas no crea promociones');
-  perform tests.eq(jsonb_array_length(public.promociones_lista()), 0, '1 · Ventas no ve la lista de administración (vacía)');
+  perform tests.lives(format('select public.promocion_guardar(%L)', jsonb_build_object('nombre', 'xx', 'desde', hoy, 'hasta', hoy, 'lineas', jsonb_build_array(jsonb_build_object('product_id', botox, 'precio', 1)))), '1 · Ventas también crea promociones (dueño, 2 nov 2026)');
+  perform tests.eq(jsonb_array_length(public.promociones_lista()), 1, '1 · Ventas ve la lista de administración (su promoción)');
+  perform public.promocion_eliminar((public.promociones_lista() -> 0 ->> 'id')::uuid);
+  perform tests.eq(jsonb_array_length(public.promociones_lista()), 0, '1 · y la puede borrar');
   perform tests.act_as_anon();
   perform tests.throws('select public.promos_vigentes()', 'permission denied', '1 · anónimo no ve promociones');
 
@@ -138,8 +140,8 @@ begin
   -- ══ 10 · PROMO-5 (176): eliminar solo lo que nunca se envió ni vendió ═════════════════════════════════
   perform tests.throws(format('select public.promocion_eliminar(%L)', pid), 'PROMO_CON_ENVIOS', '10 · una promo ya enviada no se borra (se pausa)');
   r := public.promocion_guardar(jsonb_build_object('nombre', 'Duplicada', 'desde', hoy, 'hasta', hoy + 1, 'lineas', jsonb_build_array(jsonb_build_object('product_id', otro, 'precio', 900))));
-  perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.promocion_eliminar(%L)', r ->> 'id'), 'NO_AUTORIZADO', '10 · Ventas no borra');
+  perform tests.act_as(v_doc);
+  perform tests.throws(format('select public.promocion_eliminar(%L)', r ->> 'id'), 'NO_AUTORIZADO', '10 · un doctor no borra (Ventas sí, desde 2 nov 2026)');
   perform tests.act_as(v_admin);
   r2 := public.promocion_eliminar((r ->> 'id')::uuid);
   perform tests.ok((r2 ->> 'eliminada')::boolean, '10 · se borra');
@@ -163,8 +165,8 @@ begin
   perform tests.act_as(v_admin); perform public.promocion_estado(pid, true);
 
   -- ══ 12 · PROMO-7 (178): correo de prueba a la dirección que yo diga ═══════════════════════════════════
-  perform tests.act_as(v_pos);
-  perform tests.throws(format('select public.promocion_prueba_correo(%L, ''yo@correo.test'')', pid), 'NO_AUTORIZADO', '12 · Ventas no manda pruebas');
+  perform tests.act_as(v_doc);
+  perform tests.throws(format('select public.promocion_prueba_correo(%L, ''yo@correo.test'')', pid), 'NO_AUTORIZADO', '12 · un doctor no manda pruebas (Ventas sí, desde 2 nov 2026)');
   perform tests.act_as(v_admin);
   perform tests.throws(format('select public.promocion_prueba_correo(%L, ''no-es-correo'')', pid), 'CORREO_INVALIDO', '12 · correo inválido');
   r := public.promocion_prueba_correo(pid, ' Dueno@Correo.Test ');

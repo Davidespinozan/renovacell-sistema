@@ -15,7 +15,8 @@ begin
   perform tests.ok((public.cc_ia_solicitar_alta(c1, 'Kattya Muciño', '1234567', 'nocorreo') ->> 'campo') = 'email', '1 · correo inválido');
   r := public.cc_ia_solicitar_alta(c1, 'Kattya Muciño', '12345678', 'kattya@clinica.mx', 'Medicina estética', 'Culiacán');
   perform tests.ok((r ->> 'registrada')::boolean and (r ->> 'fotos')::int = 0, '1 · registrada (sin foto aún)');
-  perform tests.ok(exists (select 1 from public.notifications where kind = 'verificacion_wa' and conversation_id = c1 and 'admin' = any (roles)), '1 · sin vendedor responsable: le llega a Dirección');
+  perform tests.ok(exists (select 1 from public.notifications n join public.cc_conversations c on c.id = n.conversation_id where n.kind = 'verificacion_wa' and n.conversation_id = c1
+               and ((c.seller_profile_id is not null and c.seller_profile_id = any (n.user_ids)) or (c.seller_profile_id is null and 'admin' = any (n.roles)))), '1 · sin responsable: a un vendedor por turno (Dirección solo si no hay vendedores; REPARTO-TURNO 2 nov 2026)');
   perform tests.ok((public.cc_ia_solicitar_alta(c1, 'Kattya Muciño García', '12345678', 'kattya@clinica.mx') ->> 'registrada')::boolean
                and (select count(*) from public.cc_solicitudes_alta where conversation_id = c1 and estado = 'pendiente') = 1, '1 · corregir datos no duplica la solicitud');
   select id into v_sol from public.cc_solicitudes_alta where conversation_id = c1 and estado = 'pendiente';

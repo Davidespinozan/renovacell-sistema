@@ -12,6 +12,8 @@ import { TarjetaPromo } from '../../app/TarjetaPromo'
 import { Flyers } from './Flyers'   // PROMO-9 · flyers del portal
 import { leerFlyerPromo, type FlyerLeido } from '../../data/ops/promociones'   // PROMOCIÓN DESDE UN FLYER (2 nov 2026)
 import { guardarFlyer, subirImagenFlyer } from '../../data/ops/flyers'
+import { useRoleOpcional } from '../../auth/RoleContext'
+import { currentUserId } from '../../lib/supabase'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // PROMO-6 · el MISMO generador del correo que usa el servidor
 import { ETIQUETA_ESTADO, PILL_ESTADO, avisarPromoPush, difundirPromocion, eliminarPromocion, estadoPromocion, pruebaCorreoPromocion, guardarPromocion, leerPromoTexto, listarPromociones, previaDifusion, vigenciaTexto, type CanalDifusion, type PreviaDifusion, type Promocion, type PromoDatos, type ResultadoDifusion } from '../../data/ops/promociones'
 
@@ -42,6 +44,10 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   const [form, setForm] = useState<Form | null>(null)
   const [texto, setTexto] = useState('')
   const [pegar, setPegar] = useState(false)
+  // REPARTO-TURNO · Almacén y Ventas también administran; enviar: Dirección a todos, un vendedor solo a su cartera, Almacén no envía
+  const rolActual = useRoleOpcional()?.role
+  const soloMiCartera = rolActual === 'pos' ? currentUserId() : null
+  const puedeEnviar = !rolActual || rolActual === 'admin' || rolActual === 'pos'
   // PROMOCIÓN DESDE UN FLYER · la imagen leída; al guardar, opcionalmente también queda como flyer del portal ligado a la promo
   const [flyerImg, setFlyerImg] = useState<{ archivo: File; publicar: boolean } | null>(null)
   const [leyendo, setLeyendo] = useState(false)
@@ -63,7 +69,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   }
   const abrirEnvio = async (p: Promocion) => {
     setEnvio({ promo: p, previa: null, canales: ['correo', 'chat'], resultado: null, error: null })
-    const r = await previa(p.id)
+    const r = await previa(p.id, soloMiCartera)
     setEnvio((e) => e && e.promo.id === p.id ? { ...e, previa: r.ok ? r.data : null, error: r.ok ? null : r.error } : e)
   }
   const [avisos, setAvisos] = useState<Record<string, string>>({})   // PROMO-8 · resultado del aviso push por promoción
@@ -75,7 +81,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
   const enviar = async () => {
     if (!envio || ocupado || envio.canales.length === 0) return
     setOcupado(true)
-    const r = await difundir(envio.promo.id, envio.canales)
+    const r = await difundir(envio.promo.id, envio.canales, soloMiCartera)
     setOcupado(false)
     setEnvio((e) => e && ({ ...e, resultado: r.ok ? r.data : null, error: r.ok ? null : r.error }))
     if (r.ok) { await cargar(); if (envio.canales.includes('chat') && r.data.chat > 0) void avisarChat(envio.promo.id) }
@@ -230,7 +236,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
             <span className={'pill ' + PILL_ESTADO[p.estado]}>{ETIQUETA_ESTADO[p.estado]}</span>
             <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{vigenciaTexto(p)}{p.listas ? ` · solo ${p.listas.map((id) => listas.find((l) => l.id === id)?.name ?? 'lista').join(', ')}` : ' · todas las listas'}</span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              {p.activa && p.estado !== 'vencida' && <button className="btn sm" type="button" onClick={() => abrirEnvio(p)} data-testid={`promo-enviar-${p.id}`}>Enviar a doctores</button>}
+              {puedeEnviar && p.activa && p.estado !== 'vencida' && <button className="btn sm" type="button" onClick={() => abrirEnvio(p)} data-testid={`promo-enviar-${p.id}`}>{soloMiCartera ? 'Enviar a mis clientes' : 'Enviar a doctores'}</button>}
               <button className="btn ghost sm" type="button" onClick={() => editar(p)}>Editar</button>
               {p.estado !== 'vencida' && <button className="btn ghost sm" type="button" onClick={() => pausar(p)} data-testid={`promo-pausar-${p.id}`}>{p.activa ? 'Pausar' : 'Activar'}</button>}
               {!(p.difusion && (p.difusion.correo > 0 || p.difusion.chat > 0)) && !(p.ventas && p.ventas.pedidos > 0) && (
