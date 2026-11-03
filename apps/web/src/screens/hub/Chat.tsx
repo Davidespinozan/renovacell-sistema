@@ -13,6 +13,7 @@ import { conEnlaces } from '../chat/ChatCanonico'
 import { cuandoLista, diaDe, horaDe } from '../../lib/cuando'
 import type { Adjunto, Conversation, Message } from '../../data/types'
 import { ACEPTA, etiquetaAdjunto, pesoLegible, urlAdjunto } from '../../data/ops/adjuntosEquipo'
+import { textoEscribiendo, useLecturasEquipo, vistoPor, type ClienteLecturas, type Lector } from '../../data/ops/lecturasEquipo'
 
 // Color estable por persona para su nombre dentro de un grupo (como en un mensajero).
 const COLORES_AUTOR = ['#0b7a3e', '#1f6fb2', '#a0522d', '#7b3fa0', '#b8860b', '#c2185b', '#00838f']
@@ -24,7 +25,7 @@ const claveLeido = (uid: string) => `rc_chat_leido_${uid}`
 const leerLeido = (uid: string): Record<string, string> => { try { return JSON.parse(localStorage.getItem(claveLeido(uid)) ?? '{}') as Record<string, string> } catch { return {} } }
 const guardarLeido = (uid: string, m: Record<string, string>) => { try { localStorage.setItem(claveLeido(uid), JSON.stringify(m)) } catch { /* sin almacenamiento: no pasa nada */ } }
 
-export function Chat() {
+export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
   const { conversations, messagesByConv, send, sendAttachment, ensureDirect, deleteMessage, deleteConversation, me } = useChat()
   const { data: directory } = useUsers({ staffOnly: true })
   const { user } = useRole()
@@ -55,6 +56,8 @@ export function Chat() {
     setSelectedId(intento.conversationId); consumirIntento(intento.id)
   }, [intento, conversations])
   const msgs = useMemo(() => (conv ? messagesByConv[conv.id] ?? [] : []), [messagesByConv, conv])
+  // PALOMITAS · hasta dónde leyó cada quien y si está escribiendo (del servidor, en vivo).
+  const { lectores, escribo } = useLecturasEquipo(conv?.id ?? null, msgs[msgs.length - 1]?.created_at ?? null, lecturas)
 
   const [leido, setLeido] = useState<Record<string, string>>(() => leerLeido(me.id))
   useEffect(() => { setLeido(leerLeido(me.id)) }, [me.id])
@@ -81,6 +84,7 @@ export function Chat() {
     if (!conv || !text.trim()) return
     send(conv.id, text)
     setText('')
+    escribo(false)
   }
 
   // Adjuntar: uno o varios archivos; el texto escrito va como pie del primero.
@@ -111,14 +115,15 @@ export function Chat() {
       const mine = m.sender_id === me.id
       const inicio = m.sender_id !== autorPrevio
       autorPrevio = m.sender_id
-      hilo.push(<Burbuja key={m.id} m={m} mine={mine} inicio={inicio} grupo={conv.kind === 'group'}
+      hilo.push(<Burbuja key={m.id} m={m} mine={mine} inicio={inicio} grupo={conv.kind === 'group'} lectores={lectores}
         nombre={mine ? me.name : (porId[m.sender_id]?.name ?? m.sender_name ?? 'Equipo')}
         onDelete={() => { if (window.confirm('¿Eliminar este mensaje?')) deleteMessage(conv.id, m.id) }} />)
     }
   }
 
   const otro = conv ? otroDe(conv) : undefined
-  const subtitulo = !conv ? '' : conv.kind === 'group'
+  const escribiendoAhora = conv ? textoEscribiendo(lectores, conv.kind === 'group') : null
+  const subtitulo = !conv ? '' : escribiendoAhora ? escribiendoAhora : conv.kind === 'group'
     ? (conv.member_ids.length ? `${conv.member_ids.length} integrantes` : 'Grupo del equipo')
     : (otro && porId[otro]?.role) || 'Mensaje directo'
 
@@ -173,7 +178,7 @@ export function Chat() {
               <ConvAvatar conv={conv} name={tituloDe(conv)} url={otro ? avatarDe(otro) : undefined} size={40} />
               <div className="rc-title">
                 <div className="rc-name">{tituloDe(conv)}</div>
-                <div className="rc-state">{subtitulo}</div>
+                <div className={'rc-state' + (escribiendoAhora ? ' rc-state--escribiendo' : '')} data-testid="tc-estado">{subtitulo}</div>
               </div>
               {conv.kind === 'dm' && (
                 <div className="rc-actions">
@@ -196,7 +201,7 @@ export function Chat() {
               <textarea
                 ref={inputRef} className="rc-input" rows={1}
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => { setText(e.target.value); escribo(e.target.value.trim().length > 0) }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
                 placeholder={`Mensaje a ${tituloDe(conv)}…`}
                 aria-label="Escribe un mensaje"
@@ -223,7 +228,8 @@ export function Chat() {
   )
 }
 
-function Burbuja({ m, mine, inicio, grupo, nombre, onDelete }: { m: Message; mine: boolean; inicio: boolean; grupo: boolean; nombre: string; onDelete: () => void }) {
+function Burbuja({ m, mine, inicio, grupo, nombre, onDelete, lectores = [] }: { m: Message; mine: boolean; inicio: boolean; grupo: boolean; nombre: string; onDelete: () => void; lectores?: Lector[] }) {
+  const v = mine ? vistoPor(lectores, m.created_at) : null
   return (
     <div className={`rc-msg ${mine ? 'rc-msg--own' : 'rc-msg--seller'}${inicio ? ' rc-msg--inicio' : ''} tc-msg`} data-testid={mine ? 'tc-propio' : 'tc-ajeno'}>
       {/* tabIndex: en táctil, tocar la burbuja propia muestra el botón de borrar (no hay hover). */}
@@ -231,7 +237,9 @@ function Burbuja({ m, mine, inicio, grupo, nombre, onDelete }: { m: Message; min
         {inicio && grupo && !mine && <div className="rc-meta" style={{ color: colorAutor(m.sender_id) }}>{nombre}</div>}
         {m.adjunto && <AdjuntoVista a={m.adjunto} subiendo={!!m.subiendo} />}
         {m.body && <div className="rc-bubble">{conEnlaces(m.body)}</div>}
-        <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{mine && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
+        <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{mine && v && (v.visto
+          ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tc-visto" />
+          : <CheckCheck className="rc-tick" size={15} aria-label={grupo && v.n > 0 ? `Visto por ${v.n} de ${v.de}` : 'Entregado'} data-testid="tc-entregado" />)}</time>
         {mine && (
           <button type="button" className="tc-del" title="Eliminar mensaje" aria-label="Eliminar mensaje" onClick={onDelete}><Trash2 size={13} /></button>
         )}
