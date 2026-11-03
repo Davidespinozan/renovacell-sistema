@@ -30,7 +30,7 @@ export function FilaMiCliente({ c, onAbrir, onError, retomar = retomarPorDefecto
         <div style={{ fontWeight: 600 }}>{capitalizarNombre(c.dueno)}</div>
         <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
           <span className={'pill ' + (c.atiende === 'ia' ? 'p-neu' : 'p-warn')}>{QUIEN_ATIENDE[c.atiende]}{c.atiende_nombre ? `: ${c.atiende_nombre}` : ''}</span>
-          {c.prospecto && <span className="pill p-neu">Prospecto</span>}
+          <span className="pill p-neu">{c.prospecto ? 'Prospecto' : 'Cliente'}</span>
           {c.canal === 'whatsapp' && <span>WhatsApp</span>}
           {c.last_message_at && <span>{cuandoLista(c.last_message_at)}</span>}
         </div>

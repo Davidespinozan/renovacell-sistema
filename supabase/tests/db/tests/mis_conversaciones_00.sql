@@ -4,7 +4,7 @@
 begin;
 do $t$
 declare v_admin uuid := tests.fixture_admin(); s1 uuid := tests.user('pos'); s2 uuid := tests.user('pos'); d1 uuid := tests.user('doctor'); d2 uuid := tests.user('doctor');
-  c1 uuid; c2 uuid; r jsonb; x jsonb;
+  c1 uuid; c2 uuid; c3 uuid; cu uuid; r jsonb; x jsonb;
 begin
   perform tests.act_as_service();
   update public.profiles set meta = coalesce(meta, '{}') || '{"capabilities":["conversaciones"]}' where id in (s1, s2);
@@ -21,6 +21,22 @@ begin
   r := public.cc_mis_conversaciones();
   x := (select e from jsonb_array_elements(r) e where e ->> 'conversation_id' = c1::text);
   perform tests.ok(jsonb_array_length(r) = 2 and x ->> 'atiende' = 'ia' and (x ->> 'puede_retomar')::boolean and x -> 'ultimo' ->> 'texto' = 'Hola, ¿me cotizas 3 Nabota?', '1 · la vendedora ve sus dos conversaciones, quién las atiende y el último mensaje (' || coalesce(x::text, r::text) || ')');
+  perform tests.ok(x ->> 'prospecto' = 'false', '1 · un doctor con cuenta no es prospecto');
+  -- Un prospecto que entra por WhatsApp (sin cuenta ni ficha) y que ella atendió.
+  perform tests.act_as_service();
+  c3 := (public.cc_wa_entrante('5216670000077', 'Yara', 'wamid.MC.1', 'Hola, ¿precio de Nabota?', false) ->> 'conversation_id')::uuid;
+  perform tests.act_as_owner();
+  update public.cc_conversations set ultimo_asesor_id = s1, seller_profile_id = null, modo = 'ai_active' where id = c3;
+  perform tests.act_as(s1);
+  perform tests.eq((select e ->> 'prospecto' from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c3::text), 'true', '1 · sin cuenta y sin ficha: prospecto');
+  perform tests.eq((select e ->> 'canal' from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c3::text), 'whatsapp', '1 · y se sabe que escribe por WhatsApp');
+  perform tests.act_as_owner();
+  insert into public.customers (full_name, active) values ('Yara Ficha', true) returning id into cu;
+  update public.cc_conversations set customer_id = cu where id = c3;
+  perform tests.act_as(s1);
+  perform tests.eq((select e ->> 'prospecto' from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c3::text), 'false', '1 · con ficha de cliente (sin cuenta): cliente, no prospecto');
+  perform tests.act_as_owner();
+  update public.cc_conversations set estado = 'cerrada', closed_at = now() where id = c3;
   perform tests.act_as(s2);
   perform tests.eq(public.cc_mis_conversaciones(), '[]'::jsonb, '1 · otro vendedor no las ve');
 

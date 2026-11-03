@@ -36,7 +36,7 @@ import type { Mensaje } from '../../data/ops/chat'
 
 const PILL: Record<string, string> = { dang: 'p-dang', warn: 'p-warn', neu: 'p-neu', ok: 'p-ok' }
 
-export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, esDireccion = false, onAtencion, contactoDe = contactoPorDefecto }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void; contactoDe?: typeof contactoPorDefecto }) {
+export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, esDireccion = false, onAtencion, contactoDe = contactoPorDefecto, cargarMis }: { cliente?: ClienteChat; intervaloMs?: number; esDireccion?: boolean; onAtencion?: () => void; contactoDe?: typeof contactoPorDefecto; cargarMis?: Parameters<typeof useMisClientes>[1] }) {
   const [cola, setCola] = useState<ColaItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -45,7 +45,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   const [aviso, setAviso] = useState<string | null>(null)
   const [enfocar, setEnfocar] = useState(false)
   const [versionMis, setVersionMis] = useState(0)   // MIS CLIENTES · se relee al volver de una conversación
-  const misClientes = useMisClientes(versionMis)
+  const misClientes = useMisClientes(versionMis, cargarMis)
   const intento = useIntento('asesorias')
   // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
   const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
