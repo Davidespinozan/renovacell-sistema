@@ -192,7 +192,7 @@ export function Chat() {
             {errorAdjunto && <div className="tc-adj-error" role="alert" data-testid="adjunto-error">{errorAdjunto}<button type="button" className="rc-ico" aria-label="Cerrar" onClick={() => setErrorAdjunto(null)}><X size={14} /></button></div>}
             <div className="rc-composer">
               <input ref={fileRef} type="file" accept={ACEPTA} multiple hidden onChange={(e) => void adjuntar(e.target.files)} data-testid="adjunto-input" />
-              <button className="rc-ico tc-clip" type="button" onClick={() => fileRef.current?.click()} aria-label="Adjuntar imagen, video o documento" title="Adjuntar imagen, video o documento"><Paperclip size={19} /></button>
+              <button className="rc-ico rc-adjuntar tc-clip" type="button" onClick={() => fileRef.current?.click()} aria-label="Adjuntar imagen, video o documento" title="Adjuntar imagen, video o documento"><Paperclip size={19} /></button>
               <textarea
                 ref={inputRef} className="rc-input" rows={1}
                 value={text}
