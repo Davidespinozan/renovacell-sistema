@@ -1,5 +1,6 @@
 -- PAGO-DESDE-CONVERSACIÓN (20270210) · el down retira comando y lectura; se reaplica idéntica.
 begin;
+\ir ../../../rollback/cliente_de_conversacion/99_down.sql   -- CLIENTE-CONV (20270316) parcha pedidos/comprobante/seguimientos del chat: se baja antes
 create temp table _pc as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/pago_desde_conversacion/99_down.sql
 do $t$ begin

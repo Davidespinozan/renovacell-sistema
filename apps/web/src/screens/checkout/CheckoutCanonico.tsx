@@ -452,7 +452,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                   <div data-testid="checkout-desglose" style={{ display: 'grid', gap: 4, marginBottom: 8 }}>
                     <div style={FILA} data-testid="checkout-productos"><span>Productos</span><span className="mono">{total != null ? money(total) : '—'}</span></div>
                     {conVolumen && <div style={{ ...FILA, color: 'var(--green-deep)' }} data-testid="checkout-volumen"><span>Precio por volumen aplicado</span><span /></div>}
-                    {sel && <div style={FILA} data-testid="checkout-envio"><span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.paqueteria === 'dhl' || sel.paqueteria === 't1' ? sel.paqueteria.toUpperCase() : tituloModalidad(sel).toLowerCase()}</span></span><span className="mono">{fleteTexto(sel.flete, money)}</span></div>}
+                    {sel && <div style={FILA} data-testid="checkout-envio"><span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.paqueteria === 'dhl' || sel.paqueteria === 't1' ? sel.paqueteria.toUpperCase() : tituloModalidad(sel).toLowerCase()}</span></span><span className="mono">{fleteTexto(envio ?? sel.flete, money)}</span></div>}
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>

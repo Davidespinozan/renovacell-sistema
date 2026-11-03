@@ -1,6 +1,7 @@
 -- ATRIBUCIÓN Y PAGADO (20270203) · el down devuelve atribución, cobro, evaluador y políticas a su texto exacto anterior y
 -- retira el aviso de pedido nuevo; la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 \ir ../../../rollback/reparto_verificacion/99_down.sql   -- REPARTO-VERIF (20270213) redefine funciones de esta cadena: se baja antes de la foto inicial
 \ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/ensayo_golive/99_down.sql   -- ENSAYO-GOLIVE (20270204) se baja antes (redefine el aviso de pedido nuevo)

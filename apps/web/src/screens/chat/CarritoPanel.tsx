@@ -26,10 +26,13 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
   const cartIdRef = useRef<string | null>(null)
 
   const cargar = useCallback(async () => {
+    // Un asesor (solo lectura) ve el carrito DEL CLIENTE si existe; nunca abre uno a su nombre (la Edge responde 403 y,
+    // con la consulta cada 20 s y con cada mensaje, eran cientos de llamadas por día: ensayo E2E 2 nov 2026).
+    if (!cartId && soloLectura) { setCart(null); setError(null); return }
     const r = cartId ? await cliente.ver(cartId) : await cliente.abrir(conversationId ?? null)
     if (!r.ok) { if (r.error.codigo !== 'sin_backend') setError(r.error.mensaje); return }
     setError(null); setCart(r.data); cartIdRef.current = r.data.cart_id
-  }, [cliente, cartId, conversationId])
+  }, [cliente, cartId, conversationId, soloLectura])
 
   useEffect(() => {
     void cargar()

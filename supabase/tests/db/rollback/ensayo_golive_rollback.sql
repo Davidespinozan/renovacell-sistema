@@ -1,6 +1,7 @@
 -- ENSAYO GO-LIVE (20270204) · el down devuelve el aviso de pedido nuevo y el saludo a su texto exacto anterior; la
 -- migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 create temp table _eg as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/ensayo_golive/99_down.sql
 do $t$ begin

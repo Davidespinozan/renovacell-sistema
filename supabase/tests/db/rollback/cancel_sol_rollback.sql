@@ -1,5 +1,6 @@
 -- CANCELACIÓN (162) · el down retira tabla, comandos y triggers sin tocar nada más; se reaplica igual.
 begin;
+\ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 create temp table _cs as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
      and p.proname not in ('_cancel_req_ve_pedido', 'solicitar_cancelacion', 'resolver_solicitud_cancelacion', '_cancelacion_avisos', '_cancelacion_bloquea_envio')) resto;

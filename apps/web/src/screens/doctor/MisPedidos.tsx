@@ -6,6 +6,7 @@ import { useOrders } from '../../data/hooks/useOrders'
 import { useOrderMoney, usePaymentClaims } from '../../data/hooks/useMoney'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useRole } from '../../auth/RoleContext'
+import { currentUserId } from '../../lib/supabase'
 import { seedReorder } from '../../data/store/reorderStore'
 import { OrderCard } from './OrderCard'
 import { PaymentModal } from './PaymentModal'
@@ -51,7 +52,7 @@ export function MisPedidos() {
             order={o}
             productsById={byId}
             onPay={() => setPaying(o)}
-            onCancel={() => setCancelling(o)}
+            onCancel={o.doctor_id && o.doctor_id === currentUserId() ? () => setCancelling(o) : undefined}   // el servidor solo deja cancelar los pedidos que hizo el propio doctor; los que levantó su vendedor se cancelan con él
             onReorder={() => reorder(o)}
             dinero={byOrder[o.id] ?? null}
             pagoReportado={claims.some((c) => c.order_id === o.id && c.status === 'reportado')}

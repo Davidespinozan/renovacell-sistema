@@ -34,10 +34,19 @@ export interface Cierre {
 
 const live = makeLive<Cierre>(async () => {
   const { data, error } = await leerTodo('los cortes de caja', (a, b) => supabase.from('cash_closings')
-    .select('id, fecha, alcance, esperado, fondo, contado, diferencia, motivo, usuario, created_at, voids_closing_id, void_reason, cajero, corte_desde, corte_hasta, prev_closing_id')
+    .select('id, fecha, alcance, esperado, fondo, contado, diferencia, motivo, usuario, created_by, created_at, voids_closing_id, void_reason, cajero, corte_desde, corte_hasta, prev_closing_id')
     .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
-  return (data ?? []).map((c) => ({ ...c, fondo: (c as { fondo?: number }).fondo ?? 0 })) as unknown as Cierre[]
+  // El servidor guarda el ROL en `usuario` (no confía en un nombre del navegador) y la persona en `created_by`: en el
+  // ticket y el historial se muestra su nombre (ensayo E2E 2 nov 2026: salía "Realizó: admin").
+  const filas = (data ?? []) as Array<Record<string, unknown>>
+  const ids = [...new Set(filas.map((c) => c.created_by).filter((x): x is string => typeof x === 'string'))]
+  const nombres = new Map<string, string>()
+  if (ids.length) {
+    const { data: gente } = await supabase.from('staff_directory').select('id, name').in('id', ids)
+    for (const g of (gente ?? []) as Array<{ id: string; name: string | null }>) if (g.name) nombres.set(g.id, g.name)
+  }
+  return filas.map((c) => ({ ...c, fondo: (c.fondo as number | undefined) ?? 0, usuario: nombres.get(c.created_by as string) ?? c.usuario })) as unknown as Cierre[]
 }, [])
 
 export const subscribe = live.subscribe

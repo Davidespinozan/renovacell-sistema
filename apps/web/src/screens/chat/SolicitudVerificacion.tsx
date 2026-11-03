@@ -7,7 +7,7 @@ export function useSolicitudVerificacion(conversationId: string, cliente: Client
   const [s, setS] = useState<SolicitudAlta | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
-  const cargar = useCallback(async () => { const r = await cliente.de(conversationId); if (r.ok) setS(r.data) }, [cliente, conversationId])
+  const cargar = useCallback(async () => { if (!conversationId) return; const r = await cliente.de(conversationId); if (r.ok) setS(r.data) }, [cliente, conversationId])   // sin conversación elegida no se pregunta
   useEffect(() => { setS(null); setMsg(null); void cargar() }, [cargar])
   if (msg?.ok) return <div className="pc-msg ok" role="status" data-testid="verif-msg">{msg.texto}</div>
   if (!s || s.estado !== 'pendiente') return msg ? <div className="pc-msg" role="alert">{msg.texto}</div> : null

@@ -123,12 +123,17 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const [soloPromos, setSoloPromos] = useState(false)
   const enPromo = useMemo(() => new Set(volRules.filter((r) => r.promo && r.active).map((r) => r.product_id)), [volRules])
   const tienePromo = (e: CatalogEntry) => enPromo.has(e.product.id) || (e.kind === 'family' && e.variants.some((v) => enPromo.has(v.id)))
-  // Búsqueda por nombre o categoría (sin acentos). Disponibles primero; lo agotado va aparte y compacto.
+  // Búsqueda por nombre o categoría (sin acentos), también DENTRO de las presentaciones de una familia ("golden v" encuentra
+  // Ultrafiltrados); cada palabra debe aparecer, en cualquier orden. Disponibles primero; lo agotado va aparte y compacto.
   const plano = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const visibles = useMemo(() => {
-    const k = plano(busca.trim())
+    const palabras = plano(busca.trim()).split(/\s+/).filter(Boolean)
     const base = soloPromos ? entries.filter(tienePromo) : entries
-    return k ? base.filter((e) => plano(e.product.name).includes(k) || plano(e.product.category).includes(k)) : base
+    if (!palabras.length) return base
+    return base.filter((e) => {
+      const t = plano([e.product.name, e.product.category, ...(e.kind === 'family' ? e.variants.map((v) => v.name) : [])].join(' '))
+      return palabras.every((w) => t.includes(w))
+    })
   }, [entries, busca, soloPromos, enPromo]) // eslint-disable-line react-hooks/exhaustive-deps
   // IA-VENDEDORA · la búsqueda es señal: al dejar de escribir (1.5 s), se registra; sin resultados avisa a la IA.
   const sinResultados = busca.trim().length >= 3 && visibles.length === 0

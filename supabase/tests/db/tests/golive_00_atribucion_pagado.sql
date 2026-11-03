@@ -60,9 +60,11 @@ begin
   -- ══ 6 · aviso de pedido nuevo ════════════════════════════════════════════════════════════════
   perform tests.act_as_owner();
   insert into public.orders (customer_id, status, total, external_ref, shipping_meta) values (cCart, 'pending_payment', 1500, 'S-GL6', jsonb_build_object('seller_profile_id', v_ale)) returning id into o2;
+  set constraints all immediate;   -- AVISOS-EXACTOS (20270317): el aviso se emite al confirmar la transacción
   perform tests.ok(exists (select 1 from public.notifications where event_key = 'pedido_nuevo:' || o2 and 'admin' = any(roles) and screen = 'av_fin' and body like '%S-GL6%por cobrar%'), '6.1 · Dirección recibe el pedido nuevo por cobrar (lleva a Facturación · Por cobrar)');
   perform tests.ok(exists (select 1 from public.notifications where event_key = 'pedido_nuevo_vendedor:' || o2 and v_ale = any(user_ids)), '6.2 · y el vendedor del pedido');
   insert into public.orders (customer_id, status, total, shipping_meta) values (cCart, 'delivered', 100, '{"channel":"pos"}'::jsonb) returning id into o2;
+  set constraints all immediate;
   perform tests.ok(not exists (select 1 from public.notifications where event_key = 'pedido_nuevo:' || o2), '6.3 · la venta de mostrador (nace pagada) no avisa');
 
   -- ══ 7 · saludo neutro (ensayo 29 oct) ═══════════════════════════════════════════════════════

@@ -1,0 +1,25 @@
+import { browser, sesion, ir, clic, sleep } from './lib.mjs'
+const b = await browser()
+try {
+  const p = await sesion(b, 'alejandra@e2e.mx')
+  await p.click('[data-testid=puerta-ahora-no]').catch(() => {})
+  await ir(p, 'Punto de venta'); await sleep(2500)
+  await p.type('input[placeholder="Buscar producto o SKU"]', 'golden placenta'); await sleep(1200)
+  await p.evaluate(() => document.querySelector('.poscard:not(.is-out)')?.click()); await sleep(1000)
+  await clic(p, 'Mostrador · público general', { sel: 'main button' }); await sleep(2000)
+  console.log('cartera:', await p.evaluate(() => [...document.querySelectorAll('[data-testid=sc-cartera-fila]')].map((x) => x.innerText.replace(/\n+/g, ' ')).join(' || ')))
+  await p.evaluate(() => [...document.querySelectorAll('[data-testid=sc-cartera-fila]')].find((x) => /Jorge/.test(x.innerText))?.click()); await sleep(1500)
+  await p.screenshot({ path: '/tmp/claude-501/shots/np0.png' }); console.log('venta:', await p.evaluate(() => document.querySelector('main').innerText.replace(/\n+/g, ' | ').slice(-400)))
+  await p.click('[data-testid=pos-entrega-envio]'); await sleep(800)
+  await p.click('[data-testid=pos-continuar-entrega]'); await sleep(3000)
+  const modal = () => p.evaluate(() => (document.querySelector('.modal') ?? document.body).innerText.replace(/\n+/g, ' | '))
+  // domicilio guardado del cliente, si la pantalla pide elegirlo
+  await p.evaluate(() => { const r = [...document.querySelectorAll('.modal input[type=radio]')].find((x) => /Av\. del Mar/.test(x.closest('label')?.innerText ?? '')); r?.click() }); await sleep(2500)
+  await p.waitForSelector('[data-testid=servicio-paqueteria]', { timeout: 12000 }).catch(() => console.log('sin selector de servicio'))
+  await p.click('[data-testid=servicio-1] input').catch(() => console.log('sin servicio 1')); await sleep(1200)
+  const m = await modal(); const i = m.indexOf('Entrega'); console.log('pedido:', m.slice(Math.max(0, i - 50), i + 900))
+  await p.screenshot({ path: '/tmp/claude-501/shots/np1.png' })
+  await clic(p, '^Crear pedido|^Levantar pedido|^Confirmar pedido'); await sleep(5000)
+  console.log('resultado:', (await modal()).slice(0, 400))
+  console.log('errores:', p.errores.filter((e) => !/429/.test(e)).slice(0, 6))
+} finally { await b.close() }

@@ -1,6 +1,7 @@
 -- SEC-C1 (140) · el down restaura EXACTAMENTE las 6 políticas SELECT y las 4 funciones de producción (md5), elimina el helper
 -- interno, conserva permisos, dueño y la política de orders, sin cambios de datos. Revertir REABRE F3 (se comprueba).
 begin;
+\ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 \ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/ensayo_golive/99_down.sql
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)

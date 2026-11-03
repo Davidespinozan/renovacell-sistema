@@ -24,3 +24,17 @@ Requiere Docker (OrbStack) y Chrome.
   (`ir`, `clic`, `sel`, `tipo`, `subir`, `espera`, `eval`); vuelca botones/campos visibles y guarda la captura.
 
 Contraseña de las cuentas sembradas: la de `lib.mjs` (solo existe en el stack local).
+
+## Ensayo profundo (2 nov 2026)
+
+- `node e2e/dia/pantallas.mjs [cuentas]` — barrido SECCIÓN POR SECCIÓN (el menú es acordeón: el barrido anterior solo
+  veía la sección abierta). 157 vistas en 8 cuentas.
+- `node e2e/dia/flujos.mjs doctor_local|doctor_foraneo|doctor_servicio` — compra del doctor en el portal y comprobación
+  en la base (chofer con horario; DHL por regla; DHL eligiendo el servicio de 12:00).
+- `guia_servicio.mjs` (Almacén genera la guía con el servicio vendido; cambiarlo pide motivo), `levantar_servicio.mjs`
+  (la vendedora levanta un pedido foráneo eligiendo servicio), `chat_vendedor.mjs` (doctor ↔ vendedor en tiempo real),
+  `evento_equipo.mjs` (solo el equipo elegido ve el evento).
+- DHL sin tocar DHL real: `node e2e/dia/dhl_stub.mjs` (puerto 4999) y, SOLO en la copia local de `supabase/`, que
+  `dhlBaseUrl` devuelva `Deno.env.get('DHL_STUB_URL')`; `.env` de funciones con credenciales falsas y
+  `DHL_STUB_URL=http://host.docker.internal:4999`; `supabase functions serve --env-file …`.
+- Todas las sesiones salen de la misma IP: entre recorridos, `delete from rate_limit_buckets` en la base local.

@@ -128,6 +128,9 @@ export function OrderCard({
             {puedeCancelar && (
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={onCancel}>Cancelar pedido</button>
             )}
+            {!onCancel && onReorder && isCancelable(order.status) && !liberado && !transferReportada && (
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }} data-testid="pedido-cancelar-asesor">Este pedido lo levantó tu asesor: para cancelarlo, pídeselo a él.</span>
+            )}
             {onCancel && isCancelable(order.status) && (liberado || transferReportada) && (
               <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>Este pedido ya está en preparación o tiene un pago en revisión: para cancelarlo, contacta a Renovacell.</span>
             )}

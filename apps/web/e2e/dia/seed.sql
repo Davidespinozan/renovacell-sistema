@@ -7,7 +7,7 @@ begin
   insert into customers (full_name, email, phone, city, profile_id, source, active) values ('Dra. Sofía Prueba', 'doctora@e2e.mx', '6671234567', 'Culiacán', d1, 'portal', true) returning id into c1;
   insert into customers (full_name, email, phone, city, profile_id, source, active) values ('Dr. Jorge Prueba', 'doctor2@e2e.mx', '6679876543', 'Mazatlán', d2, 'portal', true) returning id into c2;
   insert into customers (full_name, phone, city, source, active) values ('Clínica Mostrador Prueba', '6670001111', 'Culiacán', 'odoo', true) returning id into c3;
-  insert into cc_cartera (profile_id, seller_profile_id, asignado_por, motivo) values (d1, rob, adm, 'e2e');
+  insert into cc_cartera (profile_id, seller_profile_id, asignado_por, motivo) values (d1, rob, adm, 'e2e'), (d2, ale, adm, 'e2e');   -- con cuenta: cartera por cuenta
   insert into cc_cartera_clientes (customer_id, seller_profile_id, asignado_por, motivo) values (c1, rob, adm, 'e2e'), (c2, ale, adm, 'e2e'), (c3, rob, adm, 'e2e');
   insert into doctor_locations (doctor_id, customer_id, name, line1, exterior_number, neighborhood, postal_code, city, state, country, contact_name, contact_phone, is_default, active)
     values (d1, c1, 'Consultorio', 'Av. Obregón', '123', 'Centro', '80000', 'Culiacán', 'Sinaloa', 'MX', 'Sofía', '6671234567', true, true),
