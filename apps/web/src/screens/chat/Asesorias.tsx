@@ -22,6 +22,7 @@ import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
 import { HojaMarco } from './HojaChat'
 import { OrigenChip } from './OrigenConversacion'
 import { BuscadorConversaciones } from './BuscarMensajes'
+import { MisClientes } from './MisClientes'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
 import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
@@ -43,6 +44,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   const [llegada, setLlegada] = useState<string | null>(null)       // fila resaltada al volver de una apertura profunda
   const [aviso, setAviso] = useState<string | null>(null)
   const [enfocar, setEnfocar] = useState(false)
+  const [versionMis, setVersionMis] = useState(0)   // MIS CLIENTES · se relee al volver de una conversación
   const intento = useIntento('asesorias')
   // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
   const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
@@ -179,7 +181,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
-      <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }}
+      <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); setVersionMis((n) => n + 1); void cargar(); void recargarAtencion() }}
         tira={tira} acciones={acciones} hoja={hoja}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
@@ -216,7 +218,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
       {cargando && <div style={{ color: 'var(--ink-3, #667)' }}>Cargando…</div>}
       {!cargando && cola.length === 0 && !error && (
         <div className="op-vacio"><Vacio plano icono="chat" titulo="No hay conversaciones esperando asesor."
-          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí.'} /></div>
+          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí. Tus clientes y prospectos de antes están abajo.'} /></div>
       )}
       {esDireccion && <Seccion titulo={`Sin vendedor (${sinAsignar.length})`} items={sinAsignar} llegada={llegada} accion={(c) => (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -225,6 +227,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
         </div>
       )} />}
       <Seccion titulo={`${esDireccion ? 'Asignadas a mí' : 'Mis asesorías'} (${mias.length})`} items={mias} llegada={llegada} accion={accionMia} />
+      {!esDireccion && <MisClientes version={versionMis} onAbrir={(id) => { setAviso(null); setLlegada(id); setEnfocar(true); void cargar(); setAbierta(id) }} />}
       {esDireccion && <Seccion titulo={`En curso con vendedores (${otras.length})`} items={otras} llegada={llegada} accion={(c) => <button type="button" className="btn" onClick={() => { setLlegada(c.conversation_id); setAbierta(c.conversation_id) }} data-testid="btn-ver">Ver</button>} />}
     </div>
   )
