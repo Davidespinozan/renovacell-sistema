@@ -505,6 +505,9 @@ button.pc-tira:hover{background:var(--hueso)}
    ✕ quedaba invisible y la hoja "no se podía cerrar" (3 nov 2026). Aquí va oscuro y con área táctil de 44 px. */
 .rc-chat--wa .hj-h .rc-ico,.hj-h .rc-ico{flex:none;width:44px;height:44px;margin:-6px -4px 0 0;color:var(--ink-2);background:var(--hueso)}
 .rc-chat--wa .hj-h .rc-ico:hover,.hj-h .rc-ico:hover{background:var(--line);color:var(--ink)}
+.rc-acc-head{position:sticky;top:-6px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-6px -6px 2px;padding:8px 8px 6px 14px;background:var(--cp-surface);border-bottom:1px solid var(--line);font-size:13.5px;color:var(--ink)}
+.rc-chat--wa .rc-acc-head .rc-ico,.rc-acc-head .rc-ico{flex:none;width:44px;height:44px;color:var(--ink-2);background:var(--hueso)}
+.rc-chat--wa .rc-acc-head .rc-ico:hover,.rc-acc-head .rc-ico:hover{background:var(--line);color:var(--ink)}
 /* Mismo caso en las otras superficies claras dentro del chat: respuestas rápidas y el aviso de archivo rechazado. */
 .rc-chat--wa .rc-rr .rc-ico,.rc-chat--wa .tc-adj-error .rc-ico{color:var(--ink-2)}
 .rc-chat--wa .rc-rr .rc-ico:hover{background:var(--hueso);color:var(--ink)}

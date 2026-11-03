@@ -341,6 +341,18 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const cerrarRespuestas = () => { setRrBoton(false); if (texto.startsWith('/')) setTexto('') }
   // EXPEDIENTE EN EL CHAT · menú «+»: abre la hoja de la acción dentro del mismo chat.
   const [accAbierto, setAccAbierto] = useState(false)
+  const menuAcc = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!accAbierto) return
+    const fuera = (e: PointerEvent) => {
+      const t = e.target as Node | null
+      if (!t || menuAcc.current?.contains(t) || (t as Element).closest?.('[data-testid="btn-acciones"]')) return
+      setAccAbierto(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAccAbierto(false) }
+    document.addEventListener('pointerdown', fuera); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', fuera); document.removeEventListener('keydown', esc) }
+  }, [accAbierto])
   const conAcciones = asesor && !!acciones?.length && !finAtencion
   useEffect(() => { if (!conAcciones) setAccAbierto(false) }, [conAcciones])
   const elegirRespuesta = (r: RespuestaRapida) => {
@@ -653,8 +665,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
       {hoja && !finAtencion && <div className="rc-hoja" data-testid="chat-hoja">{hoja}</div>}
       {accAbierto && conAcciones && (
-        <div className="rc-acc-menu" role="menu" aria-label="Acciones con este cliente" data-testid="menu-acciones"
+        <div ref={menuAcc} className="rc-acc-menu" role="menu" aria-label="Acciones con este cliente" data-testid="menu-acciones"
           onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAccAbierto(false) } }}>
+          {/* Se cierra con el ✕, tocando fuera o con Esc (antes solo volviendo a tocar el «+», y nadie lo encontraba). */}
+          <div className="rc-acc-head"><b>Acciones con este cliente</b>
+            <button type="button" className="rc-ico" onClick={() => setAccAbierto(false)} aria-label="Cerrar acciones" title="Cerrar" data-testid="acciones-cerrar"><X size={17} /></button>
+          </div>
           {acciones!.map((a) => (
             <button key={a.clave} type="button" role="menuitem" className="rc-acc-item" onClick={() => { setAccAbierto(false); a.onElegir() }} data-testid={`accion-${a.clave}`}>
               {a.icono && <span className="rc-acc-ico" aria-hidden>{a.icono}</span>}
