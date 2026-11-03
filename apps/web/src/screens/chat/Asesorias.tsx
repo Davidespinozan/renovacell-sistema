@@ -22,7 +22,7 @@ import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
 import { HojaMarco } from './HojaChat'
 import { OrigenChip } from './OrigenConversacion'
 import { BuscadorConversaciones } from './BuscarMensajes'
-import { MisClientes } from './MisClientes'
+import { FilaMiCliente, useMisClientes } from './MisClientes'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
 import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
@@ -45,6 +45,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   const [aviso, setAviso] = useState<string | null>(null)
   const [enfocar, setEnfocar] = useState(false)
   const [versionMis, setVersionMis] = useState(0)   // MIS CLIENTES · se relee al volver de una conversación
+  const misClientes = useMisClientes(versionMis)
   const intento = useIntento('asesorias')
   // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
   const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
@@ -188,6 +189,9 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   )
 
   const sinAsignar = cola.filter((c) => c.modo === 'human_requested' && !c.seller_profile_id)
+  // MIS CLIENTES · en la MISMA lista: las asesorías en curso arriba y, debajo, los que atendí o son de mi cartera.
+  const retomables = esDireccion ? [] : misClientes.lista
+  const abrirRetomada = (id: string) => { setAviso(null); setLlegada(id); setEnfocar(true); void cargar(); setAbierta(id) }
   const mias = cola.filter((c) => c.es_mia)
   const otras = cola.filter((c) => !c.es_mia && !(c.modo === 'human_requested' && !c.seller_profile_id))
   const accionMia = (c: ColaItem) => (c.modo === 'human_assigned'
@@ -216,9 +220,9 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {cargando && <div style={{ color: 'var(--ink-3, #667)' }}>Cargando…</div>}
-      {!cargando && cola.length === 0 && !error && (
+      {!cargando && cola.length === 0 && retomables.length === 0 && !error && (
         <div className="op-vacio"><Vacio plano icono="chat" titulo="No hay conversaciones esperando asesor."
-          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí. Tus clientes y prospectos de antes están abajo.'} /></div>
+          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí.'} /></div>
       )}
       {esDireccion && <Seccion titulo={`Sin vendedor (${sinAsignar.length})`} items={sinAsignar} llegada={llegada} accion={(c) => (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -226,15 +230,15 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
           <button type="button" className="btn" onClick={() => setAbierta(c.conversation_id)}>Ver</button>
         </div>
       )} />}
-      <Seccion titulo={`${esDireccion ? 'Asignadas a mí' : 'Mis asesorías'} (${mias.length})`} items={mias} llegada={llegada} accion={accionMia} />
-      {!esDireccion && <MisClientes version={versionMis} onAbrir={(id) => { setAviso(null); setLlegada(id); setEnfocar(true); void cargar(); setAbierta(id) }} />}
+      <Seccion titulo={`${esDireccion ? 'Asignadas a mí' : 'Mis conversaciones'} (${mias.length + retomables.length})`} items={mias} llegada={llegada} accion={accionMia}
+        extra={retomables.map((c) => <FilaMiCliente key={c.conversation_id} c={c} onAbrir={abrirRetomada} onError={(m) => { setAviso(m); void misClientes.recargar() }} />)} />
       {esDireccion && <Seccion titulo={`En curso con vendedores (${otras.length})`} items={otras} llegada={llegada} accion={(c) => <button type="button" className="btn" onClick={() => { setLlegada(c.conversation_id); setAbierta(c.conversation_id) }} data-testid="btn-ver">Ver</button>} />}
     </div>
   )
 }
 
-function Seccion({ titulo, items, accion, llegada }: { titulo: string; items: ColaItem[]; accion: (c: ColaItem) => React.ReactNode; llegada?: string | null }) {
-  if (items.length === 0) return null
+function Seccion({ titulo, items, accion, llegada, extra }: { titulo: string; items: ColaItem[]; accion: (c: ColaItem) => React.ReactNode; llegada?: string | null; extra?: React.ReactNode[] }) {
+  if (items.length === 0 && !extra?.length) return null
   return (
     <section style={{ marginBottom: 16 }}>
       <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{titulo}</h3>
@@ -260,6 +264,7 @@ function Seccion({ titulo, items, accion, llegada }: { titulo: string; items: Co
             </li>
           )
         })}
+        {extra}
       </ul>
     </section>
   )
