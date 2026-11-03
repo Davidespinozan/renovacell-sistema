@@ -4545,6 +4545,7 @@ export type Database = {
       messages: {
         Row: {
           body: string
+          adjunto: Json | null
           conversation_id: string
           created_at: string | null
           id: string
@@ -4553,6 +4554,7 @@ export type Database = {
         }
         Insert: {
           body: string
+          adjunto?: Json | null
           conversation_id: string
           created_at?: string | null
           id?: string
@@ -4561,6 +4563,7 @@ export type Database = {
         }
         Update: {
           body?: string
+          adjunto?: Json | null
           conversation_id?: string
           created_at?: string | null
           id?: string

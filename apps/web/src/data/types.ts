@@ -195,12 +195,17 @@ export interface Conversation {
   last_message_at: ISODateTime | null
 }
 
+/** EQUIPO-ADJUNTOS · archivo de un mensaje del chat del equipo (bucket privado `equipo`). */
+export interface Adjunto { path: string; nombre: string; tipo: string; tamano: number | null; clase: 'imagen' | 'video' | 'documento' }
 export interface Message {
   id: string
   conversation_id: string
   sender_id: string
   sender_name: string | null
   body: string
+  adjunto?: Adjunto | null
+  /** Solo en este navegador: el archivo aún se está subiendo. */
+  subiendo?: boolean
   created_at: ISODateTime
 }
 

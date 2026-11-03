@@ -3,7 +3,8 @@
 // nada) y recibe mensajes EN VIVO por Supabase Realtime (postgres_changes). Las
 // mutaciones escriben write-through (optimista + insert; el eco de Realtime se
 // deduplica por id). Sin backend, opera sobre el mock. El hook useChat no cambia.
-import type { Conversation, Message } from '../types'
+import type { Adjunto, Conversation, Message } from '../types'
+import type { Json } from '../database.types'
 import { CURRENT_USER as MOCK_ME, MOCK_CONVERSATIONS, MOCK_MESSAGES } from '../mock/chat'
 import { isStaffUser } from '../mock/users'
 import { getSnapshot as directorySnapshot, subscribe as directorySubscribe } from './directoryStore'
@@ -12,6 +13,7 @@ import { alCambiarSesion } from '../../lib/sesion'
 import { notify } from './notificationsStore'
 import { CHAT_SCREEN } from '../../app/roles'
 import { mensajeDeError, reportarFallo } from './escritura'
+import { BUCKET_EQUIPO, claseDe, etiquetaAdjunto, problemaArchivo, rutaAdjunto, tipoDe } from '../ops/adjuntosEquipo'
 
 const uuid = (): string => (globalThis.crypto?.randomUUID?.() ?? `c-${Math.random().toString(16).slice(2)}`)
 const isUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)
@@ -90,7 +92,7 @@ async function hydrate() {
     // Se piden los MÁS RECIENTES (descendente + tope) y se reordenan abajo. Antes iba
     // ascendente y sin tope: al pasar de 1,000 mensajes PostgREST habría devuelto los más
     // VIEJOS, y los mensajes nuevos habrían desaparecido del chat al recargar.
-    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, created_at')
+    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, adjunto, created_at')
       .order('created_at', { ascending: false }).order('id').limit(MENSAJES_RECIENTES),
   ])
   if (ce || me2) { console.warn('[chat] hydrate', ce?.message ?? me2?.message); return }
@@ -175,6 +177,40 @@ export function sendMessage(conversationId: string, body: string) {
   }
 }
 
+// EQUIPO-ADJUNTOS · manda un archivo (con texto opcional). Primero se SUBE al bucket privado (la base solo deja subir
+// a quien puede leer la conversación, en su carpeta) y después se guarda el mensaje que lo adjunta. Mientras sube, el
+// mensaje se ve con "Subiendo…"; si algo falla, se quita y se dice por qué. Devuelve el problema o null.
+export async function sendAttachment(conversationId: string, file: File, texto = ''): Promise<string | null> {
+  const problema = problemaArchivo(file)
+  if (problema) return problema
+  const tipo = tipoDe(file.name, file.type)
+  const clase = claseDe(tipo) as Adjunto['clase']
+  const senderId = hasSupabase ? (currentUserId() ?? CURRENT_USER.id) : CURRENT_USER.id
+  seq += 1
+  const id = hasSupabase ? uuid() : `m-${seq}`
+  const body = texto.trim()
+  const path = hasSupabase ? rutaAdjunto(conversationId, senderId, id, file.name) : URL.createObjectURL(file)
+  const adjunto: Adjunto = { path, nombre: file.name.slice(0, 200), tipo, tamano: file.size, clase }
+  const now = new Date().toISOString()
+  const msg: Message = { id, conversation_id: conversationId, sender_id: senderId, sender_name: CURRENT_USER.name, body, adjunto, created_at: now, subiendo: hasSupabase }
+  messages = { ...messages, [conversationId]: [...(messages[conversationId] ?? []), msg] }
+  conversations = conversations.map((c) => (c.id === conversationId ? { ...c, last_message_at: now } : c))
+  emit()
+  if (!hasSupabase) return null
+  const quitar = () => { messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((x) => x.id !== id) }; emit() }
+  const up = await supabase.storage.from(BUCKET_EQUIPO).upload(path, file, { contentType: tipo, upsert: false })
+  if (up.error) { quitar(); return `No se pudo subir «${file.name}»: ${mensajeDeError(up.error)}` }
+  const { error } = await supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, sender_name: CURRENT_USER.name, body, adjunto: adjunto as unknown as Json })
+  if (error) {
+    quitar(); void supabase.storage.from(BUCKET_EQUIPO).remove([path])
+    return `No se pudo mandar «${file.name}»: ${mensajeDeError(error)}`
+  }
+  messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).map((x) => (x.id === id ? { ...x, subiendo: false } : x)) }
+  emit()
+  notifyMembers(conversationId, senderId, body || etiquetaAdjunto(adjunto))
+  return null
+}
+
 // Avisa a los DEMÁS miembros de la conversación que hay mensaje nuevo.
 // - Dirigido a personas (no a roles): un directo queda entre sus participantes.
 // - Nunca se avisa a quien escribió.
@@ -229,10 +265,15 @@ export function ensureDirect(user: { id: string; name: string }): string | null 
 // Borra un mensaje (el RLS permite el propio; admin cualquiera). Revierte si falla.
 export function deleteMessage(conversationId: string, messageId: string) {
   const prev = messages[conversationId] ?? []
+  const archivo = prev.find((m) => m.id === messageId)?.adjunto?.path
   messages = { ...messages, [conversationId]: prev.filter((m) => m.id !== messageId) }
   emit()
   if (hasSupabase && isUuid(messageId)) supabase.from('messages').delete().eq('id', messageId)
-    .then(({ error }) => { if (error) { reportarFallo('borrar el mensaje', mensajeDeError(error)); messages = { ...messages, [conversationId]: prev }; emit() } })
+    .then(({ error }) => {
+      if (error) { reportarFallo('borrar el mensaje', mensajeDeError(error)); messages = { ...messages, [conversationId]: prev }; emit(); return }
+      // Con el mensaje se va su archivo (la base solo deja borrarlo a quien lo subió o a Dirección).
+      if (archivo) void supabase.storage.from(BUCKET_EQUIPO).remove([archivo])
+    })
 }
 
 // Borra una conversación completa (DM: cualquier miembro; grupo: solo admin).

@@ -1,9 +1,9 @@
 // CHAT interno (hub) — con el mismo lenguaje visual del chat de mensajería (piel rc-chat--wa): lista de chats con
 // foto, adelanto, hora y no leídos; hilo con encabezado verde, separadores de día, burbujas con cola, hora dentro de
 // la burbuja y nombre del autor en los grupos. En escritorio lista y hilo van lado a lado; en teléfono, uno a la vez.
-// Solo staff (grupos por área + directos).
+// Solo staff (grupos por área + directos). EQUIPO-ADJUNTOS (3 nov 2026): imágenes, videos y documentos con el clip.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2, CheckCheck } from 'lucide-react'
+import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2, CheckCheck, Paperclip, FileText, Download, Loader2 } from 'lucide-react'
 import { UserAvatar } from '../../app/UserAvatar'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
@@ -11,7 +11,8 @@ import { useRole } from '../../auth/RoleContext'
 import { useIntento, consumirIntento } from '../../data/store/navIntentStore'
 import { conEnlaces } from '../chat/ChatCanonico'
 import { cuandoLista, diaDe, horaDe } from '../../lib/cuando'
-import type { Conversation, Message } from '../../data/types'
+import type { Adjunto, Conversation, Message } from '../../data/types'
+import { ACEPTA, etiquetaAdjunto, pesoLegible, urlAdjunto } from '../../data/ops/adjuntosEquipo'
 
 // Color estable por persona para su nombre dentro de un grupo (como en un mensajero).
 const COLORES_AUTOR = ['#0b7a3e', '#1f6fb2', '#a0522d', '#7b3fa0', '#b8860b', '#c2185b', '#00838f']
@@ -24,7 +25,7 @@ const leerLeido = (uid: string): Record<string, string> => { try { return JSON.p
 const guardarLeido = (uid: string, m: Record<string, string>) => { try { localStorage.setItem(claveLeido(uid), JSON.stringify(m)) } catch { /* sin almacenamiento: no pasa nada */ } }
 
 export function Chat() {
-  const { conversations, messagesByConv, send, ensureDirect, deleteMessage, deleteConversation, me } = useChat()
+  const { conversations, messagesByConv, send, sendAttachment, ensureDirect, deleteMessage, deleteConversation, me } = useChat()
   const { data: directory } = useUsers({ staffOnly: true })
   const { user } = useRole()
   const porId = useMemo(() => {
@@ -82,6 +83,22 @@ export function Chat() {
     setText('')
   }
 
+  // Adjuntar: uno o varios archivos; el texto escrito va como pie del primero.
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [errorAdjunto, setErrorAdjunto] = useState<string | null>(null)
+  const adjuntar = async (files: FileList | null) => {
+    if (!conv || !files || files.length === 0) return
+    setErrorAdjunto(null)
+    const pie = text; setText('')
+    const errores: string[] = []
+    for (const [i, f] of Array.from(files).entries()) {
+      const e = await sendAttachment(conv.id, f, i === 0 ? pie : '')
+      if (e) errores.push(e)
+    }
+    if (errores.length) setErrorAdjunto(errores.join(' '))
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   const lista = conversations.filter((c) => !buscar.trim() || tituloDe(c).toLowerCase().includes(buscar.trim().toLowerCase()))
 
   // Hilo: separador por día y "inicio" de racha (cola de la burbuja + nombre del autor en grupos).
@@ -133,7 +150,7 @@ export function Chat() {
                   </span>
                   <span className="tc-row-bottom">
                     <span className="tc-row-adelanto">
-                      {last ? <>{last.sender_id === me.id && <CheckCheck size={15} className="tc-row-tick" aria-label="Tú" />}{autorLast}{last.body}</> : <i>Sin mensajes</i>}
+                      {last ? <>{last.sender_id === me.id && <CheckCheck size={15} className="tc-row-tick" aria-label="Tú" />}{autorLast}{last.body || etiquetaAdjunto(last.adjunto)}</> : <i>Sin mensajes</i>}
                     </span>
                     {n > 0 && <span className="tc-badge" aria-label={`${n} sin leer`}>{n > 99 ? '99+' : n}</span>}
                   </span>
@@ -172,7 +189,10 @@ export function Chat() {
               {hilo}
               <div ref={endRef} />
             </div>
+            {errorAdjunto && <div className="tc-adj-error" role="alert" data-testid="adjunto-error">{errorAdjunto}<button type="button" className="rc-ico" aria-label="Cerrar" onClick={() => setErrorAdjunto(null)}><X size={14} /></button></div>}
             <div className="rc-composer">
+              <input ref={fileRef} type="file" accept={ACEPTA} multiple hidden onChange={(e) => void adjuntar(e.target.files)} data-testid="adjunto-input" />
+              <button className="rc-ico tc-clip" type="button" onClick={() => fileRef.current?.click()} aria-label="Adjuntar imagen, video o documento" title="Adjuntar imagen, video o documento"><Paperclip size={19} /></button>
               <textarea
                 ref={inputRef} className="rc-input" rows={1}
                 value={text}
@@ -209,13 +229,46 @@ function Burbuja({ m, mine, inicio, grupo, nombre, onDelete }: { m: Message; min
       {/* tabIndex: en táctil, tocar la burbuja propia muestra el botón de borrar (no hay hover). */}
       <div className="rc-bubble-wrap" tabIndex={mine ? 0 : undefined}>
         {inicio && grupo && !mine && <div className="rc-meta" style={{ color: colorAutor(m.sender_id) }}>{nombre}</div>}
-        <div className="rc-bubble">{conEnlaces(m.body)}</div>
+        {m.adjunto && <AdjuntoVista a={m.adjunto} subiendo={!!m.subiendo} />}
+        {m.body && <div className="rc-bubble">{conEnlaces(m.body)}</div>}
         <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{mine && <CheckCheck className="rc-tick" size={15} aria-label="Enviado" />}</time>
         {mine && (
           <button type="button" className="tc-del" title="Eliminar mensaje" aria-label="Eliminar mensaje" onClick={onDelete}><Trash2 size={13} /></button>
         )}
       </div>
     </div>
+  )
+}
+
+// Imagen (toca para verla completa), video con reproductor o tarjeta del documento para abrir/descargar. El enlace es
+// firmado y temporal: el archivo nunca queda público.
+function AdjuntoVista({ a, subiendo }: { a: Adjunto; subiendo: boolean }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [fallo, setFallo] = useState(false)
+  useEffect(() => {
+    if (subiendo) return
+    let vivo = true
+    void urlAdjunto(a.path).then((u) => { if (vivo) { setUrl(u); setFallo(!u) } })
+    return () => { vivo = false }
+  }, [a.path, subiendo])
+  if (subiendo) return <div className="tc-adj tc-adj--doc" data-testid="adjunto-subiendo"><Loader2 size={18} className="spin" aria-hidden /><span className="tc-adj-nombre">Subiendo {a.nombre}…</span></div>
+  if (fallo) return <div className="tc-adj tc-adj--doc"><FileText size={18} aria-hidden /><span className="tc-adj-nombre">{a.nombre} · no disponible</span></div>
+  if (a.clase === 'imagen') return (
+    <a className="tc-adj tc-adj--img" href={url ?? undefined} target="_blank" rel="noreferrer" data-testid="adjunto-imagen">
+      {url ? <img src={url} alt={a.nombre} loading="lazy" /> : <span className="tc-adj-cargando" />}
+    </a>
+  )
+  if (a.clase === 'video') return (
+    <div className="tc-adj tc-adj--video" data-testid="adjunto-video">
+      {url ? <video src={url} controls preload="metadata" playsInline /> : <span className="tc-adj-cargando" />}
+    </div>
+  )
+  return (
+    <a className="tc-adj tc-adj--doc" href={url ?? undefined} target="_blank" rel="noreferrer" download={a.nombre} data-testid="adjunto-documento">
+      <FileText size={22} aria-hidden />
+      <span className="tc-adj-meta"><span className="tc-adj-nombre">{a.nombre}</span><small>{[a.nombre.split('.').pop()?.toUpperCase(), pesoLegible(a.tamano)].filter(Boolean).join(' · ')}</small></span>
+      <Download size={17} aria-hidden />
+    </a>
   )
 }
 

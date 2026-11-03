@@ -2,7 +2,7 @@
 // auth.uid() (o el id mock) y nombre = el del usuario logueado. Así los mensajes
 // distinguen bien remitente/lado y se firman con el nombre correcto.
 import { useSyncExternalStore, useEffect } from 'react'
-import { subscribe, getConversations, getMessages, sendMessage, ensureDirect, deleteMessage, deleteConversation, setCurrentUser, CURRENT_USER } from '../store/chatStore'
+import { subscribe, getConversations, getMessages, sendMessage, sendAttachment, ensureDirect, deleteMessage, deleteConversation, setCurrentUser, CURRENT_USER } from '../store/chatStore'
 import { useRole } from '../../auth/RoleContext'
 import { currentUserId } from '../../lib/supabase'
 
@@ -17,5 +17,5 @@ export function useChat() {
 
   const conversations = useSyncExternalStore(subscribe, getConversations, getConversations)
   const messagesByConv = useSyncExternalStore(subscribe, getMessages, getMessages)
-  return { conversations, messagesByConv, send: sendMessage, ensureDirect, deleteMessage, deleteConversation, me: { id: meId, name: meName } }
+  return { conversations, messagesByConv, send: sendMessage, sendAttachment, ensureDirect, deleteMessage, deleteConversation, me: { id: meId, name: meName } }
 }

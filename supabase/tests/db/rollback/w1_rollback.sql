@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
+\ir ../../../rollback/equipo_adjuntos/99_down.sql   -- EQUIPO-ADJUNTOS (20270323) parcha el aviso del chat del equipo: se baja antes
 \ir ../../../rollback/compradores_promo/99_down.sql   -- COMPRADORES-PROMO (20270322) reescribe los comandos del bloque A: se baja antes
 \ir ../../../rollback/crm_embudo/99_down.sql   -- CRM (20270321) cuelga de cotizaciones, conversaciones y pedidos: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
