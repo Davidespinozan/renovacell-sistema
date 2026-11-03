@@ -7,7 +7,9 @@ import { fechaCorta, horariosEntregaDisponibles, type DiaHorarios, type HorarioE
 
 const DIA_CORTO = ['', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
 
-export function HorarioEntregaPicker({ value, onChange, cargar = horariosEntregaDisponibles, compacto = false, excluir }: {
+export function HorarioEntregaPicker({ value, onChange, cargar = horariosEntregaDisponibles, compacto = false, excluir, desde = null }: {
+  /** SALIDA PROGRAMADA · días a partir de esta fecha de salida (AAAA-MM-DD). */
+  desde?: string | null
   value: HorarioElegido | null
   onChange: (h: HorarioElegido | null) => void
   cargar?: typeof horariosEntregaDisponibles
@@ -23,7 +25,7 @@ export function HorarioEntregaPicker({ value, onChange, cargar = horariosEntrega
   useEffect(() => { vivo.current = true; return () => { vivo.current = false } }, [])
 
   const recargar = async () => {
-    const r = await cargar()
+    const r = await cargar(desde)
     if (!vivo.current) return
     if (!r.ok) { setError(r.error); setData(null); return }
     setError(null); setData(r.data)
@@ -40,7 +42,7 @@ export function HorarioEntregaPicker({ value, onChange, cargar = horariosEntrega
       if (!s || !s.disponible) onChange(null)
     }
   }
-  useEffect(() => { void recargar() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void recargar() }, [desde])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return <div role="alert" className="ms" style={{ color: 'var(--danger)' }} data-testid="horario-error">No se pudieron cargar los horarios de entrega: {error}</div>
   if (!data) return <div className="ms" style={{ color: 'var(--ink-3)' }} data-testid="horario-cargando">Buscando horarios de entrega…</div>

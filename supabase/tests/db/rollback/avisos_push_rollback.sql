@@ -1,5 +1,6 @@
 -- AVISOS PUSH (160) · el down retira tabla y comandos sin tocar nada más; se reaplica igual.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 \ir ../../../rollback/push_estado/99_down.sql   -- PUSH SIEMPRE (20270221) lee la tabla de avisos: se baja antes de la foto inicial

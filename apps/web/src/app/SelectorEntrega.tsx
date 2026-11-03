@@ -3,13 +3,14 @@
 // (o regalarlo), lo escribe con su motivo. Nunca se inventa una fecha: todo viene de entrega_opciones.
 import React, { useEffect, useRef, useState } from 'react'
 import { money } from '../lib/format'
-import { MOTIVO_ENTREGA, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega, type ServicioElegido } from '../data/ops/entrega'
+import { MOTIVO_ENTREGA, fechaCorta, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega, type ServicioElegido } from '../data/ops/entrega'
 import { HorarioEntregaPicker } from './HorarioEntregaPicker'
 import { AvisoEnvioGratisVista } from './AvisoEnvioGratis'
 import { ServicioPaqueteria } from './ServicioPaqueteria'
+import { diasEntre, sumarDias } from '../data/periodo'   // SALIDA PROGRAMADA · fechas del negocio
 
 /** ENT-H · el horario elegido viaja solo cuando existe (sin la llave en null). */
-const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido; servicio?: ServicioElegido } => ({ ...(v?.horario ? { horario: v.horario } : {}), ...(v?.servicio ? { servicio: v.servicio } : {}) })   // ENTREGA-SERVICIO · el servicio elegido también se conserva
+const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido; servicio?: ServicioElegido; salida_programada?: string } => ({ ...(v?.horario ? { horario: v.horario } : {}), ...(v?.servicio ? { servicio: v.servicio } : {}), ...(v?.salida_programada ? { salida_programada: v.salida_programada } : {}) })   // SALIDA PROGRAMADA · también se conserva   // ENTREGA-SERVICIO · el servicio elegido también se conserva
 
 export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios, piezas = 0, destino, cargarServicios }: {
   subtotal: number
@@ -125,7 +126,7 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
       )}
       {sel && sel.tipo === 'foraneo' && sel.paqueteria === 'dhl' && piezas > 0 && cp && (
         <div style={{ marginTop: 10 }} data-testid="entrega-servicio">
-          <ServicioPaqueteria cp={cp} piezas={piezas} fleteRegla={sel.flete} destino={destino} hoy={hoy} cargar={cargarServicios}
+          <ServicioPaqueteria cp={cp} piezas={piezas} fleteRegla={sel.flete} destino={destino} hoy={hoy} cargar={cargarServicios} corrimientoDias={value?.salida_programada ? diasEntre(sel.salida, value.salida_programada) : 0}
             value={value?.servicio ?? null}
             onChange={(sv) => { const { servicio: _s, ...resto } = value ?? { opcion: sel.id }; void _s; onChange({ ...resto, opcion: sel.id, ...(sv ? { servicio: sv } : {}) }, ops) }} />
         </div>
@@ -133,7 +134,23 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
       {sel && necesitaHorario && (
         <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (value?.horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="entrega-horario">
           <div className="eyebrow" style={{ margin: '0 0 8px' }}>Horario de entrega {!value?.horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige uno para continuar</span>}</div>
-          <HorarioEntregaPicker value={value?.horario ?? null} onChange={elegirHorario} cargar={cargarHorarios} compacto />
+          <HorarioEntregaPicker value={value?.horario ?? null} onChange={elegirHorario} cargar={cargarHorarios} compacto desde={value?.salida_programada ?? null} />
+        </div>
+      )}
+      {sel && sel.tipo !== 'mostrador' && (
+        <div style={{ marginTop: 10, padding: '8px 10px', border: '1px solid ' + (value?.salida_programada ? 'var(--green-deep)' : 'var(--line)'), borderRadius: 10, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="entrega-programar">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="checkbox" checked={!!value?.salida_programada} data-testid="entrega-programar-activar"
+              onChange={(e) => { const { salida_programada: _p, horario: _h, ...resto } = value ?? { opcion: sel.id }; void _p; void _h; onChange(e.target.checked ? { ...resto, opcion: sel.id, salida_programada: sumarDias(sel.salida, 7) } : { ...resto, opcion: sel.id }, ops) }} />
+            Agendar la salida para otra fecha
+          </label>
+          {value?.salida_programada && (
+            <>
+              <input type="date" value={value.salida_programada} min={sel.salida} max={sumarDias(ops.corte.hoy, 90)} data-testid="entrega-programar-fecha"
+                onChange={(e) => { if (!e.target.value) return; const { horario: _h, ...resto } = value; void _h; onChange({ ...resto, opcion: sel.id, salida_programada: e.target.value }, ops) }} />
+              <span style={{ color: 'var(--ink-3)' }}>Sale el {fechaCorta(value.salida_programada)} · Almacén lo prepara un día antes. Si ese día no hay salida, el sistema te dice la siguiente.</span>
+            </>
+          )}
         </div>
       )}
       {sel && (

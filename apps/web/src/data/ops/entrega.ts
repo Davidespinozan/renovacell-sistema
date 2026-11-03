@@ -28,9 +28,11 @@ export interface EntregaPedido {
   reprogramado?: { anterior?: HorarioEntrega | null; motivo: string; at: string } | null
   /** ENTREGA-SERVICIO · el servicio de paquetería elegido al vender, con su fecha exacta. */
   servicio?: ServicioPedido | null
+  /** SALIDA PROGRAMADA · la salida la agendó el personal (no es la del día). */
+  programada?: boolean
 }
 /** Lo que manda quien pide: la opción, el horario (entrega local) y, SOLO el personal, un flete distinto con su motivo. */
-export interface EleccionEntregaServidor { opcion: string; flete?: number; motivo?: string; horario?: HorarioElegido | null; servicio?: ServicioElegido | null }
+export interface EleccionEntregaServidor { opcion: string; flete?: number; motivo?: string; horario?: HorarioElegido | null; servicio?: ServicioElegido | null; salida_programada?: string | null }   // SALIDA PROGRAMADA · AAAA-MM-DD, solo personal
 
 // ═══ ENTREGA-SERVICIO (2 nov 2026) · el cliente o su vendedor eligen el SERVICIO de la paquetería al vender, con su fecha
 // exacta de entrega; Almacén solo genera la guía de ese servicio. Precio: la regla de siempre + la diferencia contra el
@@ -245,9 +247,12 @@ export async function opcionesEntrega(actor: 'doctor' | 'staff', subtotal: numbe
 }
 
 /** ENT-H · Horarios de entrega local para elegir (doctor y personal). El servidor decide qué día y qué horas se ofrecen. */
-export async function horariosEntregaDisponibles(): Promise<{ ok: true; data: HorariosDisponibles } | { ok: false; error: string }> {
+/** `desde` (AAAA-MM-DD): SALIDA PROGRAMADA · los horarios a partir de esa fecha de salida (si no, desde hoy). */
+export async function horariosEntregaDisponibles(desde?: string | null): Promise<{ ok: true; data: HorariosDisponibles } | { ok: false; error: string }> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
-  const { data, error } = await supabase.rpc('entrega_horarios_disponibles')
+  const { data, error } = desde && /^\d{4}-\d{2}-\d{2}$/.test(desde)
+    ? await supabase.rpc('entrega_horarios_disponibles', { p_ahora: `${desde}T08:00:00-07:00` } as never)
+    : await supabase.rpc('entrega_horarios_disponibles')
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data as unknown as HorariosDisponibles }
 }
@@ -298,4 +303,22 @@ export async function guardarConfigEntrega(d: Partial<EntregaConfig>): Promise<R
   const { data, error } = await supabase.rpc('entrega_config_guardar', { p: d as never })
   if (error) return { ok: false, error: /NO_AUTORIZADO/.test(error.message) ? 'Solo Dirección cambia la regla de entrega.' : /ck_entcfg_cp_rango/.test(error.message) ? 'El C.P. "hasta" debe ser mayor o igual que el "desde".' : /ck_entcfg_franjas/.test(error.message) ? 'Revisa los bloques de entrega: horas HH:MM y cada bloque debe terminar después de empezar.' : /ck_entcfg_(cupo|intervalo|margen|dias_adelante)/.test(error.message) ? 'Revisa los horarios de entrega: cupo 1–20, intervalo 10–120 min, margen 0–480 min, 1–30 días.' : /check constraint|invalid input/.test(error.message) ? 'Revisa los valores: montos de 0 en adelante, C.P. de 5 dígitos, tránsito de 0 a 30 días.' : error.message }
   return { ok: true, data: data as unknown as EntregaConfig }
+}
+
+// ═══ SALIDA PROGRAMADA (2 nov 2026) · el personal agenda o mueve la salida de un pedido ya hecho (antes de empacarlo).
+export async function programarSalida(orderId: string, fecha: string, horario: HorarioElegido | null, motivo: string): Promise<{ ok: true; entrega: EntregaPedido } | { ok: false; error: string }> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  const { data, error } = await supabase.rpc('entrega_salida_programar' as never, { p_order: orderId, p_salida: fecha, p_horario: horario, p_motivo: motivo } as never)
+  if (error) return { ok: false, error: mensajeSalida(error.message) }
+  return { ok: true, entrega: (data as unknown as { entrega: EntregaPedido }).entrega }
+}
+export function mensajeSalida(msg: string): string {
+  const quitar = (m: string) => m.replace(/^[A-Z_]+:\s*/, '')
+  if (/MOTIVO_REQUERIDO|SALIDA_DIA_NO_VALIDO|SALIDA_ANTES_DE_TIEMPO|SALIDA_LEJANA|PEDIDO_EN_CAMINO|HORARIO_|SALIDA_NO_APLICA/.test(msg)) return quitar(msg)
+  if (/NO_AUTORIZADO/.test(msg)) return 'Ese pedido es de otro vendedor.'
+  return msg
+}
+/** ¿El pedido está agendado para salir después de mañana? Entonces Almacén aún no lo prepara (le aparece un día antes). */
+export function esperaSalida(e: Pick<EntregaPedido, 'salida'> & Partial<Pick<EntregaPedido, 'programada'>> | null | undefined, manana: string): boolean {
+  return !!e?.programada && !!e.salida && e.salida > manana
 }

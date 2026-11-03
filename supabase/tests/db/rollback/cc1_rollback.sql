@@ -1,5 +1,6 @@
 -- CC-1 · El rollback retira el dominio de visitante y devuelve el dedupe a CC-0B.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/cliente_de_conversacion/99_down.sql   -- CLIENTE-CONV (20270316) parcha pedidos/comprobante/seguimientos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/link_pago/99_down.sql   -- LINK DE PAGO (20270309) redefine el push de avisos y usa helpers de pedido por WhatsApp: se baja antes

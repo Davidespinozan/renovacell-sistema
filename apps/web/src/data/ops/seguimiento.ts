@@ -2,6 +2,8 @@
 // "atorado" y "pendiente de surtir": lo usan Seguimiento, Almacén y el Tablero.
 import type { Shipment } from '../types'
 import type { OrderWithItems } from '../store/ordersStore'
+import { entregaDelPedido, esperaSalida } from './entrega'
+import { hoyNegocio, sumarDias } from '../periodo'
 
 // Recoge en sucursal: Empaque lo marca "listo para recoger" (pedido enviado SIN envío) y se cierra cuando el cliente
 // pasa por él. No es un envío atorado ni "en camino".
@@ -30,7 +32,8 @@ export interface Diagnosis {
 // solo lo libera. Sin libro de dinero (demo) se cae a lo único observable: payment_status.
 export const isSurtible = (o: OrderWithItems, dinero?: { liberado: boolean } | null): boolean =>
   (dinero ? dinero.liberado : o.payment_status === 'paid') &&
-  !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
+  !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '') &&
+  !esperaSalida(entregaDelPedido(o.shipping_meta), sumarDias(hoyNegocio(), 1))   // SALIDA PROGRAMADA · se prepara un día antes
 
 // Diagnóstico de un envío en curso: detecta atorados (vencido o surtido sin salir).
 export function diagnoseShipment(order: OrderWithItems, shipment: Shipment | undefined): Diagnosis {

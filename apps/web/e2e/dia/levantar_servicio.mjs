@@ -17,6 +17,11 @@ try {
   await p.evaluate(() => { const r = [...document.querySelectorAll('.modal input[type=radio]')].find((x) => /Av\. del Mar/.test(x.closest('label')?.innerText ?? '')); r?.click() }); await sleep(2500)
   await p.waitForSelector('[data-testid=servicio-paqueteria]', { timeout: 12000 }).catch(() => console.log('sin selector de servicio'))
   await p.click('[data-testid=servicio-1] input').catch(() => console.log('sin servicio 1')); await sleep(1200)
+  if (process.env.PROGRAMAR) {   // SALIDA PROGRAMADA · agendar para otra fecha
+    await p.click('[data-testid=entrega-programar-activar]'); await sleep(500)
+    await p.evaluate((f) => { const i = document.querySelector('[data-testid=entrega-programar-fecha]'); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; s.call(i, f); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })) }, process.env.PROGRAMAR); await sleep(1500)
+    console.log('agenda:', await p.evaluate(() => document.querySelector('[data-testid=entrega-programar]')?.innerText.replace(/\n+/g, ' | ')))
+  }
   const m = await modal(); const i = m.indexOf('Entrega'); console.log('pedido:', m.slice(Math.max(0, i - 50), i + 900))
   await p.screenshot({ path: '/tmp/claude-501/shots/np1.png' })
   await clic(p, '^Crear pedido|^Levantar pedido|^Confirmar pedido'); await sleep(5000)

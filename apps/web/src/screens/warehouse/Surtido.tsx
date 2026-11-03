@@ -12,6 +12,9 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { planSurtido, canFulfill, surtirPedido, mapaEnCustodia, type ItemPlan } from '../../data/ops/surtir'
 import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
+import { entregaDelPedido, esperaSalida, fechaCorta } from '../../data/ops/entrega'
+import { hoyNegocio, sumarDias } from '../../data/periodo'
+import { ProgramarSalida } from '../../app/ProgramarSalida'
 import { useOrderMoney } from '../../data/hooks/useMoney'
 import { creditoAbierto, creditoVencido } from '../../data/ops/moneyView'
 import { statusView } from '../doctor/orderStatus'
@@ -34,6 +37,10 @@ export function Surtido() {
   }, [products])
 
   const pending = orders.filter((o) => isSurtible(o, byOrder[o.id]))
+  // SALIDA PROGRAMADA · pagados que salen después de mañana: aún no se preparan (aparecen aquí un día antes).
+  const manana = sumarDias(hoyNegocio(), 1)
+  const programados = orders.filter((o) => (byOrder[o.id]?.liberado ?? o.payment_status === 'paid') && !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
+    && esperaSalida(entregaDelPedido(o.shipping_meta), manana)).sort((a, b) => (entregaDelPedido(a.shipping_meta)?.salida ?? '') < (entregaDelPedido(b.shipping_meta)?.salida ?? '') ? -1 : 1)
 
   // ¿Cada pedido pendiente se puede surtir por COMPLETO con el stock actual? Solo
   // esos entran al surtido en lote (los que no, se abren uno a uno para ver el detalle).
@@ -161,6 +168,23 @@ export function Surtido() {
             )
           })}
         </>
+      )}
+
+      {programados.length > 0 && (
+        <div className="card" data-testid="surtido-programados">
+          <div className="eyebrow" style={{ margin: '0 0 8px' }}>Agendados para salir más adelante ({programados.length})</div>
+          {programados.map((o) => {
+            const e = entregaDelPedido(o.shipping_meta)
+            return (
+              <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--line)', fontSize: 13 }} data-testid="surtido-programado">
+                <span className="mono">{o.external_ref}</span>
+                <span style={{ flex: 1, color: 'var(--ink-3)' }}>{o.items.reduce((n, it) => n + it.qty, 0)} pzas · se prepara el {fechaCorta(sumarDias(e?.salida ?? manana, -1))}</span>
+                <b>Sale el {fechaCorta(e?.salida)}</b>
+                <ProgramarSalida orderId={o.id} folio={o.external_ref} entrega={e} />
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {active && <SurtirModal order={active} productsById={byId} onClose={() => setActive(null)} />}

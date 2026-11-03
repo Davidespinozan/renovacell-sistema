@@ -2,6 +2,7 @@
 -- (misma huella, dueño, permisos y forma), elimina las auxiliares y no toca datos. Revertir REABRE los dos hallazgos
 -- (se demuestra abajo). Después se vuelve a aplicar la 146 sobre el estado revertido y queda igual que antes.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _f2 as select (select count(*) from public.orders) n_o, (select count(*) from public.fiscal_documents) n_f, (select count(*) from public.customer_fiscal_profiles) n_p,

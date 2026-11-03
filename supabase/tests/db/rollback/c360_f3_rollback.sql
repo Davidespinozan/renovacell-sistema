@@ -1,6 +1,7 @@
 -- C360-F3 · El rollback devuelve EXACTAMENTE las funciones de 120, la firma de 4 argumentos del checkout y las
 -- escrituras directas a doctor_locations; retira tablas, columnas y comandos nuevos.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
 \ir ../../../rollback/entrega_paridad/99_down.sql   -- ENT-P se baja antes que ENT-H (redefine _entrega_normalizar)

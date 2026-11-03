@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/importar_lote_fecha/99_down.sql   -- IMPORTAR-LOTE-FECHA (20270319) parcha importar_lote: se baja antes
 \ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes

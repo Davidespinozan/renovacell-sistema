@@ -1,5 +1,6 @@
 -- COTIZACIONES (20270209) · el down retira tabla y comandos y devuelve la lista de plantillas; se reaplica idéntica.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 \ir ../../../rollback/difusiones/99_down.sql   -- DIFUSIONES (20270217) amplía la lista de plantillas del buzón: se baja antes de la foto inicial

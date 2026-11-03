@@ -3,6 +3,7 @@
 // redactor ofrece lo que se puede hacer (vincular, darla de alta verificada, mandarle su acceso, cotizar, levantar pedido,
 // registrar su pago, mandarle el recibo) y cada acción abre su hoja sobre el redactor con el hilo a la vista. Las fotos del
 // hilo alimentan las hojas («Usar como INE» → alta, «Usar como comprobante» → pago). Todo lo decide el servidor.
+import { ProgramarSalida } from '../../app/ProgramarSalida'   // SALIDA PROGRAMADA
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link2, Search, UserCheck, KeyRound, UserPlus, IdCard, FileText, ShoppingBag, Banknote, Receipt, Contact, Send } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
@@ -458,6 +459,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
                 <span className="pc-cot-acc">
                   {p.saldo > 0 && !p.en_revision && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => abrirPago(p)} data-testid="pc-reportar-pago">Registrar pago</button>}
                   {p.ultimo_pago && chat && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void mandarRecibo(p)}>Mandar recibo</button>}
+                  {['draft', 'pending_payment', 'paid', 'picking'].includes(p.estado) && <ProgramarSalida orderId={p.id} folio={p.folio} entrega={p.entrega ?? null} onListo={() => void cargarPedidos()} />}
                 </span>
               </div>
             )

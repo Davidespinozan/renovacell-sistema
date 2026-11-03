@@ -1,6 +1,7 @@
 -- SEC-C2b (142) · el down restaura estado_custodia y vender_pos EXACTAMENTE como en producción antes de la 142 (misma huella,
 -- dueño, permisos y forma); SEC-C2 (141), políticas y datos intactos. Revertir REABRE el P1 (se demuestra abajo).
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial

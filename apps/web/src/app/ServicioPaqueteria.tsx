@@ -3,9 +3,17 @@
 // cliente quiere que llegue antes, paga solo la diferencia. Si la paquetería no responde se vende con la regla de siempre.
 import React, { useEffect, useRef, useState } from 'react'
 import { money } from '../lib/format'
+import { sumarDias } from '../data/periodo'
 import { cotizarEnvio, fleteTexto, llegadaServicio, precioServicio, type CotizacionEnvio, type ServicioElegido } from '../data/ops/entrega'
 
-export function ServicioPaqueteria({ cp, piezas, fleteRegla, value, onChange, destino, hoy, cargar = cotizarEnvio }: {
+const correr = (s: { llega_fecha: string; llega_at?: string }, n: number) => {
+  const f = sumarDias(s.llega_fecha.slice(0, 10), n)
+  return { llega_fecha: f, ...(s.llega_at ? { llega_at: f + s.llega_at.slice(10) } : {}) }
+}
+
+export function ServicioPaqueteria({ cp, piezas, fleteRegla, value, onChange, destino, hoy, cargar = cotizarEnvio, corrimientoDias = 0 }: {
+  /** SALIDA PROGRAMADA · la cotización es para salir hoy: las fechas se corren estos días. */
+  corrimientoDias?: number
   cp: string | null
   piezas: number
   /** El flete de la opción según la regla (gratis desde el mínimo, si no el costo fijo). */
@@ -64,7 +72,7 @@ export function ServicioPaqueteria({ cp, piezas, fleteRegla, value, onChange, de
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid ' + (on ? 'var(--green-deep)' : 'var(--line)'), borderRadius: 10, background: on ? 'var(--ok-bg, #EAF4EC)' : '#fff', cursor: 'pointer' }}>
             <input type="radio" name="servicio-paqueteria" checked={on} onChange={() => onChange({ cotizacion_id: cot.cotizacion_id, codigo: s.codigo, diferencia: s.diferencia }, cot)} />
             <span style={{ flex: 1 }}>
-              <b style={{ display: 'block', fontSize: 13 }}>Llega el {llegadaServicio(s, hoy)}</b>
+              <b style={{ display: 'block', fontSize: 13 }}>Llega el {llegadaServicio(corrimientoDias ? correr(s, corrimientoDias) : s, hoy)}</b>
               <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{s.nombre}{s.diferencia > 0 ? ` · ${money(s.diferencia)} más por llegar antes` : ''}</span>
             </span>
             <span className="mono" style={{ fontWeight: 600, fontSize: 13, color: precio ? 'var(--ink-2)' : 'var(--green-deep)' }}>{fleteTexto(precio, money)}</span>

@@ -9,6 +9,7 @@ export interface PedidoCliente {
   id: string; folio: string | null; fecha: string; total: number; estado: string
   saldo: number; cobrado: number; estado_pago: string | null; en_revision: boolean
   ultimo_pago: { monto: number; fecha: string; metodo: string } | null
+  entrega?: import('./entrega').EntregaPedido | null   // SALIDA PROGRAMADA
 }
 export type Res<T> = { ok: true; data: T } | { ok: false; mensaje: string }
 

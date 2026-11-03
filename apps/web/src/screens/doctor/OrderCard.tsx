@@ -157,7 +157,7 @@ function EntregaLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
   if (!e) return m?.channel === 'pos' ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega"><b style={{ color: 'var(--ink-2)' }}>Entrega en mostrador</b></div> : null
   return (
     <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega">
-      <b style={{ color: 'var(--ink-2)' }}>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}</b> · {promesaDe(e)}
+      <b style={{ color: 'var(--ink-2)' }}>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}</b> · {promesaDe(e)}{e.programada ? ' · salida agendada con tu asesor' : ''}
     </div>
   )
 }

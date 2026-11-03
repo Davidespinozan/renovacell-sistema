@@ -1,6 +1,7 @@
 -- CX-0c (137) · el down vuelve EXACTAMENTE a CX-0b (136): 4 funciones (md5), política POS original (md5), sin el
 -- auxiliar; CX-0b intacto (sin INSERT directo, guarda de identidad, validaciones de cuenta); sin cambios de datos.
 begin;
+\ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 create temp table _cx0c as select (select count(*) from public.orders) o, (select count(*) from public.cc_cartera) k, (select count(*) from public.payment_entries) e;
 set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (la guarda de datos se prueba en entrega_pedido_rollback.sql)
