@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W2-C.
 -- Hashes capturados de un cluster con las migraciones hasta W2 inclusive.
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/w2c/00_w2_snapshot.sql
 \ir ../../../rollback/w2c/99_down.sql
 do $t$

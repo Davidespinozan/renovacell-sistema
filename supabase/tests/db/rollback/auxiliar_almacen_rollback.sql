@@ -1,5 +1,6 @@
 -- AUXILIAR DE ALMACÉN · el down devuelve 'packing' a las 8 funciones; nada más cambia; se reaplica idéntica.
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 create temp table _ax as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
      and p.proname not in ('recibir_lote', 'anular_guia', 'abrir_custodia', 'entregar_custodia', 'devolver_de_custodia', 'registrar_perdida_custodia', 'confirmar_reingreso', 'recibir_devolucion')) resto;

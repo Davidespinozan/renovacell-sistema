@@ -1,4 +1,5 @@
 -- SEC-C4-FISCAL-2 (146) · El receptor fiscal de una venta POS lo valida y lo normaliza el SERVIDOR.
+-- (huellas de vender_pos / estado_custodia / cerrar_custodia / abrir_custodia y políticas de custodia re-ancladas por EVENTOS-EQUIPO 20270313: el equipo del evento ve y vende; solo Almacén abre eventos; Almacén cierra)
 -- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Con factura: solo {receiver:{6 campos de texto}}; cualquier otra clave (status, uuid, fechas…), tipo, tamaño o formato
 -- inválido rechaza la venta ANTES de crear pedido, cobro, inventario, custodia u operación. Sin factura: lo recibido se
@@ -37,7 +38,7 @@ begin
   select v.sql into sql from _v v;
 
   -- ══ 0 · FORMA: huellas, internas, sin cambios colaterales ══════════════════════════════════
-  perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '5bc6ea55dd22b90e04648833d7263831' and md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) = 'bb7b1d1a51edd1cbf4e8427045fb0dcb',
+  perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '078a1dc8777baf30249a75cca67409bf' and md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) = 'bb7b1d1a51edd1cbf4e8427045fb0dcb',
     '0.1 · vender_pos y _w3_receptor son las de la 146');
   perform tests.ok(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = 'd27eba9834466d71e5a3439614801bb7'
                and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '4ee1daa01dd51d5187bc46fbc2397e3d'

@@ -1,4 +1,5 @@
 -- SEC-B · autorización de escrituras financieras (D-SEC-1, D-SECB-1, D-SECB-2). POS cobra SOLO dentro de vender_pos: no
+-- (huellas de vender_pos / estado_custodia / cerrar_custodia / abrir_custodia y políticas de custodia re-ancladas por EVENTOS-EQUIPO 20270313: el equipo del evento ve y vende; solo Almacén abre eventos; Almacén cierra)
 -- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- registra cobros, no autoriza reembolsos, no reporta pagos (ni de su cartera) y solo cierra SU corte de cajero. reportar_pago
 -- autoriza rol Y pertenencia ANTES de la idempotencia; pedido ajeno e inexistente responden igual. Dirección, Facturación, el
@@ -52,7 +53,7 @@ begin
                     where pronamespace = 'public'::regnamespace and proname in ('revisar_pago','pagar_reembolso','reversar_asiento','vender_pos','crear_pedido','_w2_asiento','_w2_op_begin','orders_guard','anular_corte_caja','efectivo_esperado','tramo_corte_caja'))
                = '_w2_asiento=1ddccce14ab994f77165597df318cca6,_w2_op_begin=7e881d23606587cfd75b21eec6810085,anular_corte_caja=431d07d3cc17a95c9ddf7e62e7a80704,crear_pedido=62039cc835b93f7c0119b1c54c774495,'
                  'efectivo_esperado=85db31cc72539b1097166d272887dccc,orders_guard=e88f1bb21a69f79a1d31585cbc75bf7d,pagar_reembolso=ad015dc571cab6e7f58a5754c09fa640,reversar_asiento=ac308403a981da135ff59c031171b974,'
-                 'revisar_pago=238145e1eaabc925e64c55aab22cb064,tramo_corte_caja=fe2088f04d3b6e4d0136a0e084cb06b6,vender_pos=5bc6ea55dd22b90e04648833d7263831',
+                 'revisar_pago=238145e1eaabc925e64c55aab22cb064,tramo_corte_caja=fe2088f04d3b6e4d0136a0e084cb06b6,vender_pos=078a1dc8777baf30249a75cca67409bf',
     -- efectivo_esperado / tramo_corte_caja re-anclados por SEC-C1 (140): POS solo arquea su propio corte (lectura)
     'G3 · fuera de alcance intacto: vender_pos, crear_pedido, revisar_pago, pagar_reembolso, reversar_asiento, helpers W2, guard y cortes');
   perform tests.eq((select md5(string_agg(tablename || policyname || cmd || coalesce(qual, '') || coalesce(with_check, ''), '|' order by tablename, policyname)) from pg_policies

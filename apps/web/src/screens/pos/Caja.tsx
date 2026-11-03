@@ -33,6 +33,7 @@ import { clienteDePedido } from '../../data/mock/profiles'
 import type { Customer } from '../../data/ops/customer'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
+import { miembrosEventos } from '../../data/ops/custody'   // EVENTOS CON EQUIPO (2 nov 2026)
 
 type PayMethod = 'efectivo' | 'tarjeta'
 interface Line { product: ProductSafe; qty: number }
@@ -59,9 +60,13 @@ export function Caja() {
   // (vender_pos → precio_de) es la autoridad del cobro; esto es previsualización para el vendedor.
   const effOf = (p: ProductSafe, qty: number): number => effectiveUnitPrice(p.price, volRules, p.id, qty, vq[p.id]) ?? (p.price ?? 0)
   const uid = currentUserId()
+  // EVENTOS CON EQUIPO · vende el responsable y también quien Alberto puso en el equipo del evento
+  const [misEventos, setMisEventos] = useState<Set<string>>(new Set())
+  const hayEventos = custodias.some((c) => c.kind === 'evento' && c.status === 'abierta')   // sin eventos abiertos no se consulta nada
+  useEffect(() => { if (hayEventos) void miembrosEventos().then((m) => setMisEventos(new Set(m.filter((x) => x.profile_id === uid).map((x) => x.custody_id)))) }, [uid, hayEventos])
   const misCustodias = useMemo(
-    () => custodias.filter((c) => c.status === 'abierta' && c.holder_user_id === uid),
-    [custodias, uid])
+    () => custodias.filter((c) => c.status === 'abierta' && (c.holder_user_id === uid || misEventos.has(c.id))),
+    [custodias, uid, misEventos])
   // Contexto de venta: mostrador (null) o una custodia propia. En custodia la venta
   // descuenta el saldo del tenedor; de mostrador, la disponibilidad del almacén.
   const [custodyId, setCustodyId] = useState<string | null>(null)

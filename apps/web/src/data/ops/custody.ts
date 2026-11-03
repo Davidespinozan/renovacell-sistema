@@ -196,3 +196,19 @@ export const cerrarCustodia = (opId: string, a: { custodyId: string; motivo: str
     custody_id: string; entregadas: number; vendidas: number; devueltas: number; perdidas: number
     importe_vendido: number; cobrado: number; saldo: number
   }>('cerrar_custodia', { p_op_id: opId, p_custody: a.custodyId, p_motivo: a.motivo }, opId)
+
+// EVENTOS CON EQUIPO (2 nov 2026) · Alberto arma el equipo del evento (de cualquier puesto); ese equipo lo ve y vende en él.
+export interface MiembroEvento { custody_id: string; profile_id: string }
+/** Las membresías visibles: Dirección/Facturación/Almacén ven todas; los demás, las suyas. */
+export async function miembrosEventos(): Promise<MiembroEvento[]> {
+  if (!hasSupabase) return []
+  try {
+    const { data } = await supabase.from('custody_members' as never).select('custody_id, profile_id')
+    return (data ?? []) as unknown as MiembroEvento[]
+  } catch { return [] }   // sin acceso (o sin la tabla aún): el responsable sigue vendiendo como siempre
+}
+export async function guardarEquipoEvento(custodyId: string, miembros: string[]): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase.rpc('evento_equipo_guardar' as never, { p_custody: custodyId, p_miembros: miembros } as never)
+  if (!error) return { ok: true }
+  return { ok: false, error: /NO_AUTORIZADO|insufficient/i.test(error.message) ? 'Solo Almacén arma el equipo del evento.' : /EVENTO_CERRADO/.test(error.message) ? 'El evento ya se cerró.' : /MIEMBRO_INVALIDO/.test(error.message) ? 'Solo personal activo va a un evento.' : 'No se pudo guardar el equipo.' }
+}

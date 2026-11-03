@@ -2,6 +2,7 @@
 -- transacción y se revierte: no deja la BD de pruebas sin W1.
 -- Hashes = md5(pg_get_functiondef) / políticas / grants leídos de PRODUCCIÓN (solo lectura).
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/busqueda_compradores/99_down.sql   -- BLOQUE-A (20270214) añade índices a order_items: se bajan antes de comparar con producción
 \ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
 \ir ../../../rollback/ensayo_golive/99_down.sql

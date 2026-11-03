@@ -1,6 +1,7 @@
 -- SEC-C2 (141) · el down quita security_invoker de las dos vistas y las deja EXACTAMENTE como en producción antes de la 141
 -- (sin opciones, misma definición, columnas, dueño y permisos); políticas y datos intactos. Revertir REABRE la exposición.
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 create temp table _secc2 as select (select count(*) from public.custodies) c, (select count(*) from public.custody_lines) l;
 \ir ../../../rollback/sec_c2/99_down.sql
 do $t$

@@ -1,4 +1,5 @@
 -- SEC-C2b (142) · estado_custodia y vender_pos autorizan con comparación NULL-safe.
+-- (huellas de vender_pos / estado_custodia / cerrar_custodia / abrir_custodia y políticas de custodia re-ancladas por EVENTOS-EQUIPO 20270313: el equipo del evento ve y vende; solo Almacén abre eventos; Almacén cierra)
 -- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Lee una custodia: Dirección, Facturación, Almacén, Empaque o su titular-usuario (holder_user_id = auth.uid()).
 -- Vende de una custodia: Dirección o su titular-usuario. Un titular "tercero" (holder_customer_id) NO tiene vía propia.
@@ -55,8 +56,8 @@ begin
   todas := array[cusA, cusD, cusT, cusDup, cusS]; terceros := array[cusT, cusDup];
 
   -- ══ FORMA ════════════════════════════════════════════════════════════════════════════════════
-  perform tests.ok(md5(pg_get_functiondef('public.estado_custodia(uuid)'::regprocedure)) = '79e390a5879eb28c1ef28c2645a0169b'
-               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '5bc6ea55dd22b90e04648833d7263831',
+  perform tests.ok(md5(pg_get_functiondef('public.estado_custodia(uuid)'::regprocedure)) = 'a679d8bbe8f02a007abcf2e23e970f30'
+               and md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)) = '078a1dc8777baf30249a75cca67409bf',
     'G1 · estado_custodia con la definición SEC-C2b y vender_pos con la vigente (SEC-C2b + SEC-C4-FISCAL-2, 146: solo cambió el receptor fiscal)');
   perform tests.ok((select count(*) = 2 and bool_and(proowner = 'postgres'::regrole and prosecdef and proconfig = array['search_path=public'])
                     from pg_proc where pronamespace = 'public'::regnamespace and proname in ('estado_custodia', 'vender_pos'))
@@ -69,11 +70,11 @@ begin
     'G3 · permisos sin cambio: authenticated y service_role ejecutan; PUBLIC y anon no');
   perform tests.ok((select string_agg(proname || '=' || md5(pg_get_functiondef(oid)), ',' order by proname) from pg_proc where pronamespace = 'public'::regnamespace
                     and proname in ('cerrar_custodia', 'conciliar_custodia', 'custody_held'))
-    = 'cerrar_custodia=ec54d65fabb7eb7d8d65ed49fc705c86,conciliar_custodia=2a7d04528ecc57685f3aad09660adfb3,custody_held=0054fb41003ba6b936a38c2836434886',
+    = 'cerrar_custodia=dfb15de3a5873ba087f5c89c391823c8,conciliar_custodia=2a7d04528ecc57685f3aad09660adfb3,custody_held=0054fb41003ba6b936a38c2836434886',
     'G4 · las demás funciones de custodia no cambian');
   perform tests.ok((select count(*) = 2 from pg_class where oid in ('public.v_custody_stock'::regclass, 'public.v_custody_liquidacion'::regclass) and reloptions = array['security_invoker=true'])
-               and (select md5(qual) from pg_policies where tablename = 'custodies' and policyname = 'custodies_select_ops') = '75bc0009832a1daac1a00b2de519f1b5'
-               and (select md5(qual) from pg_policies where tablename = 'custody_lines' and policyname = 'custody_lines_select_ops') = '986084c8d75a2ed1788d8a28a6204dee'
+               and (select md5(qual) from pg_policies where tablename = 'custodies' and policyname = 'custodies_select_ops') = '30226ac22b9e5faf9db4fccc0d0dd5de'
+               and (select md5(qual) from pg_policies where tablename = 'custody_lines' and policyname = 'custody_lines_select_ops') = 'c7fe333133f0223894aafb2a5ce044da'
                and (select count(*) from pg_policies where schemaname = 'public' and tablename in ('custodies', 'custody_lines')) = 2,
     'G5 · SEC-C2 (141) intacta: vistas invoker y políticas RLS de custodia sin cambio');
   perform tests.ok((select count(*) = 7 and count(*) filter (where holder_user_id is null and holder_customer_id is not null) = 3 and count(*) filter (where status = 'cerrada') = 2 from public.custodies)

@@ -160,6 +160,14 @@ begin
   return v;
 end $$;
 
+create or replace function tests.fixture_almacen() returns uuid language plpgsql security definer set search_path = public as $$
+declare v uuid;
+begin
+  select id into v from public.profiles where role_id = 'warehouse' and email like 'fixture-almacen%' limit 1;
+  if v is null then v := tests.user('warehouse', 'fixture-almacen@test.local'); end if;
+  return v;
+end $$;
+
 -- W2: el dinero de un fixture entra por el COMANDO real (asiento en el libro).
 create or replace function tests.cobrar(p_order uuid, p_amount numeric default null, p_method text default 'transferencia')
 returns uuid language plpgsql security definer set search_path = public as $$
@@ -308,7 +316,8 @@ returns uuid language plpgsql security definer set search_path = public as $$
 declare v_op uuid := gen_random_uuid(); v_h uuid := coalesce(p_holder, tests.user('pos'));
         v_claims text := current_setting('request.jwt.claims', true);
 begin
-  perform set_config('request.jwt.claims', json_build_object('sub', tests.fixture_admin(), 'role', 'authenticated')::text, true);
+  -- EVENTOS-EQUIPO (2 nov 2026): un evento solo lo abre Almacén; una custodia de vendedor, Dirección.
+  perform set_config('request.jwt.claims', json_build_object('sub', case when p_kind = 'evento' then tests.fixture_almacen() else tests.fixture_admin() end, 'role', 'authenticated')::text, true);
   perform public.abrir_custodia(v_op, p_kind, 'staff', v_h, null,
     case when p_kind = 'evento' then coalesce(p_evento, 'Expo ' || left(v_op::text, 8)) end);
   perform set_config('request.jwt.claims', coalesce(nullif(v_claims, ''), '{}'), true);

@@ -14,9 +14,10 @@ begin
   perform tests.entregar(v_cus, v_lot, 10);
 
   -- ── Autoridad ───────────────────────────────────────────────────────────────
+  -- EVENTOS-EQUIPO (2 nov 2026): Almacén también cierra; con saldo en el stand, ni Almacén ni Dirección lo cierran.
   perform tests.act_as(v_wh);
   perform tests.throws(format('select public.cerrar_custodia(gen_random_uuid(), %L, ''terminó el evento'')', v_cus),
-    'NO_AUTORIZADO', 'solo Dirección cierra y liquida');
+    'CUSTODIA_CON_SALDO', 'Almacén puede cerrar, pero no con producto aún en el stand');
   perform tests.act_as(v_pos);
   perform tests.throws(format('select public.cerrar_custodia(gen_random_uuid(), %L, ''ya acabé'')', v_cus),
     'NO_AUTORIZADO', 'el tenedor no se cierra su propia custodia');
@@ -83,7 +84,7 @@ begin
     'CUSTODIA_CERRADA', 'ni se le reciben devoluciones');
 
   -- ── El evento se identifica por su ID, no por su nombre (bug legacy cerrado) ─
-  perform tests.act_as(v_admin);
+  perform tests.act_as(v_wh);   -- EVENTOS-EQUIPO: solo Almacén abre eventos
   perform tests.lives(format('select public.abrir_custodia(gen_random_uuid(), ''evento'', ''staff'', %L, null, ''Congreso Nacional'')', v_pos),
     'un evento HOMÓNIMO es otra custodia: los sobrantes ya no se confunden por nombre');
 

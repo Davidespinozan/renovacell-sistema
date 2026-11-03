@@ -6,8 +6,10 @@
 //   · Almacén ENTREGA el producto al stand y RECIBE lo que sobra (pantalla Custodia);
 //   · se VENDE en Punto de venta eligiendo el evento — misma ruta que el mostrador;
 //   · Dirección CIERRA y liquida.
+// EVENTOS CON EQUIPO (2 nov 2026, dueño): SOLO Alberto (Almacén) crea el evento y elige a quién lleva; ese equipo (de
+// cualquier puesto) ve el evento y vende en él. Dirección ve todo; Almacén o Dirección lo cierran.
 // No hay contadores en esta pantalla: el saldo sale del libro del servidor.
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Store, Plus, AlertTriangle, ChevronRight } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
@@ -17,7 +19,7 @@ import { useRole } from '../../auth/RoleContext'
 import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
 import { saldoDe } from '../../data/store/custodyStore'
 import { useOpId } from '../../data/hooks/useOpId'
-import { abrirCustodia } from '../../data/ops/custody'
+import { abrirCustodia, guardarEquipoEvento, miembrosEventos, type MiembroEvento } from '../../data/ops/custody'
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { currentUserId } from '../../lib/supabase'
@@ -33,7 +35,13 @@ export function Eventos() {
   const { data: stock } = useCustodyStock()
   const { data: products } = useProducts()
   const { data: users } = useUsers({ staffOnly: true })
-  const { setScreen, user } = useRole()
+  const { setScreen, user, role } = useRole()
+  const esAlmacen = role === 'warehouse'
+  const [miembros, setMiembros] = useState<MiembroEvento[]>([])
+  const cargarMiembros = () => { void miembrosEventos().then(setMiembros) }
+  useEffect(cargarMiembros, [])
+  const [editando, setEditando] = useState<{ id: string; sel: string[] } | null>(null)
+  const equipoDe = (id: string) => miembros.filter((m) => m.custody_id === id).map((m) => m.profile_id)
   const [nuevo, setNuevo] = useState(false)
   const [abierta, setAbierta] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
@@ -46,9 +54,8 @@ export function Eventos() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Eventos">
-        El inventario del stand es producto de la empresa en custodia del responsable del evento.
-        Almacén lo entrega y lo recibe; se vende en Punto de venta eligiendo el evento; Dirección
-        cierra y liquida al terminar.
+        Alberto (Almacén) crea el evento, elige quién va y entrega el producto al stand. El equipo del evento
+        vende en Punto de venta eligiendo el evento; al terminar, Almacén o Dirección lo cierran y liquidan.
       </PageHead>
 
       {CUSTODY_INVENTORY_DISABLED && (
@@ -62,9 +69,9 @@ export function Eventos() {
         </div>
       )}
 
-      {nuevo
-        ? <NuevoEvento users={users} yo={currentUserId()} miNombre={user?.name ?? ''} onClose={() => setNuevo(false)} onDone={(t) => { setNuevo(false); flash(t) }} />
-        : <div><button className="btn" type="button" onClick={() => setNuevo(true)}><Plus size={15} /> Nuevo evento</button></div>}
+      {esAlmacen && (nuevo
+        ? <NuevoEvento users={users} yo={currentUserId()} miNombre={user?.name ?? ''} onClose={() => setNuevo(false)} onDone={(t) => { setNuevo(false); flash(t); cargarMiembros() }} />
+        : <div><button className="btn" type="button" onClick={() => setNuevo(true)} data-testid="evento-nuevo"><Plus size={15} /> Nuevo evento</button></div>)}
 
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '18px 18px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -97,6 +104,16 @@ export function Eventos() {
                           Responsable: <b>{c.holder_user_id ? (userName[c.holder_user_id] ?? 'staff') : 'tercero'}</b>
                           {c.closed_at && <> · cerrado el {fmtDate(c.closed_at)}{c.close_reason ? ` (${c.close_reason})` : ''}</>}
                         </div>
+                        <div style={{ fontSize: 12.5, marginBottom: 8 }} data-testid={`evento-equipo-${c.id}`}>
+                          Equipo: {equipoDe(c.id).length ? equipoDe(c.id).map((id) => userName[id] ?? 'staff').join(', ') : <span style={{ color: 'var(--ink-3)' }}>solo el responsable</span>}
+                          {esAlmacen && c.status === 'abierta' && !editando && (
+                            <button className="btn ghost sm" type="button" style={{ marginLeft: 8 }} onClick={() => setEditando({ id: c.id, sel: equipoDe(c.id) })} data-testid="evento-equipo-editar">Editar equipo</button>
+                          )}
+                        </div>
+                        {editando?.id === c.id && (
+                          <EquipoEditor users={users} sel={editando.sel} onChange={(sel) => setEditando({ id: c.id, sel })} onCancel={() => setEditando(null)}
+                            onSave={async () => { const r = await guardarEquipoEvento(c.id, editando.sel); if (!r.ok) { flash(r.error); return } setEditando(null); cargarMiembros(); flash('Equipo del evento guardado.') }} />
+                        )}
                         {saldo.length === 0 ? (
                           <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
                             Sin producto en el stand. Almacén lo entrega desde <b>Consignación / Custodia</b>.
@@ -118,7 +135,7 @@ export function Eventos() {
                             </tbody>
                           </table>
                         )}
-                        {c.status === 'abierta' && c.holder_user_id === currentUserId() && unidades > 0 && (
+                        {c.status === 'abierta' && (c.holder_user_id === currentUserId() || equipoDe(c.id).includes(currentUserId() ?? '')) && unidades > 0 && (
                           <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setScreen('caja')}>
                             <Store size={15} /> Vender en el stand
                           </button>
@@ -146,6 +163,7 @@ function NuevoEvento({ users, yo, miNombre, onClose, onDone }: {
   const [venue, setVenue] = useState('')
   const [date, setDate] = useState('')
   const [holder, setHolder] = useState(yo ?? '')
+  const [equipo, setEquipo] = useState<string[]>(yo ? [yo] : [])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -161,7 +179,8 @@ function NuevoEvento({ users, yo, miNombre, onClose, onDone }: {
     setBusy(false)
     if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo crear el evento.')); return }
     renew()
-    onDone('Evento creado. Pide a Almacén que entregue el producto al stand.')
+    const eq = await guardarEquipoEvento(r.data?.custody_id ?? opId, [...new Set([holder, ...equipo])])
+    onDone(eq.ok ? 'Evento creado con su equipo. Entrega el producto al stand desde Custodia.' : `Evento creado, pero el equipo no se guardó: ${eq.error} Edítalo desde el evento.`)
   }
 
   return (
@@ -191,6 +210,7 @@ function NuevoEvento({ users, yo, miNombre, onClose, onDone }: {
       <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
         El responsable queda registrado como tenedor: es quien responde por el producto del stand.
       </div>
+      <EquipoEditor users={users} sel={equipo} onChange={setEquipo} />
       {err && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
         <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
@@ -198,6 +218,29 @@ function NuevoEvento({ users, yo, miNombre, onClose, onDone }: {
           {busy ? 'Creando…' : 'Crear evento'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/** Quién va al evento: ese equipo ve el evento y vende en él (de cualquier puesto). */
+function EquipoEditor({ users, sel, onChange, onSave, onCancel }: { users: { id: string; name: string }[]; sel: string[]; onChange: (s: string[]) => void; onSave?: () => void; onCancel?: () => void }) {
+  const toggle = (id: string) => onChange(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id])
+  return (
+    <div style={{ marginTop: 10 }} data-testid="evento-equipo-editor">
+      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)' }}>¿Quién va al evento? (ven el evento y venden en él)</label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+        {users.map((u) => (
+          <label key={u.id} style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--line)', borderRadius: 10, padding: '5px 9px' }}>
+            <input type="checkbox" checked={sel.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}
+          </label>
+        ))}
+      </div>
+      {onSave && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button className="btn sm" type="button" onClick={onSave} data-testid="evento-equipo-guardar">Guardar equipo</button>
+          <button className="btn ghost sm" type="button" onClick={onCancel}>Cancelar</button>
+        </div>
+      )}
     </div>
   )
 }

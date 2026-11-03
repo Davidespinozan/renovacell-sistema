@@ -11,11 +11,15 @@ describe('<Eventos>', () => {
   it('muestra el módulo de eventos y explica que el stand es producto en custodia', () => {
     renderWithRole(<Eventos />)
     expect(screen.getByRole('heading', { name: 'Eventos' })).toBeInTheDocument()
-    expect(screen.getByText(/producto de la empresa en custodia/i)).toBeInTheDocument()
+    expect(screen.getByText(/El equipo del evento\s+vende en Punto de venta/i)).toBeInTheDocument()
   })
-  it('no promete vender ni entregar desde aquí: cada quien hace lo suyo', () => {
+  it('cada quien hace lo suyo: Alberto crea y entrega, el equipo vende, Almacén o Dirección cierran', () => {
     renderWithRole(<Eventos />)
-    // Almacén entrega, Punto de venta cobra, Dirección cierra (authority matrix de W2-C).
-    expect(screen.getByText(/Almacén lo entrega y lo recibe/i)).toBeInTheDocument()
+    // EVENTOS CON EQUIPO (2 nov 2026): solo Almacén crea el evento y elige al equipo.
+    expect(screen.getByText(/Alberto \(Almacén\) crea el evento, elige quién va/i)).toBeInTheDocument()
+  })
+  it('Dirección ve los eventos pero no los crea', () => {
+    renderWithRole(<Eventos />)   // el RoleProvider de prueba entra como Dirección
+    expect(screen.queryByTestId('evento-nuevo')).toBeNull()
   })
 })

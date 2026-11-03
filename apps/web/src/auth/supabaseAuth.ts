@@ -43,7 +43,17 @@ async function fetchProfile(userId: string, email: string): Promise<Session | nu
   if (error) return atenderSuspension(error.message) ? 'suspendida' : null
   if (!data) return null
   if (data.active === false) return 'suspendida'
-  return toSessionRow(data, email)
+  const ses = toSessionRow(data, email)
+  // EVENTOS CON EQUIPO (2 nov 2026) · quien está en el equipo de un evento abierto ve Eventos y Caja aunque no tenga la
+  // capacidad (se lee al entrar o recargar). Almacén (Alberto) los administra siempre.
+  if (ses.role !== 'doctor' && !ses.capabilities.includes('eventos')) {
+    if (ses.role === 'warehouse') ses.capabilities = [...ses.capabilities, 'eventos']
+    else {
+      const { data: m } = await supabase.from('custody_members' as never).select('custody_id, custodies!inner(status)').eq('profile_id', userId).eq('custodies.status', 'abierta').limit(1)
+      if (Array.isArray(m) && m.length) ses.capabilities = [...ses.capabilities, 'eventos']
+    }
+  }
+  return ses
 }
 
 export async function signInSupabase(email: string, password: string): Promise<{ session?: Session; error?: string }> {

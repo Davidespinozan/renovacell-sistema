@@ -1,6 +1,7 @@
 -- SEC-C2b (142) · el down restaura estado_custodia y vender_pos EXACTAMENTE como en producción antes de la 142 (misma huella,
 -- dueño, permisos y forma); SEC-C2 (141), políticas y datos intactos. Revertir REABRE el P1 (se demuestra abajo).
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial
 create temp table _secc2b as select (select count(*) from public.custodies) c, (select count(*) from public.custody_lines) l, (select count(*) from public.orders) o;
 \ir ../../../rollback/sec_c4_fiscal3/99_down.sql   -- SEC-C4-FISCAL-3 (147) se baja primero

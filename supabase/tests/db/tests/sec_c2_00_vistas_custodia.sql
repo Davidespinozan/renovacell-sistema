@@ -1,4 +1,5 @@
 -- SEC-C2 · v_custody_stock y v_custody_liquidacion con security_invoker: se aplica el RLS de custodies / custody_lines.
+-- (huellas de vender_pos / estado_custodia / cerrar_custodia / abrir_custodia y políticas de custodia re-ancladas por EVENTOS-EQUIPO 20270313: el equipo del evento ve y vende; solo Almacén abre eventos; Almacén cierra)
 -- Ve una custodia quien la ve en las tablas: Dirección, Facturación, Almacén, Empaque o su titular-usuario. Correo, teléfono,
 -- vendedor de Odoo, cartera o customers.profile_id NO autorizan. Las funciones definer que leen las vistas no cambian.
 -- (estado_custodia / vender_pos comparaban holder_user_id sin tratar NULL — titular "tercero"; lo corrige SEC-C2b (142): ver sec_c2b_00. La huella de estado_custodia en G6 es la de la 142.)
@@ -49,19 +50,23 @@ begin
   perform tests.ok((select bool_and(has_table_privilege('authenticated', oid, 'SELECT') and has_table_privilege('service_role', oid, 'SELECT') and not has_table_privilege('anon', oid, 'SELECT')
                                     and not has_table_privilege('authenticated', oid, 'INSERT') and not has_table_privilege('authenticated', oid, 'UPDATE') and not has_table_privilege('authenticated', oid, 'DELETE'))
                     from pg_class where oid in ('public.v_custody_stock'::regclass, 'public.v_custody_liquidacion'::regclass)), 'G4 · permisos de las vistas sin cambio');
-  perform tests.ok((select md5(qual) from pg_policies where tablename = 'custodies' and policyname = 'custodies_select_ops') = '75bc0009832a1daac1a00b2de519f1b5'
-               and (select md5(qual) from pg_policies where tablename = 'custody_lines' and policyname = 'custody_lines_select_ops') = '986084c8d75a2ed1788d8a28a6204dee'
+  perform tests.ok((select md5(qual) from pg_policies where tablename = 'custodies' and policyname = 'custodies_select_ops') = '30226ac22b9e5faf9db4fccc0d0dd5de'
+               and (select md5(qual) from pg_policies where tablename = 'custody_lines' and policyname = 'custody_lines_select_ops') = 'c7fe333133f0223894aafb2a5ce044da'
                and (select count(*) from pg_policies where schemaname = 'public' and tablename in ('custodies', 'custody_lines')) = 2, 'G5 · políticas RLS de custodia intactas (el aislamiento descansa en ellas)');
   perform tests.ok((select string_agg(proname || '=' || md5(pg_get_functiondef(oid)), ',' order by proname) from pg_proc where pronamespace = 'public'::regnamespace
                     and proname in ('estado_custodia', 'cerrar_custodia', 'conciliar_custodia', 'custody_held'))
-    = 'cerrar_custodia=ec54d65fabb7eb7d8d65ed49fc705c86,conciliar_custodia=2a7d04528ecc57685f3aad09660adfb3,custody_held=0054fb41003ba6b936a38c2836434886,estado_custodia=79e390a5879eb28c1ef28c2645a0169b'
+    = 'cerrar_custodia=dfb15de3a5873ba087f5c89c391823c8,conciliar_custodia=2a7d04528ecc57685f3aad09660adfb3,custody_held=0054fb41003ba6b936a38c2836434886,estado_custodia=a679d8bbe8f02a007abcf2e23e970f30'
                and md5(pg_get_viewdef('public.v_order_money'::regclass)) = '8de543e01ea16278d149d7af9bc98e55', 'G6 · funciones definer y v_order_money sin cambios');
   -- los datos EXISTEN (un cero más abajo no es por falta de datos)
   perform tests.ok((select count(distinct custody_id) = 6 and sum(held_delta) = 45 from public.custody_lines) and (select count(*) = 7 from public.custodies),
     'G7 · fixture: 7 custodias, 6 con existencias, 45 unidades en poder');
 
   -- ══ ROLES GLOBALES: todo, con cantidades e importes correctos ════════════════════════════════
-  foreach rol in array array['admin', 'billing', 'warehouse', 'packing', 'service_role'] loop
+  -- EVENTOS-EQUIPO (2 nov 2026): el auxiliar (packing) ya NO es global para eventos: ve los de vendedor, y un evento solo si va.
+  perform tests.act_as(v_pk);
+  perform tests.ok(not exists (select 1 from public.custodies where id = cusE) and (select count(*) = 6 from public.v_custody_liquidacion)
+               and not exists (select 1 from public.v_custody_stock where custody_id = cusE), 'P1 · packing: las 6 custodias de vendedor; el evento al que no va, no');
+  foreach rol in array array['admin', 'billing', 'warehouse', 'service_role'] loop
     if rol = 'service_role' then perform tests.act_as_service();
     else perform tests.act_as(case rol when 'admin' then v_admin when 'billing' then v_bill when 'warehouse' then v_wh else v_pk end); end if;
     perform tests.ok((select count(distinct custody_id) = 6 and sum(en_poder) = 45 and sum(vendido) = 4 and sum(entregado) = 49 from public.v_custody_stock),

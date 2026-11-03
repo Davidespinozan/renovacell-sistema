@@ -1,6 +1,7 @@
 -- MAYOREO-REGLAS (20270222) · el down devuelve el precio renglón por renglón exacto y retira el cálculo del pedido y el nivel;
 -- se reaplica idéntica.
 begin;
+\ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/ia_vendedora/99_down.sql   -- IA-VENDEDORA (20270223) redefine el precio de un producto: se baja antes de la foto inicial
 create temp table _mr as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/mayoreo_reglas/99_down.sql

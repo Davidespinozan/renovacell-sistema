@@ -1,4 +1,5 @@
 -- SEC-C1 · Para POS, lo que se ve de una tabla hija o de una RPC nunca excede lo que se ve del pedido en orders.
+-- (huellas de vender_pos / estado_custodia / cerrar_custodia / abrir_custodia y políticas de custodia re-ancladas por EVENTOS-EQUIPO 20270313: el equipo del evento ve y vende; solo Almacén abre eventos; Almacén cierra)
 -- (huellas de crear_pedido / vender_pos / precio re-ancladas por MAYOREO-REGLAS 20270222: precio con el pedido completo)
 -- Equivalencia: POS_VE_ESTADO(pedido) ⇔ POS_VE_PEDIDO(pedido) para cada ruta de visibilidad (cartera, correo heredado,
 -- meta.owner, venta de mostrador propia) y cada ruta que NO da visibilidad (capturista, histórico Odoo, ajeno).
@@ -75,7 +76,7 @@ begin
                     and proname in ('pedido_visible','_cx0c_venta_pos_propia','order_vendor_email','vender_pos','crear_pedido','registrar_cobro','reportar_pago','registrar_corte_caja'))
     = '_cx0c_venta_pos_propia=d367994ba8540919115663de4605825a,crear_pedido=62039cc835b93f7c0119b1c54c774495,order_vendor_email=58a350df9c9582768d78a0ec1de00dde,'
       'pedido_visible=dd2c4bfe38132e221e0860ecc77e2020,registrar_cobro=0283a2987642a72f1fca89d6691e3c71,registrar_corte_caja=818494eef08f5fa91ac06e649541be41,'
-      'reportar_pago=a41ef8615e80f0834c2e6b48e75d4004,vender_pos=5bc6ea55dd22b90e04648833d7263831', 'G4 · dependencias y escrituras (CX-0c, SEC-A, SEC-B) intactas');
+      'reportar_pago=a41ef8615e80f0834c2e6b48e75d4004,vender_pos=078a1dc8777baf30249a75cca67409bf', 'G4 · dependencias y escrituras (CX-0c, SEC-A, SEC-B) intactas');
 
   -- ══ EQUIVALENCIA · POS_VE_ESTADO ⇔ POS_VE_PEDIDO (positivos y negativos) ═════════════════════
   ve_esperado := jsonb_build_object('posA', jsonb_build_array(oA, oA2, oCanc, oLeg, oSaleA), 'posB', jsonb_build_array(oSaleB), 'posC', jsonb_build_array(oC));
