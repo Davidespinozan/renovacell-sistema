@@ -10,6 +10,7 @@ import { ETIQUETA_TIPO, type TipoCliente } from '../../data/ops/perfilComercial'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // el MISMO generador del correo que usa el servidor
 import { uploadImage } from '../../lib/uploads'
 import { capitalizarNombre } from '../../lib/nombres'
+import { useRoleOpcional } from '../../auth/RoleContext'
 import { fmtDate } from '../../lib/format'
 
 type Vista = 'nueva' | 'listas' | 'enviadas'
@@ -36,6 +37,8 @@ export function Difusiones({ cliente = clientePorDefecto, subir = (f: File) => u
 }
 
 function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: ClienteDifusiones; listas: Lista[]; subir: (f: File) => Promise<string>; onEnviada: () => void }) {
+  // Dirección y el jefe de ventas mandan a TODOS los clientes (así lo calcula el servidor, _dif_alcance)
+  const sesion = useRoleOpcional(); const veTodos = sesion?.role === 'admin' || !!sesion?.capabilities?.includes('jefe_ventas')
   const especialidades = useEspecialidades()
   const [modo, setModo] = useState<'cartera' | 'lista' | 'filtro'>('cartera')
   const [listaId, setListaId] = useState('')
@@ -79,7 +82,7 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
       <section className="card dif-sec">
         <h3>1 · ¿A quién?</h3>
         <div className="pc-chips" role="radiogroup" aria-label="Audiencia">
-          {([['cartera', 'Toda mi cartera'], ['filtro', 'Por tipo y especialidad'], ['lista', 'Una de mis listas']] as const).map(([k, l]) => (
+          {([['cartera', veTodos ? 'Todos los clientes' : 'Toda mi cartera'], ['filtro', 'Por tipo y especialidad'], ['lista', 'Una de mis listas']] as const).map(([k, l]) => (
             <button key={k} type="button" role="radio" aria-checked={modo === k} className={'pc-chip' + (modo === k ? ' on' : '')} onClick={() => setModo(k)} data-testid={`dif-aud-${k}`}>{l}</button>
           ))}
         </div>
