@@ -7,6 +7,7 @@
 //   · Atención humana: qué conversaciones atiende una persona y quién.
 //   · BarraTomaCanal: en una conversación abierta, quién la atiende, "Tomar conversación" y por qué no se puede escribir.
 // La autoridad es la base (B2-1, B2-2, B2-3b, B2-4): aquí no se decide nada que el servidor no vuelva a validar.
+import { PlantillasMeta } from './PlantillasMeta'   // WA-PLANTILLAS
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -199,6 +200,7 @@ export function PanelOperativoCanal({ cliente = clientePorDefecto, canal = 'what
         )}
       </>}
 
+      {abierto && canal === 'whatsapp' && <PlantillasMeta />}
       {accion && <Confirmar testid={`confirmar-${accion.clave}`} titulo={accion.titulo} explica={accion.explica} boton={accion.boton} peligro={accion.peligro}
         onConfirmar={(m) => ejecutar(accion, m)} onCerrar={() => setAccion(null)} />}
     </div>

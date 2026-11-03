@@ -23,7 +23,8 @@ import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/peri
 import { diaEtiqueta, etiquetaActor, quienAtendio, rangoSesion, type Visor } from '../../data/ops/sesionesPresentacion'
 import { HistorialConversacion, HiloSoloLectura, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
-import { RespuestasRapidas } from './RespuestasRapidas'   // CHAT PRO · textos listos del personal
+import { RespuestasRapidas } from './RespuestasRapidas'
+import { RetomarWhatsApp } from './RetomarWhatsApp'   // WA-PLANTILLAS   // CHAT PRO · textos listos del personal
 import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 import { EVENTO_ABRIR_CHAT, tomarBorrador } from '../../data/store/chatUiStore'   // IA-VENDEDORA
@@ -677,7 +678,13 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       {canal && (canal.modo === 'espejo'
         ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">{NOMBRE_CANAL[canal.canal]} en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales; desde aquí no se puede escribir.</div>
         : !canal.ventana_abierta
-          ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">Escribió por {NOMBRE_CANAL[canal.canal]} hace más de 24 horas: lo que escribas queda aquí pero no le llega por {NOMBRE_CANAL[canal.canal]} hasta que vuelva a escribir (regla de Meta).</div>
+          ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">
+              {canal.canal === 'whatsapp'
+                ? <>Escribió por WhatsApp hace más de 24 horas: Meta solo deja mandarle un mensaje aprobado (plantilla). Cuando conteste, sigue la plática aquí.</>
+                : <>Escribió por {NOMBRE_CANAL[canal.canal]} hace más de 24 horas: lo que escribas queda aquí pero no le llega por {NOMBRE_CANAL[canal.canal]} hasta que vuelva a escribir (regla de Meta).</>}
+              {/* WA-PLANTILLAS (3 nov 2026) · retomarlo con una plantilla aprobada, llamarle o abrir su WhatsApp. */}
+              {canal.canal === 'whatsapp' && asesor && convId && <RetomarWhatsApp conversationId={convId} waId={canal.id} nombreCliente={nombreCliente} onEnviada={() => void cargar(convId, 0)} />}
+            </div>
           : null)}
 
       {hoja && !finAtencion && <div className="rc-hoja" data-testid="chat-hoja">{hoja}</div>}

@@ -3,7 +3,7 @@
 // Lo llaman el chat (al contestar), meta-webhook (tras la IA) y la tarea de cada minuto (reintentos). Nunca lanza.
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
-import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoTexto, MIME_IMAGEN, type MediaWA } from './whatsapp.ts'
+import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoPlantilla, cuerpoTexto, MIME_IMAGEN, type MediaWA } from './whatsapp.ts'
 import { esMarcadorArchivo, esMensajeConImagen } from './adjuntos.ts'
 import { cuerpoUbicacion, leerUbicacion } from './ubicacion.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
@@ -88,6 +88,16 @@ async function archivoParaEnviar(admin: any, messageId: string): Promise<{ tipo:
   } catch { return 'error' }
 }
 
+/** WA-PLANTILLAS · ¿el mensaje es una plantilla? (la mandó el personal fuera de la ventana de 24 h). */
+// deno-lint-ignore no-explicit-any
+export async function plantillaParaEnviar(admin: any, messageId: string | null | undefined): Promise<{ plantilla: string; idioma: string; parametros: string[] } | null> {
+  if (!messageId) return null
+  try {
+    const { data } = await admin.from('cc_wa_plantilla_envios').select('plantilla, idioma, parametros').eq('message_id', messageId).maybeSingle()
+    return data?.plantilla ? { plantilla: data.plantilla, idioma: data.idioma, parametros: Array.isArray(data.parametros) ? data.parametros : [] } : null
+  } catch { return null }
+}
+
 export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fetch): Promise<Despacho> {
   const cfg = configWA((k) => Deno.env.get(k))
   const r: Despacho = { enviados: 0, fallidos: 0, retenidos: 0, inciertos: 0 }
@@ -103,11 +113,14 @@ export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fe
       if (puede.error || puede.data !== true) { await resolver(s.id, { ok: false, clase: 'retener', detalle: 'canal pausado o fuera de activo antes del envío' }); r.retenidos++; continue }
       // FOTOS AL CLIENTE (2 nov 2026) · si el mensaje lleva un archivo, sale el archivo (enlace temporal de 15 min del bucket
       // privado `chat`); antes solo salía el texto "Envió una imagen." y el cliente nunca veía la foto.
-      const media = await adjuntoParaEnviar(admin, s.message_id)
+      const tpl = await plantillaParaEnviar(admin, s.message_id)
+      const media = tpl ? null : await adjuntoParaEnviar(admin, s.message_id)
       if (media === 'error') { await resolver(s.id, { ok: false, clase: 'definitivo', detalle: 'no se pudo preparar el archivo para enviarlo' }); r.fallidos++; continue }
       // UBICACIÓN EN EL CHAT · «📍 …» con coordenadas sale como ubicación nativa (pin); sin coordenadas, como texto con su enlace.
-      const ubic = media ? null : leerUbicacion(s.texto)
-      const cuerpoEnvio = media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre)
+      // WA-PLANTILLAS · una plantilla aprobada sale como plantilla (fuera de la ventana de 24 h).
+      const ubic = media || tpl ? null : leerUbicacion(s.texto)
+      const cuerpoEnvio = tpl ? cuerpoPlantilla(s.wa_id, tpl.plantilla, tpl.idioma, tpl.parametros)
+        : media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre)
         : (ubic && cuerpoUbicacion(s.wa_id, ubic)) || cuerpoTexto(s.wa_id, s.texto)
       let res: ResultadoEnvio
       try {

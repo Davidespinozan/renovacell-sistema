@@ -72,6 +72,13 @@ export function cuerpoMedia(para: string, tipo: 'image' | 'document' | 'video', 
   const media: Record<string, unknown> = { link: enlace, ...(p ? { caption: p } : {}), ...(tipo === 'document' ? { filename: (nombre || 'documento.pdf').slice(0, 240) } : {}) }
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: tipo, [tipo]: media }
 }
+/** WA-PLANTILLAS (3 nov 2026) · plantilla aprobada por Meta (la única forma de escribirle fuera de las 24 h). */
+export function cuerpoPlantilla(para: string, nombre: string, idioma: string, parametros: string[]): Record<string, unknown> {
+  return {
+    messaging_product: 'whatsapp', recipient_type: 'individual', to: para, type: 'template',
+    template: { name: nombre, language: { code: idioma }, ...(parametros.length ? { components: [{ type: 'body', parameters: parametros.map((t) => ({ type: 'text', text: String(t).slice(0, 200) })) }] } : {}) },
+  }
+}
 /** R4-C8 · marca el mensaje del cliente como leído y muestra "escribiendo…" (hasta 25 s o hasta la respuesta). No es un mensaje. */
 export function cuerpoEscribiendo(wamid: string): Record<string, unknown> {
   return { messaging_product: 'whatsapp', status: 'read', message_id: wamid, typing_indicator: { type: 'text' } }

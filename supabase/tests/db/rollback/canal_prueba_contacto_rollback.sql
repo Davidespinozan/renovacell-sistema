@@ -1,6 +1,7 @@
 -- R4-C5-A2 · el down se NIEGA en modo prueba o con permisos vigentes; cerrado, devuelve EXACTAMENTE B2 (las 13 funciones, los
 -- CHECK y los triggers de cc_wa_config), archiva los permisos en el historial y se reaplica idéntico.
 begin;
+\ir ../../../rollback/wa_plantillas/99_down.sql   -- WA-PLANTILLAS (20270403, la más nueva) parcha la cola de WhatsApp y cuelga de cc_messages: se baja antes de la foto inicial
 \ir ../../../rollback/bot_detectado/99_down.sql   -- BOT DETECTADO (20270331) redefine cc_canal_conversacion: se baja primero
 \ir ../../../rollback/whatsapp_compuerta_abierta/99_down.sql   -- R4-C6 (0124) se baja antes de la línea base (0123 se compara sin 0124)
 create temp table _c5 as select
