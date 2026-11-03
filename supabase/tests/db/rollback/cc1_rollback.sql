@@ -32,6 +32,7 @@ set app.entrega_rollback_forzado = 'on';   -- prueba estructural de la cadena (l
 \ir ../../../rollback/whatsapp_canal/99_down.sql   -- WHATSAPP (167) se baja primero (depende de cc_visitors y cc_messages)
 \ir ../../../rollback/chat_pro/99_down.sql   -- CHAT PRO (161) se baja primero (columna en cc_participants)
 \ir ../../../rollback/avisos_push/99_down.sql   -- AVISOS (160) se baja primero (depende de cc_visitors)
+\ir ../../../rollback/chat_archivos/99_down.sql   -- CHAT-ARCHIVOS (20270324): cc_archivos también depende de cc_messages
 \ir ../../../rollback/chat_adjuntos/99_down.sql   -- FOTOS (157) se baja primero (cc_adjuntos depende de cc_messages)
 \ir ../../../rollback/continuidad/99_down.sql   -- CONTINUIDAD (156) se baja primero
 \ir ../../../rollback/mi_verificacion/99_down.sql   -- MI-VERIFICACION (155) se baja primero

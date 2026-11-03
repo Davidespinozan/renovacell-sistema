@@ -4,7 +4,7 @@
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
 import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoTexto, MIME_IMAGEN, type MediaWA } from './whatsapp.ts'
-import { esMensajeConImagen } from './adjuntos.ts'
+import { esMarcadorArchivo, esMensajeConImagen } from './adjuntos.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
 
 export interface Despacho { enviados: number; fallidos: number; retenidos: number; inciertos: number }
@@ -56,18 +56,34 @@ export async function descargarMedia(media: MediaWA, fetchImpl: typeof fetch = f
 }
 
 /** Archivo del mensaje (si lo tiene) con enlace temporal para que Meta lo descargue. null = sin archivo; 'error' = tiene
- *  archivo pero no se pudo firmar (no se manda el texto marcador en su lugar). */
+ *  archivo pero no se pudo firmar (no se manda el texto marcador en su lugar).
+ *  CHAT-ARCHIVOS (3 nov 2026): también videos y documentos (cc_archivos). WhatsApp acepta video MP4/3GP de hasta 16 MB;
+ *  uno más grande o de otro formato sale como documento (el cliente lo descarga igual). */
 // deno-lint-ignore no-explicit-any
-export async function adjuntoParaEnviar(admin: any, messageId: string | null | undefined): Promise<{ tipo: 'image' | 'document'; enlace: string; nombre: string | null } | null | 'error'> {
+export async function adjuntoParaEnviar(admin: any, messageId: string | null | undefined): Promise<{ tipo: 'image' | 'document' | 'video'; enlace: string; nombre: string | null } | null | 'error'> {
   if (!messageId) return null
   let a: { ruta?: string; tipo?: string } | null = null
   try { a = (await admin.from('cc_adjuntos').select('ruta, tipo').eq('message_id', messageId).order('created_at').limit(1).maybeSingle()).data } catch { return null }
-  if (!a?.ruta) return null
+  if (!a?.ruta) return archivoParaEnviar(admin, messageId)
   try {
     const { data: f, error } = await admin.storage.from('chat').createSignedUrl(a.ruta, 15 * 60)
     if (error || !f?.signedUrl) return 'error'
     const tipo = String(a.tipo ?? '').startsWith('image/') ? 'image' : 'document'
     return { tipo, enlace: f.signedUrl, nombre: tipo === 'document' ? String(a.ruta).split('/').pop() ?? null : null }
+  } catch { return 'error' }
+}
+export const MAX_VIDEO_WA = 16 * 1024 * 1024
+export const tipoWA = (tipo: string, bytes: number): 'video' | 'document' => ((tipo === 'video/mp4' || tipo === 'video/3gpp') && bytes <= MAX_VIDEO_WA ? 'video' : 'document')
+// deno-lint-ignore no-explicit-any
+async function archivoParaEnviar(admin: any, messageId: string): Promise<{ tipo: 'document' | 'video'; enlace: string; nombre: string | null } | null | 'error'> {
+  let a: { ruta?: string; tipo?: string; bytes?: number; nombre?: string } | null = null
+  try { a = (await admin.from('cc_archivos').select('ruta, tipo, bytes, nombre').eq('message_id', messageId).maybeSingle()).data } catch { return null }
+  if (!a?.ruta) return null
+  try {
+    const { data: f, error } = await admin.storage.from('chat_archivos').createSignedUrl(a.ruta, 15 * 60)
+    if (error || !f?.signedUrl) return 'error'
+    const tipo = tipoWA(String(a.tipo ?? ''), Number(a.bytes ?? 0))
+    return { tipo, enlace: f.signedUrl, nombre: tipo === 'document' ? (a.nombre || String(a.ruta).split('/').pop() || null) : null }
   } catch { return 'error' }
 }
 
@@ -88,7 +104,7 @@ export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fe
       // privado `chat`); antes solo salía el texto "Envió una imagen." y el cliente nunca veía la foto.
       const media = await adjuntoParaEnviar(admin, s.message_id)
       if (media === 'error') { await resolver(s.id, { ok: false, clase: 'definitivo', detalle: 'no se pudo preparar el archivo para enviarlo' }); r.fallidos++; continue }
-      const cuerpoEnvio = media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) ? null : s.texto, media.nombre) : cuerpoTexto(s.wa_id, s.texto)
+      const cuerpoEnvio = media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre) : cuerpoTexto(s.wa_id, s.texto)
       let res: ResultadoEnvio
       try {
         const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)

@@ -55,6 +55,9 @@ export function mapearErrorChat(mensaje: string | undefined): { status: number; 
   if (/ATENDIDA_POR_OTRO/.test(m)) return r(409, 'atendida_por_otro', 'Otra persona atiende esta conversación.')
   if (/CANAL_EN_ESPEJO/.test(m)) return r(409, 'canal_en_espejo', 'Este canal está en modo espejo: no se envían respuestas.')
   if (/CONTENIDO_VACIO|CONTENIDO_LARGO|ACTOR_INVALIDO/.test(m)) return r(400, 'contenido_invalido', 'El mensaje no es válido.')
+  // CHAT-ARCHIVOS · la base explica por qué no sale un video o documento
+  const arc = /ARCHIVO_(TIPO|TAMANO|CANAL|INEXISTENTE|INVALIDO): ?([^\n]*)/.exec(m)
+  if (arc) return r(400, `archivo_${arc[1].toLowerCase()}`, arc[2]?.trim() || 'No se pudo mandar el archivo.')
   return r(503, 'no_disponible', 'No se pudo completar la operación. Intenta más tarde.')
 }
 

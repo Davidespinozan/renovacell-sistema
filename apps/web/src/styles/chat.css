@@ -386,6 +386,8 @@
 .tc-clip{flex:none;align-self:center}
 .tc-adj .spin{animation:tc-girar 1s linear infinite}
 @keyframes tc-girar{to{transform:rotate(360deg)}}
+.rc-subiendo{padding:6px 14px;font-size:12.5px;color:var(--mid);background:var(--hueso)}
+.rc-bubble--img .tc-adj{margin:0}
 .tc-msg .rc-bubble-wrap:focus{outline:none}
 /* Directorio de "Nuevo mensaje" */
 .tc-directorio{max-height:380px;overflow:auto;display:flex;flex-direction:column}

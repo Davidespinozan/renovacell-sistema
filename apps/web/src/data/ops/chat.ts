@@ -10,7 +10,15 @@ import type { Atencion } from './atencionComercial'
 export type ModoConversacion = 'ai_active' | 'human_offered' | 'human_requested' | 'human_assigned' | 'human_active' | 'human_ended'
 export type ActorMensaje = 'visitor' | 'doctor' | 'seller' | 'admin' | 'ai' | 'system'
 export interface AdjuntoMensaje { id: string; url: string | null; tipo: string; uso: string | null }   // FOTOS · enlace temporal (10 min)
-export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null }
+/** CHAT-ARCHIVOS · video o documento del mensaje, con enlace temporal (10 min). */
+export interface ArchivoMensaje { id: string; url: string | null; tipo: string; clase: 'video' | 'documento'; bytes: number; nombre: string }
+export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null; archivo?: ArchivoMensaje | null }
+/** Sube el archivo con la subida firmada de UN solo uso que dio el servidor (al bucket privado). */
+export type SubirFirmado = (bucket: string, ruta: string, token: string, file: File, tipo: string) => Promise<string | null>
+const subirPorDefecto: SubirFirmado = async (bucket, ruta, token, file, tipo) => {
+  const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(ruta, token, file, { contentType: tipo })
+  return error ? error.message : null
+}
 export interface Conversacion {
   conversation_id: string; estado: 'abierta' | 'cerrada'; modo: ModoConversacion; rol?: 'dueno' | 'asesor' | 'supervisor'
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
@@ -85,6 +93,15 @@ export class ClienteChat {
   // FOTOS · imagen (data URL JPG/PNG ya reducida). Idempotente por client_message_id, como un mensaje.
   adjuntar(conversation_id: string, imagen: string, client_message_id = 'img:' + nuevoClientId().replace(/^c:/, '')) {
     return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'adjuntar', conversation_id, imagen, client_message_id })
+  }
+  // CHAT-ARCHIVOS · video o documento (hasta 50 MB): el servidor autoriza y da una subida firmada; el archivo va directo
+  // al almacenamiento privado; después el servidor revisa el archivo real y crea el mensaje. Idempotente por client id.
+  async archivo(conversation_id: string, file: File, tipo: string, subir: SubirFirmado = subirPorDefecto, client_message_id = 'arc:' + nuevoClientId().replace(/^c:/, '')) {
+    const prep = await this.llamar<{ ruta: string; token: string; bucket: string }>({ action: 'archivo_preparar', conversation_id, tipo, bytes: file.size })
+    if (!prep.ok) return prep
+    const fallo = await subir(prep.data.bucket, prep.data.ruta, prep.data.token, file, tipo)
+    if (fallo) return { ok: false as const, error: { codigo: 'subida', mensaje: `No se pudo subir «${file.name}». Revisa tu conexión e intenta de nuevo.` } }
+    return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'archivo_enviar', conversation_id, ruta: prep.data.ruta, nombre: file.name, client_message_id })
   }
   leido(conversation_id: string, seq: number) { return this.llamar<{ ok: true }>({ action: 'leido', conversation_id, seq }) }
   // CHAT PRO · "escribiendo…": solo la señal (unos segundos), nunca el texto.

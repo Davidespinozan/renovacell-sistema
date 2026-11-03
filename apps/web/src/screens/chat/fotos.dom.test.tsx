@@ -112,6 +112,6 @@ describe('Palomitas', () => {
     expect(await screen.findByTestId('tick-enviando')).toBeTruthy(); expect(screen.queryByText('Enviando…')).toBeNull()
   })
   it('el servidor cuenta la lectura del OTRO lado (asesor para el cliente; dueño para el personal)', () => {
-    expect(chatEdge).toMatch(/conLecturaAjena\(admin, conv, actor\.actor, await conAdjuntos\(admin, data\)\)/)
+    expect(chatEdge).toMatch(/conLecturaAjena\(admin, conv, actor\.actor, await conArchivos\(admin, await conAdjuntos\(admin, data\)\)\)/)   // CHAT-ARCHIVOS: también videos y documentos
   })
 })

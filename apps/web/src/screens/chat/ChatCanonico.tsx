@@ -9,7 +9,8 @@ import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, Check, CheckCheck, ChevronDown, ChevronUp, History, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, History, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
@@ -368,17 +369,25 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     await enviarTexto(t, nuevoClientId())
   }
   // FOTOS · mandar una imagen: se reduce en el dispositivo y viaja con su propio id (reintento sin duplicar).
+  // CHAT-ARCHIVOS (3 nov 2026) · el mismo botón manda videos y documentos (hasta 50 MB) por la subida firmada.
   const archivo = useRef<HTMLInputElement | null>(null)
-  const [subiendo, setSubiendo] = useState(false)
-  const mandarImagen = async (f: File | undefined) => {
+  const [subiendo, setSubiendo] = useState<string | null>(null)
+  const mandarArchivo = async (f: File | undefined) => {
     if (!f || !convId || subiendo) return
-    setSubiendo(true); setError(null)
-    const dataUrl = await reducir(f)
-    if (!dataUrl) { setSubiendo(false); setError('No se pudo leer la imagen.'); return }
-    const r = await cliente.adjuntar(convId, dataUrl)
-    setSubiendo(false)
+    setError(null)
+    const tipo = tipoDe(f.name, f.type)
+    const clase = claseDe(tipo)
+    const problema = problemaArchivo(f)
+    if (problema || !clase) { setError(problema ?? 'Ese archivo no se puede mandar.'); if (archivo.current) archivo.current.value = ''; return }
+    setSubiendo(f.name)
+    let r: { ok: boolean; error?: { mensaje: string } }
+    if (clase === 'imagen') {
+      const dataUrl = await reducir(f)
+      r = dataUrl ? await cliente.adjuntar(convId, dataUrl) : { ok: false, error: { mensaje: 'No se pudo leer la imagen.' } }
+    } else r = await cliente.archivo(convId, f, tipo)
+    setSubiendo(null)
     if (archivo.current) archivo.current.value = ''
-    if (!r.ok) { setError(r.error.mensaje); return }
+    if (!r.ok) { setError(r.error?.mensaje ?? 'No se pudo mandar el archivo.'); return }
     await cargar(convId, ultimoSeq.current)
   }
   const reintentar = () => { if (pendiente) void enviarTexto(pendiente.texto, pendiente.clientId) }
@@ -478,7 +487,19 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
           {inicio && etiqueta && <div className="rc-meta">{etiqueta}</div>}
-          {m.adjunto ? (
+          {m.archivo ? (
+            <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid={m.archivo.clase === 'video' ? 'msg-video' : 'msg-documento'}>
+              {!m.archivo.url ? <span className="rc-img-nd">{m.archivo.nombre} · no disponible</span>
+                : m.archivo.clase === 'video' ? <div className="tc-adj tc-adj--video"><video src={m.archivo.url} controls preload="metadata" playsInline /></div>
+                : (
+                  <a className="tc-adj tc-adj--doc" href={m.archivo.url} target="_blank" rel="noreferrer" download={m.archivo.nombre}>
+                    <FileText size={22} aria-hidden />
+                    <span className="tc-adj-meta"><span className="tc-adj-nombre">{m.archivo.nombre}</span><small>{[m.archivo.nombre.split('.').pop()?.toUpperCase(), pesoLegible(m.archivo.bytes)].filter(Boolean).join(' · ')}</small></span>
+                    <Download size={17} aria-hidden />
+                  </a>
+                )}
+            </div>
+          ) : m.adjunto ? (
             <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid="msg-imagen">
               {m.adjunto.url
                 ? <a href={m.adjunto.url} target="_blank" rel="noreferrer"><img className="rc-img" src={m.adjunto.url} alt="Imagen enviada en la conversación" loading="lazy" /></a>
@@ -646,8 +667,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <RespuestasRapidas lista={rrVisibles} activa={rrActiva} filtro={rrFiltro} onElegir={elegirRespuesta} onCerrar={cerrarRespuestas}
           onCambio={cargarRespuestas} cliente={respuestas} puedeEmpresa={puedeEmpresa} nombre={nombreCliente} />
       )}
+      {subiendo && <div className="rc-subiendo" role="status" data-testid="subiendo">Subiendo {subiendo}…</div>}
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
-        <input ref={archivo} type="file" accept="image/jpeg,image/png,image/*" hidden onChange={(e) => void mandarImagen(e.target.files?.[0])} data-testid="input-imagen" />
+        <input ref={archivo} type="file" accept={ACEPTA} hidden onChange={(e) => void mandarArchivo(e.target.files?.[0])} data-testid="input-imagen" />
         {conAcciones && (
           <button type="button" className={`rc-ico rc-adjuntar rc-mas${accAbierto ? ' rc-ico--on' : ''}`} onClick={() => { setRrBoton(false); setAccAbierto((v) => !v) }}
             aria-label="Acciones con este cliente" aria-expanded={accAbierto} aria-haspopup="menu" title="Verificar, mandar acceso, cotizar, registrar pago…" data-testid="btn-acciones"><Plus size={21} /></button>
@@ -656,7 +678,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           <button type="button" className={`rc-ico rc-adjuntar${rrBoton ? ' rc-ico--on' : ''}`} onClick={() => { setAccAbierto(false); setRrBoton((v) => !v) }} disabled={!puedoEscribir}
             aria-label="Respuestas rápidas" aria-expanded={rrAbierto} title="Respuestas rápidas (o escribe /)" data-testid="btn-respuestas"><Zap size={19} /></button>
         )}
-        <button type="button" className="rc-ico rc-adjuntar" onClick={() => archivo.current?.click()} disabled={!puedoEscribir || subiendo} aria-label={subiendo ? 'Subiendo imagen' : 'Mandar una foto'} title="Mandar una foto" data-testid="btn-imagen"><Camera size={20} /></button>
+        <button type="button" className="rc-ico rc-adjuntar" onClick={() => archivo.current?.click()} disabled={!puedoEscribir || !!subiendo} aria-label={subiendo ? `Subiendo ${subiendo}` : 'Mandar foto, video o documento'} title="Mandar foto, video o documento" data-testid="btn-imagen"><Paperclip size={20} /></button>
         <textarea
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}

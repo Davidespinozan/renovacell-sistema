@@ -27,6 +27,31 @@ export async function guardarImagenWA(admin: any, conv: string, messageId: strin
 }
 export const VIGENCIA_ENLACE_SEG = 600
 
+// CHAT-ARCHIVOS (mig 20270324) · videos y documentos: bucket privado `chat_archivos`, tabla cc_archivos. El mensaje dice
+// qué llegó ("Envió un video." / "Envió un documento: Ficha.pdf."); el archivo solo se entrega con enlaces temporales.
+export const BUCKET_ARCHIVOS = 'chat_archivos'
+export const MAX_BYTES_ARCHIVO = 52_428_800
+export const EXT_ARCHIVO: Record<string, string> = {
+  'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'video/3gpp': '3gp',
+  'application/pdf': 'pdf', 'text/plain': 'txt', 'text/csv': 'csv', 'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx', 'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+}
+export const claseArchivo = (tipo: string): 'video' | 'documento' | null => (!EXT_ARCHIVO[tipo] ? null : tipo.startsWith('video/') ? 'video' : 'documento')
+export const nombreArchivo = (n: unknown): string => (typeof n === 'string' ? n.replace(/[\u0000-\u001f/\\]+/g, ' ').trim().slice(0, 200) : '') || 'archivo'
+export const textoArchivo = (tipo: string, nombre: string): string => (claseArchivo(tipo) === 'video' ? 'Envió un video.' : `Envió un documento: ${nombre.slice(0, 160)}.`)
+/** El texto que marca un mensaje de archivo (no se le manda al cliente como pie en WhatsApp). */
+export const esMarcadorArchivo = (t: unknown): boolean => typeof t === 'string' && (t === 'Envió un video.' || /^Envió un documento: .*\.$/s.test(t))
+/** client_message_id de un archivo: siempre con prefijo `arc:` (así la base sabe que lleva archivo). */
+export function idArchivo(entrada: unknown): string {
+  const base = typeof entrada === 'string' ? entrada.replace(/^arc:/, '').replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 70) : ''
+  return 'arc:' + (base || crypto.randomUUID())
+}
+/** Ruta del archivo: <conversación>/<uuid>.<ext> (la que acepta cc_archivos). */
+export const rutaArchivo = (conv: string, tipo: string): string => `${conv}/${crypto.randomUUID()}.${EXT_ARCHIVO[tipo]}`
+export const RUTA_ARCHIVO = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/
+
 /** client_message_id de una imagen: siempre con prefijo `img:` (así la base sabe que lleva adjunto). */
 export function idImagen(entrada: unknown): string {
   const base = typeof entrada === 'string' ? entrada.replace(/^img:/, '').replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 70) : ''
@@ -49,6 +74,24 @@ export async function conAdjuntos(admin: any, data: unknown): Promise<unknown> {
     const porMsj = new Map(lista.map((a) => [a.message_id, { id: a.id, url: url.get(a.ruta) ?? null, tipo: a.tipo, uso: a.uso }]))
     return { ...(d as Record<string, unknown>), mensajes: msgs.map((m) => (porMsj.has(m.id as string) ? { ...m, adjunto: porMsj.get(m.id as string) } : m)) }
   } catch { return data }   // sin enlaces el mensaje sigue ahí ("Envió una imagen."): nunca se rompe la lectura
+}
+
+/** CHAT-ARCHIVOS · a los mensajes que traen video o documento les pone `archivo` con su enlace temporal. */
+// deno-lint-ignore no-explicit-any
+export async function conArchivos(admin: any, data: unknown): Promise<unknown> {
+  const d = data as { mensajes?: Msj[] } | null
+  const msgs = Array.isArray(d?.mensajes) ? d!.mensajes! : []
+  const ids = msgs.filter((m) => esMarcadorArchivo(m.content) && typeof m.id === 'string').map((m) => m.id as string)
+  if (!ids.length) return data
+  try {
+    const { data: filas } = await admin.from('cc_archivos').select('id, message_id, ruta, tipo, clase, bytes, nombre').in('message_id', ids)
+    const lista = (filas ?? []) as Array<{ id: string; message_id: string; ruta: string; tipo: string; clase: string; bytes: number; nombre: string }>
+    if (!lista.length) return data
+    const { data: firmadas } = await admin.storage.from(BUCKET_ARCHIVOS).createSignedUrls(lista.map((a) => a.ruta), VIGENCIA_ENLACE_SEG)
+    const url = new Map<string, string>(((firmadas ?? []) as Array<{ path: string; signedUrl: string }>).map((f) => [f.path, f.signedUrl]))
+    const porMsj = new Map(lista.map((a) => [a.message_id, { id: a.id, url: url.get(a.ruta) ?? null, tipo: a.tipo, clase: a.clase, bytes: a.bytes, nombre: a.nombre }]))
+    return { ...(d as Record<string, unknown>), mensajes: msgs.map((m) => (porMsj.has(m.id as string) ? { ...m, archivo: porMsj.get(m.id as string) } : m)) }
+  } catch { return data }
 }
 
 /** CHAT PRO · ¿el otro lado está escribiendo? (su marca vence sola en unos segundos). */

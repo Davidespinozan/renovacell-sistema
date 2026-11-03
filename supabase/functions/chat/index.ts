@@ -26,7 +26,7 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
-import { TEXTO_IMAGEN, idImagen, conAdjuntos, conLecturaAjena } from '../_shared/adjuntos.ts'
+import { TEXTO_IMAGEN, idImagen, conAdjuntos, conArchivos, conLecturaAjena, BUCKET_ARCHIVOS, MAX_BYTES_ARCHIVO, claseArchivo, idArchivo, nombreArchivo, rutaArchivo, textoArchivo, RUTA_ARCHIVO } from '../_shared/adjuntos.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
@@ -41,7 +41,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['adjuntar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo'])   // + Chat V2-C1
+const ACCIONES = new Set(['adjuntar', 'archivo_preparar', 'archivo_enviar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo'])   // + Chat V2-C1
 // CONTACTO CONVERSACIONAL · lo único que puede hacer un visitante que aún no deja sus datos: conversar con el asistente.
 const SOLO_CONVERSAR = new Set(['abrir', 'leer', 'enviar', 'leido', 'escribiendo', 'sesiones', 'leer_sesion'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -116,7 +116,7 @@ Deno.serve(conCors(async (req) => {
     const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
     const { data, error } = await admin.rpc('cc_sesion_leer', { p_session: sesion, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile, p_desde_seq: desde, p_limite: 100 })
     if (error) return falla(error)
-    return json(200, await conAdjuntos(admin, data))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
+    return json(200, await conArchivos(admin, await conAdjuntos(admin, data)))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
   }
 
   if (!conv) return json(400, { error: 'falta_conversacion', message: 'Falta conversation_id.' })
@@ -146,7 +146,7 @@ Deno.serve(conCors(async (req) => {
     //   `canal` cubre WhatsApp, Instagram y Messenger; `whatsapp` se conserva para quien ya lo lee.
     const canal = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_canal_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) as Record<string, unknown> | null : null
     const whatsapp = canal && canal.canal === 'whatsapp' ? canal : null
-    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conAdjuntos(admin, data)) as Record<string, unknown>), cart_id, canal, whatsapp })
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conArchivos(admin, await conAdjuntos(admin, data))) as Record<string, unknown>), cart_id, canal, whatsapp })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0
@@ -222,6 +222,49 @@ Deno.serve(conCors(async (req) => {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
     enSegundoPlano(avisarPush(admin, conv, actor.actor, TEXTO_IMAGEN))
+    return json(200, { ...r, ia: 'omitida' })
+  }
+  // ── CHAT-ARCHIVOS · videos y documentos (hasta 50 MB). Dos pasos para no pasar el archivo por aquí:
+  //    1) archivo_preparar: la base dice si quien llama puede escribir YA y se le da UNA subida firmada al bucket privado;
+  //    2) archivo_enviar: se revisa el archivo REAL subido (tipo y tamaño del almacenamiento, no lo que dice el cliente),
+  //       se crea el mensaje ("Envió un documento: …") y se liga el archivo. La IA no responde a archivos.
+  if (action === 'archivo_preparar' || action === 'archivo_enviar') {
+    const v = await limitarTodas(admin, quien
+      ? [{ scope: 'chat_adjuntar_uid', sujeto }, { scope: 'chat_adjuntar_global', sujeto: 'global' }]
+      : [{ scope: 'chat_adjuntar', sujeto }, { scope: 'chat_adjuntar_global', sujeto: 'global' }])
+    if (!v.permitido) return respuestaLimite(v)
+    const autorizar = (tipo: string, bytes: number) => admin.rpc('cc_archivo_autorizar', { ...base, p_tipo: tipo, p_bytes: bytes })
+    if (action === 'archivo_preparar') {
+      const tipo = String(p.tipo ?? '').toLowerCase(); const bytes = Number(p.bytes)
+      if (!claseArchivo(tipo)) return json(400, { error: 'archivo_tipo', message: 'Solo videos (MP4, MOV, WEBM) y documentos (PDF, Word, Excel, PowerPoint, texto).' })
+      if (!Number.isFinite(bytes) || bytes < 1 || bytes > MAX_BYTES_ARCHIVO) return json(400, { error: 'archivo_tamano', message: 'El archivo debe pesar menos de 50 MB.' })
+      const { error } = await autorizar(tipo, bytes)
+      if (error) return falla(error)
+      const ruta = rutaArchivo(conv, tipo)
+      const { data: subida, error: eUp } = await admin.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta)
+      if (eUp || !subida?.token) return json(503, { error: 'no_disponible', message: 'No se pudo preparar la subida. Intenta de nuevo.' })
+      return json(200, { ruta, token: subida.token, bucket: BUCKET_ARCHIVOS })
+    }
+    const ruta = typeof p.ruta === 'string' ? p.ruta : ''
+    if (!RUTA_ARCHIVO.test(ruta) || !ruta.startsWith(conv + '/')) return json(400, { error: 'archivo_invalido', message: 'Ruta de archivo no válida.' })
+    const quitar = () => admin.storage.from(BUCKET_ARCHIVOS).remove([ruta]).then(() => {}, () => {})
+    const { data: lista } = await admin.storage.from(BUCKET_ARCHIVOS).list(conv, { search: ruta.split('/')[1], limit: 1 })
+    const obj = ((lista ?? []) as Array<{ name: string; metadata?: { size?: number; mimetype?: string } | null }>).find((o) => o.name === ruta.split('/')[1])
+    const tipo = String(obj?.metadata?.mimetype ?? '').toLowerCase().split(';')[0]; const bytes = Number(obj?.metadata?.size ?? 0)
+    if (!obj) return json(400, { error: 'archivo_inexistente', message: 'El archivo no terminó de subirse. Intenta de nuevo.' })
+    if (!claseArchivo(tipo) || bytes < 1 || bytes > MAX_BYTES_ARCHIVO) { await quitar(); return json(400, { error: 'archivo_tipo', message: 'Ese archivo no se puede mandar (tipo o tamaño no permitido).' }) }
+    const { error: eAut } = await autorizar(tipo, bytes)
+    if (eAut) { await quitar(); return falla(eAut) }
+    const nombre = nombreArchivo(p.nombre)
+    const texto = textoArchivo(tipo, nombre)
+    const { data, error } = await admin.rpc('cc_enviar_mensaje', { ...base, p_client_id: idArchivo(p.client_message_id), p_content: texto })
+    if (error) { await quitar(); return falla(error) }
+    const r = data as { id: string; seq: number; idempotente: boolean; modo: string }
+    if (r.idempotente) { await quitar(); return json(200, { ...r, ia: 'omitida' }) }   // reintento: el archivo ya quedó con su mensaje
+    const { error: eReg } = await admin.rpc('cc_archivo_registrar', { p_message: r.id, p_ruta: ruta, p_tipo: tipo, p_bytes: bytes, p_nombre: nombre })
+    if (eReg) { await quitar(); return json(503, { error: 'no_disponible', message: 'No se pudo guardar el archivo. Intenta de nuevo.' }) }
+    enSegundoPlano(avisarPush(admin, conv, actor.actor, texto))
+    if (actor.actor === 'seller' || actor.actor === 'admin') enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // si es de WhatsApp, sale ya
     return json(200, { ...r, ia: 'omitida' })
   }
   if (action === 'solicitar_asesor') {

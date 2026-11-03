@@ -57,6 +57,6 @@ describe('costura: base, webhook, despacho y chat', () => {
     expect(send).not.toMatch(/prospects/)
     expect(chatEdge).toMatch(/admin\.rpc\('cc_canal_conversacion', \{ p_conv: conv \}\)/)
     expect(chatEdge).toMatch(/cart_id, canal, whatsapp \}\)/)
-    expect((chatEdge.match(/Promise\.all\(\[despacharWhatsApp\(admin\), despacharMeta\(admin\)\]\)/g) ?? []).length).toBe(2)
+    expect((chatEdge.match(/Promise\.all\(\[despacharWhatsApp\(admin\), despacharMeta\(admin\)\]\)/g) ?? []).length).toBe(3)   // mensaje del personal, respuesta de la IA y archivo del personal (CHAT-ARCHIVOS)
   })
 })
