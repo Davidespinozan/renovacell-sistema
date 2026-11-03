@@ -105,12 +105,18 @@ sql "do \$\$ declare v_p uuid := tests.product(); v_o uuid; begin
   perform public.registrar_cobro(gen_random_uuid(), v_o, 'efectivo', 100);
   perform tests.act_as_owner();
 end \$\$;" >/dev/null
-CMD="select tests.act_as(tests.id('m7_bill')); select public.registrar_corte_caja(gen_random_uuid(), public.hoy_local(), 'dia', 0, 100) ->> 'esperado'"
+# El efectivo del día incluye el de las pruebas anteriores en esta misma base: se cuenta lo que el SERVIDOR espera
+# (antes la prueba suponía que solo existían los 100 de este paso y fallaba con MOTIVO_REQUERIDO).
+EXP=$("${P[@]}" -c "begin; select tests.act_as(tests.id('m7_bill')); select public.efectivo_esperado(public.hoy_local(), 'dia', null); commit;" | grep -E '^[0-9.]+$' | tail -1)
+PRE=$("${P[@]}" -c "select count(*) from public.cash_closings where alcance = 'dia' and voids_closing_id is null" | tail -1)
+T0=$("${P[@]}" -c "select clock_timestamp()" | tail -1)
+CMD="select tests.act_as(tests.id('m7_bill')); select public.registrar_corte_caja(gen_random_uuid(), public.hoy_local(), 'dia', 0, $EXP) ->> 'esperado'"
 race "$CMD" "$CMD"
-has "m7: A cierra el tramo con el esperado del servidor" "^100$" "$T/a.out"
+check "m7: el tramo incluye los 100 de este paso (esperado $EXP)" "select $EXP >= 100"
+check "m7: A cierra el tramo con el esperado del servidor" "select $(grep -E '^[0-9]+(\.[0-9]+)?$' "$T/a.out" | tail -1 || echo -1)::numeric = $EXP"
 has "m7: B en paralelo NO vuelve a arquear el mismo efectivo" "MOTIVO_REQUERIDO\|uq_cierre_cadena\|TRAMO_VACIO\|deadlock" "$T/b.out"
-check "m7: UN solo corte vigente del día" "select count(*) = 1 from public.cash_closings where alcance = 'dia' and voids_closing_id is null"
-check "m7: el efectivo se arqueó UNA vez (100, no 200)" "select coalesce(sum(esperado), 0) = 100 from public.cash_closings where alcance = 'dia'"
+check "m7: UN solo corte nuevo vigente del día" "select count(*) = $PRE + 1 from public.cash_closings where alcance = 'dia' and voids_closing_id is null"
+check "m7: el efectivo se arqueó UNA vez ($EXP, no el doble)" "select coalesce(sum(esperado), 0) = $EXP from public.cash_closings where alcance = 'dia' and created_at >= '$T0'"
 check "m7: ningún tramo traslapado tras la carrera" "select count(*) = 0 from public.cash_closings a, public.cash_closings b where a.id <> b.id and a.alcance = b.alcance and a.cajero is not distinct from b.cajero and a.voids_closing_id is null and b.voids_closing_id is null and a.corte_desde < b.corte_hasta and b.corte_desde < a.corte_hasta"
 check "m7: la cadena quedó lineal (ningún predecesor repetido)" "select count(*) = 0 from public.cash_closings a join public.cash_closings b on a.prev_closing_id = b.prev_closing_id and a.id <> b.id where a.prev_closing_id is not null"
 

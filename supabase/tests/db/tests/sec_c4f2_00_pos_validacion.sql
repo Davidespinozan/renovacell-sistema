@@ -40,8 +40,9 @@ begin
   -- ══ 0 · FORMA: huellas, internas, sin cambios colaterales ══════════════════════════════════
   perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '078a1dc8777baf30249a75cca67409bf' and md5(pg_get_functiondef('public._w3_receptor(uuid,jsonb)'::regprocedure)) = 'bb7b1d1a51edd1cbf4e8427045fb0dcb',
     '0.1 · vender_pos y _w3_receptor son las de la 146');
-  perform tests.ok(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = 'd27eba9834466d71e5a3439614801bb7'
-               and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '4ee1daa01dd51d5187bc46fbc2397e3d'
+  -- re-anclado por SEGURIDAD-E2E (20270318): FISCAL-1 implementado (Ventas solo sus pedidos)
+  perform tests.ok(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = '8540cd56509d419751bcc9b685a6b464'
+               and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '2082958fda2d4ec59e053db9e1142af2'
                and md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and md5(pg_get_functiondef('public._fiscal_error(jsonb)'::regprocedure)) = 'e8ff16dba9165213c6ad8d69f4a7d81f'
                and md5(pg_get_functiondef('public._fiscal_clean(jsonb)'::regprocedure)) = '1e8d88c21e6a1fd469ea101126c658f6',

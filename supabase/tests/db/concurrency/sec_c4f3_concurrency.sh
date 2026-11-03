@@ -18,7 +18,7 @@ check() { local r; r=$("${P[@]}" -c "$2" 2>&1 | tail -n1); if [ "$r" = "t" ]; th
 do $$
 declare k text; c1 uuid; c2 uuid;
 begin
-  insert into tests.ctx values ('f3_posa', tests.user('pos')), ('f3_posb', tests.user('pos')), ('f3_p1', tests.product(100)), ('f3_p2', tests.product(250));
+  insert into tests.ctx values ('f3_bill', tests.user('billing')), ('f3_posa', tests.user('pos')), ('f3_posb', tests.user('pos')), ('f3_p1', tests.product(100)), ('f3_p2', tests.product(250));
   perform tests.act_as_service();
   insert into public.customers (full_name, source) values ('Carrera F3 uno ' || left(gen_random_uuid()::text, 8), 'odoo') returning id into c1;
   insert into public.customers (full_name, source) values ('Carrera F3 dos ' || left(gen_random_uuid()::text, 8), 'odoo') returning id into c2;
@@ -74,7 +74,8 @@ uno F f
 
 # G · flujo anterior en DOS transacciones y después la función nueva
 "${P[@]}" -c "select tests.act_as(tests.id('f3_posa')); select public.crear_pedido(tests.id('f3_og'), null, null, $L1, $ENV, true, tests.id('f3_c1'));" >/dev/null
-"${P[@]}" -c "select tests.act_as(tests.id('f3_posa')); select public.set_order_fiscal_snapshot(tests.id('f3_og'), $R1);" >/dev/null
+# el receptor lo captura Facturación (FISCAL-1, 20270318: Ventas solo en sus propios pedidos)
+"${P[@]}" -c "select tests.act_as(tests.id('f3_bill')); select public.set_order_fiscal_snapshot(tests.id('f3_og'), $R1);" >/dev/null
 "${P[@]}" -c "$(nueva posa g "$L1" c1 "$R1")" > "$T/g1.out" 2>&1
 [ "$(con g PEDIDO_EXISTENTE_CONFLICTO)" = "1" ] && echo "PASS: G · pedido creado en dos llamadas (flujo anterior): la función nueva responde conflicto" || { echo "FAIL: G · $(cat "$T/g1.out")"; FAILED=1; }
 check "G · y no lo tocó (un solo cambio en bitácora, el del flujo anterior)" "select (select count(*) from public.audit_logs where resource_type = 'orders' and resource_id = tests.id('f3_og')::text and action = 'UPDATE orders') = 1 and (select count(distinct created_at) from public.audit_logs where resource_type = 'orders' and resource_id = tests.id('f3_og')::text) = 2"

@@ -29,6 +29,8 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_COMPROBANTE_B64 = 14_000_000   // ≈ 10 MB de archivo en base64 (fotos de celular sin comprimir)
+const TIPOS_COMPROBANTE = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']
 
 // Decodifica un data-URI de imagen a bytes (para subir el comprobante).
 function decodeDataUrl(dataUrl?: string): { bytes: Uint8Array; contentType: string } | null {
@@ -85,9 +87,11 @@ Deno.serve(conCors(async (req) => {
 
   // El pedido se lee solo para nombrarlo en el aviso y para tomar el saldo por omisión.
   // La autoridad sobre dueño/estado/saldo es del comando, no de esta función.
-  const { data: order } = await admin.from('orders').select('id, external_ref, doctor_id').eq('id', body.orderId).single()
+  // SEGURIDAD-E2E (2 nov 2026): se lee CON LA IDENTIDAD DEL LLAMANTE (sus permisos): un pedido ajeno responde igual que uno
+  // inexistente y nada se sube al almacenamiento antes de saber que puede verlo.
+  const { data: order } = await caller.from('orders').select('id, external_ref, doctor_id').eq('id', body.orderId).maybeSingle()
   if (!order) return json(404, { error: 'Pedido no encontrado.' })
-  const { data: dinero } = await admin.from('v_order_money').select('saldo').eq('order_id', body.orderId).maybeSingle()
+  const { data: dinero } = await caller.from('v_order_money').select('saldo').eq('order_id', body.orderId).maybeSingle()
 
   const monto = typeof body.amount === 'number' && body.amount > 0 ? body.amount : Number(dinero?.saldo ?? 0)
   if (!(monto > 0)) return json(400, { error: 'Ese pedido no tiene saldo por cobrar.' })
@@ -127,7 +131,9 @@ Deno.serve(conCors(async (req) => {
   // guardar su ruta en la declaración; si el comando falla, el archivo queda huérfano
   // (sin efecto contable) y el siguiente intento sube el suyo.
   let proofPath: string | null = null
+  if (typeof body.proof === 'string' && body.proof.length > MAX_COMPROBANTE_B64) return json(413, { error: 'El comprobante pesa demasiado (máximo 10 MB).' })
   const dec = decodeDataUrl(body.proof)
+  if (dec && !TIPOS_COMPROBANTE.includes(dec.contentType.toLowerCase())) return json(400, { error: 'El comprobante debe ser una foto o un PDF.' })
   if (dec) {
     const path = `transfers/${order.id}/${Date.now()}.jpg`
     const up = await admin.storage.from('proofs').upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })

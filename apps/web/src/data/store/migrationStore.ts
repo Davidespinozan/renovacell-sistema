@@ -98,6 +98,48 @@ function traducirLote(msg: string): string {
   if (msg.includes('LOTE_CADUCIDAD_DISTINTA')) return 'ese lote ya existe con otra caducidad'
   return ''
 }
+// ── FECHAS DE CADUCIDAD SIN AMBIGÜEDAD (ensayo 2 nov 2026) ─────────────────────────────────────────────────
+// El servidor convertía la fecha con el estilo de EE. UU. (mes/día): "06/07/2027" (6 de julio en México) se guardaba
+// como 7 de junio, sin avisar. Aquí se lee como se escribe en México y se manda SIEMPRE como AAAA-MM-DD; lo que no se
+// pueda leer con certeza se rechaza con su motivo (nunca se adivina).
+const MESES: Record<string, number> = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12,
+  jan: 1, apr: 4, aug: 8, dec: 12 }
+const iso = (y: number, m: number, d: number): string | null => {
+  if (y < 100) y += 2000
+  const t = new Date(Date.UTC(y, m - 1, d))
+  if (y < 2000 || y > 2100 || t.getUTCFullYear() !== y || t.getUTCMonth() !== m - 1 || t.getUTCDate() !== d) return null
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+export function fechaCaducidadIso(raw: string): string | null {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (!v) return null
+  let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(v)                       // 2027-06-30 · 2027/06/30
+  if (m) return iso(+m[1], +m[2], +m[3])
+  m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/.exec(v)                    // 30/06/2027 · 30-06-27 (día/mes/año)
+  if (m) return iso(+m[3], +m[2], +m[1])
+  m = /^(\d{1,2})[-/. ]+([a-záéíóú]{3,})\.?[-/. ]+(?:de[ ]+)?(\d{2}|\d{4})$/.exec(v.replace(/ de /g, ' '))   // 30-jun-2027 · 30 junio 2027
+  if (m) { const mes = MESES[m[2].normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 3)]; return mes ? iso(+m[3], mes, +m[1]) : null }
+  m = /^(\d{2})\/(\d{4})$/.exec(v) ?? /^(\d{1,2})[-/](\d{4})$/.exec(v)            // 06/2027: sin día no se adivina
+  if (m) return null
+  if (/^\d{5}$/.test(v)) { const t = new Date(Date.UTC(1899, 11, 30) + Number(v) * 86_400_000); return iso(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()) }   // número de serie de Excel
+  return null
+}
+
+/** Junta las filas repetidas del MISMO lote (mismo SKU y código) sumando piezas; si traen caducidades distintas, el lote
+ *  se rechaza completo (no se sabe cuál es la buena). Antes la segunda fila se descartaba como "ya existía". */
+export function agruparLotes(rows: LoteRow[]): { filas: LoteRow[]; conflictos: Array<{ fila: LoteRow; motivo: string }> } {
+  const porClave = new Map<string, LoteRow>(); const malas = new Set<string>(); const conflictos: Array<{ fila: LoteRow; motivo: string }> = []
+  for (const r of rows) {
+    const k = `${r.sku.trim().toLowerCase()}|${r.lote.trim().toLowerCase().replace(/\s+/g, ' ')}`
+    const ya = porClave.get(k)
+    if (!ya) { porClave.set(k, { ...r }); continue }
+    if (ya.caducidad !== r.caducidad) { malas.add(k); conflictos.push({ fila: r, motivo: `Lote ${r.lote}: aparece con dos caducidades distintas (${ya.caducidad} y ${r.caducidad})` }); continue }
+    ya.cantidad = (Number(ya.cantidad) || 0) + (Number(r.cantidad) || 0)
+  }
+  for (const k of malas) { const f = porClave.get(k); if (f) conflictos.push({ fila: f, motivo: `Lote ${f.lote}: aparece con dos caducidades distintas` }); porClave.delete(k) }
+  return { filas: [...porClave.values()], conflictos }
+}
+
 export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   const res = empty()
   if (!hasSupabase) { res.errors.push('Sin conexión al sistema: la migración requiere el backend.'); return res }
@@ -108,7 +150,16 @@ export async function importLotes(rows: LoteRow[]): Promise<MigrationResult> {
   // W1: carga inicial = entrada sin orden → solo Dirección (lo impone el servidor), caducidad
   // ESTRICTA (una fecha inválida ya no entra como NULL). Idempotencia: el servidor omite un lote
   // ya existente ('skipped'), así que re-subir el mismo archivo tras una respuesta ambigua no duplica.
+  const normalizadas: LoteRow[] = []
   for (const r of rows) {
+    const cad = fechaCaducidadIso(r.caducidad)
+    const original = String(r.caducidad ?? '').replace(/ \(no se entiende\)$/, '').trim()
+    if (!cad) { rej(res, r as unknown as Record<string, unknown>, original ? `Lote ${r.lote || '?'}: no se entiende la caducidad "${original}" (usa día/mes/año, p. ej. 30/06/2027)` : `Lote ${r.lote || '?'}: falta la caducidad`); continue }
+    normalizadas.push({ ...r, caducidad: cad })
+  }
+  const { filas, conflictos } = agruparLotes(normalizadas)
+  for (const c of conflictos) rej(res, c.fila as unknown as Record<string, unknown>, c.motivo)
+  for (const r of filas) {
     const opId = newOpId()
     const out = await runW1Command<{ result?: string }>('importar_lote', {
       p_op_id: opId,

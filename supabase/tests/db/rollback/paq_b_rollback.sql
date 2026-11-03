@@ -1,5 +1,6 @@
 -- PAQ-B (149) · el down elimina anular_guia y restaura _comm_tr_orders exactamente; todo lo demás queda igual.
 begin;
+\ir ../../../rollback/seguridad_e2e/99_down.sql   -- SEGURIDAD-E2E (20270318) parcha orders_guard, link de pago y FISCAL-1: se baja antes
 \ir ../../../rollback/auxiliar_almacen/99_down.sql   -- AUXILIAR se baja antes de tomar la foto (redefine recepción, reingreso, custodia y anular_guia)
 create temp table _pb as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,

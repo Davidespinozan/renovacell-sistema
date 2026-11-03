@@ -1,5 +1,6 @@
 -- LINK DE PAGO (20270309) · el down deja el push, las plantillas de correo y todo lo demás como antes; se reaplica idéntica.
 begin;
+\ir ../../../rollback/seguridad_e2e/99_down.sql   -- SEGURIDAD-E2E (20270318) parcha orders_guard, link de pago y FISCAL-1: se baja antes
 create temp table _lp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/link_pago/99_down.sql
 do $t$ begin

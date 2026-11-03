@@ -29,7 +29,8 @@ begin
   -- ══ 0 · FORMA ══
   perform tests.ok(md5(pg_get_functiondef('public.anular_guia(uuid,uuid,text)'::regprocedure)) = '34886f6aa94688900f77778fc08e6d7f'
                and md5(pg_get_functiondef('public._comm_tr_orders()'::regprocedure)) = 'f6cad9db69196400c9c69685ab7f5580', '0.1 · funciones de la 149');
-  perform tests.ok(md5(pg_get_functiondef('public.orders_guard()'::regprocedure)) = 'e88f1bb21a69f79a1d31585cbc75bf7d' and md5(pg_get_functiondef('public.shipments_guard()'::regprocedure)) = 'b1e791b99ca8043cb1e2913e0b294600'
+  -- orders_guard re-anclado por SEGURIDAD-E2E (20270318): el doctor no edita la entrega de su pedido
+  perform tests.ok(md5(pg_get_functiondef('public.orders_guard()'::regprocedure)) = '1ad414d5a20ee9ff5803b81068113bc5' and md5(pg_get_functiondef('public.shipments_guard()'::regprocedure)) = 'b1e791b99ca8043cb1e2913e0b294600'
                and md5(pg_get_functiondef('public.finalize_shipment(uuid,jsonb)'::regprocedure)) = 'a1cf5c01877e87f41ee0e9635b478e34' and md5(pg_get_functiondef('public.cancelar_pedido(uuid,uuid,text)'::regprocedure)) = '3da69c03241d6805a274f3acb602e399'
                and md5(pg_get_functiondef('public.anular_guia_manual(uuid,uuid,text,text)'::regprocedure)) = '68f0824cb3572d7ad394886afacdd78e', '0.2 · candados y comandos existentes NO cambiaron');
 

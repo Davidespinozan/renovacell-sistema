@@ -25,6 +25,7 @@ const EXCEPCIONES_DISPOSITIVO: Record<string, string> = {
   'lib/exportData.ts': 'nombre del archivo exportado (sello de descarga), no una cifra',
   'screens/Calendario.tsx': 'calendario de agenda interna del equipo (cita del día del dispositivo), no un reporte',
   'data/shipping/provider.ts': 'cálculo de ETA del proveedor de paquetería, no un reporte',
+  'screens/doctor/MicroformTarjeta.tsx': 'lista de años de vencimiento de la tarjeta del cliente (formulario del banco), no un reporte',
 }
 
 describe('guarda temporal: nadie corta periodos fuera de data/periodo.ts', () => {

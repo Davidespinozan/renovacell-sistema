@@ -51,10 +51,11 @@ begin
 
   -- ══ 0 · FORMA ══════════════════════════════════════════════════════════════════════════════
   perform tests.ok(md5(pg_get_functiondef(SIG::regprocedure)) = '5769c551e6ca60003ba0fcf9390d80d1', '0.1 · la función es la de la 147');
+  -- re-anclado por SEGURIDAD-E2E (20270318): FISCAL-1 implementado (Ventas solo sus pedidos)
   perform tests.ok(md5(pg_get_functiondef('public.crear_pedido(uuid,text,uuid,jsonb,jsonb,boolean,uuid)'::regprocedure)) = '62039cc835b93f7c0119b1c54c774495'
                and (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'crear_pedido') = 1
-               and md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = 'd27eba9834466d71e5a3439614801bb7'
-               and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '4ee1daa01dd51d5187bc46fbc2397e3d'
+               and md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)) = '8540cd56509d419751bcc9b685a6b464'
+               and md5(pg_get_functiondef('public.solicitar_cfdi(uuid,uuid,jsonb)'::regprocedure)) = '2082958fda2d4ec59e053db9e1142af2'
                and md5(pg_get_functiondef('public._fiscal_entrada_error(jsonb)'::regprocedure)) = 'b651a11fd4cd94040473a1aa503986c0',
     '0.2 · crear_pedido (una sola firma), set_order_fiscal_snapshot, solicitar_cfdi y la validación de la 146 NO cambiaron');
   perform tests.ok((select prosecdef and proowner = 'postgres'::regrole and proconfig = array['search_path=public'] and pronargdefaults = 0 and pronargs = 8 from pg_proc where oid = SIG::regprocedure)
@@ -256,7 +257,7 @@ begin
 
   -- ══ G · EQUIVALENCIA: dos llamadas (antes) vs una (ahora) ══════════════════════════════════
   a := pg_temp.cuentas(); o := gen_random_uuid(); o2 := gen_random_uuid();
-  perform tests.act_as(posA); perform public.crear_pedido(o, 'F3-G1', null, lin, env, true, cH); perform public.set_order_fiscal_snapshot(o, rec);
+  perform tests.act_as(posA); perform public.crear_pedido(o, 'F3-G1', null, lin, env, true, cH); perform tests.act_as(v_bill); perform public.set_order_fiscal_snapshot(o, rec); perform tests.act_as(posA);   -- FISCAL-1 (20270318): el receptor del flujo anterior lo captura Facturación
   perform tests.act_as_owner(); b := pg_temp.cuentas();
   perform tests.act_as(posA); execute format(f, o2, 'F3-G2', null, lin, env, true, cH, rec);
   perform tests.act_as_owner(); d := pg_temp.cuentas();

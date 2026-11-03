@@ -16,7 +16,7 @@ const enlacesDe = (p, g) => p.evaluate((g) => {
 }, g)
 for (const c of CUENTAS) {
   reset()
-  const p = await sesion(b, `${c}@e2e.mx`)
+  const p = await sesion(b, `${c}@e2e.mx`, { movil: process.env.MOVIL === '1' })
   await p.click('[data-testid=puerta-ahora-no]').catch(() => {})
   const gs = await grupos(p); const vistas = new Set()
   const secciones = gs.length ? gs : ['']
@@ -37,6 +37,10 @@ for (const c of CUENTAS) {
         p.errores.splice(0).forEach((e) => fallas.push(`${c} › ${l} › ${t}: ${e}`))
       }
       if (await p.evaluate(() => document.body.innerText.includes('Algo salió mal'))) fallas.push(`${c} › ${l}: CRASH`)
+      if (process.env.MOVIL === '1') {   // en el celular nada debe salirse de la pantalla (desplazamiento horizontal)
+        const ancho = await p.evaluate(() => { const w = window.innerWidth; const sale = [...document.querySelectorAll('main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > w + 2 && getComputedStyle(e).position !== 'fixed' && !e.closest('[style*="overflow"], .table-wrap, .tabla, .scroll-x, table') }).slice(0, 3).map((e) => `${e.tagName.toLowerCase()}.${String(e.className).split(' ')[0]}:${Math.round(e.getBoundingClientRect().right)}px`); return { doc: document.documentElement.scrollWidth - w, sale } })
+        if (ancho.doc > 2) fallas.push(`${c} › ${l}: la página se sale ${ancho.doc}px a lo ancho (${ancho.sale.join(', ')})`)
+      }
       p.errores.splice(0).forEach((e) => fallas.push(`${c} › ${l}: ${e}`))
       total += 1 + tabs.length
     }

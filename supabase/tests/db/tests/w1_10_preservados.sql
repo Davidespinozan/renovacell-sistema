@@ -67,8 +67,9 @@ begin
   -- (el frontend y el POS siguen llamándola igual) y se endurece en dos puntos: no toca un
   -- pedido cuya intención fiscal ya salió de `pendiente`, y mantiene sincronizado el receptor
   -- del documento fiscal vivo para que la huella material no quede desfasada.
+  -- re-anclado por SEGURIDAD-E2E (20270318): FISCAL-1
   perform tests.eq(md5(pg_get_functiondef('public.set_order_fiscal_snapshot(uuid,jsonb)'::regprocedure)),
-                   'd27eba9834466d71e5a3439614801bb7',
+                   '8540cd56509d419751bcc9b685a6b464',
                    'W3-A: set_order_fiscal_snapshot endurecida (cambio autorizado, misma firma)');
   perform tests.ok(to_regprocedure('public.set_order_fiscal_snapshot(uuid,jsonb)') is not null
                    and has_function_privilege('authenticated', 'public.set_order_fiscal_snapshot(uuid,jsonb)', 'EXECUTE'),

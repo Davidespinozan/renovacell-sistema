@@ -10,7 +10,7 @@ import { PageHead } from '../../app/PageHead'
 import { money } from '../../lib/format'
 import { exportRows } from '../../lib/exportCsv'
 import { importCatalog } from '../../data/store/productsStore'
-import { importDoctores, importLotes, importCostos, type MigrationResult } from '../../data/store/migrationStore'
+import { importDoctores, importLotes, importCostos, fechaCaducidadIso, type MigrationResult } from '../../data/store/migrationStore'
 
 type Tipo = 'catalogo' | 'clientes' | 'inventario' | 'costos'
 
@@ -75,7 +75,23 @@ const DEFS: Def[] = [
 
 const num = (v: string): number => { const n = Number(String(v ?? '').replace(/[^0-9.-]/g, '')); return Number.isNaN(n) ? 0 : n }
 
-const splitCsv = (l: string) => l.split(l.includes(';') && !l.includes(',') ? ';' : ',').map((c) => c.replace(/^"|"$/g, '').trim())
+// CSV real (lo que exporta Excel): respeta comillas — "1,200" o "Bodega, estante 3" son UNA celda — y comillas dobles
+// escapadas (""). Separador: coma; punto y coma si la línea no trae comas fuera de comillas (Excel en español).
+export const splitCsv = (l: string): string[] => {
+  const linea = l.replace(/^\uFEFF/, '')
+  const sinComillas = linea.replace(/"[^"]*"/g, '')
+  const sep = sinComillas.includes(';') && !sinComillas.includes(',') ? ';' : ','
+  const out: string[] = []; let cur = ''; let q = false
+  for (let i = 0; i < linea.length; i++) {
+    const ch = linea[i]
+    if (q) { if (ch === '"' && linea[i + 1] === '"') { cur += '"'; i++ } else if (ch === '"') q = false; else cur += ch }
+    else if (ch === '"') q = true
+    else if (ch === sep) { out.push(cur.trim()); cur = '' }
+    else cur += ch
+  }
+  out.push(cur.trim())
+  return out
+}
 const norm = (h: string) => h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
 // Índice de cada campo según el ENCABEZADO (por sinónimos). -1 si la columna no está.
@@ -109,7 +125,7 @@ function parse(text: string, def: Def): Record<string, string | number>[] {
     def.campos.forEach((c) => {
       const at = idx[c.key]
       const raw = at >= 0 ? (cols[at] ?? '') : ''
-      row[c.key] = c.num ? num(raw) : raw
+      row[c.key] = c.num ? num(raw) : c.key === 'caducidad' ? (fechaCaducidadIso(raw) ?? `${raw} (no se entiende)`) : raw   // la vista previa muestra la fecha como se guardará
     })
     return row
   }).filter((r) => Object.values(r).some((v) => String(v ?? '').trim() !== '' && v !== 0))

@@ -127,8 +127,11 @@ describe('CORS · inventario y webhooks', () => {
       if (/Deno\.serve\(conCors\(/.test(src)) conHelper.push(nombre(p))
       if (/'Access-Control-Allow-Origin': '\*'/.test(src)) conAsterisco.push(nombre(p))
     }
-    // CC-1 añade `visitor` (nace ya con la lista blanca).
-    expect(conHelper.sort()).toEqual(['assistant', 'capture-lead', 'cart', 'cfdi', 'cfdi-cancel', 'cfdi-cancel-status', 'cfdi-download', 'cfdi-send', 'chat', 'comm-dispatch', 'invitacion', 'invite-doctor', 'meta-send', 'push', 'register-doctor', 'report-transfer', 'shipping', 'staff-admin', 'stripe-checkout', 'stryv-care', 'verificacion', 'visitor'])   // CC-0B.2: todas las Edges con navegador (los webhooks no tienen CORS)
+    // Regla (ensayo 2 nov 2026; antes era una lista fija que envejecía con cada Edge nueva): TODA Edge usa la lista blanca
+    // de orígenes, salvo las que solo reciben llamadas de servidor a servidor (sin navegador), declaradas aquí.
+    const SIN_NAVEGADOR = ['cs-3ds-return', 'meta-webhook', 'stripe-webhook']
+    const todas = Object.keys(edges).map(nombre).sort()
+    expect(conHelper.sort()).toEqual(todas.filter((n) => !SIN_NAVEGADOR.includes(n)))
     for (const f of conHelper) expect(conAsterisco, f).not.toContain(f)
     expect(conAsterisco).toEqual([])   // CC-0B.2 cerrado en el preflight: ninguna Edge conserva '*'
   })
