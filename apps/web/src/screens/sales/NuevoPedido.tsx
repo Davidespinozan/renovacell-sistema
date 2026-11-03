@@ -13,6 +13,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
@@ -270,6 +271,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               </div>
 
               {savings > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: 'var(--green-deep)', fontWeight: 600 }}><span>Descuento por volumen</span><span>−{money(savings)}</span></div>}
+              <AvisoAhorroVolumen voz="vendedor" lineas={lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, base: l.p!.price }))} reglas={volRules}
+                nombreDe={(id) => lines.find((l) => l.p!.id === id)?.p!.name ?? 'este producto'}
+                disponible={(id) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }}
+                onAgregar={(id, n) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + n }))} />
               {flete > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-flete"><span>Flete</span><span className="mono">{money(flete)}</span></div>}
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b data-testid="np-total">{money(total + flete)}</b></div>
 

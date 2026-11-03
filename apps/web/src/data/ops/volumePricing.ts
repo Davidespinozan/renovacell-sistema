@@ -150,3 +150,59 @@ export function volumePromoLabel(base: number | null, rules: readonly VolumeRule
   return pct ? `${pct}% menos desde ${t.min_quantity} pzas` : `Desde ${t.min_quantity} pzas · precio especial`
 }
 const money0 = (n: number) => '$' + Math.round(n).toLocaleString('es-MX')
+
+// ═══ AVISO DE AHORRO POR MÁS PIEZAS (2 nov 2026, dueño: "avisarle al cliente que si agrega más piezas hay descuento") ═══
+// Para cada producto del pedido: cuántas piezas faltan para su SIGUIENTE nivel (medio mayoreo / mayoreo), el precio nuevo
+// y cuánto se ahorra en TOTAL. Se calcula con las reglas del pedido (uno en mayoreo baja todo; el medio de 10 se junta),
+// así que el ahorro puede incluir otros productos. Es una previsualización: el servidor cobra con precio_de.
+export interface OportunidadVolumen {
+  product_id: string
+  faltan: number          // piezas que agregar de ESTE producto
+  nivel: string           // "Medio mayoreo" | "Mayoreo"
+  precioAhora: number     // c/u de este producto hoy
+  precioNuevo: number     // c/u de este producto al llegar
+  ahorro: number          // ahorro total del pedido (lo que ya lleva + lo que agrega) vs pagarlo a los precios de hoy
+  arrastra: boolean       // el ahorro alcanza a otros productos del pedido
+}
+export function oportunidadesVolumen(lineas: ReadonlyArray<{ product_id: string; qty: number; base: number | null }>, rules: readonly VolumeRule[]): OportunidadVolumen[] {
+  const vivas = lineas.filter((l) => l.qty > 0 && l.base != null && l.base > 0)
+  if (!vivas.length) return []
+  const base = new Map(vivas.map((l) => [l.product_id, l.base as number]))
+  const vq = cantidadesVolumen(vivas, rules)
+  const ahora = new Map(vivas.map((l) => [l.product_id, effectiveUnitPrice(l.base, rules, l.product_id, l.qty, vq[l.product_id]) ?? (l.base as number)]))
+  const out: OportunidadVolumen[] = []
+  for (const l of vivas) {
+    const actual = vq[l.product_id] ?? l.qty
+    const sig = volumeTiers(rules, l.product_id).find((t) => t.min_quantity > actual && t.price < (ahora.get(l.product_id) ?? Infinity))
+    if (!sig) continue
+    // La MENOR cantidad que de verdad baja el precio de este producto con las reglas del pedido (juntando piezas puede
+    // bastar con 1 aunque a su propio escalón le falten más).
+    let faltan = 0
+    for (let k = 1; k <= sig.min_quantity - l.qty; k++) {
+      const prueba = vivas.map((x) => (x.product_id === l.product_id ? { ...x, qty: x.qty + k } : x))
+      const p2 = effectiveUnitPrice(l.base, rules, l.product_id, l.qty + k, cantidadesVolumen(prueba, rules)[l.product_id]) ?? Infinity
+      if (p2 < (ahora.get(l.product_id) as number)) { faltan = k; break }
+    }
+    if (faltan <= 0) continue
+    const nuevas = vivas.map((x) => (x.product_id === l.product_id ? { ...x, qty: x.qty + faltan } : x))
+    const vq2 = cantidadesVolumen(nuevas, rules)
+    let ahorro = 0; let arrastra = false
+    for (const x of nuevas) {
+      const antes = ahora.get(x.product_id) as number
+      const despues = effectiveUnitPrice(base.get(x.product_id) ?? null, rules, x.product_id, x.qty, vq2[x.product_id]) ?? antes
+      if (despues < antes) { ahorro += (antes - despues) * x.qty; if (x.product_id !== l.product_id) arrastra = true }
+    }
+    const precioNuevo = effectiveUnitPrice(l.base, rules, l.product_id, l.qty + faltan, vq2[l.product_id]) ?? sig.price
+    if (ahorro < 1) continue
+    const tiers = volumeTiers(rules, l.product_id)
+    out.push({ product_id: l.product_id, faltan, nivel: nombreNivel(tiers, tiers.indexOf(sig)), precioAhora: ahora.get(l.product_id) as number, precioNuevo, ahorro: Math.round(ahorro), arrastra })
+  }
+  // primero lo más cercano (menos piezas); a igualdad, lo que más ahorra
+  return out.sort((a, b) => a.faltan - b.faltan || b.ahorro - a.ahorro)
+}
+/** La frase para el cliente (o para que el vendedor se la ofrezca). */
+export function textoOportunidad(o: OportunidadVolumen, nombre: string, voz: 'cliente' | 'vendedor' = 'cliente'): string {
+  const pieza = o.faltan === 1 ? 'pieza' : 'piezas'
+  const pre = voz === 'cliente' ? `Agrega ${o.faltan} ${pieza} más de ${nombre}` : `Ofrécele ${o.faltan} ${pieza} más de ${nombre}`
+  return `${pre} y ${voz === 'cliente' ? 'pagas' : 'paga'} ${money0(o.precioNuevo)} c/u (${o.nivel.toLowerCase()}) en vez de ${money0(o.precioAhora)}: ${voz === 'cliente' ? 'ahorras' : 'ahorra'} ${money0(o.ahorro)}${o.arrastra ? ' en todo el pedido' : ''}.`
+}

@@ -20,6 +20,7 @@ import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodySto
 import { currentUserId } from '../../lib/supabase'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { SelectorClienteVentas } from './SelectorCliente'
@@ -365,6 +366,10 @@ export function Caja() {
                 <span>Descuento por volumen</span><span>−{money(savings)}</span>
               </div>
             )}
+            <AvisoAhorroVolumen voz="vendedor" lineas={lines.map((l) => ({ product_id: l.product.id, qty: l.qty, base: l.product.price }))} reglas={volRules}
+              nombreDe={(id) => lines.find((l) => l.product.id === id)?.product.name ?? 'este producto'}
+              disponible={(id) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }}
+              onAgregar={(id, n) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + n }))} />
             <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
               <span>Total</span><b>{money(total)}</b>
             </div>

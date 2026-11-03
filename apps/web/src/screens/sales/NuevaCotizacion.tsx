@@ -6,6 +6,7 @@ import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
+import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import type { ClienteChat } from '../../data/ops/chat'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
@@ -89,6 +90,8 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
                 })}
               </ul>
               <textarea className="pc-campo" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Nota para el cliente (opcional): entrega, condiciones…" aria-label="Nota" maxLength={500} />
+              <AvisoAhorroVolumen voz="vendedor" lineas={lineas.map(([id, q]) => ({ product_id: id, qty: q, base: vendibles.find((x) => x.id === id)?.price ?? null }))} reglas={volRules}
+                nombreDe={(id) => vendibles.find((x) => x.id === id)?.name ?? 'este producto'} onAgregar={(id, n) => cambiar(id, n)} />
               <div className="cot-pie">
                 <span>{lineas.length} {lineas.length === 1 ? 'producto' : 'productos'} · <b className="mono">{money(total)}</b> <small>(el servidor confirma los precios)</small></span>
                 <button type="button" className="btn" disabled={ocupado || lineas.length === 0} onClick={() => void crear()} data-testid="cot-crear">Crear cotización</button>

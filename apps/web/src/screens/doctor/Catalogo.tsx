@@ -14,7 +14,8 @@ import { catalogEntries, isSellableVariant, type CatalogEntry } from '../../data
 import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
-import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings } from '../../data/ops/volumePricing'
+import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings, type VolumeRule } from '../../data/ops/volumePricing'
+import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
@@ -273,7 +274,8 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
       {/* DERECHA: pedido en curso */}
       {hasSupabase && canon.error && <div role="alert" className="sysnote" style={{ gridColumn: '1 / -1' }}>{canon.error}</div>}
-      {verified && <CartPanel lines={lines} total={total} savings={savings} envio={envio} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)} />}
+      {verified && <CartPanel lines={lines} total={total} savings={savings} envio={envio} priceOf={priceOf} onInc={add} onDec={dec} onClear={clear} onReview={() => setCheckout(true)}
+        reglas={volRules} onAgregar={(id, n) => setQty(id, (cart[id] ?? 0) + n)} disponible={(id) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }} />}
       {/* MC-3 · barra contextual en móvil: mismo carrito, mismo checkout. Se oculta con checkout/modal abierto y con un
           carrito que no es el activo del servidor (convertido o inaccesible). Total = el mismo estimado del panel. */}
       {verified && <BarraCarrito
@@ -457,8 +459,11 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
 }
 
 function CartPanel({
-  lines, total, savings = 0, priceOf, onInc, onDec, onClear, onReview, envio = null,
+  lines, total, savings = 0, priceOf, onInc, onDec, onClear, onReview, envio = null, reglas = [], onAgregar, disponible,
 }: {
+  reglas?: readonly VolumeRule[]
+  onAgregar?: (id: string, piezas: number) => void
+  disponible?: (id: string) => number | null
   lines: CartLine[]
   total: number
   savings?: number
@@ -495,6 +500,9 @@ function CartPanel({
               <span>Ahorro por volumen</span><span>−{money(savings)}</span>
             </div>
           )}
+          {/* AVISO DE AHORRO · cuántas piezas más bajan el precio y cuánto se ahorra */}
+          <AvisoAhorroVolumen lineas={lines.map((l) => ({ product_id: l.product.id, qty: l.qty, base: priceOf(l.product) }))} reglas={reglas}
+            nombreDe={(id) => lines.find((l) => l.product.id === id)?.product.name ?? 'este producto'} onAgregar={onAgregar} disponible={disponible} />
           {/* MAYOREO-REGLAS · cómo se arma el precio por cantidad del pedido */}
           <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="reglas-mayoreo">
             Puedes juntar piezas de distintos productos para llegar al medio mayoreo de 10. Si un producto llega a su mayoreo, todo tu pedido va a precio de mayoreo.
