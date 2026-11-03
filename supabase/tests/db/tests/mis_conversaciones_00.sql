@@ -12,8 +12,9 @@ begin
   c2 := (public.cc_abrir_conversacion(null, d2) ->> 'conversation_id')::uuid;
   perform public.cc_enviar_mensaje(c1, 'doctor', null, d1, 'c:a1', 'Hola, ¿me cotizas 3 Nabota?');
   perform public.cc_enviar_mensaje(c2, 'doctor', null, d2, 'c:b1', 'Buen día');
-  -- Las dos las atendió s1 y su asesoría se cerró por inactividad: volvieron a la IA sin vendedor.
+  -- Las dos son de la cartera de s1 (las atendió) y su asesoría se cerró por inactividad: volvieron a la IA sin vendedor.
   perform tests.act_as_owner();
+  insert into public.cc_cartera (profile_id, seller_profile_id) values (d1, s1), (d2, s1);
   update public.cc_conversations set ultimo_asesor_id = s1, seller_profile_id = null, modo = 'ai_active' where id in (c1, c2);
 
   -- ══ 1 · siguen en MI lista aunque las atienda la IA ══
@@ -27,6 +28,7 @@ begin
   c3 := (public.cc_wa_entrante('5216670000077', 'Yara', 'wamid.MC.1', 'Hola, ¿precio de Nabota?', false) ->> 'conversation_id')::uuid;
   perform tests.act_as_owner();
   update public.cc_conversations set ultimo_asesor_id = s1, seller_profile_id = null, modo = 'ai_active' where id = c3;
+  insert into public.cc_cartera_prospectos (visitor_id, seller_profile_id) select visitor_id, s1 from public.cc_conversations where id = c3;
   perform tests.act_as(s1);
   perform tests.eq((select e ->> 'prospecto' from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c3::text), 'true', '1 · sin cuenta y sin ficha: prospecto');
   perform tests.eq((select e ->> 'canal' from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c3::text), 'whatsapp', '1 · y se sabe que escribe por WhatsApp');
@@ -42,7 +44,7 @@ begin
 
   -- ══ 2 · gana la cartera ══
   perform tests.act_as_owner();
-  insert into public.cc_cartera (profile_id, seller_profile_id) values (d2, s2);
+  update public.cc_cartera set seller_profile_id = s2 where profile_id = d2;
   perform tests.act_as(s1);
   perform tests.ok(jsonb_array_length(public.cc_mis_conversaciones()) = 1, '2 · el cliente de la cartera de otro ya no es mío aunque lo haya atendido');
   perform tests.throws(format('select public.cc_retomar_conversacion(%L)', c2), 'NO_AUTORIZADO', '2 · y no lo retomo');
@@ -66,7 +68,7 @@ begin
 
   -- ══ 4 · no se le quita a otro una asesoría en curso ══
   perform tests.act_as_owner();
-  delete from public.cc_cartera where profile_id = d2;
+  update public.cc_cartera set seller_profile_id = s1 where profile_id = d2;
   update public.cc_conversations set ultimo_asesor_id = s1, seller_profile_id = s2, modo = 'human_active' where id = c2;
   perform tests.act_as(s1);
   x := (select e from jsonb_array_elements(public.cc_mis_conversaciones()) e where e ->> 'conversation_id' = c2::text);

@@ -30,6 +30,7 @@ import { HomeDoctor } from './HomeDoctor'
 import { RecordatorioAvisos } from '../../app/RecordatorioAvisos'
 import { abrirPestanaAtencion } from '../admin/AtencionComercial'
 import { oportunidadesPromo, type OportunidadPromo } from '../../data/ops/busqueda'
+import { carteraPlazos, textoPlazo, textoSinCompra, tonoPlazo, type ClientePlazo } from '../../data/ops/carteraPlazos'
 import { fmtDate } from '../../lib/format'
 
 export function RoleHome() {
@@ -103,6 +104,7 @@ export function HomeVendedor() {
           </Tarjetas>
         </Seccion>
       )}
+      <PorVencer onVer={() => setScreen('cartera_plazos')} />
       <OfrecerPromo onVer={() => setScreen('productos_clientes')} />
       {/* MENÚ (dueño, 17 oct 2026): Inicio = Mi bandeja + Seguimiento. La bandeja completa va aquí (sin "ver toda"),
           y los envíos de su cartera en una sección propia; esas dos entradas ya no están en el menú de Ventas. */}
@@ -115,6 +117,24 @@ export function HomeVendedor() {
       <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento embebido /></Seccion>
       <AtajosMovil items={atajos} />
     </div>
+  )
+}
+
+// CARTERA-PLAZO (3 nov 2026): clientes que dejan de ser suyos en los próximos 30 días si no le compran.
+function PorVencer({ onVer, cargar = carteraPlazos }: { onVer: () => void; cargar?: typeof carteraPlazos }) {
+  const [lista, setLista] = useState<ClientePlazo[] | null>(null)
+  useEffect(() => { void cargar(30).then((r) => setLista(r?.clientes ?? [])) }, [cargar])
+  if (!lista || lista.length === 0) return null
+  return (
+    <Seccion titulo="Véndeles antes de que se venzan" nivel="atencion" conteo={lista.length} id="por-vencer" accion={{ label: 'Ver todos', onClick: onVer }}>
+      <Tarjetas>
+        {lista.slice(0, 3).map((c) => (
+          <TarjetaAtencion key={`${c.tipo}:${c.profile_id ?? c.customer_id ?? c.visitor_id}`} testid="inicio-por-vencer" persona={c.nombre} tono={tonoPlazo(c.dias_restantes) === 'dang' ? 'dang' : 'warn'}
+            titulo={capitalizarNombre(c.nombre)} estado={textoPlazo(c.dias_restantes)} lineas={[textoSinCompra(c.dias_sin_compra), 'Si no te compra, pasa al siguiente vendedor en turno']}
+            ctas={[{ label: 'Ver y hablarle', primaria: true, testid: 'btn-por-vencer', onClick: onVer }]} />
+        ))}
+      </Tarjetas>
+    </Seccion>
   )
 }
 

@@ -137,6 +137,7 @@ export const ROLES: RoleDef[] = [
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
       { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
       { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Nuevo → Calificado → Propuesta → Ganado
+      { key: 'cartera_plazos', label: 'Por vencer', icon: 'clock', section: 'Mi cartera' },   // CARTERA-PLAZO (3 nov 2026) · 6 meses por cliente + competencia
       { key: 'seguimientos', label: 'Pendientes', icon: 'clock', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · seguimientos por retomar
       { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
       { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Mi cartera' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers
@@ -233,7 +234,7 @@ export const canManageHub = (key: RoleKey): boolean => key === 'admin'
 // siguen existiendo (avisos, tareas, búsqueda y enlaces profundos las usan): `resolverDestino` las traduce al grupo y
 // deja pedida la pestaña. Lo que ya no tiene entrada propia (bandeja, seguimiento del vendedor, hoy de Almacén) cae en Inicio.
 export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>> = {
-  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_invitar', label: 'Invitar clientes' }],
+  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_invitar', label: 'Invitar clientes' }],
   g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }, { key: 'difusiones', label: 'Difusiones' }, { key: 'av_ia', label: 'Asesora IA' }],   // DIFUSIONES (2 nov 2026) · Dirección manda a todos o a un grupo
   g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
   g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }, { key: 'eventos', label: 'Eventos' }],

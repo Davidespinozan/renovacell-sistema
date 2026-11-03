@@ -1,5 +1,6 @@
 -- CC-2 · El rollback retira el dominio de conversación y devuelve adopción/purga al texto CC-1.
 begin;
+\ir ../../../rollback/cartera_plazo/99_down.sql   -- CARTERA-PLAZO (20270327) parcha ruteo, responsable y herencia de cartera: se baja antes de la foto inicial
 \ir ../../../rollback/crm_embudo/99_down.sql   -- CRM (20270321) cuelga de cotizaciones, conversaciones y pedidos: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/cliente_de_conversacion/99_down.sql   -- CLIENTE-CONV (20270316) parcha pedidos/comprobante/seguimientos del chat: se baja antes

@@ -605,6 +605,15 @@ button.pc-tira:hover{background:var(--hueso)}
 .pcl-nombre{justify-self:start;border:0;background:none;padding:0;font:inherit;font-size:14.5px;font-weight:600;color:var(--green-deep);cursor:pointer;text-align:left}
 .pcl-det{font-size:12.5px;color:var(--ink-2)}
 .pcl-acc{display:flex;gap:6px;flex-wrap:wrap}
+/* CARTERA-PLAZO (3 nov 2026): competencia del mes entre vendedores */
+.cp-rank{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--hueso)}
+.cp-rank h3{display:flex;align-items:center;gap:6px;margin:0;font-size:14px;color:var(--green-deep)}
+.cp-rank-tabla{display:grid;gap:2px;overflow-x:auto}
+.cp-rank-fila{display:grid;grid-template-columns:minmax(110px,1.6fr) repeat(6,minmax(64px,1fr));gap:6px;align-items:center;padding:6px 8px;border-radius:8px;font-size:13px;color:var(--ink);background:var(--cp-surface)}
+.cp-rank-fila span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.cp-rank-head{background:transparent;font-size:11.5px;font-weight:600;color:var(--mid)}
+.cp-rank-fila.yo{outline:2px solid var(--green-deep);outline-offset:-2px;font-weight:600}
+.cp-rank-nota{font-size:11.5px;color:var(--mid)}
 /* COMPRADORES × PROMOCIÓN (3 nov 2026) */
 .pcl-acc{align-items:center}
 .pcl-tabs{display:flex;gap:6px;flex-wrap:wrap}

@@ -23,6 +23,7 @@ const Seguimientos = lazyPantalla(() => import('./Seguimientos').then((m) => m.S
 const LinksPago = lazyPantalla(() => import('./cobros/LinksPago').then((m) => m.LinksPago))   // LINK DE PAGO (2 nov 2026)
 const ClasificarCartera = lazyPantalla(() => import('./ClasificarCartera').then((m) => m.ClasificarCartera))
 const ProductosClientes = lazyPantalla(() => import('./sales/ProductosClientes').then((m) => m.ProductosClientes))
+const CarteraPlazos = lazyPantalla(() => import('./sales/CarteraPlazos').then((m) => m.CarteraPlazos))
 const MiVerificacion = lazyPantalla(() => import('./doctor/MiVerificacion').then((m) => m.MiVerificacion))
 const Bandeja = lazyPantalla(() => import('./Bandeja').then((m) => m.Bandeja))
 const Solicitudes = lazyPantalla(() => import('./Solicitudes').then((m) => m.Solicitudes))
@@ -149,13 +150,14 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   mi_verificacion: () => <MiVerificacion />,   // cuenta ≠ verificación
   asesorias: () => <AsesoriasPantalla />,   // CC-7 · Dirección vs vendedor
   productos_clientes: () => <ProductosClientes />,   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
+  cartera_plazos: () => <CarteraPlazos />,   // CARTERA-PLAZO · por vencer + competencia
   links_pago: () => <LinksPago />,
   av_links: () => <LinksPago />,
   crm_embudo: () => <Embudo />,   // CRM (2 nov 2026) · embudo de ventas
   seguimientos: () => <Seguimientos />,   // HERRAMIENTAS DEL VENDEDOR · pendientes por retomar
   difusiones: () => <Difusiones />,   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
-  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'crm_embudo', label: 'Embudo de ventas', render: () => <Embudo /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
+  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'crm_embudo', label: 'Embudo de ventas', render: () => <Embudo /> }, { key: 'cartera_plazos', label: 'Plazos de cartera', render: () => <CarteraPlazos /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }, { key: 'seguimientos', label: 'Pendientes', render: () => <Seguimientos /> }, { key: 'av_ia', label: 'Asesora IA', render: () => <AsesoraIA /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   av_existencias: () => <Existencias />,

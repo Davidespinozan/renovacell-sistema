@@ -1,6 +1,7 @@
 -- VINCULAR-CLIENTE (20270206) · el down devuelve ruteo/nombre/bandeja/cola exactos y quita columna, historial y comandos;
 -- la migración se reaplica idéntica.
 begin;
+\ir ../../../rollback/cartera_plazo/99_down.sql   -- CARTERA-PLAZO (20270327) parcha ruteo, responsable y herencia de cartera: se baja antes de la foto inicial
 \ir ../../../rollback/crm_embudo/99_down.sql   -- CRM (20270321) cuelga de cotizaciones, conversaciones y pedidos: se baja antes
 \ir ../../../rollback/enlace_carrera/99_down.sql   -- ENLACE-CARRERA (20270315) parcha la creación del enlace: se baja antes
 \ir ../../../rollback/enlace_vendedor/99_down.sql   -- ENLACE-VENDEDOR (20270211) redefine funciones de esta: se baja antes de la foto inicial

@@ -31,6 +31,7 @@ export function FilaMiCliente({ c, onAbrir, onError, retomar = retomarPorDefecto
         <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
           <span className={'pill ' + (c.atiende === 'ia' ? 'p-neu' : 'p-warn')}>{QUIEN_ATIENDE[c.atiende]}{c.atiende_nombre ? `: ${c.atiende_nombre}` : ''}</span>
           <span className="pill p-neu">{c.prospecto ? 'Prospecto' : 'Cliente'}</span>
+          {c.dias_restantes != null && <span className={'pill ' + (c.dias_restantes <= 7 ? 'p-dang' : c.dias_restantes <= 30 ? 'p-warn' : 'p-ok')} data-testid="mi-cliente-plazo">Tuyo {c.dias_restantes === 1 ? '1 día' : `${c.dias_restantes} días`} más</span>}
           {c.canal === 'whatsapp' && <span>WhatsApp</span>}
           {c.last_message_at && <span>{cuandoLista(c.last_message_at)}</span>}
         </div>

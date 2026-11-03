@@ -1,5 +1,6 @@
 -- REPARTO (181) · el down retira el reparto y devuelve las 6 funciones a su texto exacto anterior; se reaplica igual.
 begin;
+\ir ../../../rollback/cartera_plazo/99_down.sql   -- CARTERA-PLAZO (20270327) parcha ruteo, responsable y herencia de cartera: se baja antes de la foto inicial
 \ir ../../../rollback/crm_embudo/99_down.sql   -- CRM (20270321) cuelga de cotizaciones, conversaciones y pedidos: se baja antes
 \ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes
 \ir ../../../rollback/reparto_turno/99_down.sql   -- REPARTO-TURNO (20270312) redefine reparto, responsable y permisos de promociones: se baja antes

@@ -1,6 +1,7 @@
 -- CARTERA-CLIENTES (152) · el down retira la cartera por cliente y devuelve las funciones exactamente a su versión
 -- anterior; todo lo demás queda igual, y la migración se puede volver a aplicar.
 begin;
+\ir ../../../rollback/cartera_plazo/99_down.sql   -- CARTERA-PLAZO (20270327) parcha ruteo, responsable y herencia de cartera: se baja antes de la foto inicial
 \ir ../../../rollback/reparto_verificacion/99_down.sql   -- REPARTO-VERIF (20270213) redefine funciones de esta cadena: se baja antes de la foto inicial
 \ir ../../../rollback/internas_solo_si_mismas/99_down.sql   -- INTERNAS-2 se baja antes (redefine políticas, cc_vendedores y comisiones_equipo)
 \ir ../../../rollback/comisiones_jefe/99_down.sql   -- COMISIONES-JEFE usa _es_interna: se baja primero

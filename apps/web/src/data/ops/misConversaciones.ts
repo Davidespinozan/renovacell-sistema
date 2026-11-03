@@ -6,6 +6,7 @@ export interface MiConversacion {
   conversation_id: string; dueno: string; modo: string; last_message_at: string | null; prospecto: boolean; canal: 'whatsapp' | null
   atiende: 'ia' | 'otro' | 'direccion' | 'nadie'; atiende_nombre: string | null; puede_retomar: boolean
   ultimo: { actor: string; texto: string; at: string } | null
+  dias_restantes?: number | null   // CARTERA-PLAZO · días que le quedan como su vendedor
 }
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) as never) as unknown as PromiseLike<{ data: unknown; error: { message?: string } | null }>
