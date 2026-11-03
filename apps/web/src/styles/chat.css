@@ -579,6 +579,20 @@ button.pc-tira:hover{background:var(--hueso)}
 .pcl-nombre{justify-self:start;border:0;background:none;padding:0;font:inherit;font-size:14.5px;font-weight:600;color:var(--green-deep);cursor:pointer;text-align:left}
 .pcl-det{font-size:12.5px;color:var(--ink-2)}
 .pcl-acc{display:flex;gap:6px;flex-wrap:wrap}
+/* COMPRADORES × PROMOCIÓN (3 nov 2026) */
+.pcl-acc{align-items:center}
+.pcl-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.pcl-tab{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border:1px solid var(--line);border-radius:var(--pill);background:var(--cp-surface);font:inherit;font-size:13.5px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.pcl-tab.on{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
+.pcl-promo{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:var(--r-sm);background:var(--warn-bg);color:var(--ink);font-size:13px}
+.pcl-promo>svg{flex:none;margin-top:2px;color:var(--warn)}
+.pcl-promo>span{display:grid;gap:2px}
+.pcl-promo-l{display:block;font-size:12.5px;color:var(--ink-2)}
+.pcl-det .pcl-promo-l{margin-top:2px;color:var(--warn);font-weight:600}
+.pcl-promo-l svg{display:inline;vertical-align:-2px}
+.pcl-badge{display:inline-flex;align-items:center;gap:4px;justify-self:start;margin-top:2px;padding:1px 8px;border-radius:var(--pill);background:var(--warn-bg);color:var(--warn)!important;font-weight:600}
+.pcl-ok{font-size:12.5px;font-weight:600;color:var(--green-deep)}
+.pcl-err{font-size:12.5px;color:var(--danger)}
 /* HERRAMIENTAS DEL VENDEDOR · más y menos vendidos (Metas y comisiones) */
 .pmov{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .pmov-h{display:flex;align-items:center;gap:6px;margin:0 0 8px}

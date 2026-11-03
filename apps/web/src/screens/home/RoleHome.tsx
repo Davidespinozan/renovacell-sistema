@@ -10,7 +10,7 @@
 // Datos: los MISMOS stores/RPC que el resto del sistema. Mi bandeja e Inicio salen de `useBandeja`
 // (no pueden contradecirse) y lo comercial del store compartido (`useAtencionComercial`). Ningún
 // tiempo de espera se calcula aquí: lo da el servidor.
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { getNav, getRole, type RoleKey } from '../../app/roles'
 import { useBandeja, ListaTareas, porUrgencia, type Task } from '../Bandeja'
@@ -29,6 +29,8 @@ import { capitalizarNombre, saludo } from '../../lib/nombres'
 import { HomeDoctor } from './HomeDoctor'
 import { RecordatorioAvisos } from '../../app/RecordatorioAvisos'
 import { abrirPestanaAtencion } from '../admin/AtencionComercial'
+import { oportunidadesPromo, type OportunidadPromo } from '../../data/ops/busqueda'
+import { fmtDate } from '../../lib/format'
 
 export function RoleHome() {
   const { role } = useRole()
@@ -101,6 +103,7 @@ export function HomeVendedor() {
           </Tarjetas>
         </Seccion>
       )}
+      <OfrecerPromo onVer={() => setScreen('productos_clientes')} />
       {/* MENÚ (dueño, 17 oct 2026): Inicio = Mi bandeja + Seguimiento. La bandeja completa va aquí (sin "ver toda"),
           y los envíos de su cartera en una sección propia; esas dos entradas ya no están en el menú de Ventas. */}
       {(() => { const resto = tareas.filter((t) => !['comercial', 'asesorias_activas'].includes(t.id)); return (
@@ -112,6 +115,28 @@ export function HomeVendedor() {
       <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento embebido /></Seccion>
       <AtajosMovil items={atajos} />
     </div>
+  )
+}
+
+// COMPRADORES × PROMOCIÓN (3 nov 2026): a quién de su cartera hablarle hoy porque lo que ya compró está en promoción.
+// Sin promociones vigentes o sin compradores no ocupa lugar.
+function OfrecerPromo({ onVer, cargar = oportunidadesPromo }: { onVer: () => void; cargar?: typeof oportunidadesPromo }) {
+  const [ofertas, setOfertas] = useState<OportunidadPromo[] | null>(null)
+  useEffect(() => { void cargar().then((r) => setOfertas(r ?? [])) }, [cargar])
+  if (!ofertas || ofertas.length === 0) return null
+  return (
+    <Seccion titulo="Ofrécele la promoción" nivel="continuar" conteo={ofertas.length} id="ofrecer-promo" accion={{ label: 'Ver a quién', onClick: onVer }}>
+      <Tarjetas>
+        {ofertas.slice(0, 3).map((o) => {
+          const f = o.ofertas[0]; const p = f?.promos[0]
+          return (
+            <TarjetaAtencion key={o.customer_id} testid="inicio-oferta" persona={o.nombre} tono="ok" titulo={capitalizarNombre(o.nombre)} estado={p ? `${p.nombre} hasta el ${fmtDate(p.hasta)}` : undefined}
+              lineas={[f ? `Compró ${f.presentaciones.length ? f.presentaciones.join(', ') : f.familia} · última ${fmtDate(f.ultima)}` : null, o.ofertas.length > 1 ? `y ${o.ofertas.length - 1} producto${o.ofertas.length === 2 ? '' : 's'} más en promoción` : null]}
+              ctas={[{ label: 'Ofrecer', primaria: true, testid: 'btn-ofrecer', onClick: onVer }]} />
+          )
+        })}
+      </Tarjetas>
+    </Seccion>
   )
 }
 
