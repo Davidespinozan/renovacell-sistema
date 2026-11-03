@@ -10,10 +10,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { carrito as clientePorDefecto, nuevaOperacion, ETIQUETA_MOTIVO, textoProblemas, type ClienteCarrito, type RevisionCheckout } from '../../data/ops/carrito'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
-import type { EntregaPedido, HorarioElegido } from '../../data/ops/entrega'
+import type { EntregaPedido, HorarioElegido, ServicioElegido } from '../../data/ops/entrega'
 
 /** Dirección elegida + (ENT-0) la opción de entrega elegida (id del servidor: recoge, local_chofer, foraneo_dhl…) + (ENT-H) el horario (entrega local). */
-export interface EleccionEntrega { address: ShippingAddress | null; locationId?: string; opcion?: string | null; horario?: HorarioElegido | null }
+export interface EleccionEntrega { address: ShippingAddress | null; locationId?: string; opcion?: string | null; horario?: HorarioElegido | null; servicio?: ServicioElegido | null }   // ENTREGA-SERVICIO · servicio de paquetería elegido
 export interface PedidoMin { id: string; external_ref: string | null; total: number | null; entrega?: EntregaPedido | null }
 export type ResultadoPedido = { ok: true; order: PedidoMin; aviso?: string } | { ok: false; error: string }
 export interface LineaVista { product_id: string; nombre: string; qty: number; unitario: number | null; subtotal: number | null; por_volumen?: boolean }
@@ -28,20 +28,22 @@ export interface ConfigServidor {
   onPedido?: () => void
   /** ENT-H · horarios de entrega local (inyectable en pruebas; por defecto el RPC). */
   cargarHorarios?: typeof import('../../data/ops/entrega').horariosEntregaDisponibles
+  /** ENTREGA-SERVICIO · cotización del servicio de paquetería (inyectable en pruebas; por defecto la Edge). */
+  cargarServicios?: typeof import('../../data/ops/entrega').cotizarEnvio
 }
 
 const MARGEN_VENCIMIENTO_MS = 30_000
 
 /** Identidad de la dirección revisada: una revisión solo sirve para la MISMA dirección. */
 export function claveEntrega(e: EleccionEntrega | null): string {
-  const op = (e?.opcion ? `|op:${e.opcion}` : '') + (e?.horario ? `|h:${e.horario.fecha}T${e.horario.inicio}` : '')
+  const op = (e?.opcion ? `|op:${e.opcion}` : '') + (e?.horario ? `|h:${e.horario.fecha}T${e.horario.inicio}` : '') + (e?.servicio ? `|s:${e.servicio.cotizacion_id}:${e.servicio.codigo}` : '')
   if (!e?.address && !e?.locationId) return 'ninguna' + op
   return (e.locationId ? `loc:${e.locationId}` : `dir:${JSON.stringify(e.address)}`) + op
 }
 
 /** Argumentos de revisión: ubicación guardada por id; dirección nueva o de legado como snapshot; la opción de entrega; el horario (ENT-H). */
-export function argsRevision(e: EleccionEntrega | null): [string | null, ShippingAddress | null, string | null, HorarioElegido | null] {
-  return [e?.locationId ?? null, e?.locationId ? null : e?.address ?? null, e?.opcion ?? null, e?.horario ?? null]
+export function argsRevision(e: EleccionEntrega | null): [string | null, ShippingAddress | null, string | null, HorarioElegido | null, ServicioElegido | null] {
+  return [e?.locationId ?? null, e?.locationId ? null : e?.address ?? null, e?.opcion ?? null, e?.horario ?? null, e?.servicio ?? null]
 }
 
 /** Líneas e importe a mostrar: SIEMPRE los de la revisión del servidor (nunca precios de lista locales). */

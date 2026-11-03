@@ -129,7 +129,7 @@ export async function quoteShipment(shipper: ShipperConfig, receiver: Receiver, 
 }
 
 // CREAR GUÍA (neutral, idempotente server-side). Devuelve la etiqueta o cae al mock.
-export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote; provider?: ProveedorPaqueteria }): Promise<{ label: LabelResult; idempotent?: boolean }> {
+export async function createShipmentReal(args: { order_id: string; orderRef: string; idempotencyKey: string; shipper: ShipperConfig; receiver: Receiver; pkg: LogisticsPackage; rate: RateQuote; provider?: ProveedorPaqueteria; cambio_motivo?: string }): Promise<{ label: LabelResult; idempotent?: boolean }> {
   if (hasSupabase) {
     const r = await callShipping<{ label: LabelResult; idempotent?: boolean }>({ action: 'create_shipment', provider: args.provider ?? 'dhl', ...args })
     // FAIL-CLOSED (#18): con backend, un proveedor no configurado NO genera guía mock silenciosa.

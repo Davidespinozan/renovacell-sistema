@@ -26,9 +26,56 @@ export interface EntregaPedido {
   /** ENT-H · solo la entrega local por chofer: el horario reservado en la agenda. */
   horario?: HorarioEntrega | null
   reprogramado?: { anterior?: HorarioEntrega | null; motivo: string; at: string } | null
+  /** ENTREGA-SERVICIO · el servicio de paquetería elegido al vender, con su fecha exacta. */
+  servicio?: ServicioPedido | null
 }
 /** Lo que manda quien pide: la opción, el horario (entrega local) y, SOLO el personal, un flete distinto con su motivo. */
-export interface EleccionEntregaServidor { opcion: string; flete?: number; motivo?: string; horario?: HorarioElegido | null }
+export interface EleccionEntregaServidor { opcion: string; flete?: number; motivo?: string; horario?: HorarioElegido | null; servicio?: ServicioElegido | null }
+
+// ═══ ENTREGA-SERVICIO (2 nov 2026) · el cliente o su vendedor eligen el SERVICIO de la paquetería al vender, con su fecha
+// exacta de entrega; Almacén solo genera la guía de ese servicio. Precio: la regla de siempre + la diferencia contra el
+// servicio más barato (la pone el servidor; aquí solo se muestra). Si la paquetería no responde, se vende con la regla.
+export interface ServicioCotizado { codigo: string; nombre: string; costo: number; diferencia: number; llega_at?: string; llega_fecha: string }
+export interface CotizacionEnvio { cotizacion_id: string; expira_at: string; proveedor: 'dhl' | 't1'; servicios: ServicioCotizado[] }
+/** Lo que viaja al servidor: la cotización y el código. `diferencia` es solo para mostrar el total (el servidor la recalcula). */
+export interface ServicioElegido { cotizacion_id: string; codigo: string; diferencia?: number }
+/** El servicio que quedó en el pedido (shipping_meta.entrega.servicio). */
+export interface ServicioPedido { proveedor: string; codigo: string; nombre: string; llega_at?: string; llega_fecha: string; costo_paqueteria?: number; diferencia?: number; cotizacion_id?: string }
+type ResultadoCot = { ok: true; data: CotizacionEnvio } | { ok: false; error: string }
+export async function cotizarEnvio(cp: string, piezas: number, destino?: { ciudad?: string | null; estado?: string | null }): Promise<ResultadoCot> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
+  try {
+    const { data, error } = await supabase.functions.invoke('entrega-cotizar', { body: { cp, piezas, ciudad: destino?.ciudad ?? '', estado: destino?.estado ?? '' } })
+    if (error) {
+      const ctx = (error as { context?: Response }).context
+      const b = ctx && typeof ctx.json === 'function' ? await ctx.json().catch(() => null) as { message?: string } | null : null
+      return { ok: false, error: b?.message ?? 'No se pudo cotizar el envío: se usa la regla de entrega.' }
+    }
+    const d = data as CotizacionEnvio | null
+    return d?.cotizacion_id && Array.isArray(d.servicios) && d.servicios.length ? { ok: true, data: d } : { ok: false, error: 'Sin servicios para ese código postal.' }
+  } catch { return { ok: false, error: 'No se pudo cotizar el envío: se usa la regla de entrega.' } }
+}
+/** El flete que verá el cliente con la elección actual: el ajuste del personal si lo hay; si no, la regla + la diferencia del servicio. */
+export function fleteDeEleccion(e: EleccionEntregaServidor | null | undefined, ops: OpcionesEntrega | null | undefined): number {
+  if (!e) return 0
+  if (e.flete != null) return e.flete
+  return Math.round(((opcionDe(ops, e.opcion)?.flete ?? 0) + (e.servicio?.diferencia ?? 0)) * 100) / 100
+}
+/** Lo que paga el cliente por ese servicio: la regla de la opción + la diferencia contra el más barato. */
+export function precioServicio(fleteRegla: number, s: Pick<ServicioCotizado, 'diferencia'>): number { return Math.round((fleteRegla + (s.diferencia || 0)) * 100) / 100 }
+/** "jueves 5 nov · antes de las 12:00" (la hora solo si la paquetería la da y no es fin del día). */
+export function llegadaServicio(s: Pick<ServicioCotizado, 'llega_fecha' | 'llega_at'>, hoy?: string | null): string {
+  const dia = hoy && s.llega_fecha === hoy ? 'hoy' : fechaCorta(s.llega_fecha)
+  const h = s.llega_at && /T(\d{2}):(\d{2})/.exec(s.llega_at)
+  return h && !(Number(h[1]) >= 18) ? `${dia} · antes de las ${h[1]}:${h[2]}` : dia
+}
+/** Mensaje claro para los errores del servidor sobre la cotización. */
+export function mensajeServicio(msg: string): string | null {
+  if (/ENTREGA_COTIZACION_VENCIDA/.test(msg)) return 'La cotización del envío venció; vuelve a cotizar.'
+  if (/ENTREGA_COTIZACION_INVALIDA/.test(msg)) return 'La cotización del envío es de otra dirección; vuelve a cotizar.'
+  if (/ENTREGA_SERVICIO_INVALIDO/.test(msg)) return 'Ese servicio de paquetería ya no está disponible; elige otro.'
+  return null
+}
 
 /** ENT-H · Lo que el servidor ofrece para elegir horario: días desde la salida del chofer y, por día, cada horario con su estado. */
 export interface SlotHorario { inicio: string; fin: string; ocupados: number; cupo: number; disponible: boolean; motivo?: 'OCUPADO' | 'PASADO' | null }
@@ -72,7 +119,7 @@ export function fechaCorta(iso: string | null | undefined): string {
   return `${DIAS[dow]} ${d} ${MESES[m - 1]}`
 }
 /** Promesa de llegada en una línea: la frase que SIEMPRE ve el cliente. `hoy` (YYYY-MM-DD, hora local del negocio) afina "hoy". */
-export type PromesaInput = Pick<EntregaPedido, 'tipo' | 'salida' | 'llega_desde' | 'llega_hasta'> & Partial<Pick<EntregaPedido, 'recoge' | 'horario'>>
+export type PromesaInput = Pick<EntregaPedido, 'tipo' | 'salida' | 'llega_desde' | 'llega_hasta'> & Partial<Pick<EntregaPedido, 'recoge' | 'horario' | 'servicio'>>
 export function promesaDe(e: PromesaInput, hoy?: string | null): string {
   const esHoy = (d: string) => !!hoy && d === hoy
   const dia = (d: string) => (esHoy(d) ? 'hoy' : fechaCorta(d))
@@ -85,6 +132,7 @@ export function promesaDe(e: PromesaInput, hoy?: string | null): string {
     return `Listo para recoger ${esHoy(e.llega_desde) ? 'hoy' : 'el ' + fechaCorta(e.llega_desde)}${lugar}`
   }
   const sale = `Sale ${dia(e.salida)}`
+  if (e.servicio?.llega_fecha) return `${sale} · llega el ${llegadaServicio(e.servicio, hoy)}`   // ENTREGA-SERVICIO · la fecha exacta del servicio elegido
   if (e.llega_desde === e.llega_hasta) return `${sale} · llega ${esHoy(e.llega_desde) ? 'hoy mismo' : 'el ' + fechaCorta(e.llega_desde)}`
   return `${sale} · llega entre el ${fechaCorta(e.llega_desde)} y el ${fechaCorta(e.llega_hasta)}`
 }

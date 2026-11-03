@@ -3,16 +3,21 @@
 // (o regalarlo), lo escribe con su motivo. Nunca se inventa una fecha: todo viene de entrega_opciones.
 import React, { useEffect, useRef, useState } from 'react'
 import { money } from '../lib/format'
-import { MOTIVO_ENTREGA, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega } from '../data/ops/entrega'
+import { MOTIVO_ENTREGA, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega, type ServicioElegido } from '../data/ops/entrega'
 import { HorarioEntregaPicker } from './HorarioEntregaPicker'
 import { AvisoEnvioGratisVista } from './AvisoEnvioGratis'
+import { ServicioPaqueteria } from './ServicioPaqueteria'
 
 /** ENT-H · el horario elegido viaja solo cuando existe (sin la llave en null). */
-const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido } => (v?.horario ? { horario: v.horario } : {})
+const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido; servicio?: ServicioElegido } => ({ ...(v?.horario ? { horario: v.horario } : {}), ...(v?.servicio ? { servicio: v.servicio } : {}) })   // ENTREGA-SERVICIO · el servicio elegido también se conserva
 
-export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios }: {
+export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios, piezas = 0, destino, cargarServicios }: {
   subtotal: number
   cp: string | null
+  /** ENTREGA-SERVICIO · piezas del pedido para cotizar el servicio de paquetería (0 = sin cotizar). */
+  piezas?: number
+  destino?: { ciudad?: string | null; estado?: string | null }
+  cargarServicios?: React.ComponentProps<typeof ServicioPaqueteria>['cargar']
   value: EleccionEntregaServidor | null
   onChange: (e: EleccionEntregaServidor | null, ops: OpcionesEntrega | null) => void
   cargar?: typeof opcionesEntrega
@@ -116,6 +121,13 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
           <label style={{ fontSize: 12.5, display: 'grid', gap: 4 }}>Motivo de la cortesía
             <input type="text" maxLength={200} value={motivo} placeholder="p. ej. cliente frecuente, entrega de paso" onChange={(e) => motivoBajoMinimo(e.target.value)} style={{ width: '100%' }} data-testid="entrega-motivo-minimo" />
           </label>
+        </div>
+      )}
+      {sel && sel.tipo === 'foraneo' && sel.paqueteria === 'dhl' && piezas > 0 && cp && (
+        <div style={{ marginTop: 10 }} data-testid="entrega-servicio">
+          <ServicioPaqueteria cp={cp} piezas={piezas} fleteRegla={sel.flete} destino={destino} hoy={hoy} cargar={cargarServicios}
+            value={value?.servicio ?? null}
+            onChange={(sv) => { const { servicio: _s, ...resto } = value ?? { opcion: sel.id }; void _s; onChange({ ...resto, opcion: sel.id, ...(sv ? { servicio: sv } : {}) }, ops) }} />
         </div>
       )}
       {sel && necesitaHorario && (

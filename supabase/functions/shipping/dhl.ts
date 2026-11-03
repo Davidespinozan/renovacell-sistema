@@ -95,7 +95,7 @@ export function buildRateRequest(shipper: NeutralShipper, receiver: NeutralRecei
 }
 
 // deno-lint-ignore no-explicit-any
-export function parseRates(data: any): Array<{ id: string; carrier: string; service: string; serviceCode?: string; amount: number; currency: string; etaDays: number }> {
+export function parseRates(data: any): Array<{ id: string; carrier: string; service: string; serviceCode?: string; amount: number; currency: string; etaDays: number; entregaAt?: string }> {
   const products = Array.isArray(data?.products) ? data.products : []
   // deno-lint-ignore no-explicit-any
   return products.map((pr: any, i: number) => {
@@ -109,8 +109,16 @@ export function parseRates(data: any): Array<{ id: string; carrier: string; serv
       amount: Math.round(Number(price?.price ?? 0)),
       currency: String(price?.priceCurrency ?? 'MXN').toUpperCase(),
       etaDays: Number(cap?.totalTransitDays ?? 0) || 2,
+      // PAQUETERÍA AL VENDER (2 nov 2026) · la fecha EXACTA que promete DHL ("2026-11-05T23:59:00"), no solo los días de tránsito
+      ...(typeof cap?.estimatedDeliveryDateAndTime === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(cap.estimatedDeliveryDateAndTime) ? { entregaAt: cap.estimatedDeliveryDateAndTime as string } : {}),
     }
   }).filter((r: { amount: number }) => r.amount > 0)
+}
+
+/** La fecha exacta de DHL viene sin zona ("2026-11-05T23:59:00"): es hora de México (Sinaloa, UTC-7, sin horario de verano). */
+export function fechaEntregaDhl(entregaAt: string | undefined, etaDays: number, ahoraMs = Date.now()): string {
+  if (entregaAt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(entregaAt)) { const d = new Date(entregaAt + (entregaAt.length === 16 ? ':00' : '') + '-07:00'); if (!Number.isNaN(d.getTime())) return d.toISOString() }
+  return new Date(ahoraMs + etaDays * 86_400_000).toISOString()
 }
 
 // ---- Creación de envío ----------------------------------------------------

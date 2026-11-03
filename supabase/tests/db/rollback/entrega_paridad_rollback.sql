@@ -1,6 +1,7 @@
 -- PARIDAD DE REGLAS DE VENTA (ENT-P) · el down devuelve _entrega_normalizar a la 189 (sin cortesía con motivo) y nada más
 -- cambia; se reaplica idéntica.
 begin;
+\ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 create temp table _entp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas,
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname <> '_entrega_normalizar') otras;
 \ir ../../../rollback/entrega_paridad/99_down.sql

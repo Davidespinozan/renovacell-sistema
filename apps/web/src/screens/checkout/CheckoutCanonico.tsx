@@ -20,8 +20,9 @@ import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
-import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega } from '../../data/ops/entrega'
+import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega, type ServicioElegido } from '../../data/ops/entrega'
 import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
+import { ServicioPaqueteria } from '../../app/ServicioPaqueteria'
 import { avisoInvalidada, claveDireccion, elegirEnIntencion, intencionInicial, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad, type Intencion, type Tarjeta } from './entregaUx'   // CX-V2-A/B/C
 import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 
@@ -123,6 +124,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const [choice, setChoice] = useState<EleccionEntrega | null>(null)
   const [opcion, setOpcion] = useState<string | null>(null)   // ENT-0 · id de la opción de entrega elegida (servidor)
   const [horario, setHorario] = useState<HorarioElegido | null>(null)   // ENT-H · horario de entrega local elegido (solo chofer)
+  const [servicio, setServicio] = useState<ServicioElegido | null>(null)   // ENTREGA-SERVICIO · servicio de paquetería elegido (con su fecha exacta)
   const [order, setOrder] = useState<PedidoMin | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [payNow, setPayNow] = useState(false)
@@ -195,13 +197,16 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null })
   }, [claveDir, dirRevision])   // eslint-disable-line react-hooks/exhaustive-deps
   const necesitaDireccion = ops ? (intencion === 'domicilio' || requiereDireccion(sel?.tipo)) : true   // sin opciones (demo/fixtures) se exige dirección como antes
-  const envio = ops ? (sel?.flete ?? null) : null
+  // ENTREGA-SERVICIO · con paquetería se elige el servicio (fecha exacta); el más rápido suma solo su diferencia.
+  const conServicio = !!ops && sel?.tipo === 'foraneo' && sel.paqueteria === 'dhl' && !!choice?.address?.cp
+  const servicioSel = conServicio ? servicio : null
+  const envio = ops ? (sel ? sel.flete + (servicioSel?.diferencia ?? 0) : null) : null
   // Total: el del servidor con envío cuando la revisión ya normalizó ESTA opción; si no, productos + flete de la opción (ambos del servidor).
-  const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && typeof motor.revision.total_con_envio === 'number'
+  const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && (motor.revision.entrega.servicio?.codigo ?? null) === (servicioSel?.codigo ?? null) && typeof motor.revision.total_con_envio === 'number'
     ? motor.revision.total_con_envio
     : total != null && envio != null ? total + envio : total
   const necesitaHorario = !!ops && requiereHorario(sel)
-  const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null, horario: necesitaHorario ? horario : null }
+  const eleccion: EleccionEntrega = { address: choice?.address ?? null, locationId: choice?.locationId, opcion: ops ? opcion : null, horario: necesitaHorario ? horario : null, servicio: servicioSel }
   const conVolumen = lineas.some((l) => l.por_volumen)
   // CX-V2-B · solo las alternativas relevantes; la dirección aparece cuando hay entrega a domicilio en juego.
   const esDomicilioSel = sel?.tipo === 'local' || sel?.tipo === 'foraneo'
@@ -400,6 +405,12 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                         <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="checkout-horario">
                           <div style={{ ...SECCION, margin: '0 0 8px', fontSize: 13 }}>¿A qué hora lo recibes? {!horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige un horario</span>}</div>
                           <HorarioEntregaPicker value={horario} onChange={setHorario} cargar={servidor?.cargarHorarios} compacto />
+                        </div>
+                      )}
+                      {conServicio && sel && choice?.address?.cp && (
+                        <div style={{ marginTop: 10 }} data-testid="checkout-servicio">
+                          <ServicioPaqueteria cp={choice.address.cp} piezas={lineas.reduce((a, l) => a + l.qty, 0)} fleteRegla={sel.flete} hoy={hoy}
+                            destino={{ ciudad: choice.address.city, estado: choice.address.state }} value={servicio} onChange={(sv) => setServicio(sv)} cargar={servidor?.cargarServicios} />
                         </div>
                       )}
                       {sel && esDomicilioSel && (

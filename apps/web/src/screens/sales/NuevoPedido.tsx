@@ -17,7 +17,7 @@ import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
 import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
-import { promesaDe, requiereDireccion, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
+import { fleteDeEleccion, promesaDe, requiereDireccion, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
@@ -215,7 +215,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   }
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
   const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || (invoice && !fiscalOk)))
-  const flete = hasSupabase && entrega ? (entrega.flete ?? opcionDe(opsEntrega, entrega.opcion)?.flete ?? 0) : 0
+  const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // ENTREGA-SERVICIO · regla + diferencia del servicio elegido
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -281,7 +281,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               {hasSupabase && (
                 <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Entrega</div>
-                  <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                  <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
                 </>
               )}
 

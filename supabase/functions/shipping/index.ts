@@ -24,7 +24,7 @@ import {
   dhlErrorMessage, dhlBaseUrl, dhlAmbiente, isTrackingNoData, emptyTrackingResult, buildPickupRequest, parsePickup,
   referenciaIntento, urlGetImage, parseGetImage,   // DHL D1
   consultarDHL, decisionPrevia, guiasDistintas, horasDesde, fetchConTimeout, TIMEOUT_COTIZACION_MS, TIMEOUT_GUIA_MS, TIMEOUT_CONSULTA_MS, MINUTOS_MINIMOS_SIN_GUIA, MINUTOS_VIGENCIA_CONSULTA,   // DHL D1 · reconciliación
-  type NeutralShipper, type NeutralReceiver, type NeutralPackage,
+  type NeutralShipper, type NeutralReceiver, type NeutralPackage, fechaEntregaDhl,   // ENTREGA-SERVICIO
 } from './dhl.ts'
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
@@ -79,6 +79,19 @@ async function companyShipper(admin: any): Promise<{ shipper: OrigenEnvios; miss
   const req: [keyof NeutralShipper, string][] = [['name', 'razón social'], ['addressLine1', 'dirección'], ['cp', 'CP'], ['city', 'ciudad'], ['phone', 'teléfono'], ['email', 'email']]
   const missing = req.filter(([k]) => !s(shipper[k])).map(([, l]) => `origen: ${l}`)
   return { shipper, missing }
+}
+
+// PAQUETERÍA AL VENDER (2 nov 2026) · la paquetería y el servicio los eligen el cliente o su vendedor al comprar; Almacén
+// solo genera la guía con eso. Cambiarlo exige un motivo (queda en la guía). Sin servicio elegido (pedidos de antes o si la
+// paquetería no respondió al vender), Almacén elige como siempre.
+// deno-lint-ignore no-explicit-any
+async function revisarServicioVendido(admin: any, orderId: string, proveedor: string, codigo: string, motivo: string): Promise<{ ok: true; cambio: string | null } | { ok: false; vendido: Record<string, unknown> }> {
+  const { data: o } = await admin.from('orders').select('shipping_meta').eq('id', orderId).maybeSingle()
+  const sv = ((o?.shipping_meta as Record<string, any> | null)?.entrega?.servicio ?? null) as Record<string, unknown> | null
+  if (!sv || !sv.codigo) return { ok: true, cambio: null }
+  if (String(sv.proveedor ?? 'dhl') === proveedor && String(sv.codigo) === codigo) return { ok: true, cambio: null }
+  if (motivo.trim().length >= 5) return { ok: true, cambio: motivo.trim().slice(0, 300) }
+  return { ok: false, vendido: { proveedor: sv.proveedor, codigo: sv.codigo, nombre: sv.nombre, llega_fecha: sv.llega_fecha } }
 }
 
 const safeErr = (msg: string) => msg.slice(0, 300)
@@ -384,6 +397,8 @@ Deno.serve(conCors(async (req) => {
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!serviceCode) return json(400, { error: 'Falta el servicio (elige una tarifa).' })
       if (!Number.isFinite(montoVisto) || montoVisto <= 0) return json(400, { error: 'Falta la tarifa confirmada (vuelve a cotizar).' })
+      const svT1 = await revisarServicioVendido(admin, orderId, 't1', serviceCode, s(p.cambio_motivo))   // PAQUETERÍA AL VENDER
+      if (!svT1.ok) return json(409, { error: 'servicio_vendido', vendido: svT1.vendido, message: `Este pedido se vendió con ${String(svT1.vendido.nombre ?? svT1.vendido.codigo)}. Usa ese servicio o escribe el motivo del cambio.` })
       // Origen: la MISMA fuente que DHL (company_settings · Origen de envíos, nunca el fiscal), por CAMPOS (183): sin heurísticas.
       const origen = datosOrigenT1(shipper), destino = datosDestinoT1(receiver)
       const faltaG = faltantesGuia(origen, destino)
@@ -598,6 +613,8 @@ Deno.serve(conCors(async (req) => {
       const idemKey = s(p.idempotencyKey) || `${orderId}:${productCode}`
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!productCode) return json(400, { error: 'Falta el código de servicio (elige una tarifa).' })
+      const sv = await revisarServicioVendido(admin, orderId, 'dhl', productCode, s(p.cambio_motivo))
+      if (!sv.ok) return json(409, { error: 'servicio_vendido', vendido: sv.vendido, message: `Este pedido se vendió con ${String(sv.vendido.nombre ?? sv.vendido.codigo)}${sv.vendido.llega_fecha ? ` (llega el ${sv.vendido.llega_fecha})` : ''}. Usa ese servicio o escribe el motivo del cambio.` })
 
       // 0) Guía existente → idempotente (0 llamadas a DHL).
       const { data: existing } = await admin.from('shipments')
@@ -688,7 +705,7 @@ Deno.serve(conCors(async (req) => {
 
       // 5) Evidencia inmediata (tracking + costo del SERVIDOR) en el intento, antes de finalizar.
       const etaDays = Number(serverRate.etaDays ?? 2)
-      const estimatedDeliveryAt = new Date(Date.now() + etaDays * 86_400_000).toISOString()
+      const estimatedDeliveryAt = fechaEntregaDhl((serverRate as { entregaAt?: string }).entregaAt, etaDays)   // la fecha exacta de DHL
       const quoteRef = String(serverRate.id ?? productCode)
       await admin.from('shipping_attempts').update({ tracking_number: tracking, provider_cost: serverRate.amount, currency: serverRate.currency, quote_ref: quoteRef, updated_at: new Date().toISOString() }).eq('id', attemptId)
 
@@ -709,7 +726,7 @@ Deno.serve(conCors(async (req) => {
         order_id: orderId, carrier: 'DHL', tracking_number: tracking, status: 'in_transit',
         estimated_delivery_at: estimatedDeliveryAt, provider: 'dhl', service_code: productCode,
         label_path: labelPath, package: pkg, ship_from: shipper, ship_to: receiver,
-        provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')) }, provider_cost: serverRate.amount,
+        provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')), ...(sv.cambio ? { cambio_servicio_motivo: sv.cambio } : {}) }, provider_cost: serverRate.amount,
         currency: serverRate.currency, quote_ref: quoteRef,
       }
       const { error: finErr } = await admin.rpc('finalize_shipment', { p_attempt_id: attemptId, p_shipment: shipmentRow as unknown as never })

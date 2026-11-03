@@ -24,7 +24,7 @@ import { useRole, useRoleOpcional } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
-import { estimadaDe, promesaDe, type EntregaPedido } from '../../data/ops/entrega'
+import { estimadaDe, llegadaServicio, promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
@@ -205,6 +205,13 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   }
   const [rates, setRates] = useState<RateQuote[] | null>(null)
   const [rateId, setRateId] = useState('')
+  // PAQUETERÍA AL VENDER · el servicio que eligió el cliente (o su vendedor) manda: se preselecciona y, si Almacén genera
+  // otro, escribe el motivo (el servidor lo exige y lo deja en la guía).
+  const vendido = entregaPedido?.servicio ?? null
+  const [cambioMotivo, setCambioMotivo] = useState('')
+  const rateSel = rates?.find((r) => r.id === rateId) ?? null
+  const cambiaServicio = !!vendido && !!rateSel && (vendido.proveedor !== proveedor || rateSel.serviceCode !== vendido.codigo)
+  const faltaMotivoCambio = cambiaServicio && cambioMotivo.trim().length < 5
   const [busy, setBusy] = useState<false | 'quote' | 'label' | 'chofer'>(false)
   const [result, setResult] = useState<LabelResult | null>(null)
   // Chofer asignado: el envío queda "por despachar". Si la carga se le entrega en este momento, se despacha aquí
@@ -229,7 +236,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     setBusy('quote'); setRates(null); setRateId('')
     try {
       const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor, order.id)
-      setRates(r); setRateId(r[0]?.id ?? '')
+      setRates(r); setRateId((vendido && vendido.proveedor === proveedor ? r.find((x) => x.serviceCode === vendido.codigo)?.id : undefined) ?? r[0]?.id ?? '')
     } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo cotizar.') }
     setBusy(false)
   }
@@ -238,11 +245,13 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     const rate = rates?.find((r) => r.id === rateId)
     if (!rate || busy) return
     if (missing.length) return
+    if (faltaMotivoCambio) { setError('Este pedido se vendió con otro servicio: escribe el motivo del cambio.'); return }
     setBusy('label'); setError(null)
     try {
       const { label } = await createShipmentReal({
         order_id: order.id, orderRef, idempotencyKey: `${order.id}:${rate.id}`,
         shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor,
+        ...(cambiaServicio ? { cambio_motivo: cambioMotivo.trim() } : {}),
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
@@ -415,6 +424,11 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                         <button key={pv} type="button" className={proveedor === pv ? 'active' : undefined} onClick={() => { setProveedor(pv); setRates(null); setError(null) }} data-testid={`proveedor-${pv}`}>{NOMBRE_PROVEEDOR[pv]}</button>
                       ))}
                     </div>
+                    {vendido && (
+                      <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--ok-bg, #EAF4EC)' }} data-testid="servicio-vendido">
+                        <b>Se vendió: {vendido.nombre}</b> ({vendido.proveedor.toUpperCase()}) · el cliente espera su pedido el {llegadaServicio(vendido)}. Genera la guía con ese servicio.
+                      </div>
+                    )}
                     {entregaPedido?.paqueteria && entregaPedido.paqueteria !== 'chofer' && entregaPedido.paqueteria !== proveedor && (
                       <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 4 }}>Se vendió con {NOMBRE_PROVEEDOR[entregaPedido.paqueteria]}; estás generando con otro proveedor.</div>
                     )}
@@ -497,16 +511,22 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                           <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', border: '1px solid ' + (rateId === r.id ? 'var(--green)' : 'var(--line)'), borderRadius: 11, cursor: 'pointer', background: rateId === r.id ? 'var(--ok-bg)' : '#fff' }}>
                             <input type="radio" name="rate" checked={rateId === r.id} onChange={() => setRateId(r.id)} />
                             <span style={{ flex: 1 }}>
-                              <b>{r.carrier}</b> · {r.service}
+                              <b>{r.carrier}</b> · {r.service}{vendido && vendido.proveedor === proveedor && r.serviceCode === vendido.codigo && <span className="chip" style={{ marginLeft: 6, fontSize: 11 }} data-testid="tarifa-vendida">Vendido</span>}
                               <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Entrega en {r.etaDays} {r.etaDays === 1 ? 'día' : 'días'}</span>
                             </span>
                             <b className="mono">{money(r.amount)}</b>
                           </label>
                         ))}
                       </div>
+                      {cambiaServicio && (
+                        <label style={{ ...labelStyle, marginTop: 12, color: faltaMotivoCambio ? 'var(--warn)' : undefined }} data-testid="cambio-servicio">
+                          El cliente pagó otro servicio ({vendido!.nombre}). ¿Por qué se cambia?
+                          <input type="text" maxLength={200} value={cambioMotivo} onChange={(e) => setCambioMotivo(e.target.value)} placeholder="p. ej. DHL no ofrece ese servicio hoy a este C.P." style={{ width: '100%', marginTop: 4 }} data-testid="cambio-servicio-motivo" />
+                        </label>
+                      )}
                       <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                         <button className="btn ghost" type="button" onClick={() => setRates(null)}>Recotizar</button>
-                        <button className="btn" type="button" onClick={generarGuia} disabled={busy === 'label' || !rateId} style={busy === 'label' ? { opacity: .6 } : undefined}>
+                        <button className="btn" type="button" onClick={generarGuia} disabled={busy === 'label' || !rateId || faltaMotivoCambio} style={busy === 'label' ? { opacity: .6 } : undefined}>
                           {busy === 'label' ? 'Generando guía…' : <><Icon name="check" /> Generar guía</>}
                         </button>
                       </div>

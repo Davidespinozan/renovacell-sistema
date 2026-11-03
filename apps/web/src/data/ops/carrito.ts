@@ -3,7 +3,7 @@
 // lista, profile_id ni seller. Cada mutación lleva un operation_id generado aquí (idempotencia).
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { leerTokenVisitante } from './visitante'
-import type { EntregaPedido, OpcionesEntrega } from './entrega'
+import type { EntregaPedido, OpcionesEntrega, ServicioElegido } from './entrega'
 
 export type EstadoPrecio = 'autorizado' | 'requiere_verificacion' | 'sin_precio'
 export interface ItemCarrito {
@@ -71,7 +71,7 @@ export class ClienteCarrito {
   // CC-7 · el Catálogo puede mandar el snapshot de dirección elegido (sin location registrada) y la intención de factura.
   // ENT-0 · la entrega elegida viaja SOLO como el id de la opción (el flete y la promesa los decide el servidor).
   // ENT-H · el horario de entrega local viaja como {fecha, inicio}; el servidor valida y reserva.
-  revisarCheckout(cart_id: string, location_id?: string | null, direccion?: DireccionSnapshot | null, entrega?: string | null, horario?: { fecha: string; inicio: string } | null) { return this.llamar<RevisionCheckout>({ action: 'revisar_checkout', cart_id, location_id: location_id ?? null, direccion: location_id ? null : direccion ?? null, ...(entrega ? { entrega } : {}), ...(entrega && horario ? { horario: { fecha: horario.fecha, inicio: horario.inicio } } : {}) }) }
+  revisarCheckout(cart_id: string, location_id?: string | null, direccion?: DireccionSnapshot | null, entrega?: string | null, horario?: { fecha: string; inicio: string } | null, servicio?: ServicioElegido | null) { return this.llamar<RevisionCheckout>({ action: 'revisar_checkout', cart_id, location_id: location_id ?? null, direccion: location_id ? null : direccion ?? null, ...(entrega ? { entrega } : {}), ...(entrega && horario ? { horario: { fecha: horario.fecha, inicio: horario.inicio } } : {}), ...(entrega && servicio ? { servicio: { cotizacion_id: servicio.cotizacion_id, codigo: servicio.codigo } } : {}) }) }   // ENTREGA-SERVICIO · solo cotización + código
   // C360-F3 · con factura viaja SOLO el id del perfil fiscal elegido; el servidor valida que sea del cliente y lo congela.
   confirmarCheckout(review_id: string, expected_cart_rev: number, operation_id = nuevaOperacion(), factura = false, perfil_fiscal_id: string | null = null) { return this.llamar<ResultadoCheckout>({ action: 'confirmar_checkout', review_id, operation_id, expected_cart_rev, factura, ...(factura && perfil_fiscal_id ? { perfil_fiscal_id } : {}) }) }
 }

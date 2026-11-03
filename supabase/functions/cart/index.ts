@@ -78,6 +78,10 @@ Deno.serve(conCors(async (req) => {
       const horario = ent && hRaw && typeof hRaw === 'object' && typeof hRaw.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(hRaw.fecha) && typeof hRaw.inicio === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(hRaw.inicio)
         ? { fecha: hRaw.fecha, inicio: hRaw.inicio } : null
       if (ent && horario) (ent as Record<string, unknown>).horario = horario
+      // ENTREGA-SERVICIO · el servicio de paquetería elegido: solo {cotizacion_id, codigo}; la base valida contra su cotización y pone el precio.
+      const sRaw = p.servicio as { cotizacion_id?: unknown; codigo?: unknown } | null | undefined
+      if (ent && sRaw && typeof sRaw === 'object' && typeof sRaw.cotizacion_id === 'string' && UUID.test(sRaw.cotizacion_id) && typeof sRaw.codigo === 'string' && /^[A-Za-z0-9]{1,8}$/.test(sRaw.codigo))
+        (ent as Record<string, unknown>).servicio = { cotizacion_id: sRaw.cotizacion_id, codigo: sRaw.codigo }
       const { data, error } = await caller.rpc('cc_checkout_revisar', { p_cart: cartR, p_location_id: loc, p_direccion: dir, p_entrega: ent })
       if (error) return falla(error)
       return json(200, data)
