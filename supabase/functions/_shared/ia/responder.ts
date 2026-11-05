@@ -9,6 +9,7 @@ import * as validacion from './validacion.ts'
 import { configurar, crearProveedorAnthropic, esModeloConPensamiento, type OpcionesModelo } from './proveedor.ts'
 import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
+import { frenoBot, sinContenido } from './antibot.ts'
 
 // R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
 // seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
@@ -85,6 +86,12 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   // Si ya había una solicitud en curso, la IA sigue informando con normalidad.
   let comercial: politica.MotivoComercial | null = null
   if (canal !== 'portal') {
+    // ANTIBOT · antes de todo (y sin llamar al modelo): mensajes sin contenido o de otro bot no se contestan. Si no se
+    // puede leer el historial, sigue el flujo normal (el techo por contacto de canal, abajo, sigue cortando).
+    let hist: Array<{ actor: string; content: string }> = []
+    if (!sinContenido(texto)) { try { hist = await leerInterno(admin, conv, seqUsuario, 20) } catch { hist = [] } }
+    const freno = frenoBot(hist, texto)
+    if (freno) return 'silenciada'
     const motivo = politica.transferenciaDeterminista(texto)
     if (motivo) {
       const { data, error } = await admin.rpc('cc_solicitar_asesor', { p_conv: conv, p_actor_type: actor, p_visitor_hash: actor === 'visitor' ? visitorHash : null, p_profile: actor === 'doctor' ? profile : null })
@@ -133,9 +140,11 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const aviso = async () => { await admin.rpc('cc_ia_aviso_no_disponible', { p_conv: conv }).then(() => {}, () => {}) }
   if (!cfg.ok) { await aviso(); return 'no_disponible' }
   // CC-0B · ráfaga/hora por sujeto y techo global: sin cupo NO se llama al proveedor.
+  // ANTIBOT · en canales, además un techo por contacto (30/h, 100/día): una persona real no lo alcanza; un bucle con otro bot sí.
+  const canalTecho = canal !== 'portal' ? [{ scope: 'ia_turno_canal_hora', sujeto }, { scope: 'ia_turno_canal_dia', sujeto }] : []
   const v = await limitarTodas(admin, actor === 'doctor'
-    ? [{ scope: 'ia_turno_uid', sujeto }, { scope: 'ia_turno_hora', sujeto }, { scope: 'ia_turno_global', sujeto: 'global' }]
-    : [{ scope: 'ia_turno', sujeto }, { scope: 'ia_turno_hora', sujeto }, { scope: 'ia_turno_global', sujeto: 'global' }])
+    ? [{ scope: 'ia_turno_uid', sujeto }, { scope: 'ia_turno_hora', sujeto }, ...canalTecho, { scope: 'ia_turno_global', sujeto: 'global' }]
+    : [{ scope: 'ia_turno', sujeto }, { scope: 'ia_turno_hora', sujeto }, ...canalTecho, { scope: 'ia_turno_global', sujeto: 'global' }])
   if (!v.permitido) return 'limitada'
   // Costo diario en tokens: pre-carga estimada (historial acotado + salida) y ajuste con el consumo real.
   const estimado = tokensEstimados([texto], cfg.config.maxTokens) + 1500
