@@ -264,6 +264,10 @@
 
 /* Enlaces dentro de un mensaje: visibles en las dos burbujas (propia verde y ajena clara). */
 .rc-enlace{color:inherit;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+/* UBICACIÓN EN EL CHAT */
+.rc-ubic{display:flex;flex-direction:column;gap:3px;min-width:200px}
+.rc-ubic-tit{display:flex;align-items:center;gap:6px}
+.rc-ubic-dir{font-size:13px;opacity:.8}
 .rc-msg--ai .rc-enlace,.rc-msg--seller .rc-enlace,.rc-msg--admin .rc-enlace,.rc-chat--wa .rc-enlace{color:var(--green-deep);font-weight:500}
 .rc-chat--wa .rc-msg--own .rc-enlace{color:#0b6b1d}
 

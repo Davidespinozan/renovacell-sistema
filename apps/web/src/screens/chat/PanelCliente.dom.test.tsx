@@ -108,3 +108,32 @@ describe('PanelCliente', () => {
     expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/^Hola Lourdes, recibimos tu pago de \$2,000.* del pedido S1203\. Tu pedido quedó pagado por completo\./)
   })
 })
+
+describe('PanelCliente · Mandar ubicación (pedido de Alejandra)', () => {
+  it('manda la sucursal por el mismo chat', async () => {
+    const c = falso([VINCULADA]); const enviar = vi.fn(async () => ({ ok: true, data: {} }))
+    render(<PanelCliente conversationId="C1" cliente={c} chat={{ enviar } as unknown as ClienteChat} />)
+    fireEvent.click(await screen.findByTestId('accion-ubicacion'))
+    fireEvent.click(screen.getByTestId('ubic-sucursal'))
+    await waitFor(() => expect(enviar).toHaveBeenCalled())
+    expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/^📍 Renovacell · Sucursal Culiacán\nBoulevard Pedro Infante 2911/)
+    expect(await screen.findByTestId('pc-msg')).toHaveTextContent('Le mandaste la ubicación.')
+  })
+  it('pega un enlace de Google Maps: sale con sus coordenadas y el nombre que escribió (también sin ficha)', async () => {
+    const c = falso([{ vinculado: false, con_cuenta: false }]); const enviar = vi.fn(async () => ({ ok: true, data: {} }))
+    render(<PanelCliente conversationId="C1" cliente={c} chat={{ enviar } as unknown as ClienteChat} />)
+    fireEvent.click(await screen.findByTestId('accion-ubicacion'))
+    fireEvent.change(screen.getByTestId('ubic-enlace'), { target: { value: 'https://www.google.com/maps/@24.8069,-107.3938,15z' } })
+    expect(screen.getByTestId('ubic-lista')).toHaveTextContent('24.8069, -107.3938')
+    fireEvent.change(screen.getByTestId('ubic-nombre'), { target: { value: 'Punto de entrega' } })
+    fireEvent.click(screen.getByTestId('ubic-mandar'))
+    await waitFor(() => expect(enviar).toHaveBeenCalled())
+    expect(String((enviar.mock.calls[0] as unknown[])[1])).toBe('📍 Punto de entrega\nhttps://www.google.com/maps/search/?api=1&query=24.8069,-107.3938')
+  })
+  it('sin chat no aparece la acción', async () => {
+    const c = falso([VINCULADA])
+    render(<PanelCliente conversationId="C1" cliente={c} />)
+    expect(await screen.findByText('Sin cuenta')).toBeInTheDocument()
+    expect(screen.queryByTestId('accion-ubicacion')).toBeNull()
+  })
+})

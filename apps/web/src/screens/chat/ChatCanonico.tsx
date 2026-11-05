@@ -9,7 +9,8 @@ import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, History, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, History, MapPin, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { enlaceMaps, leerUbicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
@@ -110,6 +111,15 @@ export function textoHandoff(conv: Pick<Conversacion, 'asesor_nombre' | 'handoff
 // Enlaces en el texto: solo http(s), se abren aparte y sin dar acceso a esta pestaña. El resto queda como texto.
 const URL_EN_TEXTO = /(https?:\/\/[^\s<>"]+)/g
 export function conEnlaces(texto: string): React.ReactNode {
+  // UBICACIÓN EN EL CHAT · «📍 …» con su enlace de Maps se ve como tarjeta (nombre, dirección y «Abrir en Google Maps»).
+  const u = leerUbicacion(texto)
+  if (u) return (
+    <span className="rc-ubic" data-testid="msg-ubicacion">
+      <span className="rc-ubic-tit"><MapPin size={15} aria-hidden /> <b>{u.nombre}</b></span>
+      {u.direccion && <span className="rc-ubic-dir">{u.direccion}</span>}
+      <a href={enlaceMaps(u)} target="_blank" rel="noopener noreferrer" className="rc-enlace">Abrir en Google Maps</a>
+    </span>
+  )
   const partes = texto.split(URL_EN_TEXTO)
   if (partes.length === 1) return texto
   return partes.map((p, i) => {

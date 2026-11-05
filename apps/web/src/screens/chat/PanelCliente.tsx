@@ -28,6 +28,8 @@ import { eliminarConversacion } from '../../data/ops/expediente'   // ELIMINAR C
 import { interesReciente as interesPorDefecto, resumenInteres, type InteresReciente } from '../../data/ops/actividadCatalogo'   // IA-VENDEDORA
 import type { AccionChat } from './ChatCanonico'
 import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
+import { MapPin, LocateFixed } from 'lucide-react'
+import { SUCURSAL, coordsDeTexto, textoUbicacion, type Ubicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
@@ -77,6 +79,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const cargarPedidos = useCallback(async () => { const r = await pagos.pedidos(conversationId); setPedidos(r.ok ? r.data : []) }, [pagos, conversationId])
   // SEGUIMIENTOS · en qué quedó con este cliente y cuándo retomarlo.
   const [seg, setSeg] = useState<Seguimiento | null>(null)
+  // UBICACIÓN EN EL CHAT (pedido de Alejandra) · la sucursal, la ubicación actual del dispositivo o un enlace de Google Maps.
+  const [ubic, setUbic] = useState({ enlace: '', nombre: '', direccion: '', lat: null as number | null, lng: null as number | null, buscando: false })
   const [segForm, setSegForm] = useState<{ estado: EstadoSeguimiento | null; nota: string; recordar: string }>({ estado: null, nota: '', recordar: enDias(3) })
   const cargarSeg = useCallback(async (customer?: string | null) => { const r = await segCli.de(customer ?? null, conversationId); setSeg(r.ok ? r.data : null) }, [segCli, conversationId])
   const [interes, setInteres] = useState<InteresReciente[]>([])
@@ -213,6 +217,35 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     await cargar()
   }
 
+  const mandarUbicacion = async (u: Ubicacion | string) => {
+    if (!chat) return
+    setOcupado(true); setMsg(null)
+    const r = await chat.enviar(conversationId, typeof u === 'string' ? u : textoUbicacion(u))
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.error.mensaje }); return }
+    cerrarHoja(conversationId)
+    setUbic({ enlace: '', nombre: '', direccion: '', lat: null, lng: null, buscando: false })
+    setMsg({ ok: true, texto: 'Le mandaste la ubicación.' })
+  }
+  const miUbicacion = () => {
+    if (!('geolocation' in navigator)) { setMsg({ ok: false, texto: 'Este dispositivo no da su ubicación. Pega un enlace de Google Maps.' }); return }
+    setUbic((u) => ({ ...u, buscando: true })); setMsg(null)
+    navigator.geolocation.getCurrentPosition(
+      (p) => setUbic((u) => ({ ...u, buscando: false, enlace: '', lat: Math.round(p.coords.latitude * 1e6) / 1e6, lng: Math.round(p.coords.longitude * 1e6) / 1e6, nombre: u.nombre || 'Mi ubicación' })),
+      () => { setUbic((u) => ({ ...u, buscando: false })); setMsg({ ok: false, texto: 'No se pudo obtener tu ubicación (revisa el permiso de ubicación del navegador).' }) },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+    )
+  }
+  const mandarUbicacionCapturada = () => {
+    const c = ubic.lat != null && ubic.lng != null ? { lat: ubic.lat, lng: ubic.lng } : coordsDeTexto(ubic.enlace)
+    const nombre = ubic.nombre.trim() || 'Ubicación'
+    if (c) { void mandarUbicacion({ nombre, direccion: ubic.direccion.trim(), lat: c.lat, lng: c.lng }); return }
+    const url = ubic.enlace.trim()
+    // enlace corto (maps.app.goo.gl) u otro sin coordenadas: sale como texto con su enlace (WhatsApp muestra la vista previa)
+    if (/^https:\/\/\S+$/.test(url)) { void mandarUbicacion([`📍 ${nombre}`, ubic.direccion.trim(), url].filter(Boolean).join('\n')); return }
+    setMsg({ ok: false, texto: 'Pega un enlace de Google Maps (o coordenadas como 24.80, -107.39) o usa tu ubicación actual.' })
+  }
+
   const vacio: PiezasChat = { tira: null, hoja: null, acciones: [] }
   if (!activo || !ficha) return { ...vacio, tira: activo && msg && !msg.ok ? <div className="pc-tira-msg" role="alert">{msg.texto}</div> : null }
   if (!ficha.vinculado && ficha.con_cuenta) return vacio   // doctor con cuenta y sin ficha: lo atiende la verificación
@@ -283,6 +316,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', detalle: 'Datos, pedidos y cotizaciones', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
   } else acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
 
+  if (chat) acciones.push({ clave: 'ubicacion', etiqueta: 'Mandar ubicación', detalle: 'La sucursal, donde estás o un enlace de Google Maps', icono: <MapPin size={18} />, onElegir: () => abrir('pc:ubicacion') })
   acciones.push({ clave: 'seguimiento', etiqueta: seg ? 'Actualizar seguimiento' : 'Dejar seguimiento', detalle: 'En qué quedó y cuándo retomarlo (te aviso ese día)', icono: <ClipboardList size={18} />,
     onElegir: () => { setSegForm({ estado: seg?.estado ?? null, nota: seg?.nota ?? '', recordar: seg && seg.recordar_el >= enDias(0) ? seg.recordar_el : enDias(3) }); abrir('pc:seguimiento') } })
   if (esDireccion) acciones.push({ clave: 'eliminar', etiqueta: 'Eliminar conversación', detalle: 'Pruebas, spam o duplicados (queda respaldo y constancia)', icono: <Trash2 size={18} />, onElegir: () => { setElim({ motivo: '', olvidar: true, seguro: false }); abrir('pc:eliminar') } })
@@ -419,6 +453,33 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
       </div>
     </HojaMarco>
   )
+  else if (hoja === 'pc:ubicacion' && chat) {
+    const lista = ubic.lat != null && ubic.lng != null ? { lat: ubic.lat, lng: ubic.lng } : coordsDeTexto(ubic.enlace)
+    cuerpo = (
+    <HojaMarco titulo="Mandar ubicación" sub="Por WhatsApp le llega como ubicación en el mapa; en el portal, con su enlace a Google Maps." onCerrar={cerrar} testid="pc-hoja-ubicacion">
+      <ul className="pc-lista">
+        <li className="pc-cand">
+          <span className="pc-av" aria-hidden><MapPin size={16} /></span>
+          <span className="pc-cand-tx"><b>{SUCURSAL.nombre}</b><small>{SUCURSAL.direccion}</small></span>
+          <button type="button" className="btn sm" disabled={ocupado} onClick={() => void mandarUbicacion(SUCURSAL)} data-testid="ubic-sucursal">Mandar</button>
+        </li>
+      </ul>
+      <div className="pc-nota">U otra ubicación:</div>
+      <div className="pc-acciones">
+        <button type="button" className="btn ghost sm" disabled={ocupado || ubic.buscando} onClick={miUbicacion} data-testid="ubic-actual"><LocateFixed size={15} aria-hidden /> {ubic.buscando ? 'Buscando…' : 'Usar mi ubicación actual'}</button>
+      </div>
+      <form className="pc-form" onSubmit={(e) => { e.preventDefault(); mandarUbicacionCapturada() }} data-testid="ubic-form">
+        {ubic.lat == null && <input className="pc-campo" value={ubic.enlace} onChange={(e) => setUbic({ ...ubic, enlace: e.target.value })} placeholder="Pega un enlace de Google Maps o coordenadas" aria-label="Enlace de Google Maps o coordenadas" data-testid="ubic-enlace" />}
+        {lista && <div className="pc-nota" data-testid="ubic-lista">Ubicación lista: {lista.lat}, {lista.lng}{ubic.lat != null && <> · <button type="button" className="rc-link" onClick={() => setUbic({ ...ubic, lat: null, lng: null })}>quitar</button></>}</div>}
+        <input className="pc-campo" value={ubic.nombre} onChange={(e) => setUbic({ ...ubic, nombre: e.target.value })} maxLength={100} placeholder="Nombre del lugar (opcional)" aria-label="Nombre del lugar" data-testid="ubic-nombre" />
+        <input className="pc-campo" value={ubic.direccion} onChange={(e) => setUbic({ ...ubic, direccion: e.target.value })} maxLength={300} placeholder="Dirección o referencia (opcional)" aria-label="Dirección o referencia" data-testid="ubic-direccion" />
+        {aviso}
+        <div className="pc-acciones">
+          <button type="submit" className="btn" disabled={ocupado || (!lista && !ubic.enlace.trim())} data-testid="ubic-mandar"><Send size={15} aria-hidden /> Mandar ubicación</button>
+        </div>
+      </form>
+    </HojaMarco>
+  ) }
   else if (hoja === 'pc:seguimiento') cuerpo = (
     <HojaMarco titulo="Seguimiento" sub="En qué quedó la plática y cuándo retomarla. Ese día te llega un aviso y aparece en Pendientes." onCerrar={cerrar} testid="pc-hoja-seguimiento">
       {seg && <div className="pc-nota">Vigente: <b>{ETIQUETA_ESTADO[seg.estado]}</b> · {cuandoRetomar(seg.recordar_el).texto}{seg.nota ? ` · ${seg.nota}` : ''}</div>}

@@ -5,6 +5,7 @@
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
 import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoTexto, MIME_IMAGEN, type MediaWA } from './whatsapp.ts'
 import { esMarcadorArchivo, esMensajeConImagen } from './adjuntos.ts'
+import { cuerpoUbicacion, leerUbicacion } from './ubicacion.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
 
 export interface Despacho { enviados: number; fallidos: number; retenidos: number; inciertos: number }
@@ -104,7 +105,10 @@ export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fe
       // privado `chat`); antes solo salía el texto "Envió una imagen." y el cliente nunca veía la foto.
       const media = await adjuntoParaEnviar(admin, s.message_id)
       if (media === 'error') { await resolver(s.id, { ok: false, clase: 'definitivo', detalle: 'no se pudo preparar el archivo para enviarlo' }); r.fallidos++; continue }
-      const cuerpoEnvio = media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre) : cuerpoTexto(s.wa_id, s.texto)
+      // UBICACIÓN EN EL CHAT · «📍 …» con coordenadas sale como ubicación nativa (pin); sin coordenadas, como texto con su enlace.
+      const ubic = media ? null : leerUbicacion(s.texto)
+      const cuerpoEnvio = media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre)
+        : (ubic && cuerpoUbicacion(s.wa_id, ubic)) || cuerpoTexto(s.wa_id, s.texto)
       let res: ResultadoEnvio
       try {
         const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)
