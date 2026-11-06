@@ -1,6 +1,6 @@
 // ANTIBOT (5 nov 2026) · la IA de canal no conversa con otro bot. Fixtures = textos reales del incidente (bot de otra empresa).
 import { describe, it, expect } from 'vitest'
-import { frenoBot, sinContenido, pareceAutomatico } from '../../../../../supabase/functions/_shared/ia/antibot'
+import { esNumeroEmpresa, frenoBot, sinContenido, pareceAutomatico } from '../../../../../supabase/functions/_shared/ia/antibot'
 import responderSrc from '../../../../../supabase/functions/_shared/ia/responder.ts?raw'
 import { LIMITES } from '../../../../../supabase/functions/_shared/limite'
 
@@ -45,6 +45,20 @@ describe('ANTIBOT · frenoBot', () => {
   it('pareceAutomatico reconoce menús típicos', () => {
     expect(pareceAutomatico('Responde con el número de la opción')).toBe(true)
     expect(pareceAutomatico('Me interesa el mayoreo')).toBe(false)
+  })
+})
+
+describe('BOT DETECTADO · aviso a Renovacell', () => {
+  it('número 800/900 de empresa (como el de hoy) sí; celulares no', () => {
+    expect(esNumeroEmpresa('wa:5218007112222')).toBe(true)
+    expect(esNumeroEmpresa('wa:528007112222')).toBe(true)
+    expect(esNumeroEmpresa('wa:5219001234567')).toBe(true)
+    expect(esNumeroEmpresa('wa:5216671112233')).toBe(false)
+    expect(esNumeroEmpresa('meta:8001234567')).toBe(false)
+  })
+  it('el freno avisa con cc_bot_detectado (sin contenido solo con número de empresa) y nunca deja de silenciar', () => {
+    expect(responderSrc).toMatch(/freno === 'sin_contenido' \? \(esNumeroEmpresa\(sujeto\) \? 'numero_empresa' : null\) : freno/)
+    expect(responderSrc).toMatch(/admin\.rpc\('cc_bot_detectado', \{ p_conv: conv, p_motivo: motivoBot \}\)\.then\(\(\) => \{\}, \(\) => \{\}\)/)
   })
 })
 

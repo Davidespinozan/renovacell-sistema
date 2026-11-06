@@ -336,6 +336,7 @@
 /* WA-2 · avisos del canal WhatsApp para el personal (sobre el redactor). */
 .rc-wa-aviso{margin:0;padding:8px 14px;font-size:12.5px;line-height:1.4;background:#e7f5ec;color:#11502a;border-top:1px solid #cfe7d8}
 .rc-wa-aviso--cerrada{background:var(--warn-bg);color:var(--warn);border-top-color:transparent}
+.rc-wa-aviso--bot{background:var(--warn-bg);color:var(--warn);border-top-color:transparent}
 
 /* ── Chat del equipo (hub) · mismo lenguaje que el chat de mensajería ──────────────────────────────
    Escritorio: lista y conversación lado a lado. Teléfono (≤900px): una a la vez; abrir un chat oculta la lista. */

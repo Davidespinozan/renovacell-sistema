@@ -79,3 +79,8 @@ export function frenoBot(historial: MensajeHist[], texto: string): MotivoFreno |
   if (pareceAutomatico(texto) && previosUsuario.slice(-8).some((p) => AUTOMATICO.some((r) => r.test(p)))) return 'automatico'
   return null
 }
+
+/** Número de empresa en México (800/900, con o sin el 1 de móvil): sujeto «wa:52800…» o «wa:521800…». */
+export function esNumeroEmpresa(sujeto: string): boolean {
+  return /^wa:521?(800|900)\d{7}$/.test(sujeto ?? '')
+}

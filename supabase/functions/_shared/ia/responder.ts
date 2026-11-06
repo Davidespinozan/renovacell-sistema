@@ -9,7 +9,7 @@ import * as validacion from './validacion.ts'
 import { configurar, crearProveedorAnthropic, esModeloConPensamiento, type OpcionesModelo } from './proveedor.ts'
 import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
-import { frenoBot, sinContenido } from './antibot.ts'
+import { esNumeroEmpresa, frenoBot, sinContenido } from './antibot.ts'
 
 // R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
 // seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
@@ -91,7 +91,13 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
     let hist: Array<{ actor: string; content: string }> = []
     if (!sinContenido(texto)) { try { hist = await leerInterno(admin, conv, seqUsuario, 20) } catch { hist = [] } }
     const freno = frenoBot(hist, texto)
-    if (freno) return 'silenciada'
+    if (freno) {
+      // BOT DETECTADO · se avisa a Renovacell (evento + campana, una vez al día por conversación). Mensaje sin contenido solo
+      // cuenta como bot si viene de un número 800/900 (empresa): una persona también manda reacciones o tipos raros.
+      const motivoBot = freno === 'sin_contenido' ? (esNumeroEmpresa(sujeto) ? 'numero_empresa' : null) : freno
+      if (motivoBot) await admin.rpc('cc_bot_detectado', { p_conv: conv, p_motivo: motivoBot }).then(() => {}, () => {})
+      return 'silenciada'
+    }
     const motivo = politica.transferenciaDeterminista(texto)
     if (motivo) {
       const { data, error } = await admin.rpc('cc_solicitar_asesor', { p_conv: conv, p_actor_type: actor, p_visitor_hash: actor === 'visitor' ? visitorHash : null, p_profile: actor === 'doctor' ? profile : null })

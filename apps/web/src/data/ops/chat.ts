@@ -33,7 +33,9 @@ export interface Conversacion {
 }
 export interface InfoWhatsApp { wa_id: string; modo: 'espejo' | 'activo'; ventana_abierta: boolean; ventana_hasta: string | null; fallidos: number }
 export type TipoCanal = 'whatsapp' | 'instagram' | 'messenger'
-export interface InfoCanal { canal: TipoCanal; id: string; modo: 'espejo' | 'activo'; ventana_abierta: boolean; ventana_hasta: string | null; fallidos: number }
+export interface InfoCanal { canal: TipoCanal; id: string; modo: 'espejo' | 'activo'; ventana_abierta: boolean; ventana_hasta: string | null; fallidos: number
+  bot?: { motivo: string; at: string } | null   // BOT DETECTADO · el freno vio respuestas automáticas en las últimas 24 h
+}
 export const NOMBRE_CANAL: Record<TipoCanal, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook' }
 /** El canal de la conversación: el nuevo `canal` o, si el servidor aún manda solo `whatsapp`, se deriva de él. */
 export const canalDe = (c: { canal?: InfoCanal | null; whatsapp?: InfoWhatsApp | null } | null | undefined): InfoCanal | null =>

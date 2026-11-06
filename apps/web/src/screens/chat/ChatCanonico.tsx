@@ -666,6 +666,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       </div>
 
       {(error ?? errorTerminar) && !finAtencion && <div role="alert" className="rc-error">{error ?? errorTerminar}</div>}
+      {/* BOT DETECTADO · el freno vio respuestas automáticas de otro sistema: se avisa al personal (el contacto no lo ve). */}
+      {canal?.bot && (
+        <div className="rc-wa-aviso rc-wa-aviso--bot" role="status" data-testid="aviso-bot">
+          🤖 <b>Parece un bot</b>: {canal.bot.motivo === 'numero_empresa' ? 'escribe desde un número 800 de empresa y su mensaje no trae texto' : 'manda respuestas automáticas de otro sistema'}. La IA dejó de contestarle para no gastar. Si es una persona, contéstale tú.
+        </div>
+      )}
       {/* WA-2 · el cliente escribe por WhatsApp: qué le llega y qué no (solo lo ve el personal). */}
       {canal && (canal.modo === 'espejo'
         ? <div className="rc-wa-aviso" role="status" data-testid="wa-espejo">{NOMBRE_CANAL[canal.canal]} en modo espejo: aquí ves sus mensajes, pero todavía se contestan en Leadsales; desde aquí no se puede escribir.</div>
