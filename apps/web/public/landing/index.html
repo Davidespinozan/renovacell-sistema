@@ -2,6 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<script>
+/* ENLACE DE CONTRASEÑA · si Supabase regresa aquí (la raíz es la landing) con los datos de un enlace de acceso
+   (#access_token / type=recovery / error_code, o ?code=), se reenvía al sistema, que es donde se crea la contraseña. */
+(function(){try{var h=location.hash||'',q=location.search||'';if(/(^#|&)(access_token|error_code|error_description)=/.test(h)||/(^#|&)type=(recovery|invite|magiclink|signup)(&|$)/.test(h)||/[?&]code=[0-9a-f-]{20,}/i.test(q)){location.replace('/sistema'+q+h)}}catch(e){}})();
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title data-rc="metaTitle">Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008</title>
 <meta name="description" data-rc-meta="metaDescription" content="Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.">

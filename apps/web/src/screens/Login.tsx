@@ -14,11 +14,23 @@ const input: React.CSSProperties = {
 const iconStyle: React.CSSProperties = { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-3)' }
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'rgba(255,255,255,.55)' }
 
+// ENLACE DE CONTRASEÑA · Supabase regresa con #error_code=otp_expired (u otro error) si el enlace ya venció o ya se usó:
+// antes la persona caía al login sin explicación. Se avisa y se limpia la dirección.
+export function enlaceVencido(): string | null {
+  if (typeof window === 'undefined') return null
+  const h = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  if (!h.get('error_code') && !h.get('error')) return null
+  try { window.history.replaceState(null, '', window.location.pathname + window.location.search) } catch { /* sin historial */ }
+  return h.get('error_code') === 'otp_expired'
+    ? 'Ese enlace para crear tu contraseña ya venció o ya se usó. Pide uno nuevo a tu asesor o toca «¿Olvidaste tu contraseña?».'
+    : 'Ese enlace ya no es válido. Pide uno nuevo a tu asesor o toca «¿Olvidaste tu contraseña?».'
+}
+
 export function Login() {
   const { signIn, recoverPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(() => motivoCierreSesion())
+  const [error, setError] = useState<string | null>(() => enlaceVencido() ?? motivoCierreSesion())
   // UN solo registro de doctores: el formulario de la landing (datos, teléfono, domicilio, INE y aviso de privacidad).
   // Aquí antes había un formulario corto (nombre, correo, cédula, contraseña) que dejaba fuera la identidad y el
   // teléfono; quien llega con #registro se manda directo al registro completo.
