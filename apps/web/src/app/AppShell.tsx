@@ -7,6 +7,7 @@ import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
+import { AsistenteEquipoPuerta } from './AsistenteEquipo'   // ASISTENTE DEL EQUIPO · «Pregúntale al sistema»
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
@@ -68,6 +69,8 @@ export function AppShell() {
       <ChatFlotante />
       {/* CHV2-B · alerta comercial en vivo del staff (vendedor con conversaciones / Dirección); fuera de #content. */}
       <AlertaComercial />
+      {/* ASISTENTE DEL EQUIPO · solo personal; fuera de #content para que la plática sobreviva al cambio de pantalla. */}
+      <AsistenteEquipoPuerta />
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
       <BottomNav onMenu={() => setDrawer(true)} />
     </div>

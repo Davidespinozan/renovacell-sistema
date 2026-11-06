@@ -740,3 +740,23 @@ button.pc-tira:hover{background:var(--hueso)}
 .rc-previa .rc-msg{opacity:.78}
 .rc-day--previa span,.rc-day--ahora span{font-weight:600}
 .rc-day--ahora span{background:var(--ok-bg, #e8f3ec);color:var(--green-deep, #1f5134)}
+/* ASISTENTE DEL EQUIPO · botón flotante y panel «Pregúntale al sistema» (solo personal) */
+.ae-lanzador{position:fixed;right:18px;bottom:18px;z-index:60;width:48px;height:48px;border-radius:999px;border:0;background:var(--green-deep);color:#fff;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+.ae-panel{position:fixed;right:16px;bottom:16px;z-index:61;width:min(400px,calc(100vw - 32px));height:min(620px,calc(100vh - 32px));background:var(--card,#fff);color:inherit;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden}
+.ae-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.ae-head span{display:flex;align-items:center;gap:6px;font-size:14px}
+.ae-ico{border:0;background:none;color:inherit;cursor:pointer;padding:4px;border-radius:8px;min-width:32px;min-height:32px}
+.ae-hilo{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.ae-vacio p{margin:0 0 8px;color:var(--ink-3)}
+.ae-ejemplo{display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:none;color:inherit;font:inherit;cursor:pointer}
+.ae-msg{max-width:92%;padding:8px 11px;border-radius:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.ae-msg p{margin:0 0 6px}.ae-msg p:last-child{margin:0}.ae-msg ul{margin:0 0 6px;padding-left:18px}
+.ae-msg--persona{align-self:flex-end;background:var(--green-deep);color:#fff}
+.ae-msg--asistente{align-self:flex-start;background:var(--hueso,#f4f4f2);white-space:normal}
+.ae-msg--error{background:var(--warn-bg);color:var(--warn)}
+.ae-pensando{opacity:.7;font-style:italic}
+.ae-form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.ae-form textarea{flex:1;resize:none;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:13.5px;background:var(--card,#fff);color:inherit}
+.ae-enviar{border:0;border-radius:10px;background:var(--green-deep);color:#fff;min-width:44px;cursor:pointer}
+.ae-enviar:disabled{opacity:.5;cursor:default}
+@media (max-width:760px){.ae-lanzador{bottom:calc(84px + env(safe-area-inset-bottom,0px))}.ae-panel{right:8px;left:8px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));height:calc(100vh - 100px)}}

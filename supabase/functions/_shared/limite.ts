@@ -105,6 +105,9 @@ export const LIMITES: Record<string, Regla> = {
   ia_turno_uid:              { limite: 40,  ventanaSegs: 60 },
   ia_turno_hora:             { limite: 120, ventanaSegs: 3600 },
   ia_turno_global:           { limite: 1500, ventanaSegs: 3600 },
+  // ASISTENTE DEL EQUIPO · preguntas del personal: 40/hora por persona y techo diario global de tokens.
+  ia_equipo_hora:            { limite: 40,  ventanaSegs: 3600 },
+  ia_equipo_tokens_dia:      { limite: 2_000_000, ventanaSegs: 86400 },
   // ANTIBOT · techo por contacto SOLO en canales (WhatsApp/IG/Messenger): una persona real no necesita más; corta bucles con bots.
   ia_turno_canal_hora:       { limite: 30,  ventanaSegs: 3600 },
   ia_turno_canal_dia:        { limite: 100, ventanaSegs: 86400 },

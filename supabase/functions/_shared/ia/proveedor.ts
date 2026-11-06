@@ -83,10 +83,13 @@ export function parsearAnthropic(status: number, data: unknown): RespuestaModelo
 export interface OpcionesModelo { effort?: 'low' | 'medium' | 'high'; fallbacks?: boolean }
 export const esModeloConPensamiento = (m: string) => /^claude-(opus|sonnet|haiku|fable)-5/.test(m)
 export function cuerpoAnthropic(model: string, s: SolicitudModelo, o: OpcionesModelo = {}): { body: Record<string, unknown>; betas: string[] } {
-  const corte = s.systemFijo && s.systemFijo > 0 && s.systemFijo < s.system.length ? s.systemFijo : 0
-  const system = corte
-    ? [{ type: 'text', text: s.system.slice(0, corte), cache_control: { type: 'ephemeral' } }, { type: 'text', text: s.system.slice(corte) }]
-    : s.system
+  const corte = s.systemFijo && s.systemFijo > 0 && s.systemFijo <= s.system.length ? s.systemFijo : 0
+  // ASISTENTE DEL EQUIPO · systemFijo = todo el system: un solo bloque en caché (el canal sigue partiéndolo en fijo + variable).
+  const system = corte === s.system.length && corte > 0
+    ? [{ type: 'text', text: s.system, cache_control: { type: 'ephemeral' } }]
+    : corte
+      ? [{ type: 'text', text: s.system.slice(0, corte), cache_control: { type: 'ephemeral' } }, { type: 'text', text: s.system.slice(corte) }]
+      : s.system
   const body: Record<string, unknown> = { model, max_tokens: s.max_tokens, system, messages: s.messages }
   if (s.tools.length) body.tools = s.tools.map((t, i) => (i === s.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t))
   const betas: string[] = []
