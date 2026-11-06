@@ -137,3 +137,42 @@ describe('PanelCliente · Mandar ubicación (pedido de Alejandra)', () => {
     expect(screen.queryByTestId('accion-ubicacion')).toBeNull()
   })
 })
+
+describe('PanelCliente · Pasar a otro vendedor (dueño, caso Dra. Vea)', () => {
+  const ROBERTO = { id: 'R', nombre: 'Roberto Ibarra' }, LUCIA = { id: 'L', nombre: 'Lucía · Ventas' }
+  function conPase(fichas: FichaConversacion[], pasar = vi.fn(async () => ({ ok: true as const, data: { seller: 'R', vendedor_nombre: 'Roberto Ibarra', idempotente: false } }))) {
+    const c = falso(fichas) as ReturnType<typeof falso> & { vendedoresTraspaso: ReturnType<typeof vi.fn>; pasar: typeof pasar }
+    c.vendedoresTraspaso = vi.fn(async () => ({ ok: true as const, data: [LUCIA, ROBERTO] }))
+    c.pasar = pasar
+    return c
+  }
+  it('elige vendedor, escribe el motivo y la pasa; queda el aviso y se avisa el cambio', async () => {
+    const c = conPase([{ vinculado: false, con_cuenta: false }]); const onCambio = vi.fn()
+    render(<PanelCliente conversationId="C1" cliente={c} onCambio={onCambio} />)
+    fireEvent.click(await screen.findByTestId('accion-pasar'))
+    fireEvent.click(await screen.findByTestId('pasar-a-R'))
+    expect(screen.getByTestId('pasar-confirmar')).toBeDisabled()   // sin motivo no se puede
+    fireEvent.change(screen.getByTestId('pasar-motivo'), { target: { value: 'Ya es cliente de Roberto' } })
+    fireEvent.click(screen.getByTestId('pasar-confirmar'))
+    await waitFor(() => expect(c.pasar).toHaveBeenCalledWith('C1', 'R', 'Ya es cliente de Roberto'))
+    expect(await screen.findByText(/Le pasaste la conversación a Roberto Ibarra/)).toBeInTheDocument()
+    expect(onCambio).toHaveBeenCalled()
+  })
+  it('ya es cliente de otro vendedor: lo sugiere con el motivo prellenado', async () => {
+    const c = conPase([{ ...VINCULADA, es_tuyo: false, vendedor: 'R', vendedor_nombre: 'Roberto Ibarra' }])
+    render(<PanelCliente conversationId="C1" cliente={c} />)
+    fireEvent.click(await screen.findByTestId('accion-pasar'))
+    await waitFor(() => expect(screen.getByTestId('pasar-a-R')).toHaveAttribute('aria-checked', 'true'))
+    expect(screen.getByTestId('pasar-motivo')).toHaveValue('Ya es cliente de Roberto Ibarra')
+  })
+  it('el servidor dice que no es suya: se muestra y no se pierde la hoja', async () => {
+    const c = conPase([{ vinculado: false, con_cuenta: false }], vi.fn(async () => ({ ok: false as const, mensaje: 'Solo quien atiende la conversación puede pasarla (o Dirección).' })) as never)
+    render(<PanelCliente conversationId="C1" cliente={c} />)
+    fireEvent.click(await screen.findByTestId('accion-pasar'))
+    fireEvent.click(await screen.findByTestId('pasar-a-L'))
+    fireEvent.change(screen.getByTestId('pasar-motivo'), { target: { value: 'Le toca a Lucía' } })
+    fireEvent.click(screen.getByTestId('pasar-confirmar'))
+    expect(await screen.findByText(/Solo quien atiende la conversación/)).toBeInTheDocument()
+    expect(screen.getByTestId('pc-hoja-pasar')).toBeInTheDocument()
+  })
+})

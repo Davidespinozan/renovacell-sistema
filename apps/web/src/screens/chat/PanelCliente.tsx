@@ -28,7 +28,7 @@ import { eliminarConversacion } from '../../data/ops/expediente'   // ELIMINAR C
 import { interesReciente as interesPorDefecto, resumenInteres, type InteresReciente } from '../../data/ops/actividadCatalogo'   // IA-VENDEDORA
 import type { AccionChat } from './ChatCanonico'
 import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
-import { MapPin, LocateFixed } from 'lucide-react'
+import { MapPin, LocateFixed, ArrowRightLeft } from 'lucide-react'
 import { SUCURSAL, coordsDeTexto, textoUbicacion, type Ubicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
@@ -80,6 +80,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   // SEGUIMIENTOS · en qué quedó con este cliente y cuándo retomarlo.
   const [seg, setSeg] = useState<Seguimiento | null>(null)
   // UBICACIÓN EN EL CHAT (pedido de Alejandra) · la sucursal, la ubicación actual del dispositivo o un enlace de Google Maps.
+  // PASAR CONVERSACIÓN · a otro vendedor (p. ej. ya es cliente de él), con motivo.
+  const [pase, setPase] = useState<{ lista: Array<{ id: string; nombre: string }> | null; a: string; motivo: string }>({ lista: null, a: '', motivo: '' })
   const [ubic, setUbic] = useState({ enlace: '', nombre: '', direccion: '', lat: null as number | null, lng: null as number | null, buscando: false })
   const [segForm, setSegForm] = useState<{ estado: EstadoSeguimiento | null; nota: string; recordar: string }>({ estado: null, nota: '', recordar: enDias(3) })
   const cargarSeg = useCallback(async (customer?: string | null) => { const r = await segCli.de(customer ?? null, conversationId); setSeg(r.ok ? r.data : null) }, [segCli, conversationId])
@@ -246,6 +248,27 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     setMsg({ ok: false, texto: 'Pega un enlace de Google Maps (o coordenadas como 24.80, -107.39) o usa tu ubicación actual.' })
   }
 
+  const abrirPase = async () => {
+    setPase({ lista: null, a: '', motivo: ficha?.vinculado && ficha.vendedor_nombre && !ficha.es_tuyo ? `Ya es cliente de ${ficha.vendedor_nombre}` : '' })
+    abrir('pc:pasar')
+    const r = await cliente.vendedoresTraspaso()
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); setPase((p) => ({ ...p, lista: [] })); return }
+    // si ya es cliente de alguien de la lista, se sugiere esa persona
+    const sugerido = ficha?.vinculado && ficha.vendedor ? r.data.find((v) => v.id === ficha.vendedor)?.id ?? '' : ''
+    setPase((p) => ({ ...p, lista: r.data, a: p.a || sugerido }))
+  }
+  const pasar = async () => {
+    if (!pase.a || !pase.motivo.trim()) return
+    setOcupado(true); setMsg(null)
+    const r = await cliente.pasar(conversationId, pase.a, pase.motivo.trim())
+    setOcupado(false)
+    if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
+    cerrarHoja(conversationId)
+    const quien = r.data.vendedor_nombre ?? pase.lista?.find((v) => v.id === pase.a)?.nombre ?? 'otro vendedor'
+    setMsg({ ok: true, texto: `Le pasaste la conversación a ${quien}. Ya le llegó el aviso.` })
+    setFicha({ vinculado: false, con_cuenta: false, traspasada: true }); onCambio?.()
+  }
+
   const vacio: PiezasChat = { tira: null, hoja: null, acciones: [] }
   if (!activo || !ficha) return { ...vacio, tira: activo && msg && !msg.ok ? <div className="pc-tira-msg" role="alert">{msg.texto}</div> : null }
   if (!ficha.vinculado && ficha.con_cuenta) return vacio   // doctor con cuenta y sin ficha: lo atiende la verificación
@@ -316,6 +339,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', detalle: 'Datos, pedidos y cotizaciones', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
   } else acciones.push({ clave: 'ficha', etiqueta: 'Ver su ficha', icono: <Contact size={18} />, onElegir: () => abrir('pc:ficha') })
 
+  acciones.push({ clave: 'pasar', etiqueta: 'Pasar a otro vendedor', detalle: 'Si ya es cliente de alguien más o le toca a otra persona', icono: <ArrowRightLeft size={18} />, onElegir: () => void abrirPase() })
   if (chat) acciones.push({ clave: 'ubicacion', etiqueta: 'Mandar ubicación', detalle: 'La sucursal, donde estás o un enlace de Google Maps', icono: <MapPin size={18} />, onElegir: () => abrir('pc:ubicacion') })
   acciones.push({ clave: 'seguimiento', etiqueta: seg ? 'Actualizar seguimiento' : 'Dejar seguimiento', detalle: 'En qué quedó y cuándo retomarlo (te aviso ese día)', icono: <ClipboardList size={18} />,
     onElegir: () => { setSegForm({ estado: seg?.estado ?? null, nota: seg?.nota ?? '', recordar: seg && seg.recordar_el >= enDias(0) ? seg.recordar_el : enDias(3) }); abrir('pc:seguimiento') } })
@@ -451,6 +475,23 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
             cerrarHoja(conversationId); setMsg({ ok: true, texto: 'Conversación eliminada.' }); onCambio?.() }}
           data-testid="elim-confirmar"><Trash2 size={15} /> Eliminar</button>
       </div>
+    </HojaMarco>
+  )
+  else if (hoja === 'pc:pasar') cuerpo = (
+    <HojaMarco titulo="Pasar a otro vendedor" sub="Le llega el aviso y la conversación queda con esa persona para que la inicie. Su cartera no cambia." onCerrar={cerrar} testid="pc-hoja-pasar">
+      {pase.lista === null ? <div className="pc-nota">Cargando vendedores…</div> : pase.lista.length === 0 ? <div className="pc-nota">No hay otro vendedor que pueda atender ahora.</div> : (
+        <form className="pc-form" onSubmit={(e) => { e.preventDefault(); void pasar() }} data-testid="pasar-form">
+          <div className="pc-chips" role="radiogroup" aria-label="A quién se la pasas">
+            {pase.lista.map((v) => <button key={v.id} type="button" role="radio" aria-checked={pase.a === v.id} className={'pc-chip' + (pase.a === v.id ? ' on' : '')} onClick={() => setPase({ ...pase, a: v.id })} data-testid={`pasar-a-${v.id}`}>{v.nombre}</button>)}
+          </div>
+          <input className="pc-campo" value={pase.motivo} onChange={(e) => setPase({ ...pase, motivo: e.target.value })} maxLength={200} placeholder="¿Por qué? (p. ej. ya es cliente de Roberto)" aria-label="Motivo" data-testid="pasar-motivo" />
+          {aviso}
+          <div className="pc-acciones">
+            <button type="submit" className="btn" disabled={ocupado || !pase.a || !pase.motivo.trim()} data-testid="pasar-confirmar">Pasar conversación</button>
+          </div>
+        </form>
+      )}
+      {pase.lista?.length === 0 && aviso}
     </HojaMarco>
   )
   else if (hoja === 'pc:ubicacion' && chat) {

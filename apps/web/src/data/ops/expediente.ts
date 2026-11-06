@@ -26,6 +26,12 @@ const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, args as never
 
 export function mensajeExpediente(t: string | undefined): string {
   const m = t ?? ''
+  if (/NO_ES_TUYA/.test(m)) return 'Solo quien atiende la conversación puede pasarla (o Dirección).'
+  if (/MOTIVO_REQUERIDO/.test(m)) return 'Escribe por qué la pasas.'
+  if (/VENDEDOR_REQUERIDO/.test(m)) return 'Elige a quién se la pasas.'
+  if (/MISMO_VENDEDOR/.test(m)) return 'Ya la tiene esa persona.'
+  if (/VENDEDOR_NO_ELEGIBLE/.test(m)) return 'Esa persona no puede atender conversaciones ahora.'
+  if (/SIN_ATENCION_HUMANA/.test(m)) return 'La atiende el asistente: todavía no hay a quién pasarla.'
   if (/NO_AUTORIZADO/.test(m)) return 'Esta conversación ya no es tuya: la atiende otra persona.'
   if (/CONVERSACION_CON_CUENTA/.test(m)) return 'Esta persona ya tiene cuenta: su ficha se liga sola.'
   if (/CONVERSACION_CERRADA/.test(m)) return 'La conversación ya está cerrada.'
@@ -59,6 +65,12 @@ export class ClienteExpediente {
       p_conv: conv, p_nombre: d.nombre, p_cedula: d.cedula, p_email: d.email || null, p_ciudad: d.ciudad || null, p_ine_frente: d.ineFrente ?? null, p_ine_reverso: d.ineReverso ?? null })
   }
   desvincular(conv: string) { return this.llamar<{ idempotente: boolean }>('cc_desvincular_cliente', { p_conv: conv }) }
+  /** PASAR CONVERSACIÓN · a quién se le puede pasar (vendedores que pueden atender, sin uno mismo). */
+  vendedoresTraspaso() { return this.llamar<Array<{ id: string; nombre: string }>>('cc_vendedores_traspaso', {}) }
+  /** PASAR CONVERSACIÓN · quien la atiende (o Dirección) se la pasa a otro vendedor, con motivo. La cartera no cambia. */
+  pasar(conv: string, vendedor: string, motivo: string) {
+    return this.llamar<{ seller: string; vendedor_nombre: string | null; idempotente: boolean }>('cc_pasar_conversacion', { p_conv: conv, p_vendedor: vendedor, p_motivo: motivo })
+  }
 }
 export const expediente = new ClienteExpediente()
 
