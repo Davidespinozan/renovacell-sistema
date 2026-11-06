@@ -184,8 +184,8 @@ describe('responderIA (canal): transferencia determinista, idempotente y sin res
     const a = adminFalso(false)
     const r = await responderIA(a, CONV, 5, 'visitor', null, 'h'.repeat(64), 'Quiero hablar con un asesor', 'wa:1', 'whatsapp')
     expect(r).toBe('transferida')
-    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_ia_contexto', 'cc_solicitar_asesor'])   // ANTIBOT lee la sesión primero
-    expect(a.llamadas[1].args).toEqual({ p_conv: CONV, p_actor_type: 'visitor', p_visitor_hash: 'h'.repeat(64), p_profile: null })
+    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_canal_conversacion', 'cc_ia_contexto', 'cc_solicitar_asesor'])   // ANTIBOT: ¿ya es bot? y la sesión, primero
+    expect(a.llamadas[2].args).toEqual({ p_conv: CONV, p_actor_type: 'visitor', p_visitor_hash: 'h'.repeat(64), p_profile: null })
   })
   it('«¿Dónde está mi pedido?» por Instagram → transfiere (soporte de pedido)', async () => {
     const a = adminFalso(false)
@@ -195,7 +195,7 @@ describe('responderIA (canal): transferencia determinista, idempotente y sin res
     const a = adminFalso(true)
     const r = await responderIA(a, CONV, 5, 'visitor', null, 'h'.repeat(64), 'Quiero hablar con un asesor', 'wa:1', 'whatsapp')
     expect(r).toBe('no_disponible')   // sin llave en esta prueba: el turno normal deja el aviso del servidor
-    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_ia_contexto', 'cc_solicitar_asesor', 'cc_ia_aviso_no_disponible'])
+    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_canal_conversacion', 'cc_ia_contexto', 'cc_solicitar_asesor', 'cc_ia_aviso_no_disponible'])
   })
   it('precio por WhatsApp → NO transfiere (sigue al turno de IA)', async () => {
     const a = adminFalso(false)

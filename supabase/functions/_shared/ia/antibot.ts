@@ -39,6 +39,10 @@ const AUTOMATICO = [
   /\b(responde|contesta|escribe) con el numero\b/,
   /\bopcion (no )?valida\b/,
   /\bmenu principal\b/,
+  /\b(escribe|escribir|escribeme)( la palabra)? menu\b/,
+  /\bvolver al inicio\b/,
+  /\bnos perdimos de vista\b/,
+  /\bestare aqui cuando me necesites\b/,
 ]
 
 /** ¿Suena a respuesta de un bot (menú, "no entendí", "asistente virtual")? */

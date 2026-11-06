@@ -22,7 +22,7 @@ export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
   const q = async (f: () => PromiseLike<{ data: unknown; error: unknown }>) => { try { const x = await f(); return x.error ? null : x.data } catch { return null } }
   const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan' }).format(new Date())   // AAAA-MM-DD en Culiacán
   const [empresa, horario, entrega, manual, promos] = await Promise.all([
-    q(() => admin.from('company_settings').select('razon_social, direccion, cp, ciudad, estado, telefono').eq('id', 'default').maybeSingle()),
+    q(() => admin.from('company_settings').select('razon_social, direccion, cp, ciudad, estado, telefono, aviso_ia, aviso_ia_hasta').eq('id', 'default').maybeSingle()),
     q(() => admin.from('cc_horario_semanal').select('dia, abierto, abre, cierra').order('dia')),
     q(() => admin.from('entrega_config').select('recoge_lugar, recoge_horario, cp_local_desde, cp_local_hasta, dias_chofer, local_mismo_dia, corte, local_gratis_desde, local_costo, dias_paqueteria, dhl_transito_min, dhl_transito_max, foraneo_costo, foraneo_gratis_desde').eq('id', 1).maybeSingle()),
     // R4-C10 · solo lo APROBADO y para cualquier contacto (el canal es público)
@@ -33,14 +33,18 @@ export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
   const promociones = Array.isArray(promos) ? (promos as Array<{ nombre: string; hasta: string | null; promocion_lineas?: Array<{ products?: { name?: string } | null }> | null }>).map((p) => ({
     nombre: p.nombre, hasta: p.hasta, productos: [...new Set((p.promocion_lineas ?? []).map((l) => l.products?.name).filter((x): x is string => !!x))],
   })) : null
+  const em = empresa as { aviso_ia?: string | null; aviso_ia_hasta?: string | null } | null
   return { empresa: empresa as politica.DatosNegocio['empresa'], horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'],
-    manual: Array.isArray(manual) ? manual as politica.DatosNegocio['manual'] : null, promociones }
+    manual: Array.isArray(manual) ? manual as politica.DatosNegocio['manual'] : null, promociones,
+    aviso: em?.aviso_ia ? { texto: em.aviso_ia, hasta: em.aviso_ia_hasta ?? null } : null, ahora: new Date().toISOString() }
 }
 /** Política y validación del canal con los datos del negocio de este turno. */
 export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boolean } = {}) {
   const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
   const manual = politica.textoManual(n); const promos = politica.textoPromociones(n); const nombresPromo = politica.nombresPromocion(n)
-  const bloques = [texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
+  // AVISO-IA · el aviso vigente y la fecha/hora van PRIMERO: mandan sobre la dirección y el horario.
+  const aviso = politica.textoAviso(n); const ahora = politica.textoAhora(n)
+  const bloques = [aviso && politica.envolverDatos('aviso_vigente', aviso), ahora && politica.envolverDatos('fecha_y_hora', ahora), texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
   return {
     politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (bloques.length ? '\n\n' + bloques.join('\n\n') : ''),
       // R4-C11 · si la conversación viene de una compra ("2 nabota" → "100"), el turno sigue con la tarea de compra
@@ -61,7 +65,9 @@ export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boo
 export function dependenciasPortal(n: politica.DatosNegocio) {
   const texto = politica.textoNegocio(n); const montos = politica.montosEnvio(n)
   const manual = politica.textoManual(n); const promos = politica.textoPromociones(n); const nombresPromo = politica.nombresPromocion(n)
-  const bloques = [texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
+  // AVISO-IA · el aviso vigente y la fecha/hora van PRIMERO: mandan sobre la dirección y el horario.
+  const aviso = politica.textoAviso(n); const ahora = politica.textoAhora(n)
+  const bloques = [aviso && politica.envolverDatos('aviso_vigente', aviso), ahora && politica.envolverDatos('fecha_y_hora', ahora), texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
   const extra = (bloques.length ? '\n\n' + bloques.join('\n\n') : '') + (texto ? '\n\n' + politica.REGLA_ENVIO_GRATIS_PORTAL : '')
   return {
     politica: { ...politica, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + extra },
@@ -88,13 +94,18 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   if (canal !== 'portal') {
     // ANTIBOT · antes de todo (y sin llamar al modelo): mensajes sin contenido o de otro bot no se contestan. Si no se
     // puede leer el historial, sigue el flujo normal (el techo por contacto de canal, abajo, sigue cortando).
+    // BOT DETECTADO (6 nov) · un número 800/900 de empresa nunca recibe a la IA (se marca), y una conversación ya marcada
+    // como bot en las últimas 24 h tampoco: el bot de hoy cambió de frase y la IA alcanzó a contestarle dos veces.
+    if (esNumeroEmpresa(sujeto)) { await admin.rpc('cc_bot_detectado', { p_conv: conv, p_motivo: 'numero_empresa' }).then(() => {}, () => {}); return 'silenciada' }
+    const yaBot = await admin.rpc('cc_canal_conversacion', { p_conv: conv }).then((x: { data: unknown }) => !!(x.data as { bot?: unknown } | null)?.bot, () => false)
+    if (yaBot) return 'silenciada'
     let hist: Array<{ actor: string; content: string }> = []
     if (!sinContenido(texto)) { try { hist = await leerInterno(admin, conv, seqUsuario, 20) } catch { hist = [] } }
     const freno = frenoBot(hist, texto)
     if (freno) {
-      // BOT DETECTADO · se avisa a Renovacell (evento + campana, una vez al día por conversación). Mensaje sin contenido solo
-      // cuenta como bot si viene de un número 800/900 (empresa): una persona también manda reacciones o tipos raros.
-      const motivoBot = freno === 'sin_contenido' ? (esNumeroEmpresa(sujeto) ? 'numero_empresa' : null) : freno
+      // BOT DETECTADO · se avisa a Renovacell (evento + campana, una vez al día por conversación). Un mensaje sin contenido
+      // solo no basta (una persona también manda reacciones o tipos raros); los 800/900 ya se cortaron arriba.
+      const motivoBot = freno === 'sin_contenido' ? null : freno
       if (motivoBot) await admin.rpc('cc_bot_detectado', { p_conv: conv, p_motivo: motivoBot }).then(() => {}, () => {})
       return 'silenciada'
     }

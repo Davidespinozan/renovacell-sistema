@@ -56,9 +56,16 @@ describe('BOT DETECTADO · aviso a Renovacell', () => {
     expect(esNumeroEmpresa('wa:5216671112233')).toBe(false)
     expect(esNumeroEmpresa('meta:8001234567')).toBe(false)
   })
-  it('el freno avisa con cc_bot_detectado (sin contenido solo con número de empresa) y nunca deja de silenciar', () => {
-    expect(responderSrc).toMatch(/freno === 'sin_contenido' \? \(esNumeroEmpresa\(sujeto\) \? 'numero_empresa' : null\) : freno/)
-    expect(responderSrc).toMatch(/admin\.rpc\('cc_bot_detectado', \{ p_conv: conv, p_motivo: motivoBot \}\)\.then\(\(\) => \{\}, \(\) => \{\}\)/)
+  it('800/900 y conversación ya marcada: silencio total; un sin-contenido de celular no se marca', () => {
+    expect(responderSrc).toMatch(/if \(esNumeroEmpresa\(sujeto\)\) \{ await admin\.rpc\('cc_bot_detectado', \{ p_conv: conv, p_motivo: 'numero_empresa' \}\)/)
+    expect(responderSrc).toMatch(/if \(yaBot\) return 'silenciada'/)
+    expect(responderSrc).toMatch(/const motivoBot = freno === 'sin_contenido' \? null : freno/)
+    expect(responderSrc.indexOf('esNumeroEmpresa(sujeto)')).toBeLessThan(responderSrc.indexOf('politica.transferenciaDeterminista(texto)'))
+  })
+  it('frases del bot del 6 nov', () => {
+    expect(pareceAutomatico('Recuerda que puedes escribir *Menú* en cualquier momento para volver al inicio.')).toBe(true)
+    expect(pareceAutomatico('👋 Hola, parece que nos perdimos de vista.')).toBe(true)
+    expect(pareceAutomatico('¿Me puedes mandar el menú de productos?')).toBe(false)
   })
 })
 

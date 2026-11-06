@@ -406,6 +406,10 @@ export interface DatosNegocio {
   // R4-C10 · Manual de ventas APROBADO (audiencia pública) y promociones vigentes (nombre, vigencia y productos; nunca precios)
   manual?: Array<{ tema: string; titulo: string; contenido: string }> | null
   promociones?: Array<{ nombre: string; hasta: string | null; productos: string[] }> | null
+  // AVISO-IA (6 nov 2026) · aviso vigente que escribe Dirección (p. ej. «sucursal en remodelación»): manda sobre lo demás.
+  aviso?: { texto: string | null; hasta: string | null } | null
+  // AVISO-IA · el instante del turno (ISO): la IA sabe qué día y hora es en Culiacán y si en este momento está abierto.
+  ahora?: string | null
 }
 const TEMA_MANUAL: Record<string, string> = { empresa: 'Quiénes somos', como_comprar: 'Cómo comprar', verificacion: 'Verificación', pagos: 'Formas de pago', envios: 'Envíos', facturacion: 'Facturación',
   devoluciones: 'Devoluciones y garantías', politica_comercial: 'Política comercial', atencion: 'Atención', tecnologia: 'Tecnología', certificaciones: 'Certificaciones' }
@@ -441,6 +445,34 @@ export function montosEnvio(n: DatosNegocio): number[] {
   const e = n.entrega ?? {}
   return [e.local_gratis_desde, e.local_costo, e.foraneo_costo, e.foraneo_gratis_desde].filter((x): x is number => typeof x === 'number' && x > 0)
 }
+// AVISO-IA · fecha, hora y si está abierto AHORA (hora de Culiacán). Sin `ahora`, nada (las pruebas viejas no cambian).
+const DIA_JS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+function partesCuliacan(iso: string): { fecha: string; dia: number; hora: string; diaNombre: string } | null {
+  const d = new Date(iso); if (Number.isNaN(d.getTime())) return null
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' })
+    .formatToParts(d).map((x) => [x.type, x.value]))
+  const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(String(p.weekday))
+  if (wd < 0) return null
+  return { fecha: `${p.year}-${p.month}-${p.day}`, dia: wd === 0 ? 7 : wd, hora: `${p.hour}:${p.minute}`, diaNombre: DIA_JS[wd] }
+}
+export function textoAhora(n: DatosNegocio): string {
+  const c = n.ahora ? partesCuliacan(n.ahora) : null
+  if (!c) return ''
+  const h = (n.horario ?? []).find((x) => x.dia === c.dia)
+  const abierto = !!(h && h.abierto && h.abre && h.cierra && c.hora >= hhmm(h.abre) && c.hora < hhmm(h.cierra))
+  const [y, m, d] = c.fecha.split('-').map(Number)
+  const estado = (n.horario ?? []).length ? (abierto ? 'en este momento estamos en horario de atención' : 'en este momento estamos FUERA de horario de atención') : ''
+  return `Hoy es ${c.diaNombre} ${d} de ${MESES[m - 1]} de ${y}, ${c.hora} (hora de Culiacán)${estado ? `; ${estado}` : ''}. Usa esta fecha: no supongas qué día fue ayer ni qué día es hoy.`
+}
+/** AVISO-IA · aviso vigente de Dirección (vence al terminar el día `hasta`). Vacío si no hay o ya venció. */
+export function textoAviso(n: DatosNegocio): string {
+  const t = (n.aviso?.texto ?? '').trim()
+  if (!t) return ''
+  const hoy = n.ahora ? partesCuliacan(n.ahora)?.fecha : null
+  if (n.aviso?.hasta && hoy && hoy > n.aviso.hasta) return ''
+  return `AVISO VIGENTE DE RENOVACELL (manda sobre la dirección, el horario y lo de recoger en sucursal que vienen abajo; si contradice algo, gana este aviso): ${t}`
+}
+
 export function textoNegocio(n: DatosNegocio): string {
   const l: string[] = []; const em = n.empresa ?? {}; const e = n.entrega ?? {}
   const lugar = [em.ciudad, em.estado].filter(Boolean).join(', ')

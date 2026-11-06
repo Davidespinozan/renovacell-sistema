@@ -113,8 +113,8 @@ describe('B · responderIA: transfiere con el aviso neutro DESPUÉS del turno de
     const a = adminFalso(true)
     const r = await responderIA(a, CONV, 17, 'visitor', null, 'h'.repeat(64), 'Quisiera comprar Nabota', 'wa:1', 'whatsapp')
     expect(r).toBe('transferida')   // la IA no pudo responder (sin llave) y aun así el comprador queda con un asesor
-    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_ia_contexto', 'cc_ia_aviso_no_disponible', '_cc_canal_transferir'])   // ANTIBOT lee la sesión primero
-    expect(a.llamadas[2].args).toEqual({ p_conv: CONV, p_origen: 'whatsapp', p_prefijo: 'wa', p_motivo: 'atencion_comercial', p_respiro: true })
+    expect(a.llamadas.map((l) => l.fn)).toEqual(['cc_canal_conversacion', 'cc_ia_contexto', 'cc_ia_aviso_no_disponible', '_cc_canal_transferir'])   // ANTIBOT: ¿ya es bot? y la sesión, primero
+    expect(a.llamadas[3].args).toEqual({ p_conv: CONV, p_origen: 'whatsapp', p_prefijo: 'wa', p_motivo: 'atencion_comercial', p_respiro: true })
   })
   it('Instagram usa su propio prefijo de aviso', async () => {
     const a = adminFalso(true)
@@ -135,7 +135,7 @@ describe('B · responderIA: transfiere con el aviso neutro DESPUÉS del turno de
   it('persona explícita sigue con la transferencia determinista de siempre (sin aviso comercial)', async () => {
     const a = { llamadas: [] as string[], rpc: async (fn: string) => { a.llamadas.push(fn); return { data: { idempotente: false }, error: null } } }
     expect(await responderIA(a, CONV, 17, 'visitor', null, 'h'.repeat(64), 'quiero hablar con un asesor', 'wa:1', 'whatsapp')).toBe('transferida')
-    expect(a.llamadas).toEqual(['cc_ia_contexto', 'cc_solicitar_asesor'])   // ANTIBOT lee la sesión primero
+    expect(a.llamadas).toEqual(['cc_canal_conversacion', 'cc_ia_contexto', 'cc_solicitar_asesor'])   // ANTIBOT lee la sesión primero
   })
   it('portal → nunca transfiere por compra (contrato del portal intacto)', async () => {
     const a = adminFalso(true)
