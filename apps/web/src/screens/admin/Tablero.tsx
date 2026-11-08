@@ -3,6 +3,7 @@
 // (atorados de Seguimiento, caducidad de Almacén). No inventa datos nuevos.
 import { Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useMemo, useState } from 'react'
+import { ResponsiveContainer, AreaChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'   // CALIDAD VISUAL · tendencia del mes
 import { Icon, type IconName } from '../../app/icons'
 import { ExportButton } from '../../app/ExportButton'
 import { money, fmtDate } from '../../lib/format'
@@ -15,7 +16,7 @@ import { diagnoseShipment, isSurtible } from '../../data/ops/seguimiento'
 import { useOrderMoney } from '../../data/hooks/useMoney'
 import { useKpiVentas, useKpiPorCobrar } from '../../data/hooks/useKpis'
 import { avanceDeCobro } from '../../data/kpis'
-import { esteMes, mesPasado, todoElHistorico, hoyNegocio } from '../../data/periodo'
+import { esteMes, mesPasado, todoElHistorico, hoyNegocio, diaNegocio } from '../../data/periodo'
 import { cifra, AvisoKpi } from '../../app/Kpi'
 import { doctorActivity, leadTime, valorEnRiesgo, doctoresEnRiesgo, DIAS_RIESGO } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
@@ -128,6 +129,9 @@ export function Tablero() {
           </div>
         </div>
       </div>
+
+      {/* CALIDAD VISUAL · ventas acumuladas por día: este mes contra el mes pasado (al mismo día se ve si vas arriba o abajo) */}
+      <TendenciaMes orders={orders} />
 
       {/* TU DINERO (posición de cobranza del mes, en lenguaje llano — inspirado en CuboPolar) */}
       <div>
@@ -345,6 +349,66 @@ function AlertItem({ folio, text, pill, badge }: { folio: string | null; text: s
         <div className="lt">{text}</div>
       </div>
       <span className={'pill ' + pill}>{badge ?? '!'}</span>
+    </div>
+  )
+}
+
+// CALIDAD VISUAL (7 nov 2026) · tendencia del mes en el Tablero. Suma pedidos no cancelados por día de negocio (Culiacán);
+// es una vista de apoyo: las cifras oficiales siguen siendo los indicadores del servidor de arriba.
+type PedidoSerie = { created_at?: string | null; total?: number | null; status?: string | null }
+export function serieMes(orders: PedidoSerie[], hoy: string) {
+  const [y, m] = hoy.split('-').map(Number)
+  const diasDe = (a: number, b: number) => (b === 2 ? ((a % 4 === 0 && a % 100 !== 0) || a % 400 === 0 ? 29 : 28) : [4, 6, 9, 11].includes(b) ? 30 : 31)
+  const diasEste = diasDe(y, m)
+  const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1
+  const diasAnt = diasDe(py, pm)
+  const pre = (a: number, b: number) => `${a}-${String(b).padStart(2, '0')}-`
+  const este = new Array(diasEste + 1).fill(0), ant = new Array(diasAnt + 1).fill(0)
+  for (const o of orders) {
+    if (!o.created_at || o.status === 'cancelled') continue
+    const d = diaNegocio(o.created_at); const n = Number(d.slice(8, 10))
+    if (d.startsWith(pre(y, m))) este[n] += Number(o.total ?? 0)
+    else if (d.startsWith(pre(py, pm))) ant[n] += Number(o.total ?? 0)
+  }
+  const hoyN = Number(hoy.slice(8, 10)); let a = 0, b = 0
+  return Array.from({ length: diasEste }, (_, i) => {
+    const dia = i + 1
+    a += este[dia]; b += dia <= diasAnt ? ant[dia] : 0
+    return { dia, este: dia <= hoyN ? a : null, anterior: b }
+  })
+}
+function TendenciaMes({ orders }: { orders: PedidoSerie[] }) {
+  const hoy = hoyNegocio()
+  const serie = useMemo(() => serieMes(orders, hoy), [orders, hoy])
+  const hoyN = Number(hoy.slice(8, 10))
+  const actual = serie[hoyN - 1]?.este ?? 0, mismoDia = serie[hoyN - 1]?.anterior ?? 0
+  const dif = mismoDia > 0 ? ((actual - mismoDia) / mismoDia) * 100 : null
+  return (
+    <div className="card tendencia" data-testid="tablero-tendencia">
+      <div className="tendencia-h">
+        <div>
+          <div className="eyebrow" style={{ margin: 0 }}>Ventas del mes, día por día</div>
+          <div className="tendencia-s">Acumulado al día {hoyN}: <b>{money(actual)}</b>{dif != null && <> · <span className={dif >= 0 ? 'tendencia-up' : 'tendencia-down'}>{dif >= 0 ? '▲' : '▼'} {Math.abs(dif).toFixed(0)}%</span> vs. el mismo día del mes pasado</>}</div>
+        </div>
+        <div className="tendencia-ley"><span className="tl-este" /> Este mes <span className="tl-ant" /> Mes pasado</div>
+      </div>
+      {serie.every((p) => !p.este && !p.anterior) ? (
+        <div className="tendencia-vacia">Todavía no hay ventas este mes ni el anterior. La gráfica aparece con la primera venta.</div>
+      ) : (
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={serie} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="gEste" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1f8f43" stopOpacity={0.28} /><stop offset="100%" stopColor="#1f8f43" stopOpacity={0} /></linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" />
+          <XAxis dataKey="dia" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} allowDecimals={false} tickFormatter={(v) => (Number(v) >= 1000 ? `$${Math.round(Number(v) / 1000)}k` : `$${v}`)} />
+          <Tooltip formatter={(v, n) => [money(Number(v)), n === 'este' ? 'Este mes' : 'Mes pasado']} labelFormatter={(d) => `Día ${d}`} />
+          <Line type="monotone" dataKey="anterior" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+          <Area type="monotone" dataKey="este" stroke="#1f8f43" strokeWidth={2.5} fill="url(#gEste)" connectNulls={false} dot={false} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+      )}
     </div>
   )
 }

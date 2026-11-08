@@ -2,6 +2,7 @@
 // posición financiera (por cobrar / por pagar) y registro de gastos. Datos
 // SENSIBLES (costos/utilidad): solo Dirección. Lógica pura en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
+import { CargandoKpis } from '../../app/EmptyState'
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle, Receipt } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -17,6 +18,9 @@ import { esteMes, mesPasado, todoElHistorico, enPeriodo, hoyNegocio } from '../.
 import { cifra, AvisoKpi } from '../../app/Kpi'
 
 const pct = (n: number) => `${n.toFixed(1)}%`
+
+// CALIDAD VISUAL · resta en la cascada: «−$1,200»; en cero, «$0» (no «−$0»)
+const menos = (n: number | null | undefined) => (n && n > 0 ? `−${money(n)}` : money(0))
 
 export function Finanzas() {
   const { data: compras, markPaid } = useCompras()
@@ -110,18 +114,19 @@ export function Finanzas() {
         )}
       </div>
 
-      {/* Estado de resultados */}
-      <div className="grid sigs">
-        <Stat icon={<TrendingUp size={18} />} v={cifra(res, (r) => money(r.ventas))} k="Ventas" s={`pedidos levantados · ${range.etiqueta.toLowerCase()}`} />
-        {er && er.devoluciones > 0 && (
-          <Stat icon={<TrendingDown size={18} />} v={money(er.devoluciones)} k="Devoluciones" s={`ventas netas ${money(er.ventas_netas)}`} accent="dang" />
-        )}
-        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => (r.costo_ventas == null ? '—' : money(r.costo_ventas)))} k="Costo de ventas" s={!er ? '' : cogsUnreliable ? `conocido: ${money(er.costo_ventas_conocido)} · faltan costos` : `margen bruto ${pct(er.margen_bruto_pct ?? 0)}`} accent={cogsUnreliable ? 'warn' : undefined} />
-        <Stat icon={<Wallet size={18} />} v={cifra(res, (r) => dinero(r.utilidad_bruta))} k="Utilidad bruta" s={cogsUnreliable ? 'falta costo de lo vendido' : 'ventas netas − costo'} accent={cogsUnreliable ? 'warn' : undefined} />
-        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => money(r.gastos))} k="Gastos" s="operativos" />
-        <Stat icon={<ArrowDownCircle size={18} />} v={cifra(res, (r) => money(r.mermas_conocidas))} k="Mermas" s={er && er.merma_unidades_sin_costo > 0 ? `+ ${er.merma_unidades_sin_costo} unidad(es) sin costo` : 'caducidad / daño'} accent={er && (er.mermas_conocidas > 0 || er.merma_unidades_sin_costo > 0) ? 'dang' : undefined} />
-        <Stat icon={er && (er.utilidad_neta ?? 0) < 0 ? <TrendingDown size={18} /> : <TrendingUp size={18} />} v={cifra(res, (r) => dinero(r.utilidad_neta))} k="Utilidad neta" s={!er ? '' : er.utilidad_neta == null ? 'falta costo para calcularla' : `margen neto ${pct(er.margen_neto_pct ?? 0)}`} accent={!er ? undefined : er.utilidad_neta == null ? 'warn' : er.utilidad_neta >= 0 ? 'ok' : 'dang'} />
-      </div>
+      {/* CALIDAD VISUAL (7 nov) · estado de resultados en cascada: se lee de arriba abajo hasta la utilidad neta
+          (antes eran seis tarjetas sueltas y la utilidad neta quedaba sola en otra fila). Sin datos aún: las tarjetas de siempre. */}
+      {er ? (
+        <div className="card cascada" data-testid="estado-resultados">
+          <div className="cas-fila"><span>Ventas<small>pedidos levantados</small></span><b>{money(er.ventas)}</b></div>
+          {er.devoluciones > 0 && <div className="cas-fila menos"><span>Devoluciones</span><b>{menos(er.devoluciones)}</b></div>}
+          <div className={'cas-fila menos' + (cogsUnreliable ? ' aviso' : '')}><span>Costo de ventas<small>{cogsUnreliable ? `faltan costos · conocido ${money(er.costo_ventas_conocido)}` : 'lo que costó lo vendido'}</small></span><b>{er.costo_ventas == null ? '—' : menos(er.costo_ventas)}</b></div>
+          <div className="cas-fila sub"><span>Utilidad bruta<small>{cogsUnreliable ? 'no confiable: falta costo' : `margen ${pct(er.margen_bruto_pct ?? 0)}`}</small></span><b>{dinero(er.utilidad_bruta)}</b></div>
+          <div className="cas-fila menos"><span>Gastos<small>operativos</small></span><b>{menos(er.gastos)}</b></div>
+          <div className="cas-fila menos"><span>Mermas<small>{er.merma_unidades_sin_costo > 0 ? `+ ${er.merma_unidades_sin_costo} unidad(es) sin costo` : 'caducidad / daño'}</small></span><b>{menos(er.mermas_conocidas)}</b></div>
+          <div className={'cas-fila total ' + (er.utilidad_neta == null ? 'aviso' : er.utilidad_neta >= 0 ? 'pos' : 'neg')}><span>Utilidad neta<small>{er.utilidad_neta == null ? 'falta costo para calcularla' : `margen neto ${pct(er.margen_neto_pct ?? 0)}`}</small></span><b>{dinero(er.utilidad_neta)}</b></div>
+        </div>
+      ) : <CargandoKpis n={4} etiqueta="Cargando estado de resultados…" />}
 
       {/* Cobranza: lo vendido en el periodo y el dinero que entró EN el periodo */}
       <div className="card">

@@ -315,3 +315,53 @@ input.interruptor:focus-visible{outline:2px solid var(--green-deep);outline-offs
 .rh-linea-d{font-size:13px;line-height:1.35;color:var(--ink-2,#334155)}
 .rh-linea-ch{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:var(--ink-3)}
 @media (max-width:420px){.rh-lineas{grid-template-columns:minmax(0,1fr)}.rh-linea{min-height:84px}}
+
+/* ── Login en escritorio: panel de marca con fotografía (antes solo una tarjeta sobre fondo liso) ── */
+@media (min-width:1024px){
+  .login-wrap{grid-template-columns:minmax(0,1.1fr) minmax(440px,.9fr)}
+  .login-brand{display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;padding:44px 52px;color:#fff;
+    background:linear-gradient(160deg,rgba(6,33,15,.86) 0%,rgba(6,33,15,.55) 45%,rgba(6,33,15,.9) 100%),url('/products/hero-clinico.webp') center/cover no-repeat}
+  .login-brand::before,.login-brand::after{display:none}
+  .lb-mid{max-width:520px}
+  .lb-mid h2{font-size:38px;line-height:1.12;font-weight:700;letter-spacing:-.025em}
+  .lb-mid p{font-size:16px;color:rgba(255,255,255,.82);max-width:440px}
+  .lb-foot{font-size:11.5px;letter-spacing:.12em}
+}
+
+/* ── Tablero: tendencia del mes ── */
+.tendencia{display:grid;gap:12px}
+.tendencia-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tendencia-s{font-size:13.5px;color:var(--ink-2,#334155);margin-top:4px}
+.tendencia-up{color:var(--green-deep);font-weight:700}.tendencia-down{color:var(--danger);font-weight:700}
+.tendencia-ley{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-3)}
+.tl-este,.tl-ant{display:inline-block;width:16px;height:3px;border-radius:2px;margin-left:8px}
+.tl-este{background:#1f8f43}.tl-ant{background:repeating-linear-gradient(90deg,#94a3b8 0 5px,transparent 5px 9px)}
+
+/* ── Finanzas: estado de resultados en cascada ── */
+.cascada{display:grid;gap:0;max-width:720px}
+.cas-fila{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.cas-fila span{display:grid;gap:2px;color:var(--ink)}
+.cas-fila small{font-size:12.5px;color:var(--ink-3);font-weight:400}
+.cas-fila b{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.cas-fila.menos b{color:var(--ink-2,#334155);font-weight:500}
+.cas-fila.sub{background:var(--hueso);margin:0 -18px;padding:11px 18px;font-weight:650}
+.cas-fila.sub b{font-weight:700}
+.cas-fila.aviso small{color:var(--warn)}
+.cas-fila.total{border-bottom:0;padding-top:16px;font-size:16px;font-weight:700}
+.cas-fila.total b{font-size:24px;letter-spacing:-.02em}
+.cas-fila.total.pos b{color:var(--green-deep)}.cas-fila.total.neg b{color:var(--danger)}.cas-fila.total.aviso b{color:var(--warn)}
+
+/* ── Bandeja de conversaciones (escritorio): dos columnas de ALTURA COMPLETA, estilo Front/Intercom
+   (antes la lista medía ~190 px y dejaba vacía su columna mientras el panel llegaba hasta abajo) ── */
+@media (min-width:901px){
+  .bq .bq-cuerpo{align-items:stretch;height:calc(100vh - 190px);height:calc(100dvh - 190px);min-height:520px}
+  .bq .bq-lista{position:static;max-height:none;height:100%;display:flex;flex-direction:column;gap:8px}
+  .bq .bq-lista .bq-items{flex:1;overflow-y:auto;align-content:start;margin:0 -4px;padding:0 4px}
+  .bq .bq-panel{height:100%;overflow:hidden;display:flex;flex-direction:column}
+  .bq .bq-panel > *{flex:1;min-height:0}
+  .bq .bq-elige{min-height:0;height:100%}
+  .bq .bq-conv{height:100%;grid-template-rows:auto auto minmax(0,1fr)}
+  .bq .bq-chat{min-height:0;display:flex}
+  .bq .bq-chat > *{flex:1;min-height:0}
+}
+.tendencia-vacia{display:grid;place-items:center;min-height:120px;border-radius:12px;background:var(--hueso);color:var(--ink-3);font-size:13.5px;text-align:center;padding:16px}

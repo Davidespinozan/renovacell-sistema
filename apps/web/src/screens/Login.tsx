@@ -74,10 +74,10 @@ export function Login() {
           </div>
         </div>
         <div className="lb-mid">
-          <h2>Bienvenido a Renovacell</h2>
-          <p>Acceso para el equipo y médicos verificados. Inicia sesión para entrar a tu espacio.</p>
+          <h2>Tecnología antiedad de grado médico, para profesionales de la salud.</h2>
+          <p>Pedidos, seguimiento y atención de tu asesor en un solo lugar. Desde 2008, en México y la Unión Europea.</p>
         </div>
-        <div className="lb-foot">Acceso seguro</div>
+        <div className="lb-foot">Acceso seguro · solo equipo y médicos verificados</div>
       </aside>
 
       {/* Panel del formulario */}
