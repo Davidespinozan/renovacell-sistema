@@ -262,6 +262,12 @@ export function Caja() {
         <div className="eyebrow crumb">Punto de Venta · Caja</div>
         {/* Buscador con el patrón .searchbox del sistema (ícono + campo sin borde propio). Sigue
             filtrando por nombre, categoría y SKU; el texto corto solo es lo que cabe sin cortarse. */}
+        {/* CALIDAD VISUAL · en celular el cliente de la venta va ARRIBA (antes quedaba hasta abajo, tras todo el catálogo) */}
+        <button type="button" className="pos-cliente-top" onClick={() => setPickOpen(true)} data-testid="pos-cliente-top">
+          <Icon name="usercheck" style={{ width: 16, height: 16, color: client ? 'var(--green-deep)' : 'var(--ink-3)' }} />
+          <span className="pct-tx"><small>Vendiendo a</small><b>{client ? client.name : 'Mostrador · público general'}</b></span>
+          <span className="pct-cta">{client ? 'Cambiar cliente' : 'Elegir cliente'}</span>
+        </button>
         <label className="searchbox pos-search">
           <Icon name="search" aria-hidden />
           <input

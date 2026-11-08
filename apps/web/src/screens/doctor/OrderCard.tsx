@@ -43,7 +43,7 @@ export function OrderCard({
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, rowGap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
         {/* CALIDAD VISUAL · sin «Pagado» duplicado cuando el estado del pedido ya lo dice */}
@@ -97,7 +97,8 @@ export function OrderCard({
 
       {order.payment_status === 'paid' && order.payment_ref && (
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
-          Pagado{order.payment_method ? ` · ${textoMetodoPago(order.payment_method)}` : ''} · ref. <span className="mono">{order.payment_ref}</span>
+          {/* CALIDAD VISUAL · el estado «Pagado» ya va arriba: aquí solo forma de pago y referencia */}
+          {order.payment_method ? <>Forma de pago: {textoMetodoPago(order.payment_method).replace(/^Pago /, '').replace(/^./, (c) => c.toUpperCase())} · </> : null}ref. <span className="mono">{order.payment_ref}</span>
         </div>
       )}
 

@@ -9,7 +9,8 @@ export function Trk({ step }: { step: number }) {
   return (
     <>
     <div className="trk-compacto" aria-label={`${TRACK_STEPS[actual]} · paso ${actual + 1} de ${TRACK_STEPS.length}`}>
-      <div className="trk-compacto-tx"><b>{TRACK_STEPS[actual]}</b><span>Paso {actual + 1} de {TRACK_STEPS.length}</span></div>
+      {/* el estado actual ya va en la etiqueta de arriba: aquí, qué sigue */}
+      <div className="trk-compacto-tx"><span className="trk-sig">{actual < TRACK_STEPS.length - 1 ? <>Sigue: <b>{TRACK_STEPS[actual + 1]}</b></> : <b>Completado</b>}</span><span>Paso {actual + 1} de {TRACK_STEPS.length}</span></div>
       <div className="trk-compacto-barra"><span style={{ width: `${((actual + 1) / TRACK_STEPS.length) * 100}%` }} /></div>
     </div>
     <div className="trk">

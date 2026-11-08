@@ -85,3 +85,20 @@ describe('Pies fijos y domicilio compacto', () => {
     expect(document.querySelectorAll('.par-corto').length).toBe(3)
   })
 })
+
+import { Trk } from '../screens/doctor/Trk'
+import fuenteOrderCard from '../screens/doctor/OrderCard.tsx?raw'
+import fuenteCaja from '../screens/pos/Caja.tsx?raw'
+describe('Pedido del doctor y Punto de venta', () => {
+  it('la barra de avance dice qué sigue (el estado ya va en la etiqueta)', () => {
+    render(<Trk step={1} />)
+    expect(document.querySelector('.trk-compacto-tx')?.textContent).toContain('Sigue: Empacado')
+    cleanup(); render(<Trk step={4} />)
+    expect(document.querySelector('.trk-compacto-tx')?.textContent).toContain('Completado')
+  })
+  it('la línea de pago ya no repite «Pagado»; el cliente de la venta va arriba en celular', () => {
+    expect(fuenteOrderCard).toMatch(/Forma de pago:/)
+    expect(fuenteOrderCard).not.toMatch(/^\s*Pagado\{order\.payment_method/m)
+    expect(fuenteCaja).toMatch(/pos-cliente-top/)
+  })
+})
