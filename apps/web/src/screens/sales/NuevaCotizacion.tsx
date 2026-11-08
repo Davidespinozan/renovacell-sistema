@@ -72,7 +72,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
         <div className="mbody">
           {!hecha ? (
             <>
-              <span className="searchbox" style={{ width: '100%' }}><Search size={15} aria-hidden /><input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar producto, categoría o SKU" aria-label="Buscar producto" data-testid="cot-buscar" /></span>
+              <span className="searchbox op-search"><Search size={15} aria-hidden /><input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar producto, categoría o SKU" aria-label="Buscar producto" data-testid="cot-buscar" /></span>
               <ul className="cot-lista">
                 {visibles.map((p) => {
                   const q = cart[p.id] ?? 0
@@ -92,7 +92,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
               <textarea className="pc-campo" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Nota para el cliente (opcional): entrega, condiciones…" aria-label="Nota" maxLength={500} />
               <AvisoAhorroVolumen voz="vendedor" lineas={lineas.map(([id, q]) => ({ product_id: id, qty: q, base: vendibles.find((x) => x.id === id)?.price ?? null }))} reglas={volRules}
                 nombreDe={(id) => vendibles.find((x) => x.id === id)?.name ?? 'este producto'} onAgregar={(id, n) => cambiar(id, n)} />
-              <div className="cot-pie">
+              <div className="cot-pie barra-accion">
                 <span>{lineas.length} {lineas.length === 1 ? 'producto' : 'productos'} · <b className="mono">{money(total)}</b> <small>(el servidor confirma los precios)</small></span>
                 <button type="button" className="btn" disabled={ocupado || lineas.length === 0} onClick={() => void crear()} data-testid="cot-crear">Crear cotización</button>
               </div>

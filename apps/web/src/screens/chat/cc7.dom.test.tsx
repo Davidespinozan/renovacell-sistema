@@ -96,7 +96,7 @@ describe('Atención comercial (Dirección)', () => {
     const a = atencionFalsa({ conversaciones: [pendiente({ conversation_id: 'C1' }), pendiente({ conversation_id: 'C2', dueno: 'visitante', profile_id: null, nombre: 'Visitante', ruteo_motivo: 'visitante' })] })
     const ch = chatFalso({})
     render(<AtencionComercial cliente={a.c} chat={ch.c} />)
-    expect(await screen.findByTestId('estado-horario')).toHaveTextContent('SIN CONFIGURAR')
+    await waitFor(() => expect(screen.getByTestId('estado-horario')).toHaveTextContent(/sin configurar/i))
     const filas = await screen.findAllByTestId('pendiente')
     fireEvent.change(filas[0].querySelector('select')!, { target: { value: 'S1' } })
     fireEvent.click(filas[0].querySelector('[data-testid="btn-asignar-pendiente"]')!)

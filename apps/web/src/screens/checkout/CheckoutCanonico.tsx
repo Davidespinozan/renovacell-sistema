@@ -447,7 +447,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                 </div>
               )}
               {/* CX-V2-B · 4) total final junto a la acción; desglose solo cuando aporta (envío con costo o precio por volumen) */}
-              <div style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--line)' }} data-testid="checkout-pie">
+              <div className="barra-accion checkout-pie" data-testid="checkout-pie">
                 {desglose && (
                   <div data-testid="checkout-desglose" style={{ display: 'grid', gap: 4, marginBottom: 8 }}>
                     <div style={FILA} data-testid="checkout-productos"><span>Productos</span><span className="mono">{total != null ? money(total) : '—'}</span></div>

@@ -246,7 +246,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 placeholder="Buscar producto por nombre, categoría o SKU…"
                 aria-label="Buscar producto"
                 data-testid="np-buscar"
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', marginBottom: 8 }}
+                className="np-buscar"
               />
               <div style={{ display: 'grid', gap: 8, maxHeight: '46vh', overflow: 'auto' }}>
                 {visibles.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 2px' }}>Ningún producto coincide con “{buscar}”.</div>}
@@ -318,7 +318,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                   {formCambio && <div data-testid="np-reenvio-original" style={{ marginTop: 6 }}>Se reenviará el pedido ORIGINAL; los cambios que hiciste después no se aplican hasta confirmarlo.</div>}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
+              {/* CALIDAD VISUAL · el total y «Crear pedido» siempre a la vista (pie fijo del modal) */}
+              <div className="barra-accion np-pie">
+                <span className="np-pie-total">Total <b className="mono">{money(total + flete)}</b></span>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
                 <button className="btn" type="button" disabled={deshabilitado} style={deshabilitado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : pendienteIncierto ? 'Reintentar envío' : 'Crear pedido'}</button>
               </div>

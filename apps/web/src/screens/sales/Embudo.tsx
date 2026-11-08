@@ -21,6 +21,7 @@ export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<type
   const [motivo, setMotivo] = useState('')
   const [nueva, setNueva] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const [etapaMovil, setEtapaMovil] = useState<Etapa>('nuevo')   // CALIDAD VISUAL · en celular se ve una etapa a la vez
   const buscador = useRef(new BuscadorClientes())
 
   const cargar = useCallback(async () => {
@@ -39,6 +40,8 @@ export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<type
     if (!r.ok) { setError(r.error); return }
     setOps((xs) => (xs ?? []).map((x) => (x.id === o.id ? r.data : x)))
   }
+  const columnas = [...ETAPAS, ...(verPerdidas ? [{ key: 'perdido' as Etapa, label: 'Perdido', pista: 'Con su motivo' }] : [])]
+  const activa: Etapa = columnas.some((c) => c.key === etapaMovil) ? etapaMovil : 'nuevo'
   const sig = (e: Etapa): Etapa | null => { const i = ETAPAS.findIndex((x) => x.key === e); return i >= 0 && i < ETAPAS.length - 1 ? ETAPAS[i + 1].key : null }
 
   return (
@@ -66,14 +69,21 @@ export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<type
       {ops === null ? (error ? <ErrorCarga titulo="No se pudo cargar el embudo" detalle={error} onReintentar={() => { setError(null); void cargar() }} /> : <Cargando filas={4} />) : ops.length === 0 ? (
         <Vacio icono="usercheck" titulo="Aún no hay oportunidades." pista="Se crean solas cuando un cliente escribe, se le cotiza o se le levanta un pedido." />
       ) : (
+        <>
+        <div className="seg seg--pestanas crm-tabs" role="tablist" aria-label="Etapas del embudo" data-testid="crm-tabs">
+          {columnas.map((col) => (
+            <button key={col.key} type="button" role="tab" aria-selected={activa === col.key} className={activa === col.key ? 'active' : undefined} onClick={() => setEtapaMovil(col.key)}>{col.label}<span className="seg-conteo">{tot[col.key].n}</span></button>
+          ))}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${verPerdidas ? 5 : 4}, minmax(220px, 1fr))`, gap: 10, overflowX: 'auto' }} className="crm-columnas">
-          {[...ETAPAS, ...(verPerdidas ? [{ key: 'perdido' as Etapa, label: 'Perdido', pista: 'Con su motivo' }] : [])].map((col) => (
-            <div key={col.key} className="card" style={{ padding: 10, minWidth: 220 }} data-testid={`crm-col-${col.key}`}>
+          {columnas.map((col) => (
+            <div key={col.key} className={'card crm-col' + (activa === col.key ? ' activa' : '')} style={{ padding: 10, minWidth: 220 }} data-testid={`crm-col-${col.key}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
                 <b style={{ fontSize: 13.5 }}>{col.label} <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{tot[col.key].n}</span></b>
                 <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{money(tot[col.key].monto)}</span>
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
+                {tot[col.key].n === 0 && <div className="crm-vacia">Sin oportunidades en {col.label.toLowerCase()}.</div>}
                 {(ops ?? []).filter((o) => o.etapa === col.key).map((o) => (
                   <div key={o.id} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 9, fontSize: 12.5, background: '#fff' }} data-testid="crm-tarjeta">
                     <b style={{ display: 'block', fontSize: 13 }}>{o.cliente}</b>
@@ -97,6 +107,7 @@ export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<type
             </div>
           ))}
         </div>
+        </>
       )}
       {perdiendo && (
         <div className="overlay" onClick={() => setPerdiendo(null)}>

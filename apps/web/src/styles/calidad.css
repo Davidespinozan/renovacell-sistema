@@ -365,3 +365,69 @@ input.interruptor:focus-visible{outline:2px solid var(--green-deep);outline-offs
   .bq .bq-chat > *{flex:1;min-height:0}
 }
 .tendencia-vacia{display:grid;place-items:center;min-height:120px;border-radius:12px;background:var(--hueso);color:var(--ink-3);font-size:13.5px;text-align:center;padding:16px}
+
+/* ── Secciones dentro de una pestaña: subrayado, no otra barra de botones (Equipo → Cartera y horario) ── */
+.subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;align-self:stretch}
+.subtabs::-webkit-scrollbar{display:none}
+.subtabs button{flex:0 0 auto;background:none;border:0;border-bottom:2.5px solid transparent;margin-bottom:-1px;padding:10px 14px;min-height:44px;font:inherit;font-size:14.5px;font-weight:600;color:var(--ink-3);cursor:pointer}
+.subtabs button:hover{color:var(--ink)}
+.subtabs button[aria-selected="true"]{color:var(--green-deep);border-bottom-color:var(--green-deep)}
+
+/* ── Embudo de ventas: en celular una etapa a la vez ── */
+.crm-tabs{display:none}
+.crm-vacia{font-size:12.5px;color:var(--ink-3);padding:6px 2px}
+@media (max-width:760px){
+  .crm-tabs{display:flex}
+  .crm-columnas{display:block!important;overflow:visible!important}
+  .crm-col{display:none}
+  .crm-col.activa{display:block;min-width:0!important;padding:12px!important}
+  .crm-col.activa [data-testid="crm-tarjeta"]{font-size:14px!important;padding:12px!important}
+  .crm-col.activa [data-testid="crm-tarjeta"] b{font-size:15px!important}
+}
+
+/* ── Ficha del cliente (Customer 360) ── */
+.c360-volver{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;background:none;border:0;padding:6px 2px;min-height:40px;font:inherit;font-size:14px;font-weight:600;color:var(--ink-3);cursor:pointer}
+.c360-volver:hover{color:var(--ink)}
+.c360-cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px;background:var(--cp-surface,#fff);border:1px solid var(--line);border-radius:var(--r,16px);box-shadow:var(--sh-sm)}
+.c360-cab .avatar{width:52px;height:52px;font-size:18px;flex:none}
+.c360-nombre{margin:0;font-size:21px;line-height:1.25;letter-spacing:-.01em}
+.c360-acciones{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.c360-tabs{align-self:flex-start;max-width:100%}
+.c360-tabla{overflow-x:auto}
+@media (max-width:760px){
+  .c360-cab{padding:14px}
+  .c360-cab > div[style*="min-width: 0"]{flex:1 1 0}
+  .c360-acciones{margin-left:0;flex:1 1 100%}
+  .c360-acciones > *{flex:1 1 auto}
+  .c360-acciones .btn{min-height:46px;justify-content:center}
+  .c360-tabs{align-self:stretch}
+  .c360-tabla{overflow:visible}
+  .c360-tabla thead{display:none}
+}
+.c360-tabla table{width:100%;border-collapse:collapse;font-size:13.5px}
+.c360-tabla th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-3);padding:8px 10px;border-bottom:1px solid var(--line)}
+.c360-tabla td{padding:10px;border-bottom:1px solid var(--line)}
+.c360-tabla .num{text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:760px){.c360-tabla td{padding:0;border-bottom:0}.c360-tabla td.num{text-align:left}}
+
+/* ── Cotizar / Levantar pedido: pie fijo con total y acción principal ── */
+.barra-accion{position:sticky;bottom:-1px;z-index:2;background:var(--cp-surface,#fff);box-shadow:0 -8px 16px -12px rgba(15,23,42,.25)}
+.np-pie{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin:16px -24px -24px;padding:12px 24px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.np-pie-total{margin-right:auto;font-size:13.5px;color:var(--ink-3)}
+.np-pie-total b{display:block;font-size:19px;color:var(--ink);letter-spacing:-.01em}
+.cot-pie.barra-accion{margin:0 -24px -24px;padding:12px 24px calc(12px + env(safe-area-inset-bottom))}
+.np-buscar{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;outline:none;margin-bottom:8px;min-height:44px}
+.np-buscar:focus{border-color:var(--green-soft)}
+@media (max-width:760px){
+  .np-buscar{font-size:16px}
+  .cot-pie.barra-accion .btn{flex:1 1 100%;min-height:48px;justify-content:center}
+  .np-pie .btn{min-height:48px}
+  .np-pie .btn:last-child{flex:1 1 auto;justify-content:center}
+}
+
+/* ── Domicilio: pares cortos (núm. ext/int, C.P./ciudad, estado/país) siguen en 2 columnas en celular ── */
+@media (max-width:640px){.par-corto.par-corto:has(input){grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important}}
+
+/* ── Checkout del doctor: total y «Crear pedido» siempre a la vista ── */
+.checkout-pie{margin:18px -24px -24px;padding:12px 24px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+@media (max-width:760px){.checkout-pie .btn{min-height:48px}.checkout-pie [data-testid="checkout-crear"]{flex:1 1 auto;justify-content:center}}

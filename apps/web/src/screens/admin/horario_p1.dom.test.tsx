@@ -69,7 +69,7 @@ describe('HORARIO-P1 · éxito refresca la tarjeta de alertas', () => {
     expect(await screen.findByText('Horario guardado.')).toBeInTheDocument()
     await waitFor(() => expect(f.de('cc_atencion_config_ver')).toHaveLength(4))   // ambas tarjetas se releen
     await waitFor(() => expect(screen.queryByTestId('config-sin-horario')).toBeNull())
-    expect(screen.getByTestId('horario-estado').textContent).not.toMatch(/SIN CONFIGURAR/)
+    expect(screen.getByTestId('horario-estado').textContent).not.toMatch(/sin configurar/i)
   })
 })
 
@@ -90,7 +90,7 @@ describe('HORARIO-P1 · errores', () => {
     expect(String((err as Error).message)).toMatch(/^atencion:cc_horario_guardar · /)
     expect(f.de('cc_atencion_config_ver')).toHaveLength(2)   // sin éxito no hay refresco (alertas + reparto)
     expect(screen.getByTestId('config-sin-horario')).toBeInTheDocument()
-    expect(screen.getByTestId('horario-estado')).toHaveTextContent('SIN CONFIGURAR')
+    expect(screen.getByTestId('horario-estado')).toHaveTextContent(/sin configurar/i)
   })
   it.each([
     ['NO_AUTORIZADO: solo Dirección', 'Solo Dirección administra la atención comercial.'],

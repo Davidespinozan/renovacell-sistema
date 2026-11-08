@@ -144,7 +144,7 @@ export function validarSemana(semana: DiaHorario[]): string | null {
 
 /** Texto para la cabecera: estado actual según el servidor. */
 export function textoEstadoHorario(e: EstadoHorario | null | undefined): string {
-  if (!e || !e.configurado) return 'Horario de atención SIN CONFIGURAR: el sistema no promete atención inmediata.'
+  if (!e || !e.configurado) return 'Horario de atención sin configurar: el sistema no promete atención inmediata.'
   if (e.abierto) return 'En horario de atención.'
   return e.proxima_apertura ? `Fuera de horario · abre ${new Date(e.proxima_apertura).toLocaleString('es-MX', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}.` : 'Fuera de horario.'
 }

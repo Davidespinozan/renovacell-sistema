@@ -31,17 +31,17 @@ export function LocationForm({ value, onChange }: { value: LocationFields; onCha
       <input style={input} placeholder="Clínica Centro, Consultorio Norte…" value={s(value.name)} onChange={(e) => set({ name: e.target.value })} />
       <label style={label}>Calle *</label>
       <input style={input} placeholder="Calle" value={s(value.line1)} onChange={(e) => set({ line1: e.target.value })} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div className="par-corto" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><label style={label}>Núm. exterior</label><input style={input} value={s(value.exterior_number)} onChange={(e) => set({ exterior_number: e.target.value })} /></div>
         <div><label style={label}>Núm. interior</label><input style={input} value={s(value.interior_number)} onChange={(e) => set({ interior_number: e.target.value })} /></div>
       </div>
       <label style={label}>Colonia</label>
       <input style={input} value={s(value.neighborhood)} onChange={(e) => set({ neighborhood: e.target.value })} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div className="par-corto" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><label style={label}>C.P. *</label><input style={input} inputMode="numeric" value={s(value.postal_code)} onChange={(e) => set({ postal_code: e.target.value })} /></div>
         <div><label style={label}>Ciudad *</label><input style={input} value={s(value.city)} onChange={(e) => set({ city: e.target.value })} /></div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div className="par-corto" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><label style={label}>Estado *</label><input style={input} value={s(value.state)} onChange={(e) => set({ state: e.target.value })} /></div>
         <div><label style={label}>País *</label><input style={input} value={s(value.country)} onChange={(e) => set({ country: e.target.value })} /></div>
       </div>

@@ -19,6 +19,8 @@ import { TelefonosEditor, DomiciliosEditor, PerfilesFiscalesEditor, ContactoEdit
 import { AvisoCancelacion, SolicitarCancelacion } from './Cancelacion'
 import { useRole } from '../auth/RoleContext'
 import { CancelOrderModal } from './CancelOrderModal'
+import { statusView } from '../screens/doctor/orderStatus'   // CALIDAD VISUAL · estado del pedido en español (antes salía 'delivered')
+import type { OrderStatus } from '../data/types'
 import { solicitudDe, useSolicitudesCancelacion } from '../data/ops/cancelacionSolicitud'
 
 function Section({ icon, title, aside, children }: { icon: React.ReactNode; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
@@ -55,23 +57,23 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
 
   return (
     <div className="grid" style={{ gap: 14, maxWidth: 1040 }} data-testid="cliente-360">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button type="button" className="btn ghost sm" onClick={onBack} data-testid="c360-volver"><ChevronLeft size={15} /> Directorio</button>
+      <button type="button" className="c360-volver" onClick={onBack} data-testid="c360-volver"><ChevronLeft size={16} /> Directorio</button>
+      <div className="c360-cab">
         {data && (
           <>
             <div className="avatar" style={{ background: avatarColor(data.resumen.nombre || '?') }}>{initials(data.resumen.nombre || '?')}</div>
             <div style={{ minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: 20 }}>{data.resumen.nombre}</h2>
+              <h2 className="c360-nombre">{data.resumen.nombre}</h2>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                 <span className={'pill ' + (data.resumen.portal.tiene ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5 }}>{data.resumen.portal.tiene ? <UserCheck size={12} /> : <UserX size={12} />} {data.resumen.portal.tiene ? 'Con portal' : 'Sin portal'}</span>
                 {data.resumen.portal.tiene && <span className={'pill ' + (data.resumen.portal.verificado ? 'p-ok' : 'p-warn')}>{estadoVerificacion(data).label}</span>}
                 {!data.resumen.activo && <span className="pill p-dang">Inactivo</span>}
               </div>
             </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="c360-acciones">
               {!data.resumen.portal.tiene && data.resumen.activo && (data.rol === 'direccion' || data.rol === 'vendedor') && <InvitarCliente customerId={data.customer_id} />}
               {data.permisos.estado && <EstadoCliente customerId={data.customer_id} activo={data.resumen.activo} cliente={cliente} onCambio={recargar} />}
-              {canOrder && onOrder && data.resumen.activo && <button type="button" className="btn sm" onClick={onOrder}>Levantar pedido</button>}
+              {canOrder && onOrder && data.resumen.activo && <button type="button" className="btn" onClick={onOrder}>Levantar pedido</button>}
             </div>
           </>
         )}
@@ -91,7 +93,7 @@ export function Customer360Page({ customerId, onBack, canOrder = false, onOrder,
       {error && <div role="alert" className="card" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
       {data && (
         <>
-          <div className="seg" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }} role="tablist">
+          <div className="seg c360-tabs" role="tablist" aria-label="Secciones de la ficha">
             {tabs.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? 'active' : undefined} onClick={() => setTab(t)} data-testid={`tab-${t}`}>{ETIQUETA_PESTANA[t]}</button>)}
           </div>
           <div className="card" style={{ display: 'grid', gap: 12 }}>
@@ -243,16 +245,22 @@ function Comercial({ d, atencion, cliente, recargar }: { d: Cliente360; atencion
   )
 }
 
-function Tabla({ cols, filas, vacio }: { cols: string[]; filas: React.ReactNode[][]; vacio: string }) {
+// CALIDAD VISUAL · en celular cada fila es un renglón de lista (tbl-cards): la 1ª columna es el título y `valor` (el monto)
+// va a la derecha; `estado` va junto al título. En escritorio sigue siendo tabla.
+function Tabla({ cols, filas, vacio, valor, estado }: { cols: string[]; filas: React.ReactNode[][]; vacio: string; valor?: number; estado?: number }) {
   if (filas.length === 0) return <Empty>{vacio}</Empty>
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead><tr>{cols.map((c) => <th key={c} style={{ textAlign: 'left', fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{c}</th>)}</tr></thead>
-        <tbody>{filas.map((f, i) => <tr key={i}>{f.map((v, j) => <td key={j} style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{v}</td>)}</tr>)}</tbody>
+    <div className="c360-tabla">
+      <table className="tbl-cards">
+        <thead><tr>{cols.map((c, j) => <th key={c || j} className={j === valor ? 'num' : undefined}>{c}</th>)}</tr></thead>
+        <tbody>{filas.map((f, i) => <tr key={i}>{f.map((v, j) => <td key={j} data-label={j > 0 && cols[j] ? cols[j] : undefined} data-rol={j === valor ? 'valor' : j === estado ? 'estado' : undefined} className={j === valor ? 'num' : undefined}>{v}</td>)}</tr>)}</tbody>
       </table>
     </div>
   )
+}
+function EstadoPedido({ estado }: { estado: string | null }) {
+  const v = statusView(estado as OrderStatus | null)
+  return v.label === '—' ? <>{estado ?? '—'}</> : <span className={'pill ' + v.pill}>{v.label}</span>
 }
 // CANCELACIÓN · en los pedidos que aún no salen: Dirección cancela directo; Ventas la solicita.
 const CANCELABLE = new Set(['draft', 'pending_payment', 'paid', 'picking', 'packed'])
@@ -271,7 +279,7 @@ function Pedidos({ d }: { d: Cliente360 }) {
   }
   return (
     <Section icon={<ShoppingBag size={15} />} title="Pedidos">
-      <Tabla cols={puede ? ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo', ''] : ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo']} vacio="Sin pedidos." filas={d.pedidos.map((p) => [<span key="f" className="mono">{p.folio ?? '—'}</span>, fmtDate(p.fecha), p.estado ?? '—', money(p.total ?? 0), ESTADO_PAGO[p.estado_pago ?? ''] ?? p.estado_pago ?? '—', p.saldo != null ? money(p.saldo) : '—', ...(puede ? [accion(p)] : [])])} />
+      <Tabla cols={puede ? ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo', ''] : ['Folio', 'Fecha', 'Estado', 'Total', 'Pago', 'Saldo']} valor={3} estado={2} vacio="Sin pedidos." filas={d.pedidos.map((p) => [<span key="f" className="mono">{p.folio ?? '—'}</span>, fmtDate(p.fecha), <EstadoPedido key="e" estado={p.estado} />, money(p.total ?? 0), ESTADO_PAGO[p.estado_pago ?? ''] ?? p.estado_pago ?? '—', p.saldo != null ? money(p.saldo) : '—', ...(puede ? [accion(p)] : [])])} />
       {cancelando && <CancelOrderModal orderId={cancelando.id} folio={cancelando.folio} requireReason actor="Administración" onClose={() => setCancelando(null)} />}
     </Section>
   )
@@ -279,18 +287,18 @@ function Pedidos({ d }: { d: Cliente360 }) {
 const Pagos = ({ d }: { d: Cliente360 }) => (
   <>
     <Section icon={<Receipt size={15} />} title="Movimientos de pago (libro W2)">
-      <Tabla cols={['Pedido', 'Fecha', 'Tipo', 'Método', 'Monto']} vacio="Sin movimientos de pago." filas={(d.pagos ?? []).map((p) => [p.pedido ?? '—', p.fecha ? fmtDate(p.fecha) : '—', p.direccion === 'in' ? 'Cobro' : p.direccion === 'out' ? 'Reembolso' : p.direccion, p.metodo ?? '—', money(p.monto)])} />
+      <Tabla cols={['Pedido', 'Fecha', 'Tipo', 'Método', 'Monto']} valor={4} vacio="Sin movimientos de pago." filas={(d.pagos ?? []).map((p) => [p.pedido ?? '—', p.fecha ? fmtDate(p.fecha) : '—', p.direccion === 'in' ? 'Cobro' : p.direccion === 'out' ? 'Reembolso' : p.direccion, p.metodo ?? '—', money(p.monto)])} />
     </Section>
     {(d.pagos_reportados ?? []).length > 0 && (
       <Section icon={<Clock size={15} />} title="Pagos reportados por el cliente">
-        <Tabla cols={['Pedido', 'Fecha', 'Método', 'Monto', 'Estado']} vacio="" filas={(d.pagos_reportados ?? []).map((p) => [p.pedido ?? '—', p.fecha ? fmtDate(p.fecha) : '—', p.metodo ?? '—', money(p.monto), p.estado])} />
+        <Tabla cols={['Pedido', 'Fecha', 'Método', 'Monto', 'Estado']} valor={3} estado={4} vacio="" filas={(d.pagos_reportados ?? []).map((p) => [p.pedido ?? '—', p.fecha ? fmtDate(p.fecha) : '—', p.metodo ?? '—', money(p.monto), p.estado])} />
       </Section>
     )}
   </>
 )
 const Facturas = ({ d }: { d: Cliente360 }) => (
   <Section icon={<FileText size={15} />} title="Facturas (CFDI)">
-    <Tabla cols={['Pedido', 'Tipo', 'Estado', 'Serie-folio', 'UUID', 'Total', 'Fecha']} vacio="Sin facturas." filas={d.facturas.map((f) => [f.pedido ?? '—', f.tipo, f.estado, [f.serie, f.folio].filter(Boolean).join('-') || '—', <span key="u" className="mono" style={{ fontSize: 11 }}>{f.uuid ?? '—'}</span>, f.total != null ? money(f.total) : '—', fmtDate(f.fecha)])} />
+    <Tabla cols={['Pedido', 'Tipo', 'Estado', 'Serie-folio', 'UUID', 'Total', 'Fecha']} valor={5} estado={2} vacio="Sin facturas." filas={d.facturas.map((f) => [f.pedido ?? '—', f.tipo, f.estado, [f.serie, f.folio].filter(Boolean).join('-') || '—', <span key="u" className="mono" style={{ fontSize: 11 }}>{f.uuid ?? '—'}</span>, f.total != null ? money(f.total) : '—', fmtDate(f.fecha)])} />
   </Section>
 )
 function Conversacion({ d, onAsesorias, lector }: { d: Cliente360; onAsesorias?: () => void; lector: LectorSesiones }) {

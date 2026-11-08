@@ -88,9 +88,9 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
       {pestanas.includes('pendientes') && <EnlaceContacto />}
       <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontWeight: 600 }} data-testid="estado-horario">{textoEstadoHorario(r?.horario)}</div>
+          <div style={{ fontWeight: 600 }} data-testid="estado-horario">{r ? textoEstadoHorario(r.horario) : error ? 'No se pudo leer el horario.' : 'Consultando horario…'}</div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-            {r && !r.horario.configurado ? 'Sin horario no se miden minutos hábiles: los avisos y escalamientos por espera están en pausa.' : 'El servidor mide la espera del asesor en minutos hábiles con este horario.'}
+            {!r ? 'La espera del asesor se mide en minutos hábiles con el horario de atención.' : !r.horario.configurado ? 'Sin horario no se miden minutos hábiles: los avisos y escalamientos por espera están en pausa.' : 'El servidor mide la espera del asesor en minutos hábiles con este horario.'}
           </div>
         </div>
         <button type="button" className="btn ghost" onClick={irHorario} style={{ minHeight: 40 }}>{r?.horario.configurado ? 'Horario y alertas' : 'Configurar horario'}</button>
@@ -103,8 +103,8 @@ export function AtencionComercial({ cliente = clientePorDefecto, chat = chatPorD
           </div>
         )}
       </div>
-      {error && <div role="alert" className="card" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
-      <div className="seg" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }} role="tablist" aria-label="Secciones de atención comercial">
+      {error && pestana !== 'cartera' && pestana !== 'horario' && <div role="alert" className="card" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
+      <div className={pestanas.includes('pendientes') ? 'seg' : 'subtabs'} style={pestanas.includes('pendientes') ? { alignSelf: 'flex-start', flexWrap: 'wrap' } : undefined} role="tablist" aria-label="Secciones de atención comercial">
         {pestanas.map((k) => (
           <button key={k} type="button" role="tab" aria-selected={pestana === k} className={pestana === k ? 'active' : undefined} onClick={() => setPestana(k)}>{ETIQUETA[k]}</button>
         ))}
