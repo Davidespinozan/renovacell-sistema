@@ -122,23 +122,25 @@ export function Doctores() {
 
       {queue.map((d) => (
         <div key={d.id} className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="tarjeta-cab">
             <Avatar name={d.full_name ?? '?'} url={avatarOf(d)} />
-            <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="tarjeta-cab-tx">
               <div style={{ fontWeight: 600 }}>{d.full_name}</div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
                 {d.organization}{specialtyOf(d) ? ` · ${specialtyOf(d)}` : ''}
               </div>
             </div>
+            <div className="tarjeta-cab-pills">
             {(() => { const st = deriveVerificationStatus(d); return (
               <span className={'pill ' + VERIF_PILL[st]}>
                 {st === 'verified' ? <ShieldCheck size={12} /> : st === 'rejected' || st === 'revoked' ? <Ban size={12} /> : <Clock size={12} />} {VERIF_LABEL[st]}
               </span>
             ) })()}
-            <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }}><ShoppingBag size={12} /> {orderCount[d.id] ?? 0}</span>
+            {(orderCount[d.id] ?? 0) > 0 && <span className="pill p-neu" style={{ display: 'inline-flex', gap: 5 }} title="Pedidos"><ShoppingBag size={12} /> {orderCount[d.id]}</span>}
             <EtiquetaPush estado={push} id={d.id} />
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="tarjeta-acciones">
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
             <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setDelDoctor({ id: d.id, name: d.full_name ?? 'este doctor' })}><Trash2 size={14} /> Eliminar</button>
@@ -462,7 +464,7 @@ function DoctorDetail({
                       <td data-label="Folio" className="mono">{o.external_ref}</td>
                       <td data-label="Estatus"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
                       <td data-label="Fecha">{fmtDate(o.created_at)}</td>
-                      <td data-label="Total" className="mono">{money(o.total)}</td>
+                      <td data-label="Total" data-rol="valor" className="mono">{money(o.total)}</td>
                     </tr>
                   )
                 })}

@@ -11,6 +11,9 @@ const invocarPorDefecto: Invocar = (fn, opts) => supabase.functions.invoke(fn, o
 interface Msg { rol: 'persona' | 'asistente'; texto: string; error?: boolean }
 const EJEMPLOS = ['¿Cómo paso una conversación a otro vendedor?', '¿De quién es cliente la Dra. Vea?', '¿Por qué esta conversación le tocó a Alejandra?', '¿Dónde pongo el aviso de la sucursal?']
 export const ROLES_EQUIPO = ['admin', 'pos', 'warehouse', 'packing', 'driver']
+/** CALIDAD VISUAL · en celular el asistente se abre desde la barra de abajo (no flota sobre el contenido). */
+export const EVENTO_ABRIR = 'rc:abrir-asistente'
+export const abrirAsistente = () => { window.dispatchEvent(new Event(EVENTO_ABRIR)) }
 
 /** **negritas** y listas «- » (lo único que pide el asistente). Sin HTML crudo. */
 export function textoRico(t: string): React.ReactNode {
@@ -40,6 +43,7 @@ export function AsistenteEquipo({ invocar = invocarPorDefecto, pantalla }: { inv
   const fin = useRef<HTMLDivElement | null>(null); const campo = useRef<HTMLTextAreaElement | null>(null)
   useEffect(() => { fin.current?.scrollIntoView?.({ block: 'end' }) }, [msgs, pensando])
   useEffect(() => { if (abierto) campo.current?.focus() }, [abierto])
+  useEffect(() => { const abrir = () => setAbierto(true); window.addEventListener(EVENTO_ABRIR, abrir); return () => window.removeEventListener(EVENTO_ABRIR, abrir) }, [])
   const preguntar = async (q: string) => {
     const pregunta = q.trim(); if (!pregunta || pensando) return
     const historial = msgs.filter((m) => !m.error).map(({ rol, texto: t }) => ({ rol, texto: t }))

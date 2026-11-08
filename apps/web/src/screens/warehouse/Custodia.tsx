@@ -24,7 +24,7 @@ import {
 } from '../../data/ops/custody'
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando } from '../../app/EmptyState'
 
 const fld: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12,
@@ -81,7 +81,7 @@ export function Custodia() {
           <span className="pill p-neu" style={{ marginLeft: 'auto' }}>{vivas.length}</span>
         </div>
         <div style={{ padding: '10px 14px 14px' }}>
-          {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
+          {loading ? <Cargando plano />
             : vivas.length === 0 ? <div className="op-vacio"><Vacio plano icono="box" titulo="No hay custodias abiertas" /></div>
               : vivas.map((c) => {
                 const saldo = saldoDe(stock, c.id)

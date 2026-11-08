@@ -7,7 +7,8 @@ import { useRole } from '../auth/RoleContext'
 import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
-import { AsistenteEquipoPuerta } from './AsistenteEquipo'   // ASISTENTE DEL EQUIPO · «Pregúntale al sistema»
+import { AsistenteEquipoPuerta } from './AsistenteEquipo'
+import { observarBarras } from './barrasDesplazables'   // CALIDAD VISUAL · pestañas: activa a la vista y desvanecido   // ASISTENTE DEL EQUIPO · «Pregúntale al sistema»
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
@@ -38,6 +39,8 @@ export function AppShell() {
   useEffect(() => { instalarRefresco() }, [])
   useEffect(() => { refrescarDatos() }, [screen])
   // PUSH DEL EQUIPO · tocar un aviso abre ese chat del equipo o Avisos del equipo.
+  // CALIDAD VISUAL · barras de pestañas/chips: la activa siempre a la vista y un desvanecido cuando hay más.
+  useEffect(() => { const c = document.querySelector<HTMLElement>('main.canvas'); return c ? observarBarras(c) : undefined }, [])
   useAbrirDesdeAviso(!!user && !!role && role !== 'doctor', setScreen)
   // Al volver de Stripe (?care=ok|cancel|volver) se abre STRYV Care una vez, ya con la sesión de Dirección resuelta.
   useEffect(() => {

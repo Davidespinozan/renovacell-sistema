@@ -5,6 +5,7 @@
 // conversación se alternan. Enlace de contacto, horario y controles de la IA viven en "Canales y horario" (no son trabajo
 // del día). La autoridad sigue en la base: aquí solo se muestran y se piden acciones.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { Settings2, Search, ArrowLeft, RefreshCw, MessageCircle } from 'lucide-react'
 import { atencion as clientePorDefecto, ETIQUETA_FUENTE, textoEstadoHorario, type BandejaUnificada, type ClienteAtencion, type FuenteConversacion, type GrupoBandeja, type ItemBandeja, type Pendientes, type Vendedor } from '../../data/ops/atencion'
 import { chat as chatPorDefecto, type ClienteChat } from '../../data/ops/chat'
@@ -125,7 +126,7 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
               {FUENTES.map((f) => <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>)}
             </select>
           </div>
-          {datos == null && !error && <div className="bq-vacio">Cargando…</div>}
+          {datos == null && !error && <Cargando plano filas={4} />}
           {datos && lista.length === 0 && <div className="bq-vacio" data-testid="bq-vacio">{vista === 'por_atender' ? 'Nada pendiente. Buen trabajo.' : 'No hay conversaciones aquí.'}</div>}
           <ul className="bq-items">
             {lista.map((c) => {

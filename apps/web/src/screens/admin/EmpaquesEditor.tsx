@@ -1,6 +1,7 @@
 // EMP-1 · Catálogo de empaques (hieleras y cajas): Dirección lo administra aquí; Empaque lo usa al cotizar la guía.
 // Agregar, editar medidas y peso vacío, marcar "la más usada", desactivar (nunca borrar). Todo por empaque_guardar.
 import React, { useEffect, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { ETIQUETA_TIPO_EMPAQUE, guardarEmpaque, listarEmpaques, medidasTexto, type Empaque, type EmpaqueDatos } from '../../data/ops/empaques'
 
@@ -57,7 +58,7 @@ export function EmpaquesEditor({ listar = listarEmpaques, guardar = guardarEmpaq
           </div>
         </div>
       )}
-      {lista === null ? <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '10px 0' }}>Cargando…</div> : lista.length === 0 ? (
+      {lista === null ? <Cargando plano filas={2} /> : lista.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '10px 0' }}>Sin empaques. Agrega el primero.</div>
       ) : (
         <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>

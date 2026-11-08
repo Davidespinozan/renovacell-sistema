@@ -32,7 +32,7 @@ describe('diagnoseShipment', () => {
     const overdue = new Date(Date.now() - 3 * 86_400_000).toISOString()
     const d = diagnoseShipment(mkOrder({ status: 'shipped' }), mkShipment({ status: 'out_for_delivery', estimated_delivery_at: overdue }))
     expect(d.stuck).toBe(true)
-    expect(d.statusPill).toBe('p-dang')
+    expect(d.statusPill).toBe('p-blue')   // CALIDAD VISUAL · el estado conserva su color; lo vencido lo dice «Detenido» + el motivo
     expect(d.reason).toContain('vencida')
   })
   it('en reparto dentro de fecha = en curso, no atorado', () => {

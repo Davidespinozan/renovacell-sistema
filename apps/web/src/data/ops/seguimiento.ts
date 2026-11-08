@@ -69,7 +69,7 @@ export function diagnoseShipment(order: OrderWithItems, shipment: Shipment | und
     if (overdue) {
       stuck = true
       reason = 'Entrega vencida · pasó su fecha estimada sin avanzar'
-      statusPill = 'p-dang'
+      // CALIDAD VISUAL · el estado conserva su color (En reparto = azul en todo el sistema); el problema lo marca UNA señal: «Detenido».
     }
   }
   return { stuck, reason, statusLabel, statusPill }

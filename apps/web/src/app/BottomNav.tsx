@@ -4,6 +4,8 @@ import React from 'react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_KEYS, INICIO_SCREEN, COMMON_SCREEN, CHAT_SCREEN } from './roles'
 import { useRole } from '../auth/RoleContext'
+import { Sparkles } from 'lucide-react'
+import { ROLES_EQUIPO, abrirAsistente } from './AsistenteEquipo'   // CALIDAD VISUAL · el asistente vive en la barra (no flota sobre el contenido)
 
 function short(label: string, key: string): string {
   if (key === INICIO_SCREEN.key) return 'Inicio'
@@ -36,6 +38,12 @@ export function BottomNav({ onMenu }: { onMenu: () => void }) {
           <span>{short(s.label, s.key)}</span>
         </a>
       ))}
+      {ROLES_EQUIPO.includes(role ?? '') && (
+        <a role="button" tabIndex={0} onClick={abrirAsistente} onKeyDown={onKey(abrirAsistente)} data-testid="bnav-asistente" aria-label="Pregúntale al sistema">
+          <Sparkles size={20} />
+          <span>Pregunta</span>
+        </a>
+      )}
       {showMenu && (
         <a role="button" tabIndex={0} onClick={onMenu} onKeyDown={onKey(onMenu)}>
           <Icon name="menu" />

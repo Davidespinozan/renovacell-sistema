@@ -8,9 +8,10 @@ export type IconName =
   | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf' | 'mail'
   | 'chevronRight' | 'chevronLeft' | 'shield'
   | 'home' | 'plus' | 'edit' | 'trash' | 'pin' | 'x' | 'eye' | 'megaphone'
-  | 'check' | 'minus' | 'cart'
+  | 'check' | 'minus' | 'cart' | 'alert'
 
 const P: Record<IconName, React.ReactNode> = {
+  alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5" /><path d="M12 16.2v.3" /></>,
   dashboard: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>,
   chart: <><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></>,
   grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,

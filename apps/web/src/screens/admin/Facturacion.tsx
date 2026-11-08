@@ -223,7 +223,7 @@ export function Facturacion() {
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Cliente">{clientName(o)}{pos ? ' ' : ''}</td>
-                    <td data-label="Monto" className="mono">{money(o.total)}</td>
+                    <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
                     <td data-label="Cobro"><span className={'pill ' + cob.pill}>{cob.label}</span></td>
                     <td data-label="CFDI"><span className={'pill ' + cf.pill}>{cf.label}</span></td>
                   </tr>

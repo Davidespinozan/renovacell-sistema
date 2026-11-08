@@ -15,7 +15,8 @@ const PASOS: Array<{ n: number; titulo: string; texto: string; keys: string[]; d
 
 export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
   const { role, capabilities, setScreen } = useRole()
-  const [oculta, setOculta] = useState(() => { try { return localStorage.getItem(CLAVE) === '1' } catch { return false } })
+  // CALIDAD VISUAL (7 nov) · plegada por defecto (ocupaba media primera pantalla en Inventario); se abre con «Ver» y se recuerda.
+  const [oculta, setOculta] = useState(() => { try { return localStorage.getItem(CLAVE) !== '0' } catch { return true } })
   const nav = new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key))
   const alternar = () => { setOculta((v) => { try { localStorage.setItem(CLAVE, v ? '0' : '1') } catch { /* sin almacenamiento */ } return !v }) }
   return (

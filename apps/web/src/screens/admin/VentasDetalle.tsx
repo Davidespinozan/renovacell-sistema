@@ -205,9 +205,9 @@ export function VentasDetalle() {
                     <td data-label="Canal"><span className={'pill ' + (isPos ? 'p-neu' : 'p-blue')}>{isPos ? 'POS' : 'Portal'}</span></td>
                     <td data-label="Cliente">{clientName(o)}</td>
                     <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
-                    <td data-label="Monto" className="mono">{money(o.total)}</td>
+                    <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
                     <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span></td>
-                    <td data-label="Pedido"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
+                    <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
                   </tr>
                 )
               })}

@@ -2,6 +2,7 @@
 // pagada; si no le compra, pasa al siguiente vendedor en turno. Arriba, la competencia del mes entre vendedores (solo
 // números); abajo, mis clientes por vencer con cuántos días me quedan y cómo hablarles.
 import React, { useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { MessageCircle, Phone, Search, Trophy } from 'lucide-react'
 import { carteraPlazos as plazosPorDefecto, carteraRanking as rankingPorDefecto, textoPlazo, textoSinCompra, tonoPlazo, type FilaRanking, type Plazos } from '../../data/ops/carteraPlazos'
 import { normalizar, whatsappCon } from '../../data/ops/busqueda'
@@ -59,7 +60,7 @@ export function CarteraPlazos({ plazos = plazosPorDefecto, ranking = rankingPorD
       </div>
       <span className="searchbox" style={{ minWidth: 200 }}><Search size={15} aria-hidden /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" /></span>
 
-      {datos === undefined ? <div className="pcl-vacio">Cargando…</div> : datos === null ? <div role="alert" className="pcl-vacio">No se pudo cargar tu cartera.</div>
+      {datos === undefined ? <Cargando plano /> : datos === null ? <div role="alert" className="pcl-vacio">No se pudo cargar tu cartera.</div>
         : lista.length === 0 ? <div className="pcl-vacio" data-testid="plazos-vacio">{dias >= 730 ? 'Tu cartera está vacía.' : `Ningún cliente tuyo vence en los próximos ${dias} días.`}</div> : (
           <ul className="pcl-lista">
             {lista.map((c) => {

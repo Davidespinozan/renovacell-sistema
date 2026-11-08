@@ -1,6 +1,7 @@
 // MI VERIFICACIÓN · el doctor ve en qué va su verificación y completa o corrige su cédula y las fotos del INE.
 // Mandarlo la deja otra vez en revisión y avisa a Dirección y a su vendedor; aprobar nunca es automático.
 import React, { useCallback, useEffect, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { useRole } from '../../auth/RoleContext'
 import { completarVerificacion as completarPorDefecto, miVerificacion as leerPorDefecto, reducirFoto, type MiVerificacion as Estado } from '../../data/ops/verificacion'
 import { textoFaltan } from './AvisoVerificacion'
@@ -25,7 +26,7 @@ export function MiVerificacion({ leer = leerPorDefecto, completar = completarPor
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     setFrente(null); setReverso(null); setMsg({ ok: true, texto: 'Listo: lo revisaremos y te avisaremos aquí.' }); await cargar()
   }
-  if (!v) return <div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>
+  if (!v) return <Cargando filas={4} />
   // Verificada: bloque de éxito con salida directa al catálogo (antes era una frase suelta sin acción).
   if (v.verificado) return (
     <div className="card pp-verif-ok" data-testid="mi-verificacion-ok">

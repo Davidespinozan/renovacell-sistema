@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   CALIDAD VISUAL · MOBILE-FIRST (7 nov 2026). Auditoría de 208 capturas (5 roles). Esta hoja va AL FINAL de index.css:
+   aquí viven las correcciones transversales y los componentes del sistema de diseño, en un solo lugar.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Asistente del equipo: en celular vive en la barra de abajo; en escritorio flota sin tapar el contenido ── */
+.ae-lanzador{z-index:40}
+body.drawer-open .ae-lanzador{display:none}
+@media (max-width:899px){.ae-lanzador{display:none}}
+@media (min-width:900px){#content{padding-bottom:84px}}
+
+/* ── Barras de pestañas/chips que se desbordan: desvanecido en la orilla con más opciones (barrasDesplazables.ts) ── */
+.seg[data-mas="der"],.chips-scroll[data-mas="der"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
+.seg[data-mas="izq"],.chips-scroll[data-mas="izq"]{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent)}
+.seg[data-mas="ambos"],.chips-scroll[data-mas="ambos"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent)}
+.seg-conteo{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--cp-slate-100,#eef1f4);color:var(--ink-2,#334155);font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.seg button.active .seg-conteo{background:rgba(255,255,255,.22);color:#fff}
+@media (max-width:640px){
+  .seg--pestanas{width:100%}
+  .seg--pestanas button{flex:1 0 auto;justify-content:center}
+}
+
+/* ── Tarjeta con cabecera (avatar + nombre + etiquetas) y fila de acciones: el nombre nunca se parte letra a letra ── */
+.tarjeta-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tarjeta-cab-tx{flex:1 1 180px;min-width:0}
+.tarjeta-cab-tx>div:first-child{overflow-wrap:anywhere}
+.tarjeta-cab-pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tarjeta-acciones{display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px;flex-wrap:wrap;align-items:center}
+@media (max-width:640px){
+  .tarjeta-cab-pills{flex-basis:100%;padding-left:52px}
+  .tarjeta-acciones .btn:not(.ghost){flex:1 1 100%;margin-left:0 !important;order:-1}
+}
+
+/* ── Filtros en celular: un selector nunca se sale de la pantalla (se veía cortado en Trazabilidad, Ventas, Revisión fiscal) ── */
+@media (max-width:640px){
+  .filters > select,.filters > .searchbox{grid-column:1 / -1;min-width:0 !important;width:100%;max-width:none}
+  .filters > span:first-child:has(+ select){grid-column:1 / -1}
+  .filters select{min-width:0;max-width:100%}
+}
+
+/* ── FILA DE LISTA MÓVIL (reemplaza las pilas «ETIQUETA …… valor» de table.tbl-cards en 32 pantallas) ──────────────
+   Cada registro: título (1a columna) en negritas · datos secundarios en línea, chicos y en gris · botones al final.
+   Opcional por celda: data-rol="valor" (va a la derecha del título, en negritas: montos), data-rol="estado" (etiqueta
+   junto al título), data-rol="sec" (se oculta en celular: dato de escritorio que estorba). */
+@media (max-width:640px){
+  table.tbl-cards tr,.card table.tbl-cards tr{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:16px;row-gap:4px;padding:12px 14px;margin:0 0 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--cp-surface);box-shadow:var(--sh-sm)}
+  .card table.tbl-cards tr{margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;padding:12px 0}
+  .card[style*="padding: 0"] table.tbl-cards tr{padding:12px 14px}
+  .card table.tbl-cards tbody tr:last-child{border-bottom:0}
+  table.tbl-cards td,.card table.tbl-cards td{display:inline-flex;align-items:baseline;justify-content:flex-start;gap:5px;flex:0 1 auto;max-width:100%;min-width:0;padding:0;border:0;text-align:left;font-size:13.5px;color:var(--ink-2,#334155);overflow-wrap:anywhere}
+  table.tbl-cards td::before,.card table.tbl-cards td::before{content:attr(data-label);flex:none;font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-3)}
+  table.tbl-cards td:not([data-label])::before{content:none}
+  table.tbl-cards td:empty{display:none}
+  /* título */
+  table.tbl-cards td:first-child{order:-3;flex:1 1 100%;font-size:15px;font-weight:600;color:var(--ink);line-height:1.3}
+  table.tbl-cards td:first-child::before{content:none}
+  table.tbl-cards tr:has(> td[data-rol="valor"]) > td:first-child{flex:1 1 calc(100% - 140px)}
+  /* valor principal a la derecha del título; estado junto al título */
+  table.tbl-cards td[data-rol="valor"]{order:-2;flex:none;margin-left:auto;font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  table.tbl-cards td[data-rol="valor"]::before,table.tbl-cards td[data-rol="estado"]::before{content:none}
+  table.tbl-cards td[data-rol="estado"]{order:-1}
+  table.tbl-cards td[data-rol="sec"]{display:none}
+  /* acciones: al final, a todo lo ancho, alineadas a la derecha */
+  table.tbl-cards td:has(button,a.btn,select,input:not([type=checkbox]):not([type=radio])){flex:1 1 100%;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:6px}
+  table.tbl-cards td:has(button,a.btn,select,input:not([type=checkbox]):not([type=radio]))::before{margin-right:auto;align-self:center}
+  table.tbl-cards td:first-child:has(button,a.btn){justify-content:flex-start;margin-top:0}
+}
+
+/* ── Botones deshabilitados: grises de verdad (antes se veían del mismo verde que uno activo) ── */
+.btn:disabled,.btn[aria-disabled="true"],.btn-primary:disabled{background:var(--cp-slate-100,#eef1f4) !important;color:var(--ink-3) !important;box-shadow:none !important;border:1px solid var(--line);cursor:not-allowed;filter:none;transform:none}
+.btn.ghost:disabled{background:var(--cp-surface) !important;opacity:.6}
+
+/* ── Formularios en celular: una columna (campos a 2–4 columnas en 390 px cortaban sus textos) ──
+   Solo cuadrículas FIJAS escritas a mano que contienen campos; las auto-fit de tarjetas/indicadores no se tocan. */
+@media (max-width:640px){
+  [style*="grid-template-columns: 1fr 1fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 1fr 1fr 1fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 1fr 1fr 1fr 1fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 2fr 1fr 1fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 1fr 2fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 2fr 1fr"]:has(input,select,textarea),
+  [style*="grid-template-columns: 2.2fr 0.8fr 1fr 1fr auto"]{grid-template-columns:minmax(0,1fr) !important}
+}
+
+/* ── Cabecera móvil: título corto (el logo centrado le quitaba espacio) y campana que combina con el fondo oscuro ── */
+.titulo-corto{display:none}
+@media (max-width:899px){
+  .top .titulo-largo{display:none}
+  .top .titulo-corto{display:inline}
+  .top .icobtn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.18);color:#fff}
+  .top .icobtn:hover{background:rgba(255,255,255,.2)}
+}
+
+/* ── Títulos de sección: tipo oración, sin guion decorativo ni mayúsculas espaciadas (se veían de plantilla y se
+   partían en 2 líneas: «COBRADO EN EL / MES»). Un solo recurso visual: el ícono, si lo hay. ── */
+.eyebrow{font-size:13.5px;line-height:18px;letter-spacing:-.005em;text-transform:none;color:var(--ink);font-weight:650;margin-bottom:12px}
+.eyebrow::before{content:none}
+.eyebrow svg{width:16px;height:16px;color:var(--green-deep);flex:none}
+.eyebrow::first-letter{text-transform:uppercase}
+
+/* ── Indicadores (tarjetas .sig): etiqueta en tipo oración y una línea (se partía «COBRADO EN EL / MES») ── */
+.sig .k{font-size:13px;line-height:17px;letter-spacing:0;text-transform:none;color:var(--ink-2,#334155);font-weight:600}
+.sig .s{font-size:12.5px;color:var(--ink-3)}
+th{letter-spacing:.02em;text-transform:none;font-size:12px}
+.rh-role,.rh-sec-h h3{letter-spacing:.02em;text-transform:none;font-size:12.5px}
+@media (max-width:640px){
+  .sigs{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .sig .v{font-size:22px}
+}
+
+/* ── Errores: una sola receta (ErrorCarga) y el mismo aspecto para los avisos de error ya existentes ── */
+.err-carga{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:var(--r);padding:14px 16px;color:var(--ink);box-shadow:none}
+.err-carga-ic{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--danger)}
+.err-carga-ic svg{width:20px;height:20px}
+.err-carga-tx{flex:1 1 200px;display:grid;gap:2px;font-size:13.5px;line-height:1.4}
+.err-carga-tx b{font-weight:650;color:var(--danger)}
+.err-carga-tx span{color:var(--ink-2,#334155)}
+.err-carga--compacto{padding:10px 12px}.err-carga--compacto .err-carga-ic{width:28px;height:28px}
+/* avisos de error escritos a mano (texto rojo con role=alert): misma caja suave, legible y con aire */
+[role="alert"][style*="color: var(--danger)"]:not(.btn):not(button){display:block;background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:12px;padding:10px 12px 10px 36px;font-size:13.5px;line-height:1.45;position:relative}
+[role="alert"][style*="color: var(--danger)"]:not(.btn):not(button)::before{content:"!";position:absolute;left:11px;top:10px;width:17px;height:17px;border-radius:50%;background:var(--danger);color:#fff;font-size:11.5px;font-weight:800;display:grid;place-items:center;line-height:1}
+
+/* ── Explicación del encabezado de página: 2 líneas en celular, «Ver más» para el resto ── */
+.page-h-mas{display:none}
+@media (max-width:640px){
+  .page-h-p:not(.abierto){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .page-h-mas{display:inline-block;border:0;background:none;padding:2px 0;margin-top:2px;font:inherit;font-size:13px;font-weight:600;color:var(--green-deep);cursor:pointer;min-height:32px}
+}
+
+/* ── Seguimiento del pedido del doctor: compacto en celular ── */
+.trk-compacto{display:none}
+.tlab{font-size:11.5px}
+@media (max-width:640px){
+  .trk{display:none}
+  .trk-compacto{display:grid;gap:8px;margin:14px 0 4px}
+  .trk-compacto-tx{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:14px}
+  .trk-compacto-tx span{font-size:12.5px;color:var(--ink-3)}
+  .trk-compacto-barra{height:6px;border-radius:999px;background:var(--cp-slate-200);overflow:hidden}
+  .trk-compacto-barra span{display:block;height:100%;border-radius:999px;background:var(--green)}
+}
+
+/* ── Letra mínima legible en celular: los textos escritos a mano en 10–11.5 px suben a 12 px ── */
+@media (max-width:640px){
+  [style*="font-size: 10px"],[style*="font-size: 10.5px"],[style*="font-size: 11px"],[style*="font-size: 11.5px"]{font-size:12px !important}
+  .tc-row-cuando,.tc-badge{font-size:12px}
+}
+
+/* ── Íconos huérfanos: la miga (.eyebrow.crumb) se oculta en todo el sistema y dejaba su ícono suelto en ~20 pantallas ── */
+div:has(> .eyebrow.crumb):not(:has(> :not(svg):not(.eyebrow.crumb):not(.pill))){display:none}
+
+/* ── Etiquetas de campos en tipo oración (las escritas a mano en MAYÚSCULAS espaciadas) ── */
+label[style*="text-transform: uppercase"],div[style*="text-transform: uppercase"],span[style*="text-transform: uppercase"]{text-transform:none !important;letter-spacing:0 !important;font-size:13px !important;color:var(--ink-2,#334155) !important;font-weight:600 !important}

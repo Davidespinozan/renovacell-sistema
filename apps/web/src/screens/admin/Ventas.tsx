@@ -150,7 +150,7 @@ function VentasResumen() {
                 <tr key={d.id}>
                   <td data-label="Doctor"><div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><span className="avatar sm" style={{ background: avatarColor(d.name) }}>{initials(d.name)}</span>{d.name}</div></td>
                   <td data-label="Pedidos" className="mono">{d.orders}</td>
-                  <td data-label="Total" className="mono">{money(d.total)}</td>
+                  <td data-label="Total" data-rol="valor" className="mono">{money(d.total)}</td>
                 </tr>
               ))}
               {docs.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-3)' }}>Sin ventas a doctores en el periodo.</td></tr>}

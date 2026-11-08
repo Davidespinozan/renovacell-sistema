@@ -2,6 +2,7 @@
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
 import { Embudo } from './sales/Embudo'   // CRM (2 nov 2026)
+import { Cargando } from '../app/EmptyState'
 import { BotonAvisos } from '../app/BotonAvisos'
 import React, { useEffect } from 'react'
 import { useRole } from '../auth/RoleContext'
@@ -179,7 +180,7 @@ function RedirigirChat() {
   return null
 }
 
-const conCarga = (el: React.ReactNode) => <React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{el}</React.Suspense>
+const conCarga = (el: React.ReactNode) => <React.Suspense fallback={<Cargando />}>{el}</React.Suspense>
 
 export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
   if (screen === COMMON_SCREEN.key) {

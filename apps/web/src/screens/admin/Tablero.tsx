@@ -220,7 +220,7 @@ export function Tablero() {
                     <td data-label="Pedido" className="mono">{o.external_ref}</td>
                     <td data-label="Estatus"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
                     <td data-label="Fecha">{fmtDate(o.created_at)}</td>
-                    <td data-label="Total" className="mono">{money(o.total)}</td>
+                    <td data-label="Total" data-rol="valor" className="mono">{money(o.total)}</td>
                   </tr>
                 )
               })}

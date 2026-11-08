@@ -29,7 +29,7 @@ import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { PanelVerificacion } from './PanelVerificacion'
 import { BotonAvisos } from '../../app/BotonAvisos'
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando } from '../../app/EmptyState'
 import { usarFotoComoIne, pendienteDeConversacion } from '../../data/ops/verificacion'
 import type { DoctorPendiente } from '../../data/ops/verificacion'
 import type { Mensaje } from '../../data/ops/chat'
@@ -219,7 +219,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
       <BuscadorConversaciones onAbrir={(id) => { setAviso(null); setLlegada(id); setEnfocar(true); setAbierta(id) }} />
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}
-      {cargando && <div style={{ color: 'var(--ink-3, #667)' }}>Cargando…</div>}
+      {cargando && <Cargando plano />}
       {!cargando && cola.length === 0 && retomables.length === 0 && !error && (
         <div className="op-vacio"><Vacio plano icono="chat" titulo="No hay conversaciones esperando asesor."
           pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí.'} /></div>

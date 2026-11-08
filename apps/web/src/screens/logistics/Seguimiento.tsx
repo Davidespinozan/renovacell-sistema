@@ -205,18 +205,18 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
   }
 
   return (
-    <div className="card" style={stuck ? { borderLeft: '4px solid var(--danger)' } : undefined}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + statusPill}><span className="d" /> {statusLabel}</span>
         {stuck && <span className="pill p-dang"><Icon name="x" style={{ width: 12, height: 12 }} /> Detenido</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
           {shipment?.estimated_delivery_at ? `Estimada ${fmtDate(shipment.estimated_delivery_at)}` : fmtDate(order.created_at)}
         </span>
       </div>
 
       {stuck && (
-        <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginBottom: 10 }}>
+        <div className="sysnote" style={{ marginBottom: 10, background: 'var(--warn-bg)', borderColor: 'var(--warn-line)', color: 'var(--warn)' }}>
           <Icon name="truck" />
           <span>{reason}</span>
         </div>

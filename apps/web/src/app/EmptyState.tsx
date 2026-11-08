@@ -58,3 +58,17 @@ export function Cargando({ filas = 3, etiqueta = 'Cargando…', plano }: { filas
     </div>
   )
 }
+
+/** CALIDAD VISUAL · error con la misma receta en todo el sistema: ícono · qué pasó · (detalle) · Reintentar. Nunca texto rojo
+ *  suelto ni jerga técnica. `plano` = sin tarjeta propia. */
+export function ErrorCarga({ titulo = 'No se pudo cargar', detalle, onReintentar, plano, compacto }: {
+  titulo?: React.ReactNode; detalle?: React.ReactNode; onReintentar?: () => void; plano?: boolean; compacto?: boolean
+}) {
+  return (
+    <div className={'err-carga' + (plano ? '' : ' card') + (compacto ? ' err-carga--compacto' : '')} role="alert">
+      <span className="err-carga-ic" aria-hidden="true"><Icon name="alert" /></span>
+      <span className="err-carga-tx"><b>{titulo}</b>{detalle && <span>{detalle}</span>}</span>
+      {onReintentar && <button type="button" className="btn ghost sm" onClick={onReintentar}>Reintentar</button>}
+    </div>
+  )
+}

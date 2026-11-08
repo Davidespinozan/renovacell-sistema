@@ -2,7 +2,7 @@
 // cliente, monto, días en la etapa, origen; se mueve con un clic (Perdido pide motivo) y abre su conversación.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHead } from '../../app/PageHead'
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando, ErrorCarga } from '../../app/EmptyState'
 import { money } from '../../lib/format'
 import { useRoleOpcional } from '../../auth/RoleContext'
 import { irAConversacion } from '../../data/store/navIntentStore'
@@ -61,9 +61,9 @@ export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<type
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="btn" onClick={() => setNueva(true)} data-testid="crm-nueva">Nueva oportunidad</button>
         <label style={{ fontSize: 12.5, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={verPerdidas} onChange={(e) => setVerPerdidas(e.target.checked)} /> Ver perdidas ({tot.perdido.n})</label>
-        {error && <span role="alert" className="ms" style={{ color: 'var(--danger)' }}>{error}</span>}
+        {error && ops !== null && <span role="alert" className="ms" style={{ color: 'var(--danger)' }}>{error}</span>}
       </div>
-      {ops === null ? <div className="ms">Cargando…</div> : ops.length === 0 ? (
+      {ops === null ? (error ? <ErrorCarga titulo="No se pudo cargar el embudo" detalle={error} onReintentar={() => { setError(null); void cargar() }} /> : <Cargando filas={4} />) : ops.length === 0 ? (
         <Vacio icono="usercheck" titulo="Aún no hay oportunidades." pista="Se crean solas cuando un cliente escribe, se le cotiza o se le levanta un pedido." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${verPerdidas ? 5 : 4}, minmax(220px, 1fr))`, gap: 10, overflowX: 'auto' }} className="crm-columnas">

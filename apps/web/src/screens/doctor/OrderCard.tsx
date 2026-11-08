@@ -1,5 +1,6 @@
 // Tarjeta de pedido reutilizable (Mis pedidos e Historial).
 import React from 'react'
+import { textoMetodoPago } from '../../data/ops/money'   // CALIDAD VISUAL · método de pago en palabras
 import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { Icon } from '../../app/icons'
@@ -45,7 +46,8 @@ export function OrderCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
-        {pagado && <span className="pill p-ok">Pagado</span>}
+        {/* CALIDAD VISUAL · sin «Pagado» duplicado cuando el estado del pedido ya lo dice */}
+        {pagado && !/pagad/i.test(sv.label) && <span className="pill p-ok">Pagado</span>}
         {!pagado && dinero && dinero.cobrado_neto > 0.0001 && <span className="pill p-warn">Pago parcial · falta {money(dinero.saldo)}</span>}
         {credito && <span className={'pill ' + (dinero && creditoVencido(dinero) ? 'p-dang' : 'p-warn')}>{credito.texto}{dinero?.due_date ? ` · vence ${fmtDate(dinero.due_date)}` : ''}</span>}
         {pagoReportado && !pagado && <span className="pill p-neu">Pago en revisión</span>}
@@ -95,7 +97,7 @@ export function OrderCard({
 
       {order.payment_status === 'paid' && order.payment_ref && (
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
-          Pagado{order.payment_method ? ` · ${order.payment_method}` : ''} · ref. <span className="mono">{order.payment_ref}</span>
+          Pagado{order.payment_method ? ` · ${textoMetodoPago(order.payment_method)}` : ''} · ref. <span className="mono">{order.payment_ref}</span>
         </div>
       )}
 

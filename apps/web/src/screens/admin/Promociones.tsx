@@ -2,6 +2,7 @@
 // escalones por cantidad), pausarla o editarla. Se puede PEGAR el texto del proveedor y el sistema propone la promoción;
 // la persona revisa, empareja productos y guarda. El precio lo aplica el servidor (precio_de/3) solo mientras dura.
 import React, { useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
@@ -227,7 +228,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
         )}
       </div>
 
-      {lista === null ? <div className="card" style={{ fontSize: 13, color: 'var(--ink-3)' }}>Cargando…</div> : lista.length === 0 ? (
+      {lista === null ? <Cargando /> : lista.length === 0 ? (
         <div className="card" style={{ fontSize: 13, color: 'var(--ink-3)' }}>Sin promociones todavía. Crea una o pega el texto del proveedor.</div>
       ) : lista.map((p) => (
         <div key={p.id} className="card" data-testid={`promo-${p.id}`} style={{ opacity: p.estado === 'vencida' || p.estado === 'inactiva' ? 0.75 : 1 }}>

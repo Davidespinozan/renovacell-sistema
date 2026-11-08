@@ -18,7 +18,7 @@ import {
   pendingReingresos, pendingDisposicion, returnableForOrder, recibirDevolucion, confirmarReingreso,
   type StockReturn, type Returnable,
 } from '../../data/store/stockReturnsStore'
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando } from '../../app/EmptyState'
 
 const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 const errBox: React.CSSProperties = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }
@@ -51,7 +51,7 @@ export function Devoluciones() {
 
       <div className="card">
         <div className="eyebrow">Reingresos por confirmar · pedidos empacados cancelados</div>
-        {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
+        {loading ? <Cargando plano />
           : reingresos.length === 0 ? <div className="op-vacio"><Vacio plano icono="check" titulo="No hay reingresos pendientes" /></div>
           : reingresos.map((r) => <ReingresoCard key={r.id} ret={r} names={names} />)}
       </div>

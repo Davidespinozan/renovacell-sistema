@@ -9,6 +9,7 @@
 @import './styles/pulido-portal.css';
 @import './styles/pulido-admin.css';
 @import './styles/pulido-operacion.css';
+@import './styles/calidad.css';
 
 @tailwind base;
 @tailwind components;

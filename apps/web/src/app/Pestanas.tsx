@@ -3,6 +3,7 @@
 // permisos). La pestaña elegida se recuerda por grupo. Las claves originales siguen en el registro para los avisos y
 // enlaces profundos (abren la pantalla sola, como antes).
 import React, { useState } from 'react'
+import { Cargando } from './EmptyState'
 
 export interface PestanaDef { key: string; label: string; render: () => React.ReactNode; conteo?: number }
 const CLAVE = (grupo: string) => `rc_pestana_${grupo}`
@@ -18,16 +19,16 @@ export function Pestanas({ grupo, pestanas, inicial }: { grupo: string; pestanas
   const actual = pestanas.find((p) => p.key === activa) ?? pestanas[0]
   return (
     <div className="grid" style={{ gap: 14 }} data-testid={`pestanas-${grupo}`}>
-      <div className="seg" role="tablist" aria-label="Secciones" style={{ flexWrap: 'wrap' }}>
+      <div className="seg seg--pestanas" role="tablist" aria-label="Secciones">
         {pestanas.map((p) => (
           <button key={p.key} type="button" role="tab" aria-selected={p.key === actual.key} className={p.key === actual.key ? 'active' : undefined} data-testid={`pestana-${p.key}`}
             onClick={() => { setActiva(p.key); guardar(grupo, p.key) }}>
-            {p.label}{p.conteo ? <span className="pill p-warn" style={{ marginLeft: 6 }}>{p.conteo}</span> : null}
+            {p.label}{p.conteo ? <span className="seg-conteo">{p.conteo}</span> : null}
           </button>
         ))}
       </div>
       {/* PERF · las pestañas cargan bajo demanda: mientras llega una, la barra de pestañas se queda. */}
-      <div role="tabpanel" key={actual.key}><React.Suspense fallback={<div className="card" style={{ color: 'var(--ink-3)' }}>Cargando…</div>}>{actual.render()}</React.Suspense></div>
+      <div role="tabpanel" key={actual.key}><React.Suspense fallback={<Cargando />}>{actual.render()}</React.Suspense></div>
     </div>
   )
 }

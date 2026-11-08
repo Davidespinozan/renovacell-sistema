@@ -3,6 +3,7 @@
 // promoción (vive y muere con ella: toma su vigencia, y su correo y su tarjeta del chat lo llevan) o a un producto, o va
 // suelto con sus propias fechas. Pausar lo quita del portal sin borrarlo.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
@@ -124,7 +125,7 @@ export function Flyers({ promociones = [], listar = listarFlyers, guardar = guar
           </div>
         </div>
       )}
-      {lista === null ? <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10 }}>Cargando…</div> : lista.length === 0 ? (
+      {lista === null ? <Cargando plano filas={2} /> : lista.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10 }}>Sin flyers todavía. Sube el primero y aparece en el Inicio de los doctores.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginTop: 12 }} data-testid="flyers-lista">

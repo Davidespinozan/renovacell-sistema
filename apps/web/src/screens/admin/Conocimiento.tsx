@@ -3,6 +3,7 @@
 // restaurar, fuentes y la importación del conocimiento ya existente como borrador.
 // No muestra ni edita precio, stock, costo ni fiscal: eso tiene sus propias pantallas.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { conocimiento as clientePorDefecto, SECCIONES, TIPOS_FUENTE, type ClienteConocimiento, type Cobertura, type Fuente, type Version, type Claim } from '../../data/ops/conocimiento'
 
 const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -132,7 +133,7 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
             <input style={input} placeholder="Buscar producto, familia o categoría" value={filtro} onChange={(e) => setFiltro(e.target.value)} />
             <label style={{ ...sutil, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={soloFaltantes} onChange={(e) => setSoloFaltantes(e.target.checked)} /> Sin aprobadas</label>
           </div>
-          {cargando && <div style={sutil}>Cargando…</div>}
+          {cargando && <Cargando plano />}
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 560, overflow: 'auto' }}>
             {lista.map((c) => (
               <li key={c.product_id}>

@@ -3,6 +3,7 @@
 // COMPRADORES × PROMOCIÓN (3 nov 2026): la pestaña "A quién ofrecerle" junta a los clientes que compraron algo que HOY
 // está en promoción para su lista, con el mensaje listo para WhatsApp o correo y el botón para llevarlo al embudo.
 import React, { useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { ArrowLeft, Mail, MessageCircle, Phone, Search, Tag, TrendingUp, Users } from 'lucide-react'
 import {
   compradoresProducto as compradoresPorDefecto, mensajeOferta, normalizar, oportunidadesPromo as oportunidadesPorDefecto,
@@ -78,7 +79,7 @@ export function ProductosClientes({ productos = productosPorDefecto, compradores
           </div>
         )}
         <p className="pcl-sub">Clientes {quienes?.some((c) => c.vendedor) ? '' : 'de tu cartera '}que lo han comprado: ofréceselo de nuevo.</p>
-        {quienes === null ? <div className="pcl-vacio">Cargando…</div> : quienes.length === 0 ? <div className="pcl-vacio">Ningún cliente de tu cartera lo ha comprado todavía.</div> : (
+        {quienes === null ? <Cargando plano /> : quienes.length === 0 ? <div className="pcl-vacio">Ningún cliente de tu cartera lo ha comprado todavía.</div> : (
           <ul className="pcl-lista">
             {quienes.map((c) => {
               const texto = promos.length > 0 && c.promo_aplica ? mensajeOferta(capitalizarNombre(c.nombre), [{ familia: sel.nombre, promos }], fmtDate) : null
@@ -121,7 +122,7 @@ export function ProductosClientes({ productos = productosPorDefecto, compradores
       {vistaActual === 'ofrecer' ? (
         <>
           <p className="pcl-sub">Clientes {ofertas?.some((o) => o.vendedor) ? '' : 'de tu cartera '}que ya compraron algo que hoy está en promoción. Háblales primero a los que compraron hace poco.</p>
-          {ofertas === null ? <div className="pcl-vacio">Cargando…</div> : ofertasVisibles.length === 0 ? (
+          {ofertas === null ? <Cargando plano /> : ofertasVisibles.length === 0 ? (
             <div className="pcl-vacio" data-testid="ofrecer-vacio">{nOfertas === 0 ? 'Por ahora ningún cliente tuyo compró algo que esté en promoción. Cuando Dirección publique una promoción de algo que tus clientes ya compran, aparecerán aquí.' : 'Nadie coincide con la búsqueda.'}</div>
           ) : (
             <ul className="pcl-lista">
@@ -148,7 +149,7 @@ export function ProductosClientes({ productos = productosPorDefecto, compradores
         <>
           <p className="pcl-sub">Elige un producto para ver qué clientes de tu cartera lo han comprado.</p>
           {error && <div role="alert" className="pcl-vacio">No se pudieron cargar los productos.</div>}
-          {lista === null ? <div className="pcl-vacio">Cargando…</div> : visibles.length === 0 ? <div className="pcl-vacio">{soloPromo ? 'Ningún producto con compradores está en promoción.' : soloConCompras ? 'Ningún producto tiene compras de tus clientes todavía.' : 'Sin productos.'}</div> : (
+          {lista === null ? <Cargando plano /> : visibles.length === 0 ? <div className="pcl-vacio">{soloPromo ? 'Ningún producto con compradores está en promoción.' : soloConCompras ? 'Ningún producto tiene compras de tus clientes todavía.' : 'Sin productos.'}</div> : (
             <ul className="pcl-lista">
               {visibles.map((p) => (
                 <li key={p.product_id}>

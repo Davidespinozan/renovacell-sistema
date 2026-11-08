@@ -12,6 +12,16 @@ import { currentUserId } from '../lib/supabase'
 import { KINDS_COMERCIALES } from '../data/ops/atencionComercial'
 import { irAConversacion, irASolicitud } from '../data/store/navIntentStore'
 
+// CALIDAD VISUAL · en celular el logo va centrado (decisión del dueño, 10 oct): los títulos largos se cortaban
+// («Compras a prov…»). Ahí se muestra un nombre corto; en escritorio, el completo.
+const CORTOS: Record<string, string> = {
+  'Compras a proveedores': 'Compras', 'Control de inventario': 'Inventario', 'Horarios de entrega': 'Entregas', 'Ventas desde custodia': 'Custodia vendida',
+  'Chofer / Seguimiento': 'Mi ruta', 'Habla con Renovacell': 'Chat', 'Avisos del equipo': 'Avisos', 'Chat del equipo': 'Chat', 'Solicitudes de recurso': 'Solicitudes',
+  'Recibir mercancía': 'Recibir', 'Preparar pedidos': 'Preparar', 'Metas y comisiones': 'Metas', 'Embudo de ventas': 'Embudo', 'Mi verificación': 'Verificación',
+  'Portal del Doctor': 'Inicio', 'Punto de venta': 'Vender',
+}
+export const tituloCorto = (t: string): string => CORTOS[t] ?? t
+
 export function TopBar({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen, capabilities } = useRole()
   const r = getRole(role)
@@ -66,7 +76,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <Icon name="menu" />
       </button>
       <div className="top-title">
-        <h1 className="screen-title serif">{s.label}</h1>
+        <h1 className="screen-title serif"><span className="titulo-largo">{s.label}</span><span className="titulo-corto" aria-hidden="true">{tituloCorto(s.label)}</span></h1>
         <div className="screen-sub">{sub}</div>
       </div>
       {/* Marca siempre a la vista en teléfono: centrada en la cabecera de todos los roles (en escritorio

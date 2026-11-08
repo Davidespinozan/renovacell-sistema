@@ -206,7 +206,7 @@ export function Finanzas() {
                   <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(g.fecha)}</td>
                   <td data-label="Categoría"><span className="pill p-neu">{g.categoria}</span></td>
                   <td data-label="Concepto">{g.concepto}</td>
-                  <td data-label="Monto" className="mono">{money(g.monto)}</td>
+                  <td data-label="Monto" data-rol="valor" className="mono">{money(g.monto)}</td>
                   <td data-label="" style={{ textAlign: 'right' }}>
                     <button className="btn ghost sm" type="button" onClick={() => { if (window.confirm(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`)) void removeGasto(g.id) }}><Trash2 size={14} /></button>
                   </td>

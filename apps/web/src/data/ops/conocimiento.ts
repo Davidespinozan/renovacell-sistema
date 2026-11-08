@@ -64,7 +64,7 @@ export function mensajeError(m: string | undefined): string {
 export class ClienteConocimiento {
   constructor(private rpc: Rpc = rpcPorDefecto) {}
   private async llamar<T>(fn: string, args?: Record<string, unknown>): Promise<Resultado<T>> {
-    if (!hasSupabase) return { ok: false, error: 'Sin conexión con Supabase.' }
+    if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor. Intenta de nuevo en un momento.' }
     try {
       const { data, error } = await this.rpc(fn, args)
       if (error) return { ok: false, error: mensajeError(error.message) }

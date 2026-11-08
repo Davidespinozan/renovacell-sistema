@@ -23,7 +23,7 @@ import { abrirCustodia, guardarEquipoEvento, miembrosEventos, type MiembroEvento
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { currentUserId } from '../../lib/supabase'
-import { Vacio } from '../../app/EmptyState'
+import { Vacio, Cargando } from '../../app/EmptyState'
 
 const fld: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12,
@@ -80,7 +80,7 @@ export function Eventos() {
           <span className="pill p-neu" style={{ marginLeft: 'auto' }}>{eventos.length}</span>
         </div>
         <div style={{ padding: '10px 14px 14px' }}>
-          {loading ? <div style={{ color: 'var(--ink-3)' }}>Cargando…</div>
+          {loading ? <Cargando plano />
             : eventos.length === 0 ? <div className="op-vacio"><Vacio plano icono="store" titulo="Todavía no hay eventos" pista="Crea uno con “Nuevo evento” para llevar producto al stand." /></div>
               : eventos.map((c) => {
                 const saldo = saldoDe(stock, c.id)

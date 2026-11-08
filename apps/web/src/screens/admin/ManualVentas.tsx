@@ -2,6 +2,7 @@
 // verificación, pagos, envíos, facturación, devoluciones, política comercial…). Borrador → aprobar → retirar, con versión y
 // revisión de claims en la base. La IA del canal usa SOLO lo aprobado. Un borrador con "[COMPLETAR" no se aprueba.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Cargando } from '../../app/EmptyState'
 import { conocimiento as clientePorDefecto, TEMAS_EMPRESA, tieneMarcaPendiente, type ClienteConocimiento, type VersionEmpresa, type Claim } from '../../data/ops/conocimiento'
 
 const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -80,7 +81,7 @@ export function ManualVentas({ cliente = clientePorDefecto }: { cliente?: Client
       <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap', ...sutil }} data-testid="resumen">
         <span>Temas con algo aprobado: <b>{resumen.aprobados}</b> de {TEMAS_EMPRESA.length}</span><span>Borradores por revisar: <b>{resumen.borradores}</b></span>
       </div>
-      {cargando && <div style={{ ...sutil, marginTop: 12 }}>Cargando…</div>}
+      {cargando && <Cargando plano />}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
         {TEMAS_EMPRESA.map((t) => {
