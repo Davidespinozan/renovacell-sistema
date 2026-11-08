@@ -9,7 +9,9 @@ describe('títulos de la landing sin HTML a la vista', () => {
     expect(amigableAHtml('La regeneración celular\n*que sí se nota*')).toBe('La regeneración celular<br><span class="green">que sí se nota</span>')
   })
   it('otro HTML → se deja tal cual (null = mostrar el original)', () => {
-    expect(htmlAAmigable('Hola <b>doctor</b>')).toBeNull()
+    expect(htmlAAmigable('Hola <i>doctor</i>')).toBeNull()
+    expect(htmlAAmigable('Hola <b>doctor</b>')).toBe('Hola **doctor**')
+    expect(amigableAHtml('Hola **doctor** y *verde*')).toBe('Hola <b>doctor</b> y <span class="green">verde</span>')
   })
   it('texto sin HTML no cambia', () => {
     expect(htmlAAmigable('Simple')).toBe('Simple')

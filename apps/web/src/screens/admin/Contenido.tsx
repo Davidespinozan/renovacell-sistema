@@ -119,7 +119,7 @@ function Section({ title, items, onEdit, onToggle, onDelete }: {
                 <tr key={p.id} style={hidden ? { opacity: 0.6 } : undefined}>
                   <td data-label="Producto"><b>{p.name}</b> <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.sku}</span></td>
                   <td data-label="Categoría" style={{ color: 'var(--ink-2)' }}>{p.category}</td>
-                  <td data-label="Precio" className="mono">{p.price == null ? '—' : money(p.price)}</td>
+                  <td data-label="Precio" data-rol="valor" className="mono">{p.price == null ? '—' : money(p.price)}</td>
                   <td data-label="Estado"><span className={'pill ' + (hidden ? 'p-neu' : 'p-ok')}>{hidden ? 'Oculto' : 'Visible'}</span></td>
                   <td data-label="" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button className="btn ghost sm" type="button" onClick={() => onToggle(p.id)} title={hidden ? 'Mostrar en el catálogo' : 'Ocultar del catálogo'}>
@@ -325,11 +325,11 @@ function SecCard({ title, children }: { title: string; children: React.ReactNode
 // CALIDAD VISUAL (7 nov) · los títulos de la landing guardan HTML (<br>, <span class="green">). El personal de oficina ya no lo
 // ve: Enter = salto de línea y *entre asteriscos* = en verde. Si el campo trae otro HTML, se muestra tal cual (no se pierde nada).
 export function htmlAAmigable(html: string): string | null {
-  const t = (html ?? '').replace(/<br\s*\/?>\s*/gi, '\n').replace(/<span class=["']green["']>([^<*]*)<\/span>/gi, '*$1*')
+  const t = (html ?? '').replace(/<br\s*\/?>\s*/gi, '\n').replace(/<b>([^<*]*)<\/b>/gi, '**$1**').replace(/<span class=["']green["']>([^<*]*)<\/span>/gi, '*$1*')
   return /<[a-z/!]/i.test(t) ? null : t
 }
 export function amigableAHtml(t: string): string {
-  return (t ?? '').replace(/\*([^*\n]+)\*/g, '<span class="green">$1</span>').replace(/\r?\n/g, '<br>')
+  return (t ?? '').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/\*([^*\n]+)\*/g, '<span class="green">$1</span>').replace(/\r?\n/g, '<br>')
 }
 
 function LandingTab() {
@@ -378,7 +378,7 @@ function LandingTab() {
           ? <textarea style={area} value={amigable} onChange={(e) => onChange(amigableAHtml(e.target.value))} />
           : <textarea style={area} value={value} onChange={(e) => onChange(e.target.value)} />}
         {amigable !== null
-          ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>Enter = salto de línea · <b>*entre asteriscos*</b> = en verde.</div>
+          ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>Enter = salto de línea · <b>*un asterisco*</b> = en verde · <b>**dos asteriscos**</b> = negritas.</div>
           : hint && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>{hint}</div>}
       </div>
     )

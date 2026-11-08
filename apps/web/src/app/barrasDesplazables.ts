@@ -1,7 +1,7 @@
 // CALIDAD VISUAL (7 nov 2026) · barras de pestañas y chips que se desbordan en celular: la pestaña ACTIVA siempre a la vista
 // (antes quedaba fuera de pantalla y no se sabía en qué sección estabas) y un desvanecido en la orilla cuando hay más
 // opciones a un lado. Un solo ayudante para todas las barras `.seg` / `.chips-scroll` del sistema (no pantalla por pantalla).
-export const SELECTOR_BARRAS = '.seg, .chips-scroll'
+export const SELECTOR_BARRAS = '.seg, .chips-scroll, .fchips'
 
 /** Marca la barra: data-mas="der" | "izq" | "ambos" según haya contenido escondido a cada lado. */
 export function marcarBarra(el: HTMLElement): void {

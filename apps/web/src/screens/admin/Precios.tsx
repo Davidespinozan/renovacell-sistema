@@ -84,7 +84,7 @@ function GeneralRow({ p }: { p: ProductSafe }) {
   return (
     <tr>
       <td data-label="SKU" className="mono" style={{ fontSize: 12 }}>{p.sku}</td>
-      <td data-label="Producto">{p.name}</td>
+      <td data-label="Producto" data-rol="titulo">{p.name}</td>
       <td data-label="Precio general">
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && dirty && save()} inputMode="decimal"

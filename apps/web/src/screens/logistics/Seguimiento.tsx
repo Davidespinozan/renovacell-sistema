@@ -206,7 +206,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
   }
 
   return (
-    <div className="card">
+    <div className="card" style={stuck ? { borderLeft: '4px solid var(--danger)' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + statusPill}><span className="d" /> {statusLabel}</span>

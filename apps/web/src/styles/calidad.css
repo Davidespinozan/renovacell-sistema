@@ -10,9 +10,9 @@ body.drawer-open .ae-lanzador{display:none}
 @media (min-width:900px){#content{padding-bottom:84px}}
 
 /* ── Barras de pestañas/chips que se desbordan: desvanecido en la orilla con más opciones (barrasDesplazables.ts) ── */
-.seg[data-mas="der"],.chips-scroll[data-mas="der"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
-.seg[data-mas="izq"],.chips-scroll[data-mas="izq"]{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent)}
-.seg[data-mas="ambos"],.chips-scroll[data-mas="ambos"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent)}
+.seg[data-mas="der"],.chips-scroll[data-mas="der"],.fchips[data-mas="der"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 40px),transparent)}
+.seg[data-mas="izq"],.chips-scroll[data-mas="izq"],.fchips[data-mas="izq"]{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 40px),transparent)}
+.seg[data-mas="ambos"],.chips-scroll[data-mas="ambos"],.fchips[data-mas="ambos"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(to right,transparent,#000 40px,#000 calc(100% - 40px),transparent)}
 .seg-conteo{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--cp-slate-100,#eef1f4);color:var(--ink-2,#334155);font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
 .seg button.active .seg-conteo{background:rgba(255,255,255,.22);color:#fff}
 @media (max-width:640px){
@@ -67,7 +67,7 @@ body.drawer-open .ae-lanzador{display:none}
 }
 
 /* ── Botones deshabilitados: grises de verdad (antes se veían del mismo verde que uno activo) ── */
-.btn:disabled,.btn[aria-disabled="true"],.btn-primary:disabled{background:var(--cp-slate-100,#eef1f4) !important;color:var(--ink-3) !important;box-shadow:none !important;border:1px solid var(--line);cursor:not-allowed;filter:none;transform:none}
+.btn:disabled,.btn[aria-disabled="true"],.btn-primary:disabled{background:var(--cp-slate-100,#eef1f4) !important;color:#475569 !important;box-shadow:none !important;border:1.5px dashed #b6c0cc;cursor:not-allowed;filter:none;transform:none}
 .btn.ghost:disabled{background:var(--cp-surface) !important;opacity:.6}
 
 /* ── Formularios en celular: una columna (campos a 2–4 columnas en 390 px cortaban sus textos) ──
@@ -93,7 +93,7 @@ body.drawer-open .ae-lanzador{display:none}
 
 /* ── Títulos de sección: tipo oración, sin guion decorativo ni mayúsculas espaciadas (se veían de plantilla y se
    partían en 2 líneas: «COBRADO EN EL / MES»). Un solo recurso visual: el ícono, si lo hay. ── */
-.eyebrow{font-size:13.5px;line-height:18px;letter-spacing:-.005em;text-transform:none;color:var(--ink);font-weight:650;margin-bottom:12px}
+.eyebrow{font-size:15px;line-height:20px;letter-spacing:-.01em;text-transform:none;color:var(--ink);font-weight:700;margin-bottom:12px}
 .eyebrow::before{content:none}
 .eyebrow svg{width:16px;height:16px;color:var(--green-deep);flex:none}
 .eyebrow::first-letter{text-transform:uppercase}
@@ -149,7 +149,7 @@ th{letter-spacing:.02em;text-transform:none;font-size:12px}
 div:has(> .eyebrow.crumb):not(:has(> :not(svg):not(.eyebrow.crumb):not(.pill))){display:none}
 
 /* ── Etiquetas de campos en tipo oración (las escritas a mano en MAYÚSCULAS espaciadas) ── */
-label[style*="text-transform: uppercase"],div[style*="text-transform: uppercase"],span[style*="text-transform: uppercase"]{text-transform:none !important;letter-spacing:0 !important;font-size:13px !important;color:var(--ink-2,#334155) !important;font-weight:600 !important}
+.main label[style*="text-transform: uppercase"],.main div[style*="text-transform: uppercase"],.main span[style*="text-transform: uppercase"]{text-transform:none !important;letter-spacing:0 !important;font-size:12.5px !important;color:var(--ink-3) !important;font-weight:600 !important}
 
 /* ── Chofer: tarjeta de parada pensada para una mano ── */
 .parada{display:grid;gap:6px;margin-bottom:12px}
@@ -188,8 +188,8 @@ summary.parada-incidencia::-webkit-details-marker{display:none}
   .lote-info{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
   .lote .lq{white-space:nowrap;font-weight:700}
   .lote .inv-acc{width:auto;margin-left:0}
-  .lote .inv-acc .btn{width:40px;min-height:40px;padding:0;font-size:0;gap:0}
-  .lote .inv-acc .btn svg{width:17px;height:17px}
+  .lote .inv-acc .btn{min-height:38px;padding:0 10px;font-size:13px;gap:4px}
+  .lote .inv-acc .btn svg{width:14px;height:14px}
   .lote .pill{white-space:nowrap}
 }
 
@@ -223,7 +223,7 @@ summary.parada-incidencia::-webkit-details-marker{display:none}
 
 /* ── Portal del doctor en escritorio: ancho de lectura (antes tarjetas y chat de 1,100 px se veían como móvil estirado) ── */
 @media (min-width:900px){
-  .main[data-area="doctor"] #content{max-width:1120px;margin-inline:auto;width:100%}
+  .main[data-area="doctor"] #content{max-width:980px;margin-inline:auto;width:100%}
   .main[data-area="doctor"] #content .rc-chat{max-width:860px;margin-inline:auto;width:100%}
 }
 
@@ -246,3 +246,15 @@ summary.parada-incidencia::-webkit-details-marker{display:none}
 
 /* Exportar dentro de una barra de filtros en celular: a la derecha, en su propia fila */
 @media (max-width:640px){.filters > .btn.ghost:last-child,.filters > button:last-child:not(:first-child){grid-column:1 / -1;justify-self:end}}
+
+/* ── Filas de lista: sin la palabra cuando el dato se entiende solo; título opcional en otra columna (data-rol="titulo") ── */
+@media (max-width:640px){
+  table.tbl-cards td:is([data-label="Fecha"],[data-label="Cliente"],[data-label="Canal"],[data-label="Doctor"],[data-label="Autor"],[data-label="Productos"],[data-label="Vendedor"],[data-label="Estado"],[data-label="Estatus"],[data-label="Cobro"],[data-label="Categoría"],[data-label="Recurso"],[data-label="Acción"],[data-label="Usuario"])::before{content:none}
+  table.tbl-cards tr:has(> td[data-rol="titulo"]) > td:first-child{order:0;flex:0 1 auto;font-size:12.5px;font-weight:500;color:var(--ink-3)}
+  table.tbl-cards td[data-rol="titulo"]{order:-3;flex:1 1 100%;font-size:15px;font-weight:600;color:var(--ink)}
+  table.tbl-cards td[data-rol="titulo"]::before{content:none}
+  table.tbl-cards tr:has(> td[data-rol="titulo"]):has(> td[data-rol="valor"]) > td[data-rol="titulo"]{flex:1 1 calc(100% - 140px)}
+}
+
+/* Portal del doctor: espacio abajo para que el botón de chat no tape montos ni «Agregar» */
+.main[data-area="doctor"] #content{padding-bottom:96px}
