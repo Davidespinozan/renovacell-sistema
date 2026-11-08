@@ -176,7 +176,7 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
           </tbody>
         </table>
       </div>
-      {err && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 8 }}>{err}</div>}
+      {err && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 8 }}>{err}</div>}
     </div>
   )
 }
@@ -228,7 +228,7 @@ function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={async () => { if ((await confirmar(`¿Eliminar el nivel desde ${tier.min_quantity} pzas?`))) onDelete(tier.id!) }}><Trash2 size={12} /></button>
             </>
           )}
-          {err && <span style={{ color: 'var(--danger)', fontSize: 11.5 }}>{err}</span>}
+          {err && <span role="alert" style={{ color: 'var(--danger)', fontSize: 11.5 }}>{err}</span>}
         </span>
       </td>
     </tr>

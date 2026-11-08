@@ -30,7 +30,7 @@ describe('bucle del asistente', () => {
     const prov = crearProveedorFalso([respuestaHerramientas([{ name: 'pedido', input: { folio: 'S12' } }]), respuestaTexto('Eso no lo puedes ver con tu usuario.')])
     const rpc = vi.fn(async () => ({ data: null, error: { message: 'NO_AUTORIZADO: ese pedido no es de tu cartera' } }))
     const r = await ejecutarAsistente({ ...base, quien: { nombre: 'Ale', rol: 'pos' }, pregunta: '¿Cómo va el S12?' }, { proveedor: prov, rpc })
-    const res = (prov.solicitudes[1].messages[prov.solicitudes[1].messages.length - 1].content as Array<{ content: string; is_error?: boolean }>)[0]
+    const res = (prov.solicitudes[1].messages[prov.solicitudes[1].messages.length - 1].content as unknown as Array<{ content: string; is_error?: boolean }>)[0]
     expect(res).toMatchObject({ is_error: true }); expect(res.content).toMatch(/^SIN_PERMISO/)
     expect(r.herramientas[0].ok).toBe(false)
   })

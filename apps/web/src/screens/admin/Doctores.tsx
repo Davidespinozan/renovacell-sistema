@@ -483,7 +483,7 @@ function DoctorDetail({
             </div>
           )}
 
-          {err && <div style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 10 }}>{err}</div>}
+          {err && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12.5, marginTop: 10 }}>{err}</div>}
           {rejectMode && !doctor.verified && (
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo del rechazo"

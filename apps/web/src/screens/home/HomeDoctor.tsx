@@ -126,6 +126,11 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   const destacados = useMemo(() => products
     .filter((p) => isPortalProduct(p) && !p.parent_product_id && p.image_url && stockInfoFor(stockMap, p.id).qty > 0)
     .slice(0, 6), [products, stockMap])
+  // CALIDAD VISUAL · accesos por línea (siempre hay algo útil y con presencia de marca, aunque no haya promociones)
+  const porLinea = useMemo(() => {
+    const vis = products.filter((p) => isPortalProduct(p) && !p.parent_product_id)
+    return { prof: vis.filter((p) => p.line === 'prof').length, cosm: vis.filter((p) => p.line !== 'prof').length }
+  }, [products])
   // (futuro) lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
 
   return (
@@ -180,6 +185,20 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           </div>
         </Seccion>
       )}
+      <Seccion titulo="Explora por línea" nivel="info" id="lineas">
+        <div className="rh-lineas" data-testid="doctor-lineas">
+          <button type="button" className="rh-linea rh-linea--prof" onClick={() => setScreen('catalogo')}>
+            <span className="rh-linea-t">Professional</span>
+            <span className="rh-linea-d">Inyectables y protocolos de consultorio{porLinea.prof ? ` · ${porLinea.prof} productos` : ''}</span>
+            <ChevronRight className="rh-linea-ch" aria-hidden />
+          </button>
+          <button type="button" className="rh-linea rh-linea--cosm" onClick={() => setScreen('catalogo')}>
+            <span className="rh-linea-t">Home Care</span>
+            <span className="rh-linea-d">Para que tus pacientes continúen en casa{porLinea.cosm ? ` · ${porLinea.cosm} productos` : ''}</span>
+            <ChevronRight className="rh-linea-ch" aria-hidden />
+          </button>
+        </div>
+      </Seccion>
       {destacados.length > 0 && (
         <Seccion titulo="Disponibles para ti" nivel="info" id="destacados" accion={{ label: 'Ver todo el catálogo', onClick: () => setScreen('catalogo') }}>
           <div className="rh-productos" data-testid="doctor-destacados">

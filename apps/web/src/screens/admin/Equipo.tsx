@@ -85,20 +85,24 @@ export function Equipo() {
             ]} />
           </div>
 
-          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 700, marginBottom: 8 }}>Responsabilidades</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* CALIDAD VISUAL · responsabilidades plegadas: resumen de una línea; al abrir, interruptores (eran 7 chips por persona) */}
+          <details className="resp">
+            <summary>
+              <span className="resp-t">Responsabilidades</span>
+              <span className="resp-r">{CAPABILITIES.filter((c) => u.capabilities.includes(c.key)).map((c) => c.label).join(' · ') || 'Ninguna'}</span>
+            </summary>
+            <div className="resp-lista">
               {CAPABILITIES.map((c) => {
                 const on = u.capabilities.includes(c.key)
                 return (
-                  // .pa-resp: activa = píldora suave de marca (pulido-admin.css), no verde sólido.
-                  <button key={c.key} type="button" className={'fchip pa-resp' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggleCapability(u.id, c.key)}>
-                    {on ? <Check size={13} aria-hidden="true" /> : '+ '}{c.label}
-                  </button>
+                  <label key={c.key} className="resp-item">
+                    <span>{c.label}</span>
+                    <input type="checkbox" role="switch" className="interruptor" checked={on} onChange={() => toggleCapability(u.id, c.key)} aria-label={`${c.label} para ${u.name}`} />
+                  </label>
                 )
               })}
             </div>
-          </div>
+          </details>
         </div>
       ))}
 

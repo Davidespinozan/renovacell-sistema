@@ -45,9 +45,28 @@ export function Calendario() {
   })
 
   // Próximos compromisos (lista de apoyo, ordenada por fecha).
-  const upcoming = useMemo(
-    () => data.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
-    [data],
+  // CALIDAD VISUAL · próximos (de hoy en adelante) y pasados (primero los sin terminar; los hechos, tachados y con «Reabrir»).
+  const ordenados = useMemo(() => data.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)), [data])
+  const upcoming = ordenados.filter((e) => e.date >= todayIso)
+  const pasados = ordenados.filter((e) => e.date < todayIso).sort((a, b) => (a.status === 'listo' ? 1 : 0) - (b.status === 'listo' ? 1 : 0))
+  const sinTerminar = pasados.filter((e) => e.status !== 'listo').length
+
+  const Fila = ({ e }: { e: (typeof data)[number] }) => (
+          <div className="lrow" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 220px' }}>
+              <span className={'pill ' + KIND[e.kind].pill} style={{ padding: '2px 8px', flex: 'none' }}>{KIND[e.kind].icon} {KIND[e.kind].label}</span>
+              <div style={{ minWidth: 0 }}>
+                <div className="nm" style={{ textDecoration: e.status === 'listo' ? 'line-through' : 'none', opacity: e.status === 'listo' ? 0.6 : 1 }}>{e.title}</div>
+                <div className="lt">{fmtLong(e.date)}{e.notes ? ` · ${e.notes}` : ''}</div>
+              </div>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button className="btn ghost sm" type="button" onClick={() => toggleDone(e.id)}>
+                <Check size={14} /> {e.status === 'listo' ? 'Reabrir' : 'Listo'}
+              </button>
+              <button className="btn ghost sm" type="button" aria-label="Quitar" title="Quitar" style={{ color: 'var(--danger)', width: 40, padding: 0 }} onClick={() => removeEntry(e.id)}><Trash2 size={15} /></button>
+            </div>
+          </div>
   )
 
   return (
@@ -115,27 +134,16 @@ export function Calendario() {
         </div>
       </div>
 
-      {/* Próximos compromisos */}
+      {pasados.length > 0 && (
+        <div className="card">
+          <div className="eyebrow" style={{ marginBottom: 8, color: sinTerminar ? 'var(--danger)' : undefined }}>Pasados{sinTerminar ? ` · ${sinTerminar} sin terminar` : ''}</div>
+          {pasados.map((e) => <Fila key={e.id} e={e} />)}
+        </div>
+      )}
       <div className="card">
         <div className="eyebrow" style={{ marginBottom: 8 }}>Próximos compromisos</div>
-        {upcoming.length === 0 && <div className="pa-vacio-c"><Vacio plano icono="clock" titulo="Sin compromisos agendados" pista="Agrega uno con «Nuevo compromiso» o tocando un día del mes." /></div>}
-        {upcoming.map((e) => (
-          <div key={e.id} className="lrow" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 220px' }}>
-              <span className={'pill ' + KIND[e.kind].pill} style={{ padding: '2px 8px', flex: 'none' }}>{KIND[e.kind].icon} {KIND[e.kind].label}</span>
-              <div style={{ minWidth: 0 }}>
-                <div className="nm" style={{ textDecoration: e.status === 'listo' ? 'line-through' : 'none', opacity: e.status === 'listo' ? 0.6 : 1 }}>{e.title}</div>
-                <div className="lt">{fmtLong(e.date)}{e.notes ? ` · ${e.notes}` : ''}</div>
-              </div>
-            </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              <button className="btn ghost sm" type="button" onClick={() => toggleDone(e.id)}>
-                <Check size={14} /> {e.status === 'listo' ? 'Reabrir' : 'Listo'}
-              </button>
-              <button className="iconbtn-round" type="button" aria-label="Quitar" onClick={() => removeEntry(e.id)}><Trash2 size={15} /></button>
-            </div>
-          </div>
-        ))}
+        {upcoming.length === 0 && <div className="pa-vacio-c"><Vacio plano icono="clock" titulo="Sin compromisos próximos" pista="Agrega uno con «Nuevo compromiso» o tocando un día del mes." /></div>}
+        {upcoming.map((e) => <Fila key={e.id} e={e} />)}
       </div>
 
       {pick && <NuevoCompromiso date={pick} onClose={() => setPick(null)} onCreate={(title, kind, notes) => { addEntry({ title, date: pick, kind, notes }); setPick(null) }} />}
@@ -145,7 +153,7 @@ export function Calendario() {
 
 function fmtLong(dateIso: string): string {
   const [y, m, d] = dateIso.split('-').map(Number)
-  return `${d} de ${MONTHS[m - 1]} ${y}`
+  return `${d} de ${MONTHS[m - 1].toLowerCase()} de ${y}`
 }
 
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', marginTop: 6 }

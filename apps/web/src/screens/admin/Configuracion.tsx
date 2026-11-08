@@ -197,8 +197,10 @@ export function Configuracion() {
         <label style={label}>Correo</label>
         <input style={input} value={form.shipping_email} onChange={set('shipping_email')} placeholder="envios@renovacell.mx" type="email" />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22 }}>
-          <button className="btn" type="button" onClick={guardar} disabled={!puedeGuardar} style={!puedeGuardar ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
+        {/* CALIDAD VISUAL · con cambios sin guardar, la barra se queda fija abajo (antes quedaba al fondo de un formulario largo) */}
+        <div className={'barra-guardar' + (dirty ? ' activa' : '')} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22 }}>
+          {dirty && <span className="barra-guardar-tx">Tienes cambios sin guardar</span>}
+          <button className="btn" type="button" onClick={guardar} disabled={!puedeGuardar}>
             <Save size={15} /> Guardar cambios
           </button>
           {saved && !dirty && <span style={{ fontSize: 13, color: 'var(--green-deep, #1e7a4b)' }}>Guardado ✓</span>}

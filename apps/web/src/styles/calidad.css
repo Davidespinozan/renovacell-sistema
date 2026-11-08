@@ -258,3 +258,60 @@ summary.parada-incidencia::-webkit-details-marker{display:none}
 
 /* Portal del doctor: espacio abajo para que el botón de chat no tape montos ni «Agregar» */
 .main[data-area="doctor"] #content{padding-bottom:96px}
+
+/* ── Interruptor (switch) tipo iOS, reutilizable: <input type="checkbox" role="switch" class="interruptor"> ── */
+input.interruptor{appearance:none;-webkit-appearance:none;width:44px !important;height:26px !important;border-radius:999px;background:#d5dbe1;position:relative;cursor:pointer;flex:none;transition:background .18s;margin:0}
+input.interruptor::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+input.interruptor:checked{background:var(--green)}
+input.interruptor:checked::after{transform:translateX(18px)}
+input.interruptor:focus-visible{outline:2px solid var(--green-deep);outline-offset:2px}
+
+/* ── Equipo: responsabilidades plegadas ── */
+.resp{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
+.resp summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;list-style:none}
+.resp summary::-webkit-details-marker{display:none}
+.resp summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--ink-3);border-bottom:2px solid var(--ink-3);transform:rotate(45deg);margin-left:auto;flex:none;transition:transform .18s}
+.resp[open] summary::after{transform:rotate(-135deg)}
+.resp-t{font-size:13px;font-weight:650;color:var(--ink);flex:none}
+.resp-r{font-size:13px;color:var(--ink-3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resp-lista{display:grid;gap:2px;padding:4px 0 6px}
+.resp-item{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 4px;border-bottom:1px solid var(--line);font-size:14px;color:var(--ink);cursor:pointer}
+.resp-item:last-child{border-bottom:0}
+
+/* ── Barra de guardado fija cuando hay cambios ── */
+.barra-guardar.activa{position:sticky;bottom:12px;z-index:30;background:var(--cp-surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(10,20,14,.14);padding:10px 12px;margin-inline:-6px}
+.barra-guardar-tx{font-size:13.5px;font-weight:600;color:var(--ink-2,#334155);margin-right:auto}
+@media (max-width:899px){.barra-guardar.activa{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
+
+/* ── Biblioteca: en celular, cuadrícula de 2 con miniaturas; sin archivo = recuadro chico (antes 190 px de ícono genérico) ── */
+@media (max-width:640px){
+  .libgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .libcard img{height:96px !important}
+  .libtile{height:72px !important;min-height:0 !important}
+  .libtile svg{width:22px;height:22px;opacity:.55}
+  .libbody{padding:8px 10px !important;font-size:13px}
+  .libdel{opacity:1}
+}
+
+/* ── Calendario en celular: casillas compactas con puntos de color ── */
+@media (max-width:640px){
+  .cal-cell{min-height:46px !important;padding:5px 2px !important;align-items:center;gap:3px !important;border-radius:10px !important}
+  .cal-cell .pill{font-size:0 !important;width:7px;height:7px;padding:0 !important;border-radius:50%;display:inline-block !important;border:0}
+  .cal-cell > span:last-child:not(.pill):not(:first-child){display:none}
+  .cal-cell{flex-direction:row !important;flex-wrap:wrap;justify-content:center;align-content:flex-start}
+  .cal-cell > span:first-child{flex-basis:100%;text-align:center}
+}
+
+/* ── Inicio: títulos de sección con presencia (eran grises de 11 px) ── */
+.rh-sec-h h3{font-size:16px !important;font-weight:700;color:var(--ink) !important;letter-spacing:-.01em !important;text-transform:none !important}
+
+/* ── Inicio del doctor: explora por línea ── */
+.rh-lineas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rh-linea{position:relative;display:grid;gap:4px;text-align:left;min-height:108px;padding:16px 40px 16px 16px;border:0;border-radius:16px;font:inherit;cursor:pointer;color:var(--ink);box-shadow:var(--sh-sm);transition:transform .16s,box-shadow .16s}
+.rh-linea:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.rh-linea--prof{background:radial-gradient(120% 140% at 100% 0%,#cfe6d6,#eaf4ec 60%)}
+.rh-linea--cosm{background:radial-gradient(120% 140% at 100% 0%,#e7d7ee,#f5ecf8 60%)}
+.rh-linea-t{font-size:17px;font-weight:750;letter-spacing:-.01em}
+.rh-linea-d{font-size:13px;line-height:1.35;color:var(--ink-2,#334155)}
+.rh-linea-ch{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:var(--ink-3)}
+@media (max-width:420px){.rh-lineas{grid-template-columns:minmax(0,1fr)}.rh-linea{min-height:84px}}

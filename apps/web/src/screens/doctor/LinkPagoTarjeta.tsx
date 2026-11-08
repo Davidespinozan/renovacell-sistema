@@ -29,7 +29,7 @@ export function LinkPagoTarjeta({ orderId, cliente = clientePorDefecto }: { orde
           <button type="button" className="btn ghost sm" onClick={() => void pedir()} disabled={busy} data-testid="link-pago-pedir">{busy ? 'Pidiendo…' : 'Pedir link de pago'}</button>
         </>
       )}
-      {error && <div style={{ color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
+      {error && <div role="alert" style={{ color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
     </div>
   )
 }

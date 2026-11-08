@@ -29,7 +29,7 @@ describe('<Reabastecimiento> · Compras a proveedores', () => {
   })
   it('18 · Almacén no ve "Marcar pagado" ni "Comprar a proveedor"; sí puede recibir', async () => {
     render(<RoleProvider><Como rol="warehouse"><Reabastecimiento /></Como></RoleProvider>)
-    expect(await screen.findByText('Compras a proveedores')).toBeTruthy()
+    expect(await screen.findByTestId('compras-solo-lectura')).toBeTruthy()   // CALIDAD VISUAL · Almacén ve una sola explicación (la suya)
     expect(screen.queryByTestId('btn-pagado')).toBeNull()
     expect(screen.queryByTestId('btn-comprar')).toBeNull()
     expect(screen.getAllByRole('button', { name: /Recibir mercancía/ }).length).toBeGreaterThan(0)

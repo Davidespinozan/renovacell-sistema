@@ -60,12 +60,12 @@ export function Reabastecimiento() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <GuiaInventario paso={1} />
-      {!isAdmin && <div className="sysnote" data-testid="compras-solo-lectura">Aquí ves <b>qué viene en camino</b>. Las compras las registra Dirección; lo tuyo es <b>Recibir mercancía</b> cuando llegue.</div>}
-      <PageHead title="Compras a proveedores">
-        Aquí registras <b>qué le compras a un proveedor</b> (o qué produces): producto, cantidad y costo. La compra
-        queda <b>pendiente de recibir</b> y <b>no suma inventario</b>: el inventario entra cuando Almacén <b>recibe la
-        mercancía</b> con su lote y caducidad.
-      </PageHead>
+      {/* CALIDAD VISUAL · una sola explicación según el rol (antes Almacén veía dos tarjetas de ayuda seguidas) */}
+      {!isAdmin
+        ? <div className="sysnote" data-testid="compras-solo-lectura">Aquí ves <b>qué viene en camino</b>. Las compras las registra Dirección; lo tuyo es <b>Recibir mercancía</b> cuando llegue.</div>
+        : <PageHead title="Compras a proveedores">
+            Registra <b>qué le compras a un proveedor</b>: producto, cantidad y costo. <b>No suma inventario</b> hasta que Almacén la recibe con lote y caducidad.
+          </PageHead>}
 
       {flash && (
         <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10, background: flash.ok ? 'var(--ok-bg)' : 'var(--danger-bg)', borderColor: 'transparent', color: flash.ok ? 'var(--green-deep)' : 'var(--danger)' }} role="status">
