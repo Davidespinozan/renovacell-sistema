@@ -2,6 +2,7 @@
 // próximo cobro, tarjeta, recibos y los botones que llevan a las páginas seguras de Stripe. Mismo contenido y flujo
 // que el panel de Fukuroll; la tarjeta se pone una sola vez en Stripe y se cobra sola cada mes.
 import React, { useCallback, useEffect, useState } from 'react'
+import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Check, ExternalLink, ShieldCheck } from 'lucide-react'
 import { stryvCare, CLAVE_REGRESO_CARE, ESTADO_CARE, INCLUYE_CARE, NOTA_INFRA_CARE, PRECIO_REGULAR_CARE_CENTAVOS, fechaCare, pesosCare, type StatusCare } from '../../data/ops/stryvCare'
 
@@ -23,7 +24,7 @@ export function StryvCare({ cliente = stryvCare }: { cliente?: typeof stryvCare 
     const r = accion === 'checkout' ? await cliente.activar() : await cliente.portal()
     if (r.ok && r.data.url) { window.location.href = r.data.url; return }
     setAbriendo(null)
-    window.alert(r.ok ? 'No pudimos abrir Stripe. Intenta de nuevo.' : r.message)
+    void avisar(r.ok ? 'No pudimos abrir Stripe. Intenta de nuevo.' : r.message)
   }
 
   const estado = d ? ESTADO_CARE[d.estado] ?? { tono: 'neu' as const, texto: String(d.estado) } : null

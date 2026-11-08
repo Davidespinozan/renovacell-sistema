@@ -2,6 +2,7 @@
 // verificación, pagos, envíos, facturación, devoluciones, política comercial…). Borrador → aprobar → retirar, con versión y
 // revisión de claims en la base. La IA del canal usa SOLO lo aprobado. Un borrador con "[COMPLETAR" no se aprueba.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { confirmar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Cargando } from '../../app/EmptyState'
 import { conocimiento as clientePorDefecto, TEMAS_EMPRESA, tieneMarcaPendiente, type ClienteConocimiento, type VersionEmpresa, type Claim } from '../../data/ops/conocimiento'
 
@@ -47,13 +48,13 @@ export function ManualVentas({ cliente = clientePorDefecto }: { cliente?: Client
   }
   const aprobar = async (v: VersionEmpresa) => {
     if (tieneMarcaPendiente(v.contenido)) { setError('Este borrador todavía tiene partes marcadas como [COMPLETAR …]. Complétalas antes de aprobar.'); return }
-    if (!window.confirm(`¿Aprobar «${v.titulo}»? Desde ese momento la IA y el equipo lo usan al atender clientes.`)) return
+    if (!(await confirmar(`¿Aprobar «${v.titulo}»? Desde ese momento la IA y el equipo lo usan al atender clientes.`))) return
     const r = await cliente.empresaAprobar(v.id)
     if (!r.ok) { setError(r.error); return }
     setError(null); setAviso(`Aprobado «${v.titulo}» v${v.version}${r.data.retirada ? ' (la versión anterior quedó retirada)' : ''}.`); await cargar()
   }
   const retirar = async (v: VersionEmpresa) => {
-    const motivo = window.prompt('Motivo del retiro:'); if (!motivo) return
+    const motivo = (await pedirTexto('Motivo del retiro:')); if (!motivo) return
     const r = await cliente.empresaRetirar(v.id, motivo); if (!r.ok) { setError(r.error); return }
     setError(null); setAviso('Retirado: la IA deja de usarlo.'); await cargar()
   }

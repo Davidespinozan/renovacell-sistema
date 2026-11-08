@@ -3,6 +3,7 @@
 // promoción (vive y muere con ella: toma su vigencia, y su correo y su tarjeta del chat lo llevan) o a un producto, o va
 // suelto con sus propias fechas. Pausar lo quita del portal sin borrarlo.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
@@ -59,7 +60,7 @@ export function Flyers({ promociones = [], listar = listarFlyers, guardar = guar
   }
   const pausar = async (f: Flyer) => { setError(null); const r = await cambiarEstado(f.id, !f.activo); if (!r.ok) { setError(r.error); return } await cargar() }
   const borrar = async (f: Flyer) => {
-    if (!window.confirm(`¿Eliminar el flyer "${f.titulo}"? Deja de verse en el portal.`)) return
+    if (!(await confirmar(`¿Eliminar el flyer "${f.titulo}"? Deja de verse en el portal.`))) return
     setError(null); const r = await eliminar(f.id); if (!r.ok) { setError(r.error); return }
     setAviso(`"${f.titulo}" eliminado.`); await cargar()
   }

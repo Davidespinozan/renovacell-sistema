@@ -8,6 +8,7 @@
 // entienda qué está contando. Un corte no se borra: se ANULA con motivo, y al anularlo su
 // tramo vuelve a quedar por arquear.
 import React, { useMemo, useState } from 'react'
+import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { createPortal } from 'react-dom'
 import { Wallet, AlertTriangle, CheckCircle2, Printer, Trash2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -159,11 +160,11 @@ export function CierreCaja() {
   }
 
   const anular = async (c: Cierre) => {
-    const m = window.prompt(`Motivo para anular el corte del ${fmtDate(c.fecha)} (queda registrado; el corte NO se borra).`)
+    const m = (await pedirTexto(`Motivo para anular el corte del ${fmtDate(c.fecha)} (queda registrado; el corte NO se borra).`))
     if (m == null) return
-    if (!m.trim()) { window.alert('La anulación necesita un motivo.'); return }
+    if (!m.trim()) { void avisar('La anulación necesita un motivo.'); return }
     const r = await anularCierre(newOpIdLocal(), c.id, m, user?.name)
-    if (!r.ok) { window.alert(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo anular el corte.')); return }
+    if (!r.ok) { void avisar(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo anular el corte.')); return }
     setRecargar((n) => n + 1)   // el tramo del corte anulado vuelve a estar por arquear
   }
 

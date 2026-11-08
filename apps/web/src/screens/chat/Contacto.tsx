@@ -7,6 +7,7 @@
 // CONTACTO CONVERSACIONAL (dueño, 30 oct): sin formulario. Se entra directo al chat; el asistente ya saludó y pide el
 // nombre, y luego celular y correo, platicando (los registra el servidor). El aviso de privacidad queda bajo el redactor.
 import React, { useEffect, useState } from 'react'
+import { pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { BadgeCheck, Globe, Heart, Lock, Send, ShieldCheck, Smartphone } from 'lucide-react'
 import { BrandLogo } from '../../app/BrandLogo'
 import { supabase, hasSupabase } from '../../lib/supabase'
@@ -126,7 +127,7 @@ function AvisoPersonal({ url: urlPropia }: { url?: string }) {
   const [copiado, setCopiado] = useState(false)
   const copiar = async () => {
     const url = urlPropia ?? urlEnlaceContacto()
-    try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { window.prompt('Copia el enlace de contacto:', url) }
+    try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { (await pedirTexto('Copia el enlace de contacto:', url)) }
   }
   return (
     <div className="rc-pre-tarjeta rc-pre-enhilo" data-testid="aviso-personal">

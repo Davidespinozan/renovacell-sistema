@@ -2,6 +2,7 @@
 // su especialidad, en una lista rápida (un toque por cliente; se guarda solo). Sin esto, la difusión "a los dermatólogos"
 // no encuentra a nadie. El jefe de ventas y Dirección clasifican a todos. Dirección agrega especialidades.
 import React, { useCallback, useEffect, useState } from 'react'
+import { pedirTexto } from '../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { ChevronDown, ChevronUp, Plus, Search, Tags } from 'lucide-react'
 import { perfilComercial as clientePorDefecto, type ClientePerfilComercial, type FilaClasificar, type MisClientesPerfil, type TipoCliente } from '../data/ops/perfilComercial'
 import { ControlesPerfil, olvidarEspecialidades, useEspecialidades } from '../app/PerfilComercialEditor'
@@ -44,7 +45,7 @@ export function ClasificarCartera({ cliente = clientePorDefecto, abiertoInicial 
     })
   }
   const agregarEspecialidad = async () => {
-    const nombre = window.prompt('Nueva especialidad (aparecerá en la lista para todos):')
+    const nombre = (await pedirTexto('Nueva especialidad (aparecerá en la lista para todos):'))
     if (!nombre?.trim()) return
     const r = await cliente.agregarEspecialidad(nombre.trim())
     if (!r.ok) { setError(r.mensaje); return }

@@ -2,6 +2,7 @@
 // paquetería— con su estatus, y DETECCIÓN DE ATORADOS (vencidos o surtidos sin
 // salir). Es la vista para cazar el pedido que se atoró (caso S12840).
 import React, { useMemo, useState } from 'react'
+import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { reloadShipments } from '../../data/store/shipmentsStore'
@@ -194,7 +195,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
   const abrirPrueba = async () => {
     const url = await signedProofUrl(shipment?.proof_image_url ?? null)
     if (url) window.open(url, '_blank', 'noopener')
-    else window.alert('No se pudo abrir la evidencia de entrega.')
+    else void avisar('No se pudo abrir la evidencia de entrega.')
   }
   const cerrarPaqueteria = async () => {
     if (!shipment || !recibio.trim()) return

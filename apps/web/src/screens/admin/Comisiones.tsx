@@ -5,6 +5,7 @@
 // La pantalla solo LEE: no congela tasas, no reconstruye vendedores, no aplica reversas
 // y no escribe ningún movimiento de dinero. Toda la regla vive en `data/comisiones.ts`.
 import React, { useMemo, useState } from 'react'
+import { pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Target, Percent, Trophy, Receipt, Info, TrendingUp, TrendingDown } from 'lucide-react'
 import { movimientoProductos } from '../../data/metrics'
 import { money } from '../../lib/format'
@@ -70,10 +71,10 @@ export function Comisiones({ leer }: { leer?: typeof leerComisionesEquipo } = {}
   }), [est, metaDe])
   const sinVend = est.sinVendedor
 
-  const editarLinea = (line: 'cosm' | 'prof', actual: number) => {
+  const editarLinea = async (line: 'cosm' | 'prof', actual: number) => {
     if (!puedeEditar) return
     const label = line === 'prof' ? 'Professional' : 'Home Care'
-    const raw = window.prompt(`Tasa VIGENTE de ${label} (%). Ej. 5 = 5%. Cambiarla recalcula la estimación de cualquier periodo: no hay tasas históricas guardadas.`, String((actual * 100).toFixed(2)))
+    const raw = (await pedirTexto(`Tasa VIGENTE de ${label} (%). Ej. 5 = 5%. Cambiarla recalcula la estimación de cualquier periodo: no hay tasas históricas guardadas.`, String((actual * 100).toFixed(2))))
     if (raw == null) return
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0 && n <= 100) setLineRate(line, n / 100)

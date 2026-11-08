@@ -1,6 +1,7 @@
 // PAQ-B · Recolección de una guía de paquetería (solo logística): la guía se genera SIN recolección; aquí se puede pedir
 // que la paquetería pase por el paquete, ver la confirmación o cancelarla. Si prefieren llevarlo a sucursal, no se toca.
 import React, { useState } from 'react'
+import { confirmar } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Icon } from './icons'
 import { fmtDate } from '../lib/format'
 import { agendarRecoleccion, ahoraLocalOrigen, cancelarRecoleccion, errorRecoleccion, type RecoleccionAgendada, type RecoleccionSolicitada } from '../data/shipping/recoleccion'
@@ -34,7 +35,7 @@ export function RecoleccionGuia({ orderId, agendada, onCambio, agendar = agendar
   }
   const quitar = async () => {
     if (ocupado) return
-    if (!window.confirm('¿Cancelar la recolección agendada con la paquetería?')) return
+    if (!(await confirmar('¿Cancelar la recolección agendada con la paquetería?'))) return
     setOcupado(true); setError(null)
     const r = await cancelar(orderId, 'Cancelada por el remitente')
     setOcupado(false)

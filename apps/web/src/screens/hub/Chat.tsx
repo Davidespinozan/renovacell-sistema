@@ -3,6 +3,7 @@
 // la burbuja y nombre del autor en los grupos. En escritorio lista y hilo van lado a lado; en teléfono, uno a la vez.
 // Solo staff (grupos por área + directos). EQUIPO-ADJUNTOS (3 nov 2026): imágenes, videos y documentos con el clip.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2, CheckCheck, Paperclip, FileText, Download, Loader2 } from 'lucide-react'
 import { UserAvatar } from '../../app/UserAvatar'
 import { useChat } from '../../data/hooks/useChat'
@@ -117,7 +118,7 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
       autorPrevio = m.sender_id
       hilo.push(<Burbuja key={m.id} m={m} mine={mine} inicio={inicio} grupo={conv.kind === 'group'} lectores={lectores}
         nombre={mine ? me.name : (porId[m.sender_id]?.name ?? m.sender_name ?? 'Equipo')}
-        onDelete={() => { if (window.confirm('¿Eliminar este mensaje?')) deleteMessage(conv.id, m.id) }} />)
+        onDelete={async () => { if ((await confirmar('¿Eliminar este mensaje?'))) deleteMessage(conv.id, m.id) }} />)
     }
   }
 
@@ -183,7 +184,7 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
               {conv.kind === 'dm' && (
                 <div className="rc-actions">
                   <button type="button" className="rc-ico" title="Eliminar conversación" aria-label="Eliminar conversación"
-                    onClick={() => { if (window.confirm('¿Eliminar esta conversación y sus mensajes?')) { deleteConversation(conv.id); setSelectedId(null) } }}>
+                    onClick={async () => { if ((await confirmar('¿Eliminar esta conversación y sus mensajes?'))) { deleteConversation(conv.id); setSelectedId(null) } }}>
                     <Trash2 size={17} />
                   </button>
                 </div>

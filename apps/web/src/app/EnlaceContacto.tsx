@@ -2,6 +2,7 @@
 // roberto-ibarra): lo manda en sus canales y quien llega por él lo atiende él, salvo que ya sea cliente de cartera de otro
 // (gana la cartera). Dirección ve el enlace general y el de cada vendedor con sus cifras. Todo es el chat propio, no WhatsApp.
 import React, { useEffect, useState } from 'react'
+import { pedirTexto } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Copy, ExternalLink, Link2, Share2 } from 'lucide-react'
 import { urlEnlaceContacto } from '../data/ops/contactoEnlace'
 import { compartir, enlacesEquipo, miEnlace, textoCompartir, urlDeEnlace, type EnlaceEquipo, type MiEnlace } from '../data/ops/enlaces'
@@ -13,7 +14,7 @@ function useCopiar() {
   const [copiado, setCopiado] = useState<string | null>(null)
   const copiar = async (texto: string, clave = 'x') => {
     try { await navigator.clipboard.writeText(texto); setCopiado(clave); window.setTimeout(() => setCopiado(null), 2500) }
-    catch { window.prompt('Copia el enlace:', texto) }
+    catch { (await pedirTexto('Copia el enlace:', texto)) }
   }
   return { copiado, copiar }
 }

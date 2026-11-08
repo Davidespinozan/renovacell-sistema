@@ -7,6 +7,7 @@
 // canónico de inicio (Edge chat → cc_iniciar_asesoria, idempotente): nunca crea otra conversación, otro
 // handoff ni cambia la cartera.
 import React, { useCallback, useEffect, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { capitalizarNombre } from '../../lib/nombres'
 import { chat as clientePorDefecto, ETIQUETA_MODO, type ClienteChat, type ColaItem } from '../../data/ops/chat'
 import { MOTIVO_RUTEO } from '../../data/ops/atencion'
@@ -90,7 +91,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   }
   const mandarRegistro = () => void mandar('Para verificarte, toca «Verificar mi cuenta» arriba en este chat: te pedirá tu cédula, las fotos de tu INE y una contraseña. No tienes que salir de aquí.', 'Le mandaste el enlace de registro.')
   const mandarInvitacion = async (customerId: string, nombre: string) => {
-    if (!window.confirm(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`)) return
+    if (!(await confirmar(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`))) return
     const inv = await crearInvitacion(customerId)
     if (!inv.ok) { setHerr(inv.mensaje); return }
     await mandar(`Te dejo tu invitación para crear tu cuenta en Renovacell. Como ya eres cliente, queda verificada: ${inv.data.enlace}`, 'Le mandaste la invitación a crear su cuenta.')

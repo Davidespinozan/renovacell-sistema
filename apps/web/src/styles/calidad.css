@@ -124,7 +124,7 @@ th{letter-spacing:.02em;text-transform:none;font-size:12px}
 .page-h-mas{display:none}
 @media (max-width:640px){
   .page-h-p:not(.abierto){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .page-h-mas{display:inline-block;border:0;background:none;padding:2px 0;margin-top:2px;font:inherit;font-size:13px;font-weight:600;color:var(--green-deep);cursor:pointer;min-height:32px}
+  .page-h-mas{display:inline-block;border:0;background:none;padding:2px 0;margin-top:2px;font:inherit;font-size:13px;font-weight:600;color:var(--green-deep);cursor:pointer;min-height:40px}
 }
 
 /* ── Seguimiento del pedido del doctor: compacto en celular ── */
@@ -150,3 +150,99 @@ div:has(> .eyebrow.crumb):not(:has(> :not(svg):not(.eyebrow.crumb):not(.pill))){
 
 /* ── Etiquetas de campos en tipo oración (las escritas a mano en MAYÚSCULAS espaciadas) ── */
 label[style*="text-transform: uppercase"],div[style*="text-transform: uppercase"],span[style*="text-transform: uppercase"]{text-transform:none !important;letter-spacing:0 !important;font-size:13px !important;color:var(--ink-2,#334155) !important;font-weight:600 !important}
+
+/* ── Chofer: tarjeta de parada pensada para una mano ── */
+.parada{display:grid;gap:6px;margin-bottom:12px}
+.parada-cliente{font-size:17px;font-weight:700;color:var(--ink);line-height:1.25}
+.parada-cliente small{display:block;font-size:13.5px;font-weight:500;color:var(--ink-3)}
+.parada-dir{font-size:15px;line-height:1.4;color:var(--ink)}
+.parada-prod{font-size:13.5px;color:var(--ink-3)}
+.parada-botones{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.parada-botones .btn{min-height:52px;font-size:15px;justify-content:center;text-decoration:none}
+.parada-botones .btn svg{width:18px;height:18px}
+summary.parada-incidencia{list-style:none;width:100%;justify-content:center;min-height:48px;color:var(--ink-2,#334155)}
+summary.parada-incidencia::-webkit-details-marker{display:none}
+
+/* ── Punto de venta: «+» visible; en celular, lista compacta (foto 56 px · nombre · precio · +) y agotados al final ── */
+.poscard{position:relative}
+.pos-add{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--green-deep);color:#fff;box-shadow:var(--sh-sm)}
+.pos-add svg{width:16px;height:16px}
+.poscard.is-out{order:1}
+@media (max-width:640px){
+  .posgrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .poscard{display:grid;grid-template-columns:56px minmax(0,1fr) auto;column-gap:12px;row-gap:2px;align-items:center;padding:10px 12px}
+  .poscard .posthumb{grid-column:1;grid-row:1 / span 6;width:56px;height:56px;margin:0;border-radius:10px;object-fit:cover;align-self:center}
+  .poscard > :not(.posthumb):not(.pos-add):not(.pos-stepper){grid-column:2;margin-top:0 !important;justify-self:start}
+  .poscard h5{margin:0;font-size:14.5px}
+  .poscard .lt{margin:0;font-size:12.5px}
+  .poscard .pr{font-size:15px}
+  .pos-add{position:static;grid-column:3;grid-row:1 / span 3;width:40px;height:40px}
+  .pos-stepper{grid-column:3;grid-row:1 / span 3;margin-top:0 !important}
+  .poscard.is-out{opacity:.62}
+}
+
+/* ── Inventario: acciones del lote como íconos en la misma fila (antes una fila extra de botones por lote) ── */
+.lote-info{display:contents}
+@media (max-width:640px){
+  .lote{display:grid !important;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 8px;align-items:center}
+  .lote-info{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
+  .lote .lq{white-space:nowrap;font-weight:700}
+  .lote .inv-acc{width:auto;margin-left:0}
+  .lote .inv-acc .btn{width:40px;min-height:40px;padding:0;font-size:0;gap:0}
+  .lote .inv-acc .btn svg{width:17px;height:17px}
+  .lote .pill{white-space:nowrap}
+}
+
+/* ── Menú «⋯» (MenuAcciones) ── */
+.menu-acc{position:relative;flex:none}
+.menu-acc-btn{width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:none;color:var(--ink-2,#334155);display:grid;place-items:center;cursor:pointer}
+.menu-acc-btn:hover,.menu-acc-btn[aria-expanded="true"]{background:var(--hueso);border-color:var(--line)}
+.menu-acc-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:200px;background:var(--cp-surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-pop,0 12px 32px rgba(0,0,0,.16));padding:6px;display:grid;gap:2px}
+.menu-acc-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;font:inherit;font-size:14px;color:var(--ink);text-align:left;cursor:pointer}
+.menu-acc-item:hover{background:var(--hueso)}
+.menu-acc-item.activa{color:var(--green-deep);font-weight:600}
+.menu-acc-item.peligro{color:var(--danger);border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:2px}
+
+/* ── Avisos: «Enterado» secundario (eran 6 botones verdes compitiendo) y etiquetas en una línea ── */
+.av-enterado{background:var(--cp-surface);color:var(--green-deep);border:1px solid var(--ok-line,#cfe5d5);min-height:40px}
+.av-enterado:hover{background:var(--ok-bg);color:var(--green-deep)}
+.av-etiquetas{flex-wrap:nowrap}
+
+/* ── Catálogo del doctor: «Agregar» de contorno (6 bloques verdes llenos pesaban como plantilla); agotados compactos ── */
+.pcard .addb{background:var(--cp-surface);color:var(--green-deep);border:1.5px solid var(--green-deep) !important;box-shadow:none}
+.pcard:hover .addb,.pcard .addb:hover{background:var(--green-deep);color:#fff}
+.pcard .pr{margin:6px 0 10px}
+.dcat-agotados .pcard{opacity:.72}
+.dcat-agotados .pcard .addb{display:none}
+@media (max-width:640px){
+  .dcat-grid--agotados{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+  .dcat-grid--agotados > *{flex:0 0 132px;scroll-snap-align:start}
+  .dcat-grid--agotados .ptile,.dcat-grid--agotados img{height:84px !important}
+  .dcat-grid--agotados .pcard h5{font-size:12.5px;min-height:0}
+}
+
+/* ── Portal del doctor en escritorio: ancho de lectura (antes tarjetas y chat de 1,100 px se veían como móvil estirado) ── */
+@media (min-width:900px){
+  .main[data-area="doctor"] #content{max-width:1120px;margin-inline:auto;width:100%}
+  .main[data-area="doctor"] #content .rc-chat{max-width:860px;margin-inline:auto;width:100%}
+}
+
+/* ── Diálogos del sistema (en lugar de window.confirm/alert/prompt) ── */
+.dlg-fondo{position:fixed;inset:0;z-index:200;background:rgba(10,20,14,.42);display:grid;place-items:center;padding:16px;animation:rise .16s both}
+.dlg{width:min(440px,100%);background:var(--cp-surface);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.25);padding:20px;display:grid;gap:14px}
+.dlg-msg{margin:0;font-size:15px;line-height:1.5;color:var(--ink);white-space:pre-wrap}
+.dlg-campo{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:16px}
+.dlg-acc{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.dlg-acc .btn{min-width:110px}
+.dlg-peligro{background:var(--danger) !important;box-shadow:none}
+@media (max-width:640px){.dlg-fondo{place-items:end center;padding:0}.dlg{border-radius:18px 18px 0 0;padding:20px 16px calc(16px + env(safe-area-inset-bottom,0px))}.dlg-acc .btn{flex:1}}
+
+/* ── Pulido táctil y de lectura en celular ── */
+@media (max-width:640px){
+  .pill{font-size:12px}
+  .notif-readall{min-height:40px;padding:0 10px}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px}
+}
+
+/* Exportar dentro de una barra de filtros en celular: a la derecha, en su propia fila */
+@media (max-width:640px){.filters > .btn.ghost:last-child,.filters > button:last-child:not(:first-child){grid-column:1 / -1;justify-self:end}}

@@ -99,9 +99,9 @@ describe('costura compartida y frontend', () => {
   })
   it('T2 e importación exigen confirmación explícita en la UI', () => {
     const p = codigo(pantallaSrc)
-    expect(p).toMatch(/window\.confirm\('Contenido clínico\/regulatorio\. ¿Confirmas que fue revisado/)   // pulido 29 oct: sin la sigla T2 en el texto
-    expect(p).toMatch(/window\.confirm\('Permitir información clínica deja aprobar/)
-    expect(p).toMatch(/window\.confirm\('Importa como BORRADOR/)
+    expect(p).toMatch(/confirmarDlg\('Contenido clínico\/regulatorio\. ¿Confirmas que fue revisado/)   // pulido 29 oct: sin la sigla T2 en el texto
+    expect(p).toMatch(/confirmarDlg\('Permitir información clínica deja aprobar/)
+    expect(p).toMatch(/confirmarDlg\('Importa como BORRADOR/)   // CALIDAD VISUAL · diálogo del sistema (antes window.confirm)
   })
   it('la Edge assistant legacy NO fue tocada por CC-3 (CC-4 la sustituirá; una sola arquitectura)', () => {
     expect(assistantSrc).not.toMatch(/cc_ficha_producto|cc_buscar|_shared\/conocimiento/)

@@ -5,6 +5,7 @@
 // El servidor es la AUTORIDAD del cobro: precio_de(product, list, qty) = LEAST(base, volumen).
 // Aquí solo se administran los datos; toda mutación se audita. RLS admin es la autoridad de escritura.
 import React, { useMemo, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Plus, Trash2, Pencil, Check, X, Layers, DollarSign } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
 import { money } from '../../lib/format'
@@ -224,7 +225,7 @@ function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
             <>
               <button className="btn ghost sm" type="button" onClick={() => setEdit(true)}><Pencil size={12} /> Editar</button>
               <button className="btn ghost sm" type="button" onClick={() => onToggle(tier.id!, !tier.active)}>{tier.active ? 'Desactivar' : 'Activar'}</button>
-              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { if (window.confirm(`¿Eliminar el nivel desde ${tier.min_quantity} pzas?`)) onDelete(tier.id!) }}><Trash2 size={12} /></button>
+              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={async () => { if ((await confirmar(`¿Eliminar el nivel desde ${tier.min_quantity} pzas?`))) onDelete(tier.id!) }}><Trash2 size={12} /></button>
             </>
           )}
           {err && <span style={{ color: 'var(--danger)', fontSize: 11.5 }}>{err}</span>}

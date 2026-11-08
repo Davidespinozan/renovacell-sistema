@@ -2,6 +2,7 @@
 // producto le faltan claves validadas, aquí se dice cuál y se va a Revisión fiscal; no se consume folio.
 // Un resultado incierto NO se reintenta: se concilia (busca por serie+folio y, si no aparece, reenvía con la misma identidad).
 import React, { useCallback, useEffect, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { FileCheck2, RefreshCw, Settings } from 'lucide-react'
 import { cfdiTimbrado as clientePorDefecto, FORMAS_TARJETA, type ClienteCfdiTimbrado, type RespuestaCfdi } from '../../data/ops/cfdiTimbrado'
 import { useRoleOpcional } from '../../auth/RoleContext'
@@ -18,7 +19,7 @@ export function TimbrarCFDI({ docId, modo, onCambio, cliente = clientePorDefecto
 
   const accion = async () => {
     if (busy) return
-    if (modo === 'timbrar' && !window.confirm(`¿Timbrar esta factura${prev?.entorno === 'produccion' ? ' REAL ante el SAT' : ' de PRUEBA'} por ${money(prev?.resumen?.total ?? 0)}?`)) return
+    if (modo === 'timbrar' && !(await confirmar(`¿Timbrar esta factura${prev?.entorno === 'produccion' ? ' REAL ante el SAT' : ' de PRUEBA'} por ${money(prev?.resumen?.total ?? 0)}?`))) return
     setBusy(true)
     const r = modo === 'timbrar' ? await cliente.timbrar(docId, forma) : await cliente.conciliar(docId, forma)
     setBusy(false); setRes(r); onCambio()

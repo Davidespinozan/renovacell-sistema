@@ -3,6 +3,8 @@
 // la Biblioteca y las Solicitudes de recurso en sus propias pestañas para que el muro no se pierda entre tarjetas.
 // Lectura para todo el staff; Dirección y quien tenga 'anuncios' publican/editan.
 import React, { useMemo, useState } from 'react'
+import { confirmar } from '../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
+import { MenuAcciones } from '../app/MenuAcciones'   // CALIDAD VISUAL · acciones del aviso en «⋯»
 import {
   Megaphone, Bell, ThumbsUp, CheckCheck, Check, MessageCircle, Pin, Pencil, Trash2,
   X, Send, Image as ImageIcon, Download, Eye, ShieldCheck, Upload, Plus,
@@ -116,7 +118,7 @@ export function CommonView() {
             onComments={() => { social.markRead(a.id); setSheetFor(a) }}
             onEdit={() => setEditing(a)}
             onPin={() => ann.togglePin(a.id)}
-            onDelete={() => { if (window.confirm('¿Borrar esta publicación?')) ann.remove(a.id) }}
+            onDelete={async () => { if ((await confirmar('¿Borrar esta publicación?'))) ann.remove(a.id) }}
           />
         )
       })}
@@ -145,7 +147,7 @@ export function CommonView() {
             {canDesign && (
               <button
                 type="button" className="libdel" title="Eliminar de la biblioteca"
-                onClick={() => { if (window.confirm('¿Eliminar este asset de la biblioteca?')) assets.remove(as.id) }}
+                onClick={async () => { if ((await confirmar('¿Eliminar este asset de la biblioteca?'))) assets.remove(as.id) }}
               >
                 <Trash2 size={15} color="var(--danger)" />
               </button>
@@ -204,7 +206,7 @@ export function CommonView() {
               <span className={'pill ' + pill}>{lbl}</span>
               {canDesign && (
                 <button className="fbtn" type="button" title="Eliminar solicitud"
-                  onClick={() => { if (window.confirm('¿Eliminar esta solicitud de recurso?')) resources.remove(rr.id) }}>
+                  onClick={async () => { if ((await confirmar('¿Eliminar esta solicitud de recurso?'))) resources.remove(rr.id) }}>
                   <Trash2 size={15} color="var(--danger)" />
                 </button>
               )}
@@ -383,9 +385,11 @@ function FeedCard({
         </div>
         {canManage && (
           <div className="av-gestion">
-            <button className="fbtn" type="button" onClick={onEdit} title="Editar" aria-label="Editar"><Pencil size={15} /></button>
-            <button className={'fbtn' + (fijado ? ' on' : '')} type="button" onClick={onPin} title={fijado ? 'Quitar de arriba' : 'Fijar arriba'} aria-label="Fijar"><Pin size={15} /></button>
-            <button className="fbtn" type="button" onClick={onDelete} title="Borrar" aria-label="Borrar"><Trash2 size={15} color="var(--danger)" /></button>
+            <MenuAcciones etiqueta="Opciones del aviso" acciones={[
+              { etiqueta: 'Editar', icono: <Pencil size={15} />, onElegir: onEdit },
+              { etiqueta: fijado ? 'Quitar de arriba' : 'Fijar arriba', icono: <Pin size={15} />, onElegir: onPin, activa: fijado },
+              { etiqueta: 'Borrar', icono: <Trash2 size={15} />, onElegir: onDelete, peligro: true },
+            ]} />
           </div>
         )}
       </header>

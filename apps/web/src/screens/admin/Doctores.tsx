@@ -2,6 +2,7 @@
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import { Vacio } from '../../app/EmptyState'
+import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -46,7 +47,7 @@ export function Doctores() {
   // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
   const doDeleteDoctor = async (id: string) => {
     const r = await deleteDoctor(id)
-    if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
+    if (!r.ok) void avisar(r.error ?? 'No se pudo eliminar.')
   }
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)

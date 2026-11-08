@@ -1,6 +1,7 @@
 // VERIFICACIÓN POR WHATSAPP (2 nov 2026) · tarjeta en el chat del personal: lo que la IA juntó (nombre, cédula, correo,
 // fotos que mandó) y los dos botones. Las fotos se revisan en la conversación misma (son mensajes del cliente).
 import React, { useCallback, useEffect, useState } from 'react'
+import { pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { verificacionWa as porDefecto, type ClienteVerificacionWa, type SolicitudAlta } from '../../data/ops/verificacionWa'
 
 export function useSolicitudVerificacion(conversationId: string, cliente: ClienteVerificacionWa = porDefecto, onCambio?: () => void): React.ReactNode {
@@ -19,7 +20,7 @@ export function useSolicitudVerificacion(conversationId: string, cliente: Client
     else setMsg({ ok: false, texto: r.error })
   }
   const rechazar = async () => {
-    const motivo = window.prompt('¿Por qué no se puede verificar? (se le dirá al cliente)', 'la foto de la cédula no se ve completa')
+    const motivo = (await pedirTexto('¿Por qué no se puede verificar? (se le dirá al cliente)', 'la foto de la cédula no se ve completa'))
     if (!motivo?.trim()) return
     setOcupado(true)
     const r = await cliente.rechazar(s.id, motivo.trim())

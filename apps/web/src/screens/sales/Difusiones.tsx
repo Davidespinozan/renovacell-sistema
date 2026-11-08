@@ -3,6 +3,7 @@
 // tiene correo y por el chat del portal a quien tiene cuenta. A una lista, a un filtro (doctores / clínicas / especialidad)
 // o a toda su cartera. Antes de mandar: a cuántos llega, vista previa del correo y una prueba a su propio correo.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { avisar, confirmar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Check, ImagePlus, Megaphone, Minus, Plus, Search, Send, Trash2, X } from 'lucide-react'
 import { difusiones as clientePorDefecto, type Audiencia, type ClienteDifusiones, type ClienteLista, type Contenido, type Difusion, type Lista, type Previa } from '../../data/ops/difusiones'
 import { useEspecialidades } from '../../app/PerfilComercialEditor'
@@ -67,13 +68,13 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
   const prueba = async () => { setOcupado(true); setMsg(null); const r = await cliente.prueba(c); setOcupado(false); setMsg(r.ok ? { ok: true, texto: `Te mandamos una prueba a ${r.data.para}.` } : { ok: false, texto: r.mensaje }) }
   const enviar = async () => {
     if (!audiencia || !previa) return
-    if (!window.confirm(`¿Mandar «${c.titulo.trim()}» a ${previa.total} ${previa.total === 1 ? 'cliente' : 'clientes'}?`)) return
+    if (!(await confirmar(`¿Mandar «${c.titulo.trim()}» a ${previa.total} ${previa.total === 1 ? 'cliente' : 'clientes'}?`))) return
     setOcupado(true); setMsg(null)
     const r = await cliente.enviar(c, audiencia, [...(canales.correo ? ['correo' as const] : []), ...(canales.chat ? ['chat' as const] : [])])
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     setC(VACIO)
-    window.alert(`Listo: ${r.data.correo} por correo y ${r.data.chat} por chat.${r.data.sin_correo ? ` ${r.data.sin_correo} sin correo.` : ''}${r.data.dados_de_baja ? ` ${r.data.dados_de_baja} se dieron de baja.` : ''}`)
+    void avisar(`Listo: ${r.data.correo} por correo y ${r.data.chat} por chat.${r.data.sin_correo ? ` ${r.data.sin_correo} sin correo.` : ''}${r.data.dados_de_baja ? ` ${r.data.dados_de_baja} se dieron de baja.` : ''}`)
     onEnviada()
   }
 
@@ -138,7 +139,7 @@ function MisListas({ cliente, listas, recargar }: { cliente: ClienteDifusiones; 
   const cargar = useCallback(async () => { if (!sel) return; const r = await cliente.buscarClientes(sel.id, q.trim(), soloLista); if (r.ok) setClientes(r.data) }, [cliente, sel, q, soloLista])
   useEffect(() => { const h = window.setTimeout(() => void cargar(), q ? 300 : 0); return () => window.clearTimeout(h) }, [cargar, q])
   const crear = async () => {
-    const nombre = window.prompt('Nombre de la lista (p. ej. «Dermatólogos VIP», «Clínicas Culiacán»):')
+    const nombre = (await pedirTexto('Nombre de la lista (p. ej. «Dermatólogos VIP», «Clínicas Culiacán»):'))
     if (!nombre?.trim()) return
     const r = await cliente.guardarLista(null, nombre.trim())
     if (!r.ok) { setMsg(r.mensaje); return }
@@ -158,7 +159,7 @@ function MisListas({ cliente, listas, recargar }: { cliente: ClienteDifusiones; 
     setSel({ ...sel, clientes: r.data.clientes }); setMsg(`La lista ahora tiene ${r.data.clientes} clientes.`); void recargar(); void cargar()
   }
   const borrar = async () => {
-    if (!sel || !window.confirm(`¿Borrar la lista «${sel.nombre}»? Los clientes no se borran.`)) return
+    if (!sel || !(await confirmar(`¿Borrar la lista «${sel.nombre}»? Los clientes no se borran.`))) return
     const r = await cliente.borrarLista(sel.id)
     if (!r.ok) { setMsg(r.mensaje); return }
     setSel(null); void recargar()

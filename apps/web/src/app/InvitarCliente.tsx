@@ -1,6 +1,7 @@
 // INVITACIONES · "Invitar a crear cuenta" desde la ficha del cliente (Dirección o su vendedor). Genera el enlace y
 // deja mandarlo por WhatsApp, copiarlo o enviarlo por correo. La cuenta que se cree con él nace verificada.
 import React, { useState } from 'react'
+import { pedirTexto } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Copy, Mail, Send, UserPlus } from 'lucide-react'
 import { crearInvitacion, whatsappInvitacion, TEXTO_CORREO, type InvitacionCreada } from '../data/ops/invitacion'
 
@@ -19,7 +20,7 @@ export function InvitarCliente({ customerId, crear = crearInvitacion }: { custom
   }
   const copiar = async () => {
     if (!inv) return
-    try { await navigator.clipboard.writeText(inv.enlace); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { window.prompt('Copia el enlace:', inv.enlace) }
+    try { await navigator.clipboard.writeText(inv.enlace); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { (await pedirTexto('Copia el enlace:', inv.enlace)) }
   }
   if (!inv) return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>

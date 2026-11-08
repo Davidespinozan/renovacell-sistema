@@ -3,6 +3,8 @@
 // y restablece contraseñas. Con backend, las acciones que tocan la cuenta de auth
 // pasan por la Edge Function `staff-admin` (service role, solo admin).
 import React, { useState } from 'react'
+import { pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
+import { MenuAcciones } from '../../app/MenuAcciones'   // CALIDAD VISUAL
 import { UserPlus, X, Ban, RotateCcw, Pencil, Trash2, KeyRound, Check } from 'lucide-react'
 import { UserAvatar } from '../../app/UserAvatar'
 import { ExportButton } from '../../app/ExportButton'
@@ -31,14 +33,14 @@ export function Equipo() {
   const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 3200) }
 
   const onDelete = async (u: TeamUser) => {
-    const motivo = window.prompt(`Dar de baja a ${u.name}: pierde el acceso al sistema desde ahora. Su historial (recepciones, cobros, entregas) se conserva. Motivo:`, 'Baja del equipo')
+    const motivo = (await pedirTexto(`Dar de baja a ${u.name}: pierde el acceso al sistema desde ahora. Su historial (recepciones, cobros, entregas) se conserva. Motivo:`, 'Baja del equipo'))
     if (motivo == null) return
     const r = await removeUser(u.id, motivo.trim() || 'Baja del equipo')
     flash(r.ok ? `Baja registrada: ${u.name}` : `No se pudo dar de baja: ${r.error}`)
   }
   const onToggle = async (u: TeamUser) => {
     if (u.active) {
-      const motivo = window.prompt(`Suspender a ${u.name}: pierde el acceso al sistema desde ahora (también en sesiones abiertas). Motivo:`, '')
+      const motivo = (await pedirTexto(`Suspender a ${u.name}: pierde el acceso al sistema desde ahora (también en sesiones abiertas). Motivo:`, ''))
       if (motivo == null) return
       if (!motivo.trim()) { flash('Escribe el motivo de la suspensión.'); return }
       const r = await setActive(u.id, false, motivo.trim())
@@ -74,17 +76,13 @@ export function Equipo() {
             <span className="pill p-neu">{getRole(u.role).label}</span>
             {u.active && <EtiquetaPush estado={push} id={u.id} />}
             {!u.active && <span className="pill p-dang">{u.baja ? 'Baja' : 'Suspendido'}</span>}
-          </div>
-
-          {/* Acciones sobre la cuenta */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            <button className="btn ghost sm" type="button" onClick={() => setEditing(u)}><Pencil size={14} /> Editar</button>
-            <button className="btn ghost sm" type="button" onClick={() => setPwFor(u)}><KeyRound size={14} /> Contraseña</button>
-            {/* Suspender es reversible → neutro; solo «Dar de baja» (definitiva) lleva rojo. */}
-            <button className="btn ghost sm" type="button" style={u.active ? undefined : { color: 'var(--green-deep)' }} onClick={() => void onToggle(u)}>
-              {u.active ? <><Ban size={14} /> Suspender</> : <><RotateCcw size={14} /> Reactivar</>}
-            </button>
-            {u.active && <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={() => onDelete(u)}><Trash2 size={14} /> Dar de baja</button>}
+            {/* CALIDAD VISUAL · acciones de la cuenta en «⋯» (eran 4 botones por persona; «Dar de baja» al final y en rojo) */}
+            <MenuAcciones etiqueta={`Opciones de ${u.name}`} acciones={[
+              { etiqueta: 'Editar', icono: <Pencil size={15} />, onElegir: () => setEditing(u) },
+              { etiqueta: 'Cambiar contraseña', icono: <KeyRound size={15} />, onElegir: () => setPwFor(u) },
+              u.active ? { etiqueta: 'Suspender', icono: <Ban size={15} />, onElegir: () => void onToggle(u) } : { etiqueta: 'Reactivar', icono: <RotateCcw size={15} />, onElegir: () => void onToggle(u), activa: true },
+              ...(u.active ? [{ etiqueta: 'Dar de baja', icono: <Trash2 size={15} />, onElegir: () => onDelete(u), peligro: true }] : []),
+            ]} />
           </div>
 
           <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>

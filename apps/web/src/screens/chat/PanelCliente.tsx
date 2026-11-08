@@ -4,6 +4,7 @@
 // registrar su pago, mandarle el recibo) y cada acción abre su hoja sobre el redactor con el hilo a la vista. Las fotos del
 // hilo alimentan las hojas («Usar como INE» → alta, «Usar como comprobante» → pago). Todo lo decide el servidor.
 import { ProgramarSalida } from '../../app/ProgramarSalida'   // SALIDA PROGRAMADA
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link2, Search, UserCheck, KeyRound, UserPlus, IdCard, FileText, ShoppingBag, Banknote, Receipt, Contact, Send } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
@@ -128,7 +129,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     await cargar()
   }
   const desvincular = async () => {
-    if (!window.confirm('¿Quitar el vínculo con esta ficha? La conversación sigue igual.')) return
+    if (!(await confirmar('¿Quitar el vínculo con esta ficha? La conversación sigue igual.'))) return
     setOcupado(true)
     const r = await cliente.desvincular(conversationId)
     setOcupado(false)
@@ -162,7 +163,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     void cargarCots(ficha?.customer_id)
   }
   const cancelarCot = async (c: Cotizacion) => {
-    if (!window.confirm(`¿Cancelar la cotización ${c.folio}?`)) return
+    if (!(await confirmar(`¿Cancelar la cotización ${c.folio}?`))) return
     const r = await cot.cancelar(c.id)
     setMsg(r.ok ? { ok: true, texto: `Cotización ${c.folio} cancelada.` } : { ok: false, texto: r.mensaje })
     void cargarCots(ficha?.customer_id)

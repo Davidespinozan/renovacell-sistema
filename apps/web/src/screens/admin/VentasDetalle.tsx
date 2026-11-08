@@ -3,6 +3,7 @@
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
 import { orderClientName } from '../../data/ops/orderClient'
+import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
@@ -497,11 +498,11 @@ function CreditoAcciones({ order, dinero }: { order: OrderWithItems; dinero: Ord
   }
 
   const revocar = async () => {
-    const m = window.prompt('Motivo para revocar el crédito (el pedido dejará de estar liberado si no hay cobro suficiente).')
+    const m = (await pedirTexto('Motivo para revocar el crédito (el pedido dejará de estar liberado si no hay cobro suficiente).'))
     if (m == null) return
-    if (!m.trim()) { window.alert('La revocación necesita un motivo.'); return }
+    if (!m.trim()) { void avisar('La revocación necesita un motivo.'); return }
     const r = await revocarCreditoDePedido(newOpId(), { orderId: order.id, motivo: m })
-    if (!r.ok) window.alert(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo revocar el crédito.'))
+    if (!r.ok) void avisar(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo revocar el crédito.'))
   }
 
   const fld: React.CSSProperties = { padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }

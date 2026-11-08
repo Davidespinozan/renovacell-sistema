@@ -2,6 +2,7 @@
 // posición financiera (por cobrar / por pagar) y registro de gastos. Datos
 // SENSIBLES (costos/utilidad): solo Dirección. Lógica pura en data/ops/finanzas.
 import React, { useMemo, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { TrendingUp, TrendingDown, Wallet, Plus, X, Trash2, ArrowDownCircle, ArrowUpCircle, AlertTriangle, Receipt } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
@@ -208,7 +209,7 @@ export function Finanzas() {
                   <td data-label="Concepto">{g.concepto}</td>
                   <td data-label="Monto" data-rol="valor" className="mono">{money(g.monto)}</td>
                   <td data-label="" style={{ textAlign: 'right' }}>
-                    <button className="btn ghost sm" type="button" onClick={() => { if (window.confirm(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`)) void removeGasto(g.id) }}><Trash2 size={14} /></button>
+                    <button className="btn ghost sm" type="button" onClick={async () => { if ((await confirmar(`¿Eliminar el gasto "${g.concepto}" por ${money(g.monto)}? No se puede deshacer.`))) void removeGasto(g.id) }}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}

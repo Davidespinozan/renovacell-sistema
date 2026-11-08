@@ -2,6 +2,7 @@
 // (evita el "muro" de links) + usuario y cierre de sesión. El marco permanece; el
 // contenido cambia.
 import React, { useEffect, useState } from 'react'
+import { confirmar } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { ChevronRight, LogOut, Settings } from 'lucide-react'
 import { Icon } from './icons'
 import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, type ScreenDef } from './roles'
@@ -120,7 +121,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <button className="su-ic" type="button" aria-label="Ajustes" title="Ajustes" onClick={() => setAjustesOpen(true)}>
               <Settings size={16} />
             </button>
-            <button className="su-ic" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { if (window.confirm('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).')) logout() }}>
+            <button className="su-ic" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={async () => { if ((await confirmar('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).'))) logout() }}>
               <LogOut size={16} />
             </button>
           </div>

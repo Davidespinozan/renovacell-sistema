@@ -295,8 +295,10 @@ export function Caja() {
                   return promo ? <div className="pos-promo" title={promo}>{nivel ?? (disc ? 'Precio por volumen' : promo)}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
                   : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
+                {/* CALIDAD VISUAL · «+» visible: antes no se sabía que tocar la tarjeta agregaba */}
+                {!out && qty === 0 && <span className="pos-add" aria-hidden="true"><Icon name="plus" /></span>}
                 {qty > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
+                  <div className="pos-stepper" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
                     <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Icon name="minus" /></button>
                     <span className="mono">{qty}</span>
                     <button className="btn sm" type="button" onClick={() => add(p.id)}><Icon name="plus" /></button>

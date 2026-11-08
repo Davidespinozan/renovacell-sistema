@@ -2,6 +2,7 @@
 // Crea un pedido contra pedido idéntico a uno del Portal → cae solo en Almacén →
 // Preparar pedidos. Respeta el stock (mismo tope que el catálogo del doctor).
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
 import { hasSupabase, supabase } from '../../lib/supabase'
@@ -207,7 +208,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
       setSavingFiscal(true)
       const res = await upsertCustomerFiscal(fiscalCustomerId, fiscal)
       setSavingFiscal(false)
-      if (!res.ok) { enviando.current = false; window.alert(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
+      if (!res.ok) { enviando.current = false; void avisar(res.error ?? 'No se pudieron guardar los datos fiscales.'); return }
     }
     const solicitud = solicitudActual()
     const huella = huellaDe(solicitud)

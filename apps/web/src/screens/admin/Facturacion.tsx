@@ -4,6 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import { orderClientName } from '../../data/ops/orderClient'
+import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
@@ -348,7 +349,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
     setSolicitando(true)
     try {
       const r = await markInvoiced(order.id)
-      if (!r.ok) window.alert(r.error ?? 'No se pudo registrar la solicitud de factura.')
+      if (!r.ok) void avisar(r.error ?? 'No se pudo registrar la solicitud de factura.')
       setFis(await estadoFiscalPedido(order.id))
     } finally { setSolicitando(false) }
   }
@@ -375,7 +376,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
     setSavingFiscal(true)
     try {
       const res = await setOrderFiscalSnapshot(order.id, fiscal) // por default: SOLO este pedido
-      if (!res.ok) { window.alert(res.error ?? 'No se pudo guardar el snapshot.'); return }
+      if (!res.ok) { void avisar(res.error ?? 'No se pudo guardar el snapshot.'); return }
       if (saveMaster && order.customer_id) await upsertCustomerFiscal(order.customer_id, fiscal) // acción explícita
       setEditingFiscal(false)
     } finally { setSavingFiscal(false) }
@@ -407,10 +408,10 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 {transfer.proof_path && <> · <button type="button" onClick={() => verProof(transfer.proof_path!)} style={{ color: 'var(--green-deep)', fontWeight: 700, background: 'none', border: 0, cursor: 'pointer', padding: 0 }}>Ver comprobante</button></>}
               </span>
               <button type="button" className="btn ghost sm" onClick={async () => {
-                const motivo = window.prompt('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela.')
+                const motivo = (await pedirTexto('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela.'))
                 if (motivo == null) return
                 const r = await reviewTransfer(order.id, 'reject', motivo)
-                if (!r.ok) { window.alert(r.error ?? 'No se pudo rechazar.'); return }
+                if (!r.ok) { void avisar(r.error ?? 'No se pudo rechazar.'); return }
                 onClose()
               }}>Rechazar pago informado</button>
             </div>
@@ -571,7 +572,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
               transfer ? (
                 <button className="btn ghost" type="button" onClick={async () => {
                   const r = await reviewTransfer(order.id, 'confirm')
-                  if (!r.ok) { window.alert(r.error ?? 'No se pudo confirmar.'); return }
+                  if (!r.ok) { void avisar(r.error ?? 'No se pudo confirmar.'); return }
                   onClose()
                 }}>
                   <BadgeDollarSign size={15} /> Confirmar pago informado

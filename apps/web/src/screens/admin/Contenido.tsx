@@ -3,6 +3,7 @@
 // punta) y la LANDING pública (siguiente paso, mismo editor). El acceso se da
 // con la capability "contenido" desde Equipo.
 import React, { useEffect, useMemo, useState } from 'react'
+import { avisar, confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Plus, X, Eye, EyeOff, Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { money } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
@@ -51,9 +52,9 @@ function ProductsEditor() {
   )
 
   const onDelete = async (p: ProductSafe) => {
-    if (!window.confirm(`¿Eliminar "${p.name}" del catálogo? Si ya tuvo pedidos, mejor ocúltalo.`)) return
+    if (!(await confirmar(`¿Eliminar "${p.name}" del catálogo? Si ya tuvo pedidos, mejor ocúltalo.`))) return
     const r = await deleteProduct(p.id)
-    if (!r.ok) window.alert(r.error ?? 'No se pudo eliminar.')
+    if (!r.ok) void avisar(r.error ?? 'No se pudo eliminar.')
   }
 
   const groups = useMemo(() => ({
@@ -321,6 +322,16 @@ function SecCard({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+// CALIDAD VISUAL (7 nov) · los títulos de la landing guardan HTML (<br>, <span class="green">). El personal de oficina ya no lo
+// ve: Enter = salto de línea y *entre asteriscos* = en verde. Si el campo trae otro HTML, se muestra tal cual (no se pierde nada).
+export function htmlAAmigable(html: string): string | null {
+  const t = (html ?? '').replace(/<br\s*\/?>\s*/gi, '\n').replace(/<span class=["']green["']>([^<*]*)<\/span>/gi, '*$1*')
+  return /<[a-z/!]/i.test(t) ? null : t
+}
+export function amigableAHtml(t: string): string {
+  return (t ?? '').replace(/\*([^*\n]+)\*/g, '<span class="green">$1</span>').replace(/\r?\n/g, '<br>')
+}
+
 function LandingTab() {
   const { data, saveLanding, resetLanding } = useLanding()
   const [draft, setDraft] = useState<LandingContent>(data)
@@ -357,13 +368,21 @@ function LandingTab() {
   // Campo de texto largo.
   const A = ({ label, value, onChange, hint }: {
     label: string; value: string; onChange: (v: string) => void; hint?: string
-  }) => (
-    <div>
-      <label style={lbl}>{label}</label>
-      <textarea style={area} value={value} onChange={(e) => onChange(e.target.value)} />
-      {hint && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>{hint}</div>}
-    </div>
-  )
+  }) => {
+    const conHtml = !!hint && /^Admite HTML/.test(hint)
+    const amigable = conHtml ? htmlAAmigable(value) : null
+    return (
+      <div>
+        <label style={lbl}>{label}</label>
+        {amigable !== null
+          ? <textarea style={area} value={amigable} onChange={(e) => onChange(amigableAHtml(e.target.value))} />
+          : <textarea style={area} value={value} onChange={(e) => onChange(e.target.value)} />}
+        {amigable !== null
+          ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>Enter = salto de línea · <b>*entre asteriscos*</b> = en verde.</div>
+          : hint && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>{hint}</div>}
+      </div>
+    )
+  }
 
   return (
     <div className="grid" style={{ gap: 14 }}>

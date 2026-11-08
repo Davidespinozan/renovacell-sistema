@@ -8,7 +8,8 @@ import { renderScreen } from '../screens/registry'
 import { FallosEscritura } from './FallosEscritura'
 import { ChatFlotante } from './ChatFlotante'
 import { AsistenteEquipoPuerta } from './AsistenteEquipo'
-import { observarBarras } from './barrasDesplazables'   // CALIDAD VISUAL · pestañas: activa a la vista y desvanecido   // ASISTENTE DEL EQUIPO · «Pregúntale al sistema»
+import { observarBarras } from './barrasDesplazables'
+import { DialogosHost } from './dialogos'   // CALIDAD VISUAL · diálogos con estilo en lugar de los nativos   // CALIDAD VISUAL · pestañas: activa a la vista y desvanecido   // ASISTENTE DEL EQUIPO · «Pregúntale al sistema»
 import { AlertaComercial } from './AlertaComercial'
 import { AvisoVerificacion } from '../screens/doctor/AvisoVerificacion'
 import { VersionNueva } from './VersionNueva'
@@ -74,6 +75,7 @@ export function AppShell() {
       <AlertaComercial />
       {/* ASISTENTE DEL EQUIPO · solo personal; fuera de #content para que la plática sobreviva al cambio de pantalla. */}
       <AsistenteEquipoPuerta />
+      <DialogosHost />
       <div id="drawerOverlay" onClick={() => setDrawer(false)} />
       <BottomNav onMenu={() => setDrawer(true)} />
     </div>

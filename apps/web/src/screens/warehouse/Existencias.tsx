@@ -20,6 +20,7 @@ export function Existencias() {
   const { data: products } = useProducts()
   const [mermaLot, setMermaLot] = useState<MermaLot | null>(null)
   const [ajusteLot, setAjusteLot] = useState<MermaLot | null>(null)
+  const [q, setQ] = useState('')   // CALIDAD VISUAL · buscar por producto o lote (antes había que recorrer toda la lista)
 
   const groups = useMemo(() => {
     const byProduct = new Map<string, Lot[]>()
@@ -32,16 +33,18 @@ export function Existencias() {
       .map((p) => ({ product: p, lots: (byProduct.get(p.id) ?? []).slice().sort(byExpiry) }))
       .filter((g) => g.lots.length > 0)
   }, [lots, products])
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const visibles = useMemo(() => { const t = norm(q.trim()); return t ? groups.filter((g) => norm(g.product.name).includes(t) || g.lots.some((l) => norm(l.lot_code).includes(t))) : groups }, [groups, q])
 
   return (
     <div className="grid" style={{ gap: 16 }}>
       <GuiaInventario paso={3} />
       <PageHead title="Inventario">
-        Todo el producto guardado, agrupado por tipo y por lote. La etiqueta
-        <b> Usar primero</b> marca el lote que debe salir antes, porque es el que caduca más pronto.
+        Por producto y por lote. <b>Usar primero</b> = el lote que caduca antes.
       </PageHead>
       {groups.length > 0 && (
-        <div style={{ display: 'flex' }}>
+        <div className="filters">
+          <label className="searchbox"><Icon name="search" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto o lote" aria-label="Buscar producto o lote" data-testid="existencias-buscar" /></label>
           <ExportButton
             name="existencias"
             style={{ marginLeft: 'auto' }}
@@ -57,7 +60,8 @@ export function Existencias() {
           />
         </div>
       )}
-      {groups.map((g) => (
+      {q.trim() && visibles.length === 0 && <Vacio icono="search" titulo="Sin resultados." pista={`Ningún producto ni lote coincide con «${q.trim()}».`} />}
+      {visibles.map((g) => (
         <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} onAjuste={setAjusteLot} />
       ))}
       {groups.length === 0 && (
@@ -103,6 +107,7 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
           const sev = severity(d)
           return (
             <div key={l.id} className="lote">
+              <span className="lote-info">
               <span className="lc" title="Código de lote">{l.lot_code}</span>
               {l.id === fefoId && (
                 <span className="fefo"><Icon name="check" /> Usar primero</span>
@@ -110,6 +115,7 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
               <span style={{ color: 'var(--ink-3)' }}>{fmtDate(l.expiry_date ?? '')}</span>
               <span className={'pill ' + sevPill(sev)}>{etiquetaCaducidad(d, l.expiry_date)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
+              </span>
               <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
               {/* Ajustar y Merma pesan igual (fantasma); solo el ícono de Merma va en rojo para avisar que da de baja. */}
               <span className="inv-acc">

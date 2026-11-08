@@ -1,6 +1,7 @@
 // CHOFER: solo SUS entregas (driver_id = chofer logueado). Marca entregado +
 // sube foto de prueba. Al confirmar, envío y pedido pasan a Entregado (cierra el ciclo).
 import { Vacio } from '../../app/EmptyState'
+import { Phone, Navigation } from 'lucide-react'
 import { useMemo, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
@@ -261,20 +262,16 @@ export function MisEntregas() {
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13, marginBottom: 12 }}>
-                <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name}{client.clinic ? ` · ${client.clinic}` : ''}</div>
-                <div>
-                  <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Teléfono</div>
-                  <a className="tap-link" href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} style={{ color: 'var(--green-deep)', fontWeight: 600, textDecoration: 'none' }}>
-                    {deliv.phone} · Llamar
-                  </a>
+              {/* CALIDAD VISUAL (7 nov) · para usarse con una mano en la calle: quién y dónde en grande, y dos botones de 52 px
+                  (Llamar · Navegar) en vez de enlaces chicos. */}
+              <div className="parada">
+                <div className="parada-cliente">{client.name}{client.clinic ? <small>{client.clinic}</small> : null}</div>
+                <div className="parada-dir">{deliv.addr}</div>
+                <div className="parada-prod">{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(' · ')}</div>
+                <div className="parada-botones">
+                  <a className="btn ghost" href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} aria-label={`Llamar al ${deliv.phone}`}><Phone size={18} /> Llamar</a>
+                  <a className="btn ghost" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer"><Navigation size={18} /> Navegar</a>
                 </div>
-                <div>
-                  <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>
-                  {deliv.addr}{' '}
-                  <a className="tap-link" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green-deep)', fontWeight: 600, whiteSpace: 'nowrap', display: 'flex' }}>Ver en mapa</a>
-                </div>
-                <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
               </div>
 
               {s.status === 'por_despachar' ? (
@@ -378,7 +375,7 @@ export function MisEntregas() {
               )}
 
               <details style={{ marginTop: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-3)', padding: '14px 0' }}>¿Problema con la entrega? Reportar incidencia</summary>
+                <summary className="btn ghost parada-incidencia">¿Problema con la entrega? Reportar incidencia</summary>
                 <div className="field-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                   <select
                     value={incType[s.id] ?? INCIDENT_TYPES[0]}

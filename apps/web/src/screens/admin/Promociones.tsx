@@ -2,6 +2,7 @@
 // escalones por cantidad), pausarla o editarla. Se puede PEGAR el texto del proveedor y el sistema propone la promoción;
 // la persona revisa, empareja productos y guarda. El precio lo aplica el servidor (precio_de/3) solo mientras dura.
 import React, { useEffect, useMemo, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { money } from '../../lib/format'
@@ -88,7 +89,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
     if (r.ok) { await cargar(); if (envio.canales.includes('chat') && r.data.chat > 0) void avisarChat(envio.promo.id) }
   }
   const borrar = async (p: Promocion) => {
-    if (!window.confirm(`¿Eliminar "${p.nombre}"? Solo se puede si nunca se envió ni vendió.`)) return
+    if (!(await confirmar(`¿Eliminar "${p.nombre}"? Solo se puede si nunca se envió ni vendió.`))) return
     setError(null)
     const r = await eliminar(p.id)
     if (!r.ok) { setError(r.error); return }

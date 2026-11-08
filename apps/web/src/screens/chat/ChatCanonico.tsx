@@ -4,6 +4,7 @@
 // Transporte: polling acotado y solo con la pestaña visible; la autoridad SIEMPRE es el servidor
 // (modo, asesor, handoff, carrito). Aquí solo se presenta y se envía con idempotencia (client_message_id).
 import { suscribirMensajes, type Suscriptor } from '../../data/ops/chatRealtime'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { TarjetaPromoChat } from './TarjetaPromoChat'
 import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
@@ -426,7 +427,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const terminarAsesoria = async (solicitud = false) => {
     if (!convId) return
     // TERMINAR-SOLICITUD · cerrar una solicitud que nadie inició se confirma: el cliente sigue con el asistente.
-    if (solicitud && !window.confirm('¿Cerrar esta solicitud de asesor? El cliente sigue con el asistente y puede volver a pedir un asesor cuando quiera.')) return
+    if (solicitud && !(await confirmar('¿Cerrar esta solicitud de asesor? El cliente sigue con el asistente y puede volver a pedir un asesor cuando quiera.'))) return
     setErrorTerminar(null)
     const r = await cliente.terminar(convId)
     if (!r.ok) { setErrorTerminar(r.error.mensaje); await cargar(convId, 0); return }

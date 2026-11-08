@@ -4,6 +4,7 @@
 // Al confirmar nace el ASIENTO (`revisar_pago`) y el servidor recalcula payment_status;
 // al rechazar (con motivo) el pedido queda sin pagar y el cliente puede volver a reportar.
 import { orderClientName } from '../../data/ops/orderClient'
+import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useMemo, useState } from 'react'
 import { BadgeDollarSign, Clock, Landmark, FileImage, Check, X } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -56,18 +57,18 @@ export function PagosPorValidar() {
     setBusy(o.id)
     try {
       const r = await reviewTransfer(o.id, 'confirm')
-      if (!r.ok) window.alert(r.error ?? 'No se pudo confirmar el pago.')
+      if (!r.ok) void avisar(r.error ?? 'No se pudo confirmar el pago.')
     } finally { setBusy(null) }
   }
   const rechazar = async (o: OrderWithItems) => {
     if (busy) return
-    const motivo = window.prompt('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela el pedido.')
+    const motivo = (await pedirTexto('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela el pedido.'))
     if (motivo == null) return
-    if (!motivo.trim()) { window.alert('El rechazo necesita un motivo.'); return }
+    if (!motivo.trim()) { void avisar('El rechazo necesita un motivo.'); return }
     setBusy(o.id)
     try {
       const r = await reviewTransfer(o.id, 'reject', motivo)
-      if (!r.ok) window.alert(r.error ?? 'No se pudo rechazar.')
+      if (!r.ok) void avisar(r.error ?? 'No se pudo rechazar.')
     } finally { setBusy(null) }
   }
 

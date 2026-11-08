@@ -3,6 +3,7 @@
 // restaurar, fuentes y la importación del conocimiento ya existente como borrador.
 // No muestra ni edita precio, stock, costo ni fiscal: eso tiene sus propias pantallas.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { confirmar as confirmarDlg, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Cargando } from '../../app/EmptyState'
 import { conocimiento as clientePorDefecto, SECCIONES, TIPOS_FUENTE, type ClienteConocimiento, type Cobertura, type Fuente, type Version, type Claim } from '../../data/ops/conocimiento'
 
@@ -59,7 +60,7 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
   }
   const aprobar = async (v: Version) => {
     let confirmar = false
-    if (v.nivel === 'T2') { confirmar = window.confirm('Contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?'); if (!confirmar) return }
+    if (v.nivel === 'T2') { confirmar = (await confirmarDlg('Contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?')); if (!confirmar) return }
     const r = await cliente.aprobar(v.id, confirmar)
     if (!r.ok) { setError(r.error); return }
     setError(null); setAviso(`Aprobada ${etiquetaSeccion(v.seccion)} v${v.version}${r.data.retirada ? ' (la versión anterior quedó retirada)' : ''}.`); await refrescar()
@@ -68,8 +69,8 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
   const aprobarFicha = async () => {
     if (!sel) return
     const hayClinico = versiones.some((v) => v.estado === 'draft' && v.nivel === 'T2')
-    if (!window.confirm(`Se aprueban todos los borradores de ${sel.nombre}. ¿Ya los revisaste?`)) return
-    const confirmar = hayClinico && t2 ? window.confirm('Incluye contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?') : false
+    if (!(await confirmarDlg(`Se aprueban todos los borradores de ${sel.nombre}. ¿Ya los revisaste?`))) return
+    const confirmar = hayClinico && t2 ? (await confirmarDlg('Incluye contenido clínico/regulatorio. ¿Confirmas que fue revisado y que Renovacell asume su publicación a doctores verificados?')) : false
     const r = await cliente.aprobarFicha(sel.product_id, confirmar)
     if (!r.ok) { setError(r.error); return }
     const MOTIVO: Record<string, string> = { FUENTE_REQUERIDA: 'falta su fuente', T2_BLOQUEADO: 'es información clínica (actívala y confirma)', CLAIM_PROHIBIDO: 'tiene una afirmación prohibida', CLAIM_REQUIERE_T2: 'tiene lenguaje clínico' }
@@ -78,7 +79,7 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
     await refrescar()
   }
   const retirar = async (v: Version) => {
-    const motivo = window.prompt('Motivo del retiro:'); if (!motivo) return
+    const motivo = (await pedirTexto('Motivo del retiro:')); if (!motivo) return
     const r = await cliente.retirar(v.id, motivo); if (!r.ok) { setError(r.error); return }
     setError(null); setAviso('Versión retirada.'); await refrescar()
   }
@@ -87,13 +88,13 @@ export function Conocimiento({ cliente = clientePorDefecto }: { cliente?: Client
     setError(null); setAviso(`Copiada como borrador v${r.data.version}; revísala y apruébala.`); await refrescar()
   }
   const importar = async () => {
-    if (!window.confirm('Importa como BORRADOR lo que el catálogo ya sabe (presentación, tagline, chips, folletos, textos del sitio). Nada se aprueba automáticamente. ¿Continuar?')) return
+    if (!(await confirmarDlg('Importa como BORRADOR lo que el catálogo ya sabe (presentación, tagline, chips, folletos, textos del sitio). Nada se aprueba automáticamente. ¿Continuar?'))) return
     const r = await cliente.importar(); if (!r.ok) { setError(r.error); return }
     const d = r.data; setAviso(`Importado como borrador: ${Object.entries(d).map(([k, n]) => `${k} ${n}`).join(' · ')}.`); await refrescar()
   }
   const cambiarT2 = async () => {
     const siguiente = !t2
-    if (siguiente && !window.confirm('Permitir información clínica deja aprobar y servir contenido clínico/regulatorio a doctores verificados. ¿Dirección lo autoriza?')) return
+    if (siguiente && !(await confirmarDlg('Permitir información clínica deja aprobar y servir contenido clínico/regulatorio a doctores verificados. ¿Dirección lo autoriza?'))) return
     const r = await cliente.configurarT2(siguiente); if (!r.ok) { setError(r.error); return }
     setT2(r.data); setAviso(r.data ? 'Información clínica permitida.' : 'Información clínica bloqueada.')
   }

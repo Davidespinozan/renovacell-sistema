@@ -6,6 +6,7 @@
 // CS-1A.7 · un "Resultado desconocido" NUNCA se cierra solo (ni por tiempo ni por búsqueda vacía): el cierre sin cargo es una acción
 // separada que exige ≥ 24 h, consulta al banco por id y referencia en ese momento, revisión declarada del Business Center, motivo y responsable.
 import React, { useEffect, useState } from 'react'
+import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { CreditCard, RefreshCw, Search, Check, Undo2, BookCheck, ShieldAlert } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { listarIntentosAtencion as listarReal, listarEventos as eventosReal, conciliar as conciliarReal, ETIQUETA_ESTADO, HORAS_CIERRE_MANUAL, MOTIVO_MINIMO_CIERRE, horasParaCierre, type IntentoAdmin, type EventoIntento, type AccionConciliar } from '../../data/payments/cybersourceConciliar'
@@ -33,9 +34,9 @@ export function ConciliacionTarjeta({ deps }: { deps?: DepsConciliacion }) {
     if (acc === 'cerrar_manual') {
       if (motivo.trim().length < MOTIVO_MINIMO_CIERRE) { setResultado({ tipo: 'error', texto: `El cierre manual exige un motivo de al menos ${MOTIVO_MINIMO_CIERRE} caracteres.` }); return }
       if (!bcRevisado) { setResultado({ tipo: 'error', texto: 'Confirma que revisaste el Business Center de CyberSource y no existe ninguna transacción de este intento.' }); return }
-      if (!window.confirm('Cerrar SIN CARGO este intento. Se consultará al banco por identificador y por referencia en este momento; si aparece cualquier transacción NO se cerrará. Quedarás como responsable en la bitácora. ¿Continuar?')) return
+      if (!(await confirmar('Cerrar SIN CARGO este intento. Se consultará al banco por identificador y por referencia en este momento; si aparece cualquier transacción NO se cerrará. Quedarás como responsable en la bitácora. ¿Continuar?'))) return
     }
-    if ((acc === 'capturar' || acc === 'reversar') && !window.confirm(acc === 'capturar' ? 'Capturar la autorización en el banco. ¿Continuar?' : 'Reversar la autorización en el banco (libera el cargo retenido). ¿Continuar?')) return
+    if ((acc === 'capturar' || acc === 'reversar') && !(await confirmar(acc === 'capturar' ? 'Capturar la autorización en el banco. ¿Continuar?' : 'Reversar la autorización en el banco (libera el cargo retenido). ¿Continuar?'))) return
     setOcupado(true); setResultado(null)
     const r = await conciliar(acc, id, motivo.trim() || undefined, acc === 'cerrar_manual' ? { business_center_revisado: true } : undefined)
     setOcupado(false)
