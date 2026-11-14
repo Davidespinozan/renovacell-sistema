@@ -84,3 +84,21 @@ describe('SUCURSAL · dirección que da la IA', () => {
     expect(SUCURSAL.direccion).not.toMatch(/Pedro Infante/)
   })
 })
+
+import { sucursalDe } from '../../../../../supabase/functions/_shared/ubicacion'
+describe('SUCURSAL editable desde Configuración («Dónde se recoge»)', () => {
+  it('texto genérico → Mía Plaza Perisur; un domicilio con número → ese domicilio', () => {
+    expect(sucursalDe('Sucursal Renovacell, Culiacán').direccion).toMatch(/Mía Plaza Perisur/)
+    expect(sucursalDe(null).direccion).toMatch(/Mía Plaza Perisur/)
+    expect(sucursalDe('Boulevard Pedro Infante 2911, Tres Ríos, Culiacán').direccion).toBe('Boulevard Pedro Infante 2911, Tres Ríos, Culiacán')
+  })
+  it('si reabren Pedro Infante y lo escriben en Configuración, la IA da esa dirección', async () => {
+    const cadena = (tabla: string, data: unknown) => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order', 'lte', 'gte']) c[k] = () => c; c.maybeSingle = async () => ({ data, error: null }); c.then = (r: (x: unknown) => unknown, j: (e: unknown) => unknown) => Promise.resolve({ data, error: null }).then(r, j); return c }
+    const entrega = { ...ERP.entrega, recoge_lugar: 'Boulevard Pedro Infante 2911, Tres Ríos, Culiacán' }
+    const admin = { from: (t: string) => cadena(t, t === 'company_settings' ? ERP.empresa : t === 'entrega_config' ? entrega : t === 'cc_horario_semanal' ? ERP.horario : []) }
+    const t = politica.textoNegocio(await leerNegocio(admin))
+    expect(t).toContain('Sucursal (aquí se atiende en persona y se recogen pedidos; es la ÚNICA dirección que se da a clientes): Boulevard Pedro Infante 2911, Tres Ríos, Culiacán.')
+    expect(t).toContain('Recoger pedidos: en la sucursal, lunes a sábado')
+    expect(t).not.toContain('Mía Plaza')
+  })
+})

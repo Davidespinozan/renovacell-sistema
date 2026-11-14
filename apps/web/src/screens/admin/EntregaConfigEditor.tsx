@@ -138,7 +138,8 @@ export function EntregaConfigEditor({ ver = verConfigEntrega, guardar = guardarC
           <label style={{ fontSize: 12 }}>T1 máx.<input style={input} type="number" min={0} max={30} value={f.t1_transito_max} onChange={texto('t1_transito_max')} aria-label="T1 tránsito máximo" disabled={!f.t1_activo} /></label>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
-          <label style={{ fontSize: 12 }}>Dónde se recoge<input style={input} maxLength={200} value={f.recoge_lugar} onChange={texto('recoge_lugar')} aria-label="Lugar para recoger" placeholder="Sucursal Renovacell, calle y número, Culiacán" /></label>
+          <label style={{ fontSize: 12 }}>Dónde se recoge<input style={input} maxLength={200} value={f.recoge_lugar} onChange={texto('recoge_lugar')} aria-label="Lugar para recoger" placeholder="Mía Plaza Perisur, Nuevo Mundo 1045-17, 80197 Culiacán" />
+            <small style={{ display: 'block', color: 'var(--ink-3)', marginTop: 3 }}>Es la dirección de la sucursal que dan la IA y el botón «Mandar ubicación». Si cambian de sucursal, cámbiala aquí.</small></label>
           <label style={{ fontSize: 12 }}>Horario para recoger<input style={input} maxLength={200} value={f.recoge_horario} onChange={texto('recoge_horario')} aria-label="Horario para recoger" placeholder="Lunes a sábado de 10:00 a 18:00" /></label>
         </div>
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }} data-testid="entrega-horarios-cfg">

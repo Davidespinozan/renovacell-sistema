@@ -10,7 +10,7 @@ import { configurar, crearProveedorAnthropic, esModeloConPensamiento, type Opcio
 import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
 import { esNumeroEmpresa, frenoBot, sinContenido } from './antibot.ts'
-import { SUCURSAL } from '../ubicacion.ts'   // SUCURSAL · la dirección que da la IA (no la fiscal)
+import { sucursalDe } from '../ubicacion.ts'   // SUCURSAL · la dirección que da la IA (no la fiscal): la de Configuración
 
 // R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
 // seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
@@ -35,7 +35,8 @@ export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
     nombre: p.nombre, hasta: p.hasta, productos: [...new Set((p.promocion_lineas ?? []).map((l) => l.products?.name).filter((x): x is string => !!x))],
   })) : null
   const em = empresa as { aviso_ia?: string | null; aviso_ia_hasta?: string | null } | null
-  return { empresa: empresa as politica.DatosNegocio['empresa'], sucursal: { nombre: SUCURSAL.nombre, direccion: SUCURSAL.direccion }, horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'],
+  const suc = sucursalDe((entrega as { recoge_lugar?: string | null } | null)?.recoge_lugar)
+  return { empresa: empresa as politica.DatosNegocio['empresa'], sucursal: { nombre: suc.nombre, direccion: suc.direccion }, horario: horario as politica.DatosNegocio['horario'], entrega: entrega as politica.DatosNegocio['entrega'],
     manual: Array.isArray(manual) ? manual as politica.DatosNegocio['manual'] : null, promociones,
     aviso: em?.aviso_ia ? { texto: em.aviso_ia, hasta: em.aviso_ia_hasta ?? null } : null, ahora: new Date().toISOString() }
 }

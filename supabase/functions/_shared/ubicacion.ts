@@ -16,6 +16,15 @@ export const SUCURSAL: Ubicacion = {
   lat: null, lng: null,
 }
 
+/** La sucursal VIGENTE: lo que Dirección escribe en Configuración → Regla de entrega → «Dónde se recoge». Si ahí hay un
+ *  domicilio con número (p. ej. «Boulevard Pedro Infante 2911, Tres Ríos, Culiacán» cuando reabran), esa es la dirección
+ *  que dan la IA y el botón «Mandar ubicación». Si solo dice algo genérico («Sucursal Renovacell, Culiacán»), se usa SUCURSAL. */
+export function sucursalDe(lugar: string | null | undefined): Ubicacion {
+  const t = (lugar ?? '').replace(/\s+/g, ' ').trim()
+  if (t.length < 8 || !/\d/.test(t)) return SUCURSAL
+  return { nombre: 'Renovacell · Sucursal', direccion: t.slice(0, 300), lat: null, lng: null }
+}
+
 const valida = (lat: number, lng: number) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0)
 const redondear = (n: number) => Math.round(n * 1e6) / 1e6
 

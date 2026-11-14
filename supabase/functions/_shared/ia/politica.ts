@@ -490,7 +490,8 @@ export function textoNegocio(n: DatosNegocio): string {
     l.push(`Horario de atención (hora de Culiacán): ${[...grupos].map(([k, ds]) => `${rangoDias(ds)} de ${k}`).join('; ')}${cerrados.length ? `; ${cerrados.join(', ')} cerrado` : ''}.`)
   }
   if (em.telefono) l.push(`Teléfono para llamadas: ${em.telefono}. Por mensaje se atiende en este mismo chat.`)
-  if (e.recoge_lugar) l.push(`Recoger pedidos: ${e.recoge_lugar}${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
+  if (n.sucursal?.direccion && (e.recoge_lugar || e.recoge_horario)) l.push(`Recoger pedidos: en la sucursal${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
+  else if (e.recoge_lugar) l.push(`Recoger pedidos: ${e.recoge_lugar}${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
   if (e.cp_local_desde && e.cp_local_hasta) {
     const partes = [`Entregas en Culiacán (C.P. ${e.cp_local_desde} a ${e.cp_local_hasta}): con chofer${rangoDias(e.dias_chofer) ? ` de ${rangoDias(e.dias_chofer)}` : ''}`]
     if (e.local_mismo_dia) partes.push(`el mismo día si el pedido se confirma antes de las ${hhmm(e.corte) || '15:30'}`)

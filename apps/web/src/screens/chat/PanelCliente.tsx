@@ -30,7 +30,8 @@ import { interesReciente as interesPorDefecto, resumenInteres, type InteresRecie
 import type { AccionChat } from './ChatCanonico'
 import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
 import { MapPin, LocateFixed, ArrowRightLeft } from 'lucide-react'
-import { SUCURSAL, coordsDeTexto, textoUbicacion, type Ubicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
+import { SUCURSAL, sucursalDe, coordsDeTexto, textoUbicacion, type Ubicacion } from '../../../../../supabase/functions/_shared/ubicacion'
+import { verConfigEntrega } from '../../data/ops/entrega'   // SUCURSAL · la vigente sale de Configuración   // UBICACIÓN EN EL CHAT
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
@@ -83,6 +84,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   // UBICACIÓN EN EL CHAT (pedido de Alejandra) · la sucursal, la ubicación actual del dispositivo o un enlace de Google Maps.
   // PASAR CONVERSACIÓN · a otro vendedor (p. ej. ya es cliente de él), con motivo.
   const [pase, setPase] = useState<{ lista: Array<{ id: string; nombre: string }> | null; a: string; motivo: string }>({ lista: null, a: '', motivo: '' })
+  const [sucursal, setSucursal] = useState<Ubicacion>(SUCURSAL)
+  useEffect(() => { if (hoja !== 'pc:ubicacion') return; let vivo = true; void verConfigEntrega().then((r) => { if (vivo && r.ok) setSucursal(sucursalDe(r.data.recoge_lugar)) }); return () => { vivo = false } }, [hoja])
   const [ubic, setUbic] = useState({ enlace: '', nombre: '', direccion: '', lat: null as number | null, lng: null as number | null, buscando: false })
   const [segForm, setSegForm] = useState<{ estado: EstadoSeguimiento | null; nota: string; recordar: string }>({ estado: null, nota: '', recordar: enDias(3) })
   const cargarSeg = useCallback(async (customer?: string | null) => { const r = await segCli.de(customer ?? null, conversationId); setSeg(r.ok ? r.data : null) }, [segCli, conversationId])
@@ -502,8 +505,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
       <ul className="pc-lista">
         <li className="pc-cand">
           <span className="pc-av" aria-hidden><MapPin size={16} /></span>
-          <span className="pc-cand-tx"><b>{SUCURSAL.nombre}</b><small>{SUCURSAL.direccion}</small></span>
-          <button type="button" className="btn sm" disabled={ocupado} onClick={() => void mandarUbicacion(SUCURSAL)} data-testid="ubic-sucursal">Mandar</button>
+          <span className="pc-cand-tx"><b>{sucursal.nombre}</b><small>{sucursal.direccion}</small></span>
+          <button type="button" className="btn sm" disabled={ocupado} onClick={() => void mandarUbicacion(sucursal)} data-testid="ubic-sucursal">Mandar</button>
         </li>
       </ul>
       <div className="pc-nota">U otra ubicación:</div>
