@@ -10,7 +10,10 @@ type Form = { nombre: string | null; etiqueta: string; categoria: Categoria; tex
 const VACIO: Form = { nombre: null, etiqueta: '', categoria: 'MARKETING', texto: '', botones: [] }
 const legible = (texto: string) => texto.replace(/\{\{(cliente|vendedor|promocion|promocion_hasta)\}\}/g, (_m, v: Variable) => `[${ETIQUETA_VARIABLE[v]}]`)
 
-export function PlantillasMeta({ cliente = plantillasPorDefecto() }: { cliente?: ReturnType<typeof plantillasPorDefecto> }) {
+// Un solo cliente para toda la app: si se creara uno por render, cargar/sincronizar cambiarían en cada render y el panel
+// consultaría a Meta en bucle.
+const CLIENTE = plantillasPorDefecto()
+export function PlantillasMeta({ cliente = CLIENTE }: { cliente?: ReturnType<typeof plantillasPorDefecto> }) {
   const [lista, setLista] = useState<PlantillaWA[] | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
