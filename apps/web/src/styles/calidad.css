@@ -442,3 +442,34 @@ input.interruptor:focus-visible{outline:2px solid var(--green-deep);outline-offs
   .pct-cta{flex:none;font-size:13.5px;font-weight:600;color:var(--green-deep)}
 }
 .trk-sig{font-size:14px;color:var(--ink-2,#334155)}.trk-sig b{color:var(--ink)}
+
+/* ── Plantillas de WhatsApp (Dirección): crear, mandar a Meta y ver su estado ── */
+.wa-tpl{padding:12px 14px;display:grid;gap:10px}
+.wa-tpl > summary{cursor:pointer;font-weight:650;display:flex;align-items:center;gap:8px;list-style:none}
+.wa-tpl-ayuda{font-size:13px;color:var(--ink-3);margin:0}
+.wa-tpl-barra{display:flex;gap:8px;flex-wrap:wrap}
+.wa-tpl-msg{font-size:13px;padding:9px 12px;border-radius:10px;background:var(--danger-bg);color:var(--danger)}
+.wa-tpl-msg.ok{background:var(--ok-bg,#EAF4EC);color:var(--green-deep)}
+.wa-tpl-form{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--cp-surface,#fff)}
+.wa-tpl-form label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.wa-tpl-form input,.wa-tpl-form textarea{font:inherit;font-size:14px;font-weight:400;padding:9px 11px;border:1px solid var(--line);border-radius:10px;min-height:42px}
+.wa-tpl-tipo{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wa-tpl-tipo button{display:grid;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;cursor:pointer}
+.wa-tpl-tipo button.on{border-color:var(--green-deep);background:var(--ok-bg,#EAF4EC)}
+.wa-tpl-tipo small{font-size:12px;color:var(--ink-3)}
+.wa-tpl-datos,.wa-tpl-botones{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wa-tpl-datos small,.wa-tpl-botones small{width:100%;font-size:12.5px;color:var(--ink-3)}
+.wa-tpl-boton{display:flex;gap:6px;align-items:center}
+.wa-tpl-boton input{width:200px}
+.wa-tpl-vista{display:grid;gap:4px}
+.wa-tpl-vista small{font-size:12.5px;color:var(--ink-3)}
+.wa-tpl-vbotones{display:flex;gap:6px;flex-wrap:wrap}
+.wa-tpl-vbotones span{font-size:12.5px;color:#0a7cff;background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+.wa-tpl-acciones{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.wa-tpl-lista{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.wa-tpl-lista > li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.wa-tpl-cab{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wa-tpl-rech{font-size:12.5px;color:var(--danger)}
+.wa-tpl-acc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.wa-tpl-manual{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink-3);margin-left:auto}
+@media (max-width:640px){.wa-tpl-tipo{grid-template-columns:1fr}.wa-tpl-boton{width:100%}.wa-tpl-boton input{flex:1;width:auto}.wa-tpl-acciones .btn{flex:1 1 auto;justify-content:center}}

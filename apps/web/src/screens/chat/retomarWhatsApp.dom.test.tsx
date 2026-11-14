@@ -8,6 +8,7 @@ import { RetomarWhatsApp } from './RetomarWhatsApp'
 import { PlantillasMeta } from '../admin/PlantillasMeta'
 import { mensajePlantilla, vistaPrevia, type PlantillaWA } from '../../data/ops/plantillasWA'
 import { cuerpoPlantilla } from '../../../../../supabase/functions/_shared/whatsapp'
+import { validar, nombreTecnico, payloadMeta, errorMeta } from '../../../../../supabase/functions/_shared/plantillasMeta'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const SEG: PlantillaWA = { nombre: 'seguimiento_vendedor', etiqueta: 'Seguimiento', categoria: 'MARKETING', cuerpo: 'Hola {{1}}, soy {{2}}, tu asesor(a) de Renovacell.', variables: ['cliente', 'vendedor'], activa: true }
@@ -54,14 +55,51 @@ describe('Retomar por WhatsApp', () => {
 })
 
 describe('Plantillas (Dirección) y formato de Meta', () => {
-  it('Dirección ve nombre, categoría y texto exactos y la activa cuando Meta la aprueba', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const c = cliente([{ ...SEG, activa: false }])
+  it('Dirección ve el estado en Meta, el texto legible y la manda a revisión (se consulta a Meta al abrir)', async () => {
+    const c = { ...cliente([{ ...SEG, activa: false, estado_meta: 'sin_enviar' }, { ...PRO, estado_meta: 'APPROVED' }]),
+      sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null) }
     render(<PlantillasMeta cliente={c} />)
-    const fila = await screen.findByTestId('plantilla-meta')
-    expect(fila).toHaveTextContent('seguimiento_vendedor'); expect(fila).toHaveTextContent('Marketing'); expect(fila).toHaveTextContent('{{1}} = nombre del cliente')
-    fireEvent.click(screen.getByTestId('plantilla-activa-seguimiento_vendedor'))
-    await waitFor(() => expect(c.activar).toHaveBeenCalledWith('seguimiento_vendedor', true))
+    const filas = await screen.findAllByTestId('plantilla-meta')
+    expect(filas[0]).toHaveTextContent('Hola [nombre del cliente], soy [nombre del vendedor]')
+    expect(screen.getByTestId('plantilla-estado-seguimiento_vendedor')).toHaveTextContent('Sin mandar a Meta')
+    expect(screen.getByTestId('plantilla-estado-promocion_vigente')).toHaveTextContent('Aprobada')
+    expect(screen.queryByTestId('plantilla-mandar-promocion_vigente')).toBeNull()   // aprobada: ya no se manda ni se edita
+    await waitFor(() => expect(c.sincronizar).toHaveBeenCalled())
+    fireEvent.click(screen.getByTestId('plantilla-mandar-seguimiento_vendedor'))
+    await waitFor(() => expect(c.mandarAMeta).toHaveBeenCalledWith('seguimiento_vendedor'))
+    expect(await screen.findByTestId('plantillas-msg')).toHaveTextContent('se mandó a Meta')
+  })
+  it('crear una plantilla: datos, botones de respuesta y vista previa; se guarda numerada y se manda', async () => {
+    const c = { ...cliente([]), sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null) }
+    render(<PlantillasMeta cliente={c} />)
+    fireEvent.click(await screen.findByTestId('plantilla-nueva'))
+    fireEvent.change(screen.getByTestId('plantilla-etiqueta'), { target: { value: 'Recordatorio de pedido' } })
+    fireEvent.change(screen.getByTestId('plantilla-texto'), { target: { value: 'Hola {{cliente}}, soy {{vendedor}}. ¿Le preparo su pedido de este mes?' } })
+    fireEvent.click(screen.getByTestId('plantilla-boton-mas'))
+    fireEvent.change(screen.getByLabelText('Botón 1'), { target: { value: 'Sí, por favor' } })
+    expect(screen.getByTestId('plantilla-vista')).toHaveTextContent('Hola [nombre del cliente], soy [nombre del vendedor]')
+    fireEvent.click(screen.getByTestId('plantilla-guardar-mandar'))
+    await waitFor(() => expect(c.guardar).toHaveBeenCalledWith({ nombre: 'recordatorio_de_pedido', etiqueta: 'Recordatorio de pedido', categoria: 'MARKETING',
+      cuerpo: 'Hola {{1}}, soy {{2}}. ¿Le preparo su pedido de este mes?', variables: ['cliente', 'vendedor'], botones: ['Sí, por favor'] }))
+    await waitFor(() => expect(c.mandarAMeta).toHaveBeenCalledWith('recordatorio_de_pedido'))
+  })
+  it('reglas de Meta revisadas antes de mandar', () => {
+    const b = (texto: string, botones: string[] = []) => validar({ etiqueta: 'Prueba', categoria: 'MARKETING', texto, botones })
+    expect(b('{{cliente}}, tenemos ofertas')).toMatchObject({ ok: false })                            // empieza con dato
+    expect(b('Hola, gracias {{cliente}}')).toMatchObject({ ok: false })                               // termina con dato
+    expect(b('Hola {{cliente}} {{vendedor}} aquí')).toMatchObject({ ok: false })                      // dos datos seguidos
+    expect(b('Hola {{nombre}}, qué tal')).toMatchObject({ ok: false })                                // dato desconocido
+    expect(b('Hola {{cliente}}, vence el {{promocion_hasta}} pronto')).toMatchObject({ ok: false })   // fecha sin promoción
+    expect(b('Hola {{cliente}}, qué tal', ['a', 'b', 'c', 'd'])).toMatchObject({ ok: false })         // más de 3 botones
+    expect(b('Hola {{cliente}}, le escribe {{vendedor}}; saludos {{cliente}} y buen día.')).toMatchObject({ ok: true, plantilla: { cuerpo: 'Hola {{1}}, le escribe {{2}}; saludos {{1}} y buen día.', variables: ['cliente', 'vendedor'] } })
+    expect(nombreTecnico('Promoción Buen Fin!')).toBe('promocion_buen_fin')
+  })
+  it('lo que se manda a Meta: cuerpo numerado, ejemplo de cada dato y botones de respuesta rápida', () => {
+    expect(payloadMeta({ nombre: 'x_y', categoria: 'UTILITY', cuerpo: 'Hola {{1}}, soy {{2}}.', variables: ['cliente', 'vendedor'], botones: ['Ok'] })).toEqual({
+      name: 'x_y', language: 'es_MX', category: 'UTILITY', components: [
+        { type: 'BODY', text: 'Hola {{1}}, soy {{2}}.', example: { body_text: [['Dra. López', 'Roberto']] } },
+        { type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: 'Ok' }] }] })
+    expect(errorMeta({ error_subcode: 2388023, message: 'x' })).toMatch(/Ya existe/)
   })
   it('cuerpo de plantilla para la API de WhatsApp', () => {
     expect(cuerpoPlantilla('521', 'seguimiento_vendedor', 'es_MX', ['Yara', 'Alejandra'])).toEqual({

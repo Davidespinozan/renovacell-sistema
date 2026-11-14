@@ -3,10 +3,21 @@
 // salida es la misma cola de WhatsApp de siempre.
 import { hasSupabase, supabase } from '../../lib/supabase'
 
-export interface PlantillaWA { nombre: string; etiqueta: string; categoria: 'MARKETING' | 'UTILITY'; cuerpo: string; variables: string[]; botones?: string[]; activa: boolean }
+export interface PlantillaWA { nombre: string; etiqueta: string; categoria: 'MARKETING' | 'UTILITY'; cuerpo: string; variables: string[]; botones?: string[]; activa: boolean
+  // WA-PLANTILLAS-META (14 nov 2026) · estado en Meta y uso
+  estado_meta?: string; motivo_meta?: string | null; enviada_at?: string | null; revisada_at?: string | null; usada?: boolean }
 export interface PromoVigente { promocion_id: string; nombre: string; hasta: string }
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) as never) as unknown as PromiseLike<{ data: unknown; error: { message?: string } | null }>
+type Invocar = (fn: string, body: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+const invocarPorDefecto: Invocar = (fn, body) => supabase.functions.invoke(fn, { body }) as unknown as Promise<{ data: unknown; error: unknown }>
+/** Mensaje legible de una Edge que respondió con error ({ message }). */
+async function mensajeEdge(e: unknown): Promise<string> {
+  const ctx = (e as { context?: { json?: () => Promise<unknown> } } | null)?.context
+  try { const b = (await ctx?.json?.()) as { message?: string } | undefined; if (b?.message) return b.message } catch { /* sin cuerpo */ }
+  return 'Sin conexión con Meta. Intenta de nuevo.'
+}
+const datosPlantilla = (m: string | undefined) => { const d = /PLANTILLA_DATOS: ?([^\n]*)/.exec(m ?? '')?.[1]; return d ? d.charAt(0).toUpperCase() + d.slice(1) + '.' : null }
 
 export function mensajePlantilla(m: string | undefined): string {
   const x = m ?? ''
@@ -18,7 +29,7 @@ export function mensajePlantilla(m: string | undefined): string {
   return 'No se pudo mandar la plantilla. Intenta de nuevo.'
 }
 
-export const plantillasWA = (rpc: Rpc = rpcPorDefecto) => ({
+export const plantillasWA = (rpc: Rpc = rpcPorDefecto, invocar: Invocar = invocarPorDefecto) => ({
   lista: async (): Promise<PlantillaWA[] | null> => {
     if (!hasSupabase && rpc === rpcPorDefecto) return []
     try { const { data, error } = await rpc('cc_wa_plantillas_lista'); return error ? null : Array.isArray(data) ? data as PlantillaWA[] : [] } catch { return null }
@@ -40,6 +51,27 @@ export const plantillasWA = (rpc: Rpc = rpcPorDefecto) => ({
       if (hasSupabase && rpc === rpcPorDefecto) void supabase.functions.invoke('meta-send', { body: {} }).catch(() => {})
       return { ok: true, texto: String((data as { texto?: string } | null)?.texto ?? '') }
     } catch { return { ok: false, mensaje: 'Sin conexión con el servidor.' } }
+  },
+  /** WA-PLANTILLAS-META · Dirección guarda una plantilla (cuerpo con {{1}}… y sus datos). */
+  guardar: async (p: { nombre: string; etiqueta: string; categoria: 'MARKETING' | 'UTILITY'; cuerpo: string; variables: string[]; botones: string[] }): Promise<string | null> => {
+    try {
+      const { error } = await rpc('cc_wa_plantilla_guardar', { p_nombre: p.nombre, p_etiqueta: p.etiqueta, p_categoria: p.categoria, p_cuerpo: p.cuerpo, p_variables: p.variables, p_botones: p.botones })
+      if (!error) return null
+      return datosPlantilla(error.message) ?? (/NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección crea plantillas.' : 'No se pudo guardar la plantilla.')
+    } catch { return 'Sin conexión con el servidor.' }
+  },
+  borrar: async (nombre: string): Promise<string | null> => {
+    try { const { error } = await rpc('cc_wa_plantilla_borrar', { p_nombre: nombre }); return error ? datosPlantilla(error.message) ?? 'No se pudo borrar.' : null } catch { return 'Sin conexión con el servidor.' }
+  },
+  /** Manda la plantilla a revisión de Meta (Edge wa-plantillas). */
+  mandarAMeta: async (nombre: string): Promise<{ ok: true; estado: string } | { ok: false; mensaje: string }> => {
+    if (!hasSupabase && invocar === invocarPorDefecto) return { ok: false, mensaje: 'Sin conexión con el servidor.' }
+    try { const { data, error } = await invocar('wa-plantillas', { accion: 'enviar', nombre }); if (error) return { ok: false, mensaje: await mensajeEdge(error) }; return { ok: true, estado: String((data as { estado?: string } | null)?.estado ?? 'PENDING') } } catch { return { ok: false, mensaje: 'Sin conexión con el servidor.' } }
+  },
+  /** Trae de Meta el estado de todas (las aprobadas se encienden solas). */
+  sincronizar: async (): Promise<string | null> => {
+    if (!hasSupabase && invocar === invocarPorDefecto) return null
+    try { const { error } = await invocar('wa-plantillas', { accion: 'sincronizar' }); return error ? await mensajeEdge(error) : null } catch { return 'Sin conexión con Meta.' }
   },
   activar: async (nombre: string, activa: boolean): Promise<string | null> => {
     try { const { error } = await rpc('cc_wa_plantilla_activar', { p_nombre: nombre, p_activa: activa }); return error ? 'No se pudo cambiar la plantilla.' : null } catch { return 'Sin conexión con el servidor.' }
