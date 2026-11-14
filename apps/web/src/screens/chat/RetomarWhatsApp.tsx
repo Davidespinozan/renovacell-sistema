@@ -1,15 +1,16 @@
 // WA-PLANTILLAS (3 nov 2026) · el cliente escribió por WhatsApp hace más de 24 h: Meta solo deja mandarle una plantilla
 // aprobada. Aquí el vendedor elige cuál (seguimiento, acceso a la app, promoción), ve cómo le llegará y la manda; cuando
 // el cliente conteste, la plática sigue normal. Mientras Meta no apruebe ninguna: llamarle o abrir su propio WhatsApp.
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { MessageCircle, Phone, Send, X } from 'lucide-react'
 import { plantillasWA as plantillasPorDefecto, vistaPrevia, type PlantillaWA, type PromoVigente } from '../../data/ops/plantillasWA'
 import { primerNombre } from '../../lib/nombres'
 import { fmtDate } from '../../lib/format'
 
-export function RetomarWhatsApp({ conversationId, waId, nombreCliente, onEnviada, cliente = plantillasPorDefecto() }: {
+export function RetomarWhatsApp({ conversationId, waId, nombreCliente, onEnviada, cliente: inyectado }: {
   conversationId: string; waId: string; nombreCliente: string | null; onEnviada: () => void; cliente?: ReturnType<typeof plantillasPorDefecto>
 }) {
+  const cliente = useRef(inyectado ?? plantillasPorDefecto()).current   // una instancia por montaje
   const [abierto, setAbierto] = useState(false)
   const [lista, setLista] = useState<PlantillaWA[] | null>(null)
   const [promos, setPromos] = useState<PromoVigente[]>([])

@@ -10,7 +10,9 @@ import { crm as crearCliente, ETAPAS, ORIGEN, totalesPorEtapa, type Etapa, type 
 import { SelectorClienteVentas } from '../pos/SelectorCliente'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 
-export function Embudo({ cliente = crearCliente() }: { cliente?: ReturnType<typeof crearCliente> }) {
+export function Embudo({ cliente: inyectado }: { cliente?: ReturnType<typeof crearCliente> }) {
+  // UNA instancia por montaje: creada en cada render, `cargar` cambiaba siempre y el efecto recargaba sin fin.
+  const cliente = useRef(inyectado ?? crearCliente()).current
   const rol = useRoleOpcional()
   const [ops, setOps] = useState<Oportunidad[] | null>(null)
   const [resumen, setResumen] = useState<ResumenCrm | null>(null)
