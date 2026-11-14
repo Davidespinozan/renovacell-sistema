@@ -55,6 +55,7 @@ export interface ColaItem {
   handoff_origen?: 'carrito' | 'manual' | null; fuera_horario?: boolean | null; ruteo_motivo?: string | null; cart_id?: string | null; n_items?: number | null; edad_min?: number | null; iniciada?: boolean
   atencion?: Atencion | null             // CHV2-A · estado derivado del servidor (_cc_atencion); la UI no recalcula esperas
   telefono?: string | null; canal?: string | null; ultimo?: { actor: string; texto: string; at: string } | null   // CONV-WHATSAPP
+  persona?: string | null   // HILO-PERSONA · la cuenta de la persona: sus conversaciones de distintos canales se muestran juntas
 }
 export type ErrorChat = { codigo: string; mensaje: string }
 

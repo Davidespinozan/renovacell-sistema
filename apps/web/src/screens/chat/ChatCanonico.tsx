@@ -19,6 +19,7 @@ import { BrandLogo } from '../../app/BrandLogo'
 import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
 import { retomarConversacion } from '../../data/ops/misConversaciones'   // CONV-WHATSAPP · escribir = retomar
 import { telefonoLegible } from '../../lib/telefono'
+import { hiloPersona as hiloPersonaPorDefecto, NOMBRE_CANAL_PERSONA, type CanalPersona, type HiloPersona } from '../../data/ops/hiloPersona'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
@@ -65,6 +66,7 @@ interface Props {
   notaRedactor?: React.ReactNode     // CONTACTO CONVERSACIONAL · línea bajo el redactor (aviso de privacidad)
   telefono?: string | null           // CONV-WHATSAPP · número de quien escribe (vista del personal), si quien monta ya lo tiene
   retomar?: (id: string) => Promise<{ ok: true } | { ok: false; mensaje: string }>   // CONV-WHATSAPP · el responsable escribe = retoma
+  hiloDePersona?: typeof hiloPersonaPorDefecto | null   // HILO-PERSONA · sus otras conversaciones (otros canales); null lo apaga
 }
 
 /** Una acción del menú «+» del redactor (solo personal). */
@@ -158,7 +160,7 @@ export const unirHilo = (...listas: Mensaje[][]): Mensaje[] => {
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor, telefono = null, retomar = retomarConversacion }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor, telefono = null, retomar = retomarConversacion, hiloDePersona = hiloPersonaPorDefecto }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -356,6 +358,25 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     alFinal()
   }, [anteriores.length, alFinal])
 
+  // HILO-PERSONA (dueño: "se generan dos conversaciones… dentro debería aparecer el historial unificado, identificado por
+  // canal, y que el vendedor elija por cuál hablarle"). Solo personal: sus mensajes de OTROS canales entran al mismo hilo
+  // con su etiqueta, y el redactor elige por dónde sale la respuesta (por defecto, por donde escribió la última vez).
+  const [persona, setPersona] = useState<HiloPersona | null>(null)
+  const [destino, setDestino] = useState<string | null>(null)
+  const recargarPersona = useCallback(async () => {
+    if (!asesor || !hiloDePersona || !convId) return
+    const h = await hiloDePersona(convId)
+    setPersona(h && h.conversaciones.length > 1 ? h : null)
+  }, [asesor, hiloDePersona, convId])
+  useEffect(() => { setPersona(null); setDestino(null) }, [convId])
+  useEffect(() => { void recargarPersona() }, [recargarPersona, conv?.ultimo_seq])
+  useEffect(() => {
+    if (!persona) return
+    const t = setInterval(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void recargarPersona() }, intervaloMs)
+    return () => clearInterval(t)
+  }, [persona, recargarPersona, intervaloMs])
+  const canalPropio: CanalPersona | null = persona?.conversaciones.find((c) => c.conversation_id === convId)?.canal ?? null
+
   // CHAT PRO · avisar "escribiendo…" (sin texto). Las pruebas pueden usar clientes sin este método.
   const ultimoPing = useRef(0)
   const avisarEscribiendo = (t: string) => {
@@ -404,6 +425,20 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (!convId || enviando) return
     setEnviando(true); setError(null)
     setPendiente({ clientId, texto: t, error: null })
+    const otro = destinoEfectivo && destinoEfectivo !== convId ? destinoEfectivo : null
+    if (otro) {
+      // HILO-PERSONA · sale por OTRO canal de la misma persona: si aún no la atiendo ahí, la retomo y reintento una vez.
+      let r = await cliente.enviar(otro, t, clientId)
+      if (!r.ok && ['asesoria_no_iniciada', 'no_autorizado', 'transicion_invalida'].includes(r.error.codigo)) {
+        const rt = await retomar(otro)
+        if (rt.ok) r = await cliente.enviar(otro, t, clientId)
+        else { setPendiente({ clientId, texto: t, error: rt.mensaje }); setEnviando(false); return }
+      }
+      if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
+      await recargarPersona()
+      setPendiente(null); setEnviando(false)
+      return
+    }
     if (soyResponsable || iniciaAlEscribir) {
       // CONV-WHATSAPP · primero retomar (o iniciar la asignada); si no se puede, el mensaje queda para reintentar.
       const previo = soyResponsable ? await retomar(convId)
@@ -483,6 +518,25 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
 
   const mensajes = useMemo(() => unirHilo(anteriores, conv?.mensajes ?? []), [anteriores, conv])
+  type Mostrable = Mensaje & { canalMsg?: CanalPersona | null; otro?: boolean }
+  const mostrar: Mostrable[] = useMemo(() => {
+    if (!persona) return mensajes
+    const propios: Mostrable[] = mensajes.map((m) => ({ ...m, canalMsg: canalPropio }))
+    const otros: Mostrable[] = persona.mensajes.map((m) => ({ ...m, canalMsg: m.canal, otro: true }))
+    return [...propios, ...otros].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.seq - b.seq)
+  }, [persona, mensajes, canalPropio])
+  // Por defecto se responde por donde el cliente escribió la última vez.
+  const destinoSugerido = useMemo(() => {
+    if (!persona) return null
+    for (let i = mostrar.length - 1; i >= 0; i--) {
+      const m = mostrar[i]
+      if (m.actor === 'visitor' || m.actor === 'doctor') return m.otro ? (m as Mostrable & { conversation_id: string }).conversation_id : convId
+    }
+    return convId
+  }, [persona, mostrar, convId])
+  const destinoEfectivo = persona ? (destino ?? destinoSugerido) : null
+  const aOtroCanal = !!destinoEfectivo && destinoEfectivo !== convId
+  const escribible = puedoEscribir || aOtroCanal
   // HERRAMIENTAS DEL VENDEDOR · buscar una palabra en ESTE chat: resalta cada coincidencia y salta entre ellas.
   const [busq, setBusq] = useState<string | null>(null)
   const [busqIdx, setBusqIdx] = useState(0)
@@ -527,7 +581,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
 
   const hilo: React.ReactNode[] = []
   let diaPrevio = ''; let actorPrevio: string | null = null
-  for (const m of mensajes) {
+  for (const m of mostrar) {
     const dia = diaDe(m.created_at)
     if (dia && dia !== diaPrevio) { hilo.push(<div key={`d-${m.seq}`} className="rc-day"><span>{dia}</span></div>); diaPrevio = dia; actorPrevio = null }
     if (m.actor === 'system') {
@@ -538,7 +592,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       actorPrevio = null
       continue
     }
-    const clave = m.propio ? 'own' : m.actor
+    const clave = `${m.propio ? 'own' : m.actor}|${m.canalMsg ?? ''}`   // HILO-PERSONA · cambiar de canal abre otro grupo
     const inicio = clave !== actorPrevio
     actorPrevio = clave
     const etiqueta = etiquetaActor(m, visor, { nombreCliente, nombreAsesor, etiquetaAsesor: ETIQUETA_ASESOR })
@@ -547,7 +601,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span>}
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
-          {inicio && etiqueta && <div className="rc-meta">{etiqueta}</div>}
+          {inicio && (etiqueta || m.canalMsg) && <div className="rc-meta">{etiqueta}{m.canalMsg && <span className={`rc-canal rc-canal--${m.canalMsg}`} data-testid="msg-canal">{NOMBRE_CANAL_PERSONA[m.canalMsg]}</span>}</div>}
           {m.archivo ? (
             <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid={m.archivo.clase === 'video' ? 'msg-video' : 'msg-documento'}>
               {!m.archivo.url ? <span className="rc-img-nd">{m.archivo.nombre} · no disponible</span>
@@ -571,7 +625,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{busq && hallados.includes(m.id)
                 ? partesResaltadas(m.content, busq).map((p, i) => (p.hallado ? <mark key={i} className="rc-mark-busq">{p.t}</mark> : <React.Fragment key={i}>{p.t}</React.Fragment>))
                 : conEnlaces(m.content)}</div>}
-          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && (visto(m.seq)
+          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && !m.otro && (visto(m.seq)
             ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tick-visto" />
             : <CheckCheck className="rc-tick" size={15} aria-label="Entregado" data-testid="tick-entregado" />)}</time>
         </div>
@@ -723,6 +777,16 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           onCambio={cargarRespuestas} cliente={respuestas} puedeEmpresa={puedeEmpresa} nombre={nombreCliente} />
       )}
       {subiendo && <div className="rc-subiendo" role="status" data-testid="subiendo">Subiendo {subiendo}…</div>}
+      {persona && (
+        <div className="rc-canal-sel" role="radiogroup" aria-label="Responder por" data-testid="responder-por">
+          <span>Responder por</span>
+          {persona.conversaciones.map((c) => (
+            <button key={c.conversation_id} type="button" role="radio" aria-checked={destinoEfectivo === c.conversation_id}
+              className={`rc-canal-op rc-canal--${c.canal}${destinoEfectivo === c.conversation_id ? ' on' : ''}`} onClick={() => setDestino(c.conversation_id)}
+              data-testid={`responder-por-${c.canal}`}>{NOMBRE_CANAL_PERSONA[c.canal]}</button>
+          ))}
+        </div>
+      )}
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>
         <input ref={archivo} type="file" accept={ACEPTA} hidden onChange={(e) => void mandarArchivo(e.target.files?.[0])} data-testid="input-imagen" />
         {conAcciones && (
@@ -737,11 +801,11 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <textarea
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}
-          disabled={!puedoEscribir || enviando || !!pendiente?.error}
-          placeholder={cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyResponsable ? 'Escribe para retomar la conversación…' : iniciaAlEscribir ? 'Escribe para iniciar la asesoría…' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
+          disabled={!escribible || enviando || !!pendiente?.error}
+          placeholder={aOtroCanal ? `Escribe por ${NOMBRE_CANAL_PERSONA[persona!.conversaciones.find((c) => c.conversation_id === destinoEfectivo)?.canal ?? 'portal']}…` : cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyResponsable ? 'Escribe para retomar la conversación…' : iniciaAlEscribir ? 'Escribe para iniciar la asesoría…' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
           enterKeyHint="send" autoComplete="off" autoCapitalize="sentences" inputMode="text"
         />
-        <button type="submit" className="rc-send" disabled={!puedoEscribir || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>
+        <button type="submit" className="rc-send" disabled={!escribible || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>
       </form>
       {notaRedactor && <div className="rc-nota-redactor">{notaRedactor}</div>}
       {!asesor && conv && !cerrada && (modo === 'ai_active' || modo === 'human_offered') && (

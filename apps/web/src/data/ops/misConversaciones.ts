@@ -3,7 +3,7 @@
 import { hasSupabase, supabase } from '../../lib/supabase'
 
 export interface MiConversacion {
-  conversation_id: string; dueno: string; modo: string; last_message_at: string | null; prospecto: boolean; canal: string | null; telefono?: string | null
+  conversation_id: string; dueno: string; modo: string; last_message_at: string | null; prospecto: boolean; canal: string | null; telefono?: string | null; persona?: string | null
   atiende: 'ia' | 'otro' | 'direccion' | 'nadie'; atiende_nombre: string | null; puede_retomar: boolean
   ultimo: { actor: string; texto: string; at: string } | null
   dias_restantes?: number | null   // CARTERA-PLAZO · días que le quedan como su vendedor

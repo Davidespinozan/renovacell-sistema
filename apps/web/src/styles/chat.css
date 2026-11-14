@@ -803,3 +803,9 @@ button.pc-tira:hover{background:var(--hueso)}
   #content:has(.ases-chat){padding-bottom:0}
   .ases-chat .rc-chat--embebido{height:calc(100dvh - 132px);min-height:380px}
 }
+/* HILO-PERSONA (14 nov 2026) · cada mensaje con su canal y el selector "Responder por". */
+.rc-canal{display:inline-block;margin-left:6px;padding:0 6px;border-radius:8px;font-size:10.5px;font-weight:600;line-height:16px;vertical-align:middle;background:#eef1ef;color:var(--ink-2,#445)}
+.rc-canal--whatsapp{background:#dff3e4;color:var(--green-deep)}
+.rc-canal-sel{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-3,#667);background:var(--cp-surface,#fff)}
+.rc-canal-op{border:1px solid var(--line);background:var(--cp-surface,#fff);border-radius:999px;padding:3px 12px;min-height:30px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink-2,#445)}
+.rc-canal-op.on{background:var(--green-deep);border-color:var(--green-deep);color:#fff;font-weight:600}

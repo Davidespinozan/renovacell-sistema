@@ -210,16 +210,28 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
         : !c.es_mia ? { texto: ETIQUETA_MODO[c.modo], tono: 'neu' as const }
         : e && tonoAtencion(e) !== 'ok' ? { texto: ETIQUETA_ATENCION[e], tono: tonoAtencion(e) } : null
       return { id: c.conversation_id, nombre: c.dueno, telefono: c.telefono ?? null, canal: c.canal ?? null, ultimo: c.ultimo ?? null, at: c.ultimo?.at ?? c.last_message_at,
-        sinLeer: c.sin_leer, etiqueta, carrito: c.handoff_origen === 'carrito' ? c.n_items ?? 0 : null, testid: 'cola-item',
+        sinLeer: c.sin_leer, etiqueta, carrito: c.handoff_origen === 'carrito' ? c.n_items ?? 0 : null, testid: 'cola-item', persona: c.persona ?? null,
         onAbrir: () => (c.es_mia && c.modo === 'human_assigned' ? void atender(c) : abrir(c.conversation_id)) }
     }),
     ...retomables.filter((c) => !enCola.has(c.conversation_id)).map((c): FilaChat => ({
       id: c.conversation_id, nombre: c.dueno, telefono: c.telefono ?? null, canal: c.canal, ultimo: c.ultimo, at: c.ultimo?.at ?? c.last_message_at, sinLeer: 0,
       etiqueta: c.atiende === 'otro' || c.atiende === 'direccion' ? { texto: `Con ${c.atiende_nombre ?? (c.atiende === 'direccion' ? 'Dirección' : 'otra persona')}`, tono: 'warn' }
         : c.dias_restantes != null && c.dias_restantes <= 7 ? { texto: `Tuyo ${c.dias_restantes === 1 ? '1 día' : `${c.dias_restantes} días`} más`, tono: 'dang' } : null,
-      carrito: null, testid: 'mi-cliente', onAbrir: () => { void cargar(); abrir(c.conversation_id) },
+      carrito: null, testid: 'mi-cliente', persona: c.persona ?? null, onAbrir: () => { void cargar(); abrir(c.conversation_id) },
     })),
   ].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
+  // HILO-PERSONA · la misma persona por varios canales (WhatsApp y portal) aparece UNA vez: la fila más reciente, con
+  // sus canales y sus no leídos sumados (al abrirla se ve todo junto).
+  const porPersona = new Map<string, FilaChat>()
+  const filasUnicas: FilaChat[] = []
+  for (const f of filas) {
+    const p = f.persona
+    const ya = p ? porPersona.get(p) : undefined
+    if (!ya) { filasUnicas.push(f); if (p) porPersona.set(p, f); continue }
+    ya.sinLeer += f.sinLeer
+    ya.canales = [...new Set([...(ya.canales ?? [ya.canal ?? 'portal']), f.canal ?? 'portal'])]
+    if (!ya.telefono) ya.telefono = f.telefono
+  }
 
   return (
     <div className="card" data-testid="asesorias">
@@ -255,9 +267,9 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
           </ul>
         </section>
       )}
-      {filas.length > 0 && (
+      {filasUnicas.length > 0 && (
         <ul className="wa-lista" aria-label="Conversaciones" data-testid="lista-conversaciones">
-          {filas.map((f) => <FilaConversacion key={f.id} f={f} llegada={llegada === f.id} />)}
+          {filasUnicas.map((f) => <FilaConversacion key={f.id} f={f} llegada={llegada === f.id} />)}
         </ul>
       )}
     </div>
@@ -268,9 +280,10 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
 export interface FilaChat {
   id: string; nombre: string; telefono: string | null; canal: string | null; ultimo: { actor: string; texto: string; at: string } | null; at: string | null
   sinLeer: number; etiqueta: { texto: string; tono: 'dang' | 'warn' | 'neu' | 'ok' } | null; carrito: number | null; testid: string; onAbrir: () => void
+  persona?: string | null; canales?: string[]   // HILO-PERSONA
 }
 const QUIEN: Record<string, string> = { ai: 'Asistente: ', seller: 'Tú: ', admin: 'Equipo: ' }
-const CANAL_CORTO: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook' }
+const CANAL_CORTO: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook', portal: 'Portal' }
 export function FilaConversacion({ f, llegada, accion }: { f: FilaChat; llegada?: boolean; accion?: React.ReactNode }) {
   const nombre = capitalizarNombre(f.nombre) || telefonoLegible(f.telefono) || 'Contacto'
   const tel = telefonoLegible(f.telefono)
@@ -287,7 +300,7 @@ export function FilaConversacion({ f, llegada, accion }: { f: FilaChat; llegada?
           </span>
           <span className="wa-l3">
             {tel && tel !== nombre && <span data-testid="fila-telefono">{tel}</span>}
-            {f.canal && <span>{CANAL_CORTO[f.canal] ?? f.canal}</span>}
+            {(f.canales ?? (f.canal ? [f.canal] : [])).map((k) => <span key={k} data-testid="fila-canal">{CANAL_CORTO[k] ?? k}</span>)}
             {f.etiqueta && <span className={'pill ' + PILL[f.etiqueta.tono]} data-testid="estado-atencion">{f.etiqueta.texto}</span>}
             {!f.etiqueta && f.ultimo && (f.ultimo.actor === 'visitor' || f.ultimo.actor === 'doctor') && <span className="pill p-warn" data-testid="sin-responder">Sin responder</span>}
             {f.carrito != null && <span className="pill p-neu" data-testid="marca-carrito">Carrito{f.carrito ? ` · ${f.carrito}` : ''}</span>}
