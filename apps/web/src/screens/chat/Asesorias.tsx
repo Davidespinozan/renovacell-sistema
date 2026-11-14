@@ -23,6 +23,7 @@ import { HojaMarco } from './HojaChat'
 import { OrigenChip } from './OrigenConversacion'
 import { BuscadorConversaciones } from './BuscarMensajes'
 import { useMisClientes } from './MisClientes'
+import { misConversaciones as misConversacionesPorDefecto } from '../../data/ops/misConversaciones'
 import { cuandoLista } from '../../lib/cuando'
 import { telefonoLegible } from '../../lib/telefono'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
@@ -132,13 +133,17 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
       // Dirección abre CUALQUIER conversación (la atienda quien la atienda o aunque nadie la haya tomado); el servidor sigue
       // decidiendo qué puede leer y escribir. Un vendedor solo abre las de su cola.
       if (!c && esDireccion) { setAviso(null); setLlegada(intento.conversationId); setEnfocar(true); setAbierta(intento.conversationId); return }
+      // CONV-WHATSAPP / REPARTO-CONTACTO · también las de SU cartera que hoy atiende el asistente (no están en la cola de asesorías).
+      if (!c && ((await (cargarMis ?? misConversacionesPorDefecto)()) ?? []).some((x) => x.conversation_id === intento.conversationId)) {
+        setAviso(null); setLlegada(intento.conversationId); setEnfocar(true); setAbierta(intento.conversationId); return
+      }
       if (!c) { setAviso('Esa conversación ya no está en tu cola: se atendió, se reasignó o no tienes acceso a ella.'); return }
       setAviso(null)
       if (intento.iniciar) await atender(c)
       else { setLlegada(c.conversation_id); setEnfocar(true); setAbierta(c.conversation_id) }
     })()
     return () => { vivo = false }
-  }, [intento, cargar, atender, esDireccion])
+  }, [intento, cargar, atender, esDireccion, cargarMis])
 
   // EXPEDIENTE EN EL CHAT · todo se trabaja dentro de la conversación: franja (quién es), menú «+» y hoja de la acción.
   const pc = usePanelCliente({ conversationId: abierta ?? '', chat: cliente, activo: !!abierta, onCambio: () => { void cargar(); void recargarAtencion() } })

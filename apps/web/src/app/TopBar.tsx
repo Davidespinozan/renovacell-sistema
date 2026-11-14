@@ -154,7 +154,7 @@ function NotifBell() {
   // vuelve a validar contra el servidor (un id ajeno o resuelto no revela nada).
   const onPick = (n: Notif) => {
     markRead(n.id)
-    if (n.kind && KINDS_COMERCIALES.has(n.kind) && n.conversationId && n.screen && navKeys.has(n.screen)) {
+    if (n.kind && (KINDS_COMERCIALES.has(n.kind) || n.kind === 'contacto_asignado') && n.conversationId && n.screen && navKeys.has(n.screen)) {   // REPARTO-CONTACTO · contacto nuevo asignado
       if (n.screen === 'asesorias') irAConversacion(setScreen, n.conversationId, { origen: 'campana' })
       else if (n.screen === 'av_atencion') irASolicitud(setScreen, n.conversationId, { origen: 'campana' })
       else setScreen(n.screen)
