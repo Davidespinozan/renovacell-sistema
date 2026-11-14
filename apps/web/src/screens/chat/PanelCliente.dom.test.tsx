@@ -116,7 +116,7 @@ describe('PanelCliente · Mandar ubicación (pedido de Alejandra)', () => {
     fireEvent.click(await screen.findByTestId('accion-ubicacion'))
     fireEvent.click(screen.getByTestId('ubic-sucursal'))
     await waitFor(() => expect(enviar).toHaveBeenCalled())
-    expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/^📍 Renovacell · Sucursal Culiacán\nBoulevard Pedro Infante 2911/)
+    expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/^📍 Renovacell · Mía Plaza Perisur\nMía Plaza Perisur, Nuevo Mundo 1045-17/)
     expect(await screen.findByTestId('pc-msg')).toHaveTextContent('Le mandaste la ubicación.')
   })
   it('pega un enlace de Google Maps: sale con sus coordenadas y el nombre que escribió (también sin ficha)', async () => {

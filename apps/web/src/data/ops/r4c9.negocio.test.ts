@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import * as politica from '../../../../../supabase/functions/_shared/ia/politica'
 import * as validacion from '../../../../../supabase/functions/_shared/ia/validacion'
 import { leerNegocio, dependenciasCanal } from '../../../../../supabase/functions/_shared/ia/responder'
+import { SUCURSAL } from '../../../../../supabase/functions/_shared/ubicacion'
 
 // Datos con la forma real del ERP (27 oct 2026)
 const ERP: politica.DatosNegocio = {
@@ -66,8 +67,20 @@ describe('dependencias del canal por turno', () => {
     const admin = { from: (t: string) => cadena(t, t === 'company_settings' ? ERP.empresa : t === 'cc_horario_semanal' ? ERP.horario : t === 'entrega_config' ? ERP.entrega : []) }
     const n = await leerNegocio(admin)
     expect(tablas.sort()).toEqual(['cc_company_knowledge', 'cc_horario_semanal', 'company_settings', 'entrega_config', 'promociones'])   // R4-C10: + manual y promociones
-    expect(politica.textoNegocio(n)).toBe(politica.textoNegocio(ERP))
+    expect(politica.textoNegocio(n)).toBe(politica.textoNegocio({ ...ERP, sucursal: n.sucursal }))   // SUCURSAL: la dirección es la de atención
     const roto = { from: () => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq', 'order', 'lte', 'gte']) c[k] = () => c; c.maybeSingle = async () => ({ data: null, error: { message: 'x' } }); c.then = (r: (x: unknown) => unknown) => Promise.resolve({ data: null, error: { message: 'x' } }).then(r); return c } }
-    expect(politica.textoNegocio(await leerNegocio(roto))).toBe('')
+    expect(politica.textoNegocio(await leerNegocio(roto))).toMatch(/^Sucursal .*Mía Plaza Perisur/)   // sin ERP: solo la sucursal (fija en código)
+  })
+})
+
+// SUCURSAL (14 nov 2026) · la IA da la dirección de la sucursal (Mía Plaza Perisur), nunca la fiscal en remodelación
+describe('SUCURSAL · dirección que da la IA', () => {
+  it('con sucursal: solo Mía Plaza Perisur, sin Pedro Infante', () => {
+    const t = politica.textoNegocio({ ...ERP, sucursal: { nombre: SUCURSAL.nombre, direccion: SUCURSAL.direccion } })
+    expect(t).toContain('Mía Plaza Perisur, Nuevo Mundo 1045-17, 80197 Culiacán')
+    expect(t).not.toContain('Pedro Infante')
+  })
+  it('el botón «Mandar ubicación» y la IA usan la misma sucursal', () => {
+    expect(SUCURSAL.direccion).not.toMatch(/Pedro Infante/)
   })
 })

@@ -400,6 +400,9 @@ export function tareaCanal(intencion: string, limiteClinico: boolean): string {
 // turno; aquí solo se redactan. Lo que falte no se inventa (la línea se omite).
 export interface DatosNegocio {
   empresa?: { razon_social?: string | null; direccion?: string | null; cp?: string | null; ciudad?: string | null; estado?: string | null; telefono?: string | null } | null
+  // SUCURSAL (14 nov 2026) · dónde se atiende y se recoge. Si viene, es la ÚNICA dirección que da la IA (la de `empresa`
+  // es la fiscal: el 6–11 nov la IA mandaba a clientes a Pedro Infante, en remodelación).
+  sucursal?: { nombre: string; direccion: string } | null
   horario?: Array<{ dia: number; abierto: boolean; abre: string | null; cierra: string | null }> | null
   entrega?: { recoge_lugar?: string | null; recoge_horario?: string | null; cp_local_desde?: string | null; cp_local_hasta?: string | null; dias_chofer?: number[] | null; local_mismo_dia?: boolean | null; corte?: string | null
     local_gratis_desde?: number | null; local_costo?: number | null; dias_paqueteria?: number[] | null; dhl_transito_min?: number | null; dhl_transito_max?: number | null; foraneo_costo?: number | null; foraneo_gratis_desde?: number | null } | null
@@ -477,7 +480,8 @@ export function textoNegocio(n: DatosNegocio): string {
   const l: string[] = []; const em = n.empresa ?? {}; const e = n.entrega ?? {}
   const lugar = [em.ciudad, em.estado].filter(Boolean).join(', ')
   if (em.razon_social || lugar) l.push(`Empresa: ${em.razon_social ?? 'Renovacell'}${lugar ? `, en ${lugar}` : ''}.`)
-  if (em.direccion) l.push(`Dirección: ${em.direccion}${em.cp ? `, C.P. ${em.cp}` : ''}${lugar ? `, ${lugar}` : ''}.`)
+  if (n.sucursal?.direccion) l.push(`Sucursal (aquí se atiende en persona y se recogen pedidos; es la ÚNICA dirección que se da a clientes): ${n.sucursal.direccion}.`)
+  else if (em.direccion) l.push(`Dirección: ${em.direccion}${em.cp ? `, C.P. ${em.cp}` : ''}${lugar ? `, ${lugar}` : ''}.`)
   const abiertos = (n.horario ?? []).filter((h) => h.abierto && h.abre && h.cierra)
   if (abiertos.length) {
     const grupos = new Map<string, number[]>()

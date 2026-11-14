@@ -11,7 +11,7 @@ describe('ubicación · formato', () => {
   })
   it('sucursal sin coordenadas: enlace de búsqueda por dirección y SIN pin nativo', () => {
     const t = textoUbicacion(SUCURSAL)
-    expect(t).toContain('query=Boulevard%20Pedro%20Infante%202911')
+    expect(t).toContain('query=M%C3%ADa%20Plaza%20Perisur%2C%20Nuevo%20Mundo%201045-17')
     const u = leerUbicacion(t)!
     expect(u.nombre).toBe(SUCURSAL.nombre)
     expect(u.lat).toBeNull()

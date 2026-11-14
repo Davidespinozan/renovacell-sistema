@@ -7,10 +7,12 @@ export interface Ubicacion { nombre: string; direccion: string; lat: number | nu
 
 export const PIN = '📍'
 
-/** La sucursal (para recoger). `lat/lng` en null = se manda con la dirección (búsqueda en Maps), sin pin nativo. */
+/** La sucursal donde se atiende y se recogen pedidos (14 nov 2026, dueño: Mía Plaza Perisur = Nuevo Mundo 1045-17, el
+ *  mismo lugar donde recoge DHL; Pedro Infante 2911 es solo la dirección FISCAL y está en remodelación). La usan el botón
+ *  «Mandar ubicación» y la IA. `lat/lng` en null = se manda con la dirección (búsqueda en Maps), sin pin nativo. */
 export const SUCURSAL: Ubicacion = {
-  nombre: 'Renovacell · Sucursal Culiacán',
-  direccion: 'Boulevard Pedro Infante 2911, Desarrollo Urbano Tres Ríos, 80020 Culiacán, Sinaloa',
+  nombre: 'Renovacell · Mía Plaza Perisur',
+  direccion: 'Mía Plaza Perisur, Nuevo Mundo 1045-17, 80197 Culiacán, Sinaloa',
   lat: null, lng: null,
 }
 
