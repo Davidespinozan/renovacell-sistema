@@ -10,8 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { capitalizarNombre } from '../../lib/nombres'
 import { chat as clientePorDefecto, ETIQUETA_MODO, type ClienteChat, type ColaItem } from '../../data/ops/chat'
-import { MOTIVO_RUTEO } from '../../data/ops/atencion'
-import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, textoEspera, textoIA, tonoAtencion } from '../../data/ops/atencionComercial'
+import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, tonoAtencion } from '../../data/ops/atencionComercial'
 import { recargarAtencion } from '../../data/store/atencionStore'
 import { consumirIntento, useIntento } from '../../data/store/navIntentStore'
 import { ChatCanonico, TEXTO_ASESORIA_FINALIZADA } from './ChatCanonico'
@@ -23,7 +22,9 @@ import { usePanelCliente, accionesIneVisitante } from './PanelCliente'
 import { HojaMarco } from './HojaChat'
 import { OrigenChip } from './OrigenConversacion'
 import { BuscadorConversaciones } from './BuscarMensajes'
-import { FilaMiCliente, useMisClientes } from './MisClientes'
+import { useMisClientes } from './MisClientes'
+import { cuandoLista } from '../../lib/cuando'
+import { telefonoLegible } from '../../lib/telefono'
 import { abrirHoja, cerrarHoja, useHoja } from '../../data/store/hojaChat'
 import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
@@ -183,33 +184,44 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   if (abierta) return (
     <div className="grid" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
-      <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); setVersionMis((n) => n + 1); void cargar(); void recargarAtencion() }}
+      <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? misClientes.lista.find((x) => x.conversation_id === abierta)?.dueno ?? null}
+        telefono={contacto?.telefono ?? cola.find((x) => x.conversation_id === abierta)?.telefono ?? misClientes.lista.find((x) => x.conversation_id === abierta)?.telefono ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); setVersionMis((n) => n + 1); void cargar(); void recargarAtencion() }}
         tira={tira} acciones={acciones} hoja={hoja}
         onFin={() => { setAviso(TEXTO_ASESORIA_FINALIZADA); setAbierta(null); setEnfocar(false); void cargar(); void recargarAtencion() }} />
     </div>
   )
 
   const sinAsignar = cola.filter((c) => c.modo === 'human_requested' && !c.seller_profile_id)
-  // MIS CLIENTES · en la MISMA lista: las asesorías en curso arriba y, debajo, los que atendí o son de mi cartera.
+  // CONV-WHATSAPP (14 nov 2026, dueño: "se tiene que sentir tal cual como WhatsApp") · UNA lista: cada persona una vez, la
+  // más reciente arriba, con su nombre, número y el último mensaje. Tocar la fila abre el chat (leer siempre se puede;
+  // escribir retoma). Las solicitudes sin vendedor (Dirección) van aparte arriba porque piden una acción distinta.
   const retomables = esDireccion ? [] : misClientes.lista
-  const abrirRetomada = (id: string) => { setAviso(null); setLlegada(id); setEnfocar(true); void cargar(); setAbierta(id) }
-  const mias = cola.filter((c) => c.es_mia)
-  const otras = cola.filter((c) => !c.es_mia && !(c.modo === 'human_requested' && !c.seller_profile_id))
-  const accionMia = (c: ColaItem) => (c.modo === 'human_assigned'
-    ? <button type="button" className="btn btn-primary" style={{ minHeight: 44 }} onClick={() => void atender(c)} data-testid="btn-atender">Atender ahora</button>
-    : <button type="button" className="btn" style={{ minHeight: 44 }} onClick={() => { setLlegada(c.conversation_id); setAbierta(c.conversation_id) }} data-testid="btn-abrir">{c.modo === 'human_active' ? 'Continuar' : 'Abrir'}</button>)
+  const abrir = (id: string) => { setAviso(null); setLlegada(id); setEnfocar(true); setAbierta(id) }
+  const enCola = new Set(cola.map((c) => c.conversation_id))
+  const filas: FilaChat[] = [
+    ...cola.filter((c) => !sinAsignar.includes(c)).map((c): FilaChat => {
+      const e = estadoDe(c)
+      const etiqueta = c.es_mia && c.modo === 'human_assigned' ? { texto: 'Te espera', tono: 'warn' as const }
+        : !c.es_mia ? { texto: ETIQUETA_MODO[c.modo], tono: 'neu' as const }
+        : e && tonoAtencion(e) !== 'ok' ? { texto: ETIQUETA_ATENCION[e], tono: tonoAtencion(e) } : null
+      return { id: c.conversation_id, nombre: c.dueno, telefono: c.telefono ?? null, canal: c.canal ?? null, ultimo: c.ultimo ?? null, at: c.ultimo?.at ?? c.last_message_at,
+        sinLeer: c.sin_leer, etiqueta, carrito: c.handoff_origen === 'carrito' ? c.n_items ?? 0 : null, testid: 'cola-item',
+        onAbrir: () => (c.es_mia && c.modo === 'human_assigned' ? void atender(c) : abrir(c.conversation_id)) }
+    }),
+    ...retomables.filter((c) => !enCola.has(c.conversation_id)).map((c): FilaChat => ({
+      id: c.conversation_id, nombre: c.dueno, telefono: c.telefono ?? null, canal: c.canal, ultimo: c.ultimo, at: c.ultimo?.at ?? c.last_message_at, sinLeer: 0,
+      etiqueta: c.atiende === 'otro' || c.atiende === 'direccion' ? { texto: `Con ${c.atiende_nombre ?? (c.atiende === 'direccion' ? 'Dirección' : 'otra persona')}`, tono: 'warn' }
+        : c.dias_restantes != null && c.dias_restantes <= 7 ? { texto: `Tuyo ${c.dias_restantes === 1 ? '1 día' : `${c.dias_restantes} días`} más`, tono: 'dang' } : null,
+      carrito: null, testid: 'mi-cliente', onAbrir: () => { void cargar(); abrir(c.conversation_id) },
+    })),
+  ].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
 
   return (
     <div className="card" data-testid="asesorias">
-      {/* Encabezado en dos bloques: título + descripción a la izquierda y UNA fila de acciones a la
-          derecha (avisos + enlace de contacto). Antes "Activar avisos" quedaba suelto al centro por el
-          space-between de tres hijos. En teléfono se apila: título, descripción y luego las acciones. */}
       <div className="ases-head">
         <div className="ases-head-txt">
-          <h2 style={{ margin: 0 }}>Conversaciones con clientes</h2>
-          <p>
-            {esDireccion ? 'Todas las conversaciones con atención humana. Los clientes sin vendedor se asignan en Conversaciones → Solicitudes.' : 'Tus clientes que activaron un carrito o pidieron hablar contigo. El asistente los atiende hasta que inicies la asesoría.'}
-          </p>
+          <h2 style={{ margin: 0 }}>Conversaciones</h2>
+          <p>{esDireccion ? 'Todas las conversaciones con atención humana. Toca una para abrirla.' : 'Tus clientes y prospectos, el más reciente arriba. Toca uno para abrir su chat; si le escribes, lo retomas tú.'}</p>
         </div>
         <div className="ases-head-acc">
           <BotonAvisos className="btn ghost sm" />
@@ -217,57 +229,68 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
         </div>
       </div>
       {/* HERRAMIENTAS DEL VENDEDOR · buscar una palabra en todas sus conversaciones (no se acuerda de con quién habló) */}
-      <BuscadorConversaciones onAbrir={(id) => { setAviso(null); setLlegada(id); setEnfocar(true); setAbierta(id) }} />
+      <BuscadorConversaciones onAbrir={abrir} />
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {cargando && <Cargando plano />}
       {!cargando && cola.length === 0 && retomables.length === 0 && !error && (
-        <div className="op-vacio"><Vacio plano icono="chat" titulo="No hay conversaciones esperando asesor."
-          pista={esDireccion ? undefined : 'Cuando un cliente active su carrito o pida hablar contigo, aparecerá aquí.'} /></div>
+        <div className="op-vacio"><Vacio plano icono="chat" titulo="Todavía no tienes conversaciones."
+          pista={esDireccion ? undefined : 'Cuando un cliente te escriba o pida hablar contigo, aparecerá aquí.'} /></div>
       )}
-      {esDireccion && <Seccion titulo={`Sin vendedor (${sinAsignar.length})`} items={sinAsignar} llegada={llegada} accion={(c) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          {onAtencion && <button type="button" className="btn btn-primary" onClick={onAtencion} data-testid="btn-asignar">Asignar vendedor</button>}
-          <button type="button" className="btn" onClick={() => setAbierta(c.conversation_id)}>Ver</button>
-        </div>
-      )} />}
-      <Seccion titulo={`${esDireccion ? 'Asignadas a mí' : 'Mis conversaciones'} (${mias.length + retomables.length})`} items={mias} llegada={llegada} accion={accionMia}
-        extra={retomables.map((c) => <FilaMiCliente key={c.conversation_id} c={c} onAbrir={abrirRetomada} onError={(m) => { setAviso(m); void misClientes.recargar() }} />)} />
-      {esDireccion && <Seccion titulo={`En curso con vendedores (${otras.length})`} items={otras} llegada={llegada} accion={(c) => <button type="button" className="btn" onClick={() => { setLlegada(c.conversation_id); setAbierta(c.conversation_id) }} data-testid="btn-ver">Ver</button>} />}
+      {esDireccion && sinAsignar.length > 0 && (
+        <section style={{ marginBottom: 16 }}>
+          <h3 className="wa-lista-tit">Por asignar ({sinAsignar.length})</h3>
+          <ul className="wa-lista">
+            {sinAsignar.map((c) => (
+              <FilaConversacion key={c.conversation_id} llegada={llegada === c.conversation_id} f={{ id: c.conversation_id, nombre: c.dueno, telefono: c.telefono ?? null, canal: c.canal ?? null, ultimo: c.ultimo ?? null,
+                at: c.ultimo?.at ?? c.last_message_at, sinLeer: c.sin_leer, etiqueta: { texto: c.edad_min != null ? `Espera hace ${formatoMinutos(c.edad_min)}` : 'Sin vendedor', tono: 'dang' },
+                carrito: c.handoff_origen === 'carrito' ? c.n_items ?? 0 : null, testid: 'cola-item', onAbrir: () => abrir(c.conversation_id) }}
+                accion={onAtencion ? <button type="button" className="btn btn-primary sm" onClick={onAtencion} data-testid="btn-asignar">Asignar</button> : null} />
+            ))}
+          </ul>
+        </section>
+      )}
+      {filas.length > 0 && (
+        <ul className="wa-lista" aria-label="Conversaciones" data-testid="lista-conversaciones">
+          {filas.map((f) => <FilaConversacion key={f.id} f={f} llegada={llegada === f.id} />)}
+        </ul>
+      )}
     </div>
   )
 }
 
-function Seccion({ titulo, items, accion, llegada, extra }: { titulo: string; items: ColaItem[]; accion: (c: ColaItem) => React.ReactNode; llegada?: string | null; extra?: React.ReactNode[] }) {
-  if (items.length === 0 && !extra?.length) return null
+/** Una fila de la lista, como en WhatsApp: inicial, nombre y hora; debajo el último mensaje; el número y el estado al final. */
+export interface FilaChat {
+  id: string; nombre: string; telefono: string | null; canal: string | null; ultimo: { actor: string; texto: string; at: string } | null; at: string | null
+  sinLeer: number; etiqueta: { texto: string; tono: 'dang' | 'warn' | 'neu' | 'ok' } | null; carrito: number | null; testid: string; onAbrir: () => void
+}
+const QUIEN: Record<string, string> = { ai: 'Asistente: ', seller: 'Tú: ', admin: 'Equipo: ' }
+const CANAL_CORTO: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Facebook' }
+export function FilaConversacion({ f, llegada, accion }: { f: FilaChat; llegada?: boolean; accion?: React.ReactNode }) {
+  const nombre = capitalizarNombre(f.nombre) || telefonoLegible(f.telefono) || 'Contacto'
+  const tel = telefonoLegible(f.telefono)
+  const inicial = nombre.replace(/^(dra?\.?|doctora?|lic\.?)\s+/i, '').replace(/^\+/, '').slice(0, 1).toUpperCase() || '?'
   return (
-    <section style={{ marginBottom: 16 }}>
-      <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{titulo}</h3>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map((c) => {
-          const e = estadoDe(c)
-          const espera = textoEspera(c.atencion)
-          const ia = textoIA(c.atencion, c.modo)
-          return (
-            <li key={c.conversation_id} className={llegada === c.conversation_id ? 'rc-llegada' : undefined} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10 }} data-testid="cola-item">
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{capitalizarNombre(c.dueno)}{c.sin_leer > 0 ? ` · ${c.sin_leer} sin leer` : ''}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-                  {e ? <span className={'pill ' + PILL[tonoAtencion(e)]} data-testid="estado-atencion">{ETIQUETA_ATENCION[e]}</span> : <span>{c.iniciada ? 'Asesoría iniciada' : ETIQUETA_MODO[c.modo]}</span>}
-                  {c.handoff_origen === 'carrito' && <span className="pill p-neu" data-testid="marca-carrito">Carrito activo{c.n_items ? ` · ${c.n_items} producto${c.n_items === 1 ? '' : 's'}` : ''}</span>}
-                  {c.fuera_horario && <span className="pill p-warn" data-testid="marca-fuera-horario">Llegó fuera de horario</span>}
-                  {c.ruteo_motivo && <span className="pill p-warn">{MOTIVO_RUTEO[c.ruteo_motivo] ?? c.ruteo_motivo}</span>}
-                  {c.edad_min != null && <span>hace {formatoEdad(c.edad_min)}</span>}
-                </div>
-                {(espera || ia) && <div style={{ fontSize: 12, color: 'var(--ink-3, #667)', marginTop: 4 }} data-testid="contexto-atencion">{[espera, ia].filter(Boolean).join(' · ')}</div>}
-              </div>
-              {accion(c)}
-            </li>
-          )
-        })}
-        {extra}
-      </ul>
-    </section>
+    <li className={`wa-fila${llegada ? ' rc-llegada' : ''}${f.sinLeer > 0 ? ' wa-fila--nueva' : ''}`} data-testid={f.testid}>
+      <button type="button" className="wa-fila-btn" onClick={f.onAbrir} aria-label={`Abrir conversación con ${nombre}${f.sinLeer ? `, ${f.sinLeer} sin leer` : ''}`} data-testid="abrir-conversacion">
+        <span className="wa-av" aria-hidden>{inicial}</span>
+        <span className="wa-cuerpo">
+          <span className="wa-l1"><b className="wa-nombre">{nombre}</b>{f.at && <time className="wa-hora" dateTime={f.at}>{cuandoLista(f.at)}</time>}</span>
+          <span className="wa-l2">
+            <span className="wa-prev">{f.ultimo ? <>{QUIEN[f.ultimo.actor] ?? ''}{f.ultimo.texto}</> : <i>Sin mensajes</i>}</span>
+            {f.sinLeer > 0 && <span className="wa-badge" data-testid="sin-leer">{f.sinLeer > 99 ? '99+' : f.sinLeer}</span>}
+          </span>
+          <span className="wa-l3">
+            {tel && tel !== nombre && <span data-testid="fila-telefono">{tel}</span>}
+            {f.canal && <span>{CANAL_CORTO[f.canal] ?? f.canal}</span>}
+            {f.etiqueta && <span className={'pill ' + PILL[f.etiqueta.tono]} data-testid="estado-atencion">{f.etiqueta.texto}</span>}
+            {!f.etiqueta && f.ultimo && (f.ultimo.actor === 'visitor' || f.ultimo.actor === 'doctor') && <span className="pill p-warn" data-testid="sin-responder">Sin responder</span>}
+            {f.carrito != null && <span className="pill p-neu" data-testid="marca-carrito">Carrito{f.carrito ? ` · ${f.carrito}` : ''}</span>}
+          </span>
+        </span>
+      </button>
+      {accion && <span className="wa-accion">{accion}</span>}
+    </li>
   )
 }
 

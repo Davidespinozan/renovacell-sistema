@@ -63,8 +63,8 @@ describe('Asesorías', () => {
   it('vendedor: solo lo suyo, con carrito / fuera de horario / antigüedad; ya NO hay "Tomar"', async () => {
     const f = chatFalso({}, [item({ conversation_id: 'C1', handoff_origen: 'carrito', n_items: 2, fuera_horario: true, edad_min: 90 })])
     render(<Asesorias cliente={f.c} intervaloMs={60_000} />)
-    expect(await screen.findByTestId('marca-carrito')).toHaveTextContent('Carrito activo · 2 productos')
-    expect(screen.getByTestId('marca-fuera-horario')).toBeInTheDocument(); expect(screen.getByText(/hace 1 h/)).toBeInTheDocument()
+    expect(await screen.findByTestId('marca-carrito')).toHaveTextContent('Carrito · 2')
+    expect(screen.getAllByTestId('cola-item')).toHaveLength(1)
     expect(screen.queryByText('Tomar')).toBeNull(); expect(screen.queryByTestId('btn-asignar')).toBeNull()
   })
   it('Dirección: ve "Sin vendedor" con su motivo y va a Atención comercial para asignar', async () => {
@@ -72,7 +72,7 @@ describe('Asesorías', () => {
     const f = chatFalso({}, [item({ conversation_id: 'C2', modo: 'human_requested', seller_profile_id: null, es_mia: false, ruteo_motivo: 'sin_vendedor' })])
     render(<Asesorias cliente={f.c} intervaloMs={60_000} esDireccion onAtencion={onAtencion} />)
     fireEvent.click(await screen.findByTestId('btn-asignar'))
-    expect(onAtencion).toHaveBeenCalled(); expect(screen.getByText('Cliente sin vendedor')).toBeInTheDocument()
+    expect(onAtencion).toHaveBeenCalled(); expect(screen.getByText(/Por asignar \(1\)/)).toBeInTheDocument()
   })
 })
 

@@ -77,18 +77,16 @@ describe('D3 · cobertura repuesta (notifica, nunca abre)', () => {
       expect(vista()!.textContent).toContain('E2'); expect(cajon()).toBeNull()
     })
   }
-  it('C4-04b / C4-12 · con el chat abierto (también en HISTORIAL) no hay vista previa; lo no visto se absorbe al cerrar', async () => {
+  it('C4-04b / C4-12 · con el chat abierto no hay vista previa; tras cerrarlo no se re-anuncia', async () => {
     srv.pantalla = 'catalogo'
     const s = servidor({ mensajes: [[1, 'ai']], leido: 1 }); const k = canal()
     montar(s, k); await listo(s, k)
-    fireEvent.click(screen.getByTestId('chat-fab'))
-    fireEvent.click(await screen.findByTestId('btn-historial')); await screen.findByTestId('historial')
-    s.llega(2, 'seller', 'Mientras veía el historial'); await senal(k)
-    expect(vista()).toBeNull(); expect(screen.getByTestId('historial')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('chat-fab')); await screen.findByTestId('chat-canonico')
+    s.llega(2, 'seller', 'Mientras tenía el chat abierto'); await senal(k)
+    expect(vista()).toBeNull()
     fireEvent.click(screen.getByTestId('btn-salir')); await waitFor(() => expect(cajon()).toBeNull()); await esperar(120)
     await senal(k)
     expect(vista()).toBeNull()                                            // absorbido por el cierre manual
-    expect(screen.getByTestId('chat-fab-badge').textContent).toBe('1')    // sigue sin leer (C3 no marcó leído)
   })
   it('C4-14 · cambio de ruta (ida y vuelta) no repite el aviso ya mostrado', async () => {
     srv.pantalla = 'catalogo'

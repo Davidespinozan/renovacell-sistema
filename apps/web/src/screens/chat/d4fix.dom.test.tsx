@@ -42,7 +42,7 @@ function falso(conv: Partial<Conversacion>, opts: { terminar?: Resp; leerInicial
 const item: ColaItem = { conversation_id: 'C1', modo: 'human_active', seller_profile_id: 'L', asesoria_solicitada_at: null, last_message_at: null, es_mia: true, sin_leer: 0, dueno: 'David' }
 
 describe('FIX-G · Terminar exitoso', () => {
-  it('ejecuta terminar, NO relee, detiene el sondeo y avisa a quien monta', async () => {
+  it('ejecuta terminar, relee UNA vez (¿sigue siendo su cliente?), detiene el sondeo y avisa a quien monta', async () => {
     const f = falso({}); const onFin = vi.fn()
     // Temporizadores vivos con el intervalo del sondeo (37 ms, único): tras terminar deben retirarse, no solo ignorarse.
     const vivos = new Set<unknown>(); const si = globalThis.setInterval; const ci = globalThis.clearInterval
@@ -57,7 +57,7 @@ describe('FIX-G · Terminar exitoso', () => {
     spySet.mockRestore(); spyClear.mockRestore()
     f.perderAcceso()   // en el servidor el asesor ya no tiene acceso (seller_profile_id = null)
     await espera(150)
-    expect(f.leerTras('terminar')).toBe(0)
+    expect(f.leerTras('terminar')).toBeLessThanOrEqual(1)   // CONV-WHATSAPP · una sola comprobación, sin sondeo
     expect(screen.queryByText(NO_AUT.mensaje)).toBeNull()
     expect(screen.getByTestId('aviso-asesoria-finalizada')).toHaveTextContent(TEXTO_ASESORIA_FINALIZADA)
     expect(screen.queryByTestId('btn-terminar')).toBeNull()
@@ -65,13 +65,13 @@ describe('FIX-G · Terminar exitoso', () => {
   it('en Asesorías: vuelve a la lista con la confirmación neutral, sin el error de acceso', async () => {
     const f = falso({})
     render(<Asesorias cliente={f.c} intervaloMs={60_000} />)
-    fireEvent.click(await screen.findByTestId('btn-abrir'))
+    fireEvent.click(await screen.findByTestId('abrir-conversacion'))
     fireEvent.click(await screen.findByTestId('btn-terminar'))
     expect(await screen.findByTestId('aviso-apertura')).toHaveTextContent(TEXTO_ASESORIA_FINALIZADA)
     expect(screen.getByTestId('asesorias')).toBeInTheDocument()
     expect(screen.queryByTestId('btn-terminar')).toBeNull()
     expect(screen.queryByText(NO_AUT.mensaje)).toBeNull()
-    expect(f.leerTras('terminar')).toBe(0)
+    expect(f.leerTras('terminar')).toBeLessThanOrEqual(1)
     await waitFor(() => expect(f.llamadas.slice(f.llamadas.indexOf('terminar')).includes('cola')).toBe(true))   // la lista se refresca
   })
   it('fallo real de terminar: conserva el error, la conversación y el sondeo', async () => {

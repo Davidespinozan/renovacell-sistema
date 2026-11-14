@@ -29,8 +29,8 @@ describe('Chat V2-C1 · alcance', () => {
     expect(m).not.toMatch(/alter table public\.cc_messages add/)   // cc_messages no se toca
   })
   // CONVERSACIÓN CONTINUA (2 nov 2026, dueño): el chat SÍ lee la sesión anterior para mostrarla arriba, solo con lectores
-  it('el chat solo LEE sesiones (lista y lector) para mostrar la anterior; no las crea ni las cierra', () => {
-    expect(codigo(chatCanonico)).toMatch(/cliente\.sesiones\(convId\)/); expect(codigo(chatCanonico)).toMatch(/cliente\.leerSesion\(id\)/)
+  it('el chat solo LEE sesiones (lista y lector) para el hilo continuo; no las crea ni las cierra', () => {
+    expect(codigo(chatCanonico)).toMatch(/cliente\.sesiones!?\(convId\)/); expect(codigo(chatCanonico)).toMatch(/cliente\.leerSesion\(id, /)
     expect(codigo(chatCanonico)).not.toMatch(/\.(abrirSesion|cerrarSesion)\(/)
   })
 })

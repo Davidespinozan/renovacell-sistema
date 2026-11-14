@@ -44,7 +44,7 @@ describe('Enlaces del chat', () => {
     fireEvent.click(screen.getByTestId('compartir-enlace'))   // sin hoja nativa (jsdom): copia el mensaje completo
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/^Hola, soy Roberto Ibarra, asesor de Renovacell/)))
     expect(bandejaSrc).toMatch(/<div className="bq-head">[\s\S]{0,400}<EnlaceContactoBotones \/>/)
-    expect(asesoriasSrc).toMatch(/Conversaciones con clientes<\/h2>[\s\S]{0,1200}<EnlaceContactoBotones \/>/)
+    expect(asesoriasSrc).toMatch(/Conversaciones<\/h2>[\s\S]{0,1200}<EnlaceContactoBotones \/>/)
     rol.actual = { role: 'admin', user: { name: 'Antonio' } }
   })
 })

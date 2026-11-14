@@ -57,206 +57,77 @@ function servidor(init: { conv: Conversacion; sesiones?: SesionListada[]; detall
   return { cliente, st, llamadas, acciones, mutaciones }
 }
 const esperar = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)) })
-async function abrirLista() { fireEvent.click(await screen.findByTestId('btn-historial')); return screen.findByTestId('historial') }
 
-describe('H · historial de sesiones', () => {
-  // CONVERSACIÓN CONTINUA (2 nov 2026, dueño): la anterior se ve AQUÍ, arriba y en solo lectura; ya no hay que ir al 🕘.
-  it('H1 · una cerrada y ninguna abierta: la anterior se ve en el chat con su separador, sin crear sesión', async () => {
+// CONV-WHATSAPP (14 nov 2026, dueño: "el reloj esconde los chats"): UN hilo con todo; las sesiones anteriores se cargan
+// arriba (las recientes primero) y no hay relojito, "Antes" ni "Ahora": solo separadores de día.
+describe('H · hilo continuo (sin relojito)', () => {
+  it('H1 · una cerrada y ninguna abierta: sus mensajes se ven en el hilo; se puede escribir; sin crear sesión', async () => {
     const s = servidor({ conv: convSinAbierta(), sesiones: [S1] })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    const previa = await screen.findByTestId('sesion-previa')
-    expect(within(previa).getByText('Con gusto, doctor.')).toBeTruthy()
-    expect(previa.textContent).toMatch(/Antes · .*Atendida por Lucía/)
-    expect(previa.textContent).toMatch(/Ahora · todavía no escribe de nuevo/)
-    expect(screen.queryByTestId('tarjeta-anterior')).toBeNull(); expect(screen.queryByTestId('msg-bienvenida')).toBeNull()
+    expect(await screen.findByText('Con gusto, doctor.')).toBeTruthy()
+    expect(screen.queryByTestId('btn-historial')).toBeNull(); expect(screen.queryByTestId('sesion-previa')).toBeNull()
+    expect(screen.queryByText(/^Antes|^Ahora/)).toBeNull(); expect(screen.queryByTestId('msg-bienvenida')).toBeNull()
     expect((screen.getByLabelText('Escribe tu mensaje') as HTMLTextAreaElement).disabled).toBe(false)
     expect(s.mutaciones()).toEqual([])
   })
-  it('H1b · con sesión abierta, la cerrada anterior también se ve arriba de lo actual', async () => {
+  it('H2 · con sesión abierta: lo anterior va ARRIBA de lo actual, en el mismo hilo y en orden', async () => {
     const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    const previa = await screen.findByTestId('sesion-previa')
-    expect(within(previa).getByText('Con gusto, doctor.')).toBeTruthy()
-    expect(screen.getByText('Hola de nuevo.')).toBeTruthy()
-    expect(previa.textContent).toMatch(/Ahora$/)
-  })
-  it('H2 · actual + cerrada: "Actual" arriba y entrar en ella vuelve a la superficie ACTUAL', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    const items = await screen.findAllByRole('button', { name: /mensaje/ })
-    expect(items[0].getAttribute('data-testid')).toBe('hist-actual')
-    expect(items[0].textContent).toContain('Actual')
-    fireEvent.click(items[0])
-    expect(screen.queryByTestId('historial')).toBeNull()
-    expect(screen.getByLabelText('Escribe tu mensaje')).toBeTruthy()
-  })
-  it('H3 / T19 / T20 · la sesión histórica es de solo lectura (sin redactor, carrito, handoff ni acciones)', async () => {
-    const cart: Carrito = { cart_id: 'K', estado: 'active', rev: 1, dueno: 'profile', audiencia: 'verified', puede_precio: true, conversation_id: 'C1', n_items: 1, cantidad_total: 1, total: { estado: 'completo', monto: 350 }, items: [{ product_id: 'P', nombre: 'Golden Placenta Mask', presentacion: 'Caja', imagen_url: null, cantidad: 1, vendible: true, visible: true, disponibilidad: 'disponible', precio: { estado: 'autorizado', unitario: 350, subtotal: 350 } }] }
-    const carrito = new ClienteCarrito(async () => ({ data: cart, error: null }), () => null)
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-    render(<ChatCanonico panel cliente={s.cliente} clienteCarrito={carrito} intervaloMs={600_000} />)
-    expect(await screen.findByTestId('carrito-panel')).toBeTruthy()
-    await abrirLista()
-    fireEvent.click(await screen.findByTestId('hist-sesion'))
-    expect(await screen.findByText('Con gusto, doctor.')).toBeTruthy()
-    for (const id of ['carrito-panel', 'btn-enviar', 'btn-asesor', 'btn-reanudar', 'btn-iniciar', 'btn-terminar', 'aviso-handoff']) expect(screen.queryByTestId(id)).toBeNull()
-    expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.queryByText(/Prefieres/)).toBeNull()
-    expect(screen.getByTestId('hist-volver-actual').textContent).toBe('Volver a la conversación actual')
-    expect(s.mutaciones()).toEqual([])
-  })
-  it('H4 · al volver, ACTUAL queda intacto (mismos mensajes y mismo cursor)', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={60} />)
-    expect(await screen.findByText('Hola, ¿en qué te ayudo hoy?')).toBeTruthy()
-    await abrirLista()
-    fireEvent.click(await screen.findByTestId('hist-sesion'))
     await screen.findByText('Con gusto, doctor.')
-    fireEvent.click(screen.getByTestId('hist-volver-actual'))
-    expect(screen.getByText('Hola, ¿en qué te ayudo hoy?')).toBeTruthy()
-    expect(screen.getByText('Hola de nuevo.')).toBeTruthy()
-    expect(within(screen.getByTestId('sesion-previa')).getByText('Con gusto, doctor.')).toBeTruthy()   // la anterior sigue arriba, en solo lectura
-    await esperar(150)
-    const leer = s.llamadas.filter((b) => b.action === 'leer')
-    expect(leer.slice(1).every((b) => b.desde_seq === 5)).toBe(true)   // el historial no movió el cursor de ACTUAL
+    const texto = screen.getByTestId('chat-canonico').textContent ?? ''
+    expect(texto.indexOf('Quiero cotizar 3 cajas.')).toBeLessThan(texto.indexOf('Hola de nuevo.'))
+    expect(s.acciones().filter((a) => a === 'leer_sesion')).toHaveLength(1)
   })
-  for (const [n, nuevo] of [['H5 · mensaje del vendedor', m(6, 'seller', 'Doctor, ya quedó.')], ['H6 · respuesta de IA', m(6, 'ai', 'Te comparto el precio.')], ['H7 · handoff', m(6, 'system', 'Registramos tu solicitud de asesor.')]] as const) {
-    it(`${n} con HISTORIAL visible → aviso, sin navegar`, async () => {
-      const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-      render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={50} />)
-      await screen.findByText('Hola de nuevo.')
-      await abrirLista()
-      fireEvent.click(await screen.findByTestId('hist-sesion'))
-      await screen.findByText('Con gusto, doctor.')
-      s.st.conv = convActual([nuevo])
-      const aviso = await screen.findByTestId('aviso-nuevo-actual')
-      expect(aviso.getAttribute('role')).toBe('status')
-      expect(aviso.getAttribute('aria-live')).toBe('polite')
-      expect(aviso.textContent).toContain('Nuevo mensaje en la conversación actual')
-      expect(screen.getByTestId('hist-banda')).toBeTruthy()          // sigue en el historial
-      expect(screen.queryByText(nuevo.content)).toBeNull()
-    })
-  }
-  it('H8 · cambio de cursor/estado sin mensajes → sin aviso; mensaje propio → sin aviso', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={40} />)
-    await screen.findByText('Hola de nuevo.')
-    await abrirLista()
-    s.st.conv = { ...convActual(), leido_hasta: 5, modo: 'human_requested' }
-    await esperar(150)
-    expect(screen.queryByTestId('aviso-nuevo-actual')).toBeNull()
-    s.st.conv = convActual([m(6, 'doctor', 'Lo escribí en otra pestaña.', true)])
-    await esperar(150)
-    expect(screen.queryByTestId('aviso-nuevo-actual')).toBeNull()
-  })
-  it('H9 / T18 · polling duplicado → un solo aviso; sin `leido` en HISTORIAL; "Ver" vuelve y marca leído una vez', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1], ignorarDesde: true })
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={30} />)
-    await screen.findByText('Hola de nuevo.')
-    await waitFor(() => expect(s.llamadas.some((b) => b.action === 'leido' && b.seq === 5)).toBe(true))
-    await abrirLista()
-    s.st.conv = convActual([m(6, 'seller', 'Doctor, ya quedó.')])
-    await screen.findByTestId('aviso-nuevo-actual')
-    await esperar(200)
-    expect(screen.getAllByTestId('aviso-nuevo-actual')).toHaveLength(1)
-    expect(s.llamadas.filter((b) => b.action === 'leido' && b.seq === 6)).toHaveLength(0)
-    fireEvent.click(screen.getByTestId('aviso-nuevo-ver'))
-    expect(await screen.findByText('Doctor, ya quedó.')).toBeTruthy()
-    expect(screen.queryByTestId('historial')).toBeNull()
-    expect(screen.getAllByText('Doctor, ya quedó.')).toHaveLength(1)
-    await waitFor(() => expect(s.llamadas.filter((b) => b.action === 'leido' && b.seq === 6)).toHaveLength(1))
-    // Reentrar al historial: lo ya anunciado no se vuelve a avisar
-    await abrirLista(); await esperar(150)
-    expect(screen.queryByTestId('aviso-nuevo-actual')).toBeNull()
-  })
-  it('H10–H13 · copia humana de la lista (asesor, IA, motivo)', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1, ses('S0', { asesor_nombre: null, close_reason: 'inactividad', n_mensajes: 2 })] })
+  it('H3 · muchas sesiones: carga solo las recientes y "Ver mensajes anteriores" trae más (caché, sin repetir)', async () => {
+    const viejas = Array.from({ length: 6 }, (_, i) => ses(`V${i}`, { ordinal: 2 + i, first_seq: 1 + i * 30, last_seq: 30 + i * 30, n_mensajes: 30 }))
+    const detalle = Object.fromEntries(viejas.map((v, i) => [v.id, Array.from({ length: 30 }, (_, k) => m(1 + i * 30 + k, k % 2 ? 'ai' : 'doctor', `S${i}-${k}`, k % 2 === 0))]))
+    const actual = conv({ ultimo_seq: 182, mensajes: [m(181, 'doctor', 'Ahora sí', true), m(182, 'ai', 'Va')], sesion: { ...S2, ordinal: 8, first_seq: 181 } })
+    const s = servidor({ conv: actual, sesiones: [{ ...S2, ordinal: 8 }, ...viejas], detalle })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    const [, hum, ia] = await screen.findAllByRole('button', { name: /mensaje/ })
-    expect(hum.textContent).toContain('Atendida por Lucía · 3 mensajes')
-    expect(hum.textContent).toContain('Asesoría finalizada')
-    expect(hum.textContent).not.toMatch(/asesor_finalizo|Ventas/)
-    expect(ia.textContent).toContain('Asistente · 2 mensajes')
-    expect(ia.textContent).toContain('Cerrada por inactividad')
+    expect(await screen.findByText('S5-0')).toBeTruthy(); expect(screen.getByText('S4-0')).toBeTruthy()
+    expect(screen.queryByText('S3-0')).toBeNull()
+    expect(s.acciones().filter((a) => a === 'leer_sesion')).toHaveLength(2)
+    fireEvent.click(screen.getByTestId('ver-anteriores'))
+    expect(await screen.findByText('S3-0')).toBeTruthy()
+    expect(s.acciones().filter((a) => a === 'leer_sesion')).toHaveLength(4)
   })
-  it('H14 · sin autorización → estado seguro, sin mensajes', async () => {
+  it('H4 · una sesión de 150 mensajes se lee completa por páginas', async () => {
+    const largo = Array.from({ length: 150 }, (_, i) => m(i + 1, i % 2 ? 'ai' : 'doctor', `Texto ${i + 1}`, i % 2 === 0))
+    const s = servidor({ conv: conv({ ultimo_seq: 152, mensajes: [m(151, 'doctor', 'Otra vez', true)], sesion: { ...S2, first_seq: 151 } }), sesiones: [S2, ses('S1', { last_seq: 150, n_mensajes: 150 })], detalle: { S1: largo } })
+    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
+    expect(await screen.findByText('Texto 150')).toBeTruthy(); expect(screen.getByText('Texto 1')).toBeTruthy()
+    expect(s.llamadas.filter((b) => b.action === 'leer_sesion').map((b) => b.desde_seq)).toEqual([0, 100])
+  })
+  it('H5 · sin autorización para lo anterior → solo lo actual, sin error ni mensajes ajenos', async () => {
     const s = servidor({ conv: convActual(), sesiones: [S2, S1], sinAcceso: true })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    expect((await screen.findByTestId('hist-error')).textContent).toBe('No tienes acceso a esta conversación anterior.')
-  })
-  it('H15 · 120 sesiones: lista ligera (sin leer mensajes); 150 mensajes: 100 + "Cargar más"; caché inmutable', async () => {
-    const muchas = Array.from({ length: 120 }, (_, i) => ses(`S${i + 10}`, { n_mensajes: 150, last_seq: 150 }))
-    const largo = Array.from({ length: 150 }, (_, i) => m(i + 1, i % 2 ? 'ai' : 'doctor', `Texto ${i + 1}`, i % 2 === 0))
-    const s = servidor({ conv: convActual(), sesiones: [S2, ...muchas], detalle: { S10: largo } })
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    expect(await screen.findAllByTestId('hist-sesion')).toHaveLength(120)
-    expect(s.acciones().filter((a) => a === 'leer_sesion')).toHaveLength(1)   // solo la anterior, que se muestra en el chat
-    fireEvent.click(screen.getAllByTestId('hist-sesion')[0])
-    expect(await screen.findByText('Texto 100')).toBeTruthy()
-    expect(screen.queryByText('Texto 101')).toBeNull()
-    fireEvent.click(screen.getByTestId('hist-cargar-mas'))
-    expect(await screen.findByText('Texto 150')).toBeTruthy()
-    expect(s.llamadas.filter((b) => b.action === 'leer_sesion').map((b) => b.desde_seq)).toEqual([0, 100])
-    expect(screen.queryByTestId('hist-cargar-mas')).toBeNull()
-    fireEvent.click(screen.getByTestId('hist-atras'))
-    fireEvent.click((await screen.findAllByTestId('hist-sesion'))[0])
-    expect(await screen.findByText('Texto 150')).toBeTruthy()
-    expect(s.acciones().filter((a) => a === 'leer_sesion')).toHaveLength(2)   // la sesión cerrada sale de la caché
-  })
-  it('Escape: SESIÓN → LISTA → ACTUAL (sin que el cajón se cierre)', async () => {
-    const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
-    let cerrado = false
-    const onDoc = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrado = true }
-    document.addEventListener('keydown', onDoc)
-    render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    fireEvent.click(await screen.findByTestId('hist-sesion'))
-    const banda = await screen.findByTestId('hist-banda')
-    await waitFor(() => expect(document.activeElement).toBe(banda))
-    fireEvent.keyDown(banda, { key: 'Escape' })
-    expect(await screen.findByTestId('hist-volver')).toBeTruthy()
-    fireEvent.keyDown(screen.getByTestId('hist-volver'), { key: 'Escape' })
-    expect(screen.queryByTestId('historial')).toBeNull()
-    expect(cerrado).toBe(false)
-    document.removeEventListener('keydown', onDoc)
+    expect(await screen.findByText('Hola de nuevo.')).toBeTruthy(); await esperar(30)
+    expect(screen.queryByText('Con gusto, doctor.')).toBeNull(); expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 
 describe('T · invariantes', () => {
-  it('T16 / T17 · abrir 🕘 y una sesión solo hace lecturas (ninguna mutación conversacional)', async () => {
+  it('T16 / T17 · el hilo continuo solo hace lecturas (ninguna mutación conversacional)', async () => {
     const s = servidor({ conv: convActual(), sesiones: [S2, S1] })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await screen.findByText('Hola de nuevo.')
-    await screen.findByTestId('sesion-previa')
-    const antes = s.llamadas.length
-    await abrirLista()
-    fireEvent.click(await screen.findByTestId('hist-sesion'))
     await screen.findByText('Con gusto, doctor.')
-    expect(s.llamadas.slice(antes).map((b) => b.action)).toEqual(['sesiones'])   // la sesión ya estaba en caché (se mostró arriba)
+    expect(s.mutaciones()).toEqual([])
     expect(s.acciones().filter((a) => a === 'abrir')).toHaveLength(1)   // solo el montaje
   })
-  it('T21 · ACTUAL sin sesión abierta permite escribir; la sesión nueva la crea el servidor al enviar', async () => {
+  it('T21 · sin sesión abierta se puede escribir; la sesión nueva la crea el servidor al enviar', async () => {
     const s = servidor({ conv: convSinAbierta(), sesiones: [S1] })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await screen.findByTestId('sesion-previa')
-    expect(s.acciones()).not.toContain('enviar')
+    await screen.findByText('Con gusto, doctor.')
     fireEvent.change(screen.getByLabelText('Escribe tu mensaje'), { target: { value: 'Vuelvo a escribir' } })
     fireEvent.click(screen.getByTestId('btn-enviar'))
     expect(await screen.findByText('Vuelvo a escribir')).toBeTruthy()
-    expect(screen.queryByTestId('tarjeta-anterior')).toBeNull()
     expect(s.acciones().filter((a) => a === 'enviar')).toHaveLength(1)
   })
   it('T22 · el doctor ve "Tú" en sus mensajes previos (no propios en la sesión)', async () => {
     const s = servidor({ conv: convActual(), sesiones: [S2, S1], detalle: { S1: [m(1, 'visitor', 'Antes de registrarme', false), m(2, 'ai', 'Claro')] } })
     render(<ChatCanonico panel cliente={s.cliente} conCarrito={false} intervaloMs={600_000} />)
-    await abrirLista()
-    fireEvent.click(await screen.findByTestId('hist-sesion'))
     await screen.findByText('Antes de registrarme')
-    expect(within(screen.getByTestId('hist-msg-visitor')).getByText('Tú')).toBeTruthy()
+    expect(within(screen.getByTestId('msg-visitor')).getByText('Tú')).toBeTruthy()
   })
   it('T23 · el personal NO ve al doctor como "Tú" (nombre del servidor, o "Doctor")', async () => {
     const asesor = conv({ rol: 'supervisor', modo: 'human_active', ultimo_seq: 2, mensajes: [m(1, 'doctor', 'Hola, soy el doctor'), m(2, 'admin', 'Hola', true)], sesion: { ...S2 } })

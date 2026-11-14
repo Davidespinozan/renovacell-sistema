@@ -27,14 +27,15 @@ import { chatUi, EVENTO_ABRIR_CHAT, marcarAbiertoPara, useSolicitudApertura } fr
 import { ChatCanonico } from '../screens/chat/ChatCanonico'
 import { debeDiferir, decidir, esElegible, guardarFrontera, leerFrontera } from '../data/ops/autoapertura'
 import { suscribirMensajes, type Suscriptor } from '../data/ops/chatRealtime'
-import { primerNombre } from '../lib/nombres'
 import { registrarAviso, type ViaLectura } from '../data/ops/chatMetricas'
 
 // Pantallas donde la conversación YA está montada a página completa.
 export const PANTALLAS_CHAT: ReadonlySet<string> = new Set(['chat_cc', 'asist'])
 export const ETIQUETA_LANZADOR = 'Habla con Renovacell'
 const MODOS_CON_ASESOR: ReadonlySet<ModoConversacion> = new Set(['human_assigned', 'human_active'])
-export const DURACION_VISTA_MS = 6000
+// CONV-WHATSAPP (14 nov 2026, dueño: "llegó notificación pero no sale claramente tal persona, mensaje nuevo, nada"): el
+// aviso ya NO se va solo a los 6 s; se queda hasta que la persona lo abre o lo descarta, como en WhatsApp.
+export const DURACION_VISTA_MS: number | null = null
 export const TEXTO_GENERICO = 'Tienes un mensaje nuevo.'
 
 /** Mensajes que cuentan como actividad (badge): asesor, Dirección e IA; del sistema, solo con la atención humana activa. */
@@ -56,7 +57,7 @@ export function fragmentoSeguro(contenido: string, max = 90): string | null {
 
 /** Quién escribe, en lenguaje del doctor. */
 export function remitenteDe(m: Pick<Mensaje, 'actor'>, asesorNombre: string | null | undefined): string {
-  if (m.actor === 'seller') return primerNombre(asesorNombre) ?? 'Tu asesora'
+  if (m.actor === 'seller') return asesorNombre?.split('·')[0].trim() || 'Tu asesora'   // nombre completo: que sepa quién le escribe
   if (m.actor === 'ai') return 'Asistente Renovacell'
   return 'Renovacell'
 }
@@ -119,7 +120,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
     if (abiertoRef.current) return
     window.clearTimeout(temporizador.current)
     setVista(aviso); pulsar()
-    temporizador.current = window.setTimeout(() => setVista(null), DURACION_VISTA_MS)
+    if (DURACION_VISTA_MS != null) temporizador.current = window.setTimeout(() => setVista(null), DURACION_VISTA_MS)
   }, [pulsar])
   useEffect(() => () => window.clearTimeout(temporizador.current), [])
 
@@ -290,7 +291,7 @@ export function ChatFlotante({ cliente = clienteShell, intervaloMs = 30000, susc
         {vista && !abierto && (
           <div className="chat-vista" data-testid="chat-vista">
             <button type="button" className="chat-vista-cuerpo" onClick={abrirManual} data-testid="chat-vista-abrir" aria-label={`Abrir la conversación. ${vista.remitente}: ${vista.texto}`}>
-              <span className="chat-vista-de">{vista.remitente}{vista.extra > 0 ? <span className="chat-vista-mas"> · +{vista.extra}</span> : null}</span>
+              <span className="chat-vista-de">{vista.remitente} <span className="chat-vista-mas">· {vista.extra > 0 ? `${vista.extra + 1} mensajes nuevos` : 'mensaje nuevo'}</span></span>
               <span className="chat-vista-texto">{vista.texto}</span>
             </button>
             <button type="button" className="chat-vista-cerrar" onClick={ocultarVista} aria-label="Descartar aviso" data-testid="chat-vista-cerrar">✕</button>

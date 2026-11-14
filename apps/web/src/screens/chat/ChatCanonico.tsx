@@ -9,19 +9,20 @@ import { TarjetaPromoChat } from './TarjetaPromoChat'
 import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, History, MapPin, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
 import { enlaceMaps, leerUbicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
-import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
+import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
+import { retomarConversacion } from '../../data/ops/misConversaciones'   // CONV-WHATSAPP · escribir = retomar
+import { telefonoLegible } from '../../lib/telefono'
 import { CarritoPanel } from './CarritoPanel'   // CC-5 · carrito canónico (dueño muta; asesor/Dirección solo lee)
 import type { ClienteCarrito } from '../../data/ops/carrito'
 import { diaNegocio, hoyNegocio, sumarDias, ZONA_NEGOCIO } from '../../data/periodo'
-import { diaEtiqueta, etiquetaActor, quienAtendio, rangoSesion, type Visor } from '../../data/ops/sesionesPresentacion'
-import { HistorialConversacion, HiloSoloLectura, type CacheSesion } from './HistorialSesiones'   // Chat V2-C3 · historial de solo lectura
+import { etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'
 import { RetomarWhatsApp } from './RetomarWhatsApp'   // WA-PLANTILLAS   // CHAT PRO · textos listos del personal
@@ -62,6 +63,8 @@ interface Props {
   hoja?: React.ReactNode
   inicioHilo?: React.ReactNode       // ENLACE · al inicio del hilo (p. ej. con quién hablas y quién te recomendó)
   notaRedactor?: React.ReactNode     // CONTACTO CONVERSACIONAL · línea bajo el redactor (aviso de privacidad)
+  telefono?: string | null           // CONV-WHATSAPP · número de quien escribe (vista del personal), si quien monta ya lo tiene
+  retomar?: (id: string) => Promise<{ ok: true } | { ok: false; mensaje: string }>   // CONV-WHATSAPP · el responsable escribe = retoma
 }
 
 /** Una acción del menú «+» del redactor (solo personal). */
@@ -142,13 +145,20 @@ const diaDe = (iso: string): string => {
 const horaDe = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: ZONA_NEGOCIO }) }
 
 type Pendiente = { clientId: string; texto: string; error: string | null }
-// Chat V2-C3 · ACTUAL = la conversación viva; HISTORIAL = lista/lector de solo lectura (mismo contenedor).
-type Vista = { tipo: 'actual' } | { tipo: 'historial'; sesion: string | null }
+// CONV-WHATSAPP · hilo continuo: las sesiones anteriores se cargan por tandas hasta ~MIN_PREVIOS mensajes.
+const MIN_PREVIOS = 60
+const PAGINA_SESION = 100   // límite que fija la Edge `leer_sesion`
+/** Une mensajes de varias sesiones en UN hilo: sin duplicados y en orden. */
+export const unirHilo = (...listas: Mensaje[][]): Mensaje[] => {
+  const porSeq = new Map<number, Mensaje>()
+  for (const l of listas) for (const m of l) porSeq.set(m.seq, m)
+  return [...porSeq.values()].sort((a, b) => a.seq - b.seq)
+}
 
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor, telefono = null, retomar = retomarConversacion }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -168,14 +178,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const fin = useRef<HTMLDivElement | null>(null)
   const area = useRef<HTMLTextAreaElement | null>(null)
   const ultimoSeq = useRef(0)
-  // Chat V2-C3 · historial: vista, caché por sesión (cerradas = inmutables), cursor de lectura diferido y aviso.
-  const [vista, setVista] = useState<Vista>({ tipo: 'actual' })
-  const enHistorial = useRef(false)
-  const porLeer = useRef(0)            // máximo seq de ACTUAL recibido mientras HISTORIAL estaba visible (sin `leido`)
-  const anunciado = useRef(0)          // máximo seq ajeno ya avisado (dedupe del aviso por seq)
-  const [nuevoActual, setNuevoActual] = useState(false)
-  const cache = useRef(new Map<string, CacheSesion>())
-  const botonHist = useRef<HTMLButtonElement | null>(null)
+  // CONV-WHATSAPP · sesiones cerradas = inmutables: se leen una vez (caché por sesión).
+  const cache = useRef(new Map<string, Mensaje[]>())
   const visor: Visor = asesor ? 'personal' : 'cliente'
   // D4-FIX · fin de la atención en la vista del asesor: 'terminada' (cerró él) o 'sin_acceso' (lo cerró C2, Dirección
   // lo reasignó o devolvió, u otra sesión lo terminó). Solo aplica a un asesor que YA estaba autorizado.
@@ -193,7 +197,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       if (asesor && autorizado.current && r.error.codigo === 'no_autorizado') { finRef.current = true; setFinAtencion('sin_acceso'); return }
       setError(r.error.mensaje); return
     }
-    if (asesor && (r.data.rol === 'asesor' || r.data.rol === 'supervisor')) autorizado.current = true
+    if (asesor && (r.data.rol === 'asesor' || r.data.rol === 'supervisor' || r.data.rol === 'responsable')) autorizado.current = true
     setError(null)
     setConv((prev) => {
       if (!prev || desde === 0 || prev.conversation_id !== id) return r.data
@@ -205,26 +209,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     const max = r.data.mensajes.reduce((s, m) => Math.max(s, m.seq), desde)
     if (max <= ultimoSeq.current) return
     ultimoSeq.current = max
-    if (enHistorial.current) {
-      // Chat V2-C3 · con HISTORIAL visible NO se marca leído; actividad ajena nueva → aviso (una vez por seq).
-      porLeer.current = max
-      const ajeno = r.data.mensajes.reduce((s, m) => (m.propio ? s : Math.max(s, m.seq)), 0)
-      if (ajeno > anunciado.current) { anunciado.current = ajeno; setNuevoActual(true) }
-      return
-    }
     void cliente.leido(id, max); onLeido?.(max)
   }, [cliente, onLeido, asesor])
-
-  const abrirHistorial = (sesion: string | null) => {
-    enHistorial.current = true; anunciado.current = ultimoSeq.current; porLeer.current = 0
-    setNuevoActual(false); setVista({ tipo: 'historial', sesion })
-  }
-  const volverActual = () => {
-    enHistorial.current = false; setNuevoActual(false); setVista({ tipo: 'actual' })
-    // De vuelta en ACTUAL: lectura normal de lo que llegó mientras tanto.
-    if (convId && porLeer.current > 0) { const s = porLeer.current; porLeer.current = 0; void cliente.leido(convId, s); onLeido?.(s) }
-    window.setTimeout(() => botonHist.current?.focus(), 0)
-  }
 
   // Abrir/reanudar (dueño) o cargar la asignada (asesor).
   useEffect(() => {
@@ -289,7 +275,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     alFinal()
     const raf = requestAnimationFrame(alFinal); const t = window.setTimeout(alFinal, 180)
     return () => { cancelAnimationFrame(raf); window.clearTimeout(t) }
-  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal, vista, otroEscribiendo])
+  }, [conv?.mensajes.length, conv?.modo, pendiente, enviando, cargando, alFinal, otroEscribiendo])
   useEffect(() => { if (autoFoco && !cargando) area.current?.focus() }, [autoFoco, cargando])
 
   const modo: ModoConversacion = conv?.modo ?? 'ai_active'
@@ -299,36 +285,75 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // Leadsales): el redactor se apaga.
   const canal = asesor ? canalDe(conv) : null
   const waEspejo = !!canal && canal.modo === 'espejo'
-  const puedoEscribir = !!conv && !cerrada && !waEspejo && !bloqueoEscritura && (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true)
+  // CONV-WHATSAPP · como en WhatsApp, el personal ESCRIBE y ya: su vendedor responsable (rol 'responsable', la atiende el
+  // asistente o terminó la asesoría) retoma al mandar; con la asesoría asignada a mí, mandar la inicia. El servidor decide.
+  const soyResponsable = asesor && conv?.rol === 'responsable'
+  const iniciaAlEscribir = soyAsesor && modo === 'human_assigned' && !!conv?.asesor_soy_yo
+  const puedoEscribir = !!conv && !cerrada && !waEspejo && !bloqueoEscritura
+    && (soyResponsable || iniciaAlEscribir || (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true))
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
-  const anterior = conv?.sesion?.estado === 'cerrada' ? conv.sesion : null   // D1: no se muestra como actual
+  const nombreVisible = capitalizarNombre(nombreCliente) || capitalizarNombre(conv?.contacto?.nombre ?? null) || null
+  const telVisible = asesor ? telefonoLegible(conv?.contacto?.telefono ?? telefono ?? (canal?.canal === 'whatsapp' ? canal.id : null)) : null
 
-  // CONVERSACIÓN CONTINUA (2 nov 2026, dueño: "te sale sin mensajes todavía porque tienes que ir al relojito a picarle a
-  // la conversación anterior, eso está mal"). La sesión anterior se muestra AQUÍ, arriba, en solo lectura y con su
-  // separador; el relojito queda para sesiones más viejas. Una sesión cerrada no cambia: se lee una vez (caché).
-  const [previa, setPrevia] = useState<CacheSesion | null>(null)
+  // CONVERSACIÓN CONTINUA → CONV-WHATSAPP (14 nov 2026, dueño: "el reloj esconde los chats", "se tiene que sentir tal cual
+  // como WhatsApp"). UN hilo con todo lo que se ha hablado: las sesiones anteriores se cargan arriba por tandas (las más
+  // recientes primero) y se leen una sola vez (cerradas = inmutables). Sin "Antes/Ahora" ni relojito: solo días.
+  const [anteriores, setAnteriores] = useState<Mensaje[]>([])
+  const [quedan, setQuedan] = useState<SesionListada[]>([])
+  const [cargandoAnt, setCargandoAnt] = useState(false)
   const sesionActual = conv?.sesion?.id ?? null
+  const leerCompleta = useCallback(async (id: string): Promise<Mensaje[] | null> => {
+    const hit = cache.current.get(id)
+    if (hit) return hit
+    if (!cliente.leerSesion) return null
+    let todos: Mensaje[] = []
+    for (let pag = 0; pag < 10; pag++) {
+      const r = await cliente.leerSesion(id, todos.length ? todos[todos.length - 1].seq : 0)
+      if (!r.ok) return todos.length ? todos : null
+      todos = todos.concat(r.data.mensajes)
+      const ultimo = r.data.sesion.last_seq ?? null
+      if (r.data.mensajes.length < PAGINA_SESION || (ultimo != null && todos.length && todos[todos.length - 1].seq >= ultimo)) break
+    }
+    cache.current.set(id, todos)
+    return todos
+  }, [cliente])
+  const cargarTanda = useCallback(async (lista: SesionListada[], vivo: () => boolean) => {
+    let junta: Mensaje[] = []; let i = 0
+    while (i < lista.length && (junta.length < MIN_PREVIOS || i === 0)) {
+      const m = await leerCompleta(lista[i].id)
+      if (!vivo()) return
+      if (m) junta = m.concat(junta)
+      i++
+    }
+    setAnteriores((prev) => unirHilo(junta, prev)); setQuedan(lista.slice(i))
+  }, [leerCompleta])
   useEffect(() => {
     let vivo = true
-    setPrevia(null)
-    if (!convId || !conv) return
+    setAnteriores([]); setQuedan([])
+    if (!convId || !sesionActual || !cliente.sesiones || (conv?.sesion?.ordinal ?? 1) <= 1) return
     void (async () => {
-      let id: string | null = anterior?.id ?? null
-      if (!id && conv.sesion?.estado === 'abierta' && (conv.sesion.ordinal ?? 1) > 1 && cliente.sesiones) {
-        const l = await cliente.sesiones(convId)
-        if (l.ok) id = (l.data.sesiones ?? []).filter((s) => s.estado === 'cerrada' && s.n_mensajes > 0).sort((a, b) => b.ordinal - a.ordinal)[0]?.id ?? null
-      }
-      if (!id || !cliente.leerSesion) return
-      const hit = cache.current.get(id)
-      if (hit) { if (vivo) setPrevia(hit); return }
-      const r = await cliente.leerSesion(id)
-      if (!r.ok || !vivo) return
-      const c: CacheSesion = { meta: r.data.sesion, mensajes: r.data.mensajes, completa: r.data.mensajes.length < 100 }   // 100 = página de leer_sesion
-      cache.current.set(id, c); setPrevia(c)
+      const l = await cliente.sesiones!(convId)
+      if (!vivo || !l.ok) return
+      const previas = (l.data.sesiones ?? []).filter((x) => x.id !== sesionActual && x.estado === 'cerrada' && x.n_mensajes > 0).sort((a, b) => b.ordinal - a.ordinal)
+      await cargarTanda(previas, () => vivo)
     })()
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convId, sesionActual, anterior?.id])
+  }, [convId, sesionActual])
+  const verAnteriores = async () => {
+    if (cargandoAnt || !quedan.length) return
+    const alto = hiloRef.current?.scrollHeight ?? 0
+    setCargandoAnt(true); conservarScroll.current = alto
+    await cargarTanda(quedan, () => true)
+    setCargandoAnt(false)
+  }
+  const hiloRef = useRef<HTMLDivElement | null>(null)
+  const conservarScroll = useRef<number | null>(null)   // al cargar mensajes viejos arriba, la vista no salta
+  useLayoutEffect(() => {
+    const el = hiloRef.current
+    if (conservarScroll.current != null && el) { el.scrollTop += el.scrollHeight - conservarScroll.current; conservarScroll.current = null; return }
+    alFinal()
+  }, [anteriores.length, alFinal])
 
   // CHAT PRO · avisar "escribiendo…" (sin texto). Las pruebas pueden usar clientes sin este método.
   const ultimoPing = useRef(0)
@@ -378,6 +403,13 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (!convId || enviando) return
     setEnviando(true); setError(null)
     setPendiente({ clientId, texto: t, error: null })
+    if (soyResponsable || iniciaAlEscribir) {
+      // CONV-WHATSAPP · primero retomar (o iniciar la asignada); si no se puede, el mensaje queda para reintentar.
+      const previo = soyResponsable ? await retomar(convId)
+        : await cliente.iniciar(convId).then((x) => (x.ok ? { ok: true as const } : { ok: false as const, mensaje: x.error.mensaje }))
+      if (!previo.ok) { setPendiente({ clientId, texto: t, error: previo.mensaje }); setEnviando(false); return }
+      await cargar(convId, 0)
+    }
     const r = await cliente.enviar(convId, t, clientId)
     if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
     if (r.data.ia === 'en_curso') setEsperaIA({ seq: r.data.seq, desde: Date.now() })
@@ -432,6 +464,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     setErrorTerminar(null)
     const r = await cliente.terminar(convId)
     if (!r.ok) { setErrorTerminar(r.error.mensaje); await cargar(convId, 0); return }
+    // CONV-WHATSAPP · si sigue siendo SU cliente, la conversación no se cierra: queda abierta para leer y retomar al escribir.
+    const sigue = asesor ? await cliente.leer(convId, 0) : null
+    if (sigue?.ok && sigue.data.rol === 'responsable') { await cargar(convId, 0); return }
     finRef.current = true; setFinAtencion('terminada')
     onFin?.('terminada')
   }
@@ -446,7 +481,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   }
   const autoAlto = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px` }
 
-  const mensajes = useMemo(() => mensajesActuales(conv), [conv])
+  const mensajes = useMemo(() => unirHilo(anteriores, conv?.mensajes ?? []), [anteriores, conv])
   // HERRAMIENTAS DEL VENDEDOR · buscar una palabra en ESTE chat: resalta cada coincidencia y salta entre ellas.
   const [busq, setBusq] = useState<string | null>(null)
   const [busqIdx, setBusqIdx] = useState(0)
@@ -545,46 +580,46 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   if (!asesor && conv && !cerrada && modo === 'human_active') hilo.push(<div key="join" className="rc-join" data-testid="aviso-asesor-activo"><span>{nombreAsesor ?? 'Tu asesor'} está contigo</span></div>)
 
   return (
-    <div ref={raiz} className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico"
-      onKeyDown={(e) => { if (e.key === 'Escape' && vista.tipo === 'historial') { e.stopPropagation(); volverActual() } }}>
+    <div ref={raiz} className={`rc-chat${panel ? ' rc-chat--panel' : embebido ? ' rc-chat--embebido' : ' rc-chat--pagina'}${estilo === 'mensajeria' ? ' rc-chat--wa' : ''}`} data-testid="chat-canonico">
       <header className="rc-head">
         {/* Como en un mensajero: el personal ve la inicial de su cliente; el cliente ve el logo de Renovacell. */}
-        {asesor && capitalizarNombre(nombreCliente)
-          ? <div className="rc-mark rc-mark--inicial" aria-hidden>{capitalizarNombre(nombreCliente).replace(/^(dra?\.?|doctora?|lic\.?)\s+/i, '').slice(0, 1).toUpperCase()}</div>
+        {asesor && nombreVisible
+          ? <div className="rc-mark rc-mark--inicial" aria-hidden>{nombreVisible.replace(/^(dra?\.?|doctora?|lic\.?)\s+/i, '').slice(0, 1).toUpperCase()}</div>
           : <div className="rc-mark" aria-hidden><BrandLogo alt="" className="rc-logo" /></div>}
         <div className="rc-title">
-          <div className="rc-name">{asesor ? (capitalizarNombre(nombreCliente) || 'Asesoría') : 'Renovacell'}</div>
-          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : `${canal ? NOMBRE_CANAL[canal.canal] + ' · ' : ''}${subtituloDe(conv, asesor)}`}</div>
+          <div className="rc-name">{asesor ? (nombreVisible || telVisible || 'Asesoría') : 'Renovacell'}</div>
+          {/* CONV-WHATSAPP · el personal ve SIEMPRE el número (como en WhatsApp), luego el canal y quién atiende. */}
+          <div className={`rc-state${otroEscribiendo ? ' rc-state--escribiendo' : ''}`} data-testid="chat-modo">{otroEscribiendo ? 'escribiendo…' : <>
+            {telVisible && nombreVisible && <a className="rc-tel" href={`tel:${telVisible.replace(/\s/g, '')}`} data-testid="chat-telefono">{telVisible}</a>}
+            {telVisible && nombreVisible && ' · '}
+            {`${canal ? NOMBRE_CANAL[canal.canal] + ' · ' : ''}${soyResponsable && (modo === 'ai_active' || modo === 'human_offered') ? 'La atiende el asistente' : subtituloDe(conv, asesor)}`}
+          </>}</div>
         </div>
         <div className="rc-actions">
-          {conv && vista.tipo === 'actual' && !finAtencion && (
+          {conv && !finAtencion && (
             <button type="button" className={`rc-ico${busq !== null ? ' rc-ico--on' : ''}`} onClick={() => (busq !== null ? cerrarBusqueda() : setBusq(''))}
               aria-label="Buscar en esta conversación" aria-pressed={busq !== null} title="Buscar en esta conversación" data-testid="btn-buscar-chat"><Search size={18} /></button>
           )}
-          {conv?.sesion && convId && (
-            <button type="button" ref={botonHist} className={`rc-ico rc-ico--hist${vista.tipo === 'historial' ? ' rc-ico--on' : ''}`} onClick={() => (vista.tipo === 'historial' ? volverActual() : abrirHistorial(null))}
-              aria-label="Conversaciones anteriores" aria-pressed={vista.tipo === 'historial'} title="Conversaciones anteriores" data-testid="btn-historial"><History size={18} /></button>
-          )}
-          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
+          {!finAtencion && soyAsesor && conv && modo === 'human_assigned' && conv.asesor_soy_yo && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.iniciar(convId!))} data-testid="btn-iniciar"><span className="rc-larga">Iniciar asesoría</span><span className="rc-corta" aria-hidden>Iniciar</span></button>
           )}
           {/* D4-FIX · solo en los estados que el backend acepta (human_active / human_ended); en human_assigned se pulsa "Iniciar" */}
-          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && (modo === 'human_active' || modo === 'human_ended') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
+          {!finAtencion && soyAsesor && conv && (modo === 'human_active' || modo === 'human_ended') && (conv.asesor_soy_yo || conv.rol === 'supervisor') && (
             <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria()} data-testid="btn-terminar"><span className="rc-larga">Terminar asesoría</span><span className="rc-corta" aria-hidden>Terminar</span></button>
           )}
           {/* TERMINAR-SOLICITUD (mig 20270205) · una solicitud sin iniciar también se cierra: Dirección cualquiera, el
               vendedor la que tiene asignada. Sin vendedor solo Dirección (lo decide la base). */}
-          {!finAtencion && vista.tipo === 'actual' && soyAsesor && conv && !cerrada && (modo === 'human_requested' || modo === 'human_assigned') && (conv.rol === 'supervisor' || conv.asesor_soy_yo) && (
+          {!finAtencion && soyAsesor && conv && !cerrada && (modo === 'human_requested' || modo === 'human_assigned') && (conv.rol === 'supervisor' || conv.asesor_soy_yo) && (
             <button type="button" className="btn ghost sm" onClick={() => void terminarAsesoria(true)} data-testid="btn-cerrar-solicitud"><span className="rc-larga">Cerrar solicitud</span><span className="rc-corta" aria-hidden>Cerrar</span></button>
           )}
-          {!finAtencion && vista.tipo === 'actual' && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
+          {!finAtencion && conv?.rol === 'supervisor' && conv && modo !== 'ai_active' && !cerrada && (
             <button type="button" className="btn ghost sm" onClick={() => accion(() => cliente.liberar(convId!))}>Devolver a la cola</button>
           )}
           {onSalir && panel && <button type="button" className="rc-ico" onClick={onSalir} aria-label="Minimizar" title="Minimizar" data-testid="btn-minimizar"><ChevronDown size={18} /></button>}
           {onSalir && <button type="button" className="rc-ico" onClick={onSalir} aria-label={etiquetaSalir} title={etiquetaSalir} data-testid="btn-salir"><X size={18} /></button>}
         </div>
       </header>
-      {busq !== null && vista.tipo === 'actual' && (
+      {busq !== null && (
         <div className="rc-busq" role="search" data-testid="chat-busqueda"
           onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); cerrarBusqueda() } }}>
           <Search size={15} aria-hidden />
@@ -597,7 +632,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         </div>
       )}
       {barra && <div className="rc-barra" data-testid="chat-barra">{barra}</div>}
-      {tira && !finAtencion && vista.tipo === 'actual' && <div className="rc-tira" data-testid="chat-tira">{tira}</div>}
+      {tira && !finAtencion && <div className="rc-tira" data-testid="chat-tira">{tira}</div>}
 
       {finAtencion ? (
         <div className="rc-thread" data-testid="asesoria-fin">
@@ -608,41 +643,19 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
             </div>
           </div>
         </div>
-      ) : vista.tipo === 'historial' && convId ? (
-        <>
-          {nuevoActual && (
-            <div className="rc-hist-aviso" role="status" aria-live="polite" data-testid="aviso-nuevo-actual">
-              <span>Nuevo mensaje en la conversación actual</span>
-              <button type="button" className="rc-link" onClick={volverActual} data-testid="aviso-nuevo-ver">Ver</button>
-            </div>
-          )}
-          <HistorialConversacion key={`${convId}:${vista.sesion ?? ''}`} conversationId={convId} lector={cliente} visor={visor} nombreCliente={nombreCliente}
-            cache={cache.current} inicial={vista.sesion} onActual={volverActual} />
-        </>
       ) : (<>
       {conCarrito && convId && conv && (
         // Dueño: su carrito activo ligado a esta conversación. Asesor/Dirección: el carrito del dueño, solo lectura (el servidor lo decide).
         <CarritoPanel senal={conv.mensajes[conv.mensajes.length - 1]?.seq} conversationId={asesor ? null : convId} cartId={asesor ? conv.cart_id ?? null : null} soloLectura={asesor} cliente={clienteCarrito} />
       )}
 
-      <div className="rc-thread" aria-live="polite">
+      <div className="rc-thread" aria-live="polite" ref={hiloRef}>
         {inicioHilo}
         {cargando && <div className="rc-sys">Cargando conversación…</div>}
-        {!cargando && previa && (
-          <div className="rc-previa" data-testid="sesion-previa">
-            <div className="rc-day rc-day--previa"><span>Antes · {rangoSesion(previa.meta)} · {quienAtendio(previa.meta.asesor_nombre)}</span></div>
-            <HiloSoloLectura mensajes={previa.mensajes.slice(-40)} visor={visor} nombreCliente={nombreCliente} nombreAsesor={previa.meta.asesor_nombre} />
-            {previa.mensajes.length > 40 && <button type="button" className="rc-link" onClick={() => abrirHistorial(previa.meta.id)} data-testid="previa-ver-todo">Ver toda la conversación anterior</button>}
-            <div className="rc-day rc-day--ahora"><span>{mensajes.length ? 'Ahora' : 'Ahora · todavía no escribe de nuevo'}</span></div>
-          </div>
+        {!cargando && quedan.length > 0 && (
+          <div className="rc-day rc-day--mas"><button type="button" className="rc-link" onClick={() => void verAnteriores()} disabled={cargandoAnt} data-testid="ver-anteriores">{cargandoAnt ? 'Cargando…' : 'Ver mensajes anteriores'}</button></div>
         )}
-        {!cargando && anterior && !previa && (
-          <div className="rc-anterior" data-testid="tarjeta-anterior">
-            <span>{asesor ? 'Conversación anterior' : 'Tu conversación anterior'}{diaEtiqueta(anterior.closed_at ?? anterior.opened_at) ? ` · ${diaEtiqueta(anterior.closed_at ?? anterior.opened_at)}` : ''}</span>
-            <button type="button" className="rc-link" onClick={() => abrirHistorial(anterior.id)} data-testid="tarjeta-anterior-ver">Ver</button>
-          </div>
-        )}
-        {!cargando && !previa && mensajes.length === 0 && !error && !pendiente && (
+        {!cargando && mensajes.length === 0 && !error && !pendiente && (
           <div className="rc-msg rc-msg--ai rc-msg--inicio" data-testid="msg-bienvenida"><span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span><div className="rc-bubble-wrap"><div className="rc-meta">Asistente</div><div className="rc-bubble">{asesor ? 'Sin mensajes todavía.' : 'Hola, soy el asistente de Renovacell. ¿En qué te ayudo?'}</div></div></div>
         )}
         {hilo}
@@ -723,7 +736,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}
           disabled={!puedoEscribir || enviando || !!pendiente?.error}
-          placeholder={cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
+          placeholder={cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyResponsable ? 'Escribe para retomar la conversación…' : iniciaAlEscribir ? 'Escribe para iniciar la asesoría…' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
           enterKeyHint="send" autoComplete="off" autoCapitalize="sentences" inputMode="text"
         />
         <button type="submit" className="rc-send" disabled={!puedoEscribir || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>

@@ -155,7 +155,7 @@ describe('V2-D2 · notifica, nunca abre', () => {
     s.llega(2, 'seller', 'Uno'); s.llega(3, 'seller', 'Dos'); s.llega(4, 'seller', 'Tres')
     await act(async () => { for (let i = 0; i < 6; i++) k.emitir() }); await esperar(250)
     expect(screen.getAllByTestId('chat-vista')).toHaveLength(1)
-    expect(vista()!.textContent).toContain('Tres'); expect(vista()!.textContent).toContain('+2')
+    expect(vista()!.textContent).toContain('Tres'); expect(vista()!.textContent).toContain('3 mensajes nuevos')
     expect(s.lecturas() - antes).toBeLessThanOrEqual(2)
   })
   it('13/14/15 · con un modal o el checkout (.overlay): badge sí, vista previa diferida; al cerrarse aparece', async () => {
@@ -223,13 +223,12 @@ describe('V2-D2 · notifica, nunca abre', () => {
     await esperar(200); expect(vista()).toBeNull()
     await waitFor(() => expect(vista()).toBeTruthy(), { timeout: 2000 })
   })
-  it('la vista previa dura ~6 s (temporizador) y se reemplaza, no se apila', async () => {
-    const espia = vi.spyOn(window, 'setTimeout')
+  it('CONV-WHATSAPP · la vista previa se queda hasta abrirla o descartarla, y se reemplaza, no se apila', async () => {
     const s = servidor({ mensajes: [[1, 'ai']], leido: 1 }); const k = canal()
     montar(s, k); await listo(s, k)
     s.llega(2, 'seller', 'Uno'); await senal(k)
-    expect(espia.mock.calls.some(([, ms]) => ms === DURACION_VISTA_MS)).toBe(true)
-    expect(DURACION_VISTA_MS).toBe(6000)
+    expect(DURACION_VISTA_MS).toBeNull()
+    await esperar(50); expect(vista()).toBeTruthy()
     s.llega(3, 'seller', 'Dos'); await senal(k)
     expect(screen.getAllByTestId('chat-vista')).toHaveLength(1); expect(vista()!.textContent).toContain('Dos')
   })
@@ -239,7 +238,7 @@ describe('V2-D2 · notifica, nunca abre', () => {
     const zona = screen.getByTestId('chat-vista-zona')
     expect(zona.getAttribute('aria-live')).toBe('polite')
     s.llega(2, 'seller', 'Hola'); await senal(k)
-    expect(screen.getByTestId('chat-vista-abrir').getAttribute('aria-label')).toMatch(/^Abrir la conversación\. Lucía: Hola/)
+    expect(screen.getByTestId('chat-vista-abrir').getAttribute('aria-label')).toMatch(/^Abrir la conversación\. Lucía Hernández: Hola/)
     expect(screen.getByTestId('chat-vista-cerrar').getAttribute('aria-label')).toBe('Descartar aviso')
     expect(document.querySelector('.overlay, .chat-drawer-wrap')).toBeNull()
   })
@@ -258,7 +257,7 @@ describe('fragmento y remitente', () => {
     expect(TEXTO_GENERICO).toBe('Tienes un mensaje nuevo.')
   })
   it('remitente: asesora por primer nombre; IA = Asistente Renovacell; sistema/Dirección = Renovacell', () => {
-    expect(remitenteDe({ actor: 'seller' }, 'Lucía Hernández · Ventas')).toBe('Lucía')
+    expect(remitenteDe({ actor: 'seller' }, 'Lucía Hernández · Ventas')).toBe('Lucía Hernández')
     expect(remitenteDe({ actor: 'seller' }, null)).toBe('Tu asesora')
     expect(remitenteDe({ actor: 'ai' }, 'x')).toBe('Asistente Renovacell')
     expect(remitenteDe({ actor: 'admin' }, 'x')).toBe('Renovacell')

@@ -771,3 +771,28 @@ button.pc-tira:hover{background:var(--hueso)}
 .ae-enviar{border:0;border-radius:10px;background:var(--green-deep);color:#fff;min-width:44px;cursor:pointer}
 .ae-enviar:disabled{opacity:.5;cursor:default}
 @media (max-width:760px){.ae-lanzador{bottom:calc(84px + env(safe-area-inset-bottom,0px))}.ae-panel{right:8px;left:8px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));height:calc(100vh - 100px)}}
+
+/* CONV-WHATSAPP (14 nov 2026) · lista de conversaciones como WhatsApp: inicial, nombre y hora, último mensaje, número. */
+.wa-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line,#e5e7eb);border-radius:12px;overflow:hidden;background:var(--surface,#fff)}
+.wa-lista-tit{font-size:13px;margin:0 0 8px;color:var(--ink-2,#445)}
+.wa-fila{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line,#e5e7eb)}
+.wa-fila:last-child{border-bottom:0}
+.wa-fila-btn{all:unset;box-sizing:border-box;flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:64px;cursor:pointer}
+.wa-fila-btn:hover{background:var(--hueso,#f6f7f5)}
+.wa-fila-btn:focus-visible{outline:2px solid var(--green-deep);outline-offset:-2px}
+.wa-av{flex:0 0 44px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#dfe5e1;color:var(--green-deep);font-weight:700;font-size:17px}
+.wa-cuerpo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wa-l1,.wa-l2{display:flex;align-items:center;gap:8px;min-width:0}
+.wa-nombre{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.wa-hora{flex:0 0 auto;font-size:12px;color:var(--ink-3,#667)}
+.wa-fila--nueva .wa-hora{color:var(--green-deep);font-weight:600}
+.wa-prev{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;color:var(--ink-2,#445)}
+.wa-fila--nueva .wa-prev{color:var(--ink,#111);font-weight:600}
+.wa-badge{flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--green-deep);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}
+.wa-l3{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:var(--ink-3,#667)}
+.wa-l3 .pill{font-size:11px}
+.wa-accion{padding-right:12px;flex:0 0 auto}
+/* encabezado del chat: el número se puede tocar para llamar */
+.rc-tel{color:inherit;text-decoration:none;font-variant-numeric:tabular-nums}
+.rc-tel:hover{text-decoration:underline}
+.rc-day--mas .rc-link{font-size:12.5px}
