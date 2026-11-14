@@ -6,6 +6,7 @@
 import { ProgramarSalida } from '../../app/ProgramarSalida'   // SALIDA PROGRAMADA
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link2, Search, UserCheck, KeyRound, UserPlus, IdCard, FileText, ShoppingBag, Banknote, Receipt, Contact, Send } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
 import { BuscadorClientes, type ClienteBusqueda } from '../../data/ops/buscarClientes'
@@ -305,7 +306,9 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
       <span className="pc-tira-cta">Vincular</span>
     </button>
   )
-  const modales = <>
+  // CONV-WHATSAPP · las ventanas (cotizar / levantar pedido) van al <body>: dentro de la tira del chat quedaban DEBAJO del
+  // encabezado verde (la tira es su propia capa) y encajonadas en el chat en vez de cubrir la pantalla.
+  const modales = modal && typeof document !== 'undefined' ? createPortal(<>
     {modal === 'cotizar' && ficha.customer_id && (
       <NuevaCotizacion customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', email: ficha.email }} conversationId={conversationId} chat={chat} cliente={cot}
         onClose={() => { setModal(null); void cargarCots(ficha.customer_id) }} />
@@ -316,7 +319,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
         onClose={() => { setModal(null); void cargar() }}
         onCreado={(pedido) => { if (typeof modal === 'object' && modal && pedido) void cot.convertida(modal.convertir.id, pedido.id).then(() => cargarCots(ficha.customer_id)) }} />
     )}
-  </>
+  </>, document.body) : null
   const segCuando = seg ? cuandoRetomar(seg.recordar_el) : null
   const tiraSeg = seg && segCuando ? (
     <button type="button" className={`pc-seg pc-seg--${segCuando.tono}`} onClick={() => abrir('pc:seguimiento')} data-testid="pc-seguimiento-tira">
@@ -327,7 +330,16 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const tiraInteres = interes.length ? (
     <div className="pc-interes" data-testid="pc-interes"><Eye size={14} aria-hidden /> <span>En el catálogo: {resumenInteres(interes)}</span></div>
   ) : null
-  const tira = <>{tiraVerificacion}{tiraFicha}{tiraSeg}{tiraInteres}{!hoja && aviso}{modales}</>
+  // CONV-WHATSAPP · "te la confirmo como pedido": la cotización vigente queda A LA VISTA con su botón (antes solo dentro de la ficha).
+  const vigentes = ficha.es_tuyo ? cots.filter((c) => estadoVisible(c) === 'vigente') : []
+  const tiraCot = vigentes.length ? (
+    <button type="button" className="pc-tira" onClick={() => (vigentes.length === 1 ? setModal({ convertir: vigentes[0] }) : abrir('pc:ficha'))} data-testid="pc-tira-cotizacion">
+      <span className="pc-av pc-av--sm" aria-hidden><FileText size={16} /></span>
+      <span className="pc-tira-tx"><b>{vigentes.length === 1 ? `Cotización ${vigentes[0].folio} · ${money(vigentes[0].total)}` : `${vigentes.length} cotizaciones vigentes`}</b><small>¿Te la confirmó? Conviértela en pedido con un toque</small></span>
+      <span className="pc-tira-cta">Hacer pedido</span>
+    </button>
+  ) : null
+  const tira = <>{tiraVerificacion}{tiraFicha}{tiraCot}{tiraSeg}{tiraInteres}{!hoja && aviso}{modales}</>
 
   // ── Menú «+»: lo que se puede hacer con este cliente ────────────────────────────────────────────────
   const acciones: AccionChat[] = []
@@ -337,6 +349,8 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   } else if (ficha.es_tuyo) {
     if (!ficha.tiene_cuenta && chat) acciones.push({ clave: 'acceso', etiqueta: ficha.invitacion_vigente ? 'Reenviar acceso al portal' : 'Mandar acceso al portal', detalle: 'Le llega aquí un enlace para crear su contraseña', icono: <KeyRound size={18} />, onElegir: () => abrir('pc:acceso') })
     acciones.push({ clave: 'cotizar', etiqueta: 'Cotizar', detalle: 'Arma la cotización y mándasela por este chat', icono: <FileText size={18} />, onElegir: () => setModal('cotizar') })
+    if (vigentes.length) acciones.push({ clave: 'convertir', etiqueta: vigentes.length === 1 ? `Convertir ${vigentes[0].folio} en pedido` : 'Convertir una cotización en pedido', detalle: 'Cuando el cliente te la confirma', icono: <ShoppingBag size={18} />,
+      onElegir: () => (vigentes.length === 1 ? setModal({ convertir: vigentes[0] }) : abrir('pc:ficha')) })
     acciones.push({ clave: 'pedido', etiqueta: 'Levantar pedido', icono: <ShoppingBag size={18} />, onElegir: () => setModal('pedido') })
     if (porCobrar.length) acciones.push({ clave: 'pago', etiqueta: 'Registrar pago', detalle: 'Con la foto del comprobante que te mandó', icono: <Banknote size={18} />, onElegir: () => { if (porCobrar.length === 1) abrirPago(porCobrar[0]); else { setPago(null); abrir('pc:pago') } } })
     if (conRecibo.length && chat) acciones.push({ clave: 'recibo', etiqueta: 'Mandar recibo', detalle: 'Del pago que ya validó Dirección', icono: <Receipt size={18} />, onElegir: () => abrir('pc:recibo') })

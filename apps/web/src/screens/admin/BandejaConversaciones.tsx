@@ -181,7 +181,7 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
     setMsg({ ok: true, texto: `Asignada a ${vendedores.find((v) => v.id === sel)?.nombre ?? 'el vendedor'}.` }); setSel(''); onCambio()
   }
   const ine = useIne(id)   // ALTA-DESDE-CONVERSACIÓN · fotos marcadas como INE para el alta
-  const pc = usePanelCliente({ conversationId: id, chat, onCambio, activo: !!c && !c.profile_id })
+  const pc = usePanelCliente({ conversationId: id, chat, onCambio, activo: !!c })   // CONV-WHATSAPP · Dirección hace lo mismo que ventas, también con doctores con cuenta
   const bloqueo = canal ? (control ? (control.canal && !control.puede_escribir ? (MOTIVO_NO_ESCRIBIR[control.motivo_no_escribir ?? ''] ?? 'Solo lectura.') : null) : 'Comprobando quién atiende…') : null
   const e = c ? estadoLinea(c) : null
   return (

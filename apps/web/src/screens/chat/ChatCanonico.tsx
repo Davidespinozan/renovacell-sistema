@@ -270,7 +270,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   }, [esperaIA, respondioIA, finAtencion, modoConv, convId, cargar])
 
   // Al final del hilo tras cada cambio (y de nuevo tras el layout/fuentes): el último elemento siempre visible.
-  const alFinal = useCallback(() => { fin.current?.scrollIntoView?.({ block: 'end' }) }, [])
+  // CONV-WHATSAPP · se mueve SOLO el hilo (scrollIntoView movía también la página: "bajo y no se mueve orgánicamente").
+  const hiloRef = useRef<HTMLDivElement | null>(null)
+  const alFinal = useCallback(() => { const el = hiloRef.current; if (el) el.scrollTop = el.scrollHeight }, [])
   useEffect(() => {
     alFinal()
     const raf = requestAnimationFrame(alFinal); const t = window.setTimeout(alFinal, 180)
@@ -347,7 +349,6 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     await cargarTanda(quedan, () => true)
     setCargandoAnt(false)
   }
-  const hiloRef = useRef<HTMLDivElement | null>(null)
   const conservarScroll = useRef<number | null>(null)   // al cargar mensajes viejos arriba, la vista no salta
   useLayoutEffect(() => {
     const el = hiloRef.current
@@ -494,7 +495,8 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const actualHallado = hallados[busqIdx] ?? null
   useEffect(() => {
     if (!actualHallado) return
-    raiz.current?.querySelector(`[data-msg-id="${actualHallado}"]`)?.scrollIntoView?.({ block: 'center' })
+    const el = raiz.current?.querySelector<HTMLElement>(`[data-msg-id="${actualHallado}"]`); const h = hiloRef.current
+    if (el && h) h.scrollTop += el.getBoundingClientRect().top - h.getBoundingClientRect().top - h.clientHeight / 2 + el.clientHeight / 2
   }, [actualHallado])
   const cerrarBusqueda = () => { setBusq(null); setBusqIdx(0) }
   // PALOMITAS · azul = el otro lado ya lo vio: su cursor de lectura lo alcanzó, o ya respondió después (incluye al asistente).

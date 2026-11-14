@@ -182,7 +182,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   ) : pc.hoja
 
   if (abierta) return (
-    <div className="grid" style={{ gap: 8 }}>
+    <div className="grid ases-chat" style={{ gap: 8 }}>
       {aviso && <div className="rc-aviso-nav" role="status">{aviso}</div>}
       <ChatCanonico embebido asesor puedeEmpresa={esDireccion} accionesAdjunto={accionesAdjunto} conversationId={abierta} cliente={cliente} autoFoco={enfocar} nombreCliente={contacto?.nombre ?? cola.find((x) => x.conversation_id === abierta)?.dueno ?? misClientes.lista.find((x) => x.conversation_id === abierta)?.dueno ?? null}
         telefono={contacto?.telefono ?? cola.find((x) => x.conversation_id === abierta)?.telefono ?? misClientes.lista.find((x) => x.conversation_id === abierta)?.telefono ?? null} onSalir={() => { setAbierta(null); setEnfocar(false); setVersionMis((n) => n + 1); void cargar(); void recargarAtencion() }}
