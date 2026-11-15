@@ -32,9 +32,9 @@ export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
             const key = p.keys.find((k) => nav.has(k))
             const actual = paso === p.n
             return (
-              <li key={p.n} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 12, border: '1px solid var(--line)', background: actual ? 'var(--ok-bg, #EAF4EC)' : 'transparent' }} data-testid={`guia-paso-${p.n}`}>
+              <li key={p.n} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 12, border: '1px solid var(--line)', background: actual ? 'var(--ds-success-bg)' : 'transparent' }} data-testid={`guia-paso-${p.n}`}>
                 <div style={{ display: 'flex', gap: 10, flex: 1 }}>
-                <span style={{ flex: 'none', width: 24, height: 24, borderRadius: 12, background: actual ? 'var(--green-deep)' : 'var(--line)', color: actual ? '#fff' : 'var(--ink-2)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{p.n}</span>
+                <span style={{ flex: 'none', width: 24, height: 24, borderRadius: 12, background: actual ? 'var(--green-deep)' : 'var(--line)', color: actual ? 'var(--ds-on-ink)' : 'var(--ink-2)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{p.n}</span>
                 <span style={{ minWidth: 0 }}>
                   <b style={{ display: 'block', fontSize: 13 }}>{p.titulo}{actual ? ' · estás aquí' : ''}</b>
                   <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{p.texto}</span>

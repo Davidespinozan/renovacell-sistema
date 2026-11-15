@@ -20,6 +20,8 @@ import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
 import { tomarBusqueda, tomarRevisarPedido } from '../../data/store/catalogoIntento'
+import { useMasPedidos } from '../../data/ops/masPedidos'
+import { Star, Trash2 } from 'lucide-react'
 import { hasSupabase } from '../../lib/supabase'
 import type { ProductSafe } from '../../data/types'
 import type { PedidoCreado } from '../../data/store/ordersStore'
@@ -124,6 +126,11 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const [fichaDe, setFichaDe] = useState<ProductSafe | null>(null)   // IA-VENDEDORA · ficha abierta
   // IA-VENDEDORA · "Promociones": productos (o familias con alguna presentación) en una promoción vigente.
   const [soloPromos, setSoloPromos] = useState(false)
+  // UX · categorías como chips (referencia: menú de STRYV Restaurant) y "Más pedido" en la tarjeta.
+  const [cat, setCat] = useState<string | null>(null)
+  const categorias = useMemo(() => [...new Set(entries.map((e) => e.product.category).filter((c): c is string => !!c && !!c.trim()))].sort((a, b) => a.localeCompare(b, 'es')), [entries])
+  useEffect(() => { if (cat && !categorias.includes(cat)) setCat(null) }, [categorias, cat])
+  const masPedidos = useMasPedidos()
   const enPromo = useMemo(() => new Set(volRules.filter((r) => r.promo && r.active).map((r) => r.product_id)), [volRules])
   const tienePromo = (e: CatalogEntry) => enPromo.has(e.product.id) || (e.kind === 'family' && e.variants.some((v) => enPromo.has(v.id)))
   // Búsqueda por nombre o categoría (sin acentos), también DENTRO de las presentaciones de una familia ("golden v" encuentra
@@ -131,13 +138,14 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const plano = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const visibles = useMemo(() => {
     const palabras = plano(busca.trim()).split(/\s+/).filter(Boolean)
-    const base = soloPromos ? entries.filter(tienePromo) : entries
+    const base0 = soloPromos ? entries.filter(tienePromo) : entries
+    const base = cat ? base0.filter((e) => e.product.category === cat) : base0
     if (!palabras.length) return base
     return base.filter((e) => {
       const t = plano([e.product.name, e.product.category, ...(e.kind === 'family' ? e.variants.map((v) => v.name) : [])].join(' '))
       return palabras.every((w) => t.includes(w))
     })
-  }, [entries, busca, soloPromos, enPromo]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, busca, soloPromos, enPromo, cat]) // eslint-disable-line react-hooks/exhaustive-deps
   // IA-VENDEDORA · la búsqueda es señal: al dejar de escribir (1.5 s), se registra; sin resultados avisa a la IA.
   const sinResultados = busca.trim().length >= 3 && visibles.length === 0
   useEffect(() => {
@@ -156,7 +164,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const tarjeta = (e: CatalogEntry) => e.kind === 'family' ? (
     <FamilyCard key={e.product.id} entry={e} cart={cart} priceOf={priceOf} onOpen={() => setOpenFamily(e.product)} />
   ) : (
-    <ProductCard key={e.product.id} onVer={() => setFichaDe(e.product)} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0, vq[e.product.id])} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
+    <ProductCard key={e.product.id} masPedido={masPedidos.has(e.product.id)} onVer={() => setFichaDe(e.product)} pendiente={!verified} p={e.product} price={priceOf(e.product)} qty={cart[e.product.id] ?? 0} stock={stockInfoFor(stockMap, e.product.id)} promo={volumePromoLabel(priceOf(e.product), volRules, e.product.id)} nivel={etiquetaNivel(priceOf(e.product), volRules, e.product.id, cart[e.product.id] ?? 0, vq[e.product.id])} effPrice={effOf(e.product, cart[e.product.id] ?? 0)} onAdd={() => add(e.product.id)} onDec={() => dec(e.product.id)} />
   )
 
   const lines: CartLine[] = useMemo(
@@ -244,6 +252,12 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
             <Icon name="search" />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar producto" aria-label="Buscar producto" data-testid="catalogo-buscar" />
           </label>
+          {categorias.length > 1 && (
+            <div className="dcat-cats" role="group" aria-label="Categoría" data-testid="catalogo-categorias">
+              <button type="button" aria-pressed={cat === null} onClick={() => setCat(null)}>Todas</button>
+              {categorias.map((c) => <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(cat === c ? null : c)}>{c}</button>)}
+            </div>
+          )}
         </div>
 
         {visibles.length === 0 ? (
@@ -306,7 +320,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
 
 // Tarjeta de producto del portal: foto completa en un cuadro limpio, línea y categoría como texto discreto, precio
 // al frente y la promoción como un chip. Lo agotado se ve compacto y sin botón (no hay nada que hacer ahí).
-function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDec, onVer, pendiente = false }: { onVer?: () => void; pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; nivel?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
+function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDec, onVer, pendiente = false, masPedido = false }: { masPedido?: boolean; onVer?: () => void; pendiente?: boolean; p: ProductSafe; price: number | null; qty: number; stock: StockInfo; promo?: string | null; nivel?: string | null; effPrice?: number | null; onAdd: () => void; onDec: () => void }) {
   const isProf = p.line === 'prof'
   const sellable = stock.tracked && stock.qty > 0
   const atMax = qty >= stock.qty
@@ -317,6 +331,7 @@ function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDe
         onClick={onVer} onKeyDown={onVer ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onVer() } } : undefined} style={onVer ? { cursor: 'pointer' } : undefined} data-testid="ver-ficha">
         {p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Icon name="leaf" />}
         {!sellable && <span className="dcat-estado">Agotado</span>}
+        {sellable && masPedido && <span className="dcat-mas" data-testid="mas-pedido"><Star size={12} aria-hidden /> Más pedido</span>}
         {sellable && stock.status === 'low' && <span className="dcat-estado dcat-estado--pocas">Quedan {stock.qty}</span>}
       </div>
       <div className="pb">
@@ -347,7 +362,7 @@ function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDe
           </button>
         ) : (
           <div className="dcat-cant">
-            <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}><Icon name="minus" /></button>
+            <button className="btn ghost sm" type="button" aria-label={qty === 1 ? 'Quitar del carrito' : 'Quitar uno'} onClick={onDec}>{qty === 1 ? <Trash2 size={15} aria-hidden /> : <Icon name="minus" />}</button>
             <span className="mono">{qty}</span>
             <button className="btn sm" type="button" aria-label="Agregar uno" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
           </div>

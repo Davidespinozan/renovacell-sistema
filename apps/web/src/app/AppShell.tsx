@@ -1,4 +1,5 @@
 // Shell: arma el layout (sidebar + main) y monta la pantalla activa.
+import { Toaster } from './Toast'
 import React, { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
@@ -59,6 +60,7 @@ export function AppShell() {
         <main className="canvas">
           {/* Fuera de #content: no se desmonta al cambiar de pantalla. */}
           <FallosEscritura />
+          <Toaster />   {/* SISTEMA DE DISEÑO · avisos tipo toast, un solo canal */}
           {/* PUSH SIEMPRE · "Activa las notificaciones" hasta que este dispositivo las tenga (equipo y doctor). */}
           {user && role && <PuertaAvisos key={user.email} doctor={role === 'doctor'} />}
           {/* Versión publicada nueva: aviso discreto para actualizar (nunca recarga sola). */}

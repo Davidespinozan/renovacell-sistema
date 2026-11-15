@@ -5,18 +5,14 @@
    escala de letra corta, menos sombra y menos radio. El verde de marca queda para lo activo y lo principal.
    ═══════════════════════════════════════════════════════════════════════════════════════════════════ */
 :root{
-  /* Escala de letra (6 pasos) */
-  --fs-xs:12px; --fs-sm:13px; --fs-md:15px; --fs-lg:17px; --fs-xl:21px; --fs-2xl:28px;
-  /* Radios (3) */
-  --r-ui-sm:8px; --r-ui:12px; --r-ui-lg:16px;
-  /* Superficies */
-  --ux-bg:#f5f6f8; --ux-surface:#ffffff; --ux-line:#e7eaee; --ux-ink:#0f1720; --ux-ink-2:#4b5563; --ux-ink-3:#8b93a1;
-  --ux-accent:var(--green); --ux-accent-soft:#e8f3ec;
-  /* Estados: verde listo · ámbar pendiente · rojo urgente · gris neutro · azul en curso */
-  --st-ok:#15703d; --st-ok-bg:#e7f5ec; --st-warn:#9a5b00; --st-warn-bg:#fdf3e1; --st-bad:#b42318; --st-bad-bg:#fdecea;
-  --st-neu:#475467; --st-neu-bg:#f2f4f7; --st-info:#1d4ed8; --st-info-bg:#eaf0fe;
-  --ux-shadow:0 1px 2px rgba(15,23,32,.05);
-  --ux-shadow-pop:0 12px 32px -12px rgba(15,23,32,.22);
+  /* UX MODERNO usa SOLO los tokens del sistema de diseño (styles/ds.css). Estos nombres quedan como alias. */
+  --fs-xs:var(--ds-fs-xs); --fs-sm:var(--ds-fs-sm); --fs-md:var(--ds-fs-md); --fs-lg:var(--ds-fs-lg); --fs-xl:var(--ds-fs-xl); --fs-2xl:var(--ds-fs-2xl);
+  --r-ui-sm:var(--ds-r-sm); --r-ui:var(--ds-r); --r-ui-lg:var(--ds-r-lg);
+  --ux-bg:var(--ds-canvas); --ux-surface:var(--ds-surface); --ux-line:var(--ds-border); --ux-ink:var(--ds-ink); --ux-ink-2:var(--ds-text-2); --ux-ink-3:var(--ds-muted);
+  --ux-accent:var(--ds-brand); --ux-accent-soft:var(--ds-brand-soft);
+  --st-ok:var(--ds-success); --st-ok-bg:var(--ds-success-bg); --st-warn:var(--ds-warning); --st-warn-bg:var(--ds-warning-bg); --st-bad:var(--ds-danger); --st-bad-bg:var(--ds-danger-bg);
+  --st-neu:var(--ds-neutral); --st-neu-bg:var(--ds-neutral-bg); --st-info:var(--ds-info); --st-info-bg:var(--ds-info-bg);
+  --ux-shadow:var(--ds-shadow); --ux-shadow-pop:var(--ds-shadow-pop);
 }
 
 /* ── Lienzo y tarjetas: planas, una sola superficie por bloque ───────────────────────────────────── */
@@ -43,12 +39,12 @@ body,.main{background:var(--ux-bg)}
 
 /* ── Barra de abajo (celular) clara, el activo en verde ─────────────────────────────────────────── */
 @media (max-width:900px){
-  .bnav{background:var(--ux-surface);background-image:none;border-top:1px solid var(--ux-line);box-shadow:0 -1px 0 rgba(15,23,32,.02)}
+  .bnav{background:var(--ux-surface);background-image:none;border-top:1px solid var(--ux-line);box-shadow:none}
   .bnav a{color:var(--ux-ink-3)}
   .bnav a span{color:inherit}
   .bnav a.on{color:var(--ux-accent);font-weight:600}
   .bnav a.on svg{background:var(--ux-accent-soft);color:var(--ux-accent)}
-  .bnav a .bnav-n{position:absolute;transform:translate(13px,-8px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--st-bad);color:#fff;font:700 10.5px/17px var(--font-ui,inherit);text-align:center}
+  .bnav a .bnav-n{position:absolute;transform:translate(13px,-8px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--st-bad);color:var(--ds-on-ink);font:700 10.5px/17px var(--font-ui,inherit);text-align:center}
 }
 
 /* ── Explicación de pantalla: un enlace discreto, no un párrafo ─────────────────────────────────── */
@@ -102,14 +98,14 @@ body,.main{background:var(--ux-bg)}
 .tienda-pedido-tx small{font-size:var(--fs-sm);color:var(--ux-ink-2)}
 /* tarjeta de producto */
 .tienda-prod{position:relative;display:grid;gap:4px;align-content:start;min-width:0}
-.tienda-prod-foto{display:block;aspect-ratio:1;width:100%;border:0;padding:0;border-radius:var(--r-ui);background:#fff;overflow:hidden;cursor:pointer;box-shadow:inset 0 0 0 1px var(--ux-line)}
+.tienda-prod-foto{display:block;aspect-ratio:1;width:100%;border:0;padding:0;border-radius:var(--r-ui);background:var(--ds-on-ink);overflow:hidden;cursor:pointer;box-shadow:inset 0 0 0 1px var(--ux-line)}
 .tienda-prod-foto img{width:100%;height:100%;object-fit:contain;padding:10px;box-sizing:border-box}
 .tienda-prod-nombre{font-size:var(--fs-sm);font-weight:500;color:var(--ux-ink);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
 .tienda-prod-precio{font-size:var(--fs-md);font-weight:700;color:var(--ux-ink);font-variant-numeric:tabular-nums}
 .tienda-prod-media{position:relative}
-.tienda-mas{position:absolute;right:8px;bottom:8px;width:36px;height:36px;border-radius:50%;border:0;background:var(--ux-accent);color:#fff;display:grid;place-items:center;box-shadow:0 4px 12px -4px rgba(0,90,13,.55);cursor:pointer}
-.tienda-cant{position:absolute;right:8px;bottom:8px;display:flex;align-items:center;gap:2px;background:var(--ux-accent);color:#fff;border-radius:999px;padding:2px;box-shadow:0 4px 12px -4px rgba(0,90,13,.55)}
-.tienda-cant button{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:#fff;display:grid;place-items:center;cursor:pointer}
+.tienda-mas{position:absolute;right:8px;bottom:8px;width:36px;height:36px;border-radius:50%;border:0;background:var(--ux-accent);color:var(--ds-on-ink);display:grid;place-items:center;box-shadow:var(--ds-shadow-pop);cursor:pointer}
+.tienda-cant{position:absolute;right:8px;bottom:8px;display:flex;align-items:center;gap:2px;background:var(--ux-accent);color:var(--ds-on-ink);border-radius:999px;padding:2px;box-shadow:var(--ds-shadow-pop)}
+.tienda-cant button{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:var(--ds-on-ink);display:grid;place-items:center;cursor:pointer}
 .tienda-cant b{min-width:18px;text-align:center;font-size:var(--fs-sm)}
 .tienda-agotado{position:absolute;left:8px;top:8px;z-index:1;font-size:var(--fs-xs);font-weight:600;color:var(--st-neu);background:var(--st-neu-bg);border-radius:999px;padding:2px 8px}
 /* tira deslizable (vuelve a comprar) y rejilla (disponibles) */
@@ -140,7 +136,7 @@ body,.main{background:var(--ux-bg)}
 @media (max-width:640px){.dcat-foto{aspect-ratio:3/2 !important}.dcat-foto img{padding:6px !important}.dcat-card h5{min-height:0 !important}.dcat-card:hover{transform:none}}
 .seg{background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important;gap:8px !important}
 .seg button{border:1px solid var(--ux-line) !important;background:var(--ux-surface) !important;color:var(--ux-ink-2) !important;border-radius:999px !important;min-height:36px;padding:0 14px !important;font-size:var(--fs-sm) !important;box-shadow:none !important}
-.seg button.active,.seg button.on,.seg button[aria-pressed="true"]{background:var(--ux-ink) !important;border-color:var(--ux-ink) !important;color:#fff !important}
+.seg button.active,.seg button.on,.seg button[aria-pressed="true"]{background:var(--ux-ink) !important;border-color:var(--ux-ink) !important;color:var(--ds-on-ink) !important}
 /* Mis pedidos: cuándo llega, arriba y claro */
 .pedido-llega{display:grid;gap:2px;background:var(--ux-accent-soft);border-radius:var(--r-ui);padding:10px 12px;margin:0 0 12px}
 .pedido-llega b{font-size:var(--fs-md);color:var(--ux-accent)}
@@ -166,7 +162,7 @@ button.cifra-v{cursor:pointer}
 .entrega-pasos li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center}
 .entrega-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--st-neu-bg);color:var(--ux-ink-2);font-weight:700;font-size:var(--fs-sm)}
 .entrega-n svg{width:15px;height:15px}
-.entrega-pasos li.hecho .entrega-n{background:var(--ux-accent);color:#fff}
+.entrega-pasos li.hecho .entrega-n{background:var(--ux-accent);color:var(--ds-on-ink)}
 .entrega-foto{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 12px;border:1.5px dashed var(--ux-line);border-radius:var(--r-ui);background:var(--ux-surface);cursor:pointer;font-weight:600;color:var(--ux-ink)}
 .entrega-pasos li.hecho .entrega-foto{border-style:solid;border-color:var(--ux-accent)}
 .entrega-foto img{width:40px;height:40px;border-radius:8px;object-fit:cover}
@@ -187,3 +183,14 @@ button.cifra-v{cursor:pointer}
 .tb-estatus b{color:var(--ux-ink);font-size:var(--fs-md);margin-right:2px}
 .tb-mas{background:var(--ux-surface);border:1px solid var(--ux-line);border-radius:var(--r-ui-lg);padding:12px 16px}
 .tb-mas summary{cursor:pointer;font-weight:600;color:var(--ux-ink-2)}
+/* Tienda del doctor · "Más pedido", categorías y barra fija */
+.dcat-mas{position:absolute;left:8px;top:8px;z-index:1;display:inline-flex;align-items:center;gap:4px;background:var(--ds-warning-bg);color:var(--ds-warning);border-radius:var(--ds-r-pill);padding:3px 8px;font:600 var(--ds-fs-xs)/1.2 var(--ds-font)}
+.dcat-barra{position:sticky;top:0;z-index:6;background:var(--ds-canvas);padding-block:8px}
+@media (max-width:900px){.dcat-barra{top:61px}}
+.dcat-cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex-basis:100%;padding-bottom:2px}
+.dcat-cats::-webkit-scrollbar{display:none}
+.dcat-cats button{flex:none;border:1px solid var(--ds-border);background:var(--ds-surface);color:var(--ds-text-2);border-radius:var(--ds-r-pill);min-height:34px;padding:0 12px;font:500 var(--ds-fs-sm)/1 var(--ds-font);cursor:pointer;white-space:nowrap}
+.dcat-cats button[aria-pressed="true"]{background:var(--ds-brand-soft);border-color:var(--ds-brand);color:var(--ds-brand-strong);font-weight:600}
+.bnav-n{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--ds-danger);color:var(--ds-on-ink);font:700 10.5px/17px var(--ds-font);text-align:center}
+@media (max-width:900px){.bnav a .bnav-n{position:absolute;transform:none}}
+.dcat-mas svg,.tienda-prod-media .dcat-mas svg{width:12px !important;height:12px !important;color:inherit !important}

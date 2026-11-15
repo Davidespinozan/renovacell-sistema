@@ -14,7 +14,8 @@
 // autoridades de lanzamientos, seguimiento posventa o envíos activos, se agregan como bloques aquí sin rehacer la pantalla.
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { ChevronRight, Minus, Package, Plus, RotateCcw, Search, ShoppingBag, Sparkles } from 'lucide-react'
+import { ChevronRight, Minus, Package, Plus, RotateCcw, Search, ShoppingBag, Sparkles, Star, Trash2 } from 'lucide-react'
+import { useMasPedidos } from '../../data/ops/masPedidos'
 import { hasSupabase } from '../../lib/supabase'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
 import { BarraCarrito } from '../doctor/BarraCarrito'
@@ -142,6 +143,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   // vitrina: buscador, "Vuelve a comprar" (lo que ya pide, con + directo al carrito), su pedido en curso, promociones y
   // productos con +. El carrito es el canónico del servidor (el mismo del catálogo y del chat).
   const canon = useCarritoCanonico(hasSupabase && verified)
+  const masPedidos = useMasPedidos()
   const enCarrito = (id: string) => (hasSupabase ? canon.qty[id] ?? 0 : 0)
   const agregar = (id: string, delta: number) => {
     if (!verified) { setScreen('catalogo'); return }
@@ -166,12 +168,13 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       <div className="tienda-prod" data-testid="tienda-producto">
         <div className="tienda-prod-media">
           {agotado && <span className="tienda-agotado">Agotado</span>}
+          {!agotado && masPedidos.has(p.id) && <span className="dcat-mas"><Star size={12} aria-hidden /> Más pedido</span>}
           <button type="button" className="tienda-prod-foto" onClick={() => { pedirBusqueda(p.name); setScreen('catalogo') }} aria-label={`Ver ${p.name}`}>
             <img src={p.image_url!} alt="" loading="lazy" />
           </button>
           {verified && !agotado && (n > 0
             ? <span className="tienda-cant" data-testid="tienda-cantidad">
-                <button type="button" onClick={() => agregar(p.id, -1)} aria-label={`Quitar uno de ${p.name}`}><Minus size={16} /></button>
+                <button type="button" onClick={() => agregar(p.id, -1)} aria-label={n === 1 ? `Quitar ${p.name} del carrito` : `Quitar uno de ${p.name}`}>{n === 1 ? <Trash2 size={15} /> : <Minus size={16} />}</button>
                 <b>{n}</b>
                 <button type="button" onClick={() => agregar(p.id, 1)} aria-label={`Agregar otro de ${p.name}`}><Plus size={16} /></button>
               </span>

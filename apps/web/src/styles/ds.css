@@ -1,0 +1,59 @@
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════
+   SISTEMA DE DISEÑO RENOVACELL (15 nov 2026) · portado de STRYV Design System V1 (stryv-restaurant-template-1,
+   docs/design-system/STRYV_DESIGN_SYSTEM_V1.md) y adaptado: la marca es el verde Renovacell, solo como acento.
+   Regla: TODO color, tamaño de letra, radio y sombra sale de este bloque. El candado (src/app/ds.test.ts) falla si un
+   archivo migrado usa un color literal fuera de aquí. Guía: docs/DISENO.md.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ds:tokens:inicio */
+:root{
+  /* superficies y texto */
+  --ds-canvas:#F5F6F8; --ds-surface:#FFFFFF; --ds-field:#F8FAFC; --ds-subtle:#F2F4F7;
+  --ds-border:#E7EAEE; --ds-border-strong:#D6DCE5;
+  --ds-ink:#0F1720; --ds-text-2:#4B5563; --ds-muted:#8B93A1; --ds-on-ink:#FFFFFF; --ds-overlay:rgba(15,23,32,.42);
+  /* marca: verde Renovacell, solo para lo activo y la acción principal */
+  --ds-brand:#007311; --ds-brand-strong:#005A0D; --ds-brand-soft:#E8F3EC; --ds-brand-ring:rgba(0,115,17,.28);
+  /* estados: verde listo · ámbar pendiente · rojo urgente/error · azul en curso · gris neutro */
+  --ds-success:#15703D; --ds-success-bg:#E7F5EC; --ds-success-line:rgba(21,112,61,.24);
+  --ds-warning:#9A5B00; --ds-warning-bg:#FDF3E1; --ds-warning-line:rgba(154,91,0,.26);
+  --ds-danger:#B42318; --ds-danger-bg:#FDECEA; --ds-danger-line:rgba(180,35,24,.24);
+  --ds-info:#1D4ED8; --ds-info-bg:#EAF0FE; --ds-info-line:rgba(29,78,216,.22);
+  --ds-neutral:#475467; --ds-neutral-bg:#F2F4F7; --ds-neutral-line:rgba(15,23,32,.10);
+  /* escala de letra (6) */
+  --ds-fs-xs:12px; --ds-fs-sm:13px; --ds-fs-md:15px; --ds-fs-lg:17px; --ds-fs-xl:21px; --ds-fs-2xl:28px;
+  /* radios (3 + píldora) */
+  --ds-r-sm:8px; --ds-r:12px; --ds-r-lg:16px; --ds-r-pill:999px;
+  /* sombras (3) */
+  --ds-shadow:0 1px 2px rgba(15,23,32,.05);
+  --ds-shadow-pop:0 12px 32px -12px rgba(15,23,32,.22);
+  --ds-shadow-sheet:0 -8px 40px rgba(15,23,32,.14);
+  /* movimiento (1 curva) */
+  --ds-ease:cubic-bezier(.32,.72,0,1); --ds-dur:200ms;
+  --ds-font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+/* ds:tokens:fin */
+
+/* ── Aviso tipo toast: un solo canal; rojo solo para error ─────────────────────────────────────── */
+.ds-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);z-index:90;max-width:min(92vw,440px);
+  padding:12px 16px;border-radius:var(--ds-r);background:var(--ds-ink);color:var(--ds-on-ink);font:500 var(--ds-fs-sm)/1.4 var(--ds-font);
+  box-shadow:var(--ds-shadow-pop);opacity:0;pointer-events:none;transition:opacity var(--ds-dur) var(--ds-ease),transform var(--ds-dur) var(--ds-ease)}
+.ds-toast.ds-toast--ver{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.ds-toast--ok{background:var(--ds-success)} .ds-toast--error{background:var(--ds-danger)}
+@media (min-width:901px){.ds-toast{bottom:24px}}
+
+/* ── Hoja inferior (celular) / diálogo (escritorio): encabezado y acción fijos, solo el cuerpo hace scroll ── */
+.ds-hoja-fondo{position:fixed;inset:0;z-index:85;background:var(--ds-overlay);display:flex;align-items:flex-end;justify-content:center;animation:ds-fundido var(--ds-dur) var(--ds-ease)}
+.ds-hoja{display:flex;flex-direction:column;width:100%;max-height:92dvh;background:var(--ds-surface);border-radius:var(--ds-r-lg) var(--ds-r-lg) 0 0;
+  box-shadow:var(--ds-shadow-sheet);animation:ds-hoja var(--ds-dur) var(--ds-ease);padding-bottom:env(safe-area-inset-bottom,0px)}
+.ds-hoja-cab{display:flex;align-items:center;gap:12px;padding:16px 18px 10px;border-bottom:1px solid var(--ds-border)}
+.ds-hoja-cab h3{flex:1;margin:0;font:600 var(--ds-fs-lg)/1.25 var(--ds-font);color:var(--ds-ink)}
+.ds-hoja-x{width:36px;height:36px;border-radius:var(--ds-r-pill);border:0;background:var(--ds-subtle);color:var(--ds-text-2);display:grid;place-items:center;cursor:pointer}
+.ds-hoja-cuerpo{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px 18px}
+.ds-hoja-pie{padding:12px 18px 16px;border-top:1px solid var(--ds-border);display:flex;gap:10px;justify-content:flex-end}
+@media (min-width:901px){
+  .ds-hoja-fondo{align-items:center}
+  .ds-hoja{width:min(560px,94vw);border-radius:var(--ds-r-lg);max-height:86vh}
+  .ds-hoja--ancha{width:min(880px,94vw)}
+}
+@keyframes ds-fundido{from{opacity:0}}
+@keyframes ds-hoja{from{opacity:0;transform:translateY(24px)}}
+@media (prefers-reduced-motion:reduce){.ds-hoja,.ds-hoja-fondo,.ds-toast{animation:none;transition:none}}

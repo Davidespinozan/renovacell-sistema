@@ -3,6 +3,7 @@
 // es un comando idempotente (operation_id) y pasa por la mutación canónica, que es la que dispara
 // el handoff comercial al primer artículo. Las mutaciones se SERIALIZAN (doble clic, ráfagas) y la
 // vista es optimista solo mientras el servidor confirma; la verdad final es la proyección del servidor.
+import { publicarPiezas } from '../store/carritoConteo'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { carrito as clientePorDefecto, type Carrito, type ClienteCarrito, type Mutacion } from '../ops/carrito'
 import { chatUi, handoffNuevoDe } from '../store/chatUiStore'
@@ -63,5 +64,7 @@ export function useCarritoCanonico(activo: boolean, cliente: ClienteCarrito = cl
   /** Espera a que terminen las mutaciones en curso (antes de revisar el checkout). */
   const esperar = useCallback(() => cola.current, [])
 
+  // UX · el contador de la pestaña "Carrito" (barra de abajo del doctor)
+  useEffect(() => { if (activo) publicarPiezas(Object.values(qty).reduce((a, b) => a + b, 0)) }, [qty, activo])
   return { cart, qty, error, fijar, vaciar, recargar, esperar, listo: !!cart }
 }

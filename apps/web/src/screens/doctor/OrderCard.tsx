@@ -85,11 +85,11 @@ export function OrderCard({
 
       {unpaid && onPay && (pagoReportado ? (
         // Ya informó su pago: no se le vuelve a ofrecer pagar (el servidor lo rechazaría) mientras Renovacell lo revisa.
-        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--cp-surface-2, #f3f5f2)', border: '1px solid var(--line)', fontSize: 13 }} data-testid="pago-en-revision">
+        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--ds-subtle)', border: '1px solid var(--line)', fontSize: 13 }} data-testid="pago-en-revision">
           Recibimos tu comprobante. Lo estamos revisando y te avisamos en cuanto se confirme.
         </div>
       ) : (
-        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--warn-bg)', border: '1px solid #EEDDB6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--warn-bg)', border: '1px solid var(--ds-warning-line)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: 'var(--warn)', fontWeight: 600 }}>Este pedido está pendiente de pago.</span>
           <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={onPay}>
             <Icon name="receipt" /> Pagar {money(saldo)}
