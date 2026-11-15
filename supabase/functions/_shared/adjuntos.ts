@@ -27,6 +27,23 @@ export async function guardarImagenWA(admin: any, conv: string, messageId: strin
 }
 export const VIGENCIA_ENLACE_SEG = 600
 
+/** NOTAS DE VOZ (15 nov 2026) · guarda el audio o video del cliente de WhatsApp con SU mensaje (bucket chat_archivos).
+ *  Cualquier falla deja el mensaje como estaba ("Envió un audio por WhatsApp."). */
+const EXT_WA: Record<string, string> = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/amr': 'amr', 'audio/mp4': 'm4a', 'video/mp4': 'mp4', 'video/3gpp': '3gp' }
+// deno-lint-ignore no-explicit-any
+export async function guardarArchivoWA(admin: any, conv: string, messageId: string, arc: { bytes: Uint8Array; mime: string }): Promise<boolean> {
+  const ext = EXT_WA[arc.mime]
+  if (!ext || !messageId || !arc.bytes.length) return false
+  try {
+    const ruta = `${conv}/${crypto.randomUUID()}.${ext}`
+    const { error: eSub } = await admin.storage.from(BUCKET_ARCHIVOS).upload(ruta, arc.bytes, { contentType: arc.mime })
+    if (eSub) return false
+    const { error } = await admin.rpc('cc_archivo_registrar_wa', { p_message: messageId, p_ruta: ruta, p_tipo: arc.mime, p_bytes: arc.bytes.length })
+    if (error) { await admin.storage.from(BUCKET_ARCHIVOS).remove([ruta]).then(() => {}, () => {}); return false }
+    return true
+  } catch { return false }
+}
+
 // CHAT-ARCHIVOS (mig 20270324) · videos y documentos: bucket privado `chat_archivos`, tabla cc_archivos. El mensaje dice
 // qué llegó ("Envió un video." / "Envió un documento: Ficha.pdf."); el archivo solo se entrega con enlaces temporales.
 export const BUCKET_ARCHIVOS = 'chat_archivos'
@@ -42,7 +59,7 @@ export const claseArchivo = (tipo: string): 'video' | 'documento' | null => (!EX
 export const nombreArchivo = (n: unknown): string => (typeof n === 'string' ? n.replace(/[\u0000-\u001f/\\]+/g, ' ').trim().slice(0, 200) : '') || 'archivo'
 export const textoArchivo = (tipo: string, nombre: string): string => (claseArchivo(tipo) === 'video' ? 'Envió un video.' : `Envió un documento: ${nombre.slice(0, 160)}.`)
 /** El texto que marca un mensaje de archivo (no se le manda al cliente como pie en WhatsApp). */
-export const esMarcadorArchivo = (t: unknown): boolean => typeof t === 'string' && (t === 'Envió un video.' || /^Envió un documento: .*\.$/s.test(t))
+export const esMarcadorArchivo = (t: unknown): boolean => typeof t === 'string' && (t === 'Envió un video.' || /^Envió un documento: .*\.$/s.test(t) || /^Envió un (audio|video) por WhatsApp\./.test(t))
 /** client_message_id de un archivo: siempre con prefijo `arc:` (así la base sabe que lleva archivo). */
 export function idArchivo(entrada: unknown): string {
   const base = typeof entrada === 'string' ? entrada.replace(/^arc:/, '').replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 70) : ''
@@ -113,5 +130,35 @@ export async function conLecturaAjena(admin: any, conv: string, actor: string, d
     const filas = (ps ?? []) as Array<{ last_read_seq: number | null; escribiendo_hasta?: string | null }>
     const leido = filas.reduce((m, p) => Math.max(m, Number(p.last_read_seq ?? 0)), 0)
     return { ...(data as Record<string, unknown>), leido_otro: leido, escribiendo_otro: escribiendoAhora(filas.map((f) => f.escribiendo_hasta ?? null)) }
+  } catch { return data }
+}
+
+/** EDITAR-MENSAJES (15 nov 2026) · el texto corregido (gana la edición más reciente) con la marca `editado`; el original
+ *  en cc_messages no cambia. Con `conv`, también la lista `ediciones` de los últimos 20 minutos para que quien ya tiene
+ *  la conversación abierta (y solo pide lo nuevo) vea la corrección. Cualquier falla deja los mensajes como estaban. */
+// deno-lint-ignore no-explicit-any
+export async function conEdiciones(admin: any, data: unknown, conv?: string | null): Promise<unknown> {
+  const d = data as { mensajes?: Msj[] } | null
+  if (!d || typeof d !== 'object') return data
+  const msgs = Array.isArray(d.mensajes) ? d.mensajes : []
+  const ids = msgs.filter((m) => typeof m.id === 'string').map((m) => m.id as string)
+  try {
+    const ultima = new Map<string, { texto: string; editado_at: string }>()
+    if (ids.length) {
+      const { data: filas } = await admin.from('cc_mensaje_ediciones').select('message_id, texto, created_at').in('message_id', ids).order('created_at', { ascending: true })
+      for (const f of (filas ?? []) as Array<{ message_id: string; texto: string; created_at: string }>) ultima.set(f.message_id, { texto: f.texto, editado_at: f.created_at })
+    }
+    let recientes: Array<{ message_id: string; texto: string; editado_at: string }> | undefined
+    if (conv) {
+      const desde = new Date(Date.now() - 20 * 60_000).toISOString()
+      const { data: rs } = await admin.from('cc_mensaje_ediciones').select('message_id, texto, created_at').eq('conversation_id', conv).gte('created_at', desde).order('created_at', { ascending: true })
+      const m = new Map<string, { message_id: string; texto: string; editado_at: string }>()
+      for (const f of (rs ?? []) as Array<{ message_id: string; texto: string; created_at: string }>) m.set(f.message_id, { message_id: f.message_id, texto: f.texto, editado_at: f.created_at })
+      recientes = [...m.values()]
+    }
+    if (!ultima.size && !recientes) return data
+    return { ...(d as Record<string, unknown>),
+      mensajes: msgs.map((m) => (ultima.has(m.id as string) ? { ...m, content: ultima.get(m.id as string)!.texto, editado: true } : m)),
+      ...(recientes ? { ediciones: recientes } : {}) }
   } catch { return data }
 }

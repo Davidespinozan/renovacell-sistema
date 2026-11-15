@@ -41,6 +41,8 @@ export class ClienteDifusiones {
   }
   prueba(c: Contenido) { return this.llamar<{ para: string }>('difusion_prueba', { p_titulo: c.titulo.trim(), p_texto: c.texto.trim(), p_enlace: c.enlace.trim() || null, p_imagen: c.imagen.trim() || null }) }
   enviadas() { return this.llamar<Difusion[]>('mis_difusiones') }
+  /** ETIQUETAS EN LA FICHA · sus etiquetas (listas) y si este cliente la tiene. */
+  etiquetasDe(customerId: string) { return this.llamar<Array<{ id: string; nombre: string; puesta: boolean }>>('cliente_etiquetas', { p_customer: customerId }) }
 }
 export const difusiones = new ClienteDifusiones()
 

@@ -17,6 +17,15 @@ const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) 
 export async function hiloPersona(conversationId: string, rpc: Rpc = rpcPorDefecto): Promise<HiloPersona | null> {
   if (!hasSupabase && rpc === rpcPorDefecto) return null
   try {
+    // 15 nov 2026 · por la Edge `chat`: la misma lectura, pero con los enlaces a las fotos, audios y archivos de los otros
+    // canales (directo de la base solo llegaba el texto "Envió una imagen"). Si la Edge no responde, la lectura directa.
+    if (rpc === rpcPorDefecto) {
+      const { data, error } = await supabase.functions.invoke('chat', { body: { action: 'hilo_persona', conversation_id: conversationId } })
+      if (!error && data && Array.isArray((data as HiloPersona).mensajes)) {
+        const d = data as HiloPersona
+        return { persona: d.persona ?? null, conversaciones: d.conversaciones ?? [], mensajes: d.mensajes ?? [] }
+      }
+    }
     const { data, error } = await rpc('cc_hilo_persona', { p_conv: conversationId })
     if (error || !data) return null
     const d = data as HiloPersona

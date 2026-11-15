@@ -26,7 +26,7 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
-import { TEXTO_IMAGEN, idImagen, conAdjuntos, conArchivos, conLecturaAjena, BUCKET_ARCHIVOS, MAX_BYTES_ARCHIVO, claseArchivo, idArchivo, nombreArchivo, rutaArchivo, textoArchivo, RUTA_ARCHIVO } from '../_shared/adjuntos.ts'
+import { TEXTO_IMAGEN, idImagen, conAdjuntos, conArchivos, conEdiciones, conLecturaAjena, BUCKET_ARCHIVOS, MAX_BYTES_ARCHIVO, claseArchivo, idArchivo, nombreArchivo, rutaArchivo, textoArchivo, RUTA_ARCHIVO } from '../_shared/adjuntos.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
@@ -41,7 +41,7 @@ const cors = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-const ACCIONES = new Set(['adjuntar', 'archivo_preparar', 'archivo_enviar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo'])   // + Chat V2-C1
+const ACCIONES = new Set(['adjuntar', 'archivo_preparar', 'archivo_enviar', 'abrir', 'leer', 'enviar', 'leido', 'solicitar_asesor', 'rechazar_asesor', 'asignar', 'iniciar', 'terminar', 'reanudar_ia', 'cerrar', 'reabrir', 'cola', 'sesiones', 'leer_sesion', 'escribiendo', 'hilo_persona', 'editar'])   // + Chat V2-C1 · + hilo_persona (15 nov)
 // CONTACTO CONVERSACIONAL · lo único que puede hacer un visitante que aún no deja sus datos: conversar con el asistente.
 const SOLO_CONVERSAR = new Set(['abrir', 'leer', 'enviar', 'leido', 'escribiendo', 'sesiones', 'leer_sesion'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -116,13 +116,34 @@ Deno.serve(conCors(async (req) => {
     const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
     const { data, error } = await admin.rpc('cc_sesion_leer', { p_session: sesion, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile, p_desde_seq: desde, p_limite: 100 })
     if (error) return falla(error)
-    return json(200, await conArchivos(admin, await conAdjuntos(admin, data)))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
+    return json(200, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data))))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
   }
 
   if (!conv) return json(400, { error: 'falta_conversacion', message: 'Falta conversation_id.' })
   const base = { p_conv: conv, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile }
 
   // ── Chat V2-C1 · sesiones autorizadas de la conversación (sin fragmentos de mensajes) ──
+  // ── HILO POR PERSONA (15 nov 2026) · lo de los otros canales de la misma persona, CON sus fotos y archivos ──
+  // La base decide (cc_hilo_persona con la sesión de quien pide); aquí solo se firman los enlaces de lo ya autorizado.
+  if (action === 'hilo_persona') {
+    if (!quien) return json(401, { error: 'sin_identidad' })
+    const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+    const { data, error } = await caller.rpc('cc_hilo_persona', { p_conv: conv })
+    if (error) return falla(error)
+    return json(200, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data))))
+  }
+
+  // ── EDITAR-MENSAJES (15 nov 2026) · la base decide (autor, 15 min, solo portal, solo texto) ──
+  if (action === 'editar') {
+    if (!quien) return json(401, { error: 'sin_identidad' })
+    const msg = typeof p.message_id === 'string' && UUID.test(p.message_id) ? p.message_id : null
+    if (!msg || typeof p.texto !== 'string') return json(400, { error: 'contenido_invalido', message: 'Falta el mensaje.' })
+    const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+    const { data, error } = await caller.rpc('cc_mensaje_editar', { p_message: msg, p_texto: p.texto })
+    if (error) return falla(error)
+    return json(200, data)
+  }
+
   if (action === 'sesiones') {
     const { data, error } = await admin.rpc('cc_sesiones_listar', base)
     if (error) return falla(error)
@@ -146,7 +167,7 @@ Deno.serve(conCors(async (req) => {
     //   `canal` cubre WhatsApp, Instagram y Messenger; `whatsapp` se conserva para quien ya lo lee.
     const canal = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_canal_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) as Record<string, unknown> | null : null
     const whatsapp = canal && canal.canal === 'whatsapp' ? canal : null
-    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conArchivos(admin, await conAdjuntos(admin, data))) as Record<string, unknown>), cart_id, canal, whatsapp })
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data)), conv)) as Record<string, unknown>), cart_id, canal, whatsapp })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0

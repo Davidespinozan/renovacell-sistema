@@ -58,6 +58,9 @@ export function mapearErrorChat(mensaje: string | undefined): { status: number; 
   // CHAT-ARCHIVOS · la base explica por qué no sale un video o documento
   const arc = /ARCHIVO_(TIPO|TAMANO|CANAL|INEXISTENTE|INVALIDO): ?([^\n]*)/.exec(m)
   if (arc) return r(400, `archivo_${arc[1].toLowerCase()}`, arc[2]?.trim() || 'No se pudo mandar el archivo.')
+  // EDITAR-MENSAJES · la base explica por qué no se puede editar
+  const ed = /EDITAR_(TEXTO|TIPO|TIEMPO|CANAL): ?([^\n]*)/.exec(m)
+  if (ed) return r(400, `editar_${ed[1].toLowerCase()}`, ed[2]?.trim() || 'Ese mensaje no se puede editar.')
   return r(503, 'no_disponible', 'No se pudo completar la operación. Intenta más tarde.')
 }
 

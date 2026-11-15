@@ -18,8 +18,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { observador } from '../_shared/observa.ts'
 import { extraerWhatsApp, extraerEstados, codigoVinculo } from '../_shared/whatsapp.ts'
-import { descargarMedia, despacharWhatsApp, mostrarEscribiendo } from '../_shared/whatsappEnvio.ts'
-import { guardarImagenWA } from '../_shared/adjuntos.ts'
+import { descargarArchivoWA, descargarMedia, despacharWhatsApp, mostrarEscribiendo } from '../_shared/whatsappEnvio.ts'
+import { guardarArchivoWA, guardarImagenWA } from '../_shared/adjuntos.ts'
 import { extraerMeta } from '../_shared/meta.ts'
 import { completarNombreMeta, despacharMeta } from '../_shared/metaEnvio.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
@@ -124,6 +124,10 @@ Deno.serve(async (req) => {
         // producto) aunque atienda una persona, y la misma descarga la ve la IA si le toca responder.
         const adjunto = m.media ? await descargarMedia(m.media) : null
         if (adjunto && r.message_id) await guardarImagenWA(admin, r.conversation_id, r.message_id, adjunto)
+        if (m.archivo && r.message_id) {   // NOTAS DE VOZ: el audio/video queda en la conversación para el equipo
+          const arc = await descargarArchivoWA(m.archivo)
+          if (arc) await guardarArchivoWA(admin, r.conversation_id, r.message_id, arc)
+        }
         await avisarPush(admin, r.conversation_id, r.actor, m.texto)
         if (IA_PUEDE(r.modo as never)) {
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación

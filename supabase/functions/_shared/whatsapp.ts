@@ -3,7 +3,9 @@
 
 // R4-C13 · `media`: imagen o PDF que la IA puede ver (se descarga de Meta al responder; no se guarda).
 export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' }
-export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA }
+// NOTAS DE VOZ (15 nov 2026) · audio o video del cliente: se guarda en la conversación para que el equipo lo escuche/vea.
+export interface ArchivoWA { id: string; mime: string; tipo: 'audio' | 'video' }
+export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA; archivo?: ArchivoWA }
 
 const ETIQUETA: Record<string, string> = {
   image: 'Envió una imagen por WhatsApp.', audio: 'Envió un audio por WhatsApp.', voice: 'Envió un audio por WhatsApp.',
@@ -12,6 +14,8 @@ const ETIQUETA: Record<string, string> = {
 }
 
 export const MIME_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+export const MIME_AUDIO_WA = ['audio/ogg', 'audio/mpeg', 'audio/aac', 'audio/amr', 'audio/mp4']
+export const MIME_VIDEO_WA = ['video/mp4', 'video/3gpp']
 
 /** Mensajes ENTRANTES de WhatsApp (entry[].changes[].value.messages[]). Ignora acuses (statuses) y lo que no trae wamid. */
 export function extraerWhatsApp(payload: unknown): EntranteWA[] {
@@ -42,7 +46,9 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
         const mime = String(obj.mime_type ?? '').toLowerCase().split(';')[0].trim(); const mediaId = String(obj.id ?? '')
         const media: MediaWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'image' && MIME_IMAGEN.includes(mime)) || (tipo === 'document' && mime === 'application/pdf'))
           ? { id: mediaId, mime, tipo: tipo as 'image' | 'document' } : undefined
-        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}) })
+        const archivo: ArchivoWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'audio' && MIME_AUDIO_WA.includes(mime)) || (tipo === 'video' && MIME_VIDEO_WA.includes(mime)))
+          ? { id: mediaId, mime, tipo: tipo as 'audio' | 'video' } : undefined
+        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}), ...(archivo ? { archivo } : {}) })
       }
     }
   }

@@ -10,7 +10,7 @@ import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Pencil, Plus, Search, Send, X, Zap } from 'lucide-react'
 import { enlaceMaps, leerUbicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
@@ -151,6 +151,16 @@ type Pendiente = { clientId: string; texto: string; error: string | null }
 const MIN_PREVIOS = 60
 const PAGINA_SESION = 100   // límite que fija la Edge `leer_sesion`
 /** Une mensajes de varias sesiones en UN hilo: sin duplicados y en orden. */
+// EDITAR-MENSAJES · las correcciones recientes que manda el servidor se aplican a lo que ya está en pantalla.
+export const conCorrecciones = (mensajes: Mensaje[], ediciones?: Conversacion['ediciones']): Mensaje[] => {
+  if (!ediciones?.length) return mensajes
+  const por = new Map(ediciones.map((e) => [e.message_id, e.texto]))
+  return mensajes.map((m) => (por.has(m.id) && m.content !== por.get(m.id) ? { ...m, content: por.get(m.id)!, editado: true } : m))
+}
+/** Se puede editar: propio del personal, solo texto, en el portal y dentro de 15 minutos. */
+export const MIN_EDITAR = 15
+export const editable = (m: Mensaje, ahora = Date.now()): boolean =>
+  m.propio && (m.actor === 'seller' || m.actor === 'admin') && !m.adjunto && !m.archivo && ahora - Date.parse(m.created_at) < MIN_EDITAR * 60_000
 export const unirHilo = (...listas: Mensaje[][]): Mensaje[] => {
   const porSeq = new Map<number, Mensaje>()
   for (const l of listas) for (const m of l) porSeq.set(m.seq, m)
@@ -206,7 +216,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       // Chat V2-C1 · el servidor muestra SOLO la sesión actual: si cambió de sesión, el hilo empieza de nuevo.
       if (r.data.sesion?.id && prev.sesion?.id && r.data.sesion.id !== prev.sesion.id) return r.data
       const vistos = new Set(prev.mensajes.map((m) => m.seq))
-      return { ...r.data, mensajes: [...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))] }
+      return { ...r.data, mensajes: conCorrecciones([...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))], r.data.ediciones) }
     })
     const max = r.data.mensajes.reduce((s, m) => Math.max(s, m.seq), desde)
     if (max <= ultimoSeq.current) return
@@ -375,6 +385,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     const t = setInterval(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void recargarPersona() }, intervaloMs)
     return () => clearInterval(t)
   }, [persona, recargarPersona, intervaloMs])
+  const portalPropio = !conv?.canal && !conv?.whatsapp   // EDITAR-MENSAJES · solo en el portal (WhatsApp no deja cambiar lo enviado)
   const canalPropio: CanalPersona | null = persona?.conversaciones.find((c) => c.conversation_id === convId)?.canal ?? null
 
   // CHAT PRO · avisar "escribiendo…" (sin texto). Las pruebas pueden usar clientes sin este método.
@@ -453,8 +464,23 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     setPendiente(null); setEnviando(false)
     if (!asesor) pedirAvisos('chat')   // PUSH SIEMPRE · el doctor acaba de escribir: que se entere cuando le respondan
   }
+  // EDITAR-MENSAJES · como WhatsApp: el texto sube al cuadro, se corrige y se guarda (el cliente ve «editado»).
+  const [editando, setEditando] = useState<Mensaje | null>(null)
+  const empezarEdicion = (m: Mensaje) => { setEditando(m); setTexto(m.content); setTimeout(() => { if (area.current) { area.current.focus(); autoAlto(area.current) } }, 0) }
+  const cancelarEdicion = () => { setEditando(null); setTexto('') }
+  const guardarEdicion = async (t: string) => {
+    if (!convId || !editando) return
+    setEnviando(true); setError(null)
+    const r = await cliente.editar(convId, editando.id, t)
+    setEnviando(false)
+    if (!r.ok) { setError(r.error.mensaje); return }
+    const id = editando.id
+    setConv((prev) => (prev ? { ...prev, mensajes: prev.mensajes.map((m) => (m.id === id ? { ...m, content: r.data.texto, editado: true } : m)) } : prev))
+    setEditando(null); setTexto('')
+  }
   const enviar = async () => {
     const t = texto.trim()
+    if (editando) { if (t) await guardarEdicion(t); return }
     if (!t || enviando || pendiente?.error) return
     setTexto('')
     if (area.current) area.current.style.height = 'auto'
@@ -603,9 +629,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         <div className="rc-bubble-wrap">
           {inicio && (etiqueta || m.canalMsg) && <div className="rc-meta">{etiqueta}{m.canalMsg && <span className={`rc-canal rc-canal--${m.canalMsg}`} data-testid="msg-canal">{NOMBRE_CANAL_PERSONA[m.canalMsg]}</span>}</div>}
           {m.archivo ? (
-            <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid={m.archivo.clase === 'video' ? 'msg-video' : 'msg-documento'}>
+            <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid={m.archivo.clase === 'video' ? 'msg-video' : m.archivo.clase === 'audio' ? 'msg-audio' : 'msg-documento'}>
               {!m.archivo.url ? <span className="rc-img-nd">{m.archivo.nombre} · no disponible</span>
                 : m.archivo.clase === 'video' ? <div className="tc-adj tc-adj--video"><video src={m.archivo.url} controls preload="metadata" playsInline /></div>
+                : m.archivo.clase === 'audio' ? <div className="tc-adj tc-adj--audio"><audio src={m.archivo.url} controls preload="metadata" aria-label="Nota de voz" /></div>
                 : (
                   <a className="tc-adj tc-adj--doc" href={m.archivo.url} target="_blank" rel="noreferrer" download={m.archivo.nombre}>
                     <FileText size={22} aria-hidden />
@@ -625,7 +652,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{busq && hallados.includes(m.id)
                 ? partesResaltadas(m.content, busq).map((p, i) => (p.hallado ? <mark key={i} className="rc-mark-busq">{p.t}</mark> : <React.Fragment key={i}>{p.t}</React.Fragment>))
                 : conEnlaces(m.content)}</div>}
-          <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{m.propio && !m.otro && (visto(m.seq)
+          {asesor && portalPropio && !m.otro && editable(m) && !editando && (
+            <button type="button" className="rc-editar" onClick={() => empezarEdicion(m)} aria-label="Editar mensaje" title="Editar (hasta 15 minutos)" data-testid="btn-editar-msg"><Pencil size={13} /></button>
+          )}
+          <time className="rc-hora" dateTime={m.created_at}>{m.editado && <span className="rc-editado" data-testid="msg-editado">editado · </span>}{horaDe(m.created_at)}{m.propio && !m.otro && (visto(m.seq)
             ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tick-visto" />
             : <CheckCheck className="rc-tick" size={15} aria-label="Entregado" data-testid="tick-entregado" />)}</time>
         </div>
@@ -785,6 +815,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               className={`rc-canal-op rc-canal--${c.canal}${destinoEfectivo === c.conversation_id ? ' on' : ''}`} onClick={() => setDestino(c.conversation_id)}
               data-testid={`responder-por-${c.canal}`}>{NOMBRE_CANAL_PERSONA[c.canal]}</button>
           ))}
+        </div>
+      )}
+      {editando && (
+        <div className="rc-editando" data-testid="editando">
+          <Pencil size={14} aria-hidden /><span><b>Editando mensaje</b><small>{editando.content.slice(0, 80)}</small></span>
+          <button type="button" className="rc-ico" onClick={cancelarEdicion} aria-label="Cancelar edición" data-testid="cancelar-edicion"><X size={16} /></button>
         </div>
       )}
       <form className="rc-composer" onSubmit={(e) => { e.preventDefault(); void enviar() }}>

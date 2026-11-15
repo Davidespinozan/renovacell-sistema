@@ -3,7 +3,8 @@
 // redactor ofrece lo que se puede hacer (vincular, darla de alta verificada, mandarle su acceso, cotizar, levantar pedido,
 // registrar su pago, mandarle el recibo) y cada acción abre su hoja sobre el redactor con el hilo a la vista. Las fotos del
 // hilo alimentan las hojas («Usar como INE» → alta, «Usar como comprobante» → pago). Todo lo decide el servidor.
-import { ProgramarSalida } from '../../app/ProgramarSalida'   // SALIDA PROGRAMADA
+import { ProgramarSalida } from '../../app/ProgramarSalida'
+import { EtiquetasCliente } from './EtiquetasCliente'   // ETIQUETAS EN LA FICHA   // SALIDA PROGRAMADA
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -575,6 +576,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   else if (hoja === 'pc:ficha' && ficha.vinculado) cuerpo = (
     <HojaMarco titulo={nombre} sub={[ficha.ciudad, ficha.vendedor_nombre ? `Vendedor: ${ficha.vendedor_nombre}` : 'Sin vendedor', ficha.por === 'personal' ? 'vinculada por el equipo' : null].filter(Boolean).join(' · ')} onCerrar={cerrar} testid="pc-hoja-ficha">
       {ficha.es_tuyo && ficha.customer_id && <PerfilComercialEditor customerId={ficha.customer_id} compacto />}
+      {ficha.es_tuyo && ficha.customer_id && <EtiquetasCliente customerId={ficha.customer_id} />}
       {ficha.es_tuyo && (
         <div className="pc-datos">
           {ficha.telefono && <a href={`tel:${ficha.telefono}`}>{ficha.telefono}</a>}

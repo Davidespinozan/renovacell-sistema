@@ -206,3 +206,24 @@ button.cifra-v{cursor:pointer}
   body.rc-acoplado .canvas{padding-right:calc(min(600px,46vw) + 16px) !important}
   .acoplado-ver-chat{display:none}
 }
+/* Etiquetas en la ficha del cliente */
+.cli-etiquetas{display:grid;gap:8px;margin:8px 0}
+.cli-etiquetas .pc-sec{display:inline-flex;align-items:center;gap:6px}
+.cli-etiquetas-chips{display:flex;flex-wrap:wrap;gap:6px}
+.cli-etiquetas-chips button{border:1px solid var(--ds-border);background:var(--ds-surface);color:var(--ds-text-2);border-radius:var(--ds-r-pill);min-height:32px;padding:0 12px;font:500 var(--ds-fs-sm)/1 var(--ds-font);cursor:pointer}
+.cli-etiquetas-chips button[aria-pressed="true"]{background:var(--ds-brand-soft);border-color:var(--ds-brand);color:var(--ds-brand-strong);font-weight:600}
+.cli-etiquetas-nueva{display:flex;gap:6px}
+.cli-etiquetas-nueva input{flex:1;min-width:0;min-height:36px;border:1px solid var(--ds-border);border-radius:var(--ds-r);padding:0 10px;font:inherit;font-size:var(--ds-fs-sm)}
+.cli-etiquetas-nueva button{width:36px;height:36px;border:0;border-radius:var(--ds-r);background:var(--ds-brand);color:var(--ds-on-ink);display:grid;place-items:center;cursor:pointer}
+.cli-etiquetas-nueva button:disabled{opacity:.4;cursor:not-allowed}
+.cli-etiquetas-error{color:var(--ds-danger)}
+/* Notas de voz de WhatsApp en el chat */
+.tc-adj--audio{padding:6px;min-width:min(260px,62vw)}
+.tc-adj--audio audio{display:block;width:100%;height:40px}
+/* Editar mensajes (como WhatsApp) */
+.rc-editar{align-self:flex-end;border:0;background:transparent;color:var(--ds-text-3);width:28px;height:28px;border-radius:var(--ds-r-pill);display:grid;place-items:center;cursor:pointer;opacity:.7}
+.rc-editar:hover,.rc-editar:focus-visible{opacity:1;background:var(--ds-surface-2)}
+.rc-editado{font-style:italic}
+.rc-editando{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--ds-border);background:var(--ds-surface-2);color:var(--ds-text-2)}
+.rc-editando span{flex:1;min-width:0;display:grid}
+.rc-editando small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ds-text-3)}

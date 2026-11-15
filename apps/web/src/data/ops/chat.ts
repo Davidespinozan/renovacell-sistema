@@ -11,8 +11,8 @@ export type ModoConversacion = 'ai_active' | 'human_offered' | 'human_requested'
 export type ActorMensaje = 'visitor' | 'doctor' | 'seller' | 'admin' | 'ai' | 'system'
 export interface AdjuntoMensaje { id: string; url: string | null; tipo: string; uso: string | null }   // FOTOS · enlace temporal (10 min)
 /** CHAT-ARCHIVOS · video o documento del mensaje, con enlace temporal (10 min). */
-export interface ArchivoMensaje { id: string; url: string | null; tipo: string; clase: 'video' | 'documento'; bytes: number; nombre: string }
-export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null; archivo?: ArchivoMensaje | null }
+export interface ArchivoMensaje { id: string; url: string | null; tipo: string; clase: 'video' | 'documento' | 'audio'; bytes: number; nombre: string }
+export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null; archivo?: ArchivoMensaje | null; editado?: boolean }
 /** Sube el archivo con la subida firmada de UN solo uso que dio el servidor (al bucket privado). */
 export type SubirFirmado = (bucket: string, ruta: string, token: string, file: File, tipo: string) => Promise<string | null>
 const subirPorDefecto: SubirFirmado = async (bucket, ruta, token, file, tipo) => {
@@ -22,6 +22,7 @@ const subirPorDefecto: SubirFirmado = async (bucket, ruta, token, file, tipo) =>
 export interface Conversacion {
   conversation_id: string; estado: 'abierta' | 'cerrada'; modo: ModoConversacion; rol?: 'dueno' | 'asesor' | 'supervisor' | 'responsable'   // responsable = su vendedor, solo lectura hasta retomar
   ultimo_seq: number; asesor_nombre?: string | null; asesor_soy_yo?: boolean; mensajes: Mensaje[]
+  ediciones?: Array<{ message_id: string; texto: string; editado_at: string }>   // EDITAR-MENSAJES · correcciones recientes
   cart_id?: string | null              // CC-5 · carrito activo del dueño (la Edge chat lo adjunta en `leer`)
   handoff?: EstadoHandoff                // CC-7 · atención humana decidida por el servidor
   leido_otro?: number                    // PALOMITAS · hasta dónde leyó el otro lado (azules)
@@ -109,6 +110,8 @@ export class ClienteChat {
     if (fallo) return { ok: false as const, error: { codigo: 'subida', mensaje: `No se pudo subir «${file.name}». Revisa tu conexión e intenta de nuevo.` } }
     return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'archivo_enviar', conversation_id, ruta: prep.data.ruta, nombre: file.name, client_message_id })
   }
+  /** EDITAR-MENSAJES (15 nov 2026) · corrige un mensaje propio (15 min, solo portal; la base decide). */
+  editar(conversation_id: string, message_id: string, texto: string) { return this.llamar<{ message_id: string; texto: string; sin_cambio: boolean }>({ action: 'editar', conversation_id, message_id, texto }) }
   leido(conversation_id: string, seq: number) { return this.llamar<{ ok: true }>({ action: 'leido', conversation_id, seq }) }
   // CHAT PRO · "escribiendo…": solo la señal (unos segundos), nunca el texto.
   escribiendo(conversation_id: string, activo = true) { return this.llamar<{ ok: boolean }>({ action: 'escribiendo', conversation_id, activo }) }
