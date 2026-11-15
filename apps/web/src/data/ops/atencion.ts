@@ -26,7 +26,9 @@ export interface PendienteRuteo {
 }
 // BANDEJA-2 · bandeja única: cada conversación abierta, de cualquier origen, con su grupo de trabajo
 export type GrupoBandeja = 'por_atender' | 'en_atencion' | 'ia'
-export interface ItemBandeja extends PendienteRuteo { grupo: GrupoBandeja; tomada: boolean; sin_responder: boolean | null; ultimo_actor: string | null; hace_min: number | null }
+export interface ItemBandeja extends PendienteRuteo { grupo: GrupoBandeja; tomada: boolean; sin_responder: boolean | null; ultimo_actor: string | null; hace_min: number | null
+  responsable_id?: string | null; responsable_nombre?: string | null   // BANDEJA-RESPONSABLE · su vendedora de cartera (aunque no esté asignada ahora)
+}
 export interface BandejaUnificada { resumen: { por_atender: number; en_atencion: number; ia: number; todas: number }; conversaciones: ItemBandeja[] }
 export type FuenteConversacion = 'whatsapp' | 'instagram' | 'messenger' | 'enlace' | 'portal'
 export interface ContactoSolicitud { fuente: FuenteConversacion; nombre: string | null; detalle: string | null; ultimo_texto: string | null; ultimo_at: string | null }

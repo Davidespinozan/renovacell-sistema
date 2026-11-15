@@ -51,9 +51,10 @@ export function estadoLinea(c: ItemBandeja): { texto: string; tono: 'dang' | 'wa
   if (c.grupo === 'por_atender') {
     if (c.modo === 'human_assigned' || (c.modo === 'human_requested' && c.seller_id)) return { texto: `Asignada a ${c.seller_nombre ?? 'un vendedor'} · sin iniciar`, tono: 'warn' }
     if (c.modo === 'human_requested') return { texto: `Sin asesor${c.edad_min != null ? ` · esperando ${hace(c.edad_min)}` : ''}`, tono: 'dang' }
-    return { texto: 'El cliente quedó sin respuesta', tono: 'dang' }
+    return { texto: `El cliente quedó sin respuesta${c.responsable_nombre ? ` · su vendedora: ${c.responsable_nombre}` : ''}`, tono: 'dang' }
   }
-  return { texto: 'IA atendiendo', tono: 'neu' }
+  // BANDEJA-RESPONSABLE · la IA la atiende, pero el cliente sí tiene vendedora (antes parecía "sin vendedor")
+  return { texto: c.responsable_nombre ? `IA atendiendo · de la cartera de ${c.responsable_nombre}` : 'IA atendiendo', tono: 'neu' }
 }
 const COLOR: Record<string, string> = { dang: 'var(--danger)', warn: 'var(--warn)', ok: 'var(--green-deep, var(--green))', neu: 'var(--ink-3)' }
 
@@ -169,7 +170,8 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
   useEffect(() => { void cliente.vendedores().then((r) => { if (r.ok) setVendedores(r.data) }) }, [cliente])
   const canal = !!c?.contacto && CANALES_META.has(c.contacto.fuente)
   const nombre = c ? nombreSolicitud(c) : 'Conversación'
-  const sinAsesor = !!c && !c.seller_id && c.grupo !== 'en_atencion'
+  // Solo se ofrece «Asignar» si de verdad nadie la tiene: ni asignada ahora ni vendedora de cartera.
+  const sinAsesor = !!c && !c.seller_id && !c.responsable_id && c.grupo !== 'en_atencion'
   const reasignable = !!c && (c.modo === 'human_requested' || c.modo === 'human_assigned')
   const asignar = async () => {
     if (!c || !sel) return
