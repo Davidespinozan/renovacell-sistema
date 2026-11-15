@@ -2,6 +2,7 @@
 // Traduce el perfil de la base a la forma que espera la app (rol/verificado/caps).
 // La seguridad real la impone el RLS; aquí solo mapeamos.
 import { supabase } from '../lib/supabase'
+import { anotarSalida, marcarSalidaPedida } from './diagnosticoSesion'
 import type { RoleKey } from '../app/roles'
 import { atenderSuspension, CUENTA_SUSPENDIDA_MSG } from './suspension'
 
@@ -90,12 +91,12 @@ export async function signInSupabase(email: string, password: string): Promise<{
   if (session === 'red') return { error: 'No hay conexión con el servidor. Revisa tu señal e intenta de nuevo.' }
   if (session === 'suspendida') {
     // W6-A1: la cuenta existe pero Dirección la suspendió. Sin sesión colgada.
-    await supabase.auth.signOut()
+    marcarSalidaPedida(); await supabase.auth.signOut()
     return { error: CUENTA_SUSPENDIDA_MSG }
   }
   if (!session) {
     // #9: no dejar una sesión autenticada colgada si el perfil no existe.
-    await supabase.auth.signOut()
+    marcarSalidaPedida(); await supabase.auth.signOut()
     return { error: 'No se encontró tu perfil. Contacta a Administración.' }
   }
   return { session }
@@ -105,13 +106,22 @@ export async function signInSupabase(email: string, password: string): Promise<{
 export async function currentSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession()
   const u = data.session?.user
-  if (!u) return null
+  if (!u) {
+    // Había alguien dentro en este dispositivo (perfil guardado) y la sesión ya no está: no la cerró la persona.
+    try { if (localStorage.getItem(CLAVE_PERFIL)) { anotarSalida('sesion_perdida', 'sin sesión guardada al abrir'); olvidarPerfilGuardado() } } catch { /* nada */ }
+    return null
+  }
   const s = await perfilConReintento(u.id, u.email ?? '')
   // Sin red: la sesión SIGUE (no se manda a la entrada); se usa el último perfil de esta misma cuenta.
-  if (s === 'red') return perfilGuardado(u.id)
+  if (s === 'red') {
+    const g = perfilGuardado(u.id)
+    anotarSalida(g ? 'perfil_sin_red_cache' : 'perfil_sin_red_fuera', g ? 'siguió con el perfil guardado' : 'sin perfil guardado: pantalla de entrada')
+    return g
+  }
+  if (s === null) anotarSalida('perfil_no_encontrado')
   if (s === 'suspendida') {
     // Sesión guardada de una cuenta que ya fue suspendida: se cierra y se avisa.
-    await supabase.auth.signOut()
+    marcarSalidaPedida(); await supabase.auth.signOut()
     return null
   }
   return s
@@ -119,7 +129,9 @@ export async function currentSession(): Promise<Session | null> {
 
 export async function signOutSupabase(): Promise<void> {
   olvidarPerfilGuardado()
-  await supabase.auth.signOut()
+  marcarSalidaPedida()
+  // 15 nov 2026 · solo ESTE dispositivo (antes 'global': salir en el celular sacaba también la computadora).
+  await supabase.auth.signOut({ scope: 'local' })
 }
 
 // Recuperación de contraseña (envía el correo real de restablecimiento).

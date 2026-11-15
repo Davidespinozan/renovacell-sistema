@@ -6,6 +6,7 @@
 // para que la pantalla de entrada lo muestre. No se promete nada más (un token vigente
 // expira solo); no hace falta: ya no tiene autoridad en ningún lado.
 import { supabase, hasSupabase } from '../lib/supabase'
+import { anotarSalida, marcarSalidaPedida } from './diagnosticoSesion'
 
 export const CUENTA_SUSPENDIDA_MSG = 'Tu acceso fue suspendido por Dirección. Si crees que es un error, contáctala.'
 
@@ -19,6 +20,7 @@ export async function cerrarSesionPorSuspension(): Promise<void> {
   if (cerrando) return
   cerrando = true
   try { sessionStorage.setItem(LLAVE, CUENTA_SUSPENDIDA_MSG) } catch { /* sin almacenamiento: solo se cierra */ }
+  anotarSalida('cuenta_suspendida'); marcarSalidaPedida()
   try { if (hasSupabase) await supabase.auth.signOut() } catch { /* el servidor ya niega todo; el cierre local basta */ }
   cerrando = false
 }

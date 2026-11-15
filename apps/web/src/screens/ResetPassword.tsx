@@ -2,6 +2,7 @@
 // enlace de recuperación (Supabase ya estableció una sesión de recovery). Fija la
 // contraseña con updateUser({password}) y regresa al login.
 import React, { useState } from 'react'
+import { marcarSalidaPedida } from '../auth/diagnosticoSesion'
 import { Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { traducirError } from '../lib/errorMsg'
@@ -32,7 +33,7 @@ export function ResetPassword() {
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password: pass })
     if (error) { setError(traducirError(error)); setBusy(false); return }
-    await supabase.auth.signOut()
+    marcarSalidaPedida(); await supabase.auth.signOut()
     setDone(true)
     setBusy(false)
     // Limpia el hash del enlace de recuperación.
