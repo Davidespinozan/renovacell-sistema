@@ -19,6 +19,7 @@ export const MIGRADOS = [
   'app/Toast.tsx', 'app/Hoja.tsx', 'app/PageHead.tsx', 'app/BottomNav.tsx', 'app/TopBar.tsx', 'app/Sidebar.tsx', 'app/GuiaInventario.tsx',
   'screens/home/HomeDoctor.tsx', 'screens/doctor/BarraCarrito.tsx', 'screens/doctor/Catalogo.tsx', 'screens/doctor/OrderCard.tsx',
   'screens/chat/Asesorias.tsx',
+  'screens/sales/LlamarHoy.tsx', 'data/ops/prospeccion.ts',
 ]
 
 describe('Sistema de diseño · candado', () => {

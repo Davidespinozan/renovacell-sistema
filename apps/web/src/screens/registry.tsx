@@ -2,6 +2,7 @@
 // La vista común ('comun') pertenece al add-on Comunicación interna; solo se
 // renderiza si el flag está activo. El resto son módulos por rol (hoy Placeholder).
 import { Embudo } from './sales/Embudo'   // CRM (2 nov 2026)
+import { LlamarHoy } from './sales/LlamarHoy'   // PROSPECCIÓN (15 nov 2026)
 import { Cargando } from '../app/EmptyState'
 import { BotonAvisos } from '../app/BotonAvisos'
 import React, { useEffect } from 'react'
@@ -154,11 +155,12 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   cartera_plazos: () => <CarteraPlazos />,   // CARTERA-PLAZO · por vencer + competencia
   links_pago: () => <LinksPago />,
   av_links: () => <LinksPago />,
-  crm_embudo: () => <Embudo />,   // CRM (2 nov 2026) · embudo de ventas
+  crm_embudo: () => <Embudo />,
+  llamar_hoy: () => <LlamarHoy />,   // PROSPECCIÓN (15 nov 2026) · a quién llamar hoy   // CRM (2 nov 2026) · embudo de ventas
   seguimientos: () => <Seguimientos />,   // HERRAMIENTAS DEL VENDEDOR · pendientes por retomar
   difusiones: () => <Difusiones />,   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
   // ── MENÚ DE DIRECCIÓN AGRUPADO (dueño, 17 oct 2026) · una entrada, pestañas internas; las claves sueltas siguen arriba ──
-  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'crm_embudo', label: 'Embudo de ventas', render: () => <Embudo /> }, { key: 'cartera_plazos', label: 'Plazos de cartera', render: () => <CarteraPlazos /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
+  g_clientes: () => <Pestanas grupo="g_clientes" pestanas={[{ key: 'av_doc', label: 'Clientes', render: () => <DoctoresDirectorio /> }, { key: 'crm_embudo', label: 'Embudo de ventas', render: () => <Embudo /> }, { key: 'llamar_hoy', label: 'Prospección', render: () => <LlamarHoy /> }, { key: 'cartera_plazos', label: 'Plazos de cartera', render: () => <CarteraPlazos /> }, { key: 'av_verif', label: 'Por verificar', render: () => <Doctores /> }, { key: 'av_invitar', label: 'Invitar clientes', render: () => <InvitarClientes /> }, { key: 'av_clasificar', label: 'Clasificar', render: () => <ClasificarCartera abiertoInicial /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }]} />,
   g_conversaciones: () => <Pestanas grupo="g_conversaciones" pestanas={[{ key: 'av_atencion', label: 'Bandeja', render: () => <AtencionComercialPantalla /> }, { key: 'asesorias', label: 'Asignadas', render: () => <AsesoriasPantalla /> }, { key: 'av_mensajes', label: 'Correos al cliente', render: () => <Comunicaciones /> }, { key: 'difusiones', label: 'Difusiones', render: () => <Difusiones /> }, { key: 'seguimientos', label: 'Pendientes', render: () => <Seguimientos /> }, { key: 'av_ia', label: 'Asesora IA', render: () => <AsesoraIA /> }]} />,
   g_catalogo: () => <Pestanas grupo="g_catalogo" pestanas={[{ key: 'av_catalogo', label: 'Productos', render: () => <CatalogoAdmin /> }, { key: 'av_precios', label: 'Precios', render: () => <Precios /> }, { key: 'av_promociones', label: 'Promociones', render: () => <Promociones /> }, { key: 'av_conocimiento', label: 'Conocimiento de producto', render: () => <Conocimiento /> }, { key: 'av_manual_ventas', label: 'Manual de ventas', render: () => <ManualVentas /> }]} />,
   av_existencias: () => <Existencias />,

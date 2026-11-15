@@ -3,7 +3,7 @@
 import React from 'react'
 
 export type IconName =
-  | 'dashboard' | 'chart' | 'grid' | 'box' | 'usercheck' | 'fingerprint'
+  | 'phone' | 'dashboard' | 'chart' | 'grid' | 'box' | 'usercheck' | 'fingerprint'
   | 'receipt' | 'bag' | 'clock' | 'chat' | 'layers' | 'download' | 'pkg'
   | 'truck' | 'store' | 'bell' | 'image' | 'search' | 'menu' | 'leaf' | 'mail'
   | 'chevronRight' | 'chevronLeft' | 'shield'
@@ -22,6 +22,7 @@ const P: Record<IconName, React.ReactNode> = {
   bag: <><path d="M6 7h12l1 13H5z" /><path d="M9 7a3 3 0 0 1 6 0" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   chat: <><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.2A8 8 0 1 1 21 12z" /></>,
+  phone: <><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" /></>,
   layers: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></>,
   download: <><path d="M12 3v12" /><path d="M7 11l5 4 5-4" /><path d="M4 20h16" /></>,
   pkg: <><path d="M21 8l-9-5-9 5v8l9 5 9-5z" /><path d="M7.5 5.5l9 5" /><path d="M12 13v8" /></>,
