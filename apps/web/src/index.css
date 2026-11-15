@@ -10,6 +10,7 @@
 @import './styles/pulido-admin.css';
 @import './styles/pulido-operacion.css';
 @import './styles/calidad.css';
+@import './styles/ux-moderno.css';   /* UX MODERNO · Fase 0 (15 nov 2026): capa final, se puede quitar de un golpe */
 
 @tailwind base;
 @tailwind components;

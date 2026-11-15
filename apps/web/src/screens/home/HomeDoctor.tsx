@@ -14,7 +14,12 @@
 // autoridades de lanzamientos, seguimiento posventa o envíos activos, se agregan como bloques aquí sin rehacer la pantalla.
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { ChevronRight, Package, RotateCcw, ShoppingBag, Sparkles } from 'lucide-react'
+import { ChevronRight, Minus, Package, Plus, RotateCcw, Search, ShoppingBag, Sparkles } from 'lucide-react'
+import { hasSupabase } from '../../lib/supabase'
+import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
+import { BarraCarrito } from '../doctor/BarraCarrito'
+import { pedirBusqueda, pedirRevisarPedido } from '../../data/store/catalogoIntento'
+import type { ProductSafe } from '../../data/types'
 import { BotonAvisos } from '../../app/BotonAvisos'   // PROMO-8 · el doctor puede activar avisos (promos y respuestas del chat)
 import { useRole } from '../../auth/RoleContext'
 import { chat as chatPorDefecto, type ClienteChat, type Conversacion } from '../../data/ops/chat'
@@ -133,23 +138,86 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   }, [products])
   // (futuro) lanzamientos / contenido personalizado / envío activo / seguimiento posventa.
 
+  // UX MODERNO · Fase 1 (15 nov 2026, auditoría: "el portal parece un sistema interno, no una tienda"). El Inicio es la
+  // vitrina: buscador, "Vuelve a comprar" (lo que ya pide, con + directo al carrito), su pedido en curso, promociones y
+  // productos con +. El carrito es el canónico del servidor (el mismo del catálogo y del chat).
+  const canon = useCarritoCanonico(hasSupabase && verified)
+  const enCarrito = (id: string) => (hasSupabase ? canon.qty[id] ?? 0 : 0)
+  const agregar = (id: string, delta: number) => {
+    if (!verified) { setScreen('catalogo'); return }
+    if (!hasSupabase) { seedReorder([{ product_id: id, qty: 1 }]); setScreen('catalogo'); return }   // demo sin servidor: lo arma el catálogo
+    canon.fijar(id, Math.max(0, enCarrito(id) + delta))
+  }
+  const unidades = hasSupabase ? Object.values(canon.qty).reduce((a, b) => a + b, 0) : 0
+  const totalCarrito = canon.cart?.total.estado === 'completo' ? canon.cart.total.monto ?? null : null
+  // Lo que más pide (por número de pedidos en que aparece), con foto y disponible en el portal.
+  const deSiempre = useMemo(() => {
+    const veces = new Map<string, number>()
+    for (const o of orders) { if (o.status === 'cancelled') continue; for (const it of o.items) if (it.product_id) veces.set(it.product_id, (veces.get(it.product_id) ?? 0) + 1) }
+    return products.filter((p) => veces.has(p.id) && isPortalProduct(p) && p.image_url).sort((a, b) => (veces.get(b.id) ?? 0) - (veces.get(a.id) ?? 0)).slice(0, 10)
+  }, [orders, products])
+  const [q, setQ] = useState('')
+  const buscar = (e: React.FormEvent) => { e.preventDefault(); pedirBusqueda(q); setScreen('catalogo') }
+  const producto = (p: ProductSafe) => {
+    const precio = verified ? priceFor(p.id, p.price) : null
+    const n = enCarrito(p.id)
+    const agotado = stockInfoFor(stockMap, p.id).tracked && stockInfoFor(stockMap, p.id).qty <= 0
+    return (
+      <div className="tienda-prod" data-testid="tienda-producto">
+        <div className="tienda-prod-media">
+          {agotado && <span className="tienda-agotado">Agotado</span>}
+          <button type="button" className="tienda-prod-foto" onClick={() => { pedirBusqueda(p.name); setScreen('catalogo') }} aria-label={`Ver ${p.name}`}>
+            <img src={p.image_url!} alt="" loading="lazy" />
+          </button>
+          {verified && !agotado && (n > 0
+            ? <span className="tienda-cant" data-testid="tienda-cantidad">
+                <button type="button" onClick={() => agregar(p.id, -1)} aria-label={`Quitar uno de ${p.name}`}><Minus size={16} /></button>
+                <b>{n}</b>
+                <button type="button" onClick={() => agregar(p.id, 1)} aria-label={`Agregar otro de ${p.name}`}><Plus size={16} /></button>
+              </span>
+            : <button type="button" className="tienda-mas" onClick={() => agregar(p.id, 1)} aria-label={`Agregar ${p.name}`} data-testid="tienda-agregar"><Plus size={18} /></button>)}
+        </div>
+        <span className="tienda-prod-precio">{precio != null ? money(precio) : verified ? '' : 'Precio al verificarte'}</span>
+        <span className="tienda-prod-nombre">{p.name}</span>
+      </div>
+    )
+  }
+
   return (
-    <div className="rh rh--doctor" data-testid="home-doctor">
+    <div className="rh rh--doctor tienda" data-testid="home-doctor">
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={nombre ? '¿Qué necesitas hoy?' : 'Bienvenido a Renovacell. ¿Qué necesitas hoy?'}>
-        {/* Quién lo atiende (solo informa: la conversación se abre desde la burbuja) y los avisos, como chips de la recepción. */}
         {conAsesor && conv && (
           <span className="rh-chip rh-chip--estado" role="status" data-testid="doctor-atencion">
             <span className={`rh-chip-dot${modo === 'human_active' ? ' rh-chip-dot--on' : ''}`} aria-hidden />
             <span>{primerNombre(conv.asesor_nombre)
-              ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b> · tu asesoría{modo === 'human_active' ? ' · en conversación' : ''}</>
+              ? <>Te atiende <b>{primerNombre(conv.asesor_nombre)}</b>{modo === 'human_active' ? ' · en conversación' : ''}</>
               : <><b>Tu atención</b> · {subtituloDe(conv, false)}</>}</span>
           </span>
         )}
-        {/* PROMO-8 · avisos en este dispositivo: promociones y respuestas de su asesora, aunque la pestaña esté cerrada. Ya activos, no se muestra. */}
         <span data-testid="home-doctor-avisos" className="rh-chip-slot"><BotonAvisos className="rh-chip rh-chip--btn" /></span>
       </Bienvenida>
+
+      <form className="tienda-buscar" role="search" onSubmit={buscar}>
+        <Search size={18} aria-hidden />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar productos" aria-label="Buscar en el catálogo" enterKeyHint="search" data-testid="tienda-buscar" />
+      </form>
+
+      {enCurso.slice(0, 1).map((o) => (
+        <button key={o.id} type="button" className="tienda-pedido" onClick={() => setScreen('pedidosdr')} data-testid="doctor-pedido">
+          <span className="tienda-pedido-ic" aria-hidden><Package size={20} /></span>
+          <span className="tienda-pedido-tx"><b>Tu pedido {o.external_ref ?? ''}</b><small>{statusView(o.status).label}{enCurso.length > 1 ? ` · ${enCurso.length - 1} más en curso` : ''}</small></span>
+          <ChevronRight size={18} aria-hidden />
+        </button>
+      ))}
+
+      {verified && deSiempre.length > 0 && (
+        <Seccion titulo="Vuelve a comprar" nivel="continuar" id="de-siempre" accion={ultimo ? { label: 'Repetir último pedido', onClick: () => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') } } : undefined}>
+          <div className="tienda-tira" data-testid="doctor-de-siempre">{deSiempre.map((p) => <React.Fragment key={p.id}>{producto(p)}</React.Fragment>)}</div>
+        </Seccion>
+      )}
+
       {lista.length > 0 && (
-        <Seccion titulo="Novedades y promociones" nivel="info" id="flyers">
+        <Seccion titulo="Novedades" nivel="info" id="flyers">
           <div className="rh-flyers" data-testid="doctor-flyers">
             {lista.map((f) => (
               <button key={f.id} type="button" className="rh-flyer" onClick={() => setAbierto(f)} aria-label={`Ver flyer: ${f.titulo}`} data-testid={`doctor-flyer-${f.id}`}>
@@ -171,50 +239,30 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           </div>
         </div>
       )}
-      {filas.length > 0 && (
-        <Seccion titulo="Continúa donde te quedaste" nivel="continuar" id="continuar">
-          <div className="tasklist" data-testid="doctor-continuar">{filas}</div>
-        </Seccion>
-      )}
-      {/* REFERIDOS · recomendar con su enlace del chat (con su asesor), en vez de pasar un WhatsApp. */}
-      <Recomendar cargar={recomendar} />
+
       {tarjetas.length > 0 && (
-        <Seccion titulo="Promociones vigentes" nivel="info" id="promos">
+        <Seccion titulo="Promociones" nivel="info" id="promos">
           <div className="rh-promos" data-testid="doctor-promos">
             {tarjetas.map((t, i) => <TarjetaPromo key={promoIds[i] ?? i} datos={{ ...t, flyer_url: null }} onCatalogo={() => setScreen('catalogo')} compacta densa />)}
           </div>
         </Seccion>
       )}
-      <Seccion titulo="Explora por línea" nivel="info" id="lineas">
-        <div className="rh-lineas" data-testid="doctor-lineas">
-          <button type="button" className="rh-linea rh-linea--prof" onClick={() => setScreen('catalogo')}>
-            <span className="rh-linea-t">Professional</span>
-            <span className="rh-linea-d">Inyectables y protocolos de consultorio{porLinea.prof ? ` · ${porLinea.prof} productos` : ''}</span>
-            <ChevronRight className="rh-linea-ch" aria-hidden />
-          </button>
-          <button type="button" className="rh-linea rh-linea--cosm" onClick={() => setScreen('catalogo')}>
-            <span className="rh-linea-t">Home Care</span>
-            <span className="rh-linea-d">Para que tus pacientes continúen en casa{porLinea.cosm ? ` · ${porLinea.cosm} productos` : ''}</span>
-            <ChevronRight className="rh-linea-ch" aria-hidden />
-          </button>
-        </div>
-      </Seccion>
+
+      {/* Sin pedidos ni carrito: el primer paso, en una fila (antes una lista de "Continúa"). */}
+      {filas.length > 0 && !(verified && deSiempre.length > 0) && enCurso.length === 0 && (
+        <div className="tasklist" data-testid="doctor-continuar">{filas}</div>
+      )}
+
       {destacados.length > 0 && (
-        <Seccion titulo="Disponibles para ti" nivel="info" id="destacados" accion={{ label: 'Ver todo el catálogo', onClick: () => setScreen('catalogo') }}>
-          <div className="rh-productos" data-testid="doctor-destacados">
-            {destacados.map((p) => {
-              const precio = verified ? priceFor(p.id, p.price) : null
-              return (
-                <button key={p.id} type="button" className="rh-producto" onClick={() => setScreen('catalogo')}>
-                  <span className="rh-producto-foto"><img src={p.image_url!} alt="" loading="lazy" /></span>
-                  <span className="rh-producto-nombre">{p.name}</span>
-                  <span className="rh-producto-precio">{precio != null ? money(precio) : 'Ver en catálogo'}</span>
-                </button>
-              )
-            })}
-          </div>
+        <Seccion titulo="Disponibles para ti" nivel="info" id="destacados" accion={{ label: 'Ver catálogo', onClick: () => setScreen('catalogo') }}>
+          <div className="tienda-rejilla" data-testid="doctor-destacados">{destacados.map((p) => <React.Fragment key={p.id}>{producto(p)}</React.Fragment>)}</div>
         </Seccion>
       )}
+
+      {/* REFERIDOS · recomendar con su enlace del chat (con su asesor), en vez de pasar un WhatsApp. */}
+      <Recomendar cargar={recomendar} />
+
+      {verified && <BarraCarrito unidades={unidades} totalEstimado={totalCarrito} bloqueada={false} onRevisar={() => { pedirRevisarPedido(); setScreen('catalogo') }} />}
     </div>
   )
 }

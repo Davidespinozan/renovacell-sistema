@@ -120,6 +120,7 @@ export function Reabastecimiento() {
                     <td data-label="">
                       {enCurso(p.id)
                         ? <span className="pill p-blue">Compra pendiente de recibir</span>
+                        : !bajo ? null   // UX MODERNO · la acción solo donde hace falta (antes en todas las filas, también "Suficiente")
                         : puedeComprar
                           // Acción de fila siempre fantasma: el estado (Bajo/Agotado) ya lo señala la píldora.
                           ? <button className="btn ghost sm" type="button"

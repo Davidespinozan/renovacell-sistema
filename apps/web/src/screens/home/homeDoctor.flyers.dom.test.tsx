@@ -38,7 +38,7 @@ describe('PROMO-9 · flyers y promociones en el Inicio del doctor', () => {
     render(<HomeDoctor cliente={chat} clienteCarrito={carrito} flyers={async () => [F1, F2]} promoTarjeta={async () => null} />)
     const c = await screen.findByTestId('doctor-flyers')
     expect(c.querySelectorAll('img')).toHaveLength(2)
-    expect(screen.getByTestId('rh-sec-flyers')).toHaveTextContent(/Novedades y promociones/)
+    expect(screen.getByTestId('rh-sec-flyers')).toHaveTextContent(/Novedades/)
     expect(c.querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/f1.jpg'); expect(c.querySelector('img')?.getAttribute('alt')).toBe('Hoy último día · Botox')
     fireEvent.click(screen.getByTestId('doctor-flyer-F2'))
     const v = screen.getByTestId('doctor-flyer-visor')

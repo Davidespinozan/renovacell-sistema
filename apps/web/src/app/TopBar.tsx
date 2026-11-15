@@ -1,6 +1,8 @@
 // Barra superior del hub: hamburguesa (móvil), título/subtítulo de la pantalla,
 // buscador GLOBAL (indexado, acotado por rol) y campana.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Sparkles } from 'lucide-react'
+import { ROLES_EQUIPO, abrirAsistente } from './AsistenteEquipo'
 import { Icon } from './icons'
 import { BrandLogo } from './BrandLogo'
 import { getRole, getScreenDef, getNav, pantallasAlcanzables, COMMON_SCREEN, CHAT_SCREEN, STRYV_CARE_SCREEN } from './roles'
@@ -35,7 +37,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       : screen === STRYV_CARE_SCREEN.key ? 'Mantenimiento y soporte'
       : screen === COMMON_SCREEN.key ? 'Comunicación del equipo'
         : screen === CHAT_SCREEN.key ? 'Mensajes del equipo'
-          : r.label
+          : ''   // UX MODERNO · ya no se repite el rol ("Administración") bajo cada título
 
   const search = useGlobalSearch()
   const [q, setQ] = useState('')
@@ -121,6 +123,10 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             </div>
           )}
         </div>
+        {/* UX MODERNO · el asistente del equipo vive aquí (antes flotaba sobre el contenido y ocupaba un lugar de la barra de abajo) */}
+        {ROLES_EQUIPO.includes(role ?? '') && (
+          <button type="button" className="icobtn" onClick={abrirAsistente} aria-label="Pregúntale al sistema" title="Pregúntale al sistema" data-testid="top-asistente"><Sparkles size={18} /></button>
+        )}
         <NotifBell />
       </div>
     </header>

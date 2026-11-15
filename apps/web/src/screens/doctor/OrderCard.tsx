@@ -51,10 +51,12 @@ export function OrderCard({
         {!pagado && dinero && dinero.cobrado_neto > 0.0001 && <span className="pill p-warn">Pago parcial · falta {money(dinero.saldo)}</span>}
         {credito && <span className={'pill ' + (dinero && creditoVencido(dinero) ? 'p-dang' : 'p-warn')}>{credito.texto}{dinero?.due_date ? ` · vence ${fmtDate(dinero.due_date)}` : ''}</span>}
         {pagoReportado && !pagado && <span className="pill p-neu">Pago en revisión</span>}
-        {order.invoice_requested && <span className="pill p-neu">CFDI</span>}
+        {order.invoice_requested && <span className="pill p-neu">Con factura</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(order.created_at)}</span>
       </div>
 
+      {/* UX MODERNO · lo que más importa al cliente va arriba: cuándo llega */}
+      <EntregaLine meta={order.shipping_meta} destacada />
       <div style={{ marginBottom: 8 }}>
         {order.items.map((it) => {
           const p = productsById[it.product_id ?? '']
@@ -96,15 +98,15 @@ export function OrderCard({
       ))}
 
       {order.payment_status === 'paid' && order.payment_ref && (
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>
-          {/* CALIDAD VISUAL · el estado «Pagado» ya va arriba: aquí solo forma de pago y referencia */}
+        <details className="pedido-detalle" style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 10 }}>
+          {/* UX MODERNO · forma de pago y referencia, solo si la buscan */}
+          <summary style={{ cursor: 'pointer' }}>Detalles del pago</summary>
           {order.payment_method ? <>Forma de pago: {textoMetodoPago(order.payment_method).replace(/^Pago /, '').replace(/^./, (c) => c.toUpperCase())} · </> : null}ref. <span className="mono">{order.payment_ref}</span>
-        </div>
+        </details>
       )}
 
       {showTracking && order.status !== 'cancelled' && <Trk step={sv.step} />}
 
-      <EntregaLine meta={order.shipping_meta} />
       <ShippingLine meta={order.shipping_meta} />
       <RastreoCliente order={order} />
 
@@ -154,10 +156,16 @@ function RastreoCliente({ order }: { order: OrderWithItems }) {
 }
 
 // ENT-0 · La promesa de entrega que se fijó al crear el pedido (tipo, paquetería y fechas): el cliente SIEMPRE la ve.
-function EntregaLine({ meta }: { meta: OrderWithItems['shipping_meta'] }) {
+function EntregaLine({ meta, destacada = false }: { meta: OrderWithItems['shipping_meta']; destacada?: boolean }) {
   const m = meta && typeof meta === 'object' ? (meta as { entrega?: EntregaPedido | null; channel?: string }) : null
   const e = m?.entrega ?? null
   if (!e) return m?.channel === 'pos' ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega"><b style={{ color: 'var(--ink-2)' }}>Entrega en mostrador</b></div> : null
+  if (destacada) return (
+    <div className="pedido-llega" data-testid="pedido-entrega">
+      <b>{promesaDe(e)}</b>
+      <span>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}{e.programada ? ' · salida agendada con tu asesor' : ''}</span>
+    </div>
+  )
   return (
     <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega">
       <b style={{ color: 'var(--ink-2)' }}>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}</b> · {promesaDe(e)}{e.programada ? ' · salida agendada con tu asesor' : ''}

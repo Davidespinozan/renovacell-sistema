@@ -1,6 +1,7 @@
 // ¿CÓMO ENTRA EL INVENTARIO? · franja corta que cuenta la historia en 3 pasos, con acceso directo a cada pantalla
 // cuando el rol la tiene en su menú. Pedido del dueño (15 oct 2026): "tiene que estar claro dónde y cuándo se mete
 // inventario". Se muestra en Inventario, Recibir mercancía y Compras a proveedores; se puede plegar y se recuerda.
+import { Info } from 'lucide-react'
 import React, { useState } from 'react'
 import { useRole } from '../auth/RoleContext'
 import { getNav, getRole } from './roles'
@@ -20,11 +21,11 @@ export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
   const nav = new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key))
   const alternar = () => { setOculta((v) => { try { localStorage.setItem(CLAVE, v ? '0' : '1') } catch { /* sin almacenamiento */ } return !v }) }
   return (
-    <div className="card" data-testid="guia-inventario" style={{ padding: '10px 14px', display: 'grid', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5 }}>¿Cómo entra el inventario?</div>
-        <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={alternar} data-testid="guia-inventario-toggle">{oculta ? 'Ver' : 'Ocultar'}</button>
-      </div>
+    // UX MODERNO · un enlace discreto (antes una tarjeta con título y botón "Ver" encima de la pantalla).
+    <div data-testid="guia-inventario" style={{ display: 'grid', gap: 8 }}>
+      <button type="button" className="page-h-ayuda" onClick={alternar} aria-expanded={!oculta} data-testid="guia-inventario-toggle">
+        <Info aria-hidden /> {oculta ? '¿Cómo entra el inventario?' : 'Ocultar'}
+      </button>
       {!oculta && (
         <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
           {PASOS.map((p) => {

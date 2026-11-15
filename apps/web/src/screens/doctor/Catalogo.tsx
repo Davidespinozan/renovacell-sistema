@@ -19,6 +19,7 @@ import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
 import { takeReorderSeed } from '../../data/store/reorderStore'
+import { tomarBusqueda, tomarRevisarPedido } from '../../data/store/catalogoIntento'
 import { hasSupabase } from '../../lib/supabase'
 import type { ProductSafe } from '../../data/types'
 import type { PedidoCreado } from '../../data/store/ordersStore'
@@ -57,7 +58,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const effOf = (p: ProductSafe, qty: number): number | null => effectiveUnitPrice(priceOf(p), volRules, p.id, qty, vq[p.id])
 
   const [filter, setFilter] = useState<LineFilter>('all')
-  const [busca, setBusca] = useState('')
+  const [busca, setBusca] = useState(() => tomarBusqueda() ?? '')   // UX MODERNO · búsqueda que viene del Inicio
   const canon = useCarritoCanonico(hasSupabase)            // CC-7 · carrito canónico (servidor)
   const [cartLocal, setCartLocal] = useState<Cart>({})      // solo modo demo (sin backend)
   const cart: Cart = hasSupabase ? canon.qty : cartLocal
@@ -68,6 +69,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
     setCartLocal((c) => { if (n <= 0) { const { [id]: _d, ...rest } = c; return rest } return { ...c, [id]: n } })
   }
   const [checkout, setCheckout] = useState(false)
+  const revisarAlCargar = useRef(tomarRevisarPedido())   // UX MODERNO · "Ver pedido" desde el Inicio: se abre en cuanto carga el carrito
   const [reorderNote, setReorderNote] = useState<string | null>(null)
 
   const stockMap = useStock()
@@ -164,6 +166,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
         .filter((l): l is CartLine => Boolean(l.product)),
     [cart, products],
   )
+  useEffect(() => { if (revisarAlCargar.current && verified && lines.length > 0) { revisarAlCargar.current = false; setCheckout(true) } }, [lines.length, verified])
 
   // Total con descuento por volumen previsualizado (el servidor recalcula al crear el pedido).
   const total = lines.reduce((sum, l) => sum + (effOf(l.product, l.qty) ?? 0) * l.qty, 0)

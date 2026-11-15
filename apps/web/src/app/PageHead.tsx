@@ -2,7 +2,8 @@
 // la pantalla / cómo leerla. El TÍTULO lo pone la cabecera (TopBar) con el nombre de la
 // pantalla: aquí solo se repite cuando el título es distinto (sub-vistas, pantallas de
 // capacidad). Así no aparece "Ventas" dos veces en la misma columna.
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
+import { Info } from 'lucide-react'
 import { useRoleOpcional } from '../auth/RoleContext'
 import { getRole, getScreenDef } from './roles'
 
@@ -13,16 +14,19 @@ export function PageHead({ title, children }: { title: string; children?: React.
     try { labelPantalla = getScreenDef(getRole(ctx.role), ctx.screen, undefined, ctx.capabilities).label } catch { /* sin def */ }
   }
   const repiteTitulo = labelPantalla != null && labelPantalla.trim().toLowerCase() === title.trim().toLowerCase()
-  // CALIDAD VISUAL · en celular la explicación se recorta a 2 líneas con «Ver más» (empujaba el contenido fuera de la pantalla).
-  const texto = useRef<HTMLParagraphElement | null>(null)
-  const [largo, setLargo] = useState(false); const [abierto, setAbierto] = useState(false)
-  useLayoutEffect(() => { const el = texto.current; if (el) setLargo(el.scrollHeight > el.clientHeight + 2) }, [children])
+  // UX MODERNO (15 nov 2026, auditoría: "la app se explica a sí misma"): la explicación ya no es un párrafo encima de la
+  // pantalla; queda detrás de un enlace discreto «Cómo funciona» que se abre al tocarlo.
+  const [abierto, setAbierto] = useState(false)
   if (repiteTitulo && !children) return null
   return (
     <div className={'page-h' + (repiteTitulo ? ' page-h--lead' : '')}>
       {!repiteTitulo && <h1>{title}</h1>}
-      {children && <p ref={texto} className={'page-h-p' + (abierto ? ' abierto' : '')}>{children}</p>}
-      {children && largo && !abierto && <button type="button" className="page-h-mas" onClick={() => setAbierto(true)}>Ver más</button>}
+      {children && (
+        <button type="button" className="page-h-ayuda" aria-expanded={abierto} onClick={() => setAbierto((v) => !v)} data-testid="page-h-ayuda">
+          <Info aria-hidden /> {abierto ? 'Ocultar' : 'Cómo funciona'}
+        </button>
+      )}
+      {children && abierto && <p className="page-h-p page-h-p--abierta">{children}</p>}
     </div>
   )
 }
