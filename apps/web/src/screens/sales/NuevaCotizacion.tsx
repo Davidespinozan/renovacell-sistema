@@ -1,6 +1,8 @@
 // COTIZACIONES · el vendedor arma la cotización de su cliente (mismo buscador y mismos precios previstos que "Levantar
 // pedido") y la manda por la conversación o por correo. El servidor pone y congela los precios; vigente 7 días.
+import { useRoleOpcional } from '../../auth/RoleContext'
 import React, { useMemo, useState } from 'react'
+import { borrarBorrador, leerBorrador, useGuardarBorrador } from '../../data/store/borradores'
 import { X, Plus, Minus, Search, Send, Mail } from 'lucide-react'
 import { money } from '../../lib/format'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
@@ -11,7 +13,8 @@ import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizac
 import type { ClienteChat } from '../../data/ops/chat'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 
-export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCreada, cliente = clientePorDefecto }: {
+export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCreada, cliente = clientePorDefecto, acoplado = false, oculto = false }: {
+  acoplado?: boolean; oculto?: boolean   // PANTALLA DIVIDIDA · ver NuevoPedido
   customer: { id: string; name: string; email?: string | null }
   conversationId?: string | null
   chat?: ClienteChat                 // para mandarla por la misma conversación (WhatsApp)
@@ -23,10 +26,14 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
   const volRules = useReglasPrecio()
   const vendibles = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
   const [buscar, setBuscar] = useState('')
-  const [cart, setCart] = useState<Record<string, number>>({})
+  // BORRADOR · lo armado para este cliente se guarda mientras se escribe y se recupera al volver a abrir.
+  const quien = useRoleOpcional()?.user?.email ?? 'yo'
+  const claveBorrador = `cotizacion:${quien}:${customer.id}`   // por persona del equipo y cliente
+  const [inicial] = useState(() => leerBorrador<{ cart: Record<string, number>; notas: string }>(claveBorrador))
+  const [cart, setCart] = useState<Record<string, number>>(() => inicial?.cart ?? {})
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
   const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
-  const [notas, setNotas] = useState('')
+  const [notas, setNotas] = useState(() => inicial?.notas ?? '')
   const [hecha, setHecha] = useState<Cotizacion | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
@@ -35,6 +42,10 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
     return (s ? vendibles.filter((p) => cart[p.id] || `${p.name} ${p.category ?? ''} ${p.sku ?? ''}`.toLowerCase().includes(s)) : vendibles).slice(0, 80)
   }, [vendibles, buscar, cart])
   const lineas = Object.entries(cart).filter(([, q]) => q > 0)
+  useGuardarBorrador(hecha ? null : claveBorrador, { cart, notas }, lineas.length === 0 && !notas.trim())
+  const recuperado = !!inicial && (Object.values(inicial.cart ?? {}).some((q) => q > 0) || !!inicial.notas?.trim())
+  const [avisoBorrador, setAvisoBorrador] = useState(recuperado)
+  const empezarDeNuevo = () => { setCart({}); setNotas(''); borrarBorrador(claveBorrador); setAvisoBorrador(false) }
   const eff = (id: string, q: number) => { const p = vendibles.find((x) => x.id === id); return p ? effectiveUnitPrice(p.price, volRules, p.id, q, vq[p.id]) ?? p.price ?? 0 : 0 }
   const total = lineas.reduce((s, [id, q]) => s + eff(id, q) * q, 0)
   const cambiar = (id: string, d: number) => setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(999, (c[id] ?? 0) + d)) }))
@@ -44,7 +55,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
     const r = await cliente.crear(customer.id, lineas.map(([product_id, qty]) => ({ product_id, qty })), notas, conversationId)
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
-    setHecha(r.data); onCreada?.(r.data)
+    setHecha(r.data); borrarBorrador(claveBorrador); onCreada?.(r.data)
   }
   const porChat = async () => {
     if (!hecha || !chat || !conversationId) return
@@ -63,7 +74,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
   }
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className={'overlay' + (acoplado ? ' overlay--acoplado' : '')} onClick={acoplado ? undefined : onClose} hidden={oculto}>
       <div className="modal cot-modal" onClick={(e) => e.stopPropagation()} data-testid="nueva-cotizacion">
         <div className="mhead">
           <div><h3>{hecha ? `Cotización ${hecha.folio}` : 'Nueva cotización'}</h3><div className="ms">Para {capitalizarNombre(customer.name)} · vigente 7 días</div></div>
@@ -72,6 +83,12 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
         <div className="mbody">
           {!hecha ? (
             <>
+              {avisoBorrador && (
+                <div className="borrador-aviso" role="status" data-testid="borrador-recuperado">
+                  <span>Recuperamos tu borrador de esta cotización.</span>
+                  <button type="button" className="rc-link" onClick={empezarDeNuevo}>Empezar de nuevo</button>
+                </div>
+              )}
               <span className="searchbox op-search"><Search size={15} aria-hidden /><input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar producto, categoría o SKU" aria-label="Buscar producto" data-testid="cot-buscar" /></span>
               <ul className="cot-lista">
                 {visibles.map((p) => {

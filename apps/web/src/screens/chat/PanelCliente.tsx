@@ -275,6 +275,14 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   }
 
   const vacio: PiezasChat = { tira: null, hoja: null, acciones: [] }
+  // PANTALLA DIVIDIDA · estado (antes de cualquier salida temprana: los hooks siempre en el mismo orden)
+  const [verChat, setVerChat] = useState(false)
+  useEffect(() => { setVerChat(false) }, [modal])
+  useEffect(() => {
+    if (!modal) return
+    document.body.classList.add('rc-acoplado')
+    return () => document.body.classList.remove('rc-acoplado')
+  }, [modal])
   if (!activo || !ficha) return { ...vacio, tira: activo && msg && !msg.ok ? <div className="pc-tira-msg" role="alert">{msg.texto}</div> : null }
   if (!ficha.vinculado && ficha.con_cuenta) return vacio   // doctor con cuenta y sin ficha: lo atiende la verificación
   const aviso = msg && <div className={'pc-msg' + (msg.ok ? ' ok' : '')} role={msg.ok ? 'status' : 'alert'} data-testid="pc-msg">{msg.texto}</div>
@@ -308,17 +316,24 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   )
   // CONV-WHATSAPP · las ventanas (cotizar / levantar pedido) van al <body>: dentro de la tira del chat quedaban DEBAJO del
   // encabezado verde (la tira es su propia capa) y encajonadas en el chat en vez de cubrir la pantalla.
+  // PANTALLA DIVIDIDA (15 nov 2026, equipo: "que se divida la pantalla entre cotización o levantar pedido y chat y se pueda
+  // interactuar entre las dos"). En escritorio la ventana va a la derecha y el chat sigue usable a la izquierda; en el
+  // celular, «Ver chat» la esconde SIN perder lo armado y una píldora la regresa.
+  const tituloModal = modal === 'cotizar' ? 'la cotización' : 'el pedido'
   const modales = modal && typeof document !== 'undefined' ? createPortal(<>
     {modal === 'cotizar' && ficha.customer_id && (
-      <NuevaCotizacion customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', email: ficha.email }} conversationId={conversationId} chat={chat} cliente={cot}
+      <NuevaCotizacion acoplado oculto={verChat} customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', email: ficha.email }} conversationId={conversationId} chat={chat} cliente={cot}
         onClose={() => { setModal(null); void cargarCots(ficha.customer_id) }} />
     )}
     {(modal === 'pedido' || (modal && typeof modal === 'object')) && ficha.customer_id && (
-      <NuevoPedido customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', phone: ficha.telefono ?? null }} placedBy={user?.name ?? 'Ventas'}
+      <NuevoPedido acoplado oculto={verChat} customer={{ id: ficha.customer_id, name: ficha.nombre ?? '', phone: ficha.telefono ?? null }} placedBy={user?.name ?? 'Ventas'}
         initialCart={typeof modal === 'object' && modal ? Object.fromEntries(modal.convertir.lineas.map((l) => [l.product_id, l.qty])) : undefined}
         onClose={() => { setModal(null); void cargar() }}
         onCreado={(pedido) => { if (typeof modal === 'object' && modal && pedido) void cot.convertida(modal.convertir.id, pedido.id).then(() => cargarCots(ficha.customer_id)) }} />
     )}
+    {!verChat
+      ? <button type="button" className="acoplado-ver-chat" onClick={() => setVerChat(true)} data-testid="ver-chat">Ver chat</button>
+      : <button type="button" className="acoplado-volver" onClick={() => setVerChat(false)} data-testid="volver-a-modal">Volver a {tituloModal}</button>}
   </>, document.body) : null
   const segCuando = seg ? cuandoRetomar(seg.recordar_el) : null
   const tiraSeg = seg && segCuando ? (

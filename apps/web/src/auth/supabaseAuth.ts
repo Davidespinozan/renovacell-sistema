@@ -34,13 +34,27 @@ function toSessionRow(row: { role_id: string | null; verified: boolean | null; f
 
 // Resultado de leer el perfil: la sesión, `null` si no hay perfil, o 'suspendida' si el
 // servidor negó la lectura con CUENTA_SUSPENDIDA o el perfil trae active = false.
-async function fetchProfile(userId: string, email: string): Promise<Session | null | 'suspendida'> {
+// SESIÓN ESTABLE (15 nov 2026, equipo: "nos está sacando de la sesión constantemente"). Un fallo de red al leer el perfil
+// ya no se trata como "sin perfil": se distingue ('red') para reintentar y, si sigue sin red, usar el perfil guardado de
+// ESA misma cuenta. Solo "sin perfil" (no existe) y "suspendida" sacan a la persona.
+const CLAVE_PERFIL = 'rc_perfil_sesion'
+function guardarPerfil(userId: string, s: Session) { try { localStorage.setItem(CLAVE_PERFIL, JSON.stringify({ uid: userId, s })) } catch { /* sin almacenamiento */ } }
+function perfilGuardado(userId: string): Session | null {
+  try { const v = JSON.parse(localStorage.getItem(CLAVE_PERFIL) ?? 'null') as { uid?: string; s?: Session } | null; return v?.uid === userId && v.s ? v.s : null } catch { return null }
+}
+export function olvidarPerfilGuardado() { try { localStorage.removeItem(CLAVE_PERFIL) } catch { /* sin almacenamiento */ } }
+
+async function fetchProfile(userId: string, email: string): Promise<Session | null | 'suspendida' | 'red'> {
   const { data, error } = await supabase
     .from('profiles')
     .select('role_id, verified, full_name, meta, active')
     .eq('id', userId)
     .single()
-  if (error) return atenderSuspension(error.message) ? 'suspendida' : null
+  if (error) {
+    if (atenderSuspension(error.message)) return 'suspendida'
+    // PGRST116 = la consulta no trajo el perfil: de verdad no existe. Lo demás (red, tiempo, servidor) es pasajero.
+    return (error as { code?: string }).code === 'PGRST116' ? null : 'red'
+  }
   if (!data) return null
   if (data.active === false) return 'suspendida'
   const ses = toSessionRow(data, email)
@@ -53,7 +67,17 @@ async function fetchProfile(userId: string, email: string): Promise<Session | nu
       if (Array.isArray(m) && m.length) ses.capabilities = [...ses.capabilities, 'eventos']
     }
   }
+  guardarPerfil(userId, ses)
   return ses
+}
+/** Lee el perfil reintentando los fallos pasajeros (1 s, 2 s, 4 s). */
+async function perfilConReintento(userId: string, email: string): Promise<Session | null | 'suspendida' | 'red'> {
+  for (let i = 0; i < 4; i++) {
+    const r = await fetchProfile(userId, email)
+    if (r !== 'red') return r
+    if (i < 3) await new Promise((ok) => setTimeout(ok, 1000 * 2 ** i))
+  }
+  return 'red'
 }
 
 export async function signInSupabase(email: string, password: string): Promise<{ session?: Session; error?: string }> {
@@ -62,7 +86,8 @@ export async function signInSupabase(email: string, password: string): Promise<{
     const m = /invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : error.message
     return { error: m }
   }
-  const session = await fetchProfile(data.user.id, data.user.email ?? email)
+  const session = await perfilConReintento(data.user.id, data.user.email ?? email)
+  if (session === 'red') return { error: 'No hay conexión con el servidor. Revisa tu señal e intenta de nuevo.' }
   if (session === 'suspendida') {
     // W6-A1: la cuenta existe pero Dirección la suspendió. Sin sesión colgada.
     await supabase.auth.signOut()
@@ -81,7 +106,9 @@ export async function currentSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession()
   const u = data.session?.user
   if (!u) return null
-  const s = await fetchProfile(u.id, u.email ?? '')
+  const s = await perfilConReintento(u.id, u.email ?? '')
+  // Sin red: la sesión SIGUE (no se manda a la entrada); se usa el último perfil de esta misma cuenta.
+  if (s === 'red') return perfilGuardado(u.id)
   if (s === 'suspendida') {
     // Sesión guardada de una cuenta que ya fue suspendida: se cierra y se avisa.
     await supabase.auth.signOut()
@@ -91,6 +118,7 @@ export async function currentSession(): Promise<Session | null> {
 }
 
 export async function signOutSupabase(): Promise<void> {
+  olvidarPerfilGuardado()
   await supabase.auth.signOut()
 }
 

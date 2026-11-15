@@ -151,6 +151,7 @@ describe('SEC-C4-B5 · Ventas · pedido con factura (captura solo para el pedido
   it('otros roles sin permiso fiscal: mismo trato que Ventas (ni lectura ni escritura)', async () => {
     for (const rol of ['warehouse', 'driver', 'doctor']) {
       cleanup(); h.role = rol; h.tablas = []; h.upserts = []
+      Object.keys(localStorage).filter((k) => k.startsWith('rc_borrador:')).forEach((k) => localStorage.removeItem(k))   // BORRADORES · cada vuelta es una pantalla nueva
       montar(); armar(); pedirFactura()
       await screen.findByTestId('form-fiscal')
       expect(h.tablas).toEqual([]); expect(h.upserts).toEqual([])

@@ -34,3 +34,7 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia
 }
+
+// BORRADORES · los de pedido/cotización viven en localStorage: se limpian entre pruebas para que no pasen de una a otra.
+import { afterEach } from 'vitest'
+afterEach(() => { try { Object.keys(localStorage).filter((k) => k.startsWith('rc_borrador:')).forEach((k) => localStorage.removeItem(k)) } catch { /* sin almacenamiento */ } })

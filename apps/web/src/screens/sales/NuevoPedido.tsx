@@ -2,6 +2,7 @@
 // Crea un pedido contra pedido idéntico a uno del Portal → cae solo en Almacén →
 // Preparar pedidos. Respeta el stock (mismo tope que el catálogo del doctor).
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { borrarBorrador, leerBorrador, useGuardarBorrador } from '../../data/store/borradores'
 import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
@@ -43,7 +44,9 @@ const huellaDe = (s: Solicitud) => JSON.stringify([
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
 // Exactamente uno de doctor|customer. Customer-only ⇒ doctor_id NULL + customer_id + snapshot.
-export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, onCreado }: {
+export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, onCreado, acoplado = false, oculto = false }: {
+  /** PANTALLA DIVIDIDA · junto al chat: a la derecha en escritorio, sin bloquear el chat; `oculto` lo esconde sin perder lo armado. */
+  acoplado?: boolean; oculto?: boolean
   doctor?: { id: string; name: string }
   customer?: { id: string; name: string; phone?: string | null }
   placedBy: string
@@ -58,7 +61,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   // SOLO para este pedido: no se lee el expediente fiscal de la cuenta ni se escribe en él; el servidor lo congela
   // en el pedido EN LA MISMA TRANSACCIÓN que lo crea (crear_pedido_con_receptor) y lo valida. Elegir una cuenta no da
   // acceso a su perfil fiscal.
-  const { role } = useRole()
+  const { role, user: usuarioSesion } = useRole()
   const fiscalPermanente = role === 'admin'
   const target = customer ?? doctor!
   const { data: products } = useProducts()
@@ -85,10 +88,15 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     ? { line1: ci.address, city: ci.city !== '—' ? ci.city : '', phone: ci.phone }
     : null
 
-  const [cart, setCart] = useState<Record<string, number>>(() => initialCart ?? {})
+  // BORRADOR · el pedido que se arma para esta persona se guarda mientras se escribe (si viene armado de Caja o de una
+  // cotización, manda lo que viene).
+  const quien = usuarioSesion?.email ?? usuarioSesion?.name ?? 'yo'
+  const claveBorrador = `pedido:${quien}:${customer?.id ?? doctor?.id ?? 'sin'}`   // por persona del equipo y cliente
+  const [inicialB] = useState(() => (initialCart ? null : leerBorrador<{ cart: Record<string, number>; invoice: boolean }>(claveBorrador)))
+  const [cart, setCart] = useState<Record<string, number>>(() => initialCart ?? inicialB?.cart ?? {})
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
   const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
-  const [invoice, setInvoice] = useState(false)
+  const [invoice, setInvoice] = useState(() => inicialB?.invoice ?? false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo
   // ENT-2 · entrega elegida por el vendedor (id de la opción del servidor; flete ajustado con motivo si lo cambia).
@@ -96,6 +104,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const [opsEntrega, setOpsEntrega] = useState<OpcionesEntrega | null>(null)
   const [promesa, setPromesa] = useState<{ texto: string; promesa: string; flete: number } | null>(null)
   const [folio, setFolio] = useState<string | null>(null)
+  useGuardarBorrador(folio || initialCart ? null : claveBorrador, { cart, invoice }, !Object.values(cart).some((q) => q > 0))
+  const [avisoBorrador, setAvisoBorrador] = useState(() => !!inicialB && Object.values(inicialB.cart ?? {}).some((q) => q > 0))
   const [repetido, setRepetido] = useState(false)                 // el servidor confirmó un envío anterior del mismo pedido
   const shipping = isCustomer ? (custDom?.address ?? null) : (choice?.address ?? null)
   const locationId = isCustomer ? custDom?.locationId ?? null : choice?.locationId ?? null
@@ -184,6 +194,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
         intento.current = null; setRepetido(!!r.repetido)
         const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
         if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
+        borrarBorrador(claveBorrador)
         setFolio(r.order.external_ref ?? it.op.folio); onCreado?.({ id: r.order.id, external_ref: r.order.external_ref ?? null }); return
       }
       const motivo: MotivoFallo = r.incierto ? 'incierto' : (r.motivo ?? (r.ambiguous ? 'incierto' : 'rechazo'))
@@ -220,7 +231,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // ENTREGA-SERVICIO · regla + diferencia del servicio elegido
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className={'overlay' + (acoplado ? ' overlay--acoplado' : '')} onClick={acoplado ? undefined : onClose} hidden={oculto}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {folio ? (
           <div className="mbody">
@@ -240,6 +251,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
             </div>
             <div className="mbody">
+              {avisoBorrador && (
+                <div className="borrador-aviso" role="status" data-testid="borrador-recuperado">
+                  <span>Recuperamos tu borrador de este pedido.</span>
+                  <button type="button" className="rc-link" onClick={() => { setCart({}); setInvoice(false); borrarBorrador(claveBorrador); setAvisoBorrador(false) }}>Empezar de nuevo</button>
+                </div>
+              )}
               <input
                 value={buscar}
                 onChange={(e) => { setBuscar(e.target.value); setCartIds(new Set(Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0))) }}

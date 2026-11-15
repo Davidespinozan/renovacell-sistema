@@ -194,3 +194,15 @@ button.cifra-v{cursor:pointer}
 .bnav-n{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--ds-danger);color:var(--ds-on-ink);font:700 10.5px/17px var(--ds-font);text-align:center}
 @media (max-width:900px){.bnav a .bnav-n{position:absolute;transform:none}}
 .dcat-mas svg,.tienda-prod-media .dcat-mas svg{width:12px !important;height:12px !important;color:inherit !important}
+.borrador-aviso{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--ds-info-bg);color:var(--ds-info);border-radius:var(--ds-r);padding:8px 12px;margin-bottom:10px;font:500 var(--ds-fs-sm)/1.4 var(--ds-font)}
+/* PANTALLA DIVIDIDA · cotización / pedido junto al chat */
+.acoplado-ver-chat,.acoplado-volver{position:fixed;z-index:95;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));border:0;border-radius:var(--ds-r-pill);padding:12px 20px;font:600 var(--ds-fs-sm)/1 var(--ds-font);box-shadow:var(--ds-shadow-pop);cursor:pointer}
+.acoplado-ver-chat{background:var(--ds-surface);color:var(--ds-ink);border:1px solid var(--ds-border)}
+.acoplado-volver{background:var(--ds-brand);color:var(--ds-on-ink)}
+@media (min-width:1100px){
+  .overlay.overlay--acoplado{left:auto;right:0;width:min(600px,46vw);background:none;backdrop-filter:none;pointer-events:none;padding:12px;place-items:stretch;display:flex}
+  .overlay.overlay--acoplado[hidden]{display:none}
+  .overlay--acoplado .modal{pointer-events:auto;width:100%;max-height:none;height:100%;box-shadow:var(--ds-shadow-pop)}
+  body.rc-acoplado .canvas{padding-right:calc(min(600px,46vw) + 16px) !important}
+  .acoplado-ver-chat{display:none}
+}
