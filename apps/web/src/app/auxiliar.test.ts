@@ -1,14 +1,14 @@
 // AUXILIAR DE ALMACÉN (rol packing · Blanca): inventario físico, surtir, empacar y despachar. Lo digital (recibir
 // mercancía, compras, devoluciones, custodia, guías y seguimiento) es de Almacén (Alberto).
 import { describe, it, expect } from 'vitest'
-import { getNav, getRole } from './roles'
+import { getNav, getRole, pantallasAlcanzables } from './roles'
 import { ROLE_MAP } from '../auth/supabaseAuth'
 import colaSrc from '../screens/packing/Cola.tsx?raw'
 import bandejaSrc from '../screens/Bandeja.tsx?raw'
 import shippingSrc from '../../../../supabase/functions/shipping/index.ts?raw'
 import migSrc from '../../../../supabase/migrations/20270201120000_auxiliar_almacen.sql?raw'
 
-const keys = (r: 'packing' | 'warehouse') => getNav(getRole(r)).map((s) => s.key)
+const keys = (r: 'packing' | 'warehouse') => [...pantallasAlcanzables(getNav(getRole(r)))]   // UX MODERNO · incluye las pestañas de "Pedidos"
 
 describe('AUXILIAR de almacén', () => {
   it('el rol packing de la base es "Auxiliar de almacén" (ya no se confunde con Almacén)', () => {

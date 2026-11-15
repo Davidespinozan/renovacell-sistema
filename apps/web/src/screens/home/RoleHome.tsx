@@ -10,6 +10,7 @@
 // Datos: los MISMOS stores/RPC que el resto del sistema. Mi bandeja e Inicio salen de `useBandeja`
 // (no pueden contradecirse) y lo comercial del store compartido (`useAtencionComercial`). Ningún
 // tiempo de espera se calcula aquí: lo da el servidor.
+import { Icon } from '../../app/icons'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { getNav, getRole, type RoleKey } from '../../app/roles'
@@ -31,7 +32,8 @@ import { RecordatorioAvisos } from '../../app/RecordatorioAvisos'
 import { abrirPestanaAtencion } from '../admin/AtencionComercial'
 import { oportunidadesPromo, type OportunidadPromo } from '../../data/ops/busqueda'
 import { carteraPlazos, textoPlazo, textoSinCompra, tonoPlazo, type ClientePlazo } from '../../data/ops/carteraPlazos'
-import { fmtDate } from '../../lib/format'
+import { fmtDate, money } from '../../lib/format'
+import { diaNegocio, hoyNegocio } from '../../data/periodo'
 
 export function RoleHome() {
   const { role } = useRole()
@@ -74,6 +76,7 @@ export function HomeVendedor() {
     <div className="rh" data-testid="home-vendedor">
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={detalle} etiqueta="Ventas" />
+      <CifrasVendedor esperan={solicitudes.length + activas.reduce((n, c) => n + (c.sin_leer > 0 ? 1 : 0), 0)} onEsperan={() => setScreen('asesorias')} />
       {fuente && (
         <Seccion titulo="Requiere tu atención" nivel="atencion" conteo={solicitudes.length} id="atencion">
           {est.error && <ErrorLectura texto={`No se pudieron actualizar tus solicitudes. ${est.error}`} onReintentar={() => void recargarAtencion()} />}
@@ -109,13 +112,47 @@ export function HomeVendedor() {
       {/* MENÚ (dueño, 17 oct 2026): Inicio = Mi bandeja + Seguimiento. La bandeja completa va aquí (sin "ver toda"),
           y los envíos de su cartera en una sección propia; esas dos entradas ya no están en el menú de Ventas. */}
       {(() => { const resto = tareas.filter((t) => !['comercial', 'asesorias_activas'].includes(t.id)); return (
+        // UX MODERNO · sin pendientes, la sección no ocupa lugar (antes "Sin otros pendientes." en un bloque).
+        resto.length === 0 ? null : (
         <Seccion titulo="Pendientes" nivel="continuar" conteo={resto.reduce((s, t) => s + t.count, 0)} id="bandeja">
-          {resto.length === 0 ? <Vacio titulo="Sin otros pendientes." /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>}
+          <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>
         </Seccion>
-      ) })()}
+      )) })()}
       {/* Embebido: sin el título propio de Seguimiento ni "Exportar"; sin filas muestra su vacío. */}
-      <Seccion titulo="Pedidos de mi cartera en camino" nivel="info" id="seguimiento"><Seguimiento embebido /></Seccion>
+      {/* UX MODERNO · los envíos de su cartera, plegados (antes un bloque rojo con tarjetas completas encima de todo) */}
+      <EnviosPlegados />
       <AtajosMovil items={atajos} />
+    </div>
+  )
+}
+
+function EnviosPlegados() {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <section className="rh-sec" data-testid="rh-sec-seguimiento">
+      <button type="button" className="tienda-pedido" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} data-testid="envios-plegados">
+        <span className="tienda-pedido-ic" aria-hidden><Icon name="truck" /></span>
+        <span className="tienda-pedido-tx"><b>Pedidos de tu cartera en camino</b><small>{abierto ? 'Toca para ocultar' : 'Toca para ver su seguimiento'}</small></span>
+      </button>
+      {abierto && <div style={{ marginTop: 12 }}><Seguimiento embebido /></div>}
+    </section>
+  )
+}
+
+// UX MODERNO · Fase 2 (15 nov 2026, auditoría: "el Inicio del vendedor no habla de ventas"). Tres cifras arriba, con
+// los pedidos que el vendedor ya puede ver (los de su cartera): lo vendido en el mes del negocio, lo que falta cobrar
+// y cuántos clientes lo esperan en Conversaciones.
+export function CifrasVendedor({ esperan, onEsperan }: { esperan: number; onEsperan: () => void }) {
+  const { data: pedidos } = useAllOrders()
+  const mes = hoyNegocio().slice(0, 7)
+  const vivos = pedidos.filter((o) => o.status !== 'cancelled' && o.status !== 'draft')
+  const vendido = vivos.filter((o) => diaNegocio(o.created_at).startsWith(mes)).reduce((s, o) => s + Number(o.total ?? 0), 0)
+  const porCobrar = vivos.filter((o) => o.payment_status !== 'paid' && o.payment_status !== 'refunded').reduce((s, o) => s + Number(o.total ?? 0), 0)
+  return (
+    <div className="cifras-v" data-testid="cifras-vendedor">
+      <div className="cifra-v"><span>Vendido este mes</span><b>{money(vendido)}</b></div>
+      <div className="cifra-v"><span>Por cobrar</span><b className={porCobrar > 0 ? 'cifra-v--warn' : undefined}>{money(porCobrar)}</b></div>
+      <button type="button" className="cifra-v" onClick={onEsperan} data-testid="cifra-esperan"><span>Te esperan</span><b className={esperan > 0 ? 'cifra-v--ok' : undefined}>{esperan}</b></button>
     </div>
   )
 }

@@ -7,7 +7,9 @@ describe('getNav — contenido por rol', () => {
   it('Almacén incluye existencias y surtido', () => {
     const keys = getNav(getRole('warehouse')).map((s) => s.key)
     expect(keys).toContain('stock')
-    expect(keys).toContain('surtido')
+    expect(keys).toContain('g_pedidos')   // UX MODERNO · Preparar vive en la pestaña de "Pedidos"
+    expect(resolverDestino(getNav(getRole('warehouse')), 'surtido')).toEqual({ screen: 'g_pedidos', pestana: 'surtido' })
+    expect(resolverDestino(getNav(getRole('admin')), 'despacho')).toEqual({ screen: 'g_envios', pestana: 'despacho' })   // Dirección sigue en Envíos
   })
   it('el doctor incluye catálogo, mis pedidos e historial', () => {
     const keys = getNav(getRole('doctor')).map((s) => s.key)

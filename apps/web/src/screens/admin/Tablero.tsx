@@ -108,36 +108,35 @@ export function Tablero() {
 
       <AvisoKpi estados={[kMes, kAnterior, kTodo, cxc]} />
 
-      {/* Dato HERO (estilo app) */}
-      <div className="grid two" style={{ gap: 16, alignItems: 'stretch' }}>
-        <div className="feature">
-          <div className="fk">Ventas · {pMes.etiqueta}</div>
-          <div className="fv">{cifra(kMes, (k) => money(k.ventas))}</div>
-          <div className="fs">
-            {deltaPct != null && <span className={'delta ' + (deltaPct >= 0 ? 'up' : 'down')}>{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span>}
-            <span>vs. {pAnterior.etiqueta.toLowerCase()} · {cifra(kTodo, (k) => money(k.ventas))} histórico</span>
-          </div>
+      {/* UX MODERNO · Fase 4 (15 nov 2026, auditoría: "el Tablero no tiene jerarquía"): 4 cifras clave en una fila, la
+          gráfica del mes, y el resto de indicadores plegado. Antes: tarjeta verde gigante + 12 tarjetas iguales. */}
+      <div className="tb-clave">
+        <div className="tb-cifra">
+          <span>Ventas · {pMes.etiqueta}</span>
+          <b>{cifra(kMes, (k) => money(k.ventas))}</b>
+          <small>{deltaPct != null ? <span className={'delta ' + (deltaPct >= 0 ? 'up' : 'down')}>{deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(1)}%</span> : null} vs. {pAnterior.etiqueta.toLowerCase()}</small>
         </div>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="eyebrow" style={{ margin: '0 0 12px' }}>Pedidos por estatus</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {(['Pedido', 'Empacado', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
-              <div key={b} className="sl-stat" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <b className="mono" style={{ fontSize: 18 }}>{porEstatus[b]}</b> {b}
-              </div>
-            ))}
-          </div>
+        <div className="tb-cifra">
+          <span>Cobrado en el mes</span>
+          <b>{cifra(kMes, (k) => money(k.cobrado_neto))}</b>
+          <small>{avance == null ? 'de lo vendido en el mes' : `${Math.round(avance)}% de lo vendido`}</small>
+        </div>
+        <div className={'tb-cifra' + (cxc.data && cxc.data.total > 0 ? ' tb-cifra--warn' : '')}>
+          <span>Te deben</span>
+          <b>{cifra(cxc, (c) => money(c.total))}</b>
+          <small>{cxc.data ? `${cxc.data.pedidos} ${cxc.data.pedidos === 1 ? 'pedido' : 'pedidos'} con saldo` : 'saldo a hoy'}</small>
+        </div>
+        <div className={'tb-cifra' + (porSurtir.length ? ' tb-cifra--warn' : '')}>
+          <span>Por surtir</span>
+          <b>{porSurtir.length}</b>
+          <small>{atorados.length ? `${atorados.length} envíos atorados` : 'pedidos esperando almacén'}</small>
         </div>
       </div>
-
-      {/* CALIDAD VISUAL · ventas acumuladas por día: este mes contra el mes pasado (al mismo día se ve si vas arriba o abajo) */}
-      <TendenciaMes orders={orders} />
-
-      {/* TU DINERO (posición de cobranza del mes, en lenguaje llano — inspirado en CuboPolar) */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 12px', flexWrap: 'wrap' }}>
-          <div className="eyebrow" style={{ margin: 0 }}>Tu dinero · {pMes.etiqueta}</div>
-          <div style={{ marginLeft: 'auto' }}>
+      <div className="tb-estatus" aria-label="Pedidos por estatus">
+        {(['Pedido', 'Empacado', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
+          <span key={b}><b className="mono">{porEstatus[b]}</b> {b}</span>
+        ))}
+        <span style={{ marginLeft: 'auto' }}>
             <ExportButton
               name="tablero-indicadores"
               rows={[
@@ -161,27 +160,25 @@ export function Tablero() {
                 { key: 'valor', label: 'Valor' },
               ]}
             />
-          </div>
-        </div>
-        <div className="grid sigs">
-          <Sig icon="chart" value={cifra(kMes, (k) => money(k.ventas))} k="Vendiste" s="pedidos levantados en el mes" />
-          <Sig icon="receipt" value={cifra(kMes, (k) => money(k.cobrado_neto))} k="Cobrado en el mes" s="dinero que entró en el mes, menos lo que salió" />
-          <Sig icon="check" value={cifra(kMes, () => (avance == null ? '—' : `${Math.round(avance)}%`))} k="Avance de cobro" s="de lo vendido en el mes, ya cobrado" tone={avance != null && avance < 70 ? 'warn' : undefined} />
-          <Sig icon="clock" value={cifra(cxc, (c) => money(c.total))} k="Te deben" s={cxc.data ? `a hoy · ${cxc.data.pedidos} ${cxc.data.pedidos === 1 ? 'pedido' : 'pedidos'} con saldo · incluye crédito` : 'saldo a hoy'} tone={cxc.data && cxc.data.total > 0 ? 'warn' : undefined} />
-        </div>
+        </span>
       </div>
 
-      {/* KPIs */}
-      <div className="grid sigs">
-        <Sig icon="bag" value={cifra(kTodo, (k) => String(k.pedidos))} k="Pedidos" s="histórico · ventas confirmadas" />
-        <Sig icon="chart" value={cifra(kTodo, (k) => money(k.ventas))} k="Ventas" s="histórico" />
-        <Sig icon="receipt" value={cifra(kTodo, (k) => money(k.ticket))} k="Ticket promedio" s="histórico · por pedido" />
-        <Sig icon="usercheck" value={String(act.active)} k="Doctores con compra" s="histórico" />
-        <Sig icon="layers" value={String(porSurtir.length)} k="Por surtir" s="pendientes en almacén" tone={porSurtir.length ? 'warn' : undefined} />
-        <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
-        <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? riesgoTexto : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
-        <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} ${lt.entregados === 1 ? 'entrega' : 'entregas'} · peor ${lt.peorDias} d` : 'sin entregas aún'} />
-      </div>
+      {/* CALIDAD VISUAL · ventas acumuladas por día: este mes contra el mes pasado (al mismo día se ve si vas arriba o abajo) */}
+      <TendenciaMes orders={orders} />
+
+      <details className="tb-mas">
+        <summary>Más indicadores</summary>
+        <div className="grid sigs" style={{ marginTop: 12 }}>
+          <Sig icon="check" value={cifra(kMes, () => (avance == null ? '—' : `${Math.round(avance)}%`))} k="Avance de cobro" s="de lo vendido en el mes, ya cobrado" tone={avance != null && avance < 70 ? 'warn' : undefined} />
+          <Sig icon="bag" value={cifra(kTodo, (k) => String(k.pedidos))} k="Pedidos" s="histórico · ventas confirmadas" />
+          <Sig icon="chart" value={cifra(kTodo, (k) => money(k.ventas))} k="Ventas" s="histórico" />
+          <Sig icon="receipt" value={cifra(kTodo, (k) => money(k.ticket))} k="Ticket promedio" s="histórico · por pedido" />
+          <Sig icon="usercheck" value={String(act.active)} k="Doctores con compra" s="histórico" />
+          <Sig icon="truck" value={String(atorados.length)} k="Atorados" s="requieren atención" tone={atorados.length ? 'dang' : undefined} />
+          <Sig icon="clock" value={String(porCaducar.length)} k="Lotes por caducar" s={porCaducar.length ? riesgoTexto : '≤ 60 días o caducados'} tone={porCaducar.length ? 'warn' : undefined} />
+          <Sig icon="truck" value={lt.promedioDias == null ? '—' : `${lt.promedioDias} d`} k="Pedido → entrega" s={lt.entregados ? `promedio de ${lt.entregados} ${lt.entregados === 1 ? 'entrega' : 'entregas'} · peor ${lt.peorDias} d` : 'sin entregas aún'} />
+        </div>
+      </details>
 
       {/* ALERTAS */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>

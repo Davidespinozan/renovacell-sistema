@@ -11,8 +11,9 @@ export function Clientes() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PorVerificar />
-      <ClasificarCartera />
       <CustomerDirectory title="Clientes" scope="all" carteraToggle />
+      {/* UX MODERNO · la herramienta de clasificar va después de la lista (antes estorbaba arriba) */}
+      <ClasificarCartera />
     </div>
   )
 }

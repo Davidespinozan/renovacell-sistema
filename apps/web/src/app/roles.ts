@@ -102,12 +102,10 @@ export const ROLES: RoleDef[] = [
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
       { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
       { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Compras y entradas' },
-      { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Pedidos y envíos' },
-      { key: 'cola', label: 'Por enviar', icon: 'pkg', section: 'Pedidos y envíos' },
-      { key: 'guia', label: 'Guías', icon: 'truck', section: 'Pedidos y envíos' },
-      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
-      { key: 'seguimiento', label: 'Seguimiento', icon: 'truck', section: 'Pedidos y envíos' },
-      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Pedidos y envíos' },   // ENT-H · agenda de entregas locales por horario
+      // UX MODERNO · Fase 3 (15 nov 2026, auditoría: "un pedido se trabaja en seis menús"): UNA entrada "Pedidos" con
+      // pestañas por etapa (Preparar → Por enviar → Guías → Despacho → Seguimiento → Horarios). Las claves sueltas
+      // siguen abriendo su pestaña (resolverDestino).
+      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
     ],
   },
   {
@@ -239,6 +237,7 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
   g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }, { key: 'eventos', label: 'Eventos' }],
   g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }],
+  g_pedidos: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'guia', label: 'Guías' }, { key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Almacén (Alberto)
   g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],
   g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_links', label: 'Links de pago' }, { key: 'av_revision', label: 'Revisión económica' }],
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
@@ -258,8 +257,9 @@ export function pantallasAlcanzables(nav: ScreenDef[]): Set<string> {
 /** A qué pantalla ir cuando se pide `key`: ella misma, su grupo (con la pestaña pedida) o Inicio si ya no tiene entrada. */
 export function resolverDestino(nav: ScreenDef[], key: string): { screen: string; pestana?: string } {
   if (nav.some((x) => x.key === key)) return { screen: key }
-  const g = GRUPO_DE[key]
-  if (g && nav.some((x) => x.key === g)) return { screen: g, pestana: key }
+  // Una clave puede estar en varios grupos (p. ej. Despacho en "Envíos" de Dirección y en "Pedidos" de Almacén): gana el que el rol tiene.
+  const g = Object.keys(GRUPOS).find((gr) => GRUPOS[gr].includes(key) && nav.some((x) => x.key === gr))
+  if (g) return { screen: g, pestana: key }
   if (ALIAS_INICIO.has(key) && nav.some((x) => x.key === INICIO_SCREEN.key)) return { screen: INICIO_SCREEN.key }
   return { screen: key }
 }

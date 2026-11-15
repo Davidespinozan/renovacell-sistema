@@ -30,7 +30,8 @@ interface Abierto { id: string; nombre: string }
 const peligro = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }
 const tenue = { fontSize: 12.5, color: 'var(--ink-3)' }
 
-export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPorDefecto, buscador: buscadorInyectado, cliente360 }: {
+export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPorDefecto, buscador: buscadorInyectado, cliente360, vistaInicial }: {
+  vistaInicial?: Vista
   title: string
   conCartera: boolean
   clienteCartera?: ClienteCartera
@@ -42,7 +43,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
   if (!buscadorInyectado && !propio.current) propio.current = new BuscadorClientes()
   const buscador = buscadorInyectado ?? (propio.current as BuscadorClientes)
 
-  const [vista, setVista] = useState<Vista>('all')
+  const [vista, setVista] = useState<Vista>(vistaInicial ?? (conCartera ? 'cartera' : 'all'))   // UX MODERNO · el vendedor abre en SU cartera, ya listada
   const [texto, setTexto] = useState('')
   const [busqueda, setBusqueda] = useState<Busqueda>({ fase: 'inicial' })
   const [miCartera, setMiCartera] = useState<Cartera>({ fase: 'cargando' })
@@ -109,7 +110,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
 
       {conCartera && (
         <div className="seg" style={{ alignSelf: 'flex-start' }}>
-          {([['all', 'Todos'], ['cartera', 'Mi cartera']] as const).map(([k, lbl]) => (
+          {([['cartera', 'Mi cartera'], ['all', 'Buscar en todos']] as const).map(([k, lbl]) => (
             <button key={k} type="button" className={vista === k ? 'active' : undefined} aria-pressed={vista === k} onClick={() => setVista(k)} data-testid={`vista-${k}`}>{lbl}</button>
           ))}
         </div>

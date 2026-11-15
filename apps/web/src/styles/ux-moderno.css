@@ -146,3 +146,44 @@ body,.main{background:var(--ux-bg)}
 .pedido-llega b{font-size:var(--fs-md);color:var(--ux-accent)}
 .pedido-llega span{font-size:var(--fs-sm);color:var(--ux-ink-2)}
 .pedido-llega b::first-letter{text-transform:uppercase}
+/* Fase 2 · cifras del vendedor */
+.cifras-v{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cifra-v{display:grid;gap:2px;text-align:left;background:var(--ux-surface);border:1px solid var(--ux-line);border-radius:var(--r-ui-lg);padding:12px 14px;font:inherit;color:var(--ux-ink)}
+button.cifra-v{cursor:pointer}
+.cifra-v span{font-size:var(--fs-xs);color:var(--ux-ink-3);font-weight:500}
+.cifra-v b{font-size:var(--fs-lg);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cifra-v--warn{color:var(--st-warn)} .cifra-v--ok{color:var(--ux-accent)}
+@media (max-width:420px){.cifra-v{padding:10px 12px}.cifra-v b{font-size:var(--fs-md)}}
+/* Fase 3 · Inventario en el celular: datos del lote + cantidad arriba, acciones abajo (antes se encimaban) */
+@media (max-width:640px){
+  .lote{grid-template-columns:minmax(0,1fr) auto !important;grid-template-areas:"info q" "acc acc";row-gap:8px !important}
+  .lote .lote-info{grid-area:info}
+  .lote .lq{grid-area:q;align-self:start;padding-top:2px}
+  .lote .inv-acc{grid-area:acc;justify-self:end}
+}
+/* Fase 3 · Chofer: cerrar entrega en tres pasos */
+.entrega-pasos{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:10px}
+.entrega-pasos li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center}
+.entrega-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--st-neu-bg);color:var(--ux-ink-2);font-weight:700;font-size:var(--fs-sm)}
+.entrega-n svg{width:15px;height:15px}
+.entrega-pasos li.hecho .entrega-n{background:var(--ux-accent);color:#fff}
+.entrega-foto{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 12px;border:1.5px dashed var(--ux-line);border-radius:var(--r-ui);background:var(--ux-surface);cursor:pointer;font-weight:600;color:var(--ux-ink)}
+.entrega-pasos li.hecho .entrega-foto{border-style:solid;border-color:var(--ux-accent)}
+.entrega-foto img{width:40px;height:40px;border-radius:8px;object-fit:cover}
+.entrega-foto svg{width:22px;height:22px;color:var(--ux-accent)}
+.entrega-quien{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--ux-line);border-radius:var(--r-ui);font:inherit;font-size:var(--fs-md);background:var(--ux-surface);color:var(--ux-ink)}
+.entrega-ok{width:100%;min-height:50px;justify-content:center;font-size:var(--fs-md)}
+.entrega-ok:disabled{opacity:.45;cursor:not-allowed}
+/* Fase 4 · Tablero: 4 cifras clave, estatus en una línea, el resto plegado */
+.tb-clave{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.tb-clave{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tb-cifra{display:grid;gap:4px;background:var(--ux-surface);border:1px solid var(--ux-line);border-radius:var(--r-ui-lg);padding:14px 16px;min-width:0}
+.tb-cifra span{font-size:var(--fs-xs);color:var(--ux-ink-3);font-weight:500}
+.tb-cifra b{font-size:var(--fs-2xl);font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ux-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-cifra small{font-size:var(--fs-xs);color:var(--ux-ink-2)}
+.tb-cifra--warn b{color:var(--st-warn)}
+@media (max-width:640px){.tb-cifra b{font-size:var(--fs-xl)}}
+.tb-estatus{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:var(--fs-sm);color:var(--ux-ink-2)}
+.tb-estatus b{color:var(--ux-ink);font-size:var(--fs-md);margin-right:2px}
+.tb-mas{background:var(--ux-surface);border:1px solid var(--ux-line);border-radius:var(--r-ui-lg);padding:12px 16px}
+.tb-mas summary{cursor:pointer;font-weight:600;color:var(--ux-ink-2)}

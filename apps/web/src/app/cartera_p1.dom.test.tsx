@@ -105,11 +105,14 @@ describe('CARTERA-P1 · Cartera histórica (Odoo) tras SEC-C4-B4', () => {
 })
 
 describe('CARTERA-P1 · Todos, Dirección y exportación', () => {
-  it('"Todos" para Ventas: sin población precargada y sin consultar carteras al abrir', async () => {
+  it('UX MODERNO · Ventas abre en SU cartera (solo la propia); "Buscar en todos" sigue sin población precargada', async () => {
     const f = carteraFalsa([{ profile_id: 'P-DAVID', customer_id: 'CU-DAVID' }])
     render(<CustomerDirectory title="Clientes" scope="all" carteraToggle clienteCartera={f.c} />)
     await new Promise((r) => setTimeout(r, 20))
-    expect(filas()).toHaveLength(0); expect(f.llamadas).toEqual([])
+    expect(f.llamadas).toHaveLength(1)   // su cartera, una vez
+    fireEvent.click(screen.getByTestId('vista-all'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(filas()).toHaveLength(0); expect(f.llamadas).toHaveLength(1)
     for (const c of [DAVID, H1, H2, OTRO]) expect(screen.queryByText(c.full_name)).toBeNull()
   })
   it('Dirección (admin) no tiene selector ni consulta carteras', async () => {

@@ -312,41 +312,35 @@ export function MisEntregas() {
                 </div>
               ) : (
               <>
-              <div style={{ marginBottom: 10 }}>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Recibió (nombre de quien recibe)</label>
-                <input
-                  value={received[s.id] ?? ''}
-                  onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))}
-                  placeholder="Ej. Recepción / nombre de quien recibe"
-                  style={{ width: '100%', maxWidth: 320, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)' }}
-                />
-              </div>
-
-              <div className="field-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <label className="btn ghost sm" style={{ cursor: 'pointer' }}>
-                  <Icon name="image" /> {photo ? 'Cambiar foto' : 'Foto de entrega'}
-                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
-                </label>
-                {photo && <img src={photo} alt="prueba" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)', opacity: uploading[s.id] ? 0.5 : 1 }} />}
-                {uploading[s.id] && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Subiendo foto…</span>}
-                {proofPath[s.id] && !uploading[s.id] && <span style={{ fontSize: 12, color: 'var(--green-deep)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="check" style={{ width: 13, height: 13 }} /> Foto guardada</span>}
-                {(() => {
-                  // Gate en la foto REALMENTE subida (proofPath), no en el preview local:
-                  // así no se cierra una entrega sin que la evidencia haya quedado guardada.
-                  const ready = Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim()) && !uploading[s.id]
-                  return (
-                    <button
-                      className="btn"
-                      type="button"
-                      style={{ marginLeft: 'auto', opacity: ready ? 1 : 0.5, cursor: ready ? 'pointer' : 'not-allowed' }}
-                      disabled={!ready}
-                      onClick={() => deliver(s.id, order.id, order.external_ref ?? order.id)}
-                    >
-                      <Icon name="check" /> Marcar entregado
-                    </button>
-                  )
-                })()}
-              </div>
+              {/* UX MODERNO · Fase 3 (auditoría: "cerrar una entrega cuesta demasiado"): tres pasos en orden, botones grandes. */}
+              <ol className="entrega-pasos">
+                <li className={proofPath[s.id] ? 'hecho' : undefined}>
+                  <span className="entrega-n" aria-hidden>{proofPath[s.id] ? <Icon name="check" /> : 1}</span>
+                  <label className="entrega-foto">
+                    {photo ? <img src={photo} alt="Foto de la entrega" style={{ opacity: uploading[s.id] ? 0.5 : 1 }} /> : <Icon name="image" />}
+                    <span>{uploading[s.id] ? 'Subiendo foto…' : proofPath[s.id] ? 'Foto guardada · cambiar' : 'Foto del paquete en el sitio'}</span>
+                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => onPhoto(s.id, e.target.files?.[0])} />
+                  </label>
+                </li>
+                <li className={received[s.id]?.trim() ? 'hecho' : undefined}>
+                  <span className="entrega-n" aria-hidden>{received[s.id]?.trim() ? <Icon name="check" /> : 2}</span>
+                  <input className="entrega-quien" value={received[s.id] ?? ''} aria-label="Quién recibió"
+                    onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))} placeholder="¿Quién recibió?" />
+                </li>
+                <li>
+                  <span className="entrega-n" aria-hidden>3</span>
+                  {(() => {
+                    // Gate en la foto REALMENTE subida (proofPath), no en el preview local:
+                    // así no se cierra una entrega sin que la evidencia haya quedado guardada.
+                    const ready = Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim()) && !uploading[s.id]
+                    return (
+                      <button className="btn entrega-ok" type="button" disabled={!ready} onClick={() => deliver(s.id, order.id, order.external_ref ?? order.id)}>
+                        <Icon name="check" /> Marcar entregado
+                      </button>
+                    )
+                  })()}
+                </li>
+              </ol>
               {upErr[s.id] && (
                 <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                   <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Icon name="x" /> No se pudo subir la foto (revisa tu señal). Vuelve a intentarlo, o si ya entregaste, ciérrala registrando el motivo.</span>
@@ -369,9 +363,6 @@ export function MisEntregas() {
                   </div>
                   <span style={{ fontSize: 11, opacity: 0.85 }}>Requiere el nombre de quién recibió (arriba) y un motivo. Queda registrado para que Almacén/Dirección pidan la evidencia después.</span>
                 </div>
-              )}
-              {!(Boolean(proofPath[s.id]) && Boolean(received[s.id]?.trim())) && !upErr[s.id] && (
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Prueba de entrega: foto del <b>paquete en el sitio</b> (no de la persona) + el nombre de quién recibió. El botón se habilita cuando la <b>foto queda guardada</b>.</div>
               )}
 
               <details style={{ marginTop: 10 }}>

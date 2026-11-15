@@ -51,7 +51,7 @@ function montar(pasos: Paso[] = [], carteras: Asig[][] = [[]], o: { falloCartera
     // Campos de más a propósito: la pantalla solo debe usar identificador y nombre.
     return { data: carteras[Math.min(k++, carteras.length - 1)].map((a) => ({ ...a, asignado_at: 'T', email: 'fuga@x.mx', phone: '6675550000', seller_name: 'Vendedor Odoo' })), error: null }
   })
-  const r = render(<DirectorioVentas title="Clientes" conCartera clienteCartera={c} buscador={buscador} cliente360={o.c360} />)
+  const r = render(<DirectorioVentas title="Clientes" conCartera vistaInicial="all" clienteCartera={c} buscador={buscador} cliente360={o.c360} />)   // estas pruebas cubren "Buscar en todos"
   return { llamadas, rpcs, buscador, ...r }
 }
 const input = () => screen.getByLabelText('Buscar cliente') as HTMLInputElement
