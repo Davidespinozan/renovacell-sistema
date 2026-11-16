@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { capitalizarNombre } from '../../lib/nombres'
+import { avatarColor } from '../../lib/format'
 import { chat as clientePorDefecto, ETIQUETA_MODO, type ClienteChat, type ColaItem } from '../../data/ops/chat'
 import { ETIQUETA_ATENCION, estadoDe, formatoMinutos, tonoAtencion } from '../../data/ops/atencionComercial'
 import { recargarAtencion } from '../../data/store/atencionStore'
@@ -277,6 +278,14 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
 }
 
 /** Una fila de la lista, como en WhatsApp: inicial, nombre y hora; debajo el último mensaje; el número y el estado al final. */
+/** FOTOS DE CLIENTES (15 nov 2026) · WhatsApp no comparte la foto de perfil: cada cliente lleva sus iniciales (sin
+ *  «Dr./Dra.») en un color propio y estable, para reconocerlo de un vistazo. Un número sin nombre lleva «#». */
+export function inicialesDe(nombre: string): string {
+  const n = nombre.replace(/^(dra?\.?|doctora?|lic\.?|cl[ií]nica)\s+/i, '').trim()
+  if (!n || /^[\d\s()+-]+$/.test(n)) return '#'
+  const p = n.split(/\s+/).filter((x) => /\p{L}/u.test(x))
+  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '#'
+}
 export interface FilaChat {
   id: string; nombre: string; telefono: string | null; canal: string | null; ultimo: { actor: string; texto: string; at: string } | null; at: string | null
   sinLeer: number; etiqueta: { texto: string; tono: 'dang' | 'warn' | 'neu' | 'ok' } | null; carrito: number | null; testid: string; onAbrir: () => void
@@ -287,11 +296,11 @@ const CANAL_CORTO: Record<string, string> = { whatsapp: 'WhatsApp', instagram: '
 export function FilaConversacion({ f, llegada, accion }: { f: FilaChat; llegada?: boolean; accion?: React.ReactNode }) {
   const nombre = capitalizarNombre(f.nombre) || telefonoLegible(f.telefono) || 'Contacto'
   const tel = telefonoLegible(f.telefono)
-  const inicial = nombre.replace(/^(dra?\.?|doctora?|lic\.?)\s+/i, '').replace(/^\+/, '').slice(0, 1).toUpperCase() || '?'
+  const iniciales = inicialesDe(nombre)
   return (
     <li className={`wa-fila${llegada ? ' rc-llegada' : ''}${f.sinLeer > 0 ? ' wa-fila--nueva' : ''}`} data-testid={f.testid}>
       <button type="button" className="wa-fila-btn" onClick={f.onAbrir} aria-label={`Abrir conversación con ${nombre}${f.sinLeer ? `, ${f.sinLeer} sin leer` : ''}`} data-testid="abrir-conversacion">
-        <span className="wa-av" aria-hidden>{inicial}</span>
+        <span className="wa-av" style={{ background: avatarColor(nombre) }} aria-hidden data-testid="fila-avatar">{iniciales}</span>
         <span className="wa-cuerpo">
           <span className="wa-l1"><b className="wa-nombre">{nombre}</b>{f.at && <time className="wa-hora" dateTime={f.at}>{cuandoLista(f.at)}</time>}</span>
           <span className="wa-l2">

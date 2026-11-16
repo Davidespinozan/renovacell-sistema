@@ -267,3 +267,6 @@ button.cifra-v{cursor:pointer}
 .dif-wa-botones span{flex:1;text-align:center;font-size:var(--ds-fs-xs);color:var(--ds-brand-strong);font-weight:600}
 .dif-wa-nota{font-size:var(--ds-fs-xs)}
 .dif-wa-pausa{display:block;color:var(--ds-warning);font-size:var(--ds-fs-xs)}
+
+/* FOTOS DE CLIENTES (15 nov 2026) · iniciales en color propio en la lista de conversaciones */
+.wa-av{color:var(--ds-on-ink);font-size:15px;letter-spacing:.03em}
