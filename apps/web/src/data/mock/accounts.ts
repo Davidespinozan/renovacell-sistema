@@ -22,7 +22,7 @@ export interface MockAccount {
 const DEMO_ACCOUNTS: MockAccount[] = [
   { email: 'direccion@renovacell.mx', password: 'demo', role: 'admin', verified: true, name: 'Claudia · Dirección', capabilities: [] },
   { email: 'almacen@renovacell.mx', password: 'demo', role: 'warehouse', verified: true, name: 'Alberto · Almacén / Empaque', capabilities: ['diseno', 'anuncios'] },
-  { email: 'ventas1@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas', capabilities: ['eventos'] },
+  { email: 'ventas1@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas', capabilities: ['eventos', 'conversaciones'] },
   { email: 'ventas2@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Diego · Ventas', capabilities: [] },
   { email: 'chofer@renovacell.mx', password: 'demo', role: 'driver', verified: true, name: 'Beto · Chofer', capabilities: [] },
   { email: 'chofer2@renovacell.mx', password: 'demo', role: 'driver', verified: true, name: 'Marta · Chofer', capabilities: [] },

@@ -58,7 +58,7 @@ export function BuscadorConversaciones({ onAbrir, buscar }: { onAbrir: (conversa
     <div className="bm-caja" data-testid="buscador-conversaciones">
       <span className="searchbox" style={{ width: '100%' }}>
         <Search size={15} aria-hidden />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar una palabra en tus conversaciones (p. ej. Dysport, factura, envío)" aria-label="Buscar en tus conversaciones" data-testid="buscar-conversaciones" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar una palabra en tus chats" title="Busca una palabra en todas tus conversaciones (p. ej. Dysport, factura, envío)" aria-label="Buscar en tus conversaciones" data-testid="buscar-conversaciones" />
         {q && <button type="button" className="rc-ico" onClick={() => setQ('')} aria-label="Limpiar búsqueda"><X size={15} /></button>}
       </span>
       <ResultadosMensajes q={q} onAbrir={(id) => { setQ(''); onAbrir(id) }} buscar={buscar} />

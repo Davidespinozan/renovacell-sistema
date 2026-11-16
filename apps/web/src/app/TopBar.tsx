@@ -91,7 +91,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             <Icon name="search" />
             <input
               ref={inputRef}
-              placeholder={esDoctor ? 'Buscar productos o pedidos…' : 'Buscar pedidos, clientes, productos…'}
+              placeholder={esDoctor ? 'Buscar productos o pedidos…' : 'Buscar cliente, pedido…'} title="Busca pedidos, clientes y productos"
               aria-label="Buscar"
               value={q}
               onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0) }}

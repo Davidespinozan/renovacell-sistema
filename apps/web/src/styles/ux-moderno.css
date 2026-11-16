@@ -291,3 +291,28 @@ button.cifra-v{cursor:pointer}
 .escribir-wa small{color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
 .llamar-wa{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:44px;min-height:44px;border-radius:var(--ds-r);border:1px solid var(--ds-border);color:var(--ds-brand-strong);cursor:pointer}
 .llamar-wa:hover{background:var(--ds-brand-soft)}
+
+/* ═══ LAPTOP CON WINDOWS (15 nov 2026, dueño: «los vendedores tienen Windows… el buscador roba mucho espacio y se ve
+   muy cortado»). Una laptop Full HD al 150 % o 1366×768 deja ≈ 1280–1366 × 600–650 útiles: aquí se compacta el marco
+   (barra de arriba, menú y márgenes) para que el contenido quepa sin cortar. Pantallas altas: sin cambio. ═══ */
+@media (min-width:901px){
+  /* Conversaciones: el título ya está arriba; buscador y botones en UNA fila */
+  [data-testid=asesorias]{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:start}
+  [data-testid=asesorias] > *{grid-column:1 / -1}
+  [data-testid=asesorias] > .ases-head{grid-column:2;grid-row:1;margin:0}
+  [data-testid=asesorias] > .bm-caja{grid-column:1;grid-row:1;margin:0 0 12px}
+  [data-testid=asesorias] .ases-head-txt{display:none}
+  .top .searchbox{width:clamp(190px,20vw,300px)}
+}
+@media (min-width:901px) and (max-height:820px){
+  .top{padding-top:9px;padding-bottom:9px}
+  .top .screen-title{font-size:19px}
+  .canvas{--canvas-pt:14px;padding-left:22px;padding-right:22px}
+  .side{padding-top:12px}
+  .brand{padding-bottom:10px}
+  .brand .lw,.brand img{width:32px;height:32px}
+  .nav a{padding-top:6.5px;padding-bottom:6.5px}
+  .side .side-user.side-user--compacto{margin-bottom:6px}
+  .side-stryv,.side-stryv--link{padding:5px 8px;margin-top:0;font-size:11px}
+  .rc-chat--embebido{height:calc(100vh - 112px);height:calc(100dvh - 112px);min-height:340px}
+}
