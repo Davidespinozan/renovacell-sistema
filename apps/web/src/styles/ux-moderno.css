@@ -257,3 +257,13 @@ button.cifra-v{cursor:pointer}
 .llamar-campo{display:grid;gap:6px;font-size:var(--ds-fs-sm);color:var(--ds-text-2)}
 .llamar-campo input,.llamar-campo textarea{border:1px solid var(--ds-border);border-radius:var(--ds-r);padding:10px;font:inherit;font-size:16px}
 @media (max-width:640px){.llamar-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.llamar-tel span{display:none}.llamar-fila{padding-right:10px}.llamar-tel{width:44px;padding:0;justify-content:center}}
+
+/* DIFUSIONES POR WHATSAPP (15 nov 2026) · vista previa como burbuja de WhatsApp */
+.dif-off{opacity:.55}
+.dif-wa{display:grid;gap:6px;padding:10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);background:var(--ds-surface-2)}
+.dif-wa small{font-size:var(--ds-fs-xs);color:var(--ds-text-2)}
+.dif-wa-burbuja{justify-self:start;max-width:420px;padding:9px 11px;border-radius:var(--ds-r-lg);border-top-left-radius:4px;background:var(--ds-brand-soft);color:var(--ds-ink);font-size:var(--ds-fs-sm);line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.dif-wa-botones{display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:1px solid var(--ds-border)}
+.dif-wa-botones span{flex:1;text-align:center;font-size:var(--ds-fs-xs);color:var(--ds-brand-strong);font-weight:600}
+.dif-wa-nota{font-size:var(--ds-fs-xs)}
+.dif-wa-pausa{display:block;color:var(--ds-warning);font-size:var(--ds-fs-xs)}

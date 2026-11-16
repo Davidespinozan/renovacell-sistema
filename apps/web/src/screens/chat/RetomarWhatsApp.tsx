@@ -20,7 +20,7 @@ export function RetomarWhatsApp({ conversationId, waId, nombreCliente, onEnviada
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   useEffect(() => {
     if (!abierto || lista) return
-    void cliente.lista().then((r) => setLista((r ?? []).filter((p) => p.activa)))
+    void cliente.lista().then((r) => setLista((r ?? []).filter((p) => p.activa && !p.variables.includes('mensaje'))))   // la de difusión solo sale desde Difusiones
     void cliente.promos().then(setPromos)
   }, [abierto, lista, cliente])
   const p = lista?.find((x) => x.nombre === elegida) ?? null

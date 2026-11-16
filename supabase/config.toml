@@ -429,3 +429,6 @@ verify_jwt = false
 # aquí evita que un despliegue sin la bandera la deje en 401 para Meta.
 [functions.meta-webhook]
 verify_jwt = false
+
+[functions.difusion-wa]
+verify_jwt = false

@@ -9,6 +9,7 @@ import { difusiones as clientePorDefecto, type Audiencia, type ClienteDifusiones
 import { useEspecialidades } from '../../app/PerfilComercialEditor'
 import { ETIQUETA_TIPO, type TipoCliente } from '../../data/ops/perfilComercial'
 import { renderizar } from '../../../../../supabase/functions/_shared/plantillas'   // el MISMO generador del correo que usa el servidor
+import { mensajeDifusionWA, vistaPreviaWA } from '../../../../../supabase/functions/_shared/difusionWA'   // la MISMA regla que la base
 import { uploadImage } from '../../lib/uploads'
 import { capitalizarNombre } from '../../lib/nombres'
 import { useRoleOpcional } from '../../auth/RoleContext'
@@ -24,7 +25,7 @@ export function Difusiones({ cliente = clientePorDefecto, subir = (f: File) => u
   useEffect(() => { void cargarListas() }, [cargarListas])
   return (
     <div className="grid dif" data-testid="difusiones" style={{ gap: 14 }}>
-      <div className="dif-h"><Megaphone size={20} aria-hidden /><div><h2>Difusiones</h2><p>Manda un mensaje, un enlace o una imagen a tus clientes: por correo y por su chat del portal.</p></div></div>
+      <div className="dif-h"><Megaphone size={20} aria-hidden /><div><h2>Difusiones</h2><p>Manda un mensaje, un enlace o una imagen a tus clientes: por WhatsApp, por correo y por su chat del portal.</p></div></div>
       <div className="seg" style={{ alignSelf: 'flex-start' }} role="tablist">
         {([['nueva', 'Nueva difusión'], ['listas', `Mis listas (${listas.filter((l) => l.es_mia).length})`], ['enviadas', 'Enviadas']] as const).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={vista === k} className={vista === k ? 'active' : undefined} onClick={() => setVista(k)} data-testid={`dif-vista-${k}`}>{l}</button>
@@ -46,17 +47,23 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
   const [tipo, setTipo] = useState<TipoCliente | null>('doctor')
   const [esp, setEsp] = useState<string | null>(null)
   const [c, setC] = useState<Contenido>(VACIO)
-  const [canales, setCanales] = useState<{ correo: boolean; chat: boolean }>({ correo: true, chat: true })
+  const [canales, setCanales] = useState<{ correo: boolean; chat: boolean; whatsapp: boolean }>({ correo: true, chat: true, whatsapp: true })
   const [previa, setPrevia] = useState<Previa | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [verCorreo, setVerCorreo] = useState(false)
+  const sesionNombre = (sesion?.user?.name ?? '').trim().split(/\s+/)[0] || 'Tu nombre'
   const audiencia: Audiencia | null = modo === 'cartera' ? { tipo: 'cartera' } : modo === 'lista' ? (listaId ? { tipo: 'lista', etiqueta_id: listaId } : null) : { tipo: 'filtro', tipo_cliente: tipo, especialidad: esp }
   const clave = JSON.stringify(audiencia)
   useEffect(() => { setPrevia(null); if (audiencia) void cliente.previa(audiencia).then((r) => setPrevia(r.ok ? r.data : null)) }, [clave, cliente])   // eslint-disable-line react-hooks/exhaustive-deps
   const correoPrevia = useMemo(() => renderizar('difusion', { titulo: c.titulo || 'Título de tu difusión', texto: c.texto || 'Aquí va tu mensaje.', enlace: c.enlace || null, imagen_url: c.imagen || null, vendedor: 'Tu nombre', baja_url: 'https://renovacell.mx/baja' }, 'Dra. Ejemplo'), [c])
-  const listo = c.titulo.trim().length >= 3 && c.texto.trim().length > 0 && (canales.correo || canales.chat) && !!audiencia && (!c.enlace.trim() || /^https:\/\//.test(c.enlace.trim()))
-  const alcance = previa ? (canales.correo ? previa.con_correo : 0) + (canales.chat ? previa.con_cuenta : 0) : 0
+  const waLista = !!previa?.whatsapp_lista
+  const conWA = canales.whatsapp && waLista
+  const listo = c.titulo.trim().length >= 3 && c.texto.trim().length > 0 && (canales.correo || canales.chat || conWA) && !!audiencia && (!c.enlace.trim() || /^https:\/\//.test(c.enlace.trim()))
+  const alcance = previa ? (canales.correo ? previa.con_correo : 0) + (canales.chat ? previa.con_cuenta : 0) + (conWA ? previa.con_whatsapp ?? 0 : 0) : 0
+  const nWA = conWA ? previa?.con_whatsapp ?? 0 : 0
+  const limiteWA = previa?.whatsapp_limite ?? 250
+  const textoWA = useMemo(() => vistaPreviaWA('Adriana', sesionNombre, mensajeDifusionWA({ titulo: c.titulo || 'Título de tu difusión', texto: c.texto || 'Aquí va tu mensaje.', enlace: c.enlace, imagen: c.imagen })), [c, sesionNombre])
 
   const subirImagen = async (f?: File) => {
     if (!f) return
@@ -68,13 +75,14 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
   const prueba = async () => { setOcupado(true); setMsg(null); const r = await cliente.prueba(c); setOcupado(false); setMsg(r.ok ? { ok: true, texto: `Te mandamos una prueba a ${r.data.para}.` } : { ok: false, texto: r.mensaje }) }
   const enviar = async () => {
     if (!audiencia || !previa) return
-    if (!(await confirmar(`¿Mandar «${c.titulo.trim()}» a ${previa.total} ${previa.total === 1 ? 'cliente' : 'clientes'}?`))) return
+    const avisoWA = nWA ? `\n\nPor WhatsApp: ${nWA} ${nWA === 1 ? 'celular' : 'celulares'}. Salen poco a poco en horario de atención (hasta ${limiteWA} por día) y Meta cobra cada mensaje de promoción.` : ''
+    if (!(await confirmar(`¿Mandar «${c.titulo.trim()}» a ${previa.total} ${previa.total === 1 ? 'cliente' : 'clientes'}?${avisoWA}`))) return
     setOcupado(true); setMsg(null)
-    const r = await cliente.enviar(c, audiencia, [...(canales.correo ? ['correo' as const] : []), ...(canales.chat ? ['chat' as const] : [])])
+    const r = await cliente.enviar(c, audiencia, [...(canales.correo ? ['correo' as const] : []), ...(canales.chat ? ['chat' as const] : []), ...(conWA ? ['whatsapp' as const] : [])])
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     setC(VACIO)
-    void avisar(`Listo: ${r.data.correo} por correo y ${r.data.chat} por chat.${r.data.sin_correo ? ` ${r.data.sin_correo} sin correo.` : ''}${r.data.dados_de_baja ? ` ${r.data.dados_de_baja} se dieron de baja.` : ''}`)
+    void avisar(`Listo: ${r.data.correo} por correo y ${r.data.chat} por chat.${r.data.whatsapp ? ` ${r.data.whatsapp} por WhatsApp (salen poco a poco en horario de atención).` : ''}${r.data.sin_correo && canales.correo ? ` ${r.data.sin_correo} sin correo.` : ''}${r.data.sin_whatsapp ? ` ${r.data.sin_whatsapp} sin celular.` : ''}${r.data.dados_de_baja ? ` ${r.data.dados_de_baja} se dieron de baja.` : ''}`)
     onEnviada()
   }
 
@@ -97,7 +105,7 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
           listas.length ? <select className="pc-campo" value={listaId} onChange={(e) => setListaId(e.target.value)} aria-label="Lista" data-testid="dif-lista"><option value="">Elige una lista…</option>{listas.map((l) => <option key={l.id} value={l.id}>{l.nombre} ({l.clientes}){l.vendedor ? ` · ${l.vendedor}` : ''}</option>)}</select>
             : <div className="pc-nota">Aún no tienes listas: créalas en «Mis listas».</div>
         )}
-        {previa && <div className="dif-previa" data-testid="dif-previa"><span><b>{previa.total}</b> {previa.total === 1 ? 'cliente' : 'clientes'} · {previa.con_correo} por correo · {previa.con_cuenta} por chat del portal
+        {previa && <div className="dif-previa" data-testid="dif-previa"><span><b>{previa.total}</b> {previa.total === 1 ? 'cliente' : 'clientes'} · {previa.whatsapp_lista ? `${previa.con_whatsapp ?? 0} por WhatsApp · ` : ''}{previa.con_correo} por correo · {previa.con_cuenta} por chat del portal
           {previa.sin_correo ? ` · ${previa.sin_correo} sin correo` : ''}{previa.dados_de_baja ? ` · ${previa.dados_de_baja} se dieron de baja` : ''}</span>
           {modo === 'filtro' && previa.total === 0 && <small>Nadie con esa especialidad todavía: clasifica tu cartera en Clientes.</small>}</div>}
       </section>
@@ -112,10 +120,19 @@ function NuevaDifusion({ cliente, listas, subir, onEnviada }: { cliente: Cliente
             : <label className="btn ghost sm"><ImagePlus size={15} /> Agregar imagen<input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => void subirImagen(e.target.files?.[0])} data-testid="dif-imagen" /></label>}
         </div>
         <div className="dif-canales">
+          <label className={'pc-check' + (waLista ? '' : ' dif-off')}><input type="checkbox" checked={conWA} disabled={!waLista} onChange={(e) => setCanales({ ...canales, whatsapp: e.target.checked })} data-testid="dif-canal-whatsapp" /> Por WhatsApp</label>
           <label className="pc-check"><input type="checkbox" checked={canales.correo} onChange={(e) => setCanales({ ...canales, correo: e.target.checked })} data-testid="dif-canal-correo" /> Por correo</label>
           <label className="pc-check"><input type="checkbox" checked={canales.chat} onChange={(e) => setCanales({ ...canales, chat: e.target.checked })} data-testid="dif-canal-chat" /> Por su chat del portal</label>
           <button type="button" className="btn ghost sm" onClick={() => setVerCorreo((v) => !v)}>{verCorreo ? 'Ocultar' : 'Ver'} cómo llega el correo</button>
         </div>
+        {previa && !waLista && <div className="pc-nota dif-wa-nota" data-testid="dif-wa-pendiente">WhatsApp se activa cuando Meta apruebe la plantilla «Difusión». Dirección la manda a revisión en Conversaciones → Canales → WhatsApp → Plantillas.</div>}
+        {conWA && (
+          <div className="dif-wa" data-testid="dif-wa-previa">
+            <small>Así le llega por WhatsApp{previa?.whatsapp_baja ? ` · ${previa.whatsapp_baja} pidieron no recibir promociones` : ''}{previa?.sin_whatsapp ? ` · ${previa.sin_whatsapp} sin celular` : ''}</small>
+            <div className="dif-wa-burbuja">{textoWA}<span className="dif-wa-botones"><span>Me interesa</span><span>Detener promociones</span></span></div>
+            <small>Salen poco a poco en horario de atención (hasta {limiteWA} por día). Las respuestas te llegan a Conversaciones. Meta cobra cada mensaje de promoción (aprox. $1 MXN).</small>
+          </div>
+        )}
         {verCorreo && <iframe title="Vista previa del correo" srcDoc={correoPrevia.html} sandbox="" className="dif-iframe" data-testid="dif-previa-correo" />}
         {msg && <div className={'pc-msg' + (msg.ok ? ' ok' : '')} role={msg.ok ? 'status' : 'alert'} data-testid="dif-msg">{msg.texto}</div>}
         <div className="pc-acciones dif-acc">
@@ -219,7 +236,8 @@ function Enviadas({ cliente }: { cliente: ClienteDifusiones }) {
         <li key={d.id}>
           <b>{d.titulo}</b>
           <small>{fmtDate(d.creada)} · {d.audiencia.tipo === 'lista' ? `lista «${d.lista ?? '—'}»` : d.audiencia.tipo === 'cartera' ? 'toda la cartera' : 'por filtro'}{!d.es_mia && d.vendedor ? ` · ${d.vendedor}` : ''}</small>
-          <span><Check size={13} aria-hidden /> {d.correo} por correo · {d.chat} por chat{d.sin_correo ? ` · ${d.sin_correo} sin correo` : ''}{d.dados_de_baja ? ` · ${d.dados_de_baja} de baja` : ''}</span>
+          <span><Check size={13} aria-hidden /> {d.correo} por correo · {d.chat} por chat{d.whatsapp ? ` · WhatsApp: ${d.whatsapp_enviados ?? 0} de ${d.whatsapp} enviados${d.whatsapp_pendientes ? ` (${d.whatsapp_pendientes} en camino)` : ''}${d.whatsapp_respuestas ? ` · ${d.whatsapp_respuestas} contestaron` : ''}${d.whatsapp_fallidos ? ` · ${d.whatsapp_fallidos} no llegaron` : ''}` : ''}{d.sin_correo ? ` · ${d.sin_correo} sin correo` : ''}{d.dados_de_baja ? ` · ${d.dados_de_baja} de baja` : ''}</span>
+          {d.whatsapp_nota && <small className="dif-wa-pausa" data-testid="dif-wa-pausa">WhatsApp en pausa: {d.whatsapp_nota}</small>}
         </li>
       ))}
     </ul>

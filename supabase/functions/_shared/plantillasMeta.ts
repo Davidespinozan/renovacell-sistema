@@ -3,10 +3,10 @@
 // (mandar a Meta, leer su estado). Dirección escribe con datos legibles ({{cliente}}, {{vendedor}}…); a Meta se le manda
 // con {{1}}, {{2}}… en ese orden, con un ejemplo de cada uno (Meta lo exige para revisarla).
 
-export const VARIABLES = ['cliente', 'vendedor', 'promocion', 'promocion_hasta'] as const
+export const VARIABLES = ['cliente', 'vendedor', 'promocion', 'promocion_hasta', 'mensaje'] as const
 export type Variable = (typeof VARIABLES)[number]
-export const ETIQUETA_VARIABLE: Record<Variable, string> = { cliente: 'nombre del cliente', vendedor: 'nombre del vendedor', promocion: 'nombre de la promoción', promocion_hasta: 'fecha de fin de la promoción' }
-export const EJEMPLO_VARIABLE: Record<Variable, string> = { cliente: 'Dra. López', vendedor: 'Roberto', promocion: 'Golden Placenta', promocion_hasta: '30 de noviembre' }
+export const ETIQUETA_VARIABLE: Record<Variable, string> = { cliente: 'nombre del cliente', vendedor: 'nombre del vendedor', promocion: 'nombre de la promoción', promocion_hasta: 'fecha de fin de la promoción', mensaje: 'mensaje de la difusión' }
+export const EJEMPLO_VARIABLE: Record<Variable, string> = { cliente: 'Dra. López', vendedor: 'Roberto', promocion: 'Golden Placenta', promocion_hasta: '30 de noviembre', mensaje: '*Golden Placenta 5 ml* — Ya tenemos la nueva presentación; pida la suya con su vendedora. https://renovacell.mx' }
 
 export type Categoria = 'MARKETING' | 'UTILITY'
 export interface Borrador { etiqueta: string; categoria: Categoria; texto: string; botones: string[] }
