@@ -3,7 +3,7 @@
 // el cliente conteste, la plática sigue normal. Mientras Meta no apruebe ninguna: llamarle o abrir su propio WhatsApp.
 import React, { useEffect, useState, useRef } from 'react'
 import { MessageCircle, Phone, Send, X } from 'lucide-react'
-import { plantillasWA as plantillasPorDefecto, vistaPrevia, type PlantillaWA, type PromoVigente } from '../../data/ops/plantillasWA'
+import { plantillasWA as plantillasPorDefecto, paraEscribir, vistaPrevia, type PlantillaWA, type PromoVigente } from '../../data/ops/plantillasWA'
 import { primerNombre } from '../../lib/nombres'
 import { fmtDate } from '../../lib/format'
 
@@ -20,7 +20,7 @@ export function RetomarWhatsApp({ conversationId, waId, nombreCliente, onEnviada
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   useEffect(() => {
     if (!abierto || lista) return
-    void cliente.lista().then((r) => setLista((r ?? []).filter((p) => p.activa && !p.variables.includes('mensaje'))))   // la de difusión solo sale desde Difusiones
+    void cliente.lista().then((r) => setLista((r ?? []).filter(paraEscribir)))   // las del sistema (difusión, pedidos, invitación) no se ofrecen aquí
     void cliente.promos().then(setPromos)
   }, [abierto, lista, cliente])
   const p = lista?.find((x) => x.nombre === elegida) ?? null

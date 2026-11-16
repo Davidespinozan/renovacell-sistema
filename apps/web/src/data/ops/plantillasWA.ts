@@ -29,6 +29,10 @@ export function mensajePlantilla(m: string | undefined): string {
   return 'No se pudo mandar la plantilla. Intenta de nuevo.'
 }
 
+/** Datos que solo llena el sistema (difusión, pedidos, invitación): esas plantillas no se ofrecen para escribirle a alguien. */
+export const VARS_SISTEMA = ['mensaje', 'folio', 'total', 'envio', 'enlace']
+export const paraEscribir = (p: PlantillaWA) => p.activa && !p.variables.some((v) => VARS_SISTEMA.includes(v))
+
 export const plantillasWA = (rpc: Rpc = rpcPorDefecto, invocar: Invocar = invocarPorDefecto) => ({
   lista: async (): Promise<PlantillaWA[] | null> => {
     if (!hasSupabase && rpc === rpcPorDefecto) return []
@@ -50,6 +54,18 @@ export const plantillasWA = (rpc: Rpc = rpcPorDefecto, invocar: Invocar = invoca
       // Sale ya (si no, el envío de cada minuto la manda).
       if (hasSupabase && rpc === rpcPorDefecto) void supabase.functions.invoke('meta-send', { body: {} }).catch(() => {})
       return { ok: true, texto: String((data as { texto?: string } | null)?.texto ?? '') }
+    } catch { return { ok: false, mensaje: 'Sin conexión con el servidor.' } }
+  },
+  /** WHATSAPP A TODA LA CARTERA (15 nov 2026) · le escribe a un cliente de su cartera aunque nunca haya escrito por WhatsApp.
+   *  Devuelve su conversación; si escribió en las últimas 24 h no manda plantilla (ventana_abierta: se le escribe normal). */
+  escribirCliente: async (customerId: string, plantilla: string, promocion?: string | null): Promise<{ ok: true; conversacion: string; ventanaAbierta: boolean; texto: string } | { ok: false; mensaje: string }> => {
+    if (!hasSupabase && rpc === rpcPorDefecto) return { ok: false, mensaje: 'Sin conexión con el servidor.' }
+    try {
+      const { data, error } = await rpc('cc_wa_escribir_cliente', { p_customer: customerId, p_plantilla: plantilla, p_promocion: promocion ?? null })
+      if (error) return { ok: false, mensaje: mensajePlantilla(error.message) }
+      const d = (data ?? {}) as { conversation_id?: string; ventana_abierta?: boolean; texto?: string }
+      if (hasSupabase && rpc === rpcPorDefecto && !d.ventana_abierta) void supabase.functions.invoke('meta-send', { body: {} }).catch(() => {})
+      return { ok: true, conversacion: String(d.conversation_id ?? ''), ventanaAbierta: !!d.ventana_abierta, texto: String(d.texto ?? '') }
     } catch { return { ok: false, mensaje: 'Sin conexión con el servidor.' } }
   },
   /** WA-PLANTILLAS-META · Dirección guarda una plantilla (cuerpo con {{1}}… y sus datos). */

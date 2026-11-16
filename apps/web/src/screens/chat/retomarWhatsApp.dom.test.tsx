@@ -57,7 +57,7 @@ describe('Retomar por WhatsApp', () => {
 describe('Plantillas (Dirección) y formato de Meta', () => {
   it('Dirección ve el estado en Meta, el texto legible y la manda a revisión (se consulta a Meta al abrir)', async () => {
     const c = { ...cliente([{ ...SEG, activa: false, estado_meta: 'sin_enviar' }, { ...PRO, estado_meta: 'APPROVED' }]),
-      sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null) }
+      sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null), escribirCliente: vi.fn() }
     render(<PlantillasMeta cliente={c} />)
     const filas = await screen.findAllByTestId('plantilla-meta')
     expect(filas[0]).toHaveTextContent('Hola [nombre del cliente], soy [nombre del vendedor]')
@@ -70,7 +70,7 @@ describe('Plantillas (Dirección) y formato de Meta', () => {
     expect(await screen.findByTestId('plantillas-msg')).toHaveTextContent('se mandó a Meta')
   })
   it('crear una plantilla: datos, botones de respuesta y vista previa; se guarda numerada y se manda', async () => {
-    const c = { ...cliente([]), sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null) }
+    const c = { ...cliente([]), sincronizar: vi.fn(async () => null), mandarAMeta: vi.fn(async () => ({ ok: true as const, estado: 'PENDING' })), guardar: vi.fn(async () => null), borrar: vi.fn(async () => null), escribirCliente: vi.fn() }
     render(<PlantillasMeta cliente={c} />)
     fireEvent.click(await screen.findByTestId('plantilla-nueva'))
     fireEvent.change(screen.getByTestId('plantilla-etiqueta'), { target: { value: 'Recordatorio de pedido' } })

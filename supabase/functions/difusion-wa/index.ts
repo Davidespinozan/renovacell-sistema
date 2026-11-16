@@ -1,5 +1,5 @@
 // Edge Function (se despliega con --no-verify-jwt; solo la tarea de cada minuto con x-cron-secret): DIFUSIONES POR
-// WHATSAPP. La base decide a quién, cuándo y cuántos (_difwa_reclamar: horario, límite diario, pausa, plantilla aprobada,
+// WHATSAPP (y, desde el 15 nov, los AVISOS DE PEDIDO por WhatsApp). La base decide a quién, cuándo y cuántos (_difwa_reclamar: horario, límite diario, pausa, plantilla aprobada,
 // bajas); aquí solo se manda la plantilla y se asienta. Un rechazo del canal (retener) pausa la salida 30 min y lo que
 // queda del lote vuelve a la cola sin intentarse: la lista nunca se quema.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -34,17 +34,8 @@ Deno.serve(conCors(async (req) => {
   if (!cfg) return json(200, { sin_configurar: true })
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
   const r = { enviados: 0, fallidos: 0, inciertos: 0, retenidos: 0 }
-  const { data, error } = await admin.rpc('_difwa_reclamar', { p_lote: 20 })
-  if (error) { console.error('difusion-wa reclamar', error.code ?? '', (error.message ?? '').slice(0, 120)); return json(500, { error: 'reclamar' }) }
-  const lote = (Array.isArray(data) ? data : []) as Lote
-  const asentar = async (id: number, a: ReturnType<typeof asientoWhatsApp>) => {
-    const k = a.resultado === 'enviado' ? 'enviados' : a.resultado === 'fallido' ? 'fallidos' : a.resultado === 'incierto' ? 'inciertos' : 'retenidos'
-    r[k]++
-    await admin.rpc('_difwa_resolver', { p_envio: id, p_resultado: a.resultado, p_proveedor_id: a.resultado === 'enviado' ? a.id : null, p_error: a.resultado === 'enviado' ? null : a.error }).then(() => {}, () => {})
-  }
-  for (let i = 0; i < lote.length; i++) {
-    const e = lote[i]
-    let res: ResultadoEnvio
+  // deno-lint-ignore no-explicit-any
+  const mandar = async (e: { destino: string; plantilla: string; idioma: string; parametros: string[] }): Promise<ResultadoEnvio> => {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)
       const resp = await fetch(`https://graph.facebook.com/${cfg.version}/${cfg.phoneId}/messages`, {
@@ -53,9 +44,33 @@ Deno.serve(conCors(async (req) => {
       })
       clearTimeout(t)
       const cuerpo = await resp.json().catch(() => null) as { messages?: Array<{ id?: string }> } | null
-      res = clasificarEnvio(resp.status, cuerpo, cuerpo?.messages?.[0]?.id)
-    } catch (err) { res = resultadoDeExcepcion(err) }
-    const a = asientoWhatsApp(res)
+      return clasificarEnvio(resp.status, cuerpo, cuerpo?.messages?.[0]?.id)
+    } catch (err) { return resultadoDeExcepcion(err) }
+  }
+  const cuenta = (a: ReturnType<typeof asientoWhatsApp>) => { r[a.resultado === 'enviado' ? 'enviados' : a.resultado === 'fallido' ? 'fallidos' : a.resultado === 'incierto' ? 'inciertos' : 'retenidos']++ }
+  // 1) Avisos del sistema (pedido recibido, pago, enviado, entregado): primero, a cualquier hora.
+  const av = await admin.rpc('_wa_avisos_reclamar', { p_lote: 20 })
+  const avisos = (Array.isArray(av.data) ? av.data : []) as Array<{ aviso_id: number; destino: string; plantilla: string; idioma: string; parametros: string[] }>
+  const asentarAviso = async (id: number, a: ReturnType<typeof asientoWhatsApp>) => {
+    cuenta(a)
+    await admin.rpc('_wa_avisos_resolver', { p_aviso: id, p_resultado: a.resultado, p_proveedor_id: a.resultado === 'enviado' ? a.id : null, p_error: a.resultado === 'enviado' ? null : a.error }).then(() => {}, () => {})
+  }
+  for (let i = 0; i < avisos.length; i++) {
+    const a = asientoWhatsApp(await mandar(avisos[i]))
+    await asentarAviso(avisos[i].aviso_id, a)
+    if (a.resultado === 'retener') { for (const resto of avisos.slice(i + 1)) await asentarAviso(resto.aviso_id, { resultado: 'retener', error: a.error }); return json(200, r) }
+  }
+  // 2) Difusiones (la base ya revisó horario, límite diario y pausa).
+  const { data, error } = await admin.rpc('_difwa_reclamar', { p_lote: 20 })
+  if (error) { console.error('difusion-wa reclamar', error.code ?? '', (error.message ?? '').slice(0, 120)); return json(500, { error: 'reclamar' }) }
+  const lote = (Array.isArray(data) ? data : []) as Lote
+  const asentar = async (id: number, a: ReturnType<typeof asientoWhatsApp>) => {
+    cuenta(a)
+    await admin.rpc('_difwa_resolver', { p_envio: id, p_resultado: a.resultado, p_proveedor_id: a.resultado === 'enviado' ? a.id : null, p_error: a.resultado === 'enviado' ? null : a.error }).then(() => {}, () => {})
+  }
+  for (let i = 0; i < lote.length; i++) {
+    const e = lote[i]
+    const a = asientoWhatsApp(await mandar(e))
     await asentar(e.envio_id, a)
     if (a.resultado === 'retener') { for (const resto of lote.slice(i + 1)) await asentar(resto.envio_id, { resultado: 'retener', error: a.error }); break }
   }

@@ -8,7 +8,7 @@ import { confirmar } from '../../app/dialogos'
 
 type Form = { nombre: string | null; etiqueta: string; categoria: Categoria; texto: string; botones: string[] }
 const VACIO: Form = { nombre: null, etiqueta: '', categoria: 'MARKETING', texto: '', botones: [] }
-const legible = (texto: string) => texto.replace(/\{\{(cliente|vendedor|promocion|promocion_hasta|mensaje)\}\}/g, (_m, v: Variable) => `[${ETIQUETA_VARIABLE[v]}]`)
+const legible = (texto: string) => texto.replace(/\{\{(cliente|vendedor|promocion|promocion_hasta|mensaje|folio|total|envio|enlace)\}\}/g, (_m, v: Variable) => `[${ETIQUETA_VARIABLE[v]}]`)
 
 // Un solo cliente para toda la app: si se creara uno por render, cargar/sincronizar cambiarían en cada render y el panel
 // consultaría a Meta en bucle.

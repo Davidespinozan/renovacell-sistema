@@ -285,3 +285,9 @@ button.cifra-v{cursor:pointer}
 .crm-paso-form input{font:inherit;font-weight:400;padding:9px 10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);min-height:44px;box-sizing:border-box}
 .crm-paso-form small{font-weight:400;color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
 .crm-paso-dias{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* WHATSAPP A TODA LA CARTERA (15 nov 2026) */
+.escribir-wa{display:grid;gap:10px}
+.escribir-wa small{color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
+.llamar-wa{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:44px;min-height:44px;border-radius:var(--ds-r);border:1px solid var(--ds-border);color:var(--ds-brand-strong);cursor:pointer}
+.llamar-wa:hover{background:var(--ds-brand-soft)}

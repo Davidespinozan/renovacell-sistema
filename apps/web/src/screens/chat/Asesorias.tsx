@@ -6,7 +6,7 @@
 // abre si aparece en la cola autorizada que devuelve el servidor. "Atender ahora" usa el comando
 // canónico de inicio (Edge chat → cc_iniciar_asesoria, idempotente): nunca crea otra conversación, otro
 // handoff ni cambia la cartera.
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { capitalizarNombre } from '../../lib/nombres'
 import { avatarColor } from '../../lib/format'
@@ -32,6 +32,10 @@ import type { AccionChat } from './ChatCanonico'
 import { ShieldCheck, Link as LinkIco, KeyRound as Llave } from 'lucide-react'
 import { useIne, elegirIne } from '../../data/store/ineSeleccion'
 import { PanelVerificacion } from './PanelVerificacion'
+import { EscribirWhatsApp } from './EscribirWhatsApp'
+import { SelectorClienteVentas } from '../pos/SelectorCliente'
+import { BuscadorClientes } from '../../data/ops/buscarClientes'
+import { MessageCirclePlus } from 'lucide-react'
 import { BotonAvisos } from '../../app/BotonAvisos'
 import { Vacio, Cargando } from '../../app/EmptyState'
 import { usarFotoComoIne, pendienteDeConversacion } from '../../data/ops/verificacion'
@@ -50,6 +54,10 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   const [enfocar, setEnfocar] = useState(false)
   const [versionMis, setVersionMis] = useState(0)   // MIS CLIENTES · se relee al volver de una conversación
   const misClientes = useMisClientes(versionMis, cargarMis)
+  // WHATSAPP A TODA LA CARTERA · «Escribir a un cliente»: elige de su cartera, manda el mensaje aprobado y se abre su chat.
+  const [eligiendo, setEligiendo] = useState(false)
+  const [escribirA, setEscribirA] = useState<{ id: string; nombre: string } | null>(null)
+  const buscadorClientes = useRef<BuscadorClientes | null>(null)
   const intento = useIntento('asesorias')
   // CX-ENLACE · datos que dejó quien escribe por el enlace de contacto (el servidor decide si me corresponde verlos).
   const [contacto, setContacto] = useState<ContactoEnlace | null>(null)
@@ -242,12 +250,21 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
           <p>{esDireccion ? 'Todas las conversaciones con atención humana. Toca una para abrirla.' : 'Tus clientes y prospectos, el más reciente arriba. Toca uno para abrir su chat; si le escribes, lo retomas tú.'}</p>
         </div>
         <div className="ases-head-acc">
+          <button type="button" className="btn sm" onClick={() => { buscadorClientes.current ??= new BuscadorClientes(); setEligiendo(true) }} data-testid="escribir-cliente"><MessageCirclePlus size={15} aria-hidden /> Escribir a un cliente</button>
           <BotonAvisos className="btn ghost sm" />
           <EnlaceContactoBotones />
         </div>
       </div>
       {/* HERRAMIENTAS DEL VENDEDOR · buscar una palabra en todas sus conversaciones (no se acuerda de con quién habló) */}
       <BuscadorConversaciones onAbrir={abrir} />
+      {eligiendo && buscadorClientes.current && (
+        <SelectorClienteVentas buscador={buscadorClientes.current} onClose={() => setEligiendo(false)} onPick={(c) => { setEligiendo(false); if (c) setEscribirA({ id: c.id, nombre: c.name }) }} />
+      )}
+      <EscribirWhatsApp cliente={escribirA} onCerrar={() => setEscribirA(null)} onListo={(conv, ventana) => {
+        setEscribirA(null); setVersionMis((n) => n + 1)
+        setAviso(ventana ? 'Te escribió en las últimas 24 horas: escríbele normal aquí.' : 'Mensaje enviado por WhatsApp. Cuando conteste, sigue la plática aquí.')
+        setLlegada(conv); setEnfocar(true); setAbierta(conv)
+      }} />
       {aviso && <div className="rc-aviso-nav" role="status" data-testid="aviso-apertura">{aviso}</div>}
       {error && <div role="alert" style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--ds-danger-bg)', color: 'var(--ds-danger)', fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {cargando && <Cargando plano />}

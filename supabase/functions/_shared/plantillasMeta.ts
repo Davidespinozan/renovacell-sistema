@@ -3,10 +3,10 @@
 // (mandar a Meta, leer su estado). Dirección escribe con datos legibles ({{cliente}}, {{vendedor}}…); a Meta se le manda
 // con {{1}}, {{2}}… en ese orden, con un ejemplo de cada uno (Meta lo exige para revisarla).
 
-export const VARIABLES = ['cliente', 'vendedor', 'promocion', 'promocion_hasta', 'mensaje'] as const
+export const VARIABLES = ['cliente', 'vendedor', 'promocion', 'promocion_hasta', 'mensaje', 'folio', 'total', 'envio', 'enlace'] as const
 export type Variable = (typeof VARIABLES)[number]
-export const ETIQUETA_VARIABLE: Record<Variable, string> = { cliente: 'nombre del cliente', vendedor: 'nombre del vendedor', promocion: 'nombre de la promoción', promocion_hasta: 'fecha de fin de la promoción', mensaje: 'mensaje de la difusión' }
-export const EJEMPLO_VARIABLE: Record<Variable, string> = { cliente: 'Dra. López', vendedor: 'Roberto', promocion: 'Golden Placenta', promocion_hasta: '30 de noviembre', mensaje: '*Golden Placenta 5 ml* — Ya tenemos la nueva presentación; pida la suya con su vendedora. https://renovacell.mx' }
+export const ETIQUETA_VARIABLE: Record<Variable, string> = { cliente: 'nombre del cliente', vendedor: 'nombre del vendedor', promocion: 'nombre de la promoción', promocion_hasta: 'fecha de fin de la promoción', mensaje: 'mensaje de la difusión', folio: 'folio del pedido', total: 'total del pedido', envio: 'cómo va el envío', enlace: 'enlace personal' }
+export const EJEMPLO_VARIABLE: Record<Variable, string> = { cliente: 'Dra. López', vendedor: 'Roberto', promocion: 'Golden Placenta', promocion_hasta: '30 de noviembre', mensaje: '*Golden Placenta 5 ml* — Ya tenemos la nueva presentación; pida la suya con su vendedora. https://renovacell.mx', folio: 'S100234', total: '$4,500.00', envio: 'con DHL, guía 1234567890', enlace: 'https://sistema.renovacell.mx/invitacion#a1b2c3' }
 
 export type Categoria = 'MARKETING' | 'UTILITY'
 export interface Borrador { etiqueta: string; categoria: Categoria; texto: string; botones: string[] }

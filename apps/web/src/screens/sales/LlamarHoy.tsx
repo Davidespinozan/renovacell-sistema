@@ -2,7 +2,10 @@
 // portal), marca con un toque y anota el resultado; el sistema decide cuándo vuelve cada cliente. Dirección y el jefe de
 // ventas ven el avance de cada vendedora y pueden abrir la lista de cualquiera.
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Phone } from 'lucide-react'
+import { MessageCircle, Phone } from 'lucide-react'
+import { EscribirWhatsApp } from '../chat/EscribirWhatsApp'
+import { useRoleOpcional } from '../../auth/RoleContext'
+import { irAConversacion } from '../../data/store/navIntentStore'
 import { PageHead } from '../../app/PageHead'
 import { Vacio, Cargando, ErrorCarga } from '../../app/EmptyState'
 import { Hoja } from '../../app/Hoja'
@@ -26,6 +29,8 @@ export function LlamarHoy({ cliente: inyectado }: { cliente?: ReturnType<typeof 
   const [nota, setNota] = useState('')
   const [proxima, setProxima] = useState(masDias(1))
   const [guardando, setGuardando] = useState(false)
+  const [whats, setWhats] = useState<{ id: string; nombre: string } | null>(null)
+  const rol = useRoleOpcional()
 
   const cargar = useCallback(async () => {
     const [r, a] = await Promise.all([cliente.hoy(vendedor || null), cliente.resumen(7)])
@@ -93,6 +98,7 @@ export function LlamarHoy({ cliente: inyectado }: { cliente?: ReturnType<typeof 
                 <a className="llamar-tel" href={`tel:${telMarcable(p.telefono)}`} aria-label={`Llamar a ${p.nombre}`} onClick={() => setTimeout(() => abrir(p), 600)} data-testid="llamar-tel">
                   <Phone size={18} aria-hidden /><span>{p.telefono}</span>
                 </a>
+                <button type="button" className="llamar-wa" onClick={() => setWhats({ id: p.customer_id, nombre: p.nombre })} aria-label={`WhatsApp a ${p.nombre}`} title="Mandarle WhatsApp" data-testid="llamar-wa"><MessageCircle size={18} aria-hidden /></button>
               </li>
             ))}
           </ul>
@@ -111,6 +117,7 @@ export function LlamarHoy({ cliente: inyectado }: { cliente?: ReturnType<typeof 
               ))}
             </div>
             {resultado && <small className="llamar-que-pasa">{QUE_PASA[resultado]}</small>}
+            {resultado === 'no_contesto' && <button type="button" className="btn ghost sm" onClick={() => setWhats({ id: abierto.customer_id, nombre: abierto.nombre })} data-testid="llamar-wa-no-contesto"><MessageCircle size={14} aria-hidden /> Mandarle WhatsApp</button>}
             {resultado === 'llamar_despues' && (
               <label className="llamar-campo">¿Qué día le vuelves a llamar?
                 <input type="date" value={proxima} min={hoyLocal()} onChange={(e) => setProxima(e.target.value)} data-testid="llamar-fecha" />
@@ -122,6 +129,11 @@ export function LlamarHoy({ cliente: inyectado }: { cliente?: ReturnType<typeof 
           </div>
         )}
       </Hoja>
+      <EscribirWhatsApp cliente={whats} onCerrar={() => setWhats(null)} onListo={(conv, ventana) => {
+        setWhats(null)
+        toast(ventana ? 'Te escribió hace poco: escríbele normal en su conversación.' : 'Listo: le llegó por WhatsApp. Cuando conteste, te aparece en Conversaciones.')
+        if (ventana && rol) irAConversacion(rol.setScreen, conv, { origen: 'inicio' })
+      }} />
     </div>
   )
 }
