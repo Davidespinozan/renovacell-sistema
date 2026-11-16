@@ -14,6 +14,14 @@ const WABA_POR_DEFECTO = '1330521442003498'
 // deno-lint-ignore no-explicit-any
 type Meta = (ruta: string, init?: RequestInit) => Promise<{ ok: boolean; d: any }>
 
+async function iguales(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  const h = async (t: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))
+  const [x, y] = await Promise.all([h(a), h(b)])
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]
+  return d === 0
+}
+
 Deno.serve(conCors(async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'método no permitido' })
   const cfg = configWA((k) => Deno.env.get(k))
@@ -22,12 +30,18 @@ Deno.serve(conCors(async (req) => {
   if (!/^[0-9]{5,30}$/.test(waba)) return json(501, { error: 'no_configurado', message: 'Falta la cuenta de WhatsApp.' })
   const url = Deno.env.get('SUPABASE_URL')!; const anon = Deno.env.get('SUPABASE_ANON_KEY')!
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!esSesionDeUsuario(authHeader)) return json(401, { error: 'sin_sesion', message: 'Inicia sesión.' })
-  const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } })
-  const q = await resolverQuien(caller, admin)
-  if (!q.ok) return json(q.status, q.body)
-  if (q.quien.role !== 'admin') return json(403, { error: 'solo_direccion', message: 'Solo Dirección maneja las plantillas.' })
+  // La base también puede pedirlo (net.http_post con el secreto de las tareas, guardado en vault): así se mandan o
+  // sincronizan sin abrir la pantalla. Cualquier otro llamante necesita sesión de Dirección.
+  const secretoCron = (Deno.env.get('CORREOS_CRON_SECRET') ?? '').trim()
+  const deLaBase = secretoCron.length >= 32 && await iguales(req.headers.get('x-cron-secret') ?? '', secretoCron)
+  if (!deLaBase) {
+    const authHeader = req.headers.get('Authorization') ?? ''
+    if (!esSesionDeUsuario(authHeader)) return json(401, { error: 'sin_sesion', message: 'Inicia sesión.' })
+    const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } })
+    const q = await resolverQuien(caller, admin)
+    if (!q.ok) return json(q.status, q.body)
+    if (q.quien.role !== 'admin') return json(403, { error: 'solo_direccion', message: 'Solo Dirección maneja las plantillas.' })
+  }
 
   // deno-lint-ignore no-explicit-any
   let p: any
@@ -63,7 +77,7 @@ Deno.serve(conCors(async (req) => {
   if (p?.accion === 'sincronizar') {
     const s = await sincronizar(meta, admin, waba)
     if (s.error) return json(502, { error: 'meta', message: s.error })
-    return json(200, { ok: true, sincronizadas: s.n, estados: s.estados })
+    return json(200, { ok: true, sincronizadas: s.n, estados: s.estados, diferencias: s.diferencias, error: s.error })
   }
   return json(400, { error: 'accion', message: 'Acción desconocida.' })
 }))
@@ -72,20 +86,33 @@ Deno.serve(conCors(async (req) => {
 // deno-lint-ignore no-explicit-any
 async function sincronizar(meta: Meta, admin: any, waba: string) {
   const estados: Record<string, string> = {}
-  const r = await meta(`/${waba}/message_templates?fields=name,status,category,language,rejected_reason,id&limit=200`)
-  if (!r.ok) return { n: 0, estados, error: errorMeta(r.d?.error) }
-  const { data: nuestras } = await admin.from('cc_wa_plantillas').select('nombre, idioma')
+  const r = await meta(`/${waba}/message_templates?fields=name,status,category,language,rejected_reason,id,components&limit=200`)
+  if (!r.ok) return { n: 0, estados, diferencias: {} as Record<string, string>, error: errorMeta(r.d?.error) }
+  const { data: nuestras } = await admin.from('cc_wa_plantillas').select('nombre, idioma, cuerpo, variables, botones')
+  const diferencias: Record<string, string> = {}
   const ahora = new Date().toISOString(); let n = 0
-  for (const t of (nuestras ?? []) as Array<{ nombre: string; idioma: string }>) {
+  for (const t of (nuestras ?? []) as Array<{ nombre: string; idioma: string; cuerpo: string; variables: string[]; botones: string[] }>) {
     // deno-lint-ignore no-explicit-any
     const m = ((r.d?.data ?? []) as any[]).find((x) => x?.name === t.nombre && (x?.language ?? 'es_MX') === (t.idioma ?? 'es_MX'))
     if (!m) continue
     const estado = String(m.status ?? 'PENDING')
     estados[t.nombre] = estado
     const motivo = estado === 'REJECTED' && m.rejected_reason && m.rejected_reason !== 'NONE' ? String(m.rejected_reason) : null
-    await admin.from('cc_wa_plantillas').update({ estado_meta: estado, meta_id: m.id ?? null, motivo_meta: motivo, revisada_at: ahora, activa: estado === 'APPROVED',
+    // Lo aprobado en Meta manda: si alguien la dio de alta a mano en WhatsApp Manager, el sistema toma SU texto y botones.
+    // Si Meta pide otro número de datos que el sistema, no se enciende (los envíos fallarían) y se dice por qué.
+    // deno-lint-ignore no-explicit-any
+    const comps = (Array.isArray(m.components) ? m.components : []) as any[]
+    const cuerpoMeta = String(comps.find((c) => c?.type === 'BODY')?.text ?? '')
+    // deno-lint-ignore no-explicit-any
+    const botonesMeta = (comps.find((c) => c?.type === 'BUTTONS')?.buttons ?? []).map((b: any) => String(b?.text ?? '')).filter(Boolean)
+    const nMeta = new Set(cuerpoMeta.match(/\{\{\d+\}\}/g) ?? []).size
+    const cuadra = !cuerpoMeta || nMeta === (t.variables ?? []).length
+    if (cuerpoMeta && (cuerpoMeta !== t.cuerpo || JSON.stringify(botonesMeta) !== JSON.stringify(t.botones ?? []))) diferencias[t.nombre] = cuadra ? 'texto de Meta adoptado' : `Meta tiene ${nMeta} datos y el sistema ${(t.variables ?? []).length}`
+    await admin.from('cc_wa_plantillas').update({ estado_meta: estado, meta_id: m.id ?? null, revisada_at: ahora, activa: estado === 'APPROVED' && cuadra,
+      motivo_meta: cuadra ? motivo : `NO_COINCIDE: en Meta tiene ${nMeta} datos y el sistema espera ${(t.variables ?? []).length}`,
+      ...(cuadra && cuerpoMeta ? { cuerpo: cuerpoMeta, botones: botonesMeta } : {}),
       ...(m.category === 'MARKETING' || m.category === 'UTILITY' ? { categoria: m.category } : {}), updated_at: ahora }).eq('nombre', t.nombre)
     n++
   }
-  return { n, estados, error: null as string | null }
+  return { n, estados, diferencias, error: null as string | null }
 }
