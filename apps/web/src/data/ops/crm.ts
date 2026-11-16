@@ -15,6 +15,8 @@ export interface Oportunidad {
   id: string; etapa: Etapa; titulo: string | null; monto: number | null; origen: string; customer_id: string | null; conversation_id: string | null
   cliente: string; vendedor_id: string | null; vendedor: string | null; cotizacion_id: string | null; order_id: string | null; folio_pedido: string | null
   motivo_perdida: string | null; etapa_at: string; created_at: string; cerrada_at: string | null; dias_en_etapa: number
+  /** PRÓXIMO PASO (15 nov 2026) · qué sigue y qué día; quieta = paso vencido o 5+ días sin paso. */
+  proximo_paso?: string | null; proximo_at?: string | null; quieta?: boolean; paso_hoy?: boolean; folio_cotizacion?: string | null
 }
 export interface ResumenCrm {
   por_etapa: Partial<Record<Etapa, { n: number; monto: number }>>
@@ -35,6 +37,7 @@ export const crm = (rpc: Rpc = rpcPorDefecto) => ({
   crear: (customerId: string, titulo?: string, monto?: number | null) => llamar<Oportunidad>(rpc, 'crm_crear', { p_customer: customerId, p_titulo: titulo ?? null, p_monto: monto ?? null }),
   editar: (id: string, cambios: { titulo?: string; monto?: number | null; vendedor?: string | null }) => llamar<Oportunidad>(rpc, 'crm_editar', { p_id: id, p_titulo: cambios.titulo ?? null, p_monto: cambios.monto ?? null, p_vendedor: cambios.vendedor ?? null }),
   resumen: (dias = 30) => llamar<ResumenCrm>(rpc, 'crm_resumen', { p_dias: dias }),
+  paso: (id: string, texto: string | null, fecha: string | null) => llamar<Oportunidad>(rpc, 'crm_paso', { p_id: id, p_texto: texto, p_fecha: fecha }),
 })
 /** Totales por columna (lo abierto y lo cerrado del periodo que trae el embudo). */
 export function totalesPorEtapa(ops: Oportunidad[]): Record<Etapa, { n: number; monto: number }> {

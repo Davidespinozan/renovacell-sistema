@@ -270,3 +270,18 @@ button.cifra-v{cursor:pointer}
 
 /* FOTOS DE CLIENTES (15 nov 2026) · iniciales en color propio en la lista de conversaciones */
 .wa-av{color:var(--ds-on-ink);font-size:15px;letter-spacing:.03em}
+
+/* EMBUDO · PRÓXIMO PASO (15 nov 2026) */
+.crm-quietas{all:unset;cursor:pointer;padding:5px 10px;border-radius:var(--ds-r-pill);background:var(--ds-warning-bg);color:var(--ds-warning);font-size:var(--ds-fs-xs);font-weight:600}
+.crm-quietas.on{outline:2px solid var(--ds-warning)}
+.crm-tarjeta--quieta{border-color:var(--ds-warning) !important}
+.crm-tarjeta--hoy{border-color:var(--ds-brand) !important}
+.crm-paso{all:unset;box-sizing:border-box;display:block;width:100%;margin-top:6px;padding:5px 7px;border-radius:6px;background:var(--ds-surface-2);color:var(--ds-text-2);font-size:var(--ds-fs-xs);cursor:pointer;line-height:1.35}
+.crm-paso:hover{background:var(--ds-brand-soft)}
+.crm-paso--hoy{background:var(--ds-brand-soft);color:var(--ds-ink)}
+.crm-paso--quieta{background:var(--ds-warning-bg);color:var(--ds-warning)}
+.crm-paso-form{display:grid;gap:12px}
+.crm-paso-form label{display:grid;gap:4px;font-size:var(--ds-fs-sm);font-weight:600}
+.crm-paso-form input{font:inherit;font-weight:400;padding:9px 10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);min-height:44px;box-sizing:border-box}
+.crm-paso-form small{font-weight:400;color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
+.crm-paso-dias{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
