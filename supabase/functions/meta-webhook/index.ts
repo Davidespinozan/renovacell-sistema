@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
           if (arc) await guardarArchivoWA(admin, r.conversation_id, r.message_id, arc)
         }
         await avisarPush(admin, r.conversation_id, r.actor, m.texto)
-        if (IA_PUEDE(r.modo as never)) {
+        if (IA_PUEDE(r.modo as never) && !m.sinRespuesta) {   // a una reacción o un sticker suelto la IA no contesta
           // LIVE C1 · canal 'whatsapp': la IA opera con audiencia PÚBLICA aunque el número coincida con un doctor (la conversación
           // y su cartera siguen siendo del doctor para el asesor humano; la elevación solo existe con sesión en el portal).
           await mostrarEscribiendo(m.wamid)   // R4-C8 · el cliente ve "leído" y "escribiendo…" mientras la IA responde

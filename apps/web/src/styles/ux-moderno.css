@@ -316,3 +316,12 @@ button.cifra-v{cursor:pointer}
   .side-stryv,.side-stryv--link{padding:5px 8px;margin-top:0;font-size:11px}
   .rc-chat--embebido{height:calc(100vh - 112px);height:calc(100dvh - 112px);min-height:340px}
 }
+
+/* STICKERS DE WHATSAPP (17 nov 2026) · sin burbuja y chicos, como en WhatsApp */
+.rc-bubble--sticker{background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important}
+.rc-bubble--sticker .rc-img{max-width:140px;max-height:140px;object-fit:contain;border-radius:0}
+
+/* SCROLL DE CONVERSACIONES (17 nov 2026) · si el chat no cabe, al llegar al final de los mensajes la rueda sigue con la
+   página (antes se «atoraba»: el hilo no dejaba pasar el scroll y lo último quedaba fuera de la vista). */
+.rc-chat--embebido .rc-thread{overscroll-behavior-y:auto}
+.canvas:has(.rc-chat--embebido){padding-bottom:12px}

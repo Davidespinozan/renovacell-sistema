@@ -4,9 +4,9 @@
 
 export const TEXTO_IMAGEN = 'Envió una imagen.'
 // ALTA-DESDE-CONVERSACIÓN · la foto que llega por WhatsApp también queda guardada con su mensaje ("Envió una imagen por WhatsApp.").
-export const esMensajeConImagen = (content: unknown): boolean => typeof content === 'string' && (content === TEXTO_IMAGEN || content.startsWith('Envió una imagen por WhatsApp.'))
+export const esMensajeConImagen = (content: unknown): boolean => typeof content === 'string' && (content === TEXTO_IMAGEN || content.startsWith('Envió una imagen por WhatsApp.') || content.startsWith('Envió un sticker por WhatsApp.'))
 const MAX_BYTES_ADJUNTO = 3_000_000
-const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png' }
+const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
 /** Guarda en el bucket privado `chat` la imagen entrante de WhatsApp (ya descargada para la IA) y la registra con SU mensaje.
  *  Solo JPG/PNG de hasta 3 MB (lo que acepta cc_adjuntos); cualquier falla deja el mensaje como estaba. */
 // deno-lint-ignore no-explicit-any

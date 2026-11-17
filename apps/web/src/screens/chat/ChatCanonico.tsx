@@ -284,7 +284,20 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // Al final del hilo tras cada cambio (y de nuevo tras el layout/fuentes): el último elemento siempre visible.
   // CONV-WHATSAPP · se mueve SOLO el hilo (scrollIntoView movía también la página: "bajo y no se mueve orgánicamente").
   const hiloRef = useRef<HTMLDivElement | null>(null)
-  const alFinal = useCallback(() => { const el = hiloRef.current; if (el) el.scrollTop = el.scrollHeight }, [])
+  const pegadoAlFinal = useRef(true)   // el vendedor está viendo lo último (si subió a leer, no lo jalamos)
+  const alFinal = useCallback(() => { const el = hiloRef.current; if (el) { el.scrollTop = el.scrollHeight; pegadoAlFinal.current = true } }, [])
+  // SCROLL (17 nov 2026, dueño: «no puedo llegar hasta abajo de la conversación, se queda atorado») · una foto, sticker,
+  // audio o video termina de cargar DESPUÉS de bajar al final y empuja lo último fuera de la vista: si estaba abajo, se
+  // vuelve a bajar.
+  useEffect(() => {
+    const el = hiloRef.current
+    if (!el) return
+    const alMover = () => { pegadoAlFinal.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }
+    const alCargar = () => { if (pegadoAlFinal.current) el.scrollTop = el.scrollHeight }
+    el.addEventListener('scroll', alMover, { passive: true })
+    el.addEventListener('load', alCargar, true); el.addEventListener('loadedmetadata', alCargar, true)
+    return () => { el.removeEventListener('scroll', alMover); el.removeEventListener('load', alCargar, true); el.removeEventListener('loadedmetadata', alCargar, true) }
+  }, [cargando, convId])
   useEffect(() => {
     alFinal()
     const raf = requestAnimationFrame(alFinal); const t = window.setTimeout(alFinal, 180)
@@ -567,6 +580,25 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const [busq, setBusq] = useState<string | null>(null)
   const [busqIdx, setBusqIdx] = useState(0)
   const raiz = useRef<HTMLDivElement | null>(null)
+  // SCROLL · el chat embebido mide el espacio que de verdad le queda en la pantalla (debajo de pestañas, avisos o la barra de
+  // arriba) en vez de una altura fija: así el cuadro de escribir y el último mensaje nunca quedan fuera de la vista.
+  useLayoutEffect(() => {
+    if (!embebido || panel) return
+    const el = raiz.current
+    if (!el || typeof window === 'undefined') return
+    const ajustar = () => {
+      if (window.innerWidth < 901) { el.style.height = ''; return }   // en celular manda el CSS de siempre
+      const lienzo = el.closest('.canvas') as HTMLElement | null
+      const arriba = el.getBoundingClientRect().top + (lienzo?.scrollTop ?? 0) - (lienzo?.getBoundingClientRect().top ?? 0)
+      const visible = lienzo ? lienzo.clientHeight : window.innerHeight
+      const alto = Math.max(340, Math.floor(visible - arriba - 12))
+      el.style.height = `${alto}px`
+    }
+    ajustar()
+    window.addEventListener('resize', ajustar)
+    const t = window.setTimeout(ajustar, 250)
+    return () => { window.removeEventListener('resize', ajustar); window.clearTimeout(t) }
+  }, [embebido, panel, cargando])
   const hallados = useMemo(() => {
     const b = normalizar((busq ?? '').trim())
     return b.length < 2 ? [] : mensajes.filter((m) => !m.adjunto && m.actor !== 'system' && normalizar(m.content).includes(b)).map((m) => m.id)
@@ -642,9 +674,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
                 )}
             </div>
           ) : m.adjunto ? (
-            <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid="msg-imagen">
+            <div className={'rc-bubble rc-bubble--img' + (m.content.startsWith('Envió un sticker') ? ' rc-bubble--sticker' : '')} title={horaDe(m.created_at)} data-testid={m.content.startsWith('Envió un sticker') ? 'msg-sticker' : 'msg-imagen'}>
               {m.adjunto.url
-                ? <a href={m.adjunto.url} target="_blank" rel="noreferrer"><img className="rc-img" src={m.adjunto.url} alt="Imagen enviada en la conversación" loading="lazy" /></a>
+                ? <a href={m.adjunto.url} target="_blank" rel="noreferrer"><img className="rc-img" src={m.adjunto.url} alt={m.content.startsWith('Envió un sticker') ? 'Sticker' : 'Imagen enviada en la conversación'} loading="lazy" /></a>
                 : <span className="rc-img-nd">Imagen no disponible</span>}
               {m.adjunto.uso && <span className="rc-img-uso">Usada como {m.adjunto.uso === 'ine-front' ? 'INE frente' : 'INE reverso'}</span>}
               {accionesAdjunto?.(m)}

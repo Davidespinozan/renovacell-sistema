@@ -21,9 +21,9 @@ describe('parser: imagen y PDF con id y tipo', () => {
     const [m] = extraerWhatsApp(payload({ type: 'image', image: { id: '987654321', mime_type: 'image/jpeg', caption: 'quiero 3 de estas' } }))
     expect(m.media).toEqual({ id: '987654321', mime: 'image/jpeg', tipo: 'image' }); expect(m.texto).toBe('Envió una imagen por WhatsApp. «quiero 3 de estas»')
   })
-  it('PDF sí; Word, sticker, audio y texto no traen media', () => {
+  it('PDF sí; Word, audio y texto no traen media (el sticker sí, desde el 17 nov: ver waStickers.test)', () => {
     expect(extraerWhatsApp(payload({ type: 'document', document: { id: '123456', mime_type: 'application/pdf' } }))[0].media).toMatchObject({ tipo: 'document' })
-    for (const m of [{ type: 'document', document: { id: '123456', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } }, { type: 'sticker', sticker: { id: '123456', mime_type: 'image/webp' } }, { type: 'audio', audio: { id: '123456', mime_type: 'audio/ogg' } }, { type: 'text', text: { body: 'hola' } }])
+    for (const m of [{ type: 'document', document: { id: '123456', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } }, { type: 'audio', audio: { id: '123456', mime_type: 'audio/ogg' } }, { type: 'text', text: { body: 'hola' } }])
       expect(extraerWhatsApp(payload(m))[0].media).toBeUndefined()
   })
 })

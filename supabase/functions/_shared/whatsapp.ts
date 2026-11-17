@@ -5,12 +5,15 @@
 export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' }
 // NOTAS DE VOZ (15 nov 2026) · audio o video del cliente: se guarda en la conversación para que el equipo lo escuche/vea.
 export interface ArchivoWA { id: string; mime: string; tipo: 'audio' | 'video' }
-export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA; archivo?: ArchivoWA }
+export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA; archivo?: ArchivoWA
+  /** STICKERS (17 nov 2026) · reacción, sticker o algo que WhatsApp no entrega: se muestra, pero la IA no contesta a eso solo. */
+  sinRespuesta?: boolean }
 
 const ETIQUETA: Record<string, string> = {
   image: 'Envió una imagen por WhatsApp.', audio: 'Envió un audio por WhatsApp.', voice: 'Envió un audio por WhatsApp.',
   video: 'Envió un video por WhatsApp.', document: 'Envió un documento por WhatsApp.', sticker: 'Envió un sticker por WhatsApp.',
   location: 'Compartió una ubicación por WhatsApp.', contacts: 'Compartió un contacto por WhatsApp.',
+  unsupported: 'Mandó algo que WhatsApp no deja ver fuera del teléfono (una encuesta, una foto de una sola vista u otro). Pídele que lo mande de otra forma.',
 }
 
 export const MIME_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -40,15 +43,23 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
           const i = (m.interactive ?? {}) as Record<string, Record<string, unknown> | undefined>
           texto = String(i.button_reply?.title ?? i.list_reply?.title ?? '')
         }
+        else if (tipo === 'reaction') {
+          // Reacción a un mensaje (👍, ❤️…). Quitar la reacción llega con emoji vacío: no es un mensaje nuevo.
+          const emoji = String((m.reaction as Record<string, unknown>)?.emoji ?? '').trim()
+          if (!emoji) continue
+          texto = `Reaccionó con ${emoji}`
+        }
         const pie = String(((m as Record<string, Record<string, unknown>>)[tipo])?.caption ?? '').trim()
         if (!texto.trim()) texto = (ETIQUETA[tipo] ?? 'Envió un mensaje por WhatsApp.') + (pie ? ` «${pie}»` : '')
         const obj = (m as Record<string, Record<string, unknown>>)[tipo] ?? {}
         const mime = String(obj.mime_type ?? '').toLowerCase().split(';')[0].trim(); const mediaId = String(obj.id ?? '')
-        const media: MediaWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'image' && MIME_IMAGEN.includes(mime)) || (tipo === 'document' && mime === 'application/pdf'))
-          ? { id: mediaId, mime, tipo: tipo as 'image' | 'document' } : undefined
+        // El sticker es una imagen WEBP (a veces animada): se guarda y se ve como imagen.
+        const media: MediaWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'image' && MIME_IMAGEN.includes(mime)) || (tipo === 'sticker' && (mime === 'image/webp' || mime === '')) || (tipo === 'document' && mime === 'application/pdf'))
+          ? { id: mediaId, mime: tipo === 'sticker' ? 'image/webp' : mime, tipo: tipo === 'document' ? 'document' : 'image' } : undefined
         const archivo: ArchivoWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'audio' && MIME_AUDIO_WA.includes(mime)) || (tipo === 'video' && MIME_VIDEO_WA.includes(mime)))
           ? { id: mediaId, mime, tipo: tipo as 'audio' | 'video' } : undefined
-        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}), ...(archivo ? { archivo } : {}) })
+        const sinRespuesta = tipo === 'reaction' || tipo === 'sticker' || tipo === 'unsupported'
+        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}), ...(archivo ? { archivo } : {}), ...(sinRespuesta ? { sinRespuesta } : {}) })
       }
     }
   }
