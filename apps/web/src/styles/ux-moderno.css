@@ -391,3 +391,12 @@ button.cifra-v{cursor:pointer}
   .promo-acciones > *{white-space:nowrap}
   .promo-acciones > :last-child{flex:1 1 100%;justify-content:center}
 }
+@media (max-width:900px){
+  /* El título ya está arriba en la barra: no repetirlo dentro de la tarjeta */
+  .sgs-h h2,.pcl-t,.dif-h h2{display:none}
+  .sgs-h:has(> span:empty){display:none}
+  /* En tarjetas de tabla, un dato vacío («Autorizó —») no ocupa renglón */
+  td.sin-dato{display:none !important}
+  /* Fechas «del … al …» con espacio suficiente */
+  .canvas input[type=date]{min-width:0;flex:1 1 140px}
+}

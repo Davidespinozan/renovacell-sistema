@@ -157,7 +157,7 @@ export function Despacho() {
                     <td data-label="Pedido" className="mono">{o?.external_ref ?? s.order_id}</td>
                     <td data-label="Chofer">{driverName(s.driver_id)}</td>
                     <td data-label="Estado"><span className={'pill ' + (confirmada ? 'p-blue' : 'p-warn')}>{confirmada ? 'En reparto' : 'Esperando confirmación'}</span></td>
-                    <td data-label="Autorizó">{s.dispatched_by ?? '—'}{s.dispatched_at ? ` · ${fmtDate(s.dispatched_at)}` : ''}</td>
+                    <td data-label="Autorizó" className={s.dispatched_by ? undefined : 'sin-dato'}>{s.dispatched_by ?? '—'}{s.dispatched_at ? ` · ${fmtDate(s.dispatched_at)}` : ''}</td>
                   </tr>
                 )
               })}
