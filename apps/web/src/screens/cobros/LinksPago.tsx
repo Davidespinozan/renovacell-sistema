@@ -8,6 +8,7 @@ import { useRoleOpcional } from '../../auth/RoleContext'
 import { money } from '../../lib/format'
 import { capitalizarNombre } from '../../lib/nombres'
 import { Vacio } from '../../app/EmptyState'
+import { useAllOrders } from '../../data/hooks/useOrders'
 
 const ETIQUETA: Record<LinkPago['estado'], string> = { solicitado: 'Por enviar', enviado: 'Enviado · esperando pago', pagado: 'Pagado', cancelado: 'Cancelado' }
 const VIA: Record<LinkPago['via'], string> = { portal: 'lo pidió en el portal', whatsapp: 'lo pidió por WhatsApp', personal: 'lo pidió su vendedor' }
@@ -22,6 +23,20 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
   useEffect(() => { void cargar() }, [cargar])
   const activos = (lista ?? []).filter((l) => l.estado === 'solicitado' || l.estado === 'enviado')
   const cerrados = (lista ?? []).filter((l) => l.estado === 'pagado' || l.estado === 'cancelado')
+  // AUDITORÍA VENTAS (19 nov 2026) · la vendedora pide el link por su cliente (antes solo lo podía pedir el doctor desde su
+  // portal, y casi ningún cliente tiene portal). Pedidos vivos sin pagar que aún no tienen un link activo.
+  const { data: pedidos } = useAllOrders()
+  const conLink = new Set(activos.map((l) => l.order_id))
+  const porCobrar = pedidos.filter((o) => o.status !== 'cancelled' && o.status !== 'draft' && o.payment_status !== 'paid' && o.payment_status !== 'refunded'
+    && (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos' && !conLink.has(o.id) && (o.total ?? 0) > 0)
+  const [pidiendo, setPidiendo] = useState<string | null>(null)
+  const pedir = async (id: string, folio: string) => {
+    setPidiendo(id); setError(null)
+    const r = await cliente.solicitar(id)
+    setPidiendo(null)
+    if (r.ok) setAviso(`Link solicitado para ${folio}. Sácalo en la app de BanBajío por el monto exacto y pégalo abajo.`); else setError(r.error ?? 'No se pudo pedir el link.')
+    void cargar()
+  }
   const hecho = async (p: Promise<{ ok: boolean; error?: string }>, ok: string) => { const r = await p; if (r.ok) setAviso(ok); else setError(r.error ?? 'No se pudo.'); void cargar() }
 
   return (
@@ -30,6 +45,15 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
       <p className="sgs-sub">Cuando un cliente quiere pagar con tarjeta: saca el link en la app de BanBajío por el <b>monto exacto</b> y pégalo aquí. Se lo mandamos por su WhatsApp, por correo y queda en su pedido.{cobra ? ' Al ver el cobro en el banco, márcalo pagado.' : ' Dirección lo marca pagado al ver el cobro en el banco.'}</p>
       {error && <div className="pce-error" role="alert">{error}</div>}
       {aviso && <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)' }}>{aviso}</div>}
+      {porCobrar.length > 0 && (
+        <section className="sgs-grupo" data-testid="links-pedir"><h3>Pedidos sin pagar <small>({porCobrar.length})</small></h3>
+          <ul>{porCobrar.slice(0, 30).map((o) => (
+            <li key={o.id} className="sgs-item">
+              <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'}</b><span>{money(o.total ?? 0)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
+              <button type="button" className="btn sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
+            </li>))}</ul>
+        </section>
+      )}
       {lista && activos.length === 0 && <Vacio plano icono="receipt" titulo="No hay links pendientes." pista="Cuando un cliente pida pagar con tarjeta, te llega un aviso y aparece aquí." />}
       {activos.length > 0 && <ul>{activos.map((l) => <Fila key={l.id} l={l} cobra={cobra} cliente={cliente} hecho={hecho} />)}</ul>}
       {cerrados.length > 0 && (
