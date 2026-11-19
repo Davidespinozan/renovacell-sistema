@@ -3,7 +3,7 @@
 // y descuenta inventario por lote (FEFO de Almacén, reutilizada).
 import { Vacio } from '../../app/EmptyState'
 import { BarraVenta } from './BarraVenta'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
 import { hasSupabase, supabase } from '../../lib/supabase'
@@ -16,7 +16,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useCustomers, useCustomerSearch } from '../../data/hooks/useCustomers'
 import { useCustodies, useCustodyStock } from '../../data/hooks/useCustody'
-import { saldoPorProducto, custodiaAbiertaDe } from '../../data/store/custodyStore'
+import { saldoPorProducto, custodiaAbiertaDe, subscribeDisponible, getDisponibleSnapshot, disponiblePorProducto } from '../../data/store/custodyStore'
 import { currentUserId } from '../../lib/supabase'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
@@ -71,6 +71,7 @@ export function Caja() {
   // Contexto de venta: mostrador (null) o una custodia propia. En custodia la venta
   // descuenta el saldo del tenedor; de mostrador, la disponibilidad del almacén.
   const [custodyId, setCustodyId] = useState<string | null>(null)
+  const disponible = useSyncExternalStore(subscribeDisponible, getDisponibleSnapshot, getDisponibleSnapshot)
   // Solo productos activos y con precio (no se vende lo oculto).
   const sellable = useMemo(() => products.filter((p) => p.price != null && isActiveProduct(p) && p.sellable !== false), [products])
   // W2-C · De qué se vende:
@@ -85,8 +86,18 @@ export function Caja() {
       })
       return m
     }
-    return stockByProduct(lots)
-  }, [custodyId, custodyStock, lots])
+    // AUDITORÍA (19 nov 2026) · de mostrador se puede vender lo DISPONIBLE (lo que está en custodia de una vendedora no):
+    // antes se mostraba todo el lote y al cobrar fallaba con «verifica existencias».
+    const base = stockByProduct(lots)
+    if (!disponible.length) return base
+    const disp = disponiblePorProducto(disponible)
+    const m: Record<string, StockInfo> = {}
+    Object.entries(base).forEach(([pid, info]) => {
+      const q = Math.min(info.qty, disp[pid] ?? 0)
+      m[pid] = info.tracked ? { ...info, qty: q, status: q <= 0 ? 'out' : q <= LOW_STOCK ? 'low' : 'ok' } : info
+    })
+    return m
+  }, [custodyId, custodyStock, lots, disponible])
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
   const [buscar, setBuscar] = useState('')
   // Buscador: por nombre, categoría o SKU (útil en un evento con fila; también sirve para

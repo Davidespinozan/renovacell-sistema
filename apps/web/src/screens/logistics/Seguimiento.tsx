@@ -51,7 +51,9 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
     doctors.forEach((d) => { const o = (d.meta as Record<string, unknown>)?.owner as string; if (o) m[d.id] = o })
     return m
   }, [doctors])
-  const inCartera = (o: OrderWithItems) => role !== 'pos' || (o.doctor_id != null && ownerByDoctor[o.doctor_id] === user?.email)
+  // AUDITORÍA (19 nov 2026) · la base ya le entrega al vendedor SOLO los pedidos de su cartera (RLS); el filtro por
+  // doctor.meta.owner dejaba la lista siempre vacía (los pedidos son de cliente, sin doctor). Se conserva la firma.
+  const inCartera = (o: OrderWithItems) => role !== 'pos' || !!o || !!ownerByDoctor
 
   const incidents = useMemo(
     () => shipments

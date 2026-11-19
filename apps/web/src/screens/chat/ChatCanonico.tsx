@@ -312,11 +312,14 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   // Leadsales): el redactor se apaga.
   const canal = asesor ? canalDe(conv) : null
   const waEspejo = !!canal && canal.modo === 'espejo'
+  // AUDITORÍA (19 nov 2026) · con la ventana de 24 h CERRADA, Meta no entrega texto libre: antes se podía escribir, salía
+  // con palomitas de «Entregado» y al cliente nunca le llegaba. Ahora el cuadro se apaga y queda «Retomar por WhatsApp».
+  const ventanaCerrada = !!canal && canal.modo === 'activo' && !canal.ventana_abierta
   // CONV-WHATSAPP · como en WhatsApp, el personal ESCRIBE y ya: su vendedor responsable (rol 'responsable', la atiende el
   // asistente o terminó la asesoría) retoma al mandar; con la asesoría asignada a mí, mandar la inicia. El servidor decide.
   const soyResponsable = asesor && conv?.rol === 'responsable'
   const iniciaAlEscribir = soyAsesor && modo === 'human_assigned' && !!conv?.asesor_soy_yo
-  const puedoEscribir = !!conv && !cerrada && !waEspejo && !bloqueoEscritura
+  const puedoEscribir = !!conv && !cerrada && !waEspejo && !ventanaCerrada && !bloqueoEscritura
     && (soyResponsable || iniciaAlEscribir || (soyAsesor ? modo === 'human_active' || conv.rol === 'supervisor' : true))
   const nombreAsesor = conv?.asesor_nombre?.trim() || null
   const nombreVisible = capitalizarNombre(nombreCliente) || capitalizarNombre(conv?.contacto?.nombre ?? null) || null
@@ -855,7 +858,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
         : !canal.ventana_abierta
           ? <div className="rc-wa-aviso rc-wa-aviso--cerrada" role="status" data-testid="wa-ventana">
               {canal.canal === 'whatsapp'
-                ? <>Escribió por WhatsApp hace más de 24 horas: Meta solo deja mandarle un mensaje aprobado (plantilla). Cuando conteste, sigue la plática aquí.</>
+                ? <>Escribió por WhatsApp hace más de 24 horas: <b>lo que escribas no le llegaría</b>. Mándale un mensaje aprobado con «Retomar por WhatsApp»; cuando conteste, sigue la plática aquí.{canal.fallidos > 0 && <><br /><b data-testid="wa-no-entregados">{canal.fallidos === 1 ? '1 mensaje tuyo no se entregó' : `${canal.fallidos} mensajes tuyos no se entregaron`}</b> por esta regla: vuelve a decírselo cuando conteste.</>}</>
                 : <>Escribió por {NOMBRE_CANAL[canal.canal]} hace más de 24 horas: lo que escribas queda aquí pero no le llega por {NOMBRE_CANAL[canal.canal]} hasta que vuelva a escribir (regla de Meta).</>}
               {/* WA-PLANTILLAS (3 nov 2026) · retomarlo con una plantilla aprobada, llamarle o abrir su WhatsApp. */}
               {canal.canal === 'whatsapp' && asesor && convId && <RetomarWhatsApp conversationId={convId} waId={canal.id} nombreCliente={nombreCliente} onEnviada={() => void cargar(convId, 0)} />}
@@ -920,7 +923,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ref={area} className="rc-input" aria-label="Escribe tu mensaje" value={texto} rows={1} maxLength={4000}
           onChange={(e) => { setTexto(e.target.value); autoAlto(e.target); avisarEscribiendo(e.target.value) }} onKeyDown={alTeclear}
           disabled={!escribible || enviando || !!pendiente?.error}
-          placeholder={aOtroCanal ? `Escribe por ${NOMBRE_CANAL_PERSONA[persona!.conversaciones.find((c) => c.conversation_id === destinoEfectivo)?.canal ?? 'portal']}…` : cerrada ? 'La conversación está cerrada' : bloqueoEscritura ? bloqueoEscritura : soyResponsable ? 'Escribe para retomar la conversación…' : iniciaAlEscribir ? 'Escribe para iniciar la asesoría…' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
+          placeholder={aOtroCanal ? `Escribe por ${NOMBRE_CANAL_PERSONA[persona!.conversaciones.find((c) => c.conversation_id === destinoEfectivo)?.canal ?? 'portal']}…` : cerrada ? 'La conversación está cerrada' : ventanaCerrada ? (canal?.canal === 'whatsapp' ? 'Más de 24 h sin que escriba: usa «Retomar por WhatsApp» arriba' : 'Más de 24 h sin que escriba: no le llegaría') : bloqueoEscritura ? bloqueoEscritura : soyResponsable ? 'Escribe para retomar la conversación…' : iniciaAlEscribir ? 'Escribe para iniciar la asesoría…' : soyAsesor && modo !== 'human_active' && conv?.rol !== 'supervisor' ? 'Inicia la asesoría para escribir' : 'Escribe tu mensaje…'}
           enterKeyHint="send" autoComplete="off" autoCapitalize="sentences" inputMode="text"
         />
         <button type="submit" className="rc-send" disabled={!escribible || enviando || !texto.trim() || !!pendiente?.error} aria-label={enviando ? 'Enviando' : 'Enviar'} title="Enviar" data-testid="btn-enviar"><Send size={18} /></button>

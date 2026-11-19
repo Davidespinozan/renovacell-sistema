@@ -31,7 +31,7 @@ vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [{ 
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useDoctors', () => ({ useDoctors: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useCustody', () => ({ useCustodies: () => ({ data: [] }), useCustodyStock: () => ({ data: [] }) }))
-vi.mock('../../data/store/custodyStore', () => ({ saldoPorProducto: () => ({}), custodiaAbiertaDe: () => null }))
+vi.mock('../../data/store/custodyStore', () => { const vacio: never[] = []; return { saldoPorProducto: () => ({}), custodiaAbiertaDe: () => null, subscribeDisponible: () => () => {}, getDisponibleSnapshot: () => vacio, disponiblePorProducto: () => ({}) } })
 vi.mock('../../data/hooks/useVolumePrices', () => ({ useVolumePrices: () => ({ data: [] }) }))
 vi.mock('../../data/ops/stock', () => ({ LOW_STOCK: 5, stockByProduct: () => ({}), stockInfoFor: () => ({ tracked: true, qty: 10, status: 'ok' }) }))
 vi.mock('../../data/ops/pos', () => ({

@@ -57,7 +57,7 @@ function allocateDesdeCustodia(productId: string, qty: number, lots: Lot[], cust
 // Identidad ESTABLE de una venta (W1): order_id = op_id de vender_pos. La caja la conserva
 // mientras la misma venta se reintenta (respuesta ambigua) y la renueva al confirmar.
 export interface PosOp { orderId: string; folio: string }
-export const newPosOp = (): PosOp => ({ orderId: newOpId(), folio: `POS-${Date.now().toString().slice(-6)}` })
+export const newPosOp = (): PosOp => ({ orderId: newOpId(), folio: `POS-${Date.now().toString(36).toUpperCase().slice(-6)}${Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0')}` })
 
 // opts: cliente (doctor) y vendedor OPCIONALES. Sin cliente = venta de mostrador
 // (público general). El folio, el pago inmediato y la baja de inventario no cambian.

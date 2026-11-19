@@ -246,6 +246,7 @@ Deno.serve(conCors(async (req) => {
       await admin.rpc('cc_enlace_auto_asesor', { p_conv: conv, p_visitor_hash: hash }).then(() => {}, () => {})
     }
     enSegundoPlano(avisarPush(admin, conv, actor.actor, TEXTO_IMAGEN))
+    if (actor.actor === 'seller' || actor.actor === 'admin') enSegundoPlano(Promise.all([despacharWhatsApp(admin), despacharMeta(admin)]))   // AUDITORÍA · la foto sale ya, no al minuto
     return json(200, { ...r, ia: 'omitida' })
   }
   // ── CHAT-ARCHIVOS · videos y documentos (hasta 50 MB). Dos pasos para no pasar el archivo por aquí:

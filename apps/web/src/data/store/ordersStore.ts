@@ -413,7 +413,7 @@ export function createPosOrder(input: {
   const invoiceReq = input.invoice_requested ?? false
   const invoiceMeta = input.invoice_meta ?? null
   const id = input.id ?? (hasSupabase ? uuid() : `pos-${Math.floor(Math.random() * 1e6)}`)
-  const folio = input.folio ?? `POS-${Date.now().toString().slice(-6)}`
+  const folio = input.folio ?? `POS-${Date.now().toString(36).toUpperCase().slice(-6)}${Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0')}`
   const now = new Date().toISOString()
   const shipping_meta = posShippingMeta(input)
 
