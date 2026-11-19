@@ -328,7 +328,7 @@ button.cifra-v{cursor:pointer}
 
 /* RESPONDER A UN MENSAJE (19 nov 2026) · cita dentro del mensaje, aviso arriba del cuadro, botón al pasar el mouse y
    deslizar con el dedo (pan-y: el dedo sigue desplazando la lista hacia arriba y abajo). */
-.rc-msg{touch-action:pan-y}
+.rc-msg{touch-action:pan-y pinch-zoom}
 .rc-bubble-wrap{position:relative}
 .rc-cita{all:unset;box-sizing:border-box;display:grid;gap:1px;width:100%;margin:2px 0 4px;padding:6px 9px;border-left:4px solid var(--ds-brand);border-radius:6px;background:var(--ds-surface-2);cursor:pointer;font-size:var(--ds-fs-xs);line-height:1.35}
 .rc-cita b{color:var(--ds-brand-strong);font-weight:600}

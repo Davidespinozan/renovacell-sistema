@@ -104,7 +104,7 @@ export function Entradas() {
                   <td data-label=""><button className="btn sm" type="button" onClick={() => setReceiving(o)} data-testid="btn-recibir"><Icon name="check" /> Recibir mercancía</button></td>
                 </tr>
               ))}
-              {pendientes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>No hay compras pendientes de recibir. Si llegó mercancía sin compra registrada, regístrala abajo en «Entradas sin compra», o carga todo de una vez en «Cargar inventario (Excel)».</td></tr>}
+              {pendientes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>No hay compras pendientes de recibir. Si llegó mercancía sin compra registrada, regístrala abajo en «Entradas sin compra», o carga todo de una vez en «Cargar inventario (CSV)».</td></tr>}
             </tbody>
           </table>
         </div>
@@ -226,7 +226,7 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
         <Icon name="shield" />
         <div>
           <div className="eyebrow" style={{ margin: 0 }}>Entradas sin compra</div>
-          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '4px 0 0' }}>Producto que entra <b>sin una compra registrada</b>: mercancía que llegó, inventario encontrado, muestra o corrección. Siempre con motivo (queda registrado quién y por qué). Para cargar mucho de una vez: «Cargar inventario (Excel)».</p>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '4px 0 0' }}>Producto que entra <b>sin una compra registrada</b>: mercancía que llegó, inventario encontrado, muestra o corrección. Siempre con motivo (queda registrado quién y por qué). Para cargar mucho de una vez: «Cargar inventario (CSV)».</p>
         </div>
         <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} data-testid="btn-excepcional">
           {abierto ? 'Ocultar' : 'Registrar entrada excepcional'}

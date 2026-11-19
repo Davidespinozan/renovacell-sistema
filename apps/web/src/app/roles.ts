@@ -100,7 +100,7 @@ export const ROLES: RoleDef[] = [
       { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Inventario' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
-      { key: 'carga_inventario', label: 'Cargar inventario (Excel)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
+      { key: 'carga_inventario', label: 'Cargar inventario (CSV)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
       { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
       { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Compras y entradas' },
       // UX MODERNO · Fase 3 (15 nov 2026, auditoría: "un pedido se trabaja en seis menús"): UNA entrada "Pedidos" con

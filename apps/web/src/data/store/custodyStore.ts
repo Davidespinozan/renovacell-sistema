@@ -48,6 +48,8 @@ export const subscribeCustodyLines = linesLive.subscribe
 export const getCustodyLinesSnapshot = linesLive.getSnapshot
 
 export const subscribeDisponible = dispLive.subscribe
+/** REVISIÓN 19 nov · se recarga junto con el inventario (al volver a la pestaña o tras cargar mercancía). */
+export const reloadDisponible = (): Promise<void> => dispLive.reload()
 export const getDisponibleSnapshot = dispLive.getSnapshot
 export const disponibleReady = dispLive.ready
 

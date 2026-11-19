@@ -11,6 +11,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, etiquetaCaducidad } from './expiry'
 import { MermaModal } from './MermaModal'
 import { AjusteModal } from './AjusteModal'
+import { useRoleOpcional } from '../../auth/RoleContext'
 import { CorregirLoteModal, type LoteACorregir } from './CorregirLoteModal'
 import type { Lot, ProductSafe } from '../../data/types'
 
@@ -80,6 +81,8 @@ export function Existencias() {
 }
 
 function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void; onAjuste: (l: MermaLot) => void; onCorregir: (l: LoteACorregir) => void }) {
+  const rol = useRoleOpcional()?.role
+  const puedeCorregir = rol === 'admin' || rol === 'warehouse'
   // Existencia FÍSICA = todo el inventario (incl. caducado, que sigue existiendo/trazable).
   // DISPONIBLE PARA VENTA = no caducado (misma semántica autoritativa que product_stock).
   const fisica = lots.reduce((s, l) => s + l.quantity, 0)
@@ -126,8 +129,8 @@ function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { produc
               <span className="inv-acc">
                 <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)"
                   onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="edit" /> Ajustar</button>
-                <button className="btn ghost sm" type="button" title="Corregir caducidad o código de lote mal capturado" data-testid="btn-corregir-lote"
-                  onClick={() => onCorregir({ id: l.id, lot_code: l.lot_code, expiry_date: l.expiry_date, producto: product.name })}><Icon name="clock" /> Corregir</button>
+                {puedeCorregir && <button className="btn ghost sm" type="button" title="Corregir caducidad o código de lote mal capturado" data-testid="btn-corregir-lote"
+                  onClick={() => onCorregir({ id: l.id, lot_code: l.lot_code, expiry_date: l.expiry_date, producto: product.name })}><Icon name="clock" /> Corregir</button>}
                 {l.quantity > 0 && (
                   <button className="btn ghost sm inv-merma" type="button" title="Dar de baja por merma (parcial o total)"
                     onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="trash" /> Merma</button>

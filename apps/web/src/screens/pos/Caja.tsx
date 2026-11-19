@@ -93,7 +93,7 @@ export function Caja() {
     const disp = disponiblePorProducto(disponible)
     const m: Record<string, StockInfo> = {}
     Object.entries(base).forEach(([pid, info]) => {
-      const q = Math.min(info.qty, disp[pid] ?? 0)
+      const q = pid in disp ? Math.min(info.qty, disp[pid]) : info.qty   // REVISIÓN · disponibilidad aún sin ese producto (recién cargado): manda el lote
       m[pid] = info.tracked ? { ...info, qty: q, status: q <= 0 ? 'out' : q <= LOW_STOCK ? 'low' : 'ok' } : info
     })
     return m

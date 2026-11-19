@@ -203,6 +203,7 @@ export function Importar({ solo }: { solo?: Tipo } = {}) {
         archivo sin miedo: <b>no duplica</b> lo que ya existe.
       </PageHead>
 
+      {solo === 'inventario' && <div className="pc-nota" data-testid="importar-csv-ayuda">¿Lo tienes en Excel? Ábrelo y usa <b>Archivo → Guardar como → CSV (delimitado por comas)</b>; sube ese archivo aquí. Columnas: SKU, lote, caducidad, cantidad.</div>}
       <div className="fchips">
         {DEFS.filter((d) => !solo || d.tipo === solo).map((d) => (
           <button key={d.tipo} type="button" className={'fchip' + (tipo === d.tipo ? ' on' : '')} onClick={() => cambiarTipo(d.tipo)}>

@@ -274,7 +274,7 @@ export function MisEntregas() {
                 {/* AUDITORÍA CHOFER · antes de tocar la puerta: ¿está pagado o hay que cobrar? */}
                 <div className={'parada-pago ' + (order.payment_status === 'paid' ? 'parada-pago--ok' : 'parada-pago--cobrar')} data-testid="parada-pago">
                   {order.payment_status === 'paid' ? 'Pagado · solo entregar'
-                    : order.payment_status === 'parcial' ? 'Pago incompleto · avisa a Dirección antes de entregar'
+                    : order.payment_status === 'parcial' ? 'Pago incompleto · cobra el saldo abajo al entregar'
                     : `Por cobrar${order.total != null ? ` · ${money(order.total)}` : ''} · regístralo abajo al entregar`}
                 </div>
                 <div className="parada-botones">

@@ -79,6 +79,9 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
     return inFlight
       .map((o): Row => {
         const shipment = envioVigente(shipments, o.id)
+        // REVISIÓN 19 nov · la vendedora ve el pedido pero no su envío (permisos): sin envío legible no se inventa
+        // «sin asignar · N días detenido»; se muestra el estado del pedido.
+        if (role === 'pos' && !shipment && o.status !== 'delivered') return { order: o, shipment, stuck: false, reason: '', statusLabel: o.status === 'shipped' ? 'En camino' : 'Preparando envío', statusPill: 'p-neu' }
         return { order: o, shipment, ...diagnoseShipment(o, shipment) }
       })
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || (a.order.created_at < b.order.created_at ? 1 : -1))

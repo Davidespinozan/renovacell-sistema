@@ -24,6 +24,7 @@ export function refrescarDatos(): void {
     void reloadMoney()
     reloadShipments()
     reloadInventory()
+    void import('./custodyStore').then((m) => m.reloadDisponible()).catch(() => {})
   }, ESPERA_MS)
 }
 
