@@ -82,7 +82,7 @@ describe('CARTERA-P1 · Mi cartera (vigente)', () => {
     render(<CustomerDirectory title="Clientes" scope="all" carteraToggle clienteCartera={f.c} />)
     fireEvent.click(screen.getByTestId('vista-cartera'))
     await waitFor(() => expect(filas()).toHaveLength(1))
-    fireEvent.change(screen.getByPlaceholderText(/Filtrar mi cartera/), { target: { value: 'zzz' } })
+    fireEvent.change(screen.getByPlaceholderText(/Buscar en mi cartera/), { target: { value: 'zzz' } })
     expect(filas()).toHaveLength(0); expect(screen.getByText(/Ninguno coincide/)).toBeInTheDocument()
   })
 })

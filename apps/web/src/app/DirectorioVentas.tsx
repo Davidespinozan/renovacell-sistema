@@ -171,7 +171,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
           <div style={{ display: 'flex', gap: 8 }}>
             <label className="searchbox op-search">
               <Search aria-hidden />
-              <input value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Filtrar mi cartera" placeholder="Filtrar mi cartera por nombre…" />
+              <input value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Filtrar mi cartera" placeholder="Buscar en mi cartera…" />
             </label>
             <button className="btn ghost" type="button" onClick={() => void cargarCartera()} disabled={miCartera.fase === 'cargando'} data-testid="cartera-refrescar">Actualizar</button>
           </div>

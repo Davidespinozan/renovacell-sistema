@@ -367,3 +367,27 @@ button.cifra-v{cursor:pointer}
 .corregir-lote input{font:inherit;font-weight:400;min-height:44px;padding:8px 10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);box-sizing:border-box}
 .corregir-lote small{color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
 .corregir-lote-aviso{color:var(--ds-warning) !important;font-weight:600}
+
+/* PULIDO CELULAR (19 nov 2026) ─────────────────────────────────────────────────────────────────────── */
+/* Recordatorio de avisos: una franja, no un cuarto de pantalla */
+@media (max-width:900px){
+  .rc-recordatorio{padding:8px 10px !important;gap:8px !important;font-size:12.5px;line-height:1.35}
+  .rc-recordatorio .btn{min-height:36px;padding:4px 10px}
+}
+/* Atajos del Inicio: la palabra no se parte («Conversacio-nes») */
+.rh-quick--movil .rh-tile-t{hyphens:manual !important;overflow-wrap:normal !important;word-break:normal}
+/* Conversaciones en celular: sin el hueco en blanco ni el buscador diminuto */
+@media (max-width:900px){
+  [data-testid=asesorias] .ases-head-txt{display:none}
+  [data-testid=asesorias] .ases-head{margin-bottom:8px}
+  .bm-caja .searchbox{max-width:none !important;width:100% !important;box-sizing:border-box}
+}
+@media (max-width:900px){
+  /* Buscadores dentro de las pantallas: a todo lo ancho (antes se cortaban: «Buscar producto, SI…») */
+  .canvas .searchbox{max-width:none !important;box-sizing:border-box}
+  .canvas .searchbox:not(.top .searchbox){width:100%}
+  /* Promociones: los tres botones en una fila que se acomoda; la acción principal a todo lo ancho */
+  .promo-acciones{flex-wrap:wrap;margin-left:0 !important;width:100%}
+  .promo-acciones > *{white-space:nowrap}
+  .promo-acciones > :last-child{flex:1 1 100%;justify-content:center}
+}

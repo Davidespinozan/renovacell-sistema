@@ -215,7 +215,7 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
     })
     setBusy(false)
     if (!r.ok) { onAviso(false, r.error ?? 'No se pudo registrar la entrada excepcional.'); return }
-    onAviso(true, `Entrada excepcional registrada: ${lotCode.trim()} (+${qty} pzas)`)
+    onAviso(true, `Entrada sin compra registrada: ${lotCode.trim()} (+${qty} pzas)`)
     renew()
     setLotCode(''); setExpiry(''); setQty(''); setCost('')
   }
@@ -229,7 +229,7 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
           <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '4px 0 0' }}>Producto que entra <b>sin una compra registrada</b>: mercancía que llegó, inventario encontrado, muestra o corrección. Siempre con motivo (queda registrado quién y por qué). Para cargar mucho de una vez: «Cargar inventario (CSV)».</p>
         </div>
         <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} data-testid="btn-excepcional">
-          {abierto ? 'Ocultar' : 'Registrar entrada excepcional'}
+          {abierto ? 'Ocultar' : 'Registrar entrada sin compra'}
         </button>
       </div>
       {abierto && (
@@ -269,7 +269,7 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
             </div>
           )}
           <button className="btn" type="button" style={{ marginTop: 18, width: '100%', opacity: valid && !busy ? 1 : 0.5, cursor: valid && !busy ? 'pointer' : 'not-allowed' }} onClick={submit} disabled={!valid || busy}>
-            <Icon name="download" /> {busy ? 'Registrando…' : 'Registrar entrada excepcional'}
+            <Icon name="download" /> {busy ? 'Registrando…' : 'Registrar entrada sin compra'}
           </button>
         </div>
       )}

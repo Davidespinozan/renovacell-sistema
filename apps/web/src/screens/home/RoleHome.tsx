@@ -65,7 +65,7 @@ export function HomeVendedor() {
   const solicitudes = solicitudesVendedor(est.cola)
   const activas = activasVendedor(est.cola)
   const atajos = useAccesos([
-    { key: 'asesorias', label: 'Conversaciones', icon: 'chat' },
+    { key: 'asesorias', label: 'Mensajes', icon: 'chat' },
     { key: 'caja', label: 'Punto de venta', icon: 'store' },
     { key: 'clientes', label: 'Clientes', icon: 'usercheck' },
   ])

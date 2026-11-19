@@ -154,7 +154,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Promociones</h4>
           <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Varios productos, un periodo. Se aplican solas en el portal, la caja y el chat mientras duran; nunca se cobra más que el precio normal del cliente.</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <div className="promo-acciones" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <label className="btn ghost sm" style={{ cursor: leyendo ? 'wait' : 'pointer' }} data-testid="promo-flyer">
               {leyendo ? 'Leyendo flyer…' : 'Subir flyer'}
               <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={leyendo} onChange={(e) => { void leerImagen(e.target.files?.[0]); e.target.value = '' }} data-testid="promo-flyer-input" />

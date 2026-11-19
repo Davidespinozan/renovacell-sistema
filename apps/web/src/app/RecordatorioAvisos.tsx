@@ -23,12 +23,12 @@ export function RecordatorioAvisos({ estado = estadoPorDefecto, activar = activa
     if (r.ok) setE('activo'); else setMsg(r.mensaje)
   }
   return (
-    <div className="rh-note rh-note--warn" role="note" data-testid="recordatorio-avisos" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="rh-note rh-note--warn rc-recordatorio" role="note" data-testid="recordatorio-avisos" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <Bell size={16} aria-hidden />
       <span style={{ flex: '1 1 220px' }}>
-        <b>Activa las notificaciones</b> para enterarte de mensajes del equipo y de tus clientes aunque tengas el sistema cerrado.
-        {e === 'requiere_instalar' && ' En iPhone, primero agrega Renovacell a tu pantalla de inicio (Compartir → Agregar a inicio).'}
-        {e === 'denegado' && ' Están bloqueadas en el navegador: actívalas desde el candado de la barra de direcciones.'}
+        <b>Activa los avisos</b> para enterarte de mensajes aunque tengas el sistema cerrado.
+        {e === 'requiere_instalar' && ' En iPhone: Compartir → Agregar a inicio, y ábrelo desde ahí.'}
+        {e === 'denegado' && ' Están bloqueados: actívalos en el candado 🔒 junto a la dirección.'}
         {msg && <span role="status" style={{ display: 'block', marginTop: 4 }}>{msg}</span>}
       </span>
       {e === 'inactivo' && <button className="btn sm" type="button" onClick={() => void tocar()} disabled={ocupado} data-testid="recordatorio-activar">{ocupado ? 'Activando…' : 'Activar'}</button>}
