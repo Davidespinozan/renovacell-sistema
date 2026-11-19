@@ -284,3 +284,5 @@ export function consume(allocations: { lot_id: string; qty: number }[], referenc
 
 // Recarga lotes+movimientos+stock tras una escritura externa (p. ej. surtir_pedido RPC).
 export function reloadInventory() { if (hasSupabase) { lotsLive.reload(); movsLive.reload(); refreshStock() } }
+/** AUDITORÍA (19 nov 2026) · igual que reloadInventory pero ESPERA a tener lotes y movimientos al día (surtido en lote). */
+export async function recargarInventario(): Promise<void> { if (hasSupabase) { await Promise.all([lotsLive.reload(), movsLive.reload()]); refreshStock() } }

@@ -111,6 +111,7 @@ export async function reportIncident(shipmentId: string, type: string, note: str
 export async function resolveIncident(shipmentId: string, folio: string): Promise<Escritura> {
   const cur = live.current().find((s) => s.id === shipmentId)
   if (!cur?.incident) return { ok: false, error: 'Este envío ya no tiene una incidencia abierta: recarga para ver su estado.', ambiguous: false }
+  if (cur.status === 'delivered' || cur.status === 'cancelado') return { ok: false, error: cur.status === 'delivered' ? 'Este envío ya se entregó: no se puede reintentar.' : 'Este envío está cancelado.', ambiguous: false }
   const incident = { ...(cur.incident as unknown as Record<string, unknown>), resolved: true } as Shipment['incident']
   const r = await patch(`resolver la incidencia de ${folio}`, shipmentId, { status: 'out_for_delivery', incident })
   if (!r.ok) return r

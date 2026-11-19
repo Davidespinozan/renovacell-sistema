@@ -343,3 +343,8 @@ button.cifra-v{cursor:pointer}
 .rc-respondiendo small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ds-text-3)}
 .rc-msg--destello .rc-bubble-wrap{animation:rc-destello 1.4s ease}
 @keyframes rc-destello{0%,40%{box-shadow:0 0 0 3px var(--ds-brand-soft)}100%{box-shadow:none}}
+
+/* AUDITORÍA CHOFER (19 nov 2026) · ¿pagado o por cobrar? en la tarjeta de la parada */
+.parada-pago{margin-top:6px;padding:6px 10px;border-radius:var(--ds-r);font-size:var(--ds-fs-sm);font-weight:600}
+.parada-pago--ok{background:var(--ds-brand-soft);color:var(--ds-brand-strong)}
+.parada-pago--cobrar{background:var(--ds-warning-bg);color:var(--ds-warning)}

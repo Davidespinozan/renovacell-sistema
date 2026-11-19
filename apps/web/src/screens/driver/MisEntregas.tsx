@@ -5,7 +5,8 @@ import { Phone, Navigation } from 'lucide-react'
 import { useMemo, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
-import { fmtDate } from '../../lib/format'
+import { fmtDate, money } from '../../lib/format'
+import { telParaMarcar } from '../../lib/telefono'
 import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -43,6 +44,7 @@ export function MisEntregas() {
   const [proofPath, setProofPath] = useState<Record<string, string>>({}) // ruta privada guardada
   const [uploading, setUploading] = useState<Record<string, boolean>>({}) // subida de la foto en curso
   const [upErr, setUpErr] = useState<Record<string, boolean>>({}) // la subida falló (reintentar)
+  const [cargando, setCargando] = useState<Record<string, boolean>>({}) // confirmando la carga (sin doble toque)
   const [received, setReceived] = useState<Record<string, string>>({})
   const [incType, setIncType] = useState<Record<string, string>>({})
   const [incNote, setIncNote] = useState<Record<string, string>>({})
@@ -268,8 +270,14 @@ export function MisEntregas() {
                 <div className="parada-cliente">{client.name}{client.clinic ? <small>{client.clinic}</small> : null}</div>
                 <div className="parada-dir">{deliv.addr}</div>
                 <div className="parada-prod">{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(' · ')}</div>
+                {/* AUDITORÍA CHOFER · antes de tocar la puerta: ¿está pagado o hay que cobrar? */}
+                <div className={'parada-pago ' + (order.payment_status === 'paid' ? 'parada-pago--ok' : 'parada-pago--cobrar')} data-testid="parada-pago">
+                  {order.payment_status === 'paid' ? 'Pagado · solo entregar'
+                    : order.payment_status === 'parcial' ? 'Pago incompleto · avisa a Dirección antes de entregar'
+                    : `Sin pago registrado${order.total != null ? ` · ${money(order.total)}` : ''} · confirma con Dirección antes de entregar`}
+                </div>
                 <div className="parada-botones">
-                  <a className="btn ghost" href={`tel:+52${deliv.phone.replace(/\s/g, '')}`} aria-label={`Llamar al ${deliv.phone}`}><Phone size={18} /> Llamar</a>
+                  {telParaMarcar(deliv.phone) && <a className="btn ghost" href={`tel:${telParaMarcar(deliv.phone)}`} aria-label={`Llamar al ${deliv.phone}`}><Phone size={18} /> Llamar</a>}
                   <a className="btn ghost" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliv.addr)}`} target="_blank" rel="noreferrer"><Navigation size={18} /> Navegar</a>
                 </div>
               </div>
@@ -284,7 +292,12 @@ export function MisEntregas() {
                     <Icon name="truck" /><span>Almacén despachó tu carga{s.dispatched_by ? ` (autorizó ${s.dispatched_by})` : ''}. Cuenta tus paquetes y confirma que los recibiste.</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn" type="button" onClick={() => confirmLoad(s.id, driverName(driverId), order.external_ref ?? order.id)}>
+                    <button className="btn" type="button" disabled={!!cargando[s.id]} onClick={async () => {
+                      setCargando((c) => ({ ...c, [s.id]: true }))
+                      const r = await confirmLoad(s.id, driverName(driverId), order.external_ref ?? order.id)
+                      setCargando((c) => ({ ...c, [s.id]: false }))
+                      avisar(r.ok, r.ok ? `Carga confirmada: ${order.external_ref ?? ''}` : `No quedó confirmada la carga. ${r.error ?? 'Intenta de nuevo.'}`)
+                    }}>
                       <Icon name="check" /> Confirmar que recibí mi carga
                     </button>
                     <button className="btn ghost" type="button" onClick={() => setLoadOpen((m) => ({ ...m, [s.id]: !m[s.id] }))}>

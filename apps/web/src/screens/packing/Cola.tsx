@@ -279,7 +279,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   }
 
   const asignarChofer = async () => {
-    if (!driverId) return
+    if (!driverId || busy) return   // AUDITORÍA · sin doble toque (la base además exige un solo envío vivo por pedido)
     const drv = getDrivers().find((d) => d.id === driverId)
     setBusy('chofer'); setError(null)
     const r = await createShipment({
@@ -542,8 +542,8 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                   </select>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
                     <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                    <button className="btn" type="button" onClick={asignarChofer} disabled={!driverId} style={!driverId ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-                      <Icon name="check" /> Asignar a chofer
+                    <button className="btn" type="button" onClick={asignarChofer} disabled={!driverId || !!busy} style={!driverId ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+                      <Icon name="check" /> {busy === 'chofer' ? 'Asignando…' : 'Asignar a chofer'}
                     </button>
                   </div>
                 </>

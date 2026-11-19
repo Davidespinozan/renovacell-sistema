@@ -55,7 +55,7 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
 
   const incidents = useMemo(
     () => shipments
-      .filter((s) => s.incident && !s.incident.resolved)
+      .filter((s) => s.incident && !s.incident.resolved && s.status !== 'delivered' && s.status !== 'cancelado')   // AUDITORÍA · lo entregado o cancelado ya no se «reintenta»
       .map((s) => ({ shipment: s, order: orders.find((o) => o.id === s.order_id) }))
       .filter(({ order }) => (order ? inCartera(order) : role !== 'pos')),
     [shipments, orders, role, user, ownerByDoctor],

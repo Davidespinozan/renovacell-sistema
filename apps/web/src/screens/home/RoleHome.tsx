@@ -289,7 +289,7 @@ export function HomeChofer() {
   const { data: orders } = useAllOrders()
   const driverId = driverIdByEmail(user?.email)
   // Misma regla que "Mis entregas": solo con chofer resuelto (evita que driver_id null entre por null===null).
-  const mias = driverId ? shipments.filter((s) => s.driver_id === driverId && s.status !== 'delivered') : []
+  const mias = driverId ? shipments.filter((s) => s.driver_id === driverId && s.status !== 'delivered' && s.status !== 'cancelado') : []
   const incidencias = mias.filter((s) => s.incident && !s.incident.resolved)
   // Siguiente parada = el orden de ruta que el chofer eligió en "Mis entregas" (solo lectura).
   const siguiente = useMemo(() => {

@@ -2,6 +2,7 @@
 // asignando lotes por caducidad ascendente. Al confirmar, descuenta lotes,
 // registra movimientos y mueve el pedido a Empacado (se ve en el Portal).
 import { Vacio } from '../../app/EmptyState'
+import { recargarInventario } from '../../data/store/lotsStore'
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { PageHead } from '../../app/PageHead'
@@ -74,7 +75,11 @@ export function Surtido() {
     setBatchBusy(true)
     let ok = 0, fail = 0
     const errors: string[] = []
+    let primero = true
     for (const o of pending.filter((x) => selIds.includes(x.id))) {
+      // AUDITORÍA · antes de planear el siguiente pedido se ESPERA el inventario real (antes se planeaba con el lote ya gastado)
+      if (!primero) await recargarInventario().catch(() => {})
+      primero = false
       const r = await surtirPedido(o)
       if (r.ok) ok += 1
       else { fail += 1; errors.push(`${o.external_ref ?? o.id}: ${r.error ?? 'no se pudo surtir'}`) }
