@@ -57,6 +57,12 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
     }
     setBusqueda(r.estado === 'ok' ? { fase: 'resultados', q, clientes: r.clientes } : { fase: 'aviso', q, estado: r.estado })
   }
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  const carteraVisible = miCartera.fase !== 'lista' ? [] : (() => {
+    const q = norm(texto)
+    const f = q ? miCartera.filas.filter((c) => norm(c.nombre).includes(q)) : miCartera.filas
+    return f.slice(0, 60)
+  })()
   const enviar = (e: FormEvent) => { e.preventDefault(); if (busqueda.fase !== 'buscando') void buscar(texto) }
   const elegir = (id: string, nombre: string, mascara: string | null) => onPick({ id, name: nombre, phone: null, mascara })
 
@@ -73,11 +79,18 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
           </button>
 
           <div style={titulo}>Mi cartera</div>
+          {/* AUDITORÍA VENTAS (19 nov 2026) · su cartera se filtra AQUÍ mientras escribe (sin ir al servidor ni gastar el
+              límite diario de búsqueda); «Buscar» solo hace falta para cuentas que no son suyas. */}
+          {miCartera.fase === 'lista' && miCartera.filas.length > 8 && (
+            <input value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Filtrar mi cartera" placeholder="Escribe para filtrar tu cartera…"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 16, outline: 'none', marginBottom: 6 }} data-testid="sc-filtro-cartera" />
+          )}
           <div style={{ display: 'grid', gap: 4, maxHeight: '22vh', overflow: 'auto' }} data-testid="sc-cartera">
             {miCartera.fase === 'cargando' && <div style={nota}>Cargando tu cartera…</div>}
             {miCartera.fase === 'error' && <div style={nota} role="alert">{miCartera.mensaje}</div>}
             {miCartera.fase === 'lista' && miCartera.filas.length === 0 && <div style={nota}>Aún no tienes clientes asignados. Puedes buscar una cuenta abajo.</div>}
-            {miCartera.fase === 'lista' && miCartera.filas.map((c) => (
+            {miCartera.fase === 'lista' && carteraVisible.length === 0 && miCartera.filas.length > 0 && <div style={nota} data-testid="sc-cartera-vacia">Nadie de tu cartera coincide. Búscalo abajo en todas las cuentas.</div>}
+            {miCartera.fase === 'lista' && carteraVisible.map((c) => (
               <button key={c.customer_id} type="button" style={fila} onClick={() => elegir(c.customer_id, c.nombre, null)} data-testid="sc-cartera-fila">
                 <Icon name="usercheck" style={{ width: 15, height: 15, color: 'var(--green-deep)' }} />
                 <span style={{ flex: 1, minWidth: 0 }}>{c.nombre}</span>
