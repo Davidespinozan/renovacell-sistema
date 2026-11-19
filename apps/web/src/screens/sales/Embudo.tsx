@@ -1,4 +1,4 @@
-// CRM · EMBUDO DE VENTAS (2 nov 2026). Columnas Nuevo → Calificado → Propuesta → Ganado; Perdido aparte. Cada tarjeta:
+// CRM · EMBUDO DE VENTAS (2 nov 2026). Columnas Primer contacto → En seguimiento → Cotizado → Ganado; Perdido aparte. Cada tarjeta:
 // cliente, monto, días en la etapa, origen; se mueve con un clic (Perdido pide motivo) y abre su conversación.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHead } from '../../app/PageHead'
@@ -76,7 +76,7 @@ export function Embudo({ cliente: inyectado }: { cliente?: ReturnType<typeof cre
   return (
     <div className="grid" style={{ gap: 16 }} data-testid="crm-embudo">
       <PageHead title="Embudo de ventas">
-        Cada oportunidad avanza sola: escribe → <b>Nuevo</b>; se verifica o se liga a su ficha → <b>Calificado</b>; recibe cotización o pedido → <b>Propuesta</b>; paga → <b>Ganado</b>.
+        Cada oportunidad avanza sola: escribe → <b>Primer contacto</b>; sabemos quién es (ficha o verificación) → <b>En seguimiento</b>; recibe cotización o pedido → <b>Cotizado</b>; paga → <b>Ganado</b>.
         Para moverla tú: en su tarjeta toca <b>«→ siguiente etapa»</b> o elige cualquier etapa en <b>«Mover a…»</b>.
       </PageHead>
       {veTodo && resumen && (

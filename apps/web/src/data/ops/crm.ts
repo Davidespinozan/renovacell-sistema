@@ -1,13 +1,13 @@
-// CRM · EMBUDO DE VENTAS (2 nov 2026). Oportunidades por etapa: Nuevo → Calificado → Propuesta → Ganado (o Perdido con
+// CRM · EMBUDO DE VENTAS (2 nov 2026). Oportunidades por etapa (nombres del equipo, 19 nov 2026): Primer contacto → En seguimiento → Cotizado → Ganado (o Perdido con
 // motivo). Avanzan solas con lo que pasa (mensaje, ficha ligada/verificada, cotización, pedido pagado) y el vendedor las
 // mueve a mano. El vendedor ve las suyas; Dirección y el jefe de ventas, todas. Autoridad: el servidor.
 import { hasSupabase, supabase } from '../../lib/supabase'
 
 export type Etapa = 'nuevo' | 'calificado' | 'propuesta' | 'ganado' | 'perdido'
 export const ETAPAS: Array<{ key: Etapa; label: string; pista: string }> = [
-  { key: 'nuevo', label: 'Nuevo', pista: 'Escribió y aún no se califica' },
-  { key: 'calificado', label: 'Calificado', pista: 'Verificado o ligado a su ficha' },
-  { key: 'propuesta', label: 'Propuesta', pista: 'Tiene cotización o pedido por pagar' },
+  { key: 'nuevo', label: 'Primer contacto', pista: 'Escribió o le llamamos por primera vez' },
+  { key: 'calificado', label: 'En seguimiento', pista: 'Ya sabemos quién es y estamos platicando' },
+  { key: 'propuesta', label: 'Cotizado', pista: 'Tiene cotización o pedido por pagar' },
   { key: 'ganado', label: 'Ganado', pista: 'Pedido pagado' },
 ]
 export const ORIGEN: Record<string, string> = { whatsapp: 'WhatsApp', portal: 'Portal', enlace: 'Enlace', vendedor: 'Vendedor', cotizacion: 'Cotización', pedido: 'Pedido' }

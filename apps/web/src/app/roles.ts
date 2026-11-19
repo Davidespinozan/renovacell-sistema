@@ -136,7 +136,7 @@ export const ROLES: RoleDef[] = [
       { key: 'llamar_hoy', label: 'A quién llamar hoy', icon: 'phone', section: 'Mi cartera' },   // PROSPECCIÓN (15 nov 2026) · cartera histórica sin cuenta
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
       { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
-      { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Nuevo → Calificado → Propuesta → Ganado
+      { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Primer contacto → En seguimiento → Cotizado → Ganado
       { key: 'cartera_plazos', label: 'Por vencer', icon: 'clock', section: 'Mi cartera' },   // CARTERA-PLAZO (3 nov 2026) · 6 meses por cliente + competencia
       { key: 'seguimientos', label: 'Pendientes', icon: 'clock', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · seguimientos por retomar
       { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
