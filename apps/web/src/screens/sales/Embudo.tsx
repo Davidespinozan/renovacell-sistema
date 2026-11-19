@@ -76,7 +76,8 @@ export function Embudo({ cliente: inyectado }: { cliente?: ReturnType<typeof cre
   return (
     <div className="grid" style={{ gap: 16 }} data-testid="crm-embudo">
       <PageHead title="Embudo de ventas">
-        Cada oportunidad avanza sola: escribe → <b>Nuevo</b>; se verifica o se liga a su ficha → <b>Calificado</b>; recibe cotización o pedido → <b>Propuesta</b>; paga → <b>Ganado</b>. También la puedes mover tú.
+        Cada oportunidad avanza sola: escribe → <b>Nuevo</b>; se verifica o se liga a su ficha → <b>Calificado</b>; recibe cotización o pedido → <b>Propuesta</b>; paga → <b>Ganado</b>.
+        Para moverla tú: en su tarjeta toca <b>«→ siguiente etapa»</b> o elige cualquier etapa en <b>«Mover a…»</b>.
       </PageHead>
       {veTodo && resumen && (
         <div className="card" style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center', fontSize: 13 }} data-testid="crm-resumen">
@@ -141,6 +142,12 @@ export function Embudo({ cliente: inyectado }: { cliente?: ReturnType<typeof cre
                       )}
                       {o.etapa !== 'ganado' && o.etapa !== 'perdido' && <button type="button" className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={() => { setPerdiendo(o); setMotivo('') }} data-testid="crm-perder">Perdido</button>}
                       {o.etapa === 'perdido' && <button type="button" className="btn ghost sm" disabled={ocupado === o.id} onClick={() => void mover(o, 'nuevo')}>Reabrir</button>}
+                      {/* MOVER A CUALQUIER ETAPA (19 nov 2026, Alejandra: «¿cómo los voy avanzando de zona?») */}
+                      <select className="crm-mover" aria-label={`Mover a ${o.cliente} a otra etapa`} value="" disabled={ocupado === o.id} data-testid="crm-mover"
+                        onChange={(e) => { const et = e.target.value as Etapa; if (!et) return; if (et === 'perdido') { setPerdiendo(o); setMotivo('') } else void mover(o, et) }}>
+                        <option value="">Mover a…</option>
+                        {([...ETAPAS.map((x) => [x.key, x.label]), ['perdido', 'Perdido']] as Array<[Etapa, string]>).filter(([k]) => k !== o.etapa).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                      </select>
                     </div>
                   </div>
                 ))}

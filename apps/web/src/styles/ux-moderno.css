@@ -400,3 +400,7 @@ button.cifra-v{cursor:pointer}
   /* Fechas «del … al …» con espacio suficiente */
   .canvas input[type=date]{min-width:0;flex:1 1 140px}
 }
+
+/* EMBUDO · «Mover a…» en cada tarjeta (19 nov 2026) */
+.crm-mover{font:inherit;font-size:var(--ds-fs-xs);min-height:32px;padding:4px 8px;border:1px solid var(--ds-border);border-radius:var(--ds-r);background:var(--ds-surface);color:var(--ds-text-2);cursor:pointer}
+@media (max-width:900px){.crm-mover{min-height:40px;flex:1 1 120px}}

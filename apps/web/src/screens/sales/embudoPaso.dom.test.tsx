@@ -35,6 +35,15 @@ describe('Embudo · próximo paso', () => {
     await waitFor(() => expect(c.paso).toHaveBeenCalledWith('o1', 'Mandar cotización', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)))
     await waitFor(() => expect(c.editar).toHaveBeenCalledWith('o1', { monto: 4500 }))
   })
+  it('«Mover a…» lleva a cualquier etapa; Perdido pide motivo', async () => {
+    const c = { ...cliente([op({ quieta: false })]), mover: vi.fn(async (id: string, etapa: string) => ({ ok: true, data: op({ id, etapa: etapa as never, quieta: false }) })) }
+    render(<Embudo cliente={c as never} />)
+    const sel = (await screen.findAllByTestId('crm-mover'))[0]
+    fireEvent.change(sel, { target: { value: 'propuesta' } })
+    await waitFor(() => expect(c.mover).toHaveBeenCalledWith('o1', 'propuesta', undefined))
+    fireEvent.change(screen.getAllByTestId('crm-mover')[0], { target: { value: 'perdido' } })
+    expect(await screen.findByTestId('crm-motivo')).toBeTruthy()
+  })
   it('la base: quieta = paso vencido o 5 días sin paso; aviso L–S a las 9 de Mazatlán', () => {
     expect(sql).toMatch(/o\.proximo_at < public\.hoy_local\(\)\)\s+or \(o\.proximo_at is null and now\(\) - o\.etapa_at >= interval '5 days'\)/)
     expect(sql).toMatch(/cron\.schedule\('renovacell-crm-quietas', '0 16 \* \* 1-6'/)
