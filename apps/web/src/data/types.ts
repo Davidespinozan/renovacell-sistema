@@ -203,6 +203,8 @@ export interface Message {
   sender_id: string
   sender_name: string | null
   body: string
+  /** RESPONDER (19 nov 2026) · id del mensaje citado (misma conversación). */
+  responde_a?: string | null
   adjunto?: Adjunto | null
   /** Solo en este navegador: el archivo aún se está subiendo. */
   subiendo?: boolean

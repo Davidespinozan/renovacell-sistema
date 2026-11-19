@@ -92,7 +92,7 @@ async function hydrate() {
     // Se piden los MÁS RECIENTES (descendente + tope) y se reordenan abajo. Antes iba
     // ascendente y sin tope: al pasar de 1,000 mensajes PostgREST habría devuelto los más
     // VIEJOS, y los mensajes nuevos habrían desaparecido del chat al recargar.
-    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, adjunto, created_at')
+    supabase.from('messages').select('id, conversation_id, sender_id, sender_name, body, adjunto, responde_a, created_at')
       .order('created_at', { ascending: false }).order('id').limit(MENSAJES_RECIENTES),
   ])
   if (ce || me2) { console.warn('[chat] hydrate', ce?.message ?? me2?.message); return }
@@ -153,7 +153,7 @@ if (hasSupabase) {
   })
 }
 
-export function sendMessage(conversationId: string, body: string) {
+export function sendMessage(conversationId: string, body: string, respondeA: string | null = null) {
   const trimmed = body.trim()
   if (!trimmed) return
   seq += 1
@@ -162,13 +162,13 @@ export function sendMessage(conversationId: string, body: string) {
   const id = hasSupabase ? uuid() : `m-${seq}`
   const msg: Message = {
     id, conversation_id: conversationId, sender_id: senderId,
-    sender_name: CURRENT_USER.name, body: trimmed, created_at: now,
+    sender_name: CURRENT_USER.name, body: trimmed, created_at: now, ...(respondeA ? { responde_a: respondeA } : {}),
   }
   messages = { ...messages, [conversationId]: [...(messages[conversationId] ?? []), msg] }
   conversations = conversations.map((c) => (c.id === conversationId ? { ...c, last_message_at: now } : c))
   emit()
   if (hasSupabase) {
-    supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, sender_name: CURRENT_USER.name, body: trimmed })
+    supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, sender_name: CURRENT_USER.name, body: trimmed, ...(respondeA && isUuid(respondeA) ? { responde_a: respondeA } : {}) })
       .then(({ error }) => {
         // Si el envío falla (RLS/red), quita el mensaje optimista (no fingir envío).
         if (error) { reportarFallo('enviar tu mensaje', mensajeDeError(error)); messages = { ...messages, [conversationId]: (messages[conversationId] ?? []).filter((x) => x.id !== id) }; emit() }

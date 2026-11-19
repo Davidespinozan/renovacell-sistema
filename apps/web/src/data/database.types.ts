@@ -4551,6 +4551,7 @@ export type Database = {
           id: string
           sender_id: string | null
           sender_name: string | null
+          responde_a: string | null
         }
         Insert: {
           body: string
@@ -4560,6 +4561,7 @@ export type Database = {
           id?: string
           sender_id?: string | null
           sender_name?: string | null
+          responde_a?: string | null
         }
         Update: {
           body?: string
@@ -4569,6 +4571,7 @@ export type Database = {
           id?: string
           sender_id?: string | null
           sender_name?: string | null
+          responde_a?: string | null
         }
         Relationships: [
           {

@@ -4,7 +4,9 @@
 // Solo staff (grupos por área + directos). EQUIPO-ADJUNTOS (3 nov 2026): imágenes, videos y documentos con el clip.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
-import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2, CheckCheck, Paperclip, FileText, Download, Loader2 } from 'lucide-react'
+import { Users, Send, MessageCircle, Plus, Search, X, ArrowLeft, Trash2, CheckCheck, Paperclip, FileText, Download, Loader2, Reply } from 'lucide-react'
+import { useDeslizarResponder } from '../chat/deslizarResponder'
+import { textoCita } from '../../data/ops/chat'
 import { UserAvatar } from '../../app/UserAvatar'
 import { useChat } from '../../data/hooks/useChat'
 import { useUsers, type DirectoryUser } from '../../data/hooks/useUsers'
@@ -49,6 +51,9 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
   const [text, setText] = useState('')
   const [buscar, setBuscar] = useState('')
   const [newOpen, setNewOpen] = useState(false)
+  // RESPONDER A UN MENSAJE · deslizar (celular) o «Responder» (computadora): queda citado arriba del cuadro.
+  const [respondiendo, setRespondiendo] = useState<Message | null>(null)
+  const responderA = (m: Message) => { setRespondiendo(m); window.setTimeout(() => inputRef.current?.focus(), 0) }
   const conv = conversations.find((c) => c.id === selectedId) ?? null
   // PUSH DEL EQUIPO · al llegar desde un aviso, abre ese chat en cuanto aparece en SUS conversaciones.
   const intento = useIntento('chat')
@@ -83,8 +88,8 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
 
   const submit = () => {
     if (!conv || !text.trim()) return
-    send(conv.id, text)
-    setText('')
+    send(conv.id, text, respondiendo?.id ?? null)
+    setText(''); setRespondiendo(null)
     escribo(false)
   }
 
@@ -108,6 +113,15 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
 
   // Hilo: separador por día y "inicio" de racha (cola de la burbuja + nombre del autor en grupos).
   const hilo: React.ReactNode[] = []
+  const nombreDe = (m: Message) => (m.sender_id === me.id ? 'Tú' : (porId[m.sender_id]?.name ?? m.sender_name ?? 'Equipo'))
+  const porMsg = new Map(msgs.map((x) => [x.id, x]))
+  const deslizar = useDeslizarResponder((id) => { const x = porMsg.get(id); if (x) responderA(x) }, !!conv)
+  const irAMensaje = (id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-tc-msg="${id}"]`)
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.classList.add('rc-msg--destello'); window.setTimeout(() => el.classList.remove('rc-msg--destello'), 1400)
+  }
   if (conv) {
     let diaPrevio = ''; let autorPrevio: string | null = null
     for (const m of msgs) {
@@ -116,7 +130,10 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
       const mine = m.sender_id === me.id
       const inicio = m.sender_id !== autorPrevio
       autorPrevio = m.sender_id
+      const original = m.responde_a ? porMsg.get(m.responde_a) : undefined
       hilo.push(<Burbuja key={m.id} m={m} mine={mine} inicio={inicio} grupo={conv.kind === 'group'} lectores={lectores}
+        cita={m.responde_a ? { autor: original ? nombreDe(original) : 'Mensaje', texto: original ? (original.body || etiquetaAdjunto(original.adjunto)) : 'Mensaje anterior', id: m.responde_a } : null}
+        onIrA={irAMensaje} onResponder={() => responderA(m)} gestos={deslizar(m.id)}
         nombre={mine ? me.name : (porId[m.sender_id]?.name ?? m.sender_name ?? 'Equipo')}
         onDelete={async () => { if ((await confirmar('¿Eliminar este mensaje?'))) deleteMessage(conv.id, m.id) }} />)
     }
@@ -196,6 +213,12 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
               <div ref={endRef} />
             </div>
             {errorAdjunto && <div className="tc-adj-error" role="alert" data-testid="adjunto-error">{errorAdjunto}<button type="button" className="rc-ico" aria-label="Cerrar" onClick={() => setErrorAdjunto(null)}><X size={14} /></button></div>}
+            {respondiendo && (
+              <div className="rc-respondiendo" data-testid="tc-respondiendo">
+                <span><b>{nombreDe(respondiendo)}</b><small>{respondiendo.body ? textoCita(respondiendo.body) : etiquetaAdjunto(respondiendo.adjunto)}</small></span>
+                <button type="button" className="rc-ico" onClick={() => setRespondiendo(null)} aria-label="Cancelar respuesta"><X size={16} /></button>
+              </div>
+            )}
             <div className="rc-composer">
               <input ref={fileRef} type="file" accept={ACEPTA} multiple hidden onChange={(e) => void adjuntar(e.target.files)} data-testid="adjunto-input" />
               <button className="rc-ico rc-adjuntar tc-clip" type="button" onClick={() => fileRef.current?.click()} aria-label="Adjuntar imagen, video o documento" title="Adjuntar imagen, video o documento"><Paperclip size={19} /></button>
@@ -229,18 +252,23 @@ export function Chat({ lecturas }: { lecturas?: ClienteLecturas } = {}) {
   )
 }
 
-function Burbuja({ m, mine, inicio, grupo, nombre, onDelete, lectores = [] }: { m: Message; mine: boolean; inicio: boolean; grupo: boolean; nombre: string; onDelete: () => void; lectores?: Lector[] }) {
+function Burbuja({ m, mine, inicio, grupo, nombre, onDelete, lectores = [], cita = null, onIrA, onResponder, gestos }: { m: Message; mine: boolean; inicio: boolean; grupo: boolean; nombre: string; onDelete: () => void; lectores?: Lector[]
+  cita?: { autor: string; texto: string; id: string } | null; onIrA?: (id: string) => void; onResponder?: () => void; gestos?: Record<string, unknown> }) {
   const v = mine ? vistoPor(lectores, m.created_at) : null
   return (
-    <div className={`rc-msg ${mine ? 'rc-msg--own' : 'rc-msg--seller'}${inicio ? ' rc-msg--inicio' : ''} tc-msg`} data-testid={mine ? 'tc-propio' : 'tc-ajeno'}>
+    <div className={`rc-msg ${mine ? 'rc-msg--own' : 'rc-msg--seller'}${inicio ? ' rc-msg--inicio' : ''} tc-msg`} data-testid={mine ? 'tc-propio' : 'tc-ajeno'} data-tc-msg={m.id} {...gestos}>
       {/* tabIndex: en táctil, tocar la burbuja propia muestra el botón de borrar (no hay hover). */}
       <div className="rc-bubble-wrap" tabIndex={mine ? 0 : undefined}>
         {inicio && grupo && !mine && <div className="rc-meta" style={{ color: colorAutor(m.sender_id) }}>{nombre}</div>}
+        {cita && (
+          <button type="button" className="rc-cita" onClick={() => onIrA?.(cita.id)} data-testid="tc-cita"><b>{cita.autor}</b><span>{textoCita(cita.texto)}</span></button>
+        )}
         {m.adjunto && <AdjuntoVista a={m.adjunto} subiendo={!!m.subiendo} />}
         {m.body && <div className="rc-bubble">{conEnlaces(m.body)}</div>}
         <time className="rc-hora" dateTime={m.created_at}>{horaDe(m.created_at)}{mine && v && (v.visto
           ? <CheckCheck className="rc-tick rc-tick--visto" size={15} aria-label="Visto" data-testid="tc-visto" />
           : <CheckCheck className="rc-tick" size={15} aria-label={grupo && v.n > 0 ? `Visto por ${v.n} de ${v.de}` : 'Entregado'} data-testid="tc-entregado" />)}</time>
+        {onResponder && !m.subiendo && <button type="button" className="rc-responder" onClick={onResponder} aria-label="Responder a este mensaje" title="Responder" data-testid="tc-responder"><Reply size={14} /></button>}
         {mine && (
           <button type="button" className="tc-del" title="Eliminar mensaje" aria-label="Eliminar mensaje" onClick={onDelete}><Trash2 size={13} /></button>
         )}
