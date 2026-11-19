@@ -10,13 +10,13 @@ import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Pencil, Plus, Search, Send, X, Zap } from 'lucide-react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Pencil, Plus, Reply, Search, Send, X, Zap } from 'lucide-react'
 import { enlaceMaps, leerUbicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
-import { chat as clientePorDefecto, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
+import { chat as clientePorDefecto, textoCita, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
 import { retomarConversacion } from '../../data/ops/misConversaciones'   // CONV-WHATSAPP · escribir = retomar
 import { telefonoLegible } from '../../lib/telefono'
 import { hiloPersona as hiloPersonaPorDefecto, NOMBRE_CANAL_PERSONA, type CanalPersona, type HiloPersona } from '../../data/ops/hiloPersona'
@@ -444,18 +444,50 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     window.setTimeout(() => { const el = area.current; if (el) { el.focus(); autoAlto(el); el.setSelectionRange?.(t.length, t.length) } }, 0)
   }
 
+  // RESPONDER A UN MENSAJE (19 nov 2026) · deslizar a la derecha (celular) o «Responder» (computadora): el mensaje queda citado
+  // arriba del cuadro y la respuesta sale ligada a él (por WhatsApp, el cliente también la ve citada).
+  const [respondiendo, setRespondiendo] = useState<Mensaje | null>(null)
+  const responderA = (m: Mensaje) => { setRespondiendo(m); window.setTimeout(() => area.current?.focus(), 0) }
+  const autorCita = (actor: string) => actor === 'ai' ? 'Asistente' : actor === 'system' ? 'Aviso'
+    : (actor === 'seller' || actor === 'admin') ? (asesor ? 'Tú' : (nombreAsesor ?? 'Tu asesor')) : (asesor ? (nombreCliente ?? 'Cliente') : 'Tú')
+  const irAMensaje = (id: string) => {
+    const el = raiz.current?.querySelector<HTMLElement>(`[data-msg-id="${id}"]`); const h = hiloRef.current
+    if (!el || !h) return
+    h.scrollTop += el.getBoundingClientRect().top - h.getBoundingClientRect().top - h.clientHeight / 2 + el.clientHeight / 2
+    el.classList.add('rc-msg--destello'); window.setTimeout(() => el.classList.remove('rc-msg--destello'), 1400)
+  }
+  // Deslizar a la derecha con el dedo (como WhatsApp): pasado el umbral, responde a ese mensaje.
+  const deslizar = useRef<{ id: string; x: number; y: number; el: HTMLElement; activo: boolean } | null>(null)
+  const alTocar = (m: Mensaje) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' || !puedoResponder) return
+    deslizar.current = { id: m.id, x: e.clientX, y: e.clientY, el: e.currentTarget, activo: false }
+  }
+  const alMoverDedo = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = deslizar.current; if (!d) return
+    const dx = e.clientX - d.x; const dy = Math.abs(e.clientY - d.y)
+    if (!d.activo && (dy > 24 || dx < 0)) { deslizar.current = null; d.el.style.transform = ''; return }
+    if (dx > 8) d.activo = true
+    if (d.activo) d.el.style.transform = `translateX(${Math.min(dx, 80)}px)`
+  }
+  const alSoltar = (m: Mensaje) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = deslizar.current; deslizar.current = null
+    if (!d) return
+    d.el.style.transition = 'transform .15s'; d.el.style.transform = ''
+    window.setTimeout(() => { d.el.style.transition = '' }, 160)
+    if (e.clientX - d.x > 60) responderA(m)
+  }
   // Enviar con idempotencia: el MISMO client_message_id en cada reintento → nunca se duplica.
-  const enviarTexto = async (t: string, clientId: string) => {
+  const enviarTexto = async (t: string, clientId: string, respondeA: string | null = null) => {
     if (!convId || enviando) return
     setEnviando(true); setError(null)
     setPendiente({ clientId, texto: t, error: null })
     const otro = destinoEfectivo && destinoEfectivo !== convId ? destinoEfectivo : null
     if (otro) {
       // HILO-PERSONA · sale por OTRO canal de la misma persona: si aún no la atiendo ahí, la retomo y reintento una vez.
-      let r = await cliente.enviar(otro, t, clientId)
+      let r = await cliente.enviar(otro, t, clientId, respondeA)
       if (!r.ok && ['asesoria_no_iniciada', 'no_autorizado', 'transicion_invalida'].includes(r.error.codigo)) {
         const rt = await retomar(otro)
-        if (rt.ok) r = await cliente.enviar(otro, t, clientId)
+        if (rt.ok) r = await cliente.enviar(otro, t, clientId, respondeA)
         else { setPendiente({ clientId, texto: t, error: rt.mensaje }); setEnviando(false); return }
       }
       if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
@@ -470,7 +502,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       if (!previo.ok) { setPendiente({ clientId, texto: t, error: previo.mensaje }); setEnviando(false); return }
       await cargar(convId, 0)
     }
-    const r = await cliente.enviar(convId, t, clientId)
+    const r = await cliente.enviar(convId, t, clientId, respondeA)
     if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
     if (r.data.ia === 'en_curso') setEsperaIA({ seq: r.data.seq, desde: Date.now() })
     await cargar(convId, ultimoSeq.current)
@@ -481,6 +513,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   const [editando, setEditando] = useState<Mensaje | null>(null)
   const empezarEdicion = (m: Mensaje) => { setEditando(m); setTexto(m.content); setTimeout(() => { if (area.current) { area.current.focus(); autoAlto(area.current) } }, 0) }
   const cancelarEdicion = () => { setEditando(null); setTexto('') }
+  const puedoResponder = puedoEscribir && !editando
   const guardarEdicion = async (t: string) => {
     if (!convId || !editando) return
     setEnviando(true); setError(null)
@@ -497,7 +530,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (!t || enviando || pendiente?.error) return
     setTexto('')
     if (area.current) area.current.style.height = 'auto'
-    await enviarTexto(t, nuevoClientId())
+    const respondeA = respondiendo?.id ?? null
+    setRespondiendo(null)
+    await enviarTexto(t, nuevoClientId(), respondeA)
   }
   // FOTOS · mandar una imagen: se reduce en el dispositivo y viaja con su propio id (reintento sin duplicar).
   // CHAT-ARCHIVOS (3 nov 2026) · el mismo botón manda videos y documentos (hasta 50 MB) por la subida firmada.
@@ -655,11 +690,17 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     actorPrevio = clave
     const etiqueta = etiquetaActor(m, visor, { nombreCliente, nombreAsesor, etiquetaAsesor: ETIQUETA_ASESOR })
     hilo.push(
-      <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}${m.id === actualHallado ? ' rc-msg--hallado' : ''}`} data-testid={`msg-${m.actor}`} data-msg-id={m.id}>
+      <div key={m.id} className={`rc-msg rc-msg--${m.propio ? 'own' : m.actor}${inicio ? ' rc-msg--inicio' : ''}${m.id === actualHallado ? ' rc-msg--hallado' : ''}`} data-testid={`msg-${m.actor}`} data-msg-id={m.id}
+        onPointerDown={alTocar(m)} onPointerMove={alMoverDedo} onPointerUp={alSoltar(m)} onPointerCancel={() => { if (deslizar.current) deslizar.current.el.style.transform = ''; deslizar.current = null }}>
         {inicio && !m.propio && m.actor === 'ai' && <span className="rc-avatar" aria-hidden><BrandLogo alt="" className="rc-logo" /></span>}
         {inicio && !m.propio && m.actor !== 'ai' && <span className="rc-avatar rc-avatar--persona" aria-hidden>{(etiqueta ?? '?').slice(0, 1)}</span>}
         <div className="rc-bubble-wrap">
           {inicio && (etiqueta || m.canalMsg) && <div className="rc-meta">{etiqueta}{m.canalMsg && <span className={`rc-canal rc-canal--${m.canalMsg}`} data-testid="msg-canal">{NOMBRE_CANAL_PERSONA[m.canalMsg]}</span>}</div>}
+          {m.respuesta && (
+            <button type="button" className="rc-cita" onClick={() => irAMensaje(m.respuesta!.id)} data-testid="msg-cita">
+              <b>{autorCita(m.respuesta.actor)}</b><span>{textoCita(m.respuesta.texto)}</span>
+            </button>
+          )}
           {m.archivo ? (
             <div className="rc-bubble rc-bubble--img" title={horaDe(m.created_at)} data-testid={m.archivo.clase === 'video' ? 'msg-video' : m.archivo.clase === 'audio' ? 'msg-audio' : 'msg-documento'}>
               {!m.archivo.url ? <span className="rc-img-nd">{m.archivo.nombre} · no disponible</span>
@@ -684,6 +725,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{busq && hallados.includes(m.id)
                 ? partesResaltadas(m.content, busq).map((p, i) => (p.hallado ? <mark key={i} className="rc-mark-busq">{p.t}</mark> : <React.Fragment key={i}>{p.t}</React.Fragment>))
                 : conEnlaces(m.content)}</div>}
+          {puedoResponder && !m.otro && (
+            <button type="button" className="rc-responder" onClick={() => responderA(m)} aria-label="Responder a este mensaje" title="Responder" data-testid="btn-responder-msg"><Reply size={14} /></button>
+          )}
           {asesor && portalPropio && !m.otro && editable(m) && !editando && (
             <button type="button" className="rc-editar" onClick={() => empezarEdicion(m)} aria-label="Editar mensaje" title="Editar (hasta 15 minutos)" data-testid="btn-editar-msg"><Pencil size={13} /></button>
           )}
@@ -847,6 +891,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
               className={`rc-canal-op rc-canal--${c.canal}${destinoEfectivo === c.conversation_id ? ' on' : ''}`} onClick={() => setDestino(c.conversation_id)}
               data-testid={`responder-por-${c.canal}`}>{NOMBRE_CANAL_PERSONA[c.canal]}</button>
           ))}
+        </div>
+      )}
+      {respondiendo && !editando && (
+        <div className="rc-respondiendo" data-testid="respondiendo">
+          <span><b>{autorCita(respondiendo.actor)}</b><small>{textoCita(respondiendo.content)}</small></span>
+          <button type="button" className="rc-ico" onClick={() => setRespondiendo(null)} aria-label="Cancelar respuesta" data-testid="cancelar-respuesta"><X size={16} /></button>
         </div>
       )}
       {editando && (

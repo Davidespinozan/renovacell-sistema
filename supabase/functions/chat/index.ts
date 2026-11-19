@@ -26,7 +26,7 @@ import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { decodificarFoto } from '../_shared/verificacion.ts'
-import { TEXTO_IMAGEN, idImagen, conAdjuntos, conArchivos, conEdiciones, conLecturaAjena, BUCKET_ARCHIVOS, MAX_BYTES_ARCHIVO, claseArchivo, idArchivo, nombreArchivo, rutaArchivo, textoArchivo, RUTA_ARCHIVO } from '../_shared/adjuntos.ts'
+import { TEXTO_IMAGEN, idImagen, conAdjuntos, conArchivos, conEdiciones, conRespuestas, conLecturaAjena, BUCKET_ARCHIVOS, MAX_BYTES_ARCHIVO, claseArchivo, idArchivo, nombreArchivo, rutaArchivo, textoArchivo, RUTA_ARCHIVO } from '../_shared/adjuntos.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { responderIA } from '../_shared/ia/responder.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
@@ -116,7 +116,7 @@ Deno.serve(conCors(async (req) => {
     const desde = Number.isFinite(Number(p.desde_seq)) ? Math.max(0, Math.floor(Number(p.desde_seq))) : 0
     const { data, error } = await admin.rpc('cc_sesion_leer', { p_session: sesion, p_actor_type: actor.actor, p_visitor_hash: hash, p_profile: actor.profile, p_desde_seq: desde, p_limite: 100 })
     if (error) return falla(error)
-    return json(200, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data))))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
+    return json(200, await conRespuestas(admin, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data)))))   // FOTOS · enlaces temporales a las imágenes de lo que YA se autorizó leer
   }
 
   if (!conv) return json(400, { error: 'falta_conversacion', message: 'Falta conversation_id.' })
@@ -130,7 +130,7 @@ Deno.serve(conCors(async (req) => {
     const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
     const { data, error } = await caller.rpc('cc_hilo_persona', { p_conv: conv })
     if (error) return falla(error)
-    return json(200, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data))))
+    return json(200, await conRespuestas(admin, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data)))))
   }
 
   // ── EDITAR-MENSAJES (15 nov 2026) · la base decide (autor, 15 min, solo portal, solo texto) ──
@@ -167,7 +167,7 @@ Deno.serve(conCors(async (req) => {
     //   `canal` cubre WhatsApp, Instagram y Messenger; `whatsapp` se conserva para quien ya lo lee.
     const canal = actor.actor === 'seller' || actor.actor === 'admin' ? ((await admin.rpc('cc_canal_conversacion', { p_conv: conv }).then((r: { data: unknown }) => r.data, () => null)) ?? null) as Record<string, unknown> | null : null
     const whatsapp = canal && canal.canal === 'whatsapp' ? canal : null
-    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data)), conv)) as Record<string, unknown>), cart_id, canal, whatsapp })
+    return json(200, { ...(await conLecturaAjena(admin, conv, actor.actor, await conRespuestas(admin, await conEdiciones(admin, await conArchivos(admin, await conAdjuntos(admin, data)), conv))) as Record<string, unknown>), cart_id, canal, whatsapp })
   }
   if (action === 'leido') {
     const seq = Number.isFinite(Number(p.seq)) ? Math.max(0, Math.floor(Number(p.seq))) : 0
@@ -194,6 +194,9 @@ Deno.serve(conCors(async (req) => {
     const { data, error } = await admin.rpc('cc_enviar_mensaje', { ...base, p_client_id: clientId, p_content: c.texto })
     if (error) return falla(error)
     const r = data as { id: string; seq: number; idempotente: boolean; modo: string }
+    // RESPONDER A UN MENSAJE · antes de despachar: si es de WhatsApp, sale citado
+    const UUID_RESP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!r.idempotente && typeof p.responde_a === 'string' && UUID_RESP.test(p.responde_a)) await admin.rpc('_cc_respuesta_registrar', { p_message: r.id, p_responde_a: p.responde_a }).then(() => {}, () => {})
     // CX-ENLACE-2 · el visitante del enlace de contacto entra a la cola humana con su primer mensaje (su vendedor o
     // Dirección), sin tener que pedirlo; el asistente sigue atendiendo. La base decide si aplica; nunca bloquea el envío.
     if (!r.idempotente && actor.actor === 'visitor' && (r.modo === 'ai_active' || r.modo === 'human_offered')) {

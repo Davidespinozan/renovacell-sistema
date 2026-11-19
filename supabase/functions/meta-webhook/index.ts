@@ -110,6 +110,12 @@ Deno.serve(async (req) => {
       if (error) { obs('whatsapp', 'internal_error', { code: 'cc_wa_entrante', error }); diag({ canal: 'whatsapp', etapa: 'wa_entrante', ...clasificarError(error), http: 500, correlacion: correlacion(m.wamid), cuenta }); return new Response('reintentar', { status: 500 }) }
       const r = data as { duplicado: boolean; conversation_id: string; seq: number; actor: 'visitor' | 'doctor'; profile_id: string | null; visitor_hash: string | null; activo: boolean; modo: string; message_id?: string }
       if (r.duplicado) continue
+      // RESPONDER · el cliente citó un mensaje: queda ligado para verse citado en el chat (nunca bloquea)
+      if (m.citado && r.message_id) {
+        const { data: orig } = await admin.from('cc_wa_mensajes').select('message_id').eq('wamid', m.citado).limit(1).maybeSingle().then((x: { data: unknown }) => x, () => ({ data: null }))
+        const origId = (orig as { message_id?: string } | null)?.message_id
+        if (origId) await admin.rpc('_cc_respuesta_registrar', { p_message: r.message_id, p_responde_a: origId }).then(() => {}, () => {})
+      }
       // E · "Conectar mi WhatsApp RC-123456": el servidor vincula (o explica por qué no) y contesta; la IA no toma este turno.
       const cod = codigoVinculo(m.texto)
       if (cod) {

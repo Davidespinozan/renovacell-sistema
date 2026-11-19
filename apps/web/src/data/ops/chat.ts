@@ -12,7 +12,9 @@ export type ActorMensaje = 'visitor' | 'doctor' | 'seller' | 'admin' | 'ai' | 's
 export interface AdjuntoMensaje { id: string; url: string | null; tipo: string; uso: string | null }   // FOTOS · enlace temporal (10 min)
 /** CHAT-ARCHIVOS · video o documento del mensaje, con enlace temporal (10 min). */
 export interface ArchivoMensaje { id: string; url: string | null; tipo: string; clase: 'video' | 'documento' | 'audio'; bytes: number; nombre: string }
-export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null; archivo?: ArchivoMensaje | null; editado?: boolean }
+export interface Mensaje { id: string; seq: number; actor: ActorMensaje; content: string; created_at: string; propio: boolean; adjunto?: AdjuntoMensaje | null; archivo?: ArchivoMensaje | null; editado?: boolean
+  /** RESPONDER A UN MENSAJE (19 nov 2026) · el mensaje citado. */
+  respuesta?: { id: string; texto: string; actor: ActorMensaje } | null }
 /** Sube el archivo con la subida firmada de UN solo uso que dio el servidor (al bucket privado). */
 export type SubirFirmado = (bucket: string, ruta: string, token: string, file: File, tipo: string) => Promise<string | null>
 const subirPorDefecto: SubirFirmado = async (bucket, ruta, token, file, tipo) => {
@@ -94,8 +96,8 @@ export class ClienteChat {
   }
   abrir() { return this.llamar<{ conversation_id: string; estado: string; modo: ModoConversacion; nuevo: boolean }>({ action: 'abrir' }) }
   leer(conversation_id: string, desde_seq = 0) { return this.llamar<Conversacion>({ action: 'leer', conversation_id, desde_seq }) }
-  enviar(conversation_id: string, content: string, client_message_id = nuevoClientId()) {
-    return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'enviar', conversation_id, content, client_message_id })
+  enviar(conversation_id: string, content: string, client_message_id = nuevoClientId(), responde_a: string | null = null) {
+    return this.llamar<{ id: string; seq: number; idempotente: boolean; modo: ModoConversacion; ia: string }>({ action: 'enviar', conversation_id, content, client_message_id, ...(responde_a ? { responde_a } : {}) })
   }
   // FOTOS · imagen (data URL JPG/PNG ya reducida). Idempotente por client_message_id, como un mensaje.
   adjuntar(conversation_id: string, imagen: string, client_message_id = 'img:' + nuevoClientId().replace(/^c:/, '')) {
@@ -131,3 +133,13 @@ export class ClienteChat {
 }
 
 export const chat = new ClienteChat()
+
+/** RESPONDER · cómo se ve un mensaje citado (las fotos y archivos, por lo que son). */
+export function textoCita(content: string): string {
+  if (/^Envió una imagen/.test(content)) return '📷 Foto'
+  if (/^Envió un sticker/.test(content)) return 'Sticker'
+  if (/^Envió un audio/.test(content)) return '🎤 Nota de voz'
+  if (/^Envió un video/.test(content)) return '🎥 Video'
+  if (/^Envió un documento/.test(content)) return '📄 Documento'
+  return content.replace(/\s+/g, ' ').trim().slice(0, 160)
+}

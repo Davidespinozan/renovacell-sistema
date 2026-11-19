@@ -4,7 +4,7 @@
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
 import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoPlantilla, cuerpoTexto, MIME_IMAGEN, MIME_AUDIO_WA, MIME_VIDEO_WA, type ArchivoWA, type MediaWA } from './whatsapp.ts'
-import { esMarcadorArchivo, esMensajeConImagen } from './adjuntos.ts'
+import { esMarcadorArchivo, esMensajeConImagen, wamidCitado } from './adjuntos.ts'
 import { cuerpoUbicacion, leerUbicacion } from './ubicacion.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
 
@@ -145,6 +145,9 @@ export async function despacharWhatsApp(admin: any, fetchImpl: typeof fetch = fe
       const cuerpoEnvio = tpl ? cuerpoPlantilla(s.wa_id, tpl.plantilla, tpl.idioma, tpl.parametros)
         : media ? cuerpoMedia(s.wa_id, media.tipo, media.enlace, esMensajeConImagen(s.texto) || esMarcadorArchivo(s.texto) ? null : s.texto, media.nombre)
         : (ubic && cuerpoUbicacion(s.wa_id, ubic)) || cuerpoTexto(s.wa_id, s.texto)
+      // RESPONDER A UN MENSAJE · el cliente lo ve citado en su WhatsApp
+      const citado = tpl ? null : await wamidCitado(admin, s.message_id)
+      if (citado) (cuerpoEnvio as Record<string, unknown>).context = { message_id: citado }
       let res: ResultadoEnvio
       try {
         const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)

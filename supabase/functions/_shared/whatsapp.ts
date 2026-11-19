@@ -7,7 +7,9 @@ export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' 
 export interface ArchivoWA { id: string; mime: string; tipo: 'audio' | 'video' }
 export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA; archivo?: ArchivoWA
   /** STICKERS (17 nov 2026) · reacción, sticker o algo que WhatsApp no entrega: se muestra, pero la IA no contesta a eso solo. */
-  sinRespuesta?: boolean }
+  sinRespuesta?: boolean
+  /** RESPONDER · el cliente respondió citando este mensaje (wamid). */
+  citado?: string }
 
 const ETIQUETA: Record<string, string> = {
   image: 'Envió una imagen por WhatsApp.', audio: 'Envió un audio por WhatsApp.', voice: 'Envió un audio por WhatsApp.',
@@ -59,7 +61,9 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
         const archivo: ArchivoWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'audio' && MIME_AUDIO_WA.includes(mime)) || (tipo === 'video' && MIME_VIDEO_WA.includes(mime)))
           ? { id: mediaId, mime, tipo: tipo as 'audio' | 'video' } : undefined
         const sinRespuesta = tipo === 'reaction' || tipo === 'sticker' || tipo === 'unsupported'
-        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}), ...(archivo ? { archivo } : {}), ...(sinRespuesta ? { sinRespuesta } : {}) })
+        const ctxId = String((m.context as Record<string, unknown> | undefined)?.id ?? '')
+        const citado = tipo !== 'reaction' && ctxId.length >= 8 && ctxId.length <= 200 ? ctxId : ''
+        out.push({ wa_id, nombre: (nombres.get(wa_id) ?? '').trim().slice(0, 120), wamid: wamid.slice(0, 200), texto: texto.slice(0, 4000), ...(media ? { media } : {}), ...(archivo ? { archivo } : {}), ...(sinRespuesta ? { sinRespuesta } : {}), ...(citado ? { citado } : {}) })
       }
     }
   }

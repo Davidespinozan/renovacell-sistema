@@ -162,3 +162,38 @@ export async function conEdiciones(admin: any, data: unknown, conv?: string | nu
       ...(recientes ? { ediciones: recientes } : {}) }
   } catch { return data }
 }
+
+/** RESPONDER A UN MENSAJE (19 nov 2026) · cada mensaje que responde a otro lleva `respuesta` con el texto citado (aunque el
+ *  original no venga en esta tanda). Si algo falla, los mensajes salen igual, sin la cita. */
+// deno-lint-ignore no-explicit-any
+export async function conRespuestas(admin: any, data: unknown): Promise<unknown> {
+  const d = data as { mensajes?: Msj[] } | null
+  if (!d || typeof d !== 'object') return data
+  const msgs = Array.isArray(d.mensajes) ? d.mensajes : []
+  const ids = msgs.filter((m) => typeof m.id === 'string').map((m) => m.id as string)
+  if (!ids.length) return data
+  try {
+    const { data: rel } = await admin.from('cc_mensaje_respuestas').select('message_id, responde_a').in('message_id', ids)
+    const pares = (rel ?? []) as Array<{ message_id: string; responde_a: string }>
+    if (!pares.length) return data
+    const { data: orig } = await admin.from('cc_messages').select('id, content, actor_type').in('id', [...new Set(pares.map((x) => x.responde_a))])
+    const porId = new Map(((orig ?? []) as Array<{ id: string; content: string; actor_type: string }>).map((o) => [o.id, o]))
+    const cita = new Map(pares.map((x) => [x.message_id, porId.get(x.responde_a)]))
+    return { ...(d as Record<string, unknown>), mensajes: msgs.map((m) => {
+      const o = cita.get(m.id as string)
+      return o ? { ...m, respuesta: { id: o.id, texto: String(o.content ?? '').slice(0, 300), actor: o.actor_type } } : m
+    }) }
+  } catch { return data }
+}
+
+/** WhatsApp: el wamid del mensaje al que responde este (para que el cliente lo vea citado). */
+// deno-lint-ignore no-explicit-any
+export async function wamidCitado(admin: any, messageId: string | null | undefined): Promise<string | null> {
+  if (!messageId) return null
+  try {
+    const { data: r } = await admin.from('cc_mensaje_respuestas').select('responde_a').eq('message_id', messageId).maybeSingle()
+    if (!r?.responde_a) return null
+    const { data: w } = await admin.from('cc_wa_mensajes').select('wamid').eq('message_id', r.responde_a).limit(1).maybeSingle()
+    return typeof w?.wamid === 'string' && w.wamid ? w.wamid : null
+  } catch { return null }
+}

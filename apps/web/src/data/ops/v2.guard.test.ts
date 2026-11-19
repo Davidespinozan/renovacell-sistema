@@ -49,7 +49,7 @@ describe('V2-B · redactor, móvil y CSS', () => {
   it('redactor: textarea con Enter/Shift+Enter, idempotencia al reintentar, sin botón grande de cierre', () => {
     const c = codigo(chatSrc)
     expect(c).toMatch(/<textarea/); expect(c).toMatch(/e\.key === 'Enter' && !e\.shiftKey/); expect(c).toMatch(/enterKeyHint="send"/)
-    expect(c).toMatch(/cliente\.enviar\(convId, t, clientId\)/)   // el MISMO client_message_id al reintentar
+    expect(c).toMatch(/cliente\.enviar\(convId, t, clientId(?:, respondeA)?\)/)   // el MISMO client_message_id al reintentar
     expect(c).toMatch(/className="rc-ico" onClick=\{onSalir\}/)
     expect(c).not.toMatch(/className="btn" onClick=\{onSalir\}/)
     expect(c).not.toMatch(/estilos\.pagina|style=\{estilos/)        // sin estilos inline de panel de ERP
