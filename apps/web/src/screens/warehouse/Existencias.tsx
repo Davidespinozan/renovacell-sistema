@@ -11,6 +11,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, etiquetaCaducidad } from './expiry'
 import { MermaModal } from './MermaModal'
 import { AjusteModal } from './AjusteModal'
+import { CorregirLoteModal, type LoteACorregir } from './CorregirLoteModal'
 import type { Lot, ProductSafe } from '../../data/types'
 
 type MermaLot = { id: string; lot_code: string; quantity: number; producto?: string }
@@ -20,6 +21,8 @@ export function Existencias() {
   const { data: products } = useProducts()
   const [mermaLot, setMermaLot] = useState<MermaLot | null>(null)
   const [ajusteLot, setAjusteLot] = useState<MermaLot | null>(null)
+  const [corregir, setCorregir] = useState<LoteACorregir | null>(null)
+  const [hecho, setHecho] = useState<string | null>(null)
   const [q, setQ] = useState('')   // CALIDAD VISUAL · buscar por producto o lote (antes había que recorrer toda la lista)
 
   const groups = useMemo(() => {
@@ -62,7 +65,7 @@ export function Existencias() {
       )}
       {q.trim() && visibles.length === 0 && <Vacio icono="search" titulo="Sin resultados." pista={`Ningún producto ni lote coincide con «${q.trim()}».`} />}
       {visibles.map((g) => (
-        <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} onAjuste={setAjusteLot} />
+        <ProductStock key={g.product.id} product={g.product} lots={g.lots} onMerma={setMermaLot} onAjuste={setAjusteLot} onCorregir={(l) => { setHecho(null); setCorregir(l) }} />
       ))}
       {groups.length === 0 && (
         <Vacio icono="box" titulo="Todavía no hay producto en almacén." pista="Entra al recibir la mercancía de una compra (“Recibir mercancía”)." />
@@ -70,11 +73,13 @@ export function Existencias() {
 
       {mermaLot && <MermaModal lot={mermaLot} onClose={() => setMermaLot(null)} />}
       {ajusteLot && <AjusteModal lot={ajusteLot} onClose={() => setAjusteLot(null)} />}
+      {corregir && <CorregirLoteModal key={corregir.id} lote={corregir} onClose={() => setCorregir(null)} onListo={(t) => { setCorregir(null); setHecho(t) }} />}
+      {hecho && <div className="pc-msg ok" role="status" data-testid="corregir-lote-ok">{hecho}</div>}
     </div>
   )
 }
 
-function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void; onAjuste: (l: MermaLot) => void }) {
+function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { product: ProductSafe; lots: Lot[]; onMerma: (l: MermaLot) => void; onAjuste: (l: MermaLot) => void; onCorregir: (l: LoteACorregir) => void }) {
   // Existencia FÍSICA = todo el inventario (incl. caducado, que sigue existiendo/trazable).
   // DISPONIBLE PARA VENTA = no caducado (misma semántica autoritativa que product_stock).
   const fisica = lots.reduce((s, l) => s + l.quantity, 0)
@@ -121,6 +126,8 @@ function ProductStock({ product, lots, onMerma, onAjuste }: { product: ProductSa
               <span className="inv-acc">
                 <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)"
                   onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="edit" /> Ajustar</button>
+                <button className="btn ghost sm" type="button" title="Corregir caducidad o código de lote mal capturado" data-testid="btn-corregir-lote"
+                  onClick={() => onCorregir({ id: l.id, lot_code: l.lot_code, expiry_date: l.expiry_date, producto: product.name })}><Icon name="clock" /> Corregir</button>
                 {l.quantity > 0 && (
                   <button className="btn ghost sm inv-merma" type="button" title="Dar de baja por merma (parcial o total)"
                     onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="trash" /> Merma</button>

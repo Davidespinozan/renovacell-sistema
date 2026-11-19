@@ -348,3 +348,22 @@ button.cifra-v{cursor:pointer}
 .parada-pago{margin-top:6px;padding:6px 10px;border-radius:var(--ds-r);font-size:var(--ds-fs-sm);font-weight:600}
 .parada-pago--ok{background:var(--ds-brand-soft);color:var(--ds-brand-strong)}
 .parada-pago--cobrar{background:var(--ds-warning-bg);color:var(--ds-warning)}
+
+/* COBRO AL ENTREGAR (19 nov 2026) */
+.cobro-ent{display:grid;gap:8px;flex:1;min-width:0}
+.cobro-ent-h{display:grid;gap:2px}
+.cobro-ent-h b{font-size:var(--ds-fs-md)}
+.cobro-ent-h small{color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
+.cobro-ent-campo{display:grid;gap:4px;font-size:var(--ds-fs-sm);font-weight:600}
+.cobro-ent-campo input,.cobro-ent-ref{font:inherit;font-weight:400;min-height:44px;padding:8px 10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);box-sizing:border-box}
+.cobro-ent-botones{display:flex;gap:8px;flex-wrap:wrap}
+.cobro-ent-botones .btn{min-height:48px;flex:1 1 140px;justify-content:center}
+.cobro-ent--ok{padding:6px 10px;border-radius:var(--ds-r);background:var(--ds-brand-soft);color:var(--ds-brand-strong);font-weight:600;font-size:var(--ds-fs-sm)}
+.cobro-ent--err{padding:6px 10px;border-radius:var(--ds-r);background:var(--ds-warning-bg);color:var(--ds-warning);font-size:var(--ds-fs-sm)}
+
+/* ALMACÉN · corregir lote (19 nov 2026) */
+.corregir-lote{display:grid;gap:12px}
+.corregir-lote label{display:grid;gap:4px;font-size:var(--ds-fs-sm);font-weight:600}
+.corregir-lote input{font:inherit;font-weight:400;min-height:44px;padding:8px 10px;border:1px solid var(--ds-border);border-radius:var(--ds-r);box-sizing:border-box}
+.corregir-lote small{color:var(--ds-text-2);font-size:var(--ds-fs-xs)}
+.corregir-lote-aviso{color:var(--ds-warning) !important;font-weight:600}

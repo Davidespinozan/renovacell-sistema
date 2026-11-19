@@ -131,8 +131,9 @@ function parse(text: string, def: Def): Record<string, string | number>[] {
   }).filter((r) => Object.values(r).some((v) => String(v ?? '').trim() !== '' && v !== 0))
 }
 
-export function Importar() {
-  const [tipo, setTipo] = useState<Tipo>('catalogo')
+export function Importar({ solo }: { solo?: Tipo } = {}) {
+  // ALMACÉN (19 nov 2026) · Alberto carga el inventario él mismo: con `solo` se ve únicamente ese tipo.
+  const [tipo, setTipo] = useState<Tipo>(solo ?? 'catalogo')
   const [text, setText] = useState('')
   const [rows, setRows] = useState<Record<string, string | number>[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -203,7 +204,7 @@ export function Importar() {
       </PageHead>
 
       <div className="fchips">
-        {DEFS.map((d) => (
+        {DEFS.filter((d) => !solo || d.tipo === solo).map((d) => (
           <button key={d.tipo} type="button" className={'fchip' + (tipo === d.tipo ? ' on' : '')} onClick={() => cambiarTipo(d.tipo)}>
             {d.titulo}
           </button>

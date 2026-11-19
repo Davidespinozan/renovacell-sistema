@@ -140,6 +140,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_mermas: () => <Mermas />,
   av_control_inv: () => <ControlInventario />,
   av_import: () => <Importar />,
+  carga_inventario: () => <Importar solo="inventario" />,   // ALMACÉN · Alberto carga el inventario desde Excel
   av_sitio: () => <SitioWeb />,
   eventos: () => <Eventos />,
   caja: () => <Caja />,

@@ -27,7 +27,7 @@ describe('UX-2 · terminología', () => {
     for (const [p, src] of Object.entries(fuentes)) if (!/guard/.test(p)) expect(src, p).not.toMatch(/Registrar entradas/)
     expect(comprasSrc).toMatch(/<PageHead title="Compras a proveedores">/)
     expect(entradasSrc).toMatch(/<PageHead title="Recibir mercancía">/)
-    expect(entradasSrc).toMatch(/Entradas excepcionales \(solo Dirección\)/)
+    expect(entradasSrc).toMatch(/Entradas sin compra/)   // ALMACÉN CONTROL TOTAL (19 nov 2026): Almacén también las registra
   })
 })
 

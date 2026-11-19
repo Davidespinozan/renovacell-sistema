@@ -25,7 +25,7 @@ export function AjusteModal({ lot, onClose }: {
   const { role } = useRole()
   // W1 · D-06: el ajuste NEGATIVO lo registra Almacén (inmediato, auditado); el POSITIVO
   // (crea stock) es solo de Dirección — el servidor lo impone igual.
-  const positivoBloqueado = hasSupabase && delta > 0 && role !== 'admin'
+  const positivoBloqueado = hasSupabase && delta > 0 && role !== 'admin' && role !== 'warehouse'   // Almacén también registra sobrantes
 
   const aplicar = async () => {
     if (delta === 0 || busy || positivoBloqueado) return

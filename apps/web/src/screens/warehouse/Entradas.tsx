@@ -53,7 +53,7 @@ export function Entradas() {
   const { data: movements } = useInventory()
   const { data: compras } = useCompras()
   const { role } = useRole()
-  const isAdmin = role === 'admin'
+  const isAdmin = role === 'admin' || role === 'warehouse'   // ALMACÉN CONTROL TOTAL (19 nov 2026): Alberto registra también entradas sin compra
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const avisar = (ok: boolean, text: string) => { setToast({ ok, text }); if (ok) window.setTimeout(() => setToast(null), 4000) }
@@ -104,7 +104,7 @@ export function Entradas() {
                   <td data-label=""><button className="btn sm" type="button" onClick={() => setReceiving(o)} data-testid="btn-recibir"><Icon name="check" /> Recibir mercancía</button></td>
                 </tr>
               ))}
-              {pendientes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>No hay compras pendientes de recibir. Cuando Dirección registre una compra a proveedor aparecerá aquí.</td></tr>}
+              {pendientes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>No hay compras pendientes de recibir. Si llegó mercancía sin compra registrada, regístrala abajo en «Entradas sin compra», o carga todo de una vez en «Cargar inventario (Excel)».</td></tr>}
             </tbody>
           </table>
         </div>
@@ -225,8 +225,8 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Icon name="shield" />
         <div>
-          <div className="eyebrow" style={{ margin: 0 }}>Entradas excepcionales (solo Dirección)</div>
-          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '4px 0 0' }}>Producto que entra <b>sin una compra</b>: inventario encontrado, muestra o corrección autorizada. Siempre con motivo. No es la recepción normal de almacén; la carga inicial va por Importar / Migración.</p>
+          <div className="eyebrow" style={{ margin: 0 }}>Entradas sin compra</div>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-3)', margin: '4px 0 0' }}>Producto que entra <b>sin una compra registrada</b>: mercancía que llegó, inventario encontrado, muestra o corrección. Siempre con motivo (queda registrado quién y por qué). Para cargar mucho de una vez: «Cargar inventario (Excel)».</p>
         </div>
         <button className="btn ghost sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} data-testid="btn-excepcional">
           {abierto ? 'Ocultar' : 'Registrar entrada excepcional'}
