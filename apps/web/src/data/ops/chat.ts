@@ -134,6 +134,21 @@ export class ClienteChat {
 
 export const chat = new ClienteChat()
 
+// DOCUMENTOS DE WHATSAPP (20 nov 2026) · el mensaje dice que el cliente mandó un archivo, pero el archivo se guarda un
+// momento DESPUÉS que el mensaje. 'esperando': acaba de llegar y se sigue releyendo hasta que aparece; 'perdido': ya no
+// llegó (muy pesado, tipo que no se guarda, o falló la descarga) y hay que pedirlo otra vez. null: no aplica.
+const ARCHIVO_WA = /^Envió (una imagen|un audio|un video|un documento) por WhatsApp\./
+export const ESPERA_ARCHIVO_MS = 120_000
+export function archivoPendienteWA(m: Pick<Mensaje, 'actor' | 'content' | 'created_at' | 'adjunto' | 'archivo'>, ahora = Date.now()): 'esperando' | 'perdido' | null {
+  if (m.adjunto || m.archivo || (m.actor !== 'visitor' && m.actor !== 'doctor') || !ARCHIVO_WA.test(m.content)) return null
+  return ahora - Date.parse(m.created_at) < ESPERA_ARCHIVO_MS ? 'esperando' : 'perdido'
+}
+/** Lo que el cliente escribió junto a su archivo de WhatsApp ("Envió un documento por WhatsApp. «mi comprobante»"). */
+export function pieArchivoWA(content: string): string | null {
+  const m = /^Envió (?:una imagen|un audio|un video|un documento) por WhatsApp\. «([\s\S]+)»$/.exec(content)
+  return m ? m[1] : null
+}
+
 /** RESPONDER · cómo se ve un mensaje citado (las fotos y archivos, por lo que son). */
 export function textoCita(content: string): string {
   if (/^Envió una imagen/.test(content)) return '📷 Foto'

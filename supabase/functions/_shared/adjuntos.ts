@@ -30,15 +30,23 @@ export const VIGENCIA_ENLACE_SEG = 600
 /** NOTAS DE VOZ (15 nov 2026) · guarda el audio o video del cliente de WhatsApp con SU mensaje (bucket chat_archivos).
  *  Cualquier falla deja el mensaje como estaba ("Envió un audio por WhatsApp."). */
 const EXT_WA: Record<string, string> = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/amr': 'amr', 'audio/mp4': 'm4a', 'video/mp4': 'mp4', 'video/3gpp': '3gp' }
+/** DOCUMENTOS DE WHATSAPP (20 nov 2026) · extensión de lo que llega "como documento" (incluye fotos sin comprimir). */
+const EXT_DOC_WA: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' }
+/** Nombre con el que el equipo ve el documento: el que le puso el cliente (con su extensión) o "Documento.pdf". */
+export const nombreDocumentoWA = (nombre: unknown, ext: string): string => {
+  const n = (typeof nombre === 'string' ? nombre.replace(/[\u0000-\u001f/\\]+/g, ' ').trim() : '') || 'Documento'
+  return (/\.[A-Za-z0-9]{2,5}$/.test(n) ? n : `${n.slice(0, 190)}.${ext}`).slice(0, 200)
+}
 // deno-lint-ignore no-explicit-any
-export async function guardarArchivoWA(admin: any, conv: string, messageId: string, arc: { bytes: Uint8Array; mime: string }): Promise<boolean> {
-  const ext = EXT_WA[arc.mime]
+export async function guardarArchivoWA(admin: any, conv: string, messageId: string, arc: { bytes: Uint8Array; mime: string; documento?: boolean; nombre?: string }): Promise<boolean> {
+  const ext = EXT_WA[arc.mime] ?? (arc.documento ? EXT_ARCHIVO[arc.mime] ?? EXT_DOC_WA[arc.mime] : undefined)
   if (!ext || !messageId || !arc.bytes.length) return false
   try {
     const ruta = `${conv}/${crypto.randomUUID()}.${ext}`
     const { error: eSub } = await admin.storage.from(BUCKET_ARCHIVOS).upload(ruta, arc.bytes, { contentType: arc.mime })
     if (eSub) return false
-    const { error } = await admin.rpc('cc_archivo_registrar_wa', { p_message: messageId, p_ruta: ruta, p_tipo: arc.mime, p_bytes: arc.bytes.length })
+    // El nombre solo viaja con los documentos: audio y video siguen llamando igual que antes.
+    const { error } = await admin.rpc('cc_archivo_registrar_wa', { p_message: messageId, p_ruta: ruta, p_tipo: arc.mime, p_bytes: arc.bytes.length, ...(arc.documento ? { p_nombre: nombreDocumentoWA(arc.nombre, ext) } : {}) })
     if (error) { await admin.storage.from(BUCKET_ARCHIVOS).remove([ruta]).then(() => {}, () => {}); return false }
     return true
   } catch { return false }
@@ -59,7 +67,7 @@ export const claseArchivo = (tipo: string): 'video' | 'documento' | null => (!EX
 export const nombreArchivo = (n: unknown): string => (typeof n === 'string' ? n.replace(/[\u0000-\u001f/\\]+/g, ' ').trim().slice(0, 200) : '') || 'archivo'
 export const textoArchivo = (tipo: string, nombre: string): string => (claseArchivo(tipo) === 'video' ? 'Envió un video.' : `Envió un documento: ${nombre.slice(0, 160)}.`)
 /** El texto que marca un mensaje de archivo (no se le manda al cliente como pie en WhatsApp). */
-export const esMarcadorArchivo = (t: unknown): boolean => typeof t === 'string' && (t === 'Envió un video.' || /^Envió un documento: .*\.$/s.test(t) || /^Envió un (audio|video) por WhatsApp\./.test(t))
+export const esMarcadorArchivo = (t: unknown): boolean => typeof t === 'string' && (t === 'Envió un video.' || /^Envió un documento: .*\.$/s.test(t) || /^Envió un (audio|video|documento) por WhatsApp\./.test(t))
 /** client_message_id de un archivo: siempre con prefijo `arc:` (así la base sabe que lleva archivo). */
 export function idArchivo(entrada: unknown): string {
   const base = typeof entrada === 'string' ? entrada.replace(/^arc:/, '').replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 70) : ''

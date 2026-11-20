@@ -16,7 +16,7 @@ import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../dat
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
 import { reducirFoto } from '../../data/ops/verificacion'
 import { BrandLogo } from '../../app/BrandLogo'
-import { chat as clientePorDefecto, textoCita, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
+import { chat as clientePorDefecto, textoCita, archivoPendienteWA, pieArchivoWA, ETIQUETA_MODO, IA_PUEDE, nuevoClientId, type ClienteChat, type Conversacion, type Mensaje, type ModoConversacion, type SesionListada, canalDe, NOMBRE_CANAL } from '../../data/ops/chat'
 import { retomarConversacion } from '../../data/ops/misConversaciones'   // CONV-WHATSAPP · escribir = retomar
 import { telefonoLegible } from '../../lib/telefono'
 import { hiloPersona as hiloPersonaPorDefecto, NOMBRE_CANAL_PERSONA, type CanalPersona, type HiloPersona } from '../../data/ops/hiloPersona'
@@ -39,6 +39,8 @@ interface Props {
   asesor?: boolean                  // controles de asesor (iniciar/terminar/liberar)
   cliente?: ClienteChat
   intervaloMs?: number
+  /** DOCUMENTOS DE WHATSAPP · cada cuánto se relee un mensaje reciente cuyo archivo aún no llega (las pruebas lo acortan). */
+  esperaArchivoMs?: number
   onSalir?: () => void
   conCarrito?: boolean               // CC-5 · chip de carrito (default: sí)
   clienteCarrito?: ClienteCarrito
@@ -170,7 +172,7 @@ export const unirHilo = (...listas: Mensaje[][]): Mensaje[] => {
 /** Chat V2-C3 · mensajes que ve ACTUAL: si el servidor devuelve la última sesión CERRADA, ACTUAL va vacío. */
 export const mensajesActuales = (conv: Conversacion | null): Mensaje[] => (!conv || conv.sesion?.estado === 'cerrada' ? [] : conv.mensajes)
 
-export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor, telefono = null, retomar = retomarConversacion, hiloDePersona = hiloPersonaPorDefecto }: Props) {
+export function ChatCanonico({ embebido = false, conversationId, asesor = false, cliente = clientePorDefecto, intervaloMs = 15_000, esperaArchivoMs = 3_000, onSalir, conCarrito = true, clienteCarrito, panel = false, onLeido, etiquetaSalir = 'Cerrar', autoFoco = false, nombreCliente = null, onFin, barra, accionesAdjunto, reducir = reducirFoto, tarjetaFinal, suscribir = suscribirMensajes, respuestas = respuestasPorDefecto, puedeEmpresa = false, estilo = 'mensajeria', onIrCatalogo, bloqueoEscritura = null, tira, acciones, hoja, inicioHilo, notaRedactor, telefono = null, retomar = retomarConversacion, hiloDePersona = hiloPersonaPorDefecto }: Props) {
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [convId, setConvId] = useState<string | null>(conversationId ?? null)
   const [texto, setTexto] = useState('')
@@ -216,7 +218,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       // Chat V2-C1 · el servidor muestra SOLO la sesión actual: si cambió de sesión, el hilo empieza de nuevo.
       if (r.data.sesion?.id && prev.sesion?.id && r.data.sesion.id !== prev.sesion.id) return r.data
       const vistos = new Set(prev.mensajes.map((m) => m.seq))
-      return { ...r.data, mensajes: conCorrecciones([...prev.mensajes, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))], r.data.ediciones) }
+      // DOCUMENTOS DE WHATSAPP · el archivo se guarda un momento después que su mensaje: al releerlo, entra con su archivo.
+      const conArchivo = new Map(r.data.mensajes.filter((m) => m.adjunto || m.archivo).map((m) => [m.seq, m]))
+      const previos = conArchivo.size ? prev.mensajes.map((m) => (!m.adjunto && !m.archivo && conArchivo.has(m.seq) ? conArchivo.get(m.seq)! : m)) : prev.mensajes
+      return { ...r.data, mensajes: conCorrecciones([...previos, ...r.data.mensajes.filter((m) => !vistos.has(m.seq))], r.data.ediciones) }
     })
     const max = r.data.mensajes.reduce((s, m) => Math.max(s, m.seq), desde)
     if (max <= ultimoSeq.current) return
@@ -259,6 +264,16 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     document.addEventListener('visibilitychange', tick)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
   }, [convId, cargar, intervaloMs, finAtencion])
+
+  // DOCUMENTOS DE WHATSAPP · si un mensaje reciente dice "Envió un documento/foto/audio por WhatsApp" y aún no trae su
+  // archivo, se relee desde ese mensaje cada 3 s (hasta 8 veces) para que aparezca sin tener que cerrar la conversación.
+  const seqEspera = useMemo(() => (conv?.mensajes ?? []).reduce((s, m) => (archivoPendienteWA(m) === 'esperando' ? (s ? Math.min(s, m.seq) : m.seq) : s), 0), [conv?.mensajes])
+  useEffect(() => {
+    if (!convId || !seqEspera || finAtencion) return
+    let n = 0
+    const t = setInterval(() => { n += 1; if (n > 8) { clearInterval(t); return } void cargar(convId, seqEspera - 1) }, esperaArchivoMs)
+    return () => clearInterval(t)
+  }, [convId, seqEspera, cargar, finAtencion, esperaArchivoMs])
 
   // CHAT PRO · mientras el otro lado escribe, se lee más seguido: su mensaje aparece en cuanto lo manda.
   const otroEscribiendo = !!conv?.escribiendo_otro
@@ -728,6 +743,13 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           ) : <div className="rc-bubble" title={horaDe(m.created_at)}>{busq && hallados.includes(m.id)
                 ? partesResaltadas(m.content, busq).map((p, i) => (p.hallado ? <mark key={i} className="rc-mark-busq">{p.t}</mark> : <React.Fragment key={i}>{p.t}</React.Fragment>))
                 : conEnlaces(m.content)}</div>}
+          {/* DOCUMENTOS DE WHATSAPP · lo que escribió junto al archivo, y el aviso honesto si el archivo no está. */}
+          {(m.archivo || m.adjunto) && pieArchivoWA(m.content) && <div className="rc-bubble rc-bubble--pie" data-testid="msg-pie">{conEnlaces(pieArchivoWA(m.content)!)}</div>}
+          {asesor && archivoPendienteWA(m) && (
+            <div className="rc-archivo-nota" role="note" data-testid="msg-archivo-nota">
+              {archivoPendienteWA(m) === 'esperando' ? 'Recibiendo el archivo…' : 'Este archivo no quedó guardado. Pídele que lo mande otra vez.'}
+            </div>
+          )}
           {puedoResponder && !m.otro && (
             <button type="button" className="rc-responder" onClick={() => responderA(m)} aria-label="Responder a este mensaje" title="Responder" data-testid="btn-responder-msg"><Reply size={14} /></button>
           )}

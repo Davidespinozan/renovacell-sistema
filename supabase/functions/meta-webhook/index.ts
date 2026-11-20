@@ -130,9 +130,11 @@ Deno.serve(async (req) => {
         // producto) aunque atienda una persona, y la misma descarga la ve la IA si le toca responder.
         const adjunto = m.media ? await descargarMedia(m.media) : null
         if (adjunto && r.message_id) await guardarImagenWA(admin, r.conversation_id, r.message_id, adjunto)
-        if (m.archivo && r.message_id) {   // NOTAS DE VOZ: el audio/video queda en la conversación para el equipo
+        if (m.archivo && r.message_id) {   // NOTAS DE VOZ y DOCUMENTOS: el archivo queda en la conversación para el equipo
           const arc = await descargarArchivoWA(m.archivo)
-          if (arc) await guardarArchivoWA(admin, r.conversation_id, r.message_id, arc)
+          const guardado = arc ? await guardarArchivoWA(admin, r.conversation_id, r.message_id, { ...arc, documento: m.archivo.tipo === 'document', nombre: m.archivo.nombre }) : false
+          // Sin esto, un archivo que no se pudo guardar no deja rastro (así se perdieron los documentos hasta el 20 nov).
+          if (!guardado) diag({ canal: 'whatsapp', etapa: 'wa_archivo', causa: 'excepcion', codigo: `${arc ? 'no_guardado' : 'no_descargado'}_${m.archivo.tipo}`, http: 200, correlacion: correlacion(m.wamid), cuenta })
         }
         await avisarPush(admin, r.conversation_id, r.actor, m.texto)
         if (IA_PUEDE(r.modo as never) && !m.sinRespuesta) {   // a una reacción o un sticker suelto la IA no contesta

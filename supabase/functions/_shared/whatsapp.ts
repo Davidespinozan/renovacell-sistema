@@ -4,7 +4,9 @@
 // R4-C13 · `media`: imagen o PDF que la IA puede ver (se descarga de Meta al responder; no se guarda).
 export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' }
 // NOTAS DE VOZ (15 nov 2026) · audio o video del cliente: se guarda en la conversación para que el equipo lo escuche/vea.
-export interface ArchivoWA { id: string; mime: string; tipo: 'audio' | 'video' }
+// DOCUMENTOS (20 nov 2026) · también lo que el cliente manda "como documento" (su comprobante en PDF, un Word, un Excel,
+// una foto sin comprimir): antes solo quedaba el texto "Envió un documento por WhatsApp." y el equipo no podía abrirlo.
+export interface ArchivoWA { id: string; mime: string; tipo: 'audio' | 'video' | 'document'; nombre?: string }
 export interface EntranteWA { wa_id: string; nombre: string; wamid: string; texto: string; media?: MediaWA; archivo?: ArchivoWA
   /** STICKERS (17 nov 2026) · reacción, sticker o algo que WhatsApp no entrega: se muestra, pero la IA no contesta a eso solo. */
   sinRespuesta?: boolean
@@ -21,6 +23,13 @@ const ETIQUETA: Record<string, string> = {
 export const MIME_IMAGEN = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 export const MIME_AUDIO_WA = ['audio/ogg', 'audio/mpeg', 'audio/aac', 'audio/amr', 'audio/mp4']
 export const MIME_VIDEO_WA = ['video/mp4', 'video/3gpp']
+/** Lo que se guarda cuando llega como DOCUMENTO: PDF, Office, texto y fotos (más audio/video adjuntados como archivo). */
+export const MIME_DOC_WA = [
+  'application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', ...MIME_AUDIO_WA, ...MIME_VIDEO_WA,
+]
 
 /** Mensajes ENTRANTES de WhatsApp (entry[].changes[].value.messages[]). Ignora acuses (statuses) y lo que no trae wamid. */
 export function extraerWhatsApp(payload: unknown): EntranteWA[] {
@@ -58,8 +67,11 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
         // El sticker es una imagen WEBP (a veces animada): se guarda y se ve como imagen.
         const media: MediaWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'image' && MIME_IMAGEN.includes(mime)) || (tipo === 'sticker' && (mime === 'image/webp' || mime === '')) || (tipo === 'document' && mime === 'application/pdf'))
           ? { id: mediaId, mime: tipo === 'sticker' ? 'image/webp' : mime, tipo: tipo === 'document' ? 'document' : 'image' } : undefined
-        const archivo: ArchivoWA | undefined = /^[0-9]{5,30}$/.test(mediaId) && ((tipo === 'audio' && MIME_AUDIO_WA.includes(mime)) || (tipo === 'video' && MIME_VIDEO_WA.includes(mime)))
-          ? { id: mediaId, mime, tipo: tipo as 'audio' | 'video' } : undefined
+        const nombreDoc = tipo === 'document' ? String(obj.filename ?? '').replace(/[\u0000-\u001f/\\]+/g, ' ').trim().slice(0, 200) : ''
+        const archivo: ArchivoWA | undefined = !/^[0-9]{5,30}$/.test(mediaId) ? undefined
+          : (tipo === 'audio' && MIME_AUDIO_WA.includes(mime)) || (tipo === 'video' && MIME_VIDEO_WA.includes(mime)) ? { id: mediaId, mime, tipo: tipo as 'audio' | 'video' }
+          : tipo === 'document' && MIME_DOC_WA.includes(mime) ? { id: mediaId, mime, tipo: 'document', ...(nombreDoc ? { nombre: nombreDoc } : {}) }
+          : undefined
         const sinRespuesta = tipo === 'reaction' || tipo === 'sticker' || tipo === 'unsupported'
         const ctxId = String((m.context as Record<string, unknown> | undefined)?.id ?? '')
         const citado = tipo !== 'reaction' && ctxId.length >= 8 && ctxId.length <= 200 ? ctxId : ''

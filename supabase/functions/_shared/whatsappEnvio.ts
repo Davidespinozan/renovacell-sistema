@@ -3,7 +3,7 @@
 // Lo llaman el chat (al contestar), meta-webhook (tras la IA) y la tarea de cada minuto (reintentos). Nunca lanza.
 // R4-B2-2 · antes de CADA POST se vuelve a preguntar a la base (pausa / canal fuera de activo → se retiene, no se envía);
 // el resultado se clasifica (definitivo / reintentable / incierto) y un incierto nunca se reintenta.
-import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoPlantilla, cuerpoTexto, MIME_IMAGEN, MIME_AUDIO_WA, MIME_VIDEO_WA, type ArchivoWA, type MediaWA } from './whatsapp.ts'
+import { configWA, cuerpoEscribiendo, cuerpoMedia, cuerpoPlantilla, cuerpoTexto, MIME_IMAGEN, MIME_AUDIO_WA, MIME_VIDEO_WA, MIME_DOC_WA, type ArchivoWA, type MediaWA } from './whatsapp.ts'
 import { esMarcadorArchivo, esMensajeConImagen, wamidCitado } from './adjuntos.ts'
 import { cuerpoUbicacion, leerUbicacion } from './ubicacion.ts'
 import { clasificarEnvio, lineaResolucion, resultadoDeExcepcion, type ResultadoEnvio } from './salidaClase.ts'
@@ -34,24 +34,31 @@ export interface AdjuntoIA { tipo: 'image' | 'document'; media_type: string; dat
 export const MAX_IMAGEN = 3.5 * 1024 * 1024, MAX_PDF = 10 * 1024 * 1024
 /** NOTAS DE VOZ · baja el audio o video del cliente (tope 16 MB, lo que permite WhatsApp). null si algo falla. */
 export const MAX_ARCHIVO_WA = 16 * 1024 * 1024
+/** DOCUMENTOS · tope de lo que se guarda cuando llega como documento (WhatsApp deja hasta 100 MB; aquí 25 MB). */
+export const MAX_DOC_WA = 25 * 1024 * 1024
 export async function descargarArchivoWA(archivo: ArchivoWA, fetchImpl: typeof fetch = fetch): Promise<{ bytes: Uint8Array; mime: string } | null> {
   const cfg = configWA((k) => Deno.env.get(k))
   if (!cfg) return null
-  const conTiempo = async (url: string) => {
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15_000)
-    try { return await fetchImpl(url, { signal: ctl.signal, headers: { Authorization: `Bearer ${cfg.token}` } }) } finally { clearTimeout(t) }
+  // El plazo cubre también la lectura del cuerpo (un documento de 25 MB puede tardar más que una nota de voz).
+  const conTiempo = async <T>(url: string, ms: number, leer: (r: Response) => Promise<T>): Promise<T> => {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms)
+    try { return await leer(await fetchImpl(url, { signal: ctl.signal, headers: { Authorization: `Bearer ${cfg.token}` } })) } finally { clearTimeout(t) }
   }
+  const esDoc = archivo.tipo === 'document'
+  const tope = esDoc ? MAX_DOC_WA : MAX_ARCHIVO_WA
   try {
-    const meta = await conTiempo(`https://graph.facebook.com/${cfg.version}/${archivo.id}`)
-    if (!meta.ok) return null
-    const info = await meta.json().catch(() => null) as { url?: string; mime_type?: string; file_size?: number } | null
+    const info = await conTiempo(`https://graph.facebook.com/${cfg.version}/${archivo.id}`, 15_000, async (r) => {
+      if (!r.ok) { await r.body?.cancel().catch(() => {}); return null }
+      return await r.json().catch(() => null) as { url?: string; mime_type?: string; file_size?: number } | null
+    })
     const mime = String(info?.mime_type ?? archivo.mime).toLowerCase().split(';')[0].trim()
-    const valido = archivo.tipo === 'audio' ? MIME_AUDIO_WA.includes(mime) : MIME_VIDEO_WA.includes(mime)
-    if (!info?.url || !/^https:\/\//.test(info.url) || !valido || Number(info.file_size ?? 0) > MAX_ARCHIVO_WA) return null
-    const bin = await conTiempo(info.url)
-    if (!bin.ok) return null
-    const bytes = new Uint8Array(await bin.arrayBuffer())
-    return bytes.length && bytes.length <= MAX_ARCHIVO_WA ? { bytes, mime } : null
+    const valido = archivo.tipo === 'audio' ? MIME_AUDIO_WA.includes(mime) : archivo.tipo === 'video' ? MIME_VIDEO_WA.includes(mime) : MIME_DOC_WA.includes(mime)
+    if (!info?.url || !/^https:\/\//.test(info.url) || !valido || Number(info.file_size ?? 0) > tope) return null
+    const bytes = await conTiempo(info.url, esDoc ? 40_000 : 15_000, async (r) => {
+      if (!r.ok) { await r.body?.cancel().catch(() => {}); return null }
+      return new Uint8Array(await r.arrayBuffer())
+    })
+    return bytes && bytes.length && bytes.length <= tope ? { bytes, mime } : null
   } catch { return null }
 }
 
