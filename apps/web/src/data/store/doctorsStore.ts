@@ -28,7 +28,7 @@ const live = makeLive<Profile>(async () => {
   // (nombre/org/verificado/contacto de envío, SIN correo ni cédula). Se piden ambos
   // en paralelo: si `profiles` trae filas → admin; si no → el directorio.
   const [prof, dir] = await Promise.all([
-    supabase.from('profiles').select('id, email, full_name, role_id, verified, organization, price_list_id, meta').eq('role_id', 'doctor').order('full_name'),
+    supabase.from('profiles').select('id, email, full_name, role_id, verified, organization, price_list_id, meta').eq('role_id', 'doctor').neq('active', false).order('full_name'),   // BLOQUE1 · los dados de baja no se listan
     supabase.from('doctor_directory').select('id, name, organization, verified, meta').order('name'),
   ])
   if ((prof.data?.length ?? 0) > 0) return prof.data as unknown as Profile[]
@@ -114,23 +114,23 @@ export async function updateDoctor(id: string, patch: { full_name?: string; orga
   return { ok: true }
 }
 
-// Eliminar un doctor. Es un usuario de auth → se borra vía la Edge Function
-// `staff-admin` (service role, solo admin). Los locales (sin persistir) se quitan
-// de la lista sin más.
-export async function deleteDoctor(id: string): Promise<{ ok: boolean; error?: string }> {
+// DAR DE BAJA a un doctor (BLOQUE1, 20 nov 2026). Antes «Eliminar» siempre fallaba: la base no borra doctores (su
+// historial de pedidos y facturas se conserva). Ahora: la Edge `staff-admin` (acción doctor_baja) le quita la
+// verificación, desactiva la cuenta y Auth deja de darle sesión. Se espera al servidor antes de quitarlo de la lista.
+export async function deleteDoctor(id: string, motivo = 'Baja desde Doctores'): Promise<{ ok: boolean; error?: string }> {
   const cur = live.current().find((d) => d.id === id)
-  live.setLocal(live.current().filter((d) => d.id !== id))
-  logAudit({ actor: 'Administración', action: 'Doctor eliminado', resource: cur?.full_name ?? id })
   if (hasSupabase && isUuid(id)) {
-    const { data, error } = await supabase.functions.invoke('staff-admin', { body: { action: 'delete', id } })
-    let err = error?.message ?? (data as { error?: string } | null)?.error
-    // FK con orders.doctor_id: el doctor tiene pedidos en su historial → mensaje claro.
-    if (err && /foreign key|violates|constraint|orders/i.test(err)) {
-      err = 'No se puede eliminar: el doctor tiene pedidos en su historial. Revócale el acceso en su lugar.'
+    const { data, error } = await supabase.functions.invoke('staff-admin', { body: { action: 'doctor_baja', id, motivo } })
+    let err = (data as { error?: string } | null)?.error
+    if (error) {
+      // El 400 trae el motivo en el cuerpo; sin cuerpo, mensaje genérico.
+      try { err = ((await (error as { context?: Response }).context?.json()) as { error?: string } | undefined)?.error ?? err } catch { /* sin cuerpo */ }
+      err = err ?? 'No se pudo dar de baja. Revisa tu conexión e intenta de nuevo.'
     }
     if (err) { await live.reload(); return { ok: false, error: err } }
-    await live.reload()
   }
+  live.setLocal(live.current().filter((d) => d.id !== id))
+  logAudit({ actor: 'Administración', action: 'Doctor dado de baja', resource: cur?.full_name ?? id, detail: motivo.slice(0, 200) })
   return { ok: true }
 }
 

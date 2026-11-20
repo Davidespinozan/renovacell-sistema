@@ -2,7 +2,7 @@
 // el acceso del doctor al Portal (profiles.verified). Solo lectura excepto
 // verificar/revocar. Agrega de profiles (doctores) + orders existentes.
 import { Vacio } from '../../app/EmptyState'
-import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
+import { avisar, confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useEffect, useMemo, useState } from 'react'
 import { UserCheck, ShieldCheck, Ban, X, ShoppingBag, Clock, Plus, Pencil, Trash2, ScanFace, IdCard } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
@@ -44,10 +44,19 @@ export function Doctores() {
   const push = usePushEstado()   // PUSH SIEMPRE · qué doctores reciben notificaciones
   const { data: customers } = useCustomers()
   const [editDoc, setEditDoc] = useState<{ id: string; name: string; org: string } | null>(null)
-  // Eliminar un doctor es irreversible (borra su cuenta e historial): confirmación tecleada.
+  // BLOQUE1 · dar de baja (ya no «eliminar»: el historial se conserva). Pide el motivo y confirmación tecleada.
+  const [motivoBaja, setMotivoBaja] = useState('')
   const doDeleteDoctor = async (id: string) => {
-    const r = await deleteDoctor(id)
-    if (!r.ok) void avisar(r.error ?? 'No se pudo eliminar.')
+    const r = await deleteDoctor(id, motivoBaja.trim())
+    if (!r.ok) void avisar(r.error ?? 'No se pudo dar de baja.')
+    setMotivoBaja('')
+  }
+  // BLOQUE1 · revocar pedía cero confirmación y no decía si falló.
+  const doRevoke = async (id: string, nombre: string): Promise<boolean> => {
+    if (!(await confirmar(`¿Revocar el acceso de ${nombre}? Dejará de ver precios y de comprar en el portal hasta que lo verifiques de nuevo.`, { peligro: true, aceptar: 'Revocar acceso' }))) return false
+    const r = await revoke(id)
+    if (!r.ok) { void avisar(r.error ?? 'No se pudo revocar el acceso.'); return false }
+    return true
   }
   const { data: orders } = useAllOrders()
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -144,13 +153,13 @@ export function Doctores() {
           <div className="tarjeta-acciones">
             <button className="btn ghost sm" type="button" onClick={() => setDetailId(d.id)}>Ver detalle</button>
             <button className="btn ghost sm" type="button" onClick={() => setEditDoc({ id: d.id, name: d.full_name ?? '', org: d.organization ?? '' })}><Pencil size={14} /> Editar</button>
-            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setDelDoctor({ id: d.id, name: d.full_name ?? 'este doctor' })}><Trash2 size={14} /> Eliminar</button>
+            <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => { setMotivoBaja(''); setDelDoctor({ id: d.id, name: d.full_name ?? 'este doctor' }) }}><Trash2 size={14} /> Dar de baja</button>
             {d.verified ? (
               <>
                 <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setPedidoFor({ id: d.id, name: d.full_name ?? 'Doctor' })}>
                   <Plus size={14} /> Levantar pedido
                 </button>
-                <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => revoke(d.id)}>
+                <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => void doRevoke(d.id, d.full_name ?? 'este doctor')}>
                   <Ban size={14} /> Revocar
                 </button>
               </>
@@ -181,7 +190,7 @@ export function Doctores() {
           onClose={() => setDetailId(null)}
           onApprove={(choice) => approve(detail.id, choice)}
           onReject={(reason) => { reject(detail.id, reason); setDetailId(null) }}
-          onRevoke={() => { revoke(detail.id); setDetailId(null) }}
+          onRevoke={() => { void doRevoke(detail.id, detail.full_name ?? 'este doctor').then((ok) => { if (ok) setDetailId(null) }) }}
           onSetCedula={(c) => setCedula(detail.id, c)}
           onInvite={() => inviteDoctor(detail.id)}
         />
@@ -190,11 +199,15 @@ export function Doctores() {
       {pedidoFor && <NuevoPedido doctor={pedidoFor} placedBy="Administración" onClose={() => setPedidoFor(null)} />}
       {delDoctor && (
         <ConfirmModal
-          title="Eliminar doctor"
-          confirmLabel="Eliminar definitivamente"
-          requireType="ELIMINAR"
-          message={<>Vas a eliminar a <b>{delDoctor.name}</b>: perderá el acceso, se borra su cuenta y su historial. <b>Esta acción no se puede deshacer.</b></>}
-          onConfirm={() => doDeleteDoctor(delDoctor.id)}
+          title="Dar de baja al doctor"
+          confirmLabel="Dar de baja"
+          requireType="BAJA"
+          message={<>
+            <b>{delDoctor.name}</b> ya no podrá entrar al portal ni comprar, y deja de aparecer en esta lista. Sus pedidos, pagos y facturas <b>se conservan</b>.
+            <input value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)} placeholder="Motivo de la baja (obligatorio)" aria-label="Motivo de la baja"
+              data-testid="doctor-baja-motivo" style={{ display: 'block', width: '100%', marginTop: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 10, font: 'inherit' }} />
+          </>}
+          onConfirm={() => { if (!motivoBaja.trim()) { void avisar('Escribe el motivo de la baja.'); return } void doDeleteDoctor(delDoctor.id) }}
           onClose={() => setDelDoctor(null)}
         />
       )}

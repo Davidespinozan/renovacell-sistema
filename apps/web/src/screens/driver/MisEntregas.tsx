@@ -8,6 +8,7 @@ import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
 import { telParaMarcar } from '../../lib/telefono'
 import { CobroEntrega } from './CobroEntrega'
+import { MiEfectivo } from './MiEfectivo'   // BLOQUE1 · efectivo que trae el chofer
 import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -195,6 +196,8 @@ export function MisEntregas() {
         <div className="card sig"><div className="chip"><Icon name="check" /></div><div className="v">{entregadas.length}</div><div className="k">Entregadas</div><div className="s">de tu ruta</div></div>
         <div className={'card sig' + (incidencias ? ' dang' : '')}><div className="chip"><Icon name="clock" /></div><div className="v">{incidencias}</div><div className="k">Con incidencia</div><div className="s">requieren atención</div></div>
       </div>
+
+      <MiEfectivo recarga={entregadas.length} />
 
       {orderedMine.length > 1 && (
         <div className="card" style={{ padding: 0 }}>

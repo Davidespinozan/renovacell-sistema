@@ -404,3 +404,17 @@ button.cifra-v{cursor:pointer}
 /* EMBUDO · «Mover a…» en cada tarjeta (19 nov 2026) */
 .crm-mover{font:inherit;font-size:var(--ds-fs-xs);min-height:32px;padding:4px 8px;border:1px solid var(--ds-border);border-radius:var(--ds-r);background:var(--ds-surface);color:var(--ds-text-2);cursor:pointer}
 @media (max-width:900px){.crm-mover{min-height:40px;flex:1 1 120px}}
+
+/* BLOQUE1 · efectivo que trae el chofer: resalta si hay que entregarlo */
+.mi-efectivo-pend { border-left: 4px solid var(--ds-warning); }
+
+/* BLOQUE1 · incidencia: reintentar / cambiar chofer / regresó al almacén */
+.seg-inc-acciones { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.seg-chofer { padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13px; background: var(--ds-surface, transparent); }
+
+/* BLOQUE1 · concepto fiscal Envío */
+.envio-fiscal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.ef-campo { display: grid; gap: 4px; font-size: 12.5px; }
+.ef-campo > span { color: var(--muted); }
+.ef-campo input, .ef-campo select { padding: 8px 11px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 13px; background: var(--cp-surface); width: 100%; }
+.ef-acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }

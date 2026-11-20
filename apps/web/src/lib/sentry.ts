@@ -8,6 +8,7 @@
 // recuperación de contraseña viaja en el hash). Los mensajes pasan por el sanitizador.
 // Sentry NO es autoridad operativa: si falla, la app sigue igual.
 import { sanitizarTexto, urlSinSecretos } from './sanitizar'
+import { registrarError } from './errores'
 
 type SentryMod = typeof import('@sentry/react')
 let sentry: SentryMod | null = null
@@ -123,6 +124,7 @@ export async function initSentry(): Promise<void> {
 // Reporta un error manejado. No-op si Sentry no está activo (en dev, lo loguea).
 // `context` se convierte en TAGS permitidas (solo claves cortas conocidas); nunca en `extra`.
 export function captureError(error: unknown, context?: Record<string, unknown>): void {
+  registrarError('cliente', error)   // BLOQUE1 · también a las alertas de Dirección
   try {
     if (sentry) {
       const tags: Record<string, string> = {}

@@ -244,7 +244,7 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_links', label: 'Links de pago' }, { key: 'av_revision', label: 'Revisión económica' }],
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
-  g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }],
+  g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }, { key: 'sistema_errores', label: 'Errores' }],
   g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }
 export const GRUPOS: Record<string, string[]> = Object.fromEntries(Object.entries(SUBPANTALLAS).map(([g, xs]) => [g, xs.map((x) => x.key)]))

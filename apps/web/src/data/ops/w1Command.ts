@@ -80,6 +80,7 @@ const MENSAJES: Record<string, string> = {
   CANCELACION_REQUIERE_DIRECCION: 'Este pedido solo lo puede cancelar Dirección (ya hay pago o evidencia de pago).',
   USAR_DEVOLUCION: 'El pedido ya salió o se entregó: no se cancela, se registra una devolución.',
   GUIA_ACTIVA: 'El pedido tiene una guía de paquetería activa. Dirección debe registrar su anulación antes de cancelar.',
+  CFDI_VIGENTE: 'El pedido tiene factura vigente. Primero cancela la factura en Facturación (botón «Cancelar CFDI») y después el pedido.',
   GUIA_EN_RECONCILIACION: 'La guía está en estado desconocido con la paquetería; requiere reconciliación antes de anularla.',
   GUIA_EN_PROCESO: 'La guía todavía se está generando. Espera a que termine.',
   GUIA_NO_ANULABLE: 'Esa guía no se puede anular.',

@@ -1,7 +1,7 @@
 // Edge Function: gestión de USUARIOS del equipo (staff) — server-side.
 // Crear/editar un usuario y fijar su contraseña requiere el service role (nunca en el
 // cliente). Todas las acciones exigen que quien invoca sea ADMIN y esté activo.
-// Acciones: create | setPassword | update | suspend | reactivate | delete.
+// Acciones: create | setPassword | update | suspend | reactivate | delete | doctor_baja.
 //
 // W6-A1 · La AUTORIDAD de suspender/reactivar vive en la base (`suspender_staff` /
 // `reactivar_staff`, con el JWT del llamante: ahí se decide quién puede y a quién).
@@ -107,14 +107,19 @@ Deno.serve(conCors(async (req) => {
     return !error
   }
 
-  if (action === 'suspend' || action === 'delete') {
+  // BLOQUE1 (20 nov 2026) · `doctor_baja`: un DOCTOR no se borra (su historial de pedidos y facturas se conserva); se
+  // da de BAJA con doctor_dar_de_baja (solo Dirección, solo doctores, motivo) y Auth deja de darle sesión.
+  if (action === 'suspend' || action === 'delete' || action === 'doctor_baja') {
     if (!body.id) return json(400, { error: 'Falta el id del usuario.' })
+    const doctor = action === 'doctor_baja'
     const baja = action === 'delete'
     const motivo = (body.motivo ?? '').trim() || (baja ? 'Baja del equipo' : '')
-    if (!motivo) return json(400, { error: 'Escribe el motivo de la suspensión.' })
-    // La base decide (admin, no a sí mismo, solo personal, motivo, bitácora).
-    const { data, error } = await caller.rpc('suspender_staff', { p_uid: body.id, p_motivo: motivo, p_baja: baja })
-    if (error) return json(400, { error: error.message })
+    if (!motivo) return json(400, { error: doctor ? 'Escribe por qué se da de baja.' : 'Escribe el motivo de la suspensión.' })
+    // La base decide (admin, no a sí mismo, solo personal / solo doctores, motivo, bitácora).
+    const { data, error } = doctor
+      ? await caller.rpc('doctor_dar_de_baja', { p_profile: body.id, p_motivo: motivo })
+      : await caller.rpc('suspender_staff', { p_uid: body.id, p_motivo: motivo, p_baja: baja })
+    if (error) return json(400, { error: doctor ? error.message.replace(/^[A-Z_]+:\s*/, '') : error.message })
     const sesionesRevocadas = await revocar(body.id)
     if (!sesionesRevocadas) obs(action, 'internal_error', { code: 'auth_revocation_failed', mensaje: 'Auth no aceptó la revocación de sesiones' })
     return json(200, { ok: true, ...(data as Record<string, unknown>), sesiones_revocadas: sesionesRevocadas })

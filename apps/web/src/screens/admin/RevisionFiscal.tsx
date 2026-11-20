@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, BadgeCheck, Check, FileSearch, Info, Layers, Lock, Pencil, Search, Unlink, X } from 'lucide-react'
 import { PageHead } from '../../app/PageHead'
+import { EnvioFiscal } from './EnvioFiscal'   // BLOQUE1 · concepto «Envío» de la factura
 import { ExportButton } from '../../app/ExportButton'
 import { ConfirmModal } from '../../app/ConfirmModal'
 import { money } from '../../lib/format'
@@ -28,7 +29,7 @@ import {
   type ObservacionEvidencia, type Procedencia, type EstadoFila,
 } from '../../data/ops/fiscalCatalogo'
 
-type Tab = 'productos' | 'categorias' | 'huerfanas'
+type Tab = 'productos' | 'categorias' | 'huerfanas' | 'envio'
 type Aviso = { ok: boolean; text: string } | null
 
 // Cada bloque del detalle se separa visualmente según QUIÉN manda en él.
@@ -72,7 +73,8 @@ export function RevisionFiscal() {
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         {([['productos', `Productos (${avance.total})`],
            ['categorias', `Candidatos por categoría (${defaults.length})`],
-           ['huerfanas', `Evidencia sin producto (${huerfanas.length})`]] as const).map(([k, lbl]) => (
+           ['huerfanas', `Evidencia sin producto (${huerfanas.length})`],
+           ['envio', 'Envío']] as const).map(([k, lbl]) => (
           <button key={k} type="button" className={tab === k ? 'active' : undefined} onClick={() => setTab(k)}>{lbl}</button>
         ))}
       </div>
@@ -80,6 +82,7 @@ export function RevisionFiscal() {
       {tab === 'productos' && <TabProductos filas={data} categorias={categorias} loading={loading} reload={reload} />}
       {tab === 'categorias' && <TabCategorias defaults={defaults} categorias={categorias} reload={reload} />}
       {tab === 'huerfanas' && <TabHuerfanas filas={huerfanas} />}
+      {tab === 'envio' && <EnvioFiscal />}
     </div>
   )
 }

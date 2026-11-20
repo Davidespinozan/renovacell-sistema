@@ -15,6 +15,7 @@
 //      "reintenta tranquilo".
 import { codigoConocido, isAmbiguous, w1Message } from '../ops/w1Command'
 import { atenderSuspension } from '../../auth/suspension'
+import { registrarError } from '../../lib/errores'
 
 export type Escritura = { ok: true } | { ok: false; error: string; ambiguous: boolean }
 
@@ -116,6 +117,9 @@ export async function confirmar(que: string, op: PromiseLike<Respuesta>, opcione
   const reconocido = codigoConocido(res.error.message)
   const ambiguous = !reconocido && isAmbiguous(res.error) && !CRUDOS.some(([re]) => re.test(res.error!.message))
   const error = ambiguous ? desconocido : mensajeDeError(res.error, opciones.origen ?? 'tabla')
+  // BLOQUE1 · un rechazo que NO sabemos leer (ni código de negocio ni restricción conocida) es un error real: alerta.
+  if (!reconocido && !ambiguous && !CRUDOS.some(([re]) => re.test(res.error!.message))
+      && !(opciones.origen === 'comando' && /^[A-Z][A-Z0-9_]{3,}:/.test(res.error.message))) registrarError('escritura', res.error.message, que)
   reportarFallo(que, error, ambiguous)
   return { ok: false, error, ambiguous }
 }

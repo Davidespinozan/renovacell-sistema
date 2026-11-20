@@ -120,6 +120,24 @@ export async function resolveIncident(shipmentId: string, folio: string): Promis
   return r
 }
 
+// BLOQUE1 (20 nov 2026) · el pedido regresó al almacén (rechazado, no estaba, dirección mala…): el envío se cierra y el
+// pedido vuelve a «Surtido» para asignarle chofer de nuevo. Lo decide el servidor (envio_regreso_almacen).
+export async function regresarAlAlmacen(shipmentId: string, motivo: string, folio: string): Promise<Escritura> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.', ambiguous: false }
+  const r = await confirmar(`regresar ${folio} al almacén`, supabase.rpc('envio_regreso_almacen' as never, { p_shipment: shipmentId, p_motivo: motivo } as never) as never, { origen: 'comando', reintentoSeguro: true })
+  void live.reload()
+  if (r.ok) { const { reloadOrders } = await import('./ordersStore'); reloadOrders() }
+  return r
+}
+
+// BLOQUE1 · pasar la entrega a otro chofer (envio_cambiar_chofer avisa a los dos).
+export async function cambiarChofer(shipmentId: string, driverId: string, folio: string): Promise<Escritura> {
+  if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.', ambiguous: false }
+  const r = await confirmar(`cambiar el chofer de ${folio}`, supabase.rpc('envio_cambiar_chofer' as never, { p_shipment: shipmentId, p_driver: driverId } as never) as never, { origen: 'comando', reintentoSeguro: true })
+  void live.reload()
+  return r
+}
+
 export async function markDelivered(shipmentId: string, proofUrl: string | null, receivedBy: string | null = null, opts: { remote?: boolean } = {}): Promise<Escritura> {
   // R-63: si el envío traía una incidencia sin resolver, ciérrala al entregar (antes quedaba
   // como incident.resolved=false para siempre, invisible: "una incidencia que nunca se resuelve").

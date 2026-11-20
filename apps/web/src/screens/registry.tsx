@@ -59,6 +59,7 @@ const RevisionEconomica = lazyPantalla(() => import('./admin/RevisionEconomica')
 const Finanzas = lazyPantalla(() => import('./admin/Finanzas').then((m) => m.Finanzas))
 const CierreCaja = lazyPantalla(() => import('./admin/CierreCaja').then((m) => m.CierreCaja))
 const Bitacora = lazyPantalla(() => import('./admin/Bitacora').then((m) => m.Bitacora))
+const ErroresApp = lazyPantalla(() => import('./admin/ErroresApp').then((m) => m.ErroresApp))   // BLOQUE1
 const Reabastecimiento = lazyPantalla(() => import('./admin/Reabastecimiento').then((m) => m.Reabastecimiento))
 const ControlInventario = lazyPantalla(() => import('./admin/ControlInventario').then((m) => m.ControlInventario))
 const Equipo = lazyPantalla(() => import('./admin/Equipo').then((m) => m.Equipo))
@@ -124,6 +125,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_finanzas: () => <Finanzas />,
   av_cierre: () => <CierreCaja />,
   av_audit: () => <Bitacora />,
+  sistema_errores: () => <ErroresApp />,
   av_inv: () => <Reabastecimiento />,
   compras: () => <Reabastecimiento />,
   av_equipo: () => <Equipo />,
@@ -174,7 +176,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   g_cobros: () => <Pestanas grupo="g_cobros" pestanas={[{ key: 'av_pagos', label: 'Pagos por validar', render: () => <PagosPorValidar /> }, { key: 'av_links', label: 'Links de pago', render: () => <LinksPago /> }, { key: 'av_revision', label: 'Revisión económica', render: () => <RevisionEconomica /> }]} />,
   g_facturacion: () => <Pestanas grupo="g_facturacion" pestanas={[{ key: 'av_fin', label: 'Facturación', render: () => <Facturacion /> }, { key: 'av_fiscal', label: 'Revisión fiscal', render: () => <RevisionFiscal /> }]} />,
   g_equipo: () => <Pestanas grupo="g_equipo" pestanas={[{ key: 'av_equipo', label: 'Personas', render: () => <Equipo /> }, { key: 'av_cartera', label: 'Cartera y horario', render: () => <CarteraHorarioPantalla /> }, { key: 'av_comisiones', label: 'Metas y comisiones', render: () => <Comisiones /> }]} />,
-  g_sistema: () => <Pestanas grupo="g_sistema" pestanas={[{ key: 'av_config', label: 'Configuración', render: () => <Configuracion /> }, { key: 'av_audit', label: 'Bitácora', render: () => <Bitacora /> }]} />,
+  g_sistema: () => <Pestanas grupo="g_sistema" pestanas={[{ key: 'av_config', label: 'Configuración', render: () => <Configuracion /> }, { key: 'av_audit', label: 'Bitácora', render: () => <Bitacora /> }, { key: 'sistema_errores', label: 'Errores', render: () => <ErroresApp /> }]} />,
 }
 
 // UX-1 · Enlaces/recuerdos a la pantalla retirada 'asist' caen en la conversación canónica (sin segunda implementación).

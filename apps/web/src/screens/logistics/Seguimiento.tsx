@@ -2,7 +2,7 @@
 // paquetería— con su estatus, y DETECCIÓN DE ATORADOS (vencidos o surtidos sin
 // salir). Es la vista para cazar el pedido que se atoró (caso S12840).
 import React, { useMemo, useState } from 'react'
-import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
+import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { reloadShipments } from '../../data/store/shipmentsStore'
@@ -18,7 +18,7 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { useRole } from '../../auth/RoleContext'
-import { driverName } from '../../data/mock/shipments'
+import { driverName, getDrivers } from '../../data/mock/shipments'
 import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { diagnoseShipment, envioVigente, esRecoge } from '../../data/ops/seguimiento'
 import { entregarRecoge } from '../../data/store/ordersStore'
@@ -40,10 +40,25 @@ interface Row {
  */
 export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
   const { data: orders } = useAllOrders()
-  const { data: shipments, resolveIncident } = useShipments()
+  const { data: shipments, resolveIncident, regresarAlAlmacen, cambiarChofer } = useShipments()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
   const { role, user } = useRole()
+  const puedeAlmacen = role === 'admin' || role === 'warehouse' || role === 'packing'
+  const [cambioDe, setCambioDe] = useState<string | null>(null)
+  // BLOQUE1 · el pedido regresó (rechazado, no estaba…): vuelve a Surtido para asignar otro chofer.
+  const regresar = async (shipmentId: string, folio: string) => {
+    const motivo = await pedirTexto(`¿Por qué regresó ${folio} al almacén? (vuelve a Surtido para asignarle chofer de nuevo)`)
+    if (!motivo || !motivo.trim()) return
+    const r = await regresarAlAlmacen(shipmentId, motivo.trim(), folio)
+    if (r.ok) void avisar(`${folio} regresó al almacén. Asígnale chofer de nuevo en Surtido.`)
+  }
+  const cambiar = async (shipmentId: string, driverId: string, folio: string) => {
+    setCambioDe(null)
+    if (!driverId) return
+    const r = await cambiarChofer(shipmentId, driverId, folio)
+    if (r.ok) void avisar(`Listo: ${folio} ahora lo lleva ${driverName(driverId)}.`)
+  }
 
   // Vendedor: solo pedidos de SU cartera (doctor.meta.owner). Otros roles: todos.
   const ownerByDoctor = useMemo(() => {
@@ -141,9 +156,22 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
                   <div className="nm mono">{folio}</div>
                   <div className="lt">{shipment.incident!.type}{shipment.incident!.note ? ` · ${shipment.incident!.note}` : ''}</div>
                 </div>
-                <button className="btn sm" type="button" onClick={() => resolveIncident(shipment.id, folio)}>
-                  <Icon name="check" /> Resolver · reintentar
-                </button>
+                <div className="seg-inc-acciones">
+                  <button className="btn sm" type="button" onClick={() => resolveIncident(shipment.id, folio)}>
+                    <Icon name="check" /> Reintentar
+                  </button>
+                  {puedeAlmacen && shipment.driver_id && (cambioDe === shipment.id ? (
+                    <select className="seg-chofer" autoFocus defaultValue="" aria-label="Nuevo chofer" onChange={(e) => void cambiar(shipment.id, e.target.value, folio)} onBlur={() => setCambioDe(null)}>
+                      <option value="" disabled>Elegir chofer…</option>
+                      {getDrivers().filter((d) => d.id !== shipment.driver_id).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  ) : (
+                    <button className="btn ghost sm" type="button" onClick={() => setCambioDe(shipment.id)} data-testid="cambiar-chofer">Cambiar chofer</button>
+                  ))}
+                  {puedeAlmacen && shipment.driver_id && (
+                    <button className="btn ghost sm" type="button" onClick={() => void regresar(shipment.id, folio)} data-testid="regreso-almacen">Regresó al almacén</button>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -163,6 +191,12 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
 
 function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, string> }) {
   const { order, shipment, stuck, reason, statusLabel, statusPill } = row
+  const { role } = useRole()
+  const { cambiarChofer } = useShipments()
+  // BLOQUE1 · cambiar el chofer de una entrega viva (el chofer no vino, se reparte la ruta…).
+  const cambiable = (role === 'admin' || role === 'warehouse' || role === 'packing') && !!shipment?.driver_id
+    && ['por_despachar', 'despachado', 'out_for_delivery', 'incident'].includes(shipment.status ?? '')
+  const [cambiando, setCambiando] = useState(false)
   const client = clienteDePedido(order)
   const deliv = deliveryOf(order) // dirección de ENTREGA del pedido (respaldo al perfil)
   const items = order.items.filter((it) => it.unit_price != null)
@@ -231,7 +265,15 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13 }}>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name}{client.clinic ? ` · ${client.clinic}` : ''}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>{deliv.addr}</div>
-        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Método</div>{method}</div>
+        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Método</div>{method}
+          {cambiable && (cambiando ? (
+            <select className="seg-chofer" autoFocus defaultValue="" aria-label="Nuevo chofer" onBlur={() => setCambiando(false)}
+              onChange={(e) => { const v = e.target.value; setCambiando(false); if (v) void cambiarChofer(shipment!.id, v, order.external_ref ?? 'el pedido').then((r) => { if (r.ok) void avisar(`Ahora lo lleva ${driverName(v)}.`) }) }}>
+              <option value="" disabled>Elegir chofer…</option>
+              {getDrivers().filter((d) => d.id !== shipment!.driver_id).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          ) : <> · <button className="rc-link" type="button" onClick={() => setCambiando(true)} data-testid="fila-cambiar-chofer">Cambiar</button></>)}
+        </div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
       </div>
 

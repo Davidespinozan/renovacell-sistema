@@ -24,6 +24,7 @@ import { tramoCorteCaja, type TramoCorte } from '../../data/ops/money'
 import { vigentes, anulados, type Cierre } from '../../data/store/cierresStore'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { useOpId } from '../../data/hooks/useOpId'
+import { EfectivoChoferes } from './EfectivoChoferes'   // BLOQUE1 · efectivo que traen los choferes
 import { AMBIGUO_MSG, newOpId as newOpIdLocal } from '../../data/ops/w1Command'
 
 // Imprime SOLO el ticket: marca el <body>, imprime, y limpia la clase en `afterprint`
@@ -80,7 +81,7 @@ export function CierreCaja() {
   const { data: orders } = useAllOrders()
   const { data: cierres, registrarCierre, anularCierre } = useCierres()
   const { data: refunds } = useRefunds()
-  const { user } = useRole()
+  const { user, role } = useRole()
   const { opId, renew } = useOpId()
 
   const today = hoyNegocio() // día DEL NEGOCIO (ni UTC ni el reloj del dispositivo): el mismo que usa el servidor
@@ -185,6 +186,8 @@ export function CierreCaja() {
         Arqueo del efectivo: el sistema calcula lo <b>esperado</b> (ventas en efectivo) y tú capturas lo
         <b> contado</b>. Si no cuadra, registras el motivo. Queda el historial para control.
       </PageHead>
+
+      {role === 'admin' && <EfectivoChoferes alRecibir={() => setRecargar((n) => n + 1)} />}
 
       <div className="grid two" style={{ alignItems: 'start' }}>
         {/* Arqueo */}

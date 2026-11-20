@@ -39,6 +39,7 @@ const MENSAJES: Array<[RegExp, string]> = [
   [/PEDIDO_INEXISTENTE/, 'No tienes acceso a este pedido.'],
   [/NOTA_REQUERIDA/, 'Escribe por qué no se cancela.'],
   [/GUIA_ACTIVA/, 'El pedido tiene una guía activa: anúlala primero en Guías.'],
+  [/CFDI_VIGENTE/, 'El pedido tiene factura vigente: primero cancela la factura en Facturación («Cancelar CFDI»).'],
   [/NO_AUTORIZADO/, 'Tu rol no puede hacer esto.'],
 ]
 const traducir = (m?: string): string => MENSAJES.find(([r]) => r.test(m ?? ''))?.[1] ?? 'No se pudo completar. Intenta de nuevo.'
