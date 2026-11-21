@@ -18,6 +18,7 @@ import { SurtirModal } from './Surtido'
 import { useAgendaEntregas } from '../logistics/AgendaEntregas'
 import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe, Shipment } from '../../data/types'
+import { cantidadVista } from '../../lib/cajas'
 
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const diaLocal = (iso: string | null | undefined) => (iso ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso)) : '')
@@ -98,7 +99,7 @@ export function HoyAlmacen() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Productos a empacar</div>
-                {o.items.map((it) => <div key={it.id} style={{ fontSize: 13 }}><b>{it.qty}</b> × {byId[it.product_id ?? '']?.name ?? 'Producto'}</div>)}
+                {o.items.map((it) => <div key={it.id} style={{ fontSize: 13 }}><b>{cantidadVista(byId[it.product_id ?? ''], it.qty)}</b> × {byId[it.product_id ?? '']?.name ?? 'Producto'}{/* CAJAS-MEDIOS */}</div>)}
               </div>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>{ent?.tipo === 'recoge' || ent?.tipo === 'mostrador' ? 'Entrega' : 'Dirección'}</div>

@@ -19,6 +19,7 @@ import {
   type StockReturn, type Returnable,
 } from '../../data/store/stockReturnsStore'
 import { Vacio, Cargando } from '../../app/EmptyState'
+import { aInterno, aVista, cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 const fld: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }
 const errBox: React.CSSProperties = { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }
@@ -31,7 +32,10 @@ function useNames() {
     const prod = new Map(products.map((p) => [p.id, p.name]))
     const lot = new Map(lots.map((l) => [l.id, l]))
     const ord = new Map(orders.map((o) => [o.id, o]))
-    return { prod, lot, ord, orders }
+    // CAJAS-MEDIOS: producto completo para leer/escribir media caja en cajas con medios.
+    const full = new Map(products.map((p) => [p.id, p]))
+    const cant = (productId: string | null | undefined, n: number, otros = '') => cantidadVista(full.get(productId ?? ''), n, otros)
+    return { prod, lot, ord, orders, full, cant }
   }, [products, lots, orders])
 }
 
@@ -69,7 +73,7 @@ export function Devoluciones() {
                   <td data-label="Pedido">{names.ord.get(ret.order_id)?.external_ref ?? ret.order_id.slice(0, 8)}</td>
                   <td data-label="Producto">{names.prod.get(line.product_id) ?? 'Producto'}</td>
                   <td data-label="Lote" className="mono">{names.lot.get(line.lot_id)?.lot_code ?? '—'}</td>
-                  <td data-label="Cant." className="mono">{line.qty}</td>
+                  <td data-label="Cant." className="mono">{names.cant(line.product_id, line.qty)}</td>
                   <td data-label="Inspección">{line.inspection}</td>
                 </tr>
               ))}
@@ -104,7 +108,7 @@ function ReingresoCard({ ret, names }: { ret: StockReturn; names: ReturnType<typ
         const lot = names.lot.get(l.lot_id)
         return (
           <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', flexWrap: 'wrap' }}>
-            <span style={{ flex: 1, minWidth: 160 }}>{names.prod.get(l.product_id) ?? 'Producto'} · <span className="mono">{lot?.lot_code ?? '—'}</span> · <b>{l.qty} u</b></span>
+            <span style={{ flex: 1, minWidth: 160 }}>{names.prod.get(l.product_id) ?? 'Producto'} · <span className="mono">{lot?.lot_code ?? '—'}</span> · <b>{names.cant(l.product_id, l.qty, 'u')}</b></span>
             <div className="seg">
               <button type="button" className={estado[l.id] === 'ok' ? 'active' : undefined} onClick={() => setEstado((e) => ({ ...e, [l.id]: 'ok' }))}>Reacomodado OK</button>
               <button type="button" className={estado[l.id] === 'dañado' ? 'active' : undefined} onClick={() => setEstado((e) => ({ ...e, [l.id]: 'dañado' }))}>Dañado</button>
@@ -180,14 +184,16 @@ function RecibirDevolucion({ names }: { names: ReturnType<typeof useNames> }) {
               <tbody>
                 {rows.map((r) => {
                   const lot = names.lot.get(r.lot_id)
+                  const p = names.full.get(lot?.product_id ?? '')
                   return (
                     <tr key={r.lot_id}>
                       <td data-label="Producto / lote">{names.prod.get(lot?.product_id ?? '') ?? 'Producto'} · <span className="mono">{lot?.lot_code ?? '—'}</span></td>
-                      <td data-label="Salió" className="mono">{r.salido}</td>
-                      <td data-label="Ya devuelto" className="mono">{r.devuelto}</td>
+                      <td data-label="Salió" className="mono">{cantidadVista(p, r.salido)}</td>
+                      <td data-label="Ya devuelto" className="mono">{cantidadVista(p, r.devuelto)}</td>
                       <td data-label="Regresa">
-                        <input type="number" min={0} max={r.disponible} disabled={r.disponible === 0} style={{ ...fld, maxWidth: 90 }}
-                          value={qty[r.lot_id] ?? 0} onChange={(e) => setQty((q) => ({ ...q, [r.lot_id]: Math.max(0, Math.min(r.disponible, Math.floor(Number(e.target.value) || 0))) }))} />
+                        {/* CAJAS-MEDIOS: se escribe en cajas (acepta ½); el estado y el tope quedan en internas */}
+                        <input type="number" min={0} step={esMediaCaja(p) ? 0.5 : 1} max={aVista(p, r.disponible)} disabled={r.disponible === 0} style={{ ...fld, maxWidth: 90 }}
+                          value={aVista(p, qty[r.lot_id] ?? 0)} onChange={(e) => setQty((q) => ({ ...q, [r.lot_id]: Math.max(0, Math.min(r.disponible, esMediaCaja(p) ? aInterno(p, Number(e.target.value) || 0) : Math.floor(Number(e.target.value) || 0))) }))} />
                       </td>
                       <td data-label="Estado">
                         <select style={{ ...fld, maxWidth: 130 }} value={insp[r.lot_id] ?? 'ok'} onChange={(e) => setInsp((s) => ({ ...s, [r.lot_id]: e.target.value as 'ok' | 'dañado' }))}>

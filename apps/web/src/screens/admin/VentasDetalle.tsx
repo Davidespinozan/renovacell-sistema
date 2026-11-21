@@ -8,6 +8,7 @@ import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
+import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
@@ -304,8 +305,9 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
               {order.items.map((it) => (
                 <tr key={it.id}>
                   <td data-label="Producto">{productsById[it.product_id ?? '']?.name ?? 'Producto'}</td>
-                  <td data-label="Cant." className="mono">{it.qty}</td>
-                  <td data-label="Precio" className="mono">{money(it.unit_price ?? 0)}</td>
+                  {/* CAJAS-MEDIOS: cantidad y precio por caja para la media caja; el importe no cambia */}
+                  <td data-label="Cant." className="mono">{cantidadVista(productsById[it.product_id ?? ''], it.qty)}</td>
+                  <td data-label="Precio" className="mono">{money(precioVista(productsById[it.product_id ?? ''], it.unit_price ?? 0))}{esMediaCaja(productsById[it.product_id ?? '']) ? ' por caja' : ''}</td>
                   <td data-label="Importe" className="mono">{money((it.unit_price ?? 0) * it.qty)}</td>
                 </tr>
               ))}
@@ -433,16 +435,17 @@ function DevolverForm({ order, restante, usuario, productsById, onClose }: {
           {sellable.map((it) => {
             const max = returnable(it); const q = qtys[it.id] ?? 0
             const yaDev = it.qty - max
+            const p = productsById[it.product_id ?? '']   // CAJAS-MEDIOS: se muestra en cajas; el −/+ mueve media caja (interno)
             return (
               <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13 }}>{productsById[it.product_id ?? '']?.name ?? 'Producto'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{money(it.unit_price ?? 0)} · comprado {it.qty}{yaDev > 0 ? ` · ya devuelto ${yaDev}` : ''}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{money(precioVista(p, it.unit_price ?? 0))}{esMediaCaja(p) ? ' por caja' : ''} · comprado {cantidadVista(p, it.qty)}{yaDev > 0 ? ` · ya devuelto ${cantidadVista(p, yaDev)}` : ''}</div>
                 </div>
                 {max === 0 ? <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Devuelto</span> : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button type="button" className="btn ghost sm" disabled={q <= 0} onClick={() => setQ(it.id, q - 1, max)}>−</button>
-                    <span className="mono" style={{ minWidth: 24, textAlign: 'center' }}>{q}<span style={{ color: 'var(--ink-3)' }}>/{max}</span></span>
+                    <span className="mono" style={{ minWidth: 24, textAlign: 'center' }}>{numeroVista(p, q)}<span style={{ color: 'var(--ink-3)' }}>/{numeroVista(p, max)}</span></span>
                     <button type="button" className="btn ghost sm" disabled={q >= max} onClick={() => setQ(it.id, q + 1, max)}>+</button>
                   </div>
                 )}

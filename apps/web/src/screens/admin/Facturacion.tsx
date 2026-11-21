@@ -9,6 +9,7 @@ import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
+import { cantidadVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
@@ -423,7 +424,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
               {order.items.map((it) => (
                 <tr key={it.id}>
                   <td data-label="Producto">{productsById[it.product_id ?? '']?.name ?? 'Producto'}</td>
-                  <td data-label="Cant." className="mono">{it.qty}</td>
+                  <td data-label="Cant." className="mono">{cantidadVista(productsById[it.product_id ?? ''], it.qty)}</td>{/* CAJAS-MEDIOS */}
                   <td data-label="Importe" className="mono">{money((it.unit_price ?? 0) * it.qty)}</td>
                 </tr>
               ))}

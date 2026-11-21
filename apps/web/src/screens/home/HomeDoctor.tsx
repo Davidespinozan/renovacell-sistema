@@ -37,6 +37,7 @@ import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor } from '../../data/ops/stock'
 import { isPortalProduct } from '../../data/hooks/useProducts'
 import { money } from '../../lib/format'
+import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'
 import { flyersVigentes as flyersPorDefecto, type Flyer } from '../../data/ops/flyers'   // PROMO-9 · flyers del portal
 import { subscribePromos, getPromosSnapshot } from '../../data/store/promosStore'
 import { promoTarjeta as promoTarjetaPorDefecto, type DatosPromoDifusion } from '../../data/ops/promociones'
@@ -71,7 +72,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   const stockMap = useStock()
   const { data: orders } = useOrders()
   const { data: products } = useProducts()
-  const nombreProducto = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products])
+  const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const [conv, setConv] = useState<Conversacion | null>(null)
   const [cart, setCart] = useState<Carrito | null>(null)
   // PROMO-9 · flyers vigentes para este doctor (el servidor filtra por lista y vigencia) y el visor a pantalla completa.
@@ -123,7 +124,8 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       detalle={enCurso.length > 1 ? `Ver seguimiento · ${enCurso.length - 1} más en curso` : 'Ver seguimiento'} onClick={() => setScreen('pedidosdr')} />))
   if (ultimo && enCurso.length === 0) filas.push(
     <Fila key="reorden" testid="doctor-ultimo" icono={<RotateCcw />} titulo="Volver a pedir tu último pedido"
-      detalle={ultimo.items.slice(0, 2).map((it) => `${it.qty} × ${nombreProducto.get(it.product_id ?? '') ?? 'producto'}`).join(' · ') || null}
+      // CAJAS-MEDIOS · la cantidad se lee en cajas con medios
+      detalle={ultimo.items.slice(0, 2).map((it) => { const p = porId.get(it.product_id ?? ''); return `${cantidadVista(p, it.qty)} × ${p?.name ?? 'producto'}` }).join(' · ') || null}
       onClick={() => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') }} />)
   if (orders.length === 0 && !(cart && cart.n_items > 0)) filas.push(
     <Fila key="primero" testid="doctor-primer-pedido" icono={<Sparkles />} titulo="Haz tu primer pedido"
@@ -175,12 +177,12 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
           {verified && !agotado && (n > 0
             ? <span className="tienda-cant" data-testid="tienda-cantidad">
                 <button type="button" onClick={() => agregar(p.id, -1)} aria-label={n === 1 ? `Quitar ${p.name} del carrito` : `Quitar uno de ${p.name}`}>{n === 1 ? <Trash2 size={15} /> : <Minus size={16} />}</button>
-                <b>{n}</b>
+                <b>{numeroVista(p, n)}</b>{/* CAJAS-MEDIOS */}
                 <button type="button" onClick={() => agregar(p.id, 1)} aria-label={`Agregar otro de ${p.name}`}><Plus size={16} /></button>
               </span>
             : <button type="button" className="tienda-mas" onClick={() => agregar(p.id, 1)} aria-label={`Agregar ${p.name}`} data-testid="tienda-agregar"><Plus size={18} /></button>)}
         </div>
-        <span className="tienda-prod-precio">{precio != null ? money(precio) : verified ? '' : 'Precio al verificarte'}</span>
+        <span className="tienda-prod-precio">{precio != null ? `${money(precioVista(p, precio))}${esMediaCaja(p) ? ' por caja' : ''}` : verified ? '' : 'Precio al verificarte'}</span>
         <span className="tienda-prod-nombre">{p.name}</span>
       </div>
     )

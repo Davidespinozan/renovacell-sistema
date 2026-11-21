@@ -50,10 +50,10 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
   { name: 'candidatos_comerciales', autoridad: 'cualquiera', mutante: false, description: 'Candidatos comerciales (vendibles y visibles) por categoría, familia o términos de necesidad (p. ej. hidratación, labios, flacidez). Solo puedes recomendar productos que regresen aquí.',
     input_schema: { type: 'object', properties: { categoria: texto('Categoría', 80), familia: texto('Familia', 80), terminos: { type: 'array', items: texto('término', 40), maxItems: 5 } }, additionalProperties: false } },
   { name: 'obtener_precio', autoridad: 'cualquiera', mutante: false, description: 'Precio autorizado de un producto para este usuario (su lista y cantidad). Si el usuario no está verificado, devuelve que requiere verificación.',
-    input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'integer', minimum: 1, maximum: 999, description: 'Cantidad (default 1)' } }, required: ['product_id'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'number', minimum: 0.5, maximum: 999, description: 'Cantidad (default 1). En productos por caja, en CAJAS: 0.5 = media caja' } }, required: ['product_id'], additionalProperties: false } },
   // IA-VENDEDORA · la IA cotiza combinaciones con las reglas del pedido (lo que se cobraría) y recomienda con motivo.
   { name: 'cotizar', autoridad: 'cualquiera', mutante: false, description: 'Cotiza varios productos juntos con las reglas de precio del pedido (juntar piezas para medio mayoreo, todo a mayoreo si uno llega a mayoreo, promociones). Devuelve precio por línea, nivel aplicado, total, ahorro y OPORTUNIDADES (cuántas piezas faltan para el siguiente nivel y cuánto ahorraría). Úsala para "¿cuánto me queda si llevo…?", combinaciones y para proponer cómo ahorrar. Nunca calcules tú.',
-    input_schema: { type: 'object', properties: { lineas: { type: 'array', minItems: 1, maxItems: 20, items: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'integer', minimum: 1, maximum: 999 } }, required: ['product_id', 'cantidad'], additionalProperties: false } } }, required: ['lineas'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { lineas: { type: 'array', minItems: 1, maxItems: 20, items: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'number', minimum: 0.5, maximum: 999, description: 'En productos por caja, en CAJAS: 0.5 = media caja' } }, required: ['product_id', 'cantidad'], additionalProperties: false } } }, required: ['lineas'], additionalProperties: false } },
   { name: 'recomendar_productos', autoridad: 'cualquiera', mutante: false, description: 'Recomendaciones con motivo para este cliente: complementos curados por Renovacell, lo que otros compran junto, lo que usa su especialidad, recompra de lo que ya compró y similares del producto del que hablan. Excluye lo que ya lleva en su carrito. Solo puedes recomendar lo que regrese aquí o en candidatos_comerciales.',
     input_schema: { type: 'object', properties: { product_id: texto('product_id del producto del que hablan (opcional)', 36) }, additionalProperties: false } },
   { name: 'obtener_disponibilidad', autoridad: 'cualquiera', mutante: false, description: 'Disponibilidad comercial de un producto (disponible / no disponible) para usuarios verificados.',
@@ -66,9 +66,9 @@ export const HERRAMIENTAS: readonly DefinicionHerramienta[] = [
   { name: 'ver_carrito', autoridad: 'cualquiera', mutante: false, description: 'Muestra el carrito actual del usuario: productos, cantidades, disponibilidad y precio/total cuando están autorizados.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'agregar_al_carrito', autoridad: 'cualquiera', mutante: true, description: 'Agrega un producto (por product_id de buscar_productos/candidatos) al carrito con una cantidad. SOLO cuando el usuario lo pidió de forma explícita e inequívoca; si hay varios productos posibles, pregunta antes. Suma a lo que ya haya.',
-    input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'integer', minimum: 1, maximum: 999, description: 'Cantidad a agregar (default 1)' } }, required: ['product_id'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { product_id: texto('product_id autorizado', 36), cantidad: { type: 'number', minimum: 0.5, maximum: 999, description: 'Cantidad a agregar (default 1). En productos por caja, en CAJAS: 0.5 = media caja' } }, required: ['product_id'], additionalProperties: false } },
   { name: 'actualizar_carrito', autoridad: 'cualquiera', mutante: true, description: 'Fija la cantidad exacta de un producto que YA está en el carrito (0 = quitarlo). Solo a petición explícita.',
-    input_schema: { type: 'object', properties: { product_id: texto('product_id del carrito', 36), cantidad: { type: 'integer', minimum: 0, maximum: 999 } }, required: ['product_id', 'cantidad'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { product_id: texto('product_id del carrito', 36), cantidad: { type: 'number', minimum: 0, maximum: 999, description: 'En productos por caja, en CAJAS: 0.5 = media caja' } }, required: ['product_id', 'cantidad'], additionalProperties: false } },
   { name: 'quitar_del_carrito', autoridad: 'cualquiera', mutante: true, description: 'Quita un producto del carrito. Solo a petición explícita.',
     input_schema: { type: 'object', properties: { product_id: texto('product_id del carrito', 36) }, required: ['product_id'], additionalProperties: false } },
   { name: 'vaciar_carrito', autoridad: 'cualquiera', mutante: true, description: 'Vacía el carrito. Solo a petición explícita e inequívoca.',
@@ -185,7 +185,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     case 'obtener_precio': {
       const id = uuid(i.product_id); if (!id) return { ok: false, motivo: 'argumentos' }
       if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
-      const c = Number(i.cantidad ?? 1); const cantidad = Number.isInteger(c) && c >= 1 && c <= 999 ? c : (i.cantidad === undefined ? 1 : null)
+      const c = Number(i.cantidad ?? 1); const cantidad = Number.isInteger(c * 2) && c >= 0.5 && c <= 999 ? c : (i.cantidad === undefined ? 1 : null)
       if (cantidad === null) return { ok: false, motivo: 'argumentos' }
       return { ok: true, nombre: n, args: { product_id: id, cantidad }, ids: [id] }
     }
@@ -196,7 +196,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
       for (const l of arr) {
         const x = (l && typeof l === 'object' ? l : {}) as Record<string, unknown>
         const id = uuid(x.product_id); const c = Number(x.cantidad)
-        if (!id || !Number.isInteger(c) || c < 1 || c > 999) return { ok: false, motivo: 'argumentos' }
+        if (!id || !Number.isInteger(c * 2) || c < 0.5 || c > 999) return { ok: false, motivo: 'argumentos' }
         if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
         lineas.push({ product_id: id, cantidad: c })
       }
@@ -227,7 +227,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
     case 'agregar_al_carrito': {
       const id = uuid(i.product_id); if (!id) return { ok: false, motivo: 'argumentos' }
       if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
-      const c = Number(i.cantidad ?? 1); const cantidad = Number.isInteger(c) && c >= 1 && c <= 999 ? c : (i.cantidad === undefined ? 1 : null)
+      const c = Number(i.cantidad ?? 1); const cantidad = Number.isInteger(c * 2) && c >= 0.5 && c <= 999 ? c : (i.cantidad === undefined ? 1 : null)
       if (cantidad === null) return { ok: false, motivo: 'argumentos' }
       return { ok: true, nombre: n, args: { product_id: id, cantidad }, ids: [id] }
     }
@@ -235,7 +235,7 @@ export function validarLlamada(nombre: unknown, input: unknown, ctx: { conCuenta
       // El product_id puede venir del carrito leído en este turno (ver_carrito) o de una búsqueda: ambos son retrieval autorizado.
       const id = uuid(i.product_id); if (!id) return { ok: false, motivo: 'argumentos' }
       if (!ctx.idsAutorizados.has(id)) return { ok: false, motivo: 'id_no_autorizado' }
-      const c = Number(i.cantidad); if (!Number.isInteger(c) || c < 0 || c > 999) return { ok: false, motivo: 'argumentos' }
+      const c = Number(i.cantidad); if (!Number.isInteger(c * 2) || c < 0 || c > 999) return { ok: false, motivo: 'argumentos' }
       return { ok: true, nombre: n, args: { product_id: id, cantidad: c }, ids: [id] }
     }
     case 'quitar_del_carrito': {
@@ -350,4 +350,52 @@ export const RECHAZO: Record<string, string> = {
   no_autorizada: 'Esta herramienta requiere que el usuario tenga sesión iniciada en el portal. Si no la tiene, ofrece el enlace oficial con enlace_portal.',
   argumentos: 'Argumentos inválidos para la herramienta.',
   id_no_autorizado: 'Ese product_id no proviene de una búsqueda de este turno. Usa buscar_productos primero.',
+}
+
+// CAJAS-MEDIOS (21 nov 2026, dueño: «1 caja debe ser 1»). Los ultrafiltrados se guardan por MEDIA CAJA (unit 'Media caja/10
+// viales'), pero el cliente habla en CAJAS (1, 1½, 2…). En las herramientas la cantidad es en CAJAS (acepta .5) y lo que
+// la IA lee viene en cajas y precio por caja. El orquestador convierte en los dos sentidos solo para esos productos.
+const CANT = new Set(['cantidad', 'qty', 'faltan', 'piezas', 'min_quantity', 'desde', 'disponible', 'cantidad_minima', 'faltan_piezas'])
+const PRECIO = new Set(['unitario', 'precio_unitario', 'precio', 'price', 'precio_base', 'precio_lista', 'precio_nivel', 'precio_siguiente'])
+export const NOTA_UNIDAD = 'caja de 20 viales; se vende también media caja (cantidad 0.5); cantidades en cajas y precio por caja'
+
+type Args = Record<string, unknown>
+/** Cantidad del modelo (en cajas) → interna. null = un medio en un producto que no se vende por medias. */
+function aInterno(id: unknown, c: unknown, media: ReadonlySet<string>): number | null | undefined {
+  if (c === undefined || c === null) return c as undefined
+  const n = Number(c)
+  if (typeof id === 'string' && media.has(id)) return Math.round(n * 2)
+  return Number.isInteger(n) ? n : null
+}
+
+/** Convierte los argumentos de la herramienta. { ok:false } si pidió medios de un producto que no se vende así. */
+export function argsAInterno(nombre: string, a: Args, media: ReadonlySet<string>): { ok: true; args: Args } | { ok: false } {
+  if (['obtener_precio', 'agregar_al_carrito', 'actualizar_carrito'].includes(nombre) && a.cantidad !== undefined) {
+    const c = aInterno(a.product_id, a.cantidad, media); if (c === null) return { ok: false }
+    return { ok: true, args: { ...a, cantidad: c } }
+  }
+  if (nombre === 'cotizar' && Array.isArray(a.lineas)) {
+    const lineas: Args[] = []
+    for (const l of a.lineas as Args[]) { const c = aInterno(l.product_id, l.cantidad, media); if (c === null) return { ok: false }; lineas.push({ ...l, cantidad: c }) }
+    return { ok: true, args: { ...a, lineas } }
+  }
+  return { ok: true, args: a }
+}
+
+/** Convierte la salida para el modelo: dentro de un objeto de un producto por media caja, cantidades ÷2 y precios ×2. */
+export function salidaEnCajas(x: unknown, media: ReadonlySet<string>, dentro = false): unknown {
+  if (media.size === 0) return x
+  if (Array.isArray(x)) return x.map((v) => salidaEnCajas(v, media, dentro))
+  if (!x || typeof x !== 'object') return x
+  const o = x as Args
+  const id = o.product_id ?? o.producto_id
+  const esMedia = dentro || (typeof id === 'string' && media.has(id))
+  const out: Args = {}
+  for (const [k, v] of Object.entries(o)) {
+    if (esMedia && typeof v === 'number' && CANT.has(k)) out[k] = v / 2
+    else if (esMedia && typeof v === 'number' && PRECIO.has(k)) out[k] = v * 2
+    else out[k] = salidaEnCajas(v, media, esMedia)
+  }
+  if (esMedia && !dentro) out.unidad_venta = NOTA_UNIDAD
+  return out
 }

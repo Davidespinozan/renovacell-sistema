@@ -10,12 +10,13 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil, severity, sevPill, sevLabel, etiquetaCaducidad } from './expiry'
 import { MermaModal } from './MermaModal'
 import type { ProductSafe } from '../../data/types'
+import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 export function Caducidades() {
   const { data: lots } = useLots()
   const { data: products } = useProducts()
   // Baja por merma: parcial o total, con motivo (antes solo el lote completo).
-  const [mermaLot, setMermaLot] = useState<{ id: string; lot_code: string; quantity: number; producto?: string } | null>(null)
+  const [mermaLot, setMermaLot] = useState<{ id: string; lot_code: string; quantity: number; producto?: string; unit?: string | null } | null>(null)
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -80,9 +81,10 @@ export function Caducidades() {
                     <td data-label="Lote"><span className="lc">{lot.lot_code}</span></td>
                     <td data-label="Caducidad">{fmtDate(lot.expiry_date ?? '')}</td>
                     <td data-label="Estado"><span className={'pill ' + sevPill(sev)}>{etiquetaCaducidad(d, lot.expiry_date)}</span></td>
-                    <td data-label="Cantidad" className="mono">{lot.quantity} {lot.quantity === 1 ? 'pza' : 'pzas'}</td>
+                    {/* CAJAS-MEDIOS: el lote de media caja se lee en cajas */}
+                    <td data-label="Cantidad" className="mono">{esMediaCaja(byId[lot.product_id]) ? cantidadVista(byId[lot.product_id], lot.quantity) : `${lot.quantity} ${lot.quantity === 1 ? 'pza' : 'pzas'}`}</td>
                     <td data-label="" style={{ textAlign: 'right' }}>
-                      <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setMermaLot({ id: lot.id, lot_code: lot.lot_code, quantity: lot.quantity, producto: byId[lot.product_id]?.name })}>Dar de baja</button>
+                      <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={() => setMermaLot({ id: lot.id, lot_code: lot.lot_code, quantity: lot.quantity, producto: byId[lot.product_id]?.name, unit: byId[lot.product_id]?.unit })}>Dar de baja</button>
                     </td>
                   </tr>
                 )

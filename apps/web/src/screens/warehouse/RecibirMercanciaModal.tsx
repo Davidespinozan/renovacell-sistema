@@ -10,6 +10,8 @@ import { useLots } from '../../data/hooks/useLots'
 import { useOpId } from '../../data/hooks/useOpId'
 import { hasSupabase } from '../../lib/supabase'
 import { cerrarOrdenCompra, pendingQty, isOpen, markReceivedLocal, type PurchaseOrder } from '../../data/store/comprasStore'
+import { useProducts } from '../../data/hooks/useProducts'
+import { aInterno, aVista, cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'
 
 export const STATUS_LABEL: Record<PurchaseOrder['status'], string> = { pendiente: 'Pendiente de recibir', parcial: 'Recibida parcial', recibida: 'Recibida completa', cerrada_incompleta: 'Cerrada incompleta' }
 export const STATUS_PILL: Record<PurchaseOrder['status'], string> = { pendiente: 'p-warn', parcial: 'p-blue', recibida: 'p-ok', cerrada_incompleta: 'p-neu' }
@@ -25,18 +27,23 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
   onDone: (msg: string) => void
 }) {
   const { recibirLote } = useLots()
+  // CAJAS-MEDIOS: en media caja se ve y escribe en cajas (acepta ½); se manda y valida en internas.
+  const { data: products } = useProducts()
+  const prod = products.find((p) => p.id === po.product_id)
+  const mc = esMediaCaja(prod)
+  const u = (x: number) => (mc ? cantidadVista(prod, x) : `${x} u`)
   const pend = pendingQty(po)
   const abierta = isOpen(po)
   const [mode, setMode] = useState<'recibir' | 'excedente' | 'cerrar'>(abierta ? 'recibir' : 'excedente')
   const [lotCode, setLotCode] = useState('')
   const [expiry, setExpiry] = useState('')
-  const [qty, setQty] = useState(String(abierta ? pend : 1))
+  const [qty, setQty] = useState(String(abierta ? aVista(prod, pend) : 1))
   const [reason, setReason] = useState('')
   const [evidence, setEvidence] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const { opId } = useOpId()   // una intención = un op_id (reintentar NO duplica)
-  const n = Math.max(0, parseInt(qty, 10) || 0)
+  const n = mc ? aInterno(prod, Number(qty) || 0) : Math.max(0, parseInt(qty, 10) || 0)
   const needsReason = mode !== 'recibir'
   const valid = mode === 'cerrar'
     ? reason.trim().length >= 3
@@ -49,7 +56,7 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
       const r = await cerrarOrdenCompra(opId, po.id, reason)
       setBusy(false)
       if (!r.ok) { setErr(r.error ?? 'No se pudo cerrar la orden.'); return }
-      onDone(`Orden cerrada incompleta (faltaron ${pend} u). Si se necesitan, genera una compra nueva.`)
+      onDone(`Orden cerrada incompleta (faltaron ${u(pend)}). Si se necesitan, genera una compra nueva.`)
       return
     }
     const r = await recibirLote({
@@ -62,7 +69,7 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
     if (!hasSupabase && mode === 'recibir') markReceivedLocal(po.id, n)
     onDone(mode === 'excedente'
       ? 'Excedente registrado como entrada separada (no suma a la compra).'
-      : r.replenishment_status === 'parcial' ? `Recepción parcial registrada. Pendiente de recibir: ${r.pending_qty ?? pend - n} u.` : 'Mercancía recibida. Compra completa: ya está en inventario.')
+      : r.replenishment_status === 'parcial' ? `Recepción parcial registrada. Pendiente de recibir: ${u(r.pending_qty ?? pend - n)}.` : 'Mercancía recibida. Compra completa: ya está en inventario.')
   }
 
   return (
@@ -71,7 +78,7 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
         <div className="mhead">
           <div>
             <h3>{mode === 'cerrar' ? 'Cerrar compra incompleta' : mode === 'excedente' ? 'Registrar excedente' : 'Recibir mercancía'}</h3>
-            <div className="ms">{po.product_name} · {TIPO_LABEL[po.kind]}{po.supplier ? ` · ${po.supplier}` : ''} · recibido {po.received_qty ?? 0}/{po.qty} u{abierta ? ` · pendiente ${pend} u` : ''}</div>
+            <div className="ms">{po.product_name} · {TIPO_LABEL[po.kind]}{po.supplier ? ` · ${po.supplier}` : ''} · recibido {mc ? `${numeroVista(prod, po.received_qty ?? 0)}/${u(po.qty)}` : `${po.received_qty ?? 0}/${po.qty} u`}{abierta ? ` · pendiente ${u(pend)}` : ''}</div>
           </div>
           <button className="mclose" type="button" aria-label="Cerrar" onClick={onClose}><X size={16} /></button>
         </div>
@@ -89,10 +96,10 @@ export function RecibirMercanciaModal({ po, isAdmin, onClose, onDone }: {
               <input style={fld} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="p. ej. LT-2026-014" autoFocus aria-label="Código de lote" />
               <label style={lbl}>Caducidad (obligatoria)</label>
               <input type="date" style={fld} value={expiry} onChange={(e) => setExpiry(e.target.value)} aria-label="Caducidad" />
-              <label style={lbl}>{mode === 'excedente' ? 'Cantidad excedente' : `Cantidad que llegó (máx. ${pend})`}</label>
-              <input type="number" min={1} max={mode === 'recibir' ? pend : undefined} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Cantidad recibida" />
-              {mode === 'recibir' && n > pend && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>Supera lo pendiente ({pend} u). El excedente lo registra Dirección aparte.</div>}
-              {mode === 'recibir' && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>Costo unitario: el de la compra (<b className="mono">${po.unit_cost.toLocaleString('es-MX')}</b>); se hereda al lote.</div>}
+              <label style={lbl}>{mode === 'excedente' ? 'Cantidad excedente' : `Cantidad que llegó${mc ? ' (cajas)' : ''} (máx. ${numeroVista(prod, pend)})`}</label>
+              <input type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} max={mode === 'recibir' ? aVista(prod, pend) : undefined} style={fld} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Cantidad recibida" />
+              {mode === 'recibir' && n > pend && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>Supera lo pendiente ({u(pend)}). El excedente lo registra Dirección aparte.</div>}
+              {mode === 'recibir' && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>{mc ? 'Costo por caja' : 'Costo unitario'}: el de la compra (<b className="mono">${precioVista(prod, po.unit_cost).toLocaleString('es-MX')}</b>); se hereda al lote.</div>}
             </>
           )}
           {needsReason && (

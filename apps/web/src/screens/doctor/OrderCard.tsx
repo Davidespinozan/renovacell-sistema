@@ -13,6 +13,7 @@ import { trackingUrl } from '../../data/shipping/provider'
 import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/ops/moneyView'
 import type { OrderMoney } from '../../data/ops/money'
 import type { ProductSafe } from '../../data/types'
+import { cantidadVista } from '../../lib/cajas'
 import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 
 export function OrderCard({
@@ -63,7 +64,7 @@ export function OrderCard({
           return (
             <div key={it.id} className="coitem">
               <span>
-                {p?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
+                {p?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(p, it.qty)}</span>{/* CAJAS-MEDIOS */}
               </span>
               <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
             </div>

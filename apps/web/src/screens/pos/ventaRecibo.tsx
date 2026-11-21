@@ -6,15 +6,20 @@ import { createPortal } from 'react-dom'
 import { money, fmtDate } from '../../lib/format'
 import { montoEnLetras } from '../../lib/enLetras'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
+import { cantidadVista, type ConUnidad } from '../../lib/cajas'
+
+// CAJAS-MEDIOS: `unidades` (opcional) da la unidad de cada producto para mostrar la media caja en cajas
+// («×1½ cajas»); sin él, o para el resto de productos, la cantidad sale igual que antes.
+export type UnidadesPorProducto = Record<string, ConUnidad | undefined>
 
 export interface Pago { recibido: number; cambio: number }
 
 // Recibo en TEXTO para enviar por WhatsApp (wa.me abre el chat con el mensaje listo).
 // No adjunta PDF —eso necesita la API de WhatsApp— pero manda el comprobante legible.
-function reciboTexto(order: OrderWithItems, productName: Record<string, string>, pago: Pago | null): string {
+function reciboTexto(order: OrderWithItems, productName: Record<string, string>, pago: Pago | null, unidades?: UnidadesPorProducto): string {
   const L: string[] = ['*RENOVACELL* · Comprobante de venta', `Folio: ${order.external_ref}`, fmtDate(order.created_at), '']
   order.items.filter((it) => it.unit_price != null).forEach((it) => {
-    L.push(`${productName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty} — ${money((it.unit_price ?? 0) * it.qty)}`)
+    L.push(`${productName[it.product_id ?? ''] ?? 'Producto'} ×${cantidadVista(unidades?.[it.product_id ?? ''], it.qty)} — ${money((it.unit_price ?? 0) * it.qty)}`)
   })
   L.push('', `*Total: ${money(order.total)}*`, `Son: ${montoEnLetras(order.total ?? 0)}`, `Pago: ${order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}`)
   if (pago) L.push(`Recibí: ${money(pago.recibido)} · Cambio: ${money(pago.cambio)}`)
@@ -23,10 +28,10 @@ function reciboTexto(order: OrderWithItems, productName: Record<string, string>,
 }
 
 // Abre WhatsApp con el recibo. Con teléfono del cliente va directo; sin él, se elige contacto.
-export function enviarReciboWhatsApp(order: OrderWithItems, productName: Record<string, string>, pago: Pago | null, phone?: string) {
+export function enviarReciboWhatsApp(order: OrderWithItems, productName: Record<string, string>, pago: Pago | null, phone?: string, unidades?: UnidadesPorProducto) {
   const digits = (phone ?? '').replace(/\D/g, '')
   const to = digits.length >= 10 ? (digits.length === 10 ? '52' + digits : digits) : ''
-  const url = `https://wa.me/${to}?text=${encodeURIComponent(reciboTexto(order, productName, pago))}`
+  const url = `https://wa.me/${to}?text=${encodeURIComponent(reciboTexto(order, productName, pago, unidades))}`
   window.open(url, '_blank')
 }
 
@@ -39,7 +44,7 @@ export function imprimirVenta() {
 }
 
 // Recibo de venta para el cliente (comprobante interno, NO es CFDI).
-function VentaTicketView({ order, productName, clientName, pago }: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: Pago | null }) {
+function VentaTicketView({ order, productName, clientName, pago, unidades }: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: Pago | null; unidades?: UnidadesPorProducto }) {
   const items = order.items.filter((it) => it.unit_price != null)
   return (
     <div className="corte-ticket">
@@ -53,7 +58,7 @@ function VentaTicketView({ order, productName, clientName, pago }: { order: Orde
       <div className="ct-sep" />
       {items.map((it) => (
         <div key={it.id} className="ct-item">
-          <span className="n">{productName[it.product_id ?? ''] ?? 'Producto'} <small>× {it.qty}</small></span>
+          <span className="n">{productName[it.product_id ?? ''] ?? 'Producto'} <small>× {cantidadVista(unidades?.[it.product_id ?? ''], it.qty)}</small></span>
           <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
         </div>
       ))}
@@ -70,6 +75,6 @@ function VentaTicketView({ order, productName, clientName, pago }: { order: Orde
   )
 }
 
-export function VentaTicketPrint(props: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: Pago | null }) {
+export function VentaTicketPrint(props: { order: OrderWithItems; productName: Record<string, string>; clientName: string; pago?: Pago | null; unidades?: UnidadesPorProducto }) {
   return createPortal(<div className="venta-print-root"><VentaTicketView {...props} /></div>, document.body)
 }

@@ -20,6 +20,7 @@ import { useOrderMoney } from '../../data/hooks/useMoney'
 import { creditoAbierto, creditoVencido } from '../../data/ops/moneyView'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
+import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 export function Surtido() {
   const { data: orders } = useAllOrders()
@@ -161,7 +162,7 @@ export function Surtido() {
                 {o.items.map((it) => (
                   <div key={it.id} className="coitem">
                     <span>
-                      {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span>
+                      {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(byId[it.product_id ?? ''], it.qty)}</span>{/* CAJAS-MEDIOS */}
                     </span>
                     <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
                   </div>
@@ -248,7 +249,7 @@ export function SurtirModal({
             </div>
             <div className="mbody">
               {plans.map((p) => (
-                <ItemPlanRow key={p.item.id} plan={p} name={productsById[p.item.product_id ?? '']?.name ?? 'Producto'} />
+                <ItemPlanRow key={p.item.id} plan={p} name={productsById[p.item.product_id ?? '']?.name ?? 'Producto'} producto={productsById[p.item.product_id ?? '']} />
               ))}
 
               {!ok && (
@@ -277,12 +278,14 @@ export function SurtirModal({
   )
 }
 
-function ItemPlanRow({ plan, name }: { plan: ItemPlan; name: string }) {
+// CAJAS-MEDIOS: cantidades por línea en cajas con medios para los de media caja (interno sin cambios).
+function ItemPlanRow({ plan, name, producto }: { plan: ItemPlan; name: string; producto?: ProductSafe }) {
+  const mc = esMediaCaja(producto)
   return (
     <div style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{name} <span style={{ color: 'var(--ink-3)' }}>×{plan.item.qty}</span></span>
-        {plan.shortfall > 0 && <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Faltan {plan.shortfall} {plan.shortfall === 1 ? 'pieza' : 'piezas'}</span>}
+        <span style={{ fontWeight: 600, fontSize: 14 }}>{name} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(producto, plan.item.qty)}</span></span>
+        {plan.shortfall > 0 && <span className="pill p-dang" style={{ marginLeft: 'auto' }}>Faltan {mc ? cantidadVista(producto, plan.shortfall) : `${plan.shortfall} ${plan.shortfall === 1 ? 'pieza' : 'piezas'}`}</span>}
       </div>
       <div className="tbl-scroll">
         <table className="tbl-cards">
@@ -297,7 +300,7 @@ function ItemPlanRow({ plan, name }: { plan: ItemPlan; name: string }) {
                   {i === 0 && <span className="fefo" style={{ marginLeft: 8 }}><Icon name="check" /> Usar primero</span>}
                 </td>
                 <td data-label="Caduca">{fmtDate(a.lot.expiry_date ?? '')}</td>
-                <td data-label="Cuántas" className="mono">{a.qty} {a.qty === 1 ? 'pza' : 'pzas'}</td>
+                <td data-label="Cuántas" className="mono">{mc ? cantidadVista(producto, a.qty) : `${a.qty} ${a.qty === 1 ? 'pza' : 'pzas'}`}</td>
               </tr>
             ))}
             {plan.allocations.length === 0 && (

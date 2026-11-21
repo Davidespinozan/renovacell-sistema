@@ -6,6 +6,7 @@ import { BarraVenta } from './BarraVenta'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
+import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { FiscalFields } from '../../app/FiscalFields'
 import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
@@ -99,6 +100,7 @@ export function Caja() {
     return m
   }, [custodyId, custodyStock, lots, disponible])
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
+  const unidadesRecibo = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products])   // CAJAS-MEDIOS · recibo en cajas
   const [buscar, setBuscar] = useState('')
   // Buscador: por nombre, categoría o SKU (útil en un evento con fila; también sirve para
   // teclear/escanear el código y encontrarlo sin scrollear 64 productos).
@@ -307,17 +309,18 @@ export function Caja() {
                 )}
                 <h5>{p.name}</h5>
                 <div className="lt">{p.category}</div>
-                <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(effOf(p, qty)) : money(p.price)}</div>
+                {/* CAJAS-MEDIOS: precio por caja, existencias y cantidad en cajas para la media caja */}
+                <div className="pr">{qty > 0 && effOf(p, qty) < (p.price ?? 0) ? money(precioVista(p, effOf(p, qty))) : money(p.price == null ? p.price : precioVista(p, p.price))}{esMediaCaja(p) ? ' por caja' : ''}</div>
                 {(() => { const promo = volumePromoLabel(p.price, volRules, p.id); const disc = qty > 0 && effOf(p, qty) < (p.price ?? 0); const nivel = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id])
                   return promo ? <div className="pos-promo" title={promo}>{nivel ?? (disc ? 'Precio por volumen' : promo)}</div> : null })()}
                 {out ? <span className="pill p-dang" style={{ marginTop: 6 }}>Agotado</span>
-                  : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {stock.qty}</span> : null}
+                  : stock.status === 'low' ? <span className="pill p-warn" style={{ marginTop: 6 }}>Quedan {cantidadVista(p, stock.qty)}</span> : null}
                 {/* CALIDAD VISUAL · «+» visible: antes no se sabía que tocar la tarjeta agregaba */}
                 {!out && qty === 0 && <span className="pos-add" aria-hidden="true"><Icon name="plus" /></span>}
                 {qty > 0 && (
                   <div className="pos-stepper" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
                     <button className="btn ghost sm" type="button" onClick={() => dec(p.id)}><Icon name="minus" /></button>
-                    <span className="mono">{qty}</span>
+                    <span className="mono">{numeroVista(p, qty)}</span>
                     <button className="btn sm" type="button" onClick={() => add(p.id)}><Icon name="plus" /></button>
                   </div>
                 )}
@@ -374,7 +377,7 @@ export function Caja() {
               <div key={l.product.id} className="titem">
                 <div>
                   <div>{l.product.name}</div>
-                  <div className="tl">{money(l.product.price)} × {l.qty}</div>
+                  <div className="tl">{money(precioVista(l.product, l.product.price ?? 0))}{esMediaCaja(l.product) ? ' por caja' : ''} × {numeroVista(l.product, l.qty)}</div>{/* CAJAS-MEDIOS */}
                 </div>
                 <span className="mono">{money((l.product.price ?? 0) * l.qty)}</span>
               </div>
@@ -480,7 +483,7 @@ export function Caja() {
       </div>
 
       {!done && reprint && (
-        <VentaTicketPrint order={reprint.order} productName={productName} pago={reprint.pago} clientName={reprint.clientName} />
+        <VentaTicketPrint order={reprint.order} productName={productName} unidades={unidadesRecibo} pago={reprint.pago} clientName={reprint.clientName} />
       )}
 
       {pedidoAbierto && client && (
@@ -517,7 +520,7 @@ export function Caja() {
                 </p>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
-                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, (() => { const t = clienteDePedido(done).phone; return t && t !== '—' ? t : undefined })())}>
+                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, (() => { const t = clienteDePedido(done).phone; return t && t !== '—' ? t : undefined })(), unidadesRecibo)}>
                     <Icon name="chat" /> Enviar por WhatsApp
                   </button>
                   <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>
@@ -525,7 +528,7 @@ export function Caja() {
               </div>
             </div>
           </div>
-          <VentaTicketPrint order={done} productName={productName} pago={lastPago} clientName={clientNameFor(done)} />
+          <VentaTicketPrint order={done} productName={productName} unidades={unidadesRecibo} pago={lastPago} clientName={clientNameFor(done)} />
         </div>
       )}
     </div>

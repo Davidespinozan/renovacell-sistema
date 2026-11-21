@@ -23,6 +23,7 @@ import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { diagnoseShipment, envioVigente, esRecoge } from '../../data/ops/seguimiento'
 import { entregarRecoge } from '../../data/store/ordersStore'
 import type { Shipment } from '../../data/types'
+import { cantidadVista } from '../../lib/cajas'
 
 interface Row {
   order: OrderWithItems
@@ -190,6 +191,7 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
 }
 
 function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, string> }) {
+  const { data: products } = useProducts()   // CAJAS-MEDIOS: para leer media caja en cajas
   const { order, shipment, stuck, reason, statusLabel, statusPill } = row
   const { role } = useRole()
   const { cambiarChofer } = useShipments()
@@ -274,7 +276,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
             </select>
           ) : <> · <button className="rc-link" type="button" onClick={() => setCambiando(true)} data-testid="fila-cambiar-chofer">Cambiar</button></>)}
         </div>
-        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(', ')}</div>
+        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${cantidadVista(products.find((p) => p.id === it.product_id), it.qty)}`).join(', ')}</div>
       </div>
 
       {tieneGuia && <RastreoEnvio rastreo={rastreo} cargando={consultando} onActualizar={actualizarRastreo} />}

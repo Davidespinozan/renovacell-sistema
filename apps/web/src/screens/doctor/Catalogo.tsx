@@ -24,6 +24,7 @@ import { useMasPedidos } from '../../data/ops/masPedidos'
 import { Star, Trash2 } from 'lucide-react'
 import { hasSupabase } from '../../lib/supabase'
 import type { ProductSafe } from '../../data/types'
+import { cantidadVista, esMediaCaja, numeroVista, precioVista, aVista } from '../../lib/cajas'
 import type { PedidoCreado } from '../../data/store/ordersStore'
 import { reloadOrders } from '../../data/store/ordersStore'
 import { useCarritoCanonico } from '../../data/hooks/useCarritoCanonico'
@@ -296,7 +297,7 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
       {/* MC-3 · barra contextual en móvil: mismo carrito, mismo checkout. Se oculta con checkout/modal abierto y con un
           carrito que no es el activo del servidor (convertido o inaccesible). Total = el mismo estimado del panel. */}
       {verified && <BarraCarrito
-        unidades={lines.reduce((n, l) => n + l.qty, 0)}
+        unidades={lines.reduce((n, l) => n + Math.ceil(aVista(l.product, l.qty)), 0)}   // CAJAS-MEDIOS · media caja cuenta como 1
         totalEstimado={lines.length ? total : null}
         bloqueada={checkout || !!openFamily || (hasSupabase && (!canon.cart || canon.cart.estado !== 'active'))}
         onRevisar={() => setCheckout(true)}
@@ -332,14 +333,16 @@ function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDe
         {p.image_url ? <img src={p.image_url} alt={p.name} loading="lazy" /> : <Icon name="leaf" />}
         {!sellable && <span className="dcat-estado">Agotado</span>}
         {sellable && masPedido && <span className="dcat-mas" data-testid="mas-pedido"><Star size={12} aria-hidden /> Más pedido</span>}
-        {sellable && stock.status === 'low' && <span className="dcat-estado dcat-estado--pocas">Quedan {stock.qty}</span>}
+        {sellable && stock.status === 'low' && <span className="dcat-estado dcat-estado--pocas">Quedan {cantidadVista(p, stock.qty)}</span>}
       </div>
       <div className="pb">
         <div className={'dcat-linea ' + (isProf ? 'prof' : 'cosm')}>{isProf ? 'Professional' : 'Home Care'}{p.category ? <span> · {p.category}</span> : null}</div>
         <h5>{onVer ? <button type="button" className="dcat-nombre" onClick={onVer}>{p.name}</button> : p.name}</h5>
         {!pendiente && price != null && (
           <div className="pr dcat-precio">
-            {discounted ? (<><span>{money(effPrice)}</span><s>{money(price)}</s></>) : money(price)}
+            {/* CAJAS-MEDIOS · media caja: el precio se ve por caja */}
+            {discounted ? (<><span>{money(precioVista(p, effPrice!))}</span><s>{money(precioVista(p, price))}</s></>) : money(precioVista(p, price))}
+            {esMediaCaja(p) && <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--ink-3)' }}> por caja</span>}
           </div>
         )}
         {sellable && !pendiente && (promo || discounted || nivel) && (
@@ -363,7 +366,7 @@ function ProductCard({ p, price, qty, stock, promo, nivel, effPrice, onAdd, onDe
         ) : (
           <div className="dcat-cant">
             <button className="btn ghost sm" type="button" aria-label={qty === 1 ? 'Quitar del carrito' : 'Quitar uno'} onClick={onDec}>{qty === 1 ? <Trash2 size={15} aria-hidden /> : <Icon name="minus" />}</button>
-            <span className="mono">{qty}</span>
+            <span className="mono">{numeroVista(p, qty)}</span>{/* CAJAS-MEDIOS */}
             <button className="btn sm" type="button" aria-label="Agregar uno" onClick={onAdd} disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}><Icon name="plus" /></button>
           </div>
         )}
@@ -378,7 +381,8 @@ function FamilyCard({ entry, cart, onOpen, priceOf }: { entry: CatalogEntry; car
   const p = entry.product
   const disponibles = entry.variants.filter(isSellableVariant).length
   // Precio mínimo con lo que ya está en memoria (priceOf es síncrono; sin verificar devuelve null).
-  const precios = priceOf ? entry.variants.filter(isSellableVariant).map(priceOf).filter((x): x is number => x != null) : []
+  // CAJAS-MEDIOS · «desde» por caja en variantes que se venden por media caja
+  const precios = priceOf ? entry.variants.filter(isSellableVariant).map((v) => { const x = priceOf(v); return x == null ? null : precioVista(v, x) }).filter((x): x is number => x != null) : []
   const desde = precios.length ? Math.min(...precios) : null
   const enCarrito = entry.variants.reduce((s, v) => s + (cart[v.id] ?? 0), 0)
   const isProf = p.line === 'prof'
@@ -450,7 +454,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, opacity: disponible ? 1 : 0.6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>{variantLabel(v)}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{disponible ? money(price) : 'No disponible'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{disponible ? `${money(precioVista(v, price!))}${esMediaCaja(v) ? ' por caja' : ''}` : 'No disponible'}</div>{/* CAJAS-MEDIOS */}
                   </div>
                   {!disponible ? (
                     <span className="pill p-neu" style={{ whiteSpace: 'nowrap' }}>No disponible</span>
@@ -459,7 +463,7 @@ function VariantModal({ parent, variants, cart, priceOf, stockMap, onAdd, onDec,
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={() => onDec(v.id)}><Icon name="minus" /></button>
-                      <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>
+                      <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{numeroVista(v, qty)}</span>{/* CAJAS-MEDIOS */}
                       <button className="btn sm" type="button" aria-label="Agregar uno" disabled={atMax} style={atMax ? { opacity: 0.4, cursor: 'not-allowed' } : undefined} onClick={() => onAdd(v.id)}><Icon name="plus" /></button>
                     </div>
                   )}
@@ -544,11 +548,12 @@ function LineRow({ l, price, onInc, onDec }: { l: CartLine; price: number | null
     <div className="titem">
       <div>
         <div>{l.product.name}</div>
-        <div className="tl">{money(price)}</div>
+        {/* CAJAS-MEDIOS · precio por caja y cantidad en cajas con medios */}
+        <div className="tl">{money(price == null ? price : precioVista(l.product, price))}{esMediaCaja(l.product) ? ' c/caja' : ''}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}><Icon name="minus" /></button>
-        <span className="mono">{l.qty}</span>
+        <span className="mono">{numeroVista(l.product, l.qty)}</span>
         <button className="btn ghost sm" type="button" aria-label="Agregar uno" onClick={onInc}><Icon name="plus" /></button>
       </div>
     </div>

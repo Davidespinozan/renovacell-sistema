@@ -18,6 +18,7 @@ import { useDoctors } from '../../data/hooks/useDoctors'
 import { clientOf } from '../../data/mock/profiles'
 import { costOf } from '../../data/mock/costs'
 import type { InventoryMovement, Lot } from '../../data/types'
+import { cantidadVista, esMediaCaja, type ConUnidad } from '../../lib/cajas'
 
 type Mode = 'lote' | 'pedido'
 
@@ -26,6 +27,12 @@ type Mode = 'lote' | 'pedido'
 // directo, que no encontraba el uuid en el mock y caía SIEMPRE a 'Dra. Laura Méndez'.
 const clientLabel = (o: OrderWithItems | undefined, names: Record<string, string>): string =>
   !o ? '—' : o.doctor_id ? (names[o.doctor_id] ?? clientOf(o.doctor_id).name) : 'Venta en mostrador (POS)'
+
+// CAJAS-MEDIOS: mapa de producto completo para leer media caja en cajas con medios.
+function useProdById() {
+  const { data: products } = useProducts()
+  return useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ConUnidad | undefined>, [products])
+}
 
 function lotStatus(lot: Lot): { label: string; pill: string } {
   if (lot.quantity <= 0) return { label: 'Agotado', pill: 'p-neu' }
@@ -87,6 +94,8 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
 }) {
   const [lotId, setLotId] = useState(lots[0]?.id ?? '')
   const lot = lots.find((l) => l.id === lotId) ?? lots[0]
+  const prodById = useProdById()
+  const pLot = lot ? prodById[lot.product_id] : undefined
 
   const hist = useMemo(
     () => movements.filter((m) => m.lot_id === lot?.id).slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
@@ -143,7 +152,7 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
           <span className={'pill ' + st.pill} style={{ marginLeft: 'auto' }}>{st.label}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10, fontSize: 13 }}>
-          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Quedan</div><b className="mono">{lot.quantity} u</b></div>
+          <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Quedan</div><b className="mono">{cantidadVista(pLot, lot.quantity, 'u')}</b></div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Caduca</div>{fmtDate(lot.expiry_date ?? '')}</div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Costo unitario</div><b className="mono">{money(lotCost)}</b></div>
           <div><div style={{ color: 'var(--ink-3)', fontSize: 11 }}>Llegó a</div><b>{clientesUnicos}</b> {clientesUnicos === 1 ? 'cliente' : 'clientes'}</div>
@@ -187,7 +196,7 @@ function PorLote({ lots, movements, prodName, orders, orderByRef, clientName }: 
                 <tr key={i}>
                   <td data-label="Cliente"><b>{d.cliente}</b></td>
                   <td data-label="Pedido" className="mono">{d.folio}</td>
-                  <td data-label="Cantidad" className="mono">{d.qty} u</td>
+                  <td data-label="Cantidad" className="mono">{cantidadVista(pLot, d.qty, 'u')}</td>
                   <td data-label="Importe" className="mono">{money(d.importe)}</td>
                   <td data-label="Utilidad" className="mono" style={{ color: d.utilidad >= 0 ? 'var(--green-deep)' : 'var(--danger)' }}>{money(d.utilidad)}</td>
                   <td data-label="Fecha">{fmtDate(d.fecha)}</td>
@@ -206,6 +215,7 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
 }) {
   const [orderId, setOrderId] = useState(orders[0]?.id ?? '')
   const order = orders.find((o) => o.id === orderId) ?? orders[0]
+  const prodById = useProdById()
   // Lotes con que se surtió el pedido. Fuente PRIMARIA: el lote estampado en cada
   // renglón (order_items.lot_id) — cubre almacén, POS, consignación y eventos por igual.
   // Cruzar por referencia del movimiento fallaba en consignación/eventos, donde la
@@ -257,7 +267,7 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
                   <tr key={s.key}>
                     <td data-label="Lote"><span className="lc">{lot?.lot_code ?? s.lot_id}</span></td>
                     <td data-label="Producto">{lot ? prodName[lot.product_id] ?? 'Producto' : '—'}</td>
-                    <td data-label="Cantidad" className="mono">{s.qty} u</td>
+                    <td data-label="Cantidad" className="mono">{cantidadVista(lot ? prodById[lot.product_id] : undefined, s.qty, 'u')}</td>
                     <td data-label="Caduca">{lot ? fmtDate(lot.expiry_date ?? '') : '—'}</td>
                   </tr>
                 )
@@ -276,7 +286,7 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
               {order.items.map((it) => (
                 <tr key={it.id}>
                   <td data-label="Producto">{prodName[it.product_id ?? ''] ?? 'Producto'}</td>
-                  <td data-label="Cant." className="mono">{it.qty} {it.qty === 1 ? 'pza' : 'pzas'}</td>
+                  <td data-label="Cant." className="mono">{esMediaCaja(prodById[it.product_id ?? '']) ? cantidadVista(prodById[it.product_id ?? ''], it.qty) : `${it.qty} ${it.qty === 1 ? 'pza' : 'pzas'}`}</td>
                   <td data-label="Importe" className="mono">{money((it.unit_price ?? 0) * it.qty)}</td>
                 </tr>
               ))}

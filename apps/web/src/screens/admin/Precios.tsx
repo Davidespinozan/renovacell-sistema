@@ -14,6 +14,12 @@ import { useVolumePrices } from '../../data/hooks/useVolumePrices'
 import { setBasePrice } from '../../data/store/productsStore'
 import { volumeTiers, tierDiscountPct, nombreNivel, type VolumeRule } from '../../data/ops/volumePricing'
 import type { ProductSafe } from '../../data/types'
+import { aInterno, aVista, esMediaCaja, factor, numeroVista, precioVista } from '../../lib/cajas'
+
+// CAJAS-MEDIOS: la media caja se guarda por MEDIA caja (cantidad y precio internos), pero aquí se edita en
+// CAJAS: el mínimo se convierte con aInterno y el precio por caja se divide entre el factor al guardar.
+const precioInterno = (p: ProductSafe, porCaja: number): number => Math.round((porCaja / factor(p)) * 100) / 100
+const NOTA_CAJAS = 'Se vende por media caja; aquí en cajas.'
 
 type Tab = 'general' | 'volumen'
 // SKU comercial = producto vendible (no tarjeta visual/variante padre) y activo.
@@ -68,12 +74,12 @@ function GeneralTab({ skus }: { skus: ProductSafe[] }) {
 }
 
 function GeneralRow({ p }: { p: ProductSafe }) {
-  const [val, setVal] = useState(p.price != null ? String(p.price) : '')
+  const [val, setVal] = useState(p.price != null ? String(precioVista(p, p.price)) : '')   // CAJAS-MEDIOS: por caja
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const dirty = val.trim() !== '' && Number(val) !== p.price
+  const dirty = val.trim() !== '' && (p.price == null || Number(val) !== precioVista(p, p.price))
   const [guardando, setGuardando] = useState(false)
   const save = async () => {
-    const price = Number(val)
+    const price = precioInterno(p, Number(val))   // CAJAS-MEDIOS
     setGuardando(true); setMsg(null)
     // "Guardado ✓" solo cuando el servidor confirmó: es el precio que se va a cobrar.
     const r = await setBasePrice(p.id, price, p.name)
@@ -92,6 +98,7 @@ function GeneralRow({ p }: { p: ProductSafe }) {
           <button className="btn ghost sm" type="button" title="Guardar" disabled={!dirty || guardando} onClick={save}><Check size={13} /></button>
           {msg && <span style={{ fontSize: 11.5, color: msg.ok ? 'var(--green-deep)' : 'var(--danger)' }}>{msg.text}</span>}
         </span>
+        {esMediaCaja(p) && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>Precio por caja. {NOTA_CAJAS}</div>}
       </td>
       <td data-label="Estado"><span className="pill p-ok" style={{ fontSize: 10.5 }}>Activo</span></td>
     </tr>
@@ -145,9 +152,10 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
   const [addNivel, setAddNivel] = useState<Nivel>(tiers.some((t) => t.active) ? 'mayoreo' : 'medio')
   const [addPrice, setAddPrice] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const cajas = esMediaCaja(product)
   const add = async () => {
     setErr(null)
-    const r = await onCreate(Number(addMin), Number(addPrice), addNivel)
+    const r = await onCreate(aInterno(product, Number(addMin)), precioInterno(product, Number(addPrice)), addNivel)   // CAJAS-MEDIOS
     if (!r.ok) { setErr(r.error ?? 'No se guardó'); return }
     setAddMin(''); setAddPrice('')
   }
@@ -156,20 +164,21 @@ function VolumeCard({ product, tiers, onCreate, onUpdate, onToggle, onDelete }: 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <b>{product.name}</b>
         <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{product.sku}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--ink-2)' }}>General: <b>{money(product.price)}</b></span>
+        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--ink-2)' }}>General: <b>{money(product.price == null ? product.price : precioVista(product, product.price))}</b>{cajas ? ' por caja' : ''}</span>
       </div>
+      {cajas && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{NOTA_CAJAS}</div>}
 
       <div className="tbl-scroll" style={{ marginTop: 10 }}>
         <table className="tbl-cards">
-          <thead><tr><th>Nivel</th><th>Desde (pzas)</th><th>Precio c/u</th><th>Descuento</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Nivel</th><th>{cajas ? 'Desde (cajas)' : 'Desde (pzas)'}</th><th>{cajas ? 'Precio por caja' : 'Precio c/u'}</th><th>Descuento</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             {tiers.map((t) => { const act = tiers.filter((x) => x.active); const i = act.indexOf(t)
-              return <TierRow key={t.id} nivel={i >= 0 ? nombreNivel(act, i) : 'Apagado'} tier={t} base={product.price} onUpdate={onUpdate} onToggle={onToggle} onDelete={onDelete} /> })}
+              return <TierRow key={t.id} nivel={i >= 0 ? nombreNivel(act, i) : 'Apagado'} tier={t} product={product} base={product.price} onUpdate={onUpdate} onToggle={onToggle} onDelete={onDelete} /> })}
             <tr>
               <td data-label="Nivel"><SelectorNivel value={addNivel} onChange={setAddNivel} /></td>
-              <td data-label="Desde"><input value={addMin} onChange={(e) => setAddMin(e.target.value)} inputMode="numeric" placeholder="5" style={inp(70)} /></td>
+              <td data-label="Desde"><input value={addMin} onChange={(e) => setAddMin(e.target.value)} inputMode={cajas ? 'decimal' : 'numeric'} placeholder="5" style={inp(70)} /></td>
               <td data-label="Precio c/u"><input value={addPrice} onChange={(e) => setAddPrice(e.target.value)} inputMode="decimal" placeholder="0.00" style={inp(110)} /></td>
-              <td data-label="Descuento" className="mono" style={{ color: 'var(--ink-3)' }}>{addPrice && product.price ? (tierDiscountPct(product.price, Number(addPrice)) ?? 0) + '%' : '—'}</td>
+              <td data-label="Descuento" className="mono" style={{ color: 'var(--ink-3)' }}>{addPrice && product.price ? (tierDiscountPct(product.price, precioInterno(product, Number(addPrice))) ?? 0) + '%' : '—'}</td>
               <td />
               <td><button className="btn sm" type="button" onClick={add} disabled={!addMin || !addPrice}><Plus size={13} /> Agregar nivel</button></td>
             </tr>
@@ -193,25 +202,27 @@ function SelectorNivel({ value, onChange }: { value: Nivel; onChange: (n: Nivel)
   )
 }
 
-function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
-  nivel: string; tier: VolumeRule; base: number | null
+function TierRow({ nivel, tier, product, base, onUpdate, onToggle, onDelete }: {
+  nivel: string; tier: VolumeRule; product: ProductSafe; base: number | null
   onUpdate: (id: string, min: number, price: number, nivel: Nivel) => Promise<{ ok: boolean; error?: string }>
   onToggle: (id: string, active: boolean) => Promise<{ ok: boolean; error?: string }>
   onDelete: (id: string) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [edit, setEdit] = useState(false)
-  const [min, setMin] = useState(String(tier.min_quantity))
-  const [price, setPrice] = useState(String(tier.price))
+  // CAJAS-MEDIOS: se edita en cajas y precio por caja; se guarda interno.
+  const minVista = String(aVista(product, tier.min_quantity)), priceVista = String(precioVista(product, tier.price))
+  const [min, setMin] = useState(minVista)
+  const [price, setPrice] = useState(priceVista)
   const [err, setErr] = useState<string | null>(null)
   const pct = tierDiscountPct(base, tier.price)
   // La fila solo sale del modo edición si el servidor guardó el cambio.
   const [niv, setNiv] = useState<Nivel>(tier.nivel ?? 'medio')
-  const save = async () => { setErr(null); const r = await onUpdate(tier.id!, Number(min), Number(price), niv); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
+  const save = async () => { setErr(null); const r = await onUpdate(tier.id!, aInterno(product, Number(min)), precioInterno(product, Number(price)), niv); if (!r.ok) { setErr(r.error ?? 'No se guardó'); return } setEdit(false) }
   return (
     <tr style={{ opacity: tier.active ? 1 : 0.55 }}>
       <td data-label="Nivel">{edit ? <SelectorNivel value={niv} onChange={setNiv} /> : <b>{nivel}</b>}</td>
-      <td data-label="Desde">{edit ? <input value={min} onChange={(e) => setMin(e.target.value)} inputMode="numeric" style={inp(70)} /> : <span className="mono">{tier.min_quantity}</span>}</td>
-      <td data-label="Precio c/u">{edit ? <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" style={inp(110)} /> : <span className="mono">{money(tier.price)}</span>}</td>
+      <td data-label="Desde">{edit ? <input value={min} onChange={(e) => setMin(e.target.value)} inputMode={esMediaCaja(product) ? 'decimal' : 'numeric'} style={inp(70)} /> : <span className="mono">{numeroVista(product, tier.min_quantity)}</span>}</td>
+      <td data-label="Precio c/u">{edit ? <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" style={inp(110)} /> : <span className="mono">{money(precioVista(product, tier.price))}</span>}</td>
       <td data-label="Descuento" className="mono" style={{ color: pct ? 'var(--green-deep)' : 'var(--ink-3)' }}>{pct ? pct + '%' : '—'}</td>
       <td data-label="Estado"><span className={'pill ' + (tier.active ? 'p-ok' : 'p-neu')} style={{ fontSize: 10.5 }}>{tier.active ? 'Activo' : 'Inactivo'}</span></td>
       <td>
@@ -219,13 +230,13 @@ function TierRow({ nivel, tier, base, onUpdate, onToggle, onDelete }: {
           {edit ? (
             <>
               <button className="btn ghost sm" type="button" title="Guardar" onClick={save}><Check size={13} /></button>
-              <button className="btn ghost sm" type="button" title="Cancelar" onClick={() => { setEdit(false); setMin(String(tier.min_quantity)); setPrice(String(tier.price)) }}><X size={13} /></button>
+              <button className="btn ghost sm" type="button" title="Cancelar" onClick={() => { setEdit(false); setMin(minVista); setPrice(priceVista) }}><X size={13} /></button>
             </>
           ) : (
             <>
               <button className="btn ghost sm" type="button" onClick={() => setEdit(true)}><Pencil size={12} /> Editar</button>
               <button className="btn ghost sm" type="button" onClick={() => onToggle(tier.id!, !tier.active)}>{tier.active ? 'Desactivar' : 'Activar'}</button>
-              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={async () => { if ((await confirmar(`¿Eliminar el nivel desde ${tier.min_quantity} pzas?`))) onDelete(tier.id!) }}><Trash2 size={12} /></button>
+              <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={async () => { if ((await confirmar(`¿Eliminar el nivel desde ${numeroVista(product, tier.min_quantity)} ${esMediaCaja(product) ? 'cajas' : 'pzas'}?`))) onDelete(tier.id!) }}><Trash2 size={12} /></button>
             </>
           )}
           {err && <span role="alert" style={{ color: 'var(--danger)', fontSize: 11.5 }}>{err}</span>}

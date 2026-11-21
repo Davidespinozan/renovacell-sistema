@@ -3,6 +3,7 @@
 // Cada venta es un pedido real con su cobro en el libro de dinero.
 import React, { useMemo, useState } from 'react'
 import { money, fmtDate } from '../../lib/format'
+import { cantidadVista, esMediaCaja, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { PageHead } from '../../app/PageHead'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useUsers } from '../../data/hooks/useUsers'
@@ -58,13 +59,14 @@ export function VentasEvento() {
                   <tbody>
                     {ventas.map((l) => {
                       const c = custodias.find((x) => x.id === l.custody_id)
+                      const p = products.find((x) => x.id === l.product_id)   // CAJAS-MEDIOS: cantidad y precio en cajas
                       return (
                         <tr key={l.id}>
                           <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(l.created_at)}</td>
                           <td data-label="Custodia">{c ? etiqueta(c) : '—'}</td>
                           <td data-label="Producto">{prodName[l.product_id] ?? 'Producto'}</td>
-                          <td data-label="Cant." className="mono">{l.qty}</td>
-                          <td data-label="Precio" className="mono">{money(l.unit_price ?? 0)}</td>
+                          <td data-label="Cant." className="mono">{cantidadVista(p, l.qty)}</td>
+                          <td data-label="Precio" className="mono">{money(precioVista(p, l.unit_price ?? 0))}{esMediaCaja(p) ? ' por caja' : ''}</td>
                           <td data-label="Importe" className="mono">{money(l.qty * (l.unit_price ?? 0))}</td>
                         </tr>
                       )

@@ -9,6 +9,7 @@ import { leerFicha as leerPorDefecto, registrarActividad, SECCIONES_FICHA, type 
 import { nombreNivel, promoTiers, volumeTiers, type VolumeRule } from '../../data/ops/volumePricing'
 import { pedirAbrirChat } from '../../data/store/chatUiStore'
 import type { ProductSafe } from '../../data/types'
+import { aVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'
 
 export interface Escalon { etiqueta: string; desde: number; precio: number; nota?: string }
 /** La escalera de precio que ve el doctor (la misma que cobra el servidor). */
@@ -61,11 +62,12 @@ export function FichaProducto({ p, precio, verificado, reglas, qty, puedeAgregar
               <section aria-label="Precio por cantidad" data-testid="ficha-escalera">
                 <div className="eyebrow" style={{ margin: '0 0 6px' }}>Precio por cantidad</div>
                 <div style={{ display: 'grid', gap: 6 }}>
+                  {/* CAJAS-MEDIOS · media caja: «desde N cajas … por caja» (la escalera sigue en unidades internas) */}
                   {pasos.map((s) => (
                     <div key={s.etiqueta + s.desde} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--cp-surface, #fff)', border: '1px solid var(--line)' }}>
-                      <span style={{ flex: 1 }}><b>{s.etiqueta}</b>{s.desde > 1 ? <span style={{ color: 'var(--ink-3)' }}> · desde {s.desde} piezas</span> : null}
+                      <span style={{ flex: 1 }}><b>{s.etiqueta}</b>{s.desde > 1 ? <span style={{ color: 'var(--ink-3)' }}> · desde {esMediaCaja(p) ? `${aVista(p, s.desde)} cajas` : `${s.desde} piezas`}</span> : null}
                         {s.nota && <span style={{ display: 'block', fontSize: 12, color: 'var(--green-deep)' }}>{s.nota}</span>}</span>
-                      <span className="mono" style={{ fontWeight: 700 }}>{money(s.precio)}<span style={{ fontWeight: 400, fontSize: 12, color: 'var(--ink-3)' }}> c/u</span></span>
+                      <span className="mono" style={{ fontWeight: 700 }}>{money(precioVista(p, s.precio))}<span style={{ fontWeight: 400, fontSize: 12, color: 'var(--ink-3)' }}>{esMediaCaja(p) ? ' por caja' : ' c/u'}</span></span>
                     </div>
                   ))}
                 </div>
@@ -95,7 +97,7 @@ export function FichaProducto({ p, precio, verificado, reglas, qty, puedeAgregar
             {verificado && puedeAgregar && (qty > 0 ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <button className="btn ghost sm" type="button" aria-label="Quitar uno" onClick={onDec}>−</button>
-                <b className="mono">{qty}</b>
+                <b className="mono">{numeroVista(p, qty)}</b>{/* CAJAS-MEDIOS */}
                 <button className="btn ghost sm" type="button" aria-label="Agregar uno" onClick={onAdd}>+</button>
               </span>
             ) : <button className="btn" type="button" onClick={onAdd} data-testid="ficha-agregar"><Icon name="cart" /> Agregar al pedido</button>)}

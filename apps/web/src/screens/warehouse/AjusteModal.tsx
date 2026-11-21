@@ -8,16 +8,20 @@ import { ajustarLote } from '../../data/store/lotsStore'
 import { useOpId } from '../../data/hooks/useOpId'
 import { useRole } from '../../auth/RoleContext'
 import { hasSupabase } from '../../lib/supabase'
+import { aInterno, aVista, cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 const MOTIVOS = ['Conteo físico', 'Entrada mal capturada', 'Devolución no registrada', 'Otro']
 
 export function AjusteModal({ lot, onClose }: {
-  lot: { id: string; lot_code: string; quantity: number; producto?: string }
+  lot: { id: string; lot_code: string; quantity: number; producto?: string; unit?: string | null }
   onClose: () => void
 }) {
-  const [real, setReal] = useState<string>(String(lot.quantity))
+  // CAJAS-MEDIOS: en media caja se cuenta y escribe en cajas (acepta ½); el delta se calcula en internas.
+  const mc = esMediaCaja(lot)
+  const u = (n: number) => (mc ? cantidadVista(lot, n) : `${n} u`)
+  const [real, setReal] = useState<string>(String(aVista(lot, lot.quantity)))
   const [motivo, setMotivo] = useState(MOTIVOS[0])
-  const realN = Math.max(0, Math.floor(Number(real) || 0))
+  const realN = mc ? aInterno(lot, Number(real) || 0) : Math.max(0, Math.floor(Number(real) || 0))
   const delta = realN - lot.quantity
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -43,7 +47,7 @@ export function AjusteModal({ lot, onClose }: {
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div><h3>Corregir conteo</h3><div className="ms">{lot.producto ? `${lot.producto} · ` : ''}Lote {lot.lot_code} · sistema marca {lot.quantity} u</div></div>
+          <div><h3>Corregir conteo</h3><div className="ms">{lot.producto ? `${lot.producto} · ` : ''}Lote {lot.lot_code} · sistema marca {u(lot.quantity)}</div></div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
         </div>
         <div className="mbody">
@@ -55,10 +59,10 @@ export function AjusteModal({ lot, onClose }: {
           </div>
 
           <label style={label}>Conteo físico real</label>
-          <input style={input} type="number" min={0} value={real} onChange={(e) => setReal(e.target.value)} />
+          <input style={input} type="number" min={0} step={mc ? 0.5 : 1} value={real} onChange={(e) => setReal(e.target.value)} />
           {delta !== 0 && (
             <div style={{ fontSize: 12.5, marginTop: 8, color: delta > 0 ? 'var(--green-deep)' : 'var(--danger)' }}>
-              {delta > 0 ? `Sobran ${delta} u — se sumarán al lote.` : `Faltan ${-delta} u — se restarán del lote.`}
+              {delta > 0 ? `Sobran ${u(delta)} — se sumarán al lote.` : `Faltan ${u(-delta)} — se restarán del lote.`}
             </div>
           )}
 
@@ -67,7 +71,7 @@ export function AjusteModal({ lot, onClose }: {
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" onClick={aplicar} disabled={delta === 0 || busy || positivoBloqueado} style={delta === 0 || busy || positivoBloqueado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-              <Icon name="check" /> {busy ? 'Registrando…' : err ? 'Reintentar' : `Ajustar a ${realN} u`}
+              <Icon name="check" /> {busy ? 'Registrando…' : err ? 'Reintentar' : `Ajustar a ${u(realN)}`}
             </button>
           </div>
         </div>

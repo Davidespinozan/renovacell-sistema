@@ -14,8 +14,9 @@ import { AjusteModal } from './AjusteModal'
 import { useRoleOpcional } from '../../auth/RoleContext'
 import { CorregirLoteModal, type LoteACorregir } from './CorregirLoteModal'
 import type { Lot, ProductSafe } from '../../data/types'
+import { cantidadVista, esMediaCaja, numeroVista } from '../../lib/cajas'
 
-type MermaLot = { id: string; lot_code: string; quantity: number; producto?: string }
+type MermaLot = { id: string; lot_code: string; quantity: number; producto?: string; unit?: string | null }
 
 export function Existencias() {
   const { data: lots } = useLots()
@@ -89,6 +90,9 @@ function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { produc
   const disponible = lots.reduce((s, l) => s + ((daysUntil(l.expiry_date) ?? 1) >= 0 ? l.quantity : 0), 0)
   const caducado = fisica - disponible
   const isProf = product.line === 'prof'
+  // CAJAS-MEDIOS: totales y lotes del producto de media caja se leen en cajas con medios.
+  const mc = esMediaCaja(product)
+  const pzas = (n: number) => (mc ? cantidadVista(product, n) : `${n} ${n === 1 ? 'pza' : 'pzas'}`)
   // El lote FEFO = el primero con stock que no esté caducado.
   const fefoId = lots.find((l) => l.quantity > 0 && (daysUntil(l.expiry_date) ?? 1) >= 0)?.id
 
@@ -103,10 +107,10 @@ function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { produc
           {/* Una cifra que manda (lo disponible para venta) y el desglose como subtítulo: antes "Física/Disponible"
               competían arriba a la derecha y la cantidad del lote flotaba a media fila. */}
           <div className="inv-tot">
-            <div className="inv-tot-n" title="No caducado (lo que se puede vender)">{disponible} {disponible === 1 ? 'pza' : 'pzas'}</div>
+            <div className="inv-tot-n" title="No caducado (lo que se puede vender)">{pzas(disponible)}</div>
             <div className="inv-tot-d">
-              <span title="Todo el inventario, incluido lo caducado">{disponible === 1 ? 'disponible' : 'disponibles'} · física {fisica}</span>
-              {caducado > 0 && <span className="inv-tot-cad" title="Caducado: existe físicamente pero NO es vendible"> · caducado {caducado}</span>}
+              <span title="Todo el inventario, incluido lo caducado">{disponible === 1 ? 'disponible' : 'disponibles'} · física {numeroVista(product, fisica)}</span>
+              {caducado > 0 && <span className="inv-tot-cad" title="Caducado: existe físicamente pero NO es vendible"> · caducado {numeroVista(product, caducado)}</span>}
             </div>
           </div>
         </div>
@@ -124,16 +128,16 @@ function ProductStock({ product, lots, onMerma, onAjuste, onCorregir }: { produc
               <span className={'pill ' + sevPill(sev)}>{etiquetaCaducidad(d, l.expiry_date)}</span>
               <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{l.location}</span>
               </span>
-              <span className="lq">{l.quantity} {l.quantity === 1 ? 'pza' : 'pzas'}</span>
+              <span className="lq">{pzas(l.quantity)}</span>
               {/* Ajustar y Merma pesan igual (fantasma); solo el ícono de Merma va en rojo para avisar que da de baja. */}
               <span className="inv-acc">
                 <button className="btn ghost sm" type="button" title="Corregir conteo (cuadrar contra el físico)"
-                  onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="edit" /> Ajustar</button>
+                  onClick={() => onAjuste({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name, unit: product.unit })}><Icon name="edit" /> Ajustar</button>
                 {puedeCorregir && <button className="btn ghost sm" type="button" title="Corregir caducidad o código de lote mal capturado" data-testid="btn-corregir-lote"
                   onClick={() => onCorregir({ id: l.id, lot_code: l.lot_code, expiry_date: l.expiry_date, producto: product.name })}><Icon name="clock" /> Corregir</button>}
                 {l.quantity > 0 && (
                   <button className="btn ghost sm inv-merma" type="button" title="Dar de baja por merma (parcial o total)"
-                    onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name })}><Icon name="trash" /> Merma</button>
+                    onClick={() => onMerma({ id: l.id, lot_code: l.lot_code, quantity: l.quantity, producto: product.name, unit: product.unit })}><Icon name="trash" /> Merma</button>
                 )}
               </span>
             </div>

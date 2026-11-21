@@ -12,12 +12,17 @@ import { CheckoutCanonico, domicilioLegadoDelDoctor } from '../checkout/Checkout
 import { payOrder, reloadOrders } from '../../data/store/ordersStore'
 import { AvisoEnvioGratisVista, useAvisoEnvioGratis } from '../../app/AvisoEnvioGratis'   // ENT-P · mismo aviso que el Catálogo
 import { hasSupabase } from '../../lib/supabase'
+import { useProducts } from '../../data/hooks/useProducts'
+import { esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 
 interface Props { conversationId?: string | null; cartId?: string | null; soloLectura?: boolean; cliente?: ClienteCarrito; intervaloMs?: number; compacto?: boolean; senal?: unknown }
 
 export function CarritoPanel({ conversationId, cartId, soloLectura = false, cliente = clientePorDefecto, intervaloMs = 20_000, compacto = true, senal }: Props) {
   const [cart, setCart] = useState<Carrito | null>(null)
   const [abierto, setAbierto] = useState(!compacto)
+  // CAJAS-MEDIOS: el DTO del carrito no trae la unidad; se busca el producto por id para mostrar cajas.
+  const { data: productos } = useProducts()
+  const prodDe = (id: string) => productos.find((p) => p.id === id)
   const [error, setError] = useState<string | null>(null)
   const [prep, setPrep] = useState<Preparacion | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -114,12 +119,12 @@ export function CarritoPanel({ conversationId, cartId, soloLectura = false, clie
                   <div className="rc-cart-name">{it.nombre}</div>
                   <div className="rc-cart-sub">
                     {it.presentacion ? `${it.presentacion} · ` : ''}{ETIQUETA_DISPONIBILIDAD[it.disponibilidad] ?? it.disponibilidad}
-                    {it.precio.estado === 'autorizado' && it.precio.unitario != null ? ` · ${formatoMXN(it.precio.unitario)} c/u${it.precio.por_volumen ? ' (volumen)' : ''}` : it.precio.estado === 'requiere_verificacion' ? ' · precio al verificar' : it.precio.estado === 'sin_precio' ? ' · precio a consultar' : ''}
+                    {it.precio.estado === 'autorizado' && it.precio.unitario != null ? ` · ${formatoMXN(precioVista(prodDe(it.product_id), it.precio.unitario))} ${esMediaCaja(prodDe(it.product_id)) ? 'por caja' : 'c/u'}${it.precio.por_volumen ? ' (volumen)' : ''}` : it.precio.estado === 'requiere_verificacion' ? ' · precio al verificar' : it.precio.estado === 'sin_precio' ? ' · precio a consultar' : ''}
                   </div>
                 </div>
                 <div className="rc-cart-ctl">
                   {puedeMutar && <button type="button" className="rc-mini" disabled={ocupado} aria-label="Quitar uno" onClick={() => mutar(() => it.cantidad <= 1 ? cliente.quitar(cart.cart_id, it.product_id) : cliente.actualizar(cart.cart_id, it.product_id, it.cantidad - 1))}>−</button>}
-                  <span className="rc-cart-qty" data-testid="carrito-qty">{it.cantidad}</span>
+                  <span className="rc-cart-qty" data-testid="carrito-qty">{numeroVista(prodDe(it.product_id), it.cantidad)}</span>
                   {puedeMutar && <button type="button" className="rc-mini" disabled={ocupado || it.cantidad >= 999} aria-label="Agregar uno" onClick={() => mutar(() => cliente.actualizar(cart.cart_id, it.product_id, it.cantidad + 1))}>+</button>}
                   {puedeMutar && <button type="button" className="rc-mini rc-mini--x" disabled={ocupado} aria-label="Quitar del carrito" onClick={() => mutar(() => cliente.quitar(cart.cart_id, it.product_id))}>×</button>}
                 </div>

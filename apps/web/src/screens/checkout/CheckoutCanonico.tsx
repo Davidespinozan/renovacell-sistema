@@ -9,6 +9,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
+import { useProducts } from '../../data/hooks/useProducts'
+import { aVista, cantidadVista, esMediaCaja, precioVista } from '../../lib/cajas'
 import { PaymentModal } from '../doctor/PaymentModal'
 import { DeliveryLocationPicker } from '../../app/DeliveryLocationPicker'
 import { FiscalFields } from '../../app/FiscalFields'
@@ -150,6 +152,9 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     ? (lineasServidor.length ? lineasServidor : previas.map((p) => ({ ...p, unitario: null, subtotal: null })))
     : local?.lineas ?? []
   const total = conServidor ? totalServidor : local?.total ?? 0
+  // CAJAS-MEDIOS · producto de cada línea (por id; si no, por nombre) para mostrar cajas con medios
+  const { data: productos } = useProducts()
+  const productoDe = (l: LineaVista) => productos.find((x) => x.id === l.product_id) ?? productos.find((x) => x.name === l.nombre)
   // El carrito ya es un pedido (p. ej. confirmado en otra pestaña): se informa y NO se ofrece confirmar de nuevo.
   const yaPedido = conServidor && !order && motor.revision?.order_id ? motor.revision.order_id : null
   // Avisos de la revisión que NO son la dirección (esa se elige aquí abajo): disponibilidad, precio, cuenta…
@@ -303,12 +308,12 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
             </div>
             <div className="mbody">
               {/* CX-V2-B · 1) resumen compacto de productos (el total va junto al botón, una sola vez) */}
-              {lineas.map((l) => (
+              {lineas.map((l) => { const p = productoDe(l); return (
                 <div key={l.product_id} className="coitem" data-testid="checkout-linea" style={{ fontSize: 13.5 }}>
-                  <span>{l.nombre} <span style={{ color: 'var(--ink-3)' }}>×{l.qty}</span>{l.unitario != null && l.qty > 1 && <span style={{ color: 'var(--ink-3)', fontSize: 12 }}> · {money(l.unitario)} c/u</span>}</span>
+                  <span>{l.nombre} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(p, l.qty)}</span>{l.unitario != null && aVista(p, l.qty) > 1 && <span style={{ color: 'var(--ink-3)', fontSize: 12 }}> · {money(precioVista(p, l.unitario))} {esMediaCaja(p) ? 'c/caja' : 'c/u'}</span>}</span>
                   <span className="mono">{l.subtotal != null ? money(l.subtotal) : '—'}</span>
                 </div>
-              ))}
+              ) })}
               {conServidor && motor.errorRevision && (
                 <div role="alert" style={{ ...NOTA, color: 'var(--danger)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }} data-testid="checkout-error-revision">
                   <span style={{ flex: 1 }}>{motor.errorRevision}</span>

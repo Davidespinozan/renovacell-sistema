@@ -19,6 +19,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useOpId } from '../../data/hooks/useOpId'
 import { w1Message } from '../../data/ops/w1Command'
 import { pendingDisposicion, disponerDevolucion, type StockReturn, type StockReturnLine, type Disposition } from '../../data/store/stockReturnsStore'
+import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 type Tab = 'disp' | 'conc' | 'bajas'
 interface ConcRow { check_id: string; severidad: 'error' | 'alerta' | 'info'; entidad: string; entidad_id: string; detalle: string | null; esperado: number | null; obtenido: number | null }
@@ -98,7 +99,7 @@ function DisposicionCard({ ret, lines }: { ret: StockReturn; lines: StockReturnL
         return (
           <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
             <span style={{ flex: 1, minWidth: 180 }}>
-              {products.find((p) => p.id === l.product_id)?.name ?? 'Producto'} · <span className="mono">{lot?.lot_code ?? '—'}</span> · <b>{l.qty} u</b>
+              {products.find((p) => p.id === l.product_id)?.name ?? 'Producto'} · <span className="mono">{lot?.lot_code ?? '—'}</span> · <b>{cantidadVista(products.find((p) => p.id === l.product_id), l.qty, 'u')}</b>{/* CAJAS-MEDIOS */}
               <span className={'pill ' + (l.inspection === 'ok' ? 'p-ok' : 'p-dang')} style={{ marginLeft: 8, fontSize: 10.5 }}>{l.inspection}</span>
               {l.notes && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--ink-3)' }}>{l.notes}</span>}
             </span>
@@ -165,6 +166,12 @@ function Conciliacion() {
 }
 
 function Bajas() {
+  // CAJAS-MEDIOS: la baja de un producto de media caja se lee en cajas (se ubica por SKU).
+  const { data: products } = useProducts()
+  const cant = (sku: string, n: number) => {
+    const p = products.find((x) => x.sku === sku)
+    return esMediaCaja(p) ? `${n < 0 ? '-' : ''}${cantidadVista(p, Math.abs(n))}` : String(n)
+  }
   const [rows, setRows] = useState<BajaRow[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -192,7 +199,7 @@ function Bajas() {
                 <td data-label="Quién">{r.actor_email ?? '—'}{r.actor_role ? ` · ${r.actor_role}` : ''}</td>
                 <td data-label="Tipo">{r.tipo}</td>
                 <td data-label="SKU / lote" className="mono">{r.sku} · {r.lote}</td>
-                <td data-label="Cant." className="mono">{r.cantidad}</td>
+                <td data-label="Cant." className="mono">{cant(r.sku, r.cantidad)}</td>
                 <td data-label="Motivo">{r.motivo ?? '—'}</td>
               </tr>
             ))}

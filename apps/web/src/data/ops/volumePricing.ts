@@ -1,3 +1,4 @@
+import { esMediaCaja, cantidadVista, precioVista, type ConUnidad } from '../../lib/cajas'
 // Precios por VOLUMEN (descuentos por cantidad) — helpers PUROS de PREVISUALIZACIÓN.
 // ⚠️ El servidor es la AUTORIDAD final: `precio_de(product, list, qty)` calcula
 //    LEAST(base [override de lista ∥ general], mejor regla de volumen activa con
@@ -203,8 +204,10 @@ export function oportunidadesVolumen(lineas: ReadonlyArray<{ product_id: string;
   return out.sort((a, b) => a.faltan - b.faltan || b.ahorro - a.ahorro)
 }
 /** La frase para el cliente (o para que el vendedor se la ofrezca). */
-export function textoOportunidad(o: OportunidadVolumen, nombre: string, voz: 'cliente' | 'vendedor' = 'cliente'): string {
-  const pieza = o.faltan === 1 ? 'pieza' : 'piezas'
-  const pre = voz === 'cliente' ? `Agrega ${o.faltan} ${pieza} más de ${nombre}` : `Ofrécele ${o.faltan} ${pieza} más de ${nombre}`
-  return `${pre} y ${voz === 'cliente' ? 'pagas' : 'paga'} ${money0(o.precioNuevo)} c/u (${o.nivel.toLowerCase()}) en vez de ${money0(o.precioAhora)}: ${voz === 'cliente' ? 'ahorras' : 'ahorra'} ${money0(o.ahorro)}${o.arrastra ? ' en todo el pedido' : ''}.`
+export function textoOportunidad(o: OportunidadVolumen, nombre: string, voz: 'cliente' | 'vendedor' = 'cliente', producto?: ConUnidad | null): string {
+  // CAJAS-MEDIOS · un producto por media caja habla en cajas y precio por caja.
+  const mc = esMediaCaja(producto)
+  const cuanto = mc ? cantidadVista(producto, o.faltan) : `${o.faltan} ${o.faltan === 1 ? 'pieza' : 'piezas'}`
+  const pre = voz === 'cliente' ? `Agrega ${cuanto} más de ${nombre}` : `Ofrécele ${cuanto} más de ${nombre}`
+  return `${pre} y ${voz === 'cliente' ? 'pagas' : 'paga'} ${money0(precioVista(producto, o.precioNuevo))} ${mc ? 'por caja' : 'c/u'} (${o.nivel.toLowerCase()}) en vez de ${money0(precioVista(producto, o.precioAhora))}: ${voz === 'cliente' ? 'ahorras' : 'ahorra'} ${money0(o.ahorro)}${o.arrastra ? ' en todo el pedido' : ''}.`
 }

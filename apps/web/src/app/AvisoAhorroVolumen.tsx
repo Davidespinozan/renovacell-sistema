@@ -2,6 +2,8 @@
 // misma oportunidad como "Ofrécele…". Una sola fuente de cálculo (oportunidadesVolumen) para todas las pantallas.
 import React from 'react'
 import { oportunidadesVolumen, textoOportunidad, type VolumeRule } from '../data/ops/volumePricing'
+import { useProducts } from '../data/hooks/useProducts'
+import { esMediaCaja, numeroVista } from '../lib/cajas'
 
 export function AvisoAhorroVolumen({ lineas, reglas, nombreDe, voz = 'cliente', max = 2, onAgregar, disponible }: {
   lineas: ReadonlyArray<{ product_id: string; qty: number; base: number | null }>
@@ -15,6 +17,7 @@ export function AvisoAhorroVolumen({ lineas, reglas, nombreDe, voz = 'cliente', 
   disponible?: (productId: string) => number | null
 }) {
   const qtyDe = new Map(lineas.map((l) => [l.product_id, l.qty]))
+  const { data: productos } = useProducts()
   const ops = oportunidadesVolumen(lineas, reglas)
     .filter((o) => { const d = disponible?.(o.product_id); return d == null || (qtyDe.get(o.product_id) ?? 0) + o.faltan <= d })
     .slice(0, max)
@@ -23,10 +26,11 @@ export function AvisoAhorroVolumen({ lineas, reglas, nombreDe, voz = 'cliente', 
     <div data-testid="aviso-ahorro-volumen" style={{ marginTop: 10, padding: '9px 11px', borderRadius: 10, background: 'var(--ok-bg, #EAF4EC)', display: 'grid', gap: 6 }}>
       {ops.map((o) => (
         <div key={o.product_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--green-deep)' }} data-testid={`ahorro-${o.product_id}`}>
-          <span style={{ flex: 1 }}>{textoOportunidad(o, nombreDe(o.product_id), voz)}</span>
+          <span style={{ flex: 1 }}>{textoOportunidad(o, nombreDe(o.product_id), voz, productos.find((x) => x.id === o.product_id))}</span>
           {onAgregar && (
             <button type="button" className="btn ghost sm" style={{ whiteSpace: 'nowrap' }} onClick={() => onAgregar(o.product_id, o.faltan)} data-testid={`ahorro-agregar-${o.product_id}`}>
-              +{o.faltan}
+              {/* CAJAS-MEDIOS · se muestra en cajas; el clic sigue agregando las unidades internas */}
+              {(() => { const p = productos.find((x) => x.id === o.product_id); return esMediaCaja(p) ? `+${numeroVista(p, o.faltan)} caja${o.faltan > 2 ? 's' : ''}` : `+${o.faltan}` })()}
             </button>
           )}
         </div>

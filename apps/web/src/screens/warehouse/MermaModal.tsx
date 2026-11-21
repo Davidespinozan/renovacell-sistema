@@ -5,18 +5,22 @@ import React, { useState } from 'react'
 import { Icon } from '../../app/icons'
 import { ajustarLote } from '../../data/store/lotsStore'
 import { useOpId } from '../../data/hooks/useOpId'
+import { aInterno, aVista, cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 const MOTIVOS = ['Dañado', 'Caducado', 'Robo / extravío', 'Muestra', 'Otro']
 
 export function MermaModal({ lot, onClose }: {
-  lot: { id: string; lot_code: string; quantity: number; producto?: string }
+  lot: { id: string; lot_code: string; quantity: number; producto?: string; unit?: string | null }
   onClose: () => void
 }) {
+  // CAJAS-MEDIOS: en media caja se escribe en cajas (acepta ½) y se convierte a internas; el tope se compara en internas.
+  const mc = esMediaCaja(lot)
+  const u = (x: number) => (mc ? cantidadVista(lot, x) : `${x} u`)
   // R-59: NO precargar el lote completo. La baja es irreversible; el usuario debe escribir la
   // cantidad (o pulsar "Todo el lote" a propósito). Así no se borra un lote entero por descuido.
   const [qty, setQty] = useState<string>('')
   const [motivo, setMotivo] = useState(MOTIVOS[0])
-  const n = Math.max(0, Math.min(lot.quantity, Math.floor(Number(qty) || 0)))
+  const n = Math.max(0, Math.min(lot.quantity, mc ? aInterno(lot, Number(qty) || 0) : Math.floor(Number(qty) || 0)))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const { opId } = useOpId() // W1 · D-06: baja inmediata e idempotente (reintento no baja dos veces)
@@ -37,7 +41,7 @@ export function MermaModal({ lot, onClose }: {
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
-          <div><h3>Dar de baja (merma)</h3><div className="ms">{lot.producto ? `${lot.producto} · ` : ''}Lote {lot.lot_code} · {lot.quantity} u disponibles</div></div>
+          <div><h3>Dar de baja (merma)</h3><div className="ms">{lot.producto ? `${lot.producto} · ` : ''}Lote {lot.lot_code} · {u(lot.quantity)} disponibles</div></div>
           <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
         </div>
         <div className="mbody">
@@ -50,16 +54,16 @@ export function MermaModal({ lot, onClose }: {
 
           <label style={label}>Cantidad a dar de baja</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input style={input} type="number" min={1} max={lot.quantity} value={qty} onChange={(e) => setQty(e.target.value)} />
-            <button className="btn ghost sm" type="button" onClick={() => setQty(String(lot.quantity))}>Todo el lote</button>
+            <input style={input} type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} max={aVista(lot, lot.quantity)} value={qty} onChange={(e) => setQty(e.target.value)} />
+            <button className="btn ghost sm" type="button" onClick={() => setQty(String(aVista(lot, lot.quantity)))}>Todo el lote</button>
           </div>
-          {n > 0 && n < lot.quantity && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>Quedan {lot.quantity - n} u en el lote tras la baja.</div>}
+          {n > 0 && n < lot.quantity && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>Quedan {u(lot.quantity - n)} en el lote tras la baja.</div>}
 
           {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 12 }}><span>{err}</span></div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" onClick={dar} disabled={n <= 0 || busy} style={n <= 0 || busy ? { opacity: 0.5, cursor: 'not-allowed' } : { background: 'var(--danger)' }}>
-              <Icon name="x" /> {busy ? 'Registrando…' : err ? 'Reintentar' : `Dar de baja ${n} u`}
+              <Icon name="x" /> {busy ? 'Registrando…' : err ? 'Reintentar' : `Dar de baja ${u(n)}`}
             </button>
           </div>
         </div>

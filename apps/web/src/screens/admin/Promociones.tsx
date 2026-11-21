@@ -6,6 +6,7 @@ import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos 
 import { Cargando } from '../../app/EmptyState'
 import { Plus } from 'lucide-react'
 import { money } from '../../lib/format'
+import { aInterno, aVista, cantidadVista, esMediaCaja, factor, precioVista } from '../../lib/cajas'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { usePricing } from '../../data/hooks/usePricing'
 import { recargarPromos } from '../../data/store/promosStore'
@@ -100,6 +101,8 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
 
   const nombreDe = (id: string) => vendibles.find((p) => p.id === id)?.name ?? 'Producto'
   const precioNormal = (id: string) => vendibles.find((p) => p.id === id)?.price ?? null
+  // CAJAS-MEDIOS: el renglón guarda cantidad y precio INTERNOS (media caja); los campos muestran y reciben CAJAS.
+  const prodDe = (id: string) => productos.find((p) => p.id === id)
   const valido = (f: Form) => f.nombre.trim().length >= 2 && !!f.desde && !!f.hasta && f.desde <= f.hasta && f.lineas.length > 0 && f.lineas.every((l) => l.product_id && l.min_qty >= 1 && typeof l.precio === 'number' && l.precio > 0)
 
   const guardarForm = async () => {
@@ -201,6 +204,7 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
               <div style={{ display: 'grid', gap: 6 }}>
                 {form.lineas.map((l, i) => {
                   const normal = l.product_id ? precioNormal(l.product_id) : null
+                  const pr = prodDe(l.product_id), cajas = esMediaCaja(pr)
                   return (
                     <div key={i} style={{ display: 'grid', gridTemplateColumns: '2.2fr 0.8fr 1fr 1fr auto', gap: 8, alignItems: 'center' }} data-testid={`promo-linea-${i}`}>
                       <div>
@@ -210,9 +214,9 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
                         </select>
                         {l.texto && !l.product_id && <div style={{ fontSize: 11, color: 'var(--warn)' }}>Del texto: "{l.texto}"</div>}
                       </div>
-                      <input style={input} type="number" min={1} step={1} value={l.min_qty} onChange={(e) => setLinea(i, { min_qty: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} aria-label={`Cantidad mínima ${i + 1}`} />
-                      <input style={input} type="number" min={0} step="0.01" value={l.precio} onChange={(e) => setLinea(i, { precio: e.target.value === '' ? '' : Number(e.target.value) })} aria-label={`Precio promo ${i + 1}`} />
-                      <span className="mono" style={{ fontSize: 13, color: normal != null && typeof l.precio === 'number' && l.precio > normal ? 'var(--warn)' : 'var(--ink-3)' }}>{normal != null ? money(normal) : '—'}{normal != null && typeof l.precio === 'number' && l.precio > normal ? ' · la promo es más cara: no se aplicará' : ''}</span>
+                      <input style={input} type="number" min={cajas ? 0.5 : 1} step={cajas ? 0.5 : 1} value={aVista(pr, l.min_qty)} onChange={(e) => setLinea(i, { min_qty: cajas ? Math.max(1, aInterno(pr, Number(e.target.value) || 0)) : Math.max(1, Math.floor(Number(e.target.value) || 1)) })} aria-label={`Cantidad mínima ${i + 1}`} />
+                      <input style={input} type="number" min={0} step="0.01" value={l.precio === '' ? '' : precioVista(pr, l.precio)} onChange={(e) => setLinea(i, { precio: e.target.value === '' ? '' : Number(e.target.value) / factor(pr) })} aria-label={`Precio promo ${i + 1}`} />
+                      <span className="mono" style={{ fontSize: 13, color: normal != null && typeof l.precio === 'number' && l.precio > normal ? 'var(--warn)' : 'var(--ink-3)' }}>{normal != null ? money(precioVista(pr, normal)) : '—'}{cajas ? ' por caja · se vende por media caja; aquí en cajas' : ''}{normal != null && typeof l.precio === 'number' && l.precio > normal ? ' · la promo es más cara: no se aplicará' : ''}</span>
                       <button className="btn ghost sm" type="button" onClick={() => setForm({ ...form, lineas: form.lineas.filter((_, j) => j !== i) })} aria-label={`Quitar renglón ${i + 1}`}>×</button>
                     </div>
                   )
@@ -318,9 +322,10 @@ export function Promociones({ listar = listarPromociones, guardar = guardarPromo
           <div style={{ display: 'grid', gap: 3, marginTop: 8 }}>
             {p.lineas.map((l) => (
               <div key={l.id ?? `${l.product_id}-${l.min_qty}`} style={{ display: 'flex', gap: 8, fontSize: 13, alignItems: 'baseline' }}>
-                <span style={{ flex: 1 }}>{l.producto ?? nombreDe(l.product_id)}{l.min_qty > 1 ? <span style={{ color: 'var(--ink-3)' }}> · desde {l.min_qty} pzas</span> : null}</span>
-                <span className="mono" style={{ color: 'var(--ink-3)', textDecoration: 'line-through' }}>{l.precio_normal != null ? money(l.precio_normal) : ''}</span>
-                <b className="mono">{money(l.precio)}</b>
+                <span style={{ flex: 1 }}>{l.producto ?? nombreDe(l.product_id)}{l.min_qty > 1 ? <span style={{ color: 'var(--ink-3)' }}> · desde {esMediaCaja(prodDe(l.product_id)) ? cantidadVista(prodDe(l.product_id), l.min_qty) : `${l.min_qty} pzas`}</span> : null}{esMediaCaja(prodDe(l.product_id)) ? <span style={{ color: 'var(--ink-3)' }}> · por caja</span> : null}</span>
+                {/* CAJAS-MEDIOS: precios por caja para la media caja */}
+                <span className="mono" style={{ color: 'var(--ink-3)', textDecoration: 'line-through' }}>{l.precio_normal != null ? money(precioVista(prodDe(l.product_id), l.precio_normal)) : ''}</span>
+                <b className="mono">{money(precioVista(prodDe(l.product_id), l.precio))}</b>
               </div>
             ))}
           </div>

@@ -19,6 +19,7 @@ import { hoyNegocio } from '../../data/periodo'
 import { driverIdByEmail, driverName } from '../../data/mock/shipments'
 import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
+import { cantidadVista } from '../../lib/cajas'
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
 // Problemas al CONTAR la carga (antes de salir a reparto): distintos de las incidencias de entrega.
@@ -273,7 +274,7 @@ export function MisEntregas() {
               <div className="parada">
                 <div className="parada-cliente">{client.name}{client.clinic ? <small>{client.clinic}</small> : null}</div>
                 <div className="parada-dir">{deliv.addr}</div>
-                <div className="parada-prod">{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${it.qty}`).join(' · ')}</div>
+                <div className="parada-prod">{/* CAJAS-MEDIOS */}{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${cantidadVista(products.find((p) => p.id === it.product_id), it.qty)}`).join(' · ')}</div>
                 {/* AUDITORÍA CHOFER · antes de tocar la puerta: ¿está pagado o hay que cobrar? */}
                 <div className={'parada-pago ' + (order.payment_status === 'paid' ? 'parada-pago--ok' : 'parada-pago--cobrar')} data-testid="parada-pago">
                   {order.payment_status === 'paid' ? 'Pagado · solo entregar'

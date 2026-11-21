@@ -25,6 +25,7 @@ import {
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 import { Vacio, Cargando } from '../../app/EmptyState'
+import { aInterno, aVista, cantidadVista, esMediaCaja, numeroVista, type ConUnidad } from '../../lib/cajas'
 
 const fld: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12,
@@ -46,6 +47,8 @@ export function Custodia() {
 
   const prodName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])) as Record<string, string>, [products])
   const userName = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u.name])) as Record<string, string>, [users])
+  // CAJAS-MEDIOS: producto completo para mostrar/escribir media caja en cajas con medios.
+  const prodById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ConUnidad | undefined>, [products])
   const vivas = custodias.filter((c) => c.status === 'abierta')
   const flash = (t: string) => { setMsg(t); window.setTimeout(() => setMsg(''), 3500) }
 
@@ -107,11 +110,11 @@ export function Custodia() {
                                 {saldo.map((s) => (
                                   <tr key={s.lot_id}>
                                     <td data-label="Producto">{prodName[s.product_id] ?? 'Producto'}</td>
-                                    <td data-label="Entregado" className="mono">{s.entregado}</td>
-                                    <td data-label="Vendido" className="mono">{s.vendido}</td>
-                                    <td data-label="Devuelto" className="mono">{s.devuelto}</td>
-                                    <td data-label="Perdido" className="mono">{s.perdido}</td>
-                                    <td data-label="En poder" className="mono"><b>{s.en_poder}</b></td>
+                                    <td data-label="Entregado" className="mono">{cantidadVista(prodById[s.product_id], s.entregado)}</td>
+                                    <td data-label="Vendido" className="mono">{cantidadVista(prodById[s.product_id], s.vendido)}</td>
+                                    <td data-label="Devuelto" className="mono">{cantidadVista(prodById[s.product_id], s.devuelto)}</td>
+                                    <td data-label="Perdido" className="mono">{cantidadVista(prodById[s.product_id], s.perdido)}</td>
+                                    <td data-label="En poder" className="mono"><b>{cantidadVista(prodById[s.product_id], s.en_poder)}</b></td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -119,9 +122,9 @@ export function Custodia() {
                           )}
                         <div className="grid two" style={{ marginTop: 12, alignItems: 'start' }}>
                           <Entregar custody={c} disp={disp} products={products} onDone={flash} />
-                          <Recibir custody={c} saldo={saldo} prodName={prodName} onDone={flash} />
+                          <Recibir custody={c} saldo={saldo} prodName={prodName} prodById={prodById} onDone={flash} />
                         </div>
-                        <Perdida custody={c} saldo={saldo} prodName={prodName} onDone={flash} />
+                        <Perdida custody={c} saldo={saldo} prodName={prodName} prodById={prodById} onDone={flash} />
                       </div>
                     )}
                   </div>
@@ -180,7 +183,7 @@ function AbrirCustodia({ users, onDone }: { users: { id: string; name: string }[
 function Entregar({ custody, disp, products, onDone }: {
   custody: Custody
   disp: ReturnType<typeof useDisponible>['data']
-  products: { id: string; name: string }[]
+  products: { id: string; name: string; unit?: string | null }[]
   onDone: (t: string) => void
 }) {
   const { opId, renew } = useOpId()
@@ -193,7 +196,10 @@ function Entregar({ custody, disp, products, onDone }: {
   // Solo lotes con DISPONIBILIDAD real (no lo que ya trae otro vendedor) y vigentes.
   const lotes = useMemo(() => (productId ? lotesDisponibles(disp, productId) : []), [disp, productId])
   const lote = lotes.find((l) => l.lot_id === lotId)
-  const n = Math.max(0, Number(qty) || 0)
+  // CAJAS-MEDIOS: se escribe en cajas (acepta ½) → internas; el tope se compara en internas.
+  const prod = products.find((p) => p.id === productId)
+  const mc = esMediaCaja(prod)
+  const n = mc ? aInterno(prod, Number(qty) || 0) : Math.max(0, Number(qty) || 0)
   const valido = !!lote && n > 0 && n <= (lote?.disponible ?? 0)
 
   const entregar = async () => {
@@ -203,7 +209,7 @@ function Entregar({ custody, disp, products, onDone }: {
     setBusy(false)
     if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo entregar.')); return }
     renew(); setQty(''); setLotId('')
-    onDone(`Entregadas ${n} unidades. El inventario NO se descontó: dejó de estar disponible.`)
+    onDone(`Entregadas ${mc ? cantidadVista(prod, n) : `${n} unidades`}. El inventario NO se descontó: dejó de estar disponible.`)
   }
 
   return (
@@ -219,7 +225,7 @@ function Entregar({ custody, disp, products, onDone }: {
         <option value="">Elige…</option>
         {lotes.map((l) => (
           <option key={l.lot_id} value={l.lot_id}>
-            {l.lot_code} · disponible {l.disponible}{l.en_custodia > 0 ? ` (${l.en_custodia} en custodia)` : ''}{l.expiry_date ? ` · vence ${l.expiry_date}` : ''}
+            {l.lot_code} · disponible {numeroVista(prod, l.disponible)}{l.en_custodia > 0 ? ` (${numeroVista(prod, l.en_custodia)} en custodia)` : ''}{l.expiry_date ? ` · vence ${l.expiry_date}` : ''}
           </option>
         ))}
       </select>
@@ -229,7 +235,7 @@ function Entregar({ custody, disp, products, onDone }: {
         </div>
       )}
       <label style={lbl}>Cantidad</label>
-      <input type="number" min={1} max={lote?.disponible ?? undefined} style={{ ...fld, width: 120 }} value={qty} onChange={(e) => setQty(e.target.value)} />
+      <input type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} max={lote ? aVista(prod, lote.disponible) : undefined} style={{ ...fld, width: 120 }} value={qty} onChange={(e) => setQty(e.target.value)} />
       {err && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{err}</div>}
       <div style={{ marginTop: 12 }}>
         <button className="btn sm" type="button" disabled={!valido || busy} style={!valido || busy ? { opacity: .5, cursor: 'not-allowed' } : undefined} onClick={() => void entregar()}>
@@ -241,10 +247,11 @@ function Entregar({ custody, disp, products, onDone }: {
 }
 
 // ── Recibir devolución ──────────────────────────────────────────────────────────
-function Recibir({ custody, saldo, prodName, onDone }: {
+function Recibir({ custody, saldo, prodName, prodById, onDone }: {
   custody: Custody
   saldo: { lot_id: string; product_id: string; en_poder: number }[]
   prodName: Record<string, string>
+  prodById: Record<string, ConUnidad | undefined>
   onDone: (t: string) => void
 }) {
   const { opId, renew } = useOpId()
@@ -256,7 +263,11 @@ function Recibir({ custody, saldo, prodName, onDone }: {
   const [err, setErr] = useState('')
 
   const fila = saldo.find((s) => s.lot_id === lotId)
-  const n = Math.max(0, Number(qty) || 0)
+  // CAJAS-MEDIOS: se escribe en cajas (acepta ½) → internas; el tope se compara en internas.
+  const prod = fila ? prodById[fila.product_id] : undefined
+  const mc = esMediaCaja(prod)
+  const cv = (x: number) => (mc ? cantidadVista(prod, x) : String(x))
+  const n = mc ? aInterno(prod, Number(qty) || 0) : Math.max(0, Number(qty) || 0)
   const valido = !!fila && n > 0 && n <= (fila?.en_poder ?? 0) && (insp === 'ok' || motivo.trim().length >= 3)
 
   const recibir = async () => {
@@ -272,8 +283,8 @@ function Recibir({ custody, saldo, prodName, onDone }: {
     renew(); setQty(''); setMotivo(''); setLotId('')
     const d = r.data
     onDone(d.dado_de_baja > 0
-      ? `Recibido. ${d.devuelto_disponible} volvieron a estar disponibles y ${d.dado_de_baja} se dieron de baja.`
-      : `Recibidas ${d.devuelto_disponible} unidades: vuelven a estar disponibles (el inventario no cambió).`)
+      ? `Recibido. ${cv(d.devuelto_disponible)} volvieron a estar disponibles y ${cv(d.dado_de_baja)} se dieron de baja.`
+      : `Recibidas ${mc ? cantidadVista(prod, d.devuelto_disponible) : `${d.devuelto_disponible} unidades`}: vuelven a estar disponibles (el inventario no cambió).`)
   }
 
   return (
@@ -282,10 +293,10 @@ function Recibir({ custody, saldo, prodName, onDone }: {
       <label style={lbl}>Qué regresa</label>
       <select style={{ ...fld, width: '100%' }} value={lotId} onChange={(e) => setLotId(e.target.value)}>
         <option value="">Elige…</option>
-        {saldo.map((s) => <option key={s.lot_id} value={s.lot_id}>{prodName[s.product_id] ?? 'Producto'} · en poder {s.en_poder}</option>)}
+        {saldo.map((s) => <option key={s.lot_id} value={s.lot_id}>{prodName[s.product_id] ?? 'Producto'} · en poder {numeroVista(prodById[s.product_id], s.en_poder)}</option>)}
       </select>
       <label style={lbl}>Cantidad</label>
-      <input type="number" min={1} max={fila?.en_poder ?? undefined} style={{ ...fld, width: 120 }} value={qty} onChange={(e) => setQty(e.target.value)} />
+      <input type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} max={fila ? aVista(prod, fila.en_poder) : undefined} style={{ ...fld, width: 120 }} value={qty} onChange={(e) => setQty(e.target.value)} />
       <label style={lbl}>¿Cómo llegó?</label>
       <select style={{ ...fld, width: '100%' }} value={insp} onChange={(e) => setInsp(e.target.value as Inspeccion)}>
         {INSPECCIONES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
@@ -310,10 +321,11 @@ function Recibir({ custody, saldo, prodName, onDone }: {
 }
 
 // ── Registrar pérdida ───────────────────────────────────────────────────────────
-function Perdida({ custody, saldo, prodName, onDone }: {
+function Perdida({ custody, saldo, prodName, prodById, onDone }: {
   custody: Custody
   saldo: { lot_id: string; product_id: string; en_poder: number }[]
   prodName: Record<string, string>
+  prodById: Record<string, ConUnidad | undefined>
   onDone: (t: string) => void
 }) {
   const { opId, renew } = useOpId()
@@ -327,7 +339,10 @@ function Perdida({ custody, saldo, prodName, onDone }: {
   const [err, setErr] = useState('')
 
   const fila = saldo.find((s) => s.lot_id === lotId)
-  const n = Math.max(0, Number(qty) || 0)
+  // CAJAS-MEDIOS: se escribe en cajas (acepta ½) → internas; el tope se compara en internas.
+  const prod = fila ? prodById[fila.product_id] : undefined
+  const mc = esMediaCaja(prod)
+  const n = mc ? aInterno(prod, Number(qty) || 0) : Math.max(0, Number(qty) || 0)
   const valido = !!fila && n > 0 && n <= (fila?.en_poder ?? 0) && motivo.trim().length >= 3
 
   const registrar = async () => {
@@ -340,7 +355,7 @@ function Perdida({ custody, saldo, prodName, onDone }: {
     setBusy(false)
     if (!r.ok) { setErr(r.ambiguous ? AMBIGUO_MSG : (r.error ?? 'No se pudo registrar la pérdida.')); return }
     renew(); setAbierto(false); setQty(''); setMotivo(''); setEvidencia(''); setLotId('')
-    onDone(`Pérdida registrada: ${n} unidades dadas de baja. Es una pérdida de la empresa, no una deuda del vendedor.`)
+    onDone(`Pérdida registrada: ${mc ? cantidadVista(prod, n) : `${n} unidades`} dadas de baja. Es una pérdida de la empresa, no una deuda del vendedor.`)
   }
 
   if (saldo.length === 0) return null
@@ -366,12 +381,12 @@ function Perdida({ custody, saldo, prodName, onDone }: {
           <label style={lbl}>Qué se perdió</label>
           <select style={{ ...fld, minWidth: 200 }} value={lotId} onChange={(e) => setLotId(e.target.value)}>
             <option value="">Elige…</option>
-            {saldo.map((s) => <option key={s.lot_id} value={s.lot_id}>{prodName[s.product_id] ?? 'Producto'} · en poder {s.en_poder}</option>)}
+            {saldo.map((s) => <option key={s.lot_id} value={s.lot_id}>{prodName[s.product_id] ?? 'Producto'} · en poder {numeroVista(prodById[s.product_id], s.en_poder)}</option>)}
           </select>
         </div>
         <div>
           <label style={lbl}>Cantidad</label>
-          <input type="number" min={1} max={fila?.en_poder ?? undefined} style={{ ...fld, width: 100 }} value={qty} onChange={(e) => setQty(e.target.value)} />
+          <input type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} max={fila ? aVista(prod, fila.en_poder) : undefined} style={{ ...fld, width: 100 }} value={qty} onChange={(e) => setQty(e.target.value)} />
         </div>
         <div>
           <label style={lbl}>Causa</label>

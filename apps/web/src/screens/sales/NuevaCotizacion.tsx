@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react'
 import { borrarBorrador, leerBorrador, useGuardarBorrador } from '../../data/store/borradores'
 import { X, Plus, Minus, Search, Send, Mail } from 'lucide-react'
 import { money } from '../../lib/format'
+import { esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
@@ -96,10 +97,10 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
                   const promo = etiquetaNivel(p.price, volRules, p.id, q, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id)
                   return (
                     <li key={p.id} className={'cot-prod' + (q ? ' on' : '')}>
-                      <span className="cot-prod-tx"><b>{p.name}</b><small>{money(q ? eff(p.id, q) : p.price ?? 0)}{promo ? ` · ${promo}` : ''}</small></span>
+                      <span className="cot-prod-tx"><b>{p.name}</b><small>{money(precioVista(p, q ? eff(p.id, q) : p.price ?? 0))}{esMediaCaja(p) ? ' por caja' : ''}{promo ? ` · ${promo}` : ''}</small></span>
                       <span className="cot-qty">
                         {q > 0 && <button type="button" className="rc-mini" onClick={() => cambiar(p.id, -1)} aria-label={`Quitar ${p.name}`}><Minus size={14} /></button>}
-                        {q > 0 && <span className="mono">{q}</span>}
+                        {q > 0 && <span className="mono">{numeroVista(p, q)}</span>}{/* CAJAS-MEDIOS */}
                         <button type="button" className="rc-mini" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.name}`}><Plus size={14} /></button>
                       </span>
                     </li>
@@ -117,7 +118,7 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
           ) : (
             <>
               <ul className="cot-resumen">
-                {hecha.lineas.map((l) => <li key={l.product_id}><span>{l.qty} × {l.nombre}</span><b className="mono">{money(l.subtotal)}</b></li>)}
+                {hecha.lineas.map((l) => <li key={l.product_id}><span>{numeroVista(products.find((x) => x.id === l.product_id), l.qty)} × {l.nombre}</span>{/* CAJAS-MEDIOS */}<b className="mono">{money(l.subtotal)}</b></li>)}
                 <li className="tot"><span>Total</span><b className="mono">{money(hecha.total)}</b></li>
               </ul>
               <div className="cot-envio">

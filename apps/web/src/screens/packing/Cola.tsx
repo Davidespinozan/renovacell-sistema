@@ -26,6 +26,7 @@ import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
 import { estimadaDe, llegadaServicio, promesaDe, type EntregaPedido } from '../../data/ops/entrega'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
+import { cantidadVista } from '../../lib/cajas'
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -124,7 +125,7 @@ export function Cola() {
             <EntregaPill e={entregaDe(o)} />
             {o.items.map((it) => (
               <div key={it.id} className="coitem">
-                <span>{byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{it.qty}</span></span>
+                <span>{byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(byId[it.product_id ?? ''], it.qty)}</span></span>{/* CAJAS-MEDIOS */}
                 <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}

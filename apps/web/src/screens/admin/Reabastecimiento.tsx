@@ -21,6 +21,7 @@ import { useOpId } from '../../data/hooks/useOpId'
 import { pendingQty, isOpen, PUEDE_MARCAR_PAGADO } from '../../data/store/comprasStore'
 import { RecibirMercanciaModal, STATUS_LABEL, STATUS_PILL, TIPO_LABEL } from '../warehouse/RecibirMercanciaModal'
 import type { ProductSafe } from '../../data/types'
+import { aInterno, aVista, cantidadVista, esMediaCaja, factor, precioVista } from '../../lib/cajas'
 
 const LOW = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 const TARGET = 60   // stock objetivo tras reabastecer
@@ -40,6 +41,8 @@ export function Reabastecimiento() {
 
   const stock = useMemo(() => stockByProduct(lots), [lots])
   const stockOf = (id: string) => stock[id]?.qty ?? 0
+  // CAJAS-MEDIOS: media caja se lee en cajas con medios (umbrales y guardado siguen en internas).
+  const prodById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
 
   // Todo el inventario, de menor a mayor existencia: lo que urge queda arriba solo.
   const filas = useMemo(
@@ -108,14 +111,14 @@ export function Reabastecimiento() {
                 return (
                   <tr key={p.id}>
                     <td data-label="Producto">{p.name}</td>
-                    <td data-label="Stock" className="mono">{qty} u</td>
+                    <td data-label="Stock" className="mono">{cantidadVista(p, qty, 'u')}</td>
                     <td data-label="Estado">
                       <span className={'pill ' + (agotado ? 'p-dang' : bajo ? 'p-warn' : 'p-ok')}>
                         {agotado ? 'Agotado' : bajo ? 'Bajo' : 'Suficiente'}
                       </span>
                     </td>
                     <td data-label="Sugerido" className="mono" style={bajo ? undefined : { color: 'var(--ink-3)' }}>
-                      {bajo ? `+${sugerido} u` : '—'}
+                      {bajo ? `+${cantidadVista(p, sugerido, 'u')}` : '—'}
                     </td>
                     <td data-label="">
                       {enCurso(p.id)
@@ -174,10 +177,10 @@ export function Reabastecimiento() {
                     <span className={'pill ' + (o.kind === 'compra' ? 'p-blue' : 'p-neu')}>{o.kind === 'compra' ? 'Compra' : 'Producción'}</span>
                     {o.supplier && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{o.supplier}</div>}
                   </td>
-                  <td data-label="Pedido" className="mono">{o.qty} u</td>
-                  <td data-label="Recibido" className="mono">{o.received_qty ?? 0} u</td>
-                  <td data-label="Pendiente" className="mono" style={pendingQty(o) > 0 && isOpen(o) ? { color: 'var(--warn)', fontWeight: 700 } : { color: 'var(--ink-3)' }}>{isOpen(o) ? `${pendingQty(o)} u` : '—'}</td>
-                  <td data-label="Costo unit." className="mono">${o.unit_cost.toLocaleString('es-MX')}</td>
+                  <td data-label="Pedido" className="mono">{cantidadVista(prodById[o.product_id], o.qty, 'u')}</td>
+                  <td data-label="Recibido" className="mono">{cantidadVista(prodById[o.product_id], o.received_qty ?? 0, 'u')}</td>
+                  <td data-label="Pendiente" className="mono" style={pendingQty(o) > 0 && isOpen(o) ? { color: 'var(--warn)', fontWeight: 700 } : { color: 'var(--ink-3)' }}>{isOpen(o) ? cantidadVista(prodById[o.product_id], pendingQty(o), 'u') : '—'}</td>
+                  <td data-label="Costo unit." className="mono">${precioVista(prodById[o.product_id], o.unit_cost).toLocaleString('es-MX')}{esMediaCaja(prodById[o.product_id]) ? ' /caja' : ''}</td>
                   <td data-label="Fecha">{fmtDate(o.created_at)}</td>
                   <td data-label="Estado"><span className={'pill ' + STATUS_PILL[o.status]} title={o.close_reason ?? undefined}>{STATUS_LABEL[o.status]}</span></td>
                   <td data-label="">
@@ -246,12 +249,14 @@ function ComprarModal({ product, suggested, onClose, onConfirm }: {
 }) {
   const [kind, setKind] = useState<ReplenKind>('compra')
   const [supplier, setSupplier] = useState('')
-  const [qty, setQty] = useState(String(suggested))
-  const [cost, setCost] = useState(String(costOf(product.id) || ''))
+  // CAJAS-MEDIOS: en media caja se escribe cantidad en cajas (acepta ½) y costo por caja; se mandan en internas.
+  const mc = esMediaCaja(product)
+  const [qty, setQty] = useState(String(aVista(product, suggested)))
+  const [cost, setCost] = useState(String(precioVista(product, costOf(product.id)) || ''))
   const [busy, setBusy] = useState(false)
   const { opId, renew } = useOpId()
-  const n = Math.max(0, parseInt(qty, 10) || 0)
-  const c = Math.max(0, Number(cost) || 0)
+  const n = mc ? aInterno(product, Number(qty) || 0) : Math.max(0, parseInt(qty, 10) || 0)
+  const c = Math.max(0, Number(cost) || 0) / factor(product)
   const valid = n > 0 && c > 0 && (kind === 'produccion' || supplier.trim() !== '')
   const submit = async () => {
     if (!valid || busy) return
@@ -284,11 +289,11 @@ function ComprarModal({ product, suggested, onClose, onConfirm }: {
 
           <div className="form-grid-2">
             <div>
-              <label style={lbl}>Cantidad</label>
-              <input style={fld} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Cantidad" />
+              <label style={lbl}>{mc ? 'Cantidad (cajas)' : 'Cantidad'}</label>
+              <input style={fld} type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Cantidad" />
             </div>
             <div>
-              <label style={lbl}>{kind === 'compra' ? 'Costo unitario (proveedor)' : 'Costo unitario (producir)'}</label>
+              <label style={lbl}>{(mc ? 'Costo por caja' : 'Costo unitario') + (kind === 'compra' ? ' (proveedor)' : ' (producir)')}</label>
               <input style={fld} type="number" min={1} value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0" aria-label="Costo unitario" />
             </div>
           </div>

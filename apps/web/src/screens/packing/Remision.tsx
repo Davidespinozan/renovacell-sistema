@@ -13,6 +13,7 @@ import { driverName } from '../../data/mock/shipments'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 import { capitalizarNombre } from '../../lib/nombres'
 import { currentCompany } from '../../data/store/companyStore'
+import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 
 export const LEMA_MARCA = 'Tecnologías Antiedad'
 type EnvioRemision = { carrier?: string | null; tracking_number?: string | null; driver_id?: string | null; estimated_delivery_at?: string | null }
@@ -56,7 +57,8 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
               <tr key={it.id}>
                 <td>{products.find((p) => p.id === it.product_id)?.name ?? 'Producto'}</td>
                 <td><span className="lc">{it.lot_id ? lots.find((l) => l.id === it.lot_id)?.lot_code ?? '—' : '—'}</span></td>
-                <td className="mono">{it.qty} {it.qty === 1 ? 'pza' : 'pzas'}</td>
+                {/* CAJAS-MEDIOS: la línea de media caja se lee en cajas */}
+                <td className="mono">{(() => { const p = products.find((x) => x.id === it.product_id); return esMediaCaja(p) ? cantidadVista(p, it.qty) : `${it.qty} ${it.qty === 1 ? 'pza' : 'pzas'}` })()}</td>
               </tr>
             ))}
           </tbody>

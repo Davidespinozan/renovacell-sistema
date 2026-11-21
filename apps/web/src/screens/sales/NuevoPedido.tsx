@@ -6,6 +6,7 @@ import { borrarBorrador, leerBorrador, useGuardarBorrador } from '../../data/sto
 import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { X, Plus, Minus } from 'lucide-react'
 import { money } from '../../lib/format'
+import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
 import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
@@ -276,12 +277,13 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.name}</div>
                         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                          {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(effOf(p, qty))}</b> : money(p.price)}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${stock.qty}` : ''}
+                          {/* CAJAS-MEDIOS: precio por caja y existencias en cajas para la media caja */}
+                          {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(precioVista(p, effOf(p, qty) ?? 0))}</b> : money(p.price == null ? p.price : precioVista(p, p.price))}{esMediaCaja(p) ? ' por caja' : ''}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${cantidadVista(p, stock.qty)}` : ''}
                         </div>
                         {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}
-                      {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{qty}</span>}
+                      {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{numeroVista(p, qty)}</span>}
                       <button className="btn sm" type="button" aria-label={`Agregar ${p.name}`} disabled={out} style={out ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => add(p.id)}><Plus size={14} /></button>
                     </div>
                   )

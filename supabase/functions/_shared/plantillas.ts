@@ -35,6 +35,14 @@ interface Cuerpo { asunto: string; titulo: string; parrafos: string[]; datos: Ar
 const URL_SISTEMA = 'https://sistema.renovacell.mx/sistema'
 const URL_LOGO = 'https://sistema.renovacell.mx/brand/logo.png'
 /** Enlace de rastreo de la paquetería (solo las que conocemos; si no, se muestra el número sin enlace). */
+// CAJAS-MEDIOS · un producto por media caja (ultrafiltrados) se muestra en cajas: 3 → «1½ cajas».
+function cantidadLinea(l: Record<string, unknown>): string {
+  const q = Number(l.qty ?? 0)
+  if (l.media_caja !== true) return String(q)
+  const ent = Math.floor(q / 2), medio = q % 2 === 1
+  return `${ent === 0 && medio ? '½' : `${ent}${medio ? '½' : ''}`} ${q / 2 > 1 ? 'cajas' : 'caja'}`
+}
+
 export function urlRastreo(paq: string, numero: string): string | null {
   const n = encodeURIComponent(numero.trim())
   if (!n) return null
@@ -101,7 +109,7 @@ function cuerpo(p: Plantilla, d: Record<string, unknown>): Cuerpo {
         `${vend ? vend + ' te preparó' : 'Te preparamos'} esta cotización${vence ? `, vigente hasta el ${vence}` : ''}.`,
         'Para confirmar tu pedido, responde a este correo o escríbele a tu asesor por WhatsApp.',
         ...(notas ? [notas] : []),
-      ], datos: [...lineas.map((l): [string, string] => [`${Number(l.qty ?? 0)} × ${String(l.nombre ?? '')}`, dinero(l.subtotal)]), ...fila('Total', dinero(d.total)), ...fila('Cotización', folio)],
+      ], datos: [...lineas.map((l): [string, string] => [`${cantidadLinea(l)} × ${String(l.nombre ?? '')}`, dinero(l.subtotal)]), ...fila('Total', dinero(d.total)), ...fila('Cotización', folio)],
         boton: { label: 'Entrar a Renovacell', href: URL_SISTEMA }, pie: 'Precios para profesionales de la salud. El envío se confirma al hacer el pedido.' }
     }
     case 'cuenta_verificada':

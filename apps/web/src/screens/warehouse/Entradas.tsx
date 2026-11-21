@@ -21,6 +21,7 @@ import { useOpId } from '../../data/hooks/useOpId'
 import { hasSupabase } from '../../lib/supabase'
 import { pendingQty, isOpen } from '../../data/store/comprasStore'
 import { RecibirMercanciaModal, STATUS_LABEL, STATUS_PILL, TIPO_LABEL } from './RecibirMercanciaModal'
+import { aInterno, cantidadVista, esMediaCaja, factor } from '../../lib/cajas'
 
 // W1 · D-04: una entrada SIN compra requiere Dirección y motivo. "Carga inicial" NO va aquí (Importar / Migración).
 const MOTIVOS_EXCEPCIONALES = ['Inventario encontrado', 'Muestra', 'Corrección autorizada', 'Otro']
@@ -93,17 +94,17 @@ export function Entradas() {
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Tipo · proveedor</th><th>Pedido</th><th>Recibido</th><th>Pendiente</th><th>Estado</th><th></th></tr></thead>
             <tbody>
-              {pendientes.map((o) => (
+              {pendientes.map((o) => { const p = prodById[o.product_id]; const u = (n: number) => (esMediaCaja(p) ? cantidadVista(p, n) : `${n} u`); return ( // CAJAS-MEDIOS
                 <tr key={o.id} data-testid="compra-pendiente">
                   <td data-label="Producto">{o.product_name}</td>
                   <td data-label="Tipo · proveedor">{TIPO_LABEL[o.kind]}{o.supplier && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{o.supplier}</div>}</td>
-                  <td data-label="Pedido" className="mono">{o.qty} u</td>
-                  <td data-label="Recibido" className="mono">{o.received_qty ?? 0} u</td>
-                  <td data-label="Pendiente" className="mono" style={{ color: 'var(--warn)', fontWeight: 700 }}>{pendingQty(o)} u</td>
+                  <td data-label="Pedido" className="mono">{u(o.qty)}</td>
+                  <td data-label="Recibido" className="mono">{u(o.received_qty ?? 0)}</td>
+                  <td data-label="Pendiente" className="mono" style={{ color: 'var(--warn)', fontWeight: 700 }}>{u(pendingQty(o))}</td>
                   <td data-label="Estado"><span className={'pill ' + STATUS_PILL[o.status]}>{STATUS_LABEL[o.status]}</span></td>
                   <td data-label=""><button className="btn sm" type="button" onClick={() => setReceiving(o)} data-testid="btn-recibir"><Icon name="check" /> Recibir mercancía</button></td>
                 </tr>
-              ))}
+              ) })}
               {pendientes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }}>No hay compras pendientes de recibir. Si llegó mercancía sin compra registrada, regístrala abajo en «Entradas sin compra», o carga todo de una vez en «Cargar inventario (CSV)».</td></tr>}
             </tbody>
           </table>
@@ -169,7 +170,7 @@ export function Entradas() {
                     </td>
                     <td data-label="Qué pasó"><span className={'pill ' + (m.reason === 'entrada' ? 'p-ok' : 'p-neu')}>{reasonLabel(m.reason)}</span></td>
                     <td data-label="Referencia" className="mono" style={{ fontSize: 11.5 }}>{m.reference || '—'}</td>
-                    <td data-label="Cambio" className="mono" style={{ color: pos ? 'var(--green-deep)' : 'var(--danger)' }}>{pos ? '+' : ''}{m.change} {Math.abs(m.change) === 1 ? 'pza' : 'pzas'}</td>
+                    <td data-label="Cambio" className="mono" style={{ color: pos ? 'var(--green-deep)' : 'var(--danger)' }}>{esMediaCaja(prod) ? `${pos ? '+' : '-'}${cantidadVista(prod, Math.abs(m.change))}` : `${pos ? '+' : ''}${m.change} ${Math.abs(m.change) === 1 ? 'pza' : 'pzas'}`}</td>
                   </tr>
                 )
               })}
@@ -202,20 +203,24 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
   const [busy, setBusy] = useState(false)
   const { opId, renew } = useOpId()
   const motivoFinal = motivo === 'Otro' ? motivoOtro.trim() : motivo
-  const valid = productId && lotCode.trim() && Number(qty) > 0 && (!hasSupabase || (!!expiry && motivoFinal.length >= 3))
+  // CAJAS-MEDIOS: en media caja la cantidad se escribe en cajas (acepta ½) y el costo es por caja; se guardan internas.
+  const prodSel = products.find((p) => p.id === productId)
+  const mc = esMediaCaja(prodSel)
+  const qtyInterno = aInterno(prodSel, Number(qty) || 0)
+  const valid = productId && lotCode.trim() && qtyInterno > 0 && (!hasSupabase || (!!expiry && motivoFinal.length >= 3))
 
   const submit = async () => {
     if (!valid || busy) return
     setBusy(true)
     const c = cost.trim() === '' ? null : Number(cost)
     const r = await recibirLote({
-      product_id: productId, lot_code: lotCode.trim(), expiry_date: expiry || null, quantity: Number(qty), location: null,
-      unit_cost: c != null && c > 0 ? c : null, // vacío → la RPC usa el costo de referencia
+      product_id: productId, lot_code: lotCode.trim(), expiry_date: expiry || null, quantity: qtyInterno, location: null,
+      unit_cost: c != null && c > 0 ? c / factor(prodSel) : null, // vacío → la RPC usa el costo de referencia
       reason: hasSupabase ? motivoFinal : 'entrada', kind: 'sin_orden', op_id: opId,
     })
     setBusy(false)
     if (!r.ok) { onAviso(false, r.error ?? 'No se pudo registrar la entrada excepcional.'); return }
-    onAviso(true, `Entrada sin compra registrada: ${lotCode.trim()} (+${qty} pzas)`)
+    onAviso(true, `Entrada sin compra registrada: ${lotCode.trim()} (+${mc ? cantidadVista(prodSel, qtyInterno) : `${qty} pzas`})`)
     renew()
     setLotCode(''); setExpiry(''); setQty(''); setCost('')
   }
@@ -245,8 +250,8 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
               <input style={inputStyle} value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="Ej. MGP-90-C" />
             </div>
             <div>
-              <label style={labelStyle}>Cantidad</label>
-              <input style={inputStyle} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
+              <label style={labelStyle}>{mc ? 'Cantidad (cajas)' : 'Cantidad'}</label>
+              <input style={inputStyle} type="number" min={mc ? 0.5 : 1} step={mc ? 0.5 : 1} value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
             </div>
           </div>
           <div className="form-grid-2" style={{ marginTop: 14 }}>
@@ -255,7 +260,7 @@ function EntradasExcepcionales({ products, onAviso }: { products: ProductSafe[];
               <input style={inputStyle} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Costo de adquisición (opcional)</label>
+              <label style={labelStyle}>{mc ? 'Costo por caja (opcional)' : 'Costo de adquisición (opcional)'}</label>
               <input style={inputStyle} type="number" min={0} step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Vacío = costo de referencia" />
             </div>
           </div>

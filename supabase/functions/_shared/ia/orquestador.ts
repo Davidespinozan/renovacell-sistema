@@ -37,6 +37,9 @@ export interface DepsOrquestador {
     ejecutarEnlacePortal?: () => { url: string; uso: string }
     acotarSalida: (v: unknown, max?: number) => string; limiteSalida?: (nombre: string) => number; idsDe: (v: unknown) => string[]; nombresDe: (v: unknown) => string[]
     evidenciaDe: (nombre: string, salida: unknown) => string[]; RECHAZO: Record<string, string>
+    // CAJAS-MEDIOS · opcional: cajas del modelo ↔ medias cajas internas
+    argsAInterno?: (nombre: string, a: Record<string, unknown>, media: ReadonlySet<string>) => { ok: true; args: Record<string, unknown> } | { ok: false }
+    salidaEnCajas?: (x: unknown, media: ReadonlySet<string>) => unknown
     evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
     // ENT-P · opcional: completa la salida de una herramienta con datos del negocio (p. ej. envío gratis del carrito)
     complementar?: (nombre: string, salida: unknown) => unknown
@@ -91,6 +94,9 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   let perfilIA: string | null = canal === 'portal' ? e.profile : null
   if (canal === 'whatsapp') { const idc = await rpc('cc_ia_identidad_canal', { p_conv: e.conv }); if (!idc.error && typeof idc.data === 'string') perfilIA = idc.data }
   const identificado = canal !== 'portal' && !!perfilIA
+  // CAJAS-MEDIOS · productos que se guardan por media caja: la IA habla en cajas (ver ./cajas.ts).
+  const mc = await rpc('cc_ia_media_caja', {})
+  const mediaCaja = new Set<string>(Array.isArray(mc.data) ? (mc.data as unknown[]).map(String) : [])
   const cx = await rpc('cc_ia_contexto_actor', { p_profile: perfilIA })
   const ctx = (cx.data ?? null) as Ctx | null
   if (cx.error || !ctx || ctx.actor === 'suspendido') return { estado: 'no_autorizado', usage }
@@ -161,7 +167,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       addEv(['PRICE_EVIDENCE'])
       // su carrito viene en el perfil (lo arma el servidor): describirlo no es inventarlo
       if (Array.isArray((pc.data as { carrito?: unknown }).carrito) && ((pc.data as { carrito: unknown[] }).carrito.length > 0)) addEv(['CART_READ_EVIDENCE'])
-      perfilComercial = '\n\n' + d.politica.envolverDatos('perfil_comercial_del_cliente', d.herramientas.acotarSalida(pc.data))
+      perfilComercial = '\n\n' + d.politica.envolverDatos('perfil_comercial_del_cliente', d.herramientas.acotarSalida(d.herramientas.salidaEnCajas ? d.herramientas.salidaEnCajas(pc.data, mediaCaja) : pc.data))   /* CAJAS-MEDIOS */
     }
   }
   // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
@@ -236,9 +242,12 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
         continue
       }
+      const vc = d.herramientas.argsAInterno ? d.herramientas.argsAInterno(v.nombre, v.args, mediaCaja) : { ok: true as const, args: v.args }   // CAJAS-MEDIOS · cajas del modelo → medias internas
+      if (!vc.ok) { resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: 'Ese producto se vende por pieza completa: usa una cantidad entera.' })) }); continue }
+      v.args = vc.args
       const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal, confirmacion: d.politica.esConfirmacionExplicita?.(e.textoUsuario) ?? false })
       const ej = !ej0.error && d.herramientas.complementar ? { ...ej0, data: d.herramientas.complementar(v.nombre, ej0.data) } : ej0
-      const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : ej.data
+      const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : (d.herramientas.salidaEnCajas ? d.herramientas.salidaEnCajas(ej.data, mediaCaja) : ej.data)   // CAJAS-MEDIOS
       if (!ej.error) { for (const id of d.herramientas.idsDe(ej.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(ej.data)) nombresAutorizados.add(n); addEv(d.herramientas.evidenciaDe(v.nombre, ej.data)) }
       const ev = ej.error ? [] : d.herramientas.evidenciaDe(v.nombre, ej.data)
       await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: v.nombre, p_status: ej.error ? 'error' : (ev.length ? 'ok' : 'vacia'), p_product_ids: v.ids, p_detalle: ej.error ? { motivo: 'rpc' } : { n: d.herramientas.idsDe(ej.data).length, evidencia: ev } })
