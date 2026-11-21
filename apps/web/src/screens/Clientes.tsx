@@ -6,10 +6,20 @@
 import { CustomerDirectory } from '../app/CustomerDirectory'
 import { PorVerificar } from './PorVerificar'   // AVISO-VERIF · los que mandaron su verificación
 import { ClasificarCartera } from './ClasificarCartera'   // HERRAMIENTAS DEL VENDEDOR · doctor/clínica y especialidad
+import { useState } from 'react'
+import { NuevoProspectoForm, avisoProspecto } from './pos/NuevoProspecto'   // NUEVO PROSPECTO
+import { avisar } from '../app/dialogos'
 
 export function Clientes() {
+  const [registrando, setRegistrando] = useState(false)
   return (
     <div className="grid" style={{ gap: 16 }}>
+      {/* NUEVO PROSPECTO · registrar a alguien que la vendedora consiguió por su cuenta */}
+      <div className="card prospecto-card">
+        {registrando
+          ? <NuevoProspectoForm onCancelar={() => setRegistrando(false)} onListo={(p) => { setRegistrando(false); void avisar(`${avisoProspecto(p)} Ya está en tu embudo; desde Inicio → «Escribir a un cliente» le mandas su primer WhatsApp.`) }} />
+          : <button type="button" className="btn" onClick={() => setRegistrando(true)} data-testid="clientes-nuevo-prospecto">＋ Nuevo prospecto</button>}
+      </div>
       <PorVerificar />
       <CustomerDirectory title="Clientes" scope="all" carteraToggle />
       {/* UX MODERNO · la herramienta de clasificar va después de la lista (antes estorbaba arriba) */}

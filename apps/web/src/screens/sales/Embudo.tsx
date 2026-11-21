@@ -194,6 +194,7 @@ export function Embudo({ cliente: inyectado }: { cliente?: ReturnType<typeof cre
         <SelectorClienteVentas buscador={buscador.current} onClose={() => setNueva(false)} onPick={async (c) => {
           setNueva(false)
           if (!c) return
+          if (c.nuevo) { void cargar(); return }   // NUEVO PROSPECTO · la base ya le abrió su oportunidad en «Primer contacto»
           const r = await cliente.crear(c.id, 'Oportunidad')
           if (!r.ok) { setError(r.error); return }
           setOps((xs) => [r.data, ...(xs ?? [])])

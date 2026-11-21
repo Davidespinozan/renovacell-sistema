@@ -7,8 +7,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '../../app/icons'
 import { BuscadorClientes, mensajeBusqueda, validarBusqueda, type ClienteBusqueda, type EstadoBusqueda } from '../../data/ops/buscarClientes'
 import { ClienteCartera, type AsignacionCartera } from '../../data/ops/cartera'
+import { NuevoProspectoForm } from './NuevoProspecto'   // NUEVO PROSPECTO
 
-export interface ClienteElegido { id: string; name: string; phone: null; mascara: string | null }
+export interface ClienteElegido { id: string; name: string; phone: null; mascara: string | null; nuevo?: boolean }   // nuevo = prospecto recién registrado (ya trae su oportunidad)
 
 type Busqueda =
   | { fase: 'inicial' }
@@ -34,6 +35,7 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
   const [texto, setTexto] = useState('')
   const [busqueda, setBusqueda] = useState<Busqueda>({ fase: 'inicial' })
   const [miCartera, setMiCartera] = useState<Cartera>({ fase: 'cargando' })
+  const [registrando, setRegistrando] = useState(false)
   const vivo = useRef(true)
 
   useEffect(() => {
@@ -77,6 +79,11 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
           <button type="button" onClick={() => onPick(null)} style={{ ...fila, padding: '11px 12px' }} data-testid="sc-mostrador">
             <Icon name="store" style={{ width: 15, height: 15, color: 'var(--ink-3)' }} /> Mostrador · público general
           </button>
+
+          {/* NUEVO PROSPECTO · alguien que la vendedora consiguió por su cuenta */}
+          {registrando
+            ? <NuevoProspectoForm onCancelar={() => setRegistrando(false)} onListo={(p) => onPick({ id: p.customer_id, name: p.nombre, phone: null, mascara: null, nuevo: p.status !== 'existente' })} />
+            : <button type="button" className="btn ghost sm prospecto-abrir" onClick={() => setRegistrando(true)} data-testid="sc-nuevo-prospecto">＋ Nuevo prospecto (no está registrado)</button>}
 
           <div style={titulo}>Mi cartera</div>
           {/* AUDITORÍA VENTAS (19 nov 2026) · su cartera se filtra AQUÍ mientras escribe (sin ir al servidor ni gastar el
