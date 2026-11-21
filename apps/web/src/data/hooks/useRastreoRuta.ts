@@ -13,6 +13,32 @@ function metros(a: { lat: number; lng: number }, b: { lat: number; lng: number }
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
+// PANTALLA ENCENDIDA (21 nov 2026) · el GPS de una app web se detiene cuando la pantalla se apaga sola. Mientras el chofer
+// está en ruta se le pide al navegador que no apague la pantalla (como Waze). El chofer lo puede desactivar.
+const CLAVE_PANTALLA = 'rc_ruta_pantalla_encendida'
+export function leerPantallaEncendida(): boolean { try { return localStorage.getItem(CLAVE_PANTALLA) !== 'no' } catch { return true } }
+export function guardarPantallaEncendida(v: boolean): void { try { localStorage.setItem(CLAVE_PANTALLA, v ? 'si' : 'no') } catch { /* sin almacenamiento */ } }
+type Bloqueo = { release: () => Promise<void> }
+type ConWakeLock = { wakeLock?: { request: (t: 'screen') => Promise<Bloqueo> } }
+
+/** Mantiene la pantalla encendida mientras `activo` y la app esté a la vista. Devuelve si el navegador lo soporta. */
+export function usePantallaEncendida(activo: boolean): boolean {
+  const soportado = typeof navigator !== 'undefined' && !!(navigator as unknown as ConWakeLock).wakeLock
+  useEffect(() => {
+    if (!activo || !soportado) return
+    let bloqueo: Bloqueo | null = null, vivo = true
+    const pedir = async () => {
+      if (document.visibilityState !== 'visible' || bloqueo) return
+      try { const b = await (navigator as unknown as ConWakeLock).wakeLock!.request('screen'); if (vivo) bloqueo = b; else void b.release() } catch { /* sin permiso o batería baja: se ignora */ }
+    }
+    const alCambiar = () => { if (document.visibilityState === 'visible') { bloqueo = null; void pedir() } }
+    void pedir()
+    document.addEventListener('visibilitychange', alCambiar)
+    return () => { vivo = false; document.removeEventListener('visibilitychange', alCambiar); if (bloqueo) void bloqueo.release().catch(() => {}); bloqueo = null }
+  }, [activo, soportado])
+  return soportado
+}
+
 export function useRastreoRuta(enRuta: boolean, cadaMs = 50_000): EstadoRastreo {
   const [estado, setEstado] = useState<EstadoRastreo>('apagado')
   const ultimo = useRef<{ lat: number; lng: number; t: number } | null>(null)

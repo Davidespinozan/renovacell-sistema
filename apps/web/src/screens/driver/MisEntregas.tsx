@@ -9,7 +9,7 @@ import { fmtDate, money } from '../../lib/format'
 import { telParaMarcar } from '../../lib/telefono'
 import { CobroEntrega } from './CobroEntrega'
 import { MiEfectivo } from './MiEfectivo'
-import { useRastreoRuta } from '../../data/hooks/useRastreoRuta'   // CHOFER EN EL MAPA
+import { useRastreoRuta, usePantallaEncendida, leerPantallaEncendida, guardarPantallaEncendida } from '../../data/hooks/useRastreoRuta'   // CHOFER EN EL MAPA
 import { ubicacionChofer, ubicacionAhora } from '../../data/ops/ubicacionChofer'   // BLOQUE1 · efectivo que trae el chofer
 import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
@@ -104,6 +104,8 @@ export function MisEntregas() {
   // CHOFER EN EL MAPA · en ruta = alguna entrega ya salió (despachada, en camino o con incidencia).
   const enRuta = mine.some((s) => ['despachado', 'out_for_delivery', 'incident'].includes(s.status ?? ''))
   const rastreo = useRastreoRuta(enRuta)
+  const [pantalla, setPantalla] = useState(leerPantallaEncendida)
+  const pantallaSoportada = usePantallaEncendida(enRuta && pantalla)
   // Piezas a bordo = suma de unidades de los pedidos pendientes en su ruta.
   const piezasABordo = mine.reduce((s, sh) => {
     const o = orderById[sh.order_id]
@@ -200,7 +202,12 @@ export function MisEntregas() {
       <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
 
       {/* CHOFER EN EL MAPA · aviso honesto de que se comparte la ubicación (solo en ruta) */}
-      {enRuta && rastreo === 'activo' && <div className="rastreo-aviso" data-testid="rastreo-activo">📍 La oficina ve tu ubicación mientras estás en ruta. Deja esta pantalla abierta.</div>}
+      {enRuta && rastreo === 'activo' && (
+        <div className="rastreo-aviso" data-testid="rastreo-activo">
+          📍 La oficina ve tu ubicación mientras estás en ruta. {pantallaSoportada && pantalla ? 'La pantalla se queda encendida hasta que termines.' : 'Deja esta pantalla abierta.'}
+          {pantallaSoportada && <> <button type="button" className="rc-link" onClick={() => { const v = !pantalla; guardarPantallaEncendida(v); setPantalla(v) }} data-testid="rastreo-pantalla">{pantalla ? 'Dejar que se apague' : 'Mantener encendida'}</button></>}
+        </div>
+      )}
       {enRuta && rastreo === 'denegado' && <div className="rastreo-aviso rastreo-mal" data-testid="rastreo-denegado">📍 Activa la ubicación para esta página: toca el candado junto a la dirección (o Ajustes → Ubicación del navegador) y elige «Permitir».</div>}
       {enRuta && rastreo === 'no_disponible' && <div className="rastreo-aviso rastreo-mal">📍 No se pudo leer tu ubicación. Revisa que el GPS del teléfono esté encendido.</div>}
 
