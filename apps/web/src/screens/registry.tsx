@@ -59,6 +59,7 @@ const RevisionEconomica = lazyPantalla(() => import('./admin/RevisionEconomica')
 const Finanzas = lazyPantalla(() => import('./admin/Finanzas').then((m) => m.Finanzas))
 const CierreCaja = lazyPantalla(() => import('./admin/CierreCaja').then((m) => m.CierreCaja))
 const Bitacora = lazyPantalla(() => import('./admin/Bitacora').then((m) => m.Bitacora))
+const MapaChoferes = lazyPantalla(() => import('./logistics/MapaChoferes').then((m) => m.MapaChoferes))   // CHOFER EN EL MAPA
 const ErroresApp = lazyPantalla(() => import('./admin/ErroresApp').then((m) => m.ErroresApp))   // BLOQUE1
 const Reabastecimiento = lazyPantalla(() => import('./admin/Reabastecimiento').then((m) => m.Reabastecimiento))
 const ControlInventario = lazyPantalla(() => import('./admin/ControlInventario').then((m) => m.ControlInventario))
@@ -126,6 +127,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_cierre: () => <CierreCaja />,
   av_audit: () => <Bitacora />,
   sistema_errores: () => <ErroresApp />,
+  mapa_choferes: () => <MapaChoferes />,
   av_inv: () => <Reabastecimiento />,
   compras: () => <Reabastecimiento />,
   av_equipo: () => <Equipo />,
@@ -170,8 +172,8 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_entradas: () => <Entradas />,
   // Dirección corrige conteos al alza y registra entradas sin compra (solo admin en el servidor): antes no tenía cómo llegar.
   g_inventario: () => <Pestanas grupo="g_inventario" pestanas={[{ key: 'av_existencias', label: 'Existencias', render: () => <Existencias /> }, { key: 'av_entradas', label: 'Entradas', render: () => <Entradas /> }, { key: 'av_traza', label: 'Trazabilidad', render: () => <Trazabilidad /> }, { key: 'av_mermas', label: 'Mermas', render: () => <Mermas /> }, { key: 'av_control_inv', label: 'Control de inventario', render: () => <ControlInventario /> }, { key: 'av_custodias', label: 'Custodias', render: () => <Custodias /> }, { key: 'eventos', label: 'Eventos', render: () => <Eventos /> }]} />,
-  g_pedidos: () => <Pestanas grupo="g_pedidos" pestanas={[{ key: 'surtido', label: 'Preparar', render: () => <Surtido /> }, { key: 'cola', label: 'Por enviar', render: () => <Cola /> }, { key: 'guia', label: 'Guías', render: () => <Guias /> }, { key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'agenda_entregas', label: 'Horarios', render: () => <AgendaEntregas sinTitulo /> }]} />,   // UX MODERNO · Fase 3
-  g_envios: () => <Pestanas grupo="g_envios" pestanas={[{ key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'agenda_entregas', label: 'Horarios de entrega', render: () => <AgendaEntregas sinTitulo /> }]} />,
+  g_pedidos: () => <Pestanas grupo="g_pedidos" pestanas={[{ key: 'surtido', label: 'Preparar', render: () => <Surtido /> }, { key: 'cola', label: 'Por enviar', render: () => <Cola /> }, { key: 'guia', label: 'Guías', render: () => <Guias /> }, { key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'mapa_choferes', label: 'Choferes en ruta', render: () => <MapaChoferes /> }, { key: 'agenda_entregas', label: 'Horarios', render: () => <AgendaEntregas sinTitulo /> }]} />,   // UX MODERNO · Fase 3
+  g_envios: () => <Pestanas grupo="g_envios" pestanas={[{ key: 'despacho', label: 'Despacho', render: () => <Despacho /> }, { key: 'seguimiento', label: 'Seguimiento', render: () => <Seguimiento /> }, { key: 'mapa_choferes', label: 'Choferes en ruta', render: () => <MapaChoferes /> }, { key: 'agenda_entregas', label: 'Horarios de entrega', render: () => <AgendaEntregas sinTitulo /> }]} />,
   g_finanzas: () => <Pestanas grupo="g_finanzas" pestanas={[{ key: 'av_finanzas', label: 'Finanzas', render: () => <Finanzas /> }, { key: 'av_cierre', label: 'Cierre de caja', render: () => <CierreCaja /> }]} />,
   g_cobros: () => <Pestanas grupo="g_cobros" pestanas={[{ key: 'av_pagos', label: 'Pagos por validar', render: () => <PagosPorValidar /> }, { key: 'av_links', label: 'Links de pago', render: () => <LinksPago /> }, { key: 'av_revision', label: 'Revisión económica', render: () => <RevisionEconomica /> }]} />,
   g_facturacion: () => <Pestanas grupo="g_facturacion" pestanas={[{ key: 'av_fin', label: 'Facturación', render: () => <Facturacion /> }, { key: 'av_fiscal', label: 'Revisión fiscal', render: () => <RevisionFiscal /> }]} />,

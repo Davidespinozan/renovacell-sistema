@@ -8,7 +8,9 @@ import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
 import { telParaMarcar } from '../../lib/telefono'
 import { CobroEntrega } from './CobroEntrega'
-import { MiEfectivo } from './MiEfectivo'   // BLOQUE1 · efectivo que trae el chofer
+import { MiEfectivo } from './MiEfectivo'
+import { useRastreoRuta } from '../../data/hooks/useRastreoRuta'   // CHOFER EN EL MAPA
+import { ubicacionChofer, ubicacionAhora } from '../../data/ops/ubicacionChofer'   // BLOQUE1 · efectivo que trae el chofer
 import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
@@ -89,6 +91,7 @@ export function MisEntregas() {
   // el registro (received_by) para que Almacén/Dirección reclamen la evidencia después.
   const deliverNoPhoto = async (shipmentId: string, orderId: string, folio: string, who: string, motivo: string) => {
     const r = await entregar(shipmentId, orderId, null, `${who} (sin foto: ${motivo})`)
+    if (r.ok) marcarLugar(shipmentId)
     avisar(r.ok, r.ok ? `Entrega registrada sin foto: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
   }
 
@@ -98,6 +101,9 @@ export function MisEntregas() {
   // Un envío cancelado (pedido cancelado o guía anulada) sale de la ruta: ya no se entrega.
   const mine = myAll.filter((s) => s.status !== 'delivered' && s.status !== 'cancelado')
   const entregadas = myAll.filter((s) => s.status === 'delivered')
+  // CHOFER EN EL MAPA · en ruta = alguna entrega ya salió (despachada, en camino o con incidencia).
+  const enRuta = mine.some((s) => ['despachado', 'out_for_delivery', 'incident'].includes(s.status ?? ''))
+  const rastreo = useRastreoRuta(enRuta)
   // Piezas a bordo = suma de unidades de los pedidos pendientes en su ruta.
   const piezasABordo = mine.reduce((s, sh) => {
     const o = orderById[sh.order_id]
@@ -181,14 +187,22 @@ export function MisEntregas() {
     else setUpErr((e) => ({ ...e, [shipmentId]: true }))
   }
 
+  // CHOFER EN EL MAPA · dónde se entregó (prueba de entrega). Nunca frena la entrega: si no hay GPS, no se guarda.
+  const marcarLugar = (shipmentId: string) => { void ubicacionAhora().then((p) => { if (p) void ubicacionChofer().registrar({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy, tipo: 'entrega', shipmentId }) }) }
   const deliver = async (shipmentId: string, orderId: string, folio: string) => {
     const r = await entregar(shipmentId, orderId, proofPath[shipmentId] ?? null, received[shipmentId]?.trim() || null)
+    if (r.ok) marcarLugar(shipmentId)
     avisar(r.ok, r.ok ? `Entrega confirmada: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
   }
 
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
+
+      {/* CHOFER EN EL MAPA · aviso honesto de que se comparte la ubicación (solo en ruta) */}
+      {enRuta && rastreo === 'activo' && <div className="rastreo-aviso" data-testid="rastreo-activo">📍 La oficina ve tu ubicación mientras estás en ruta. Deja esta pantalla abierta.</div>}
+      {enRuta && rastreo === 'denegado' && <div className="rastreo-aviso rastreo-mal" data-testid="rastreo-denegado">📍 Activa la ubicación para esta página: toca el candado junto a la dirección (o Ajustes → Ubicación del navegador) y elige «Permitir».</div>}
+      {enRuta && rastreo === 'no_disponible' && <div className="rastreo-aviso rastreo-mal">📍 No se pudo leer tu ubicación. Revisa que el GPS del teléfono esté encendido.</div>}
 
       {/* Resumen de la ruta (asignada por Empaque al elegir chofer) */}
       {/* pp-kpis3: en móvil las tres caben en una fila compacta (antes 2+1, la tercera a lo ancho). */}
