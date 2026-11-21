@@ -16,6 +16,10 @@ import { runW1Command, newOpId, type W1Result } from '../ops/w1Command'
 import { reloadCompras } from './comprasStore'
 import { leerTodo } from './lectura'
 import { diaNegocio, diasEntre, hoyNegocio } from '../periodo'
+// INVENTARIO INICIAL (21 nov 2026, dueño: «que no sea a fuerzas»): lo migrado de Odoo entra con lote «POR CAPTURAR» y
+// esta caducidad de marcador (la base exige una). En pantalla se ve como «Caducidad por capturar»; sale al último al
+// surtir y no dispara alertas. Almacén la captura después con «Corregir».
+export const CADUCIDAD_POR_CAPTURAR = '2099-12-31'
 
 const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
@@ -39,7 +43,7 @@ const lotsLive = makeLive<Lot>(async () => {
   if (lotsErr) throw lotsErr
   const mapped = (lotsData ?? []).map((l) => ({
     id: l.id, product_id: l.product_id ?? '', lot_code: l.lot_code,
-    manufacture_date: l.manufacture_date, expiry_date: l.expiry_date, quantity: l.quantity,
+    manufacture_date: l.manufacture_date, expiry_date: l.expiry_date === CADUCIDAD_POR_CAPTURAR ? null : l.expiry_date, quantity: l.quantity,
     location: l.location, unit_cost: (l as { unit_cost?: number | null }).unit_cost ?? null, metadata: (l.metadata ?? null) as Lot['metadata'],
   }))
   flagExpiring(mapped) // avisa de lotes por caducar / caducados al cargar inventario

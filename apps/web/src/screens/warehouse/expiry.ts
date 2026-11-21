@@ -24,7 +24,7 @@ export function sevPill(s: Sev): 'p-dang' | 'p-warn' | 'p-ok' {
 }
 
 export function sevLabel(days: number | null): string {
-  if (days == null) return 'Sin caducidad'
+  if (days == null) return 'Caducidad por capturar'   // inventario migrado sin caducidad (ver CADUCIDAD_POR_CAPTURAR)
   if (days < 0) return `Caducó hace ${-days} día${-days === 1 ? '' : 's'}`
   if (days === 0) return 'Caduca hoy'
   if (days === 1) return 'Caduca mañana'
