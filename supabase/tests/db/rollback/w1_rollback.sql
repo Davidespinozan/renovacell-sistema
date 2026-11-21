@@ -20,6 +20,7 @@ begin;
 \ir ../../../rollback/atribucion_pagado/99_down.sql   -- ATRIBUCIÓN-PAGADO (20270203) se baja antes (redefine atribución, cobro, evaluador y políticas)
 \ir ../../../rollback/auxiliar_almacen/99_down.sql   -- AUXILIAR se baja antes de tomar la foto (redefine recepción, reingreso, custodia y anular_guia)
 \ir ../../../rollback/dhl_d1_reconciliacion/99_down.sql   -- DHL D1 (190): columnas de shipping_attempts y tipo de operación en inventory_operations; se baja primero
+\ir ../../../rollback/cs_bb_3ds/99_down.sql   -- CS-BB (20270407410000) cuelga de card_payment_attempts (FK): se baja antes que la 187
 \ir ../../../rollback/cs1a7_cierre_manual/99_down.sql   -- CS-1A.7 (187)
 \ir ../../../rollback/cs1a6_reversa/99_down.sql   -- CS-1A.6 (186)
 \ir ../../../rollback/cs1b_reserva_guard/99_down.sql   -- CS-1A.1b (185): la guarda vive en payment_entries; se baja antes que 1a

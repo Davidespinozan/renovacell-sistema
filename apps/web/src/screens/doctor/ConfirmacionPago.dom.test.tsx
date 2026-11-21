@@ -40,8 +40,12 @@ describe('CS-1A.5 · ConfirmacionPago', () => {
     expect(d.llamadas).toEqual(['pagar', 'estado'])
   })
   it('declined → rechazado; captured (asiento pendiente) y desconocido → pendiente; authorized sin captura → mensaje sin segundo cargo', async () => {
+    // CS-BB: antes el detalle técnico del banco ('DECLINED · INSUFFICIENT_FUND') se mostraba al doctor; ahora nunca: el servidor manda
+    // un mensaje en español y, si llegara texto técnico, el portal lo cambia por uno genérico.
     render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={deps(resp('declined', { detalle: 'DECLINED · INSUFFICIENT_FUND' }))} />)
-    await esperar('rechazado'); expect(document.body.textContent).toContain('INSUFFICIENT_FUND'); cleanup(); _reiniciarEnviadosPago()
+    await esperar('rechazado'); expect(document.body.textContent).not.toContain('INSUFFICIENT_FUND'); expect(document.body.textContent).toContain('Puedes intentar con otra tarjeta'); cleanup(); _reiniciarEnviadosPago()
+    render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={deps(resp('declined', { detalle: 'Tu banco rechazó el pago por fondos o límite insuficiente. Puedes intentar con otra tarjeta.' }))} />)
+    await esperar('rechazado'); expect(document.body.textContent).toContain('fondos o límite insuficiente'); cleanup(); _reiniciarEnviadosPago()
     render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={deps(resp('captured'))} />)
     await esperar('pendiente'); cleanup(); _reiniciarEnviadosPago()
     render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={deps(resp('unknown_requires_reconciliation', { message: 'Pago pendiente de verificación con el banco.' }))} />)
@@ -56,6 +60,12 @@ describe('CS-1A.5 · ConfirmacionPago', () => {
     const d2 = deps({ ok: false, error: 'token_invalido', message: 'La captura de la tarjeta caducó.' })
     render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={d2} />)
     await esperar('recuperable'); expect(d2.llamadas).toEqual(['pagar']); cleanup()
+    // CS-BB: token transitorio caducado (15 min) o tarjeta distinta de la autenticada → sin cargo, recapturar
+    for (const error of ['tarjeta_expirada', 'reautenticar', 'configuracion']) {
+      const dx = deps({ ok: false, error, message: 'Vuelve a capturar tu tarjeta para continuar; no se realizó ningún cargo.' })
+      render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={dx} />)
+      await esperar('recuperable'); expect(dx.llamadas).toEqual(['pagar']); expect(document.body.textContent).toContain('no se realizó ningún cargo'); cleanup(); _reiniciarEnviadosPago()
+    }
     const d3 = deps({ ok: false, error: 'en_proceso', message: 'Tu pago ya se está procesando.' })
     render(<ConfirmacionPago attemptId={ATT} token={TOKEN} amount={6000} deps={d3} />)
     await esperar('pendiente'); expect(d3.llamadas).toEqual(['pagar'])

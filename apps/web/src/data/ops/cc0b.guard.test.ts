@@ -129,7 +129,8 @@ describe('CORS · inventario y webhooks', () => {
     }
     // Regla (ensayo 2 nov 2026; antes era una lista fija que envejecía con cada Edge nueva): TODA Edge usa la lista blanca
     // de orígenes, salvo las que solo reciben llamadas de servidor a servidor (sin navegador), declaradas aquí.
-    const SIN_NAVEGADOR = ['cs-3ds-return', 'meta-webhook', 'stripe-webhook']
+    // CS-BB: cs-3ds-return salió de la lista porque se retiró (el returnUrl del reto vive en Netlify, /pago/3ds-retorno).
+    const SIN_NAVEGADOR = ['meta-webhook', 'stripe-webhook']
     const todas = Object.keys(edges).map(nombre).sort()
     expect(conHelper.sort()).toEqual(todas.filter((n) => !SIN_NAVEGADOR.includes(n)))
     for (const f of conHelper) expect(conAsterisco, f).not.toContain(f)

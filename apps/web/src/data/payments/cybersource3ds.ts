@@ -7,7 +7,7 @@ import type { DispositivoNavegador } from '../../../../../supabase/functions/cs-
 export type Estado3ds = 'created' | 'tokenized' | 'auth_setup' | 'auth_pending' | 'auth_challenge' | 'auth_validated' | 'declined' | 'failed_safe_to_retry' | 'unknown_requires_reconciliation' | 'expired' | 'amount_changed' | string
 
 export interface RespSetup { estado: 'auth_setup'; reference_id: string; ddc_url: string; ddc_token: string; ddc_origen: string; ddc_timeout_ms: number }
-export interface RespEnroll { estado: 'auth_validated' | 'auth_challenge' | 'declined' | 'failed_safe_to_retry'; reto?: boolean; step_up_url?: string; step_up_token?: string; ventana?: '01' | '02' | '03' | '04' | '05'; ventana_px?: { w: number; h: number } | null; retorno_origen?: string; message?: string }
+export interface RespEnroll { estado: 'auth_validated' | 'auth_challenge' | 'declined' | 'failed_safe_to_retry'; reto?: boolean; step_up_url?: string; step_up_token?: string; ventana?: '01' | '02' | '03' | '04' | '05'; ventana_px?: { w: number; h: number } | null; retorno_origen?: string; authentication_transaction_id?: string | null; message?: string }
 export interface RespValidate { estado: 'auth_validated' | 'declined' | 'auth_challenge'; pendiente?: boolean; message?: string }
 export interface RespEstado { estado: Estado3ds; amount: number; ambiente: 'test' | 'production'; puede_validar: boolean; requiere_tarjeta: boolean; bloqueado: boolean }
 export type Resultado3ds<T> = { ok: true; data: T } | { ok: false; error: string; message: string; estado?: string; status?: number }
@@ -28,7 +28,8 @@ export const cs3ds = {
   estado: (attemptId: string) => llamar<RespEstado>({ accion: 'estado', attempt_id: attemptId }),
   setup: (attemptId: string, token: string) => llamar<RespSetup>({ accion: 'setup', attempt_id: attemptId, token }),
   enroll: (attemptId: string, token: string, dispositivo: DispositivoNavegador) => llamar<RespEnroll>({ accion: 'enroll', attempt_id: attemptId, token, dispositivo }),
-  validate: (attemptId: string) => llamar<RespValidate>({ accion: 'validate', attempt_id: attemptId }),
+  /** transactionId: el que el banco devolvió al returnUrl (el servidor lo compara con el guardado). En recuperación no hay. */
+  validate: (attemptId: string, transactionId?: string | null) => llamar<RespValidate>({ accion: 'validate', attempt_id: attemptId, ...(transactionId ? { transaction_id: transactionId } : {}) }),
   abandonar: (attemptId: string) => llamar<{ estado: string }>({ accion: 'abandonar', attempt_id: attemptId }),
 }
 
@@ -52,7 +53,7 @@ function formEnIframe(doc: Document, contenedor: HTMLElement, url: string, jwt: 
   const iframe = doc.createElement('iframe')
   iframe.name = nombre; iframe.title = nombre
   if (visible === undefined) { iframe.width = '10'; iframe.height = '10'; iframe.style.cssText = 'width:10px;height:10px;border:0;position:absolute;left:-9999px' }
-  else { iframe.style.cssText = `border:0;width:${visible ? visible.w + 'px' : '100%'};height:${visible ? visible.h + 'px' : '100%'};max-width:100%` }
+  else { iframe.style.cssText = visible ? `border:0;width:${visible.w}px;height:${visible.h}px;max-width:100%` : 'border:0;width:100%;height:100%' }
   const form = doc.createElement('form')
   form.method = 'POST'; form.action = url; form.target = nombre; form.style.display = 'none'
   const inJwt = doc.createElement('input'); inJwt.type = 'hidden'; inJwt.name = 'JWT'; inJwt.value = jwt; form.appendChild(inJwt)
@@ -88,21 +89,40 @@ export function ejecutarDDC(p: { url: string; token: string; origen: string; tim
 }
 
 /**
- * Reto step-up (paso oficial 4): form POST con JWT a stepUpUrl en un iframe visible. Termina cuando el returnUrl (nuestra Edge
- * cs-3ds-return) avisa por postMessage desde el ORIGEN de las funciones; el resultado real lo decide después el servidor (validate).
+ * CS-BB · tamaño del recuadro del reto (manual BanBajío §9.2): 01 250×400, 02 390×400, 03 500×600, 04 600×400 y 05 = PANTALLA
+ * COMPLETA real (capa fija de 100vw × 100vh sobre toda la página, no "el 100% del contenedor").
  */
-export function ejecutarStepUp(p: { url: string; token: string; md: string; retornoOrigen: string; ventana: { w: number; h: number } | null; timeoutMs: number; contenedor: HTMLElement; doc?: Document; win?: Window }): Promise<{ regreso: boolean }> {
+export const TAMANOS_RETO: Record<'01' | '02' | '03' | '04', { w: number; h: number }> = { '01': { w: 250, h: 400 }, '02': { w: 390, h: 400 }, '03': { w: 500, h: 600 }, '04': { w: 600, h: 400 } }
+export function estiloVentanaReto(ventana: '01' | '02' | '03' | '04' | '05' | null | undefined): { pantallaCompleta: boolean; contenedor: Record<string, string | number>; iframe: { w: number; h: number } | null } {
+  if (ventana === '05') {
+    return { pantallaCompleta: true, iframe: null,
+             contenedor: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 2147483000, background: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'stretch' } }
+  }
+  const t = TAMANOS_RETO[(ventana ?? '02') as '01'] ?? TAMANOS_RETO['02']
+  return { pantallaCompleta: false, iframe: t, contenedor: { marginTop: 12, display: 'flex', justifyContent: 'center', minHeight: t.h } }
+}
+
+/**
+ * Reto step-up (paso oficial 4): form POST con JWT a stepUpUrl en un iframe visible. Termina cuando la página de retorno
+ * (/pago/3ds-retorno, en el MISMO origen que esta página) avisa por postMessage { tipo: 'cs-3ds-retorno', transactionId }.
+ * Se acepta solo si: el origen del mensaje es el nuestro (y el que indicó el servidor) y el transactionId es el
+ * authenticationTransactionId del enrolamiento. El resultado real lo decide después el servidor (validate).
+ */
+export function ejecutarStepUp(p: { url: string; token: string; md: string; retornoOrigen: string; transactionId: string | null; ventana: { w: number; h: number } | null; timeoutMs: number; contenedor: HTMLElement; doc?: Document; win?: Window }): Promise<{ regreso: boolean; transactionId?: string }> {
   const doc = p.doc ?? document, win = p.win ?? window
   let host = ''
   try { host = new URL(p.url).hostname } catch { host = '' }
   if (!/(^|\.)cardinalcommerce\.com$/i.test(host) || !p.url.startsWith('https://')) return Promise.resolve({ regreso: false })
+  if (p.retornoOrigen !== win.location.origin) return Promise.resolve({ regreso: false })   // el aviso nunca llegaría: no se monta el reto
   return new Promise((resolve) => {
     let listo = false
-    const fin = (r: { regreso: boolean }) => { if (listo) return; listo = true; win.removeEventListener('message', onMsg); clearTimeout(t); try { iframe.remove() } catch { /* ya no está */ } resolve(r) }
+    const fin = (r: { regreso: boolean; transactionId?: string }) => { if (listo) return; listo = true; win.removeEventListener('message', onMsg); clearTimeout(t); try { iframe.remove() } catch { /* ya no está */ } resolve(r) }
     const onMsg = (ev: MessageEvent) => {
-      if (ev.origin !== p.retornoOrigen) return
+      if (ev.origin !== win.location.origin || ev.origin !== p.retornoOrigen) return
       const m = (ev.data && typeof ev.data === 'object' ? ev.data : {}) as Record<string, unknown>
-      if (m.tipo === 'renovacell-3ds-return') fin({ regreso: true })
+      if (m.tipo !== 'cs-3ds-retorno' || typeof m.transactionId !== 'string') return
+      if (p.transactionId && m.transactionId !== p.transactionId) return   // retorno de otra transacción: se ignora
+      fin({ regreso: true, transactionId: m.transactionId })
     }
     win.addEventListener('message', onMsg)
     const t = setTimeout(() => fin({ regreso: false }), p.timeoutMs)

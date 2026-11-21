@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
-import { csPago as csPagoReal, type RespPago } from '../../data/payments/cybersourcePago'
+import { csPago as csPagoReal, mensajeSeguroPago, type RespPago } from '../../data/payments/cybersourcePago'
 
 export type FasePago = 'procesando' | 'confirmado' | 'rechazado' | 'pendiente' | 'autorizado_sin_captura' | 'recuperable' | 'consultando'
 export interface DepsPago { csPago?: typeof csPagoReal }
@@ -22,6 +22,8 @@ const faseDe = (estado: string): FasePago =>
   estado === 'posted' ? 'confirmado' : estado === 'declined' ? 'rechazado' : estado === 'authorized' ? 'autorizado_sin_captura'
   : estado === 'captured' || estado === 'unknown_requires_reconciliation' || estado === 'authz_sent' ? 'pendiente' : 'recuperable'
 
+/** Errores del servidor ANTES de enviar la venta (sin cargo posible): el doctor puede volver a capturar la tarjeta. */
+export const SIN_CARGO: readonly string[] = ['token_invalido', 'tarjeta_expirada', 'reautenticar', 'sin_autenticacion', 'estado_invalido', 'datos_incompletos', 'not_configured', 'configuracion', 'solicitud_invalida', 'pagos_en_linea_apagados']
 // Un intento solo se envía UNA vez por sesión del navegador, aunque el componente se monte dos veces (StrictMode) o se recargue el modal.
 const enviados = new Set<string>()
 export function _reiniciarEnviadosPago(): void { enviados.clear() }
@@ -53,14 +55,15 @@ export function ConfirmacionPago({ attemptId, token, amount, onFin, deps }: {
       if (!r.ok) {
         if (r.error === 'importe_cambio') { setFase('recuperable'); setDetalle(`${r.message} Saldo vigente: ${money(r.saldo_vigente ?? 0)}.`); enviados.delete(attemptId); onFin?.('recuperable'); return }
         if (r.error === 'en_proceso') { setFase('pendiente'); setDetalle(r.message); onFin?.('pendiente'); return }
-        if (r.error === 'token_invalido' || r.error === 'estado_invalido' || r.error === 'datos_incompletos' || r.error === 'not_configured') { setFase('recuperable'); setDetalle(r.message); enviados.delete(attemptId); onFin?.('recuperable'); return }
+        // Sin cargo (el servidor no llegó a enviar la venta): token caducado, tarjeta distinta de la autenticada, configuración, datos.
+        if (SIN_CARGO.includes(r.error)) { setFase('recuperable'); setDetalle(mensajeSeguroPago(r.message)); enviados.delete(attemptId); onFin?.('recuperable'); return }
         // error tras enviar (red): no se sabe si el banco cobró → consultar, nunca reenviar
         const e = await cs.estado(attemptId)
         if (!vivo) return
-        if (e.ok) { setResp(e.data); const f = faseDe(e.data.estado); setFase(f); setDetalle(e.data.message ?? ''); onFin?.(f, e.data); return }
+        if (e.ok) { setResp(e.data); const f = faseDe(e.data.estado); setFase(f); setDetalle(mensajeSeguroPago(e.data.message)); onFin?.(f, e.data); return }
         setFase('pendiente'); setDetalle('No pudimos confirmar el resultado con el banco. Consulta tu pedido más tarde; no se enviará otro cargo.'); onFin?.('pendiente'); return
       }
-      setResp(r.data); const f = faseDe(r.data.estado); setFase(f); setDetalle(r.data.detalle ?? r.data.message ?? ''); onFin?.(f, r.data)
+      setResp(r.data); const f = faseDe(r.data.estado); setFase(f); setDetalle(mensajeSeguroPago(r.data.detalle ?? r.data.message)); onFin?.(f, r.data)
     })().catch(() => { if (vivo) { setFase('pendiente'); setDetalle('No pudimos confirmar el resultado. Consulta tu pedido más tarde; no se enviará otro cargo.'); onFin?.('pendiente') } })
     return () => { vivo = false; corriendo.current = false }
   }, [attemptId, token])   // eslint-disable-line react-hooks/exhaustive-deps

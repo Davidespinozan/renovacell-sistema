@@ -64,26 +64,38 @@ export interface FlexSdk { microform: (opciones?: Record<string, unknown>) => Fl
 export type FlexCtor = new (captureContext: string) => FlexSdk
 
 const cargas = new Map<string, Promise<FlexCtor>>()
+let cargadaClave: string | null = null   // URL#integridad de la librería que está hoy en window.Flex
 
-/** Carga la librería desde la URL e integridad que trae el capture context (nunca hardcodeadas). Una sola vez por URL. */
+/**
+ * Carga la librería desde la URL e integridad que trae el capture context (nunca hardcodeadas). Una sola vez por URL.
+ * CS-BB · manual BanBajío §4.1: los valores pueden cambiar POR TRANSACCIÓN. Si el nuevo capture context trae otra URL o integridad,
+ * se retira el script anterior y su `window.Flex` y se carga la nueva (nunca se usa una librería incompatible con la sesión).
+ */
 export function cargarLibreriaFlex(url: string, integridad: string, doc: Document = document): Promise<FlexCtor> {
   const w = window as unknown as { Flex?: FlexCtor }
   const clave = `${url}#${integridad}`
   const previa = cargas.get(clave)
-  if (previa) return previa
+  if (previa && cargadaClave === clave) return previa
   if (!/^https:\/\/([a-z0-9-]+\.)*cybersource\.com\//i.test(url)) return Promise.reject(new Error('librería no permitida'))
+  if (cargadaClave && cargadaClave !== clave) {
+    doc.querySelectorAll('script[data-flex-microform]').forEach((n) => n.remove())
+    try { delete w.Flex } catch { w.Flex = undefined }
+    cargas.clear()
+  }
   const p = new Promise<FlexCtor>((resolve, reject) => {
-    if (w.Flex) { resolve(w.Flex); return }
+    if (w.Flex && cargadaClave === clave) { resolve(w.Flex); return }
     const s = doc.createElement('script')
     s.src = url; s.integrity = integridad; s.crossOrigin = 'anonymous'; s.async = true
+    s.setAttribute('data-flex-microform', clave)
     s.onload = () => { if (w.Flex) resolve(w.Flex); else reject(new Error('Flex no disponible tras cargar')) }
     s.onerror = () => reject(new Error('no se pudo cargar la librería de tarjeta'))
     doc.head.appendChild(s)
   })
   cargas.set(clave, p)
-  p.catch(() => cargas.delete(clave))
+  cargadaClave = clave
+  p.catch(() => { cargas.delete(clave); if (cargadaClave === clave) cargadaClave = null })
   return p
 }
 
 /** Solo para pruebas: olvida las cargas memorizadas. */
-export function _reiniciarCargasFlex(): void { cargas.clear() }
+export function _reiniciarCargasFlex(): void { cargas.clear(); cargadaClave = null }

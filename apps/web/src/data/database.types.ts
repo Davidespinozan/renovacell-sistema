@@ -238,6 +238,80 @@ export type Database = {
         }
         Relationships: []
       }
+      card_payment_3ds_auth: {
+        Row: {
+          attempt_id: string
+          authentication_transaction_id: string | null
+          card_brand: string | null
+          cavv: string | null
+          created_at: string
+          directory_server_transaction_id: string | null
+          eci: string | null
+          eci_raw: string | null
+          ecommerce_indicator: string | null
+          expires_at: string
+          fuente: string
+          jti: string
+          pares_status: string | null
+          specification_version: string | null
+          token_exp: string
+          ucaf_authentication_data: string | null
+          ucaf_collection_indicator: string | null
+          updated_at: string
+          xid: string | null
+        }
+        Insert: {
+          attempt_id: string
+          authentication_transaction_id?: string | null
+          card_brand?: string | null
+          cavv?: string | null
+          created_at?: string
+          directory_server_transaction_id?: string | null
+          eci?: string | null
+          eci_raw?: string | null
+          ecommerce_indicator?: string | null
+          expires_at?: string
+          fuente?: string
+          jti: string
+          pares_status?: string | null
+          specification_version?: string | null
+          token_exp: string
+          ucaf_authentication_data?: string | null
+          ucaf_collection_indicator?: string | null
+          updated_at?: string
+          xid?: string | null
+        }
+        Update: {
+          attempt_id?: string
+          authentication_transaction_id?: string | null
+          card_brand?: string | null
+          cavv?: string | null
+          created_at?: string
+          directory_server_transaction_id?: string | null
+          eci?: string | null
+          eci_raw?: string | null
+          ecommerce_indicator?: string | null
+          expires_at?: string
+          fuente?: string
+          jti?: string
+          pares_status?: string | null
+          specification_version?: string | null
+          token_exp?: string
+          ucaf_authentication_data?: string | null
+          ucaf_collection_indicator?: string | null
+          updated_at?: string
+          xid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_payment_3ds_auth_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: true
+            referencedRelation: "card_payment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_payment_attempt_events: {
         Row: {
           actor: string | null
@@ -292,6 +366,7 @@ export type Database = {
           cs_eci: string | null
           cs_payment_id: string | null
           cs_payment_status: string | null
+          cs_processor_transaction_id: string | null
           cs_reason: string | null
           cs_reconciliation_id: string | null
           cs_request_sent_at: string | null
@@ -323,6 +398,7 @@ export type Database = {
           cs_eci?: string | null
           cs_payment_id?: string | null
           cs_payment_status?: string | null
+          cs_processor_transaction_id?: string | null
           cs_reason?: string | null
           cs_reconciliation_id?: string | null
           cs_request_sent_at?: string | null
@@ -354,6 +430,7 @@ export type Database = {
           cs_eci?: string | null
           cs_payment_id?: string | null
           cs_payment_status?: string | null
+          cs_processor_transaction_id?: string | null
           cs_reason?: string | null
           cs_reconciliation_id?: string | null
           cs_request_sent_at?: string | null
@@ -2874,6 +2951,59 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_order_money"
             referencedColumns: ["order_id"]
+          },
+        ]
+      }
+      cs_bitacora_pruebas: {
+        Row: {
+          ambiente: string
+          attempt_id: string
+          created_at: string
+          duracion_ms: number
+          http_status: number | null
+          id: number
+          metodo: string
+          paso: string
+          request: Json | null
+          response: Json | null
+          resultado: string
+          ruta: string
+        }
+        Insert: {
+          ambiente: string
+          attempt_id: string
+          created_at?: string
+          duracion_ms?: number
+          http_status?: number | null
+          id?: number
+          metodo: string
+          paso: string
+          request?: Json | null
+          response?: Json | null
+          resultado: string
+          ruta: string
+        }
+        Update: {
+          ambiente?: string
+          attempt_id?: string
+          created_at?: string
+          duracion_ms?: number
+          http_status?: number | null
+          id?: number
+          metodo?: string
+          paso?: string
+          request?: Json | null
+          response?: Json | null
+          resultado?: string
+          ruta?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_bitacora_pruebas_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "card_payment_attempts"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -8496,6 +8626,8 @@ export type Database = {
         }
         Returns: Json
       }
+      cs_bitacora_pruebas_contar: { Args: never; Returns: number }
+      cs_bitacora_pruebas_ver: { Args: { p_limite?: number }; Returns: Json }
       cs_intento_abrir: {
         Args: { p_ambiente?: string; p_order: string }
         Returns: Json
@@ -8509,6 +8641,10 @@ export type Database = {
         Returns: Json
       }
       cs_intento_contabilizar: { Args: { p_attempt: string }; Returns: Json }
+      cs_intento_procesador: {
+        Args: { p_attempt: string; p_transaction_id: string }
+        Returns: Json
+      }
       cs_intentos_expirar: { Args: never; Returns: number }
       cs_reservas_activas: { Args: { p_order: string }; Returns: number }
       registrar_cobro: {

@@ -6,6 +6,7 @@
 // attempt_id, importe, capture_context (JWT), URL e integridad de la librería y la expiración.
 // Qué NO hace: no cobra, no autoriza, no captura, no llama a /pts/v2/payments ni a 3DS, no toca el ledger, no expone secretos
 // ni cabeceras firmadas. El navegador no elige merchant, ambiente, host, importe ni redes: todo sale del servidor.
+// CS-BB: la firma RS256 del capture context se verifica (manual §3) y, en sandbox, la llamada entra a la bitácora de pruebas.
 // SEAM: sin secretos CS_* responde 501 (como stripe-checkout). targetOrigins = el Origin de la página, validado contra la lista
 // blanca de CORS (la misma que decide si la página puede llamarnos). Requiere JWT: desplegar SIN --no-verify-jwt.
 import { RESPUESTA_APAGADO, tarjetaEnLineaActiva } from '../_shared/pagosEnLinea.ts'   // PAGOS EN LÍNEA · interruptor de Dirección
@@ -13,7 +14,9 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { conCors, origenPermitido } from '../_shared/cors.ts'
 import { observador } from '../_shared/observa.ts'
-import { csConfig, solicitarCS, RUTAS_CS, describirCS } from '../_shared/cybersource.ts'
+import { csConfig, RUTAS_CS, describirCS } from '../_shared/cybersource.ts'
+import { verificarJwtCS } from '../_shared/csJwt.ts'                      // CS-BB · firma RS256 del capture context (manual §3)
+import { llamarCS, obtenedorJwkCS } from '../_shared/csEdge.ts'
 import { buildCaptureContextRequest, leerCaptureContext, respuestaParaNavegador, traducirErrorAbrir, ESTADOS_REEMISION_CS } from './contrato.ts'
 
 const obs = observador('cs-capture-context')
@@ -65,12 +68,15 @@ Deno.serve(conCors(async (req) => {
   // Capture context (una sola llamada; sin reintentos). El JWT llega como TEXTO.
   let cuerpo
   try { cuerpo = buildCaptureContextRequest(origen) } catch { return json(403, { error: 'origen_no_permitido' }) }
-  const r = await solicitarCS<string>(cfg, { metodo: 'POST', ruta: RUTAS_CS.captureContext, cuerpo, aceptar: 'texto' })
+  const r = await llamarCS<string>(cfg, admin, a.attempt_id, 'capture_context', { metodo: 'POST', ruta: RUTAS_CS.captureContext, cuerpo, aceptar: 'texto' })
   if (!r.ok) {
     if (r.clase === 'http') { obs('capture_context', 'provider_error', { code: r.status, mensaje: r.mensaje }); return json(502, { error: 'proveedor', message: 'CyberSource no pudo preparar el formulario de tarjeta. Intenta de nuevo.' }) }
     if (r.clase === 'resultado_desconocido') { obs('capture_context', 'provider_error', { code: r.motivo, mensaje: r.mensaje }); return json(503, { error: 'proveedor_sin_respuesta', message: 'CyberSource no respondió. Intenta de nuevo en un momento.' }) }
     obs('capture_context', 'internal_error', { code: 'firma', mensaje: r.mensaje }); return json(500, { error: 'edge', message: 'No se pudo preparar el pago con tarjeta.' })
   }
+  // CS-BB · manual §3: el capture context se VALIDA (RS256 con la llave pública del kid, /flex/v2/public-keys/{kid}) antes de usarlo.
+  const firma = await verificarJwtCS(r.data, obtenedorJwkCS(cfg))
+  if (!firma.ok) { obs('capture_context', 'provider_error', { code: `firma_${firma.motivo}`, mensaje: `capture context sin firma válida (${describirCS(cfg)})` }); return json(502, { error: 'contrato', message: 'No se pudo preparar el formulario de tarjeta. Intenta de nuevo.' }) }
   const lectura = leerCaptureContext(r.data, origen)
   if (!lectura.ok) { obs('capture_context', 'provider_error', { code: lectura.motivo, mensaje: `capture context ${lectura.motivo} (${describirCS(cfg)})` }); return json(502, { error: 'contrato', message: 'CyberSource devolvió un contexto no válido.' }) }
 

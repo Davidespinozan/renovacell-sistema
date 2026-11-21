@@ -23,6 +23,20 @@ export async function guardarPagosConfig(tarjeta: boolean, rpc: Rpc = rpcPorDefe
   } catch { return { ok: false, error: 'No hay conexión con el servidor.' } }
 }
 
+// CS-BB · BITÁCORA DE PRUEBAS de certificación de BanBajío (solo sandbox; filas ya enmascaradas por el servidor). Solo Dirección.
+export type FilaBitacoraPruebas = Record<string, unknown>
+export async function contarBitacoraPruebas(rpc: Rpc = rpcPorDefecto): Promise<number> {
+  if (!hasSupabase && rpc === rpcPorDefecto) return 0
+  try { const { data, error } = await rpc('cs_bitacora_pruebas_contar'); return error ? 0 : Number(data) || 0 } catch { return 0 }
+}
+export async function leerBitacoraPruebas(rpc: Rpc = rpcPorDefecto): Promise<{ ok: true; filas: FilaBitacoraPruebas[] } | { ok: false; error: string }> {
+  try {
+    const { data, error } = await rpc('cs_bitacora_pruebas_ver', { p_limite: 20000 })
+    if (error) return { ok: false, error: /NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección descarga la bitácora.' : 'No se pudo leer la bitácora.' }
+    return { ok: true, filas: Array.isArray(data) ? data as FilaBitacoraPruebas[] : [] }
+  } catch { return { ok: false, error: 'No hay conexión con el servidor.' } }
+}
+
 // Estado compartido del portal: mientras no se sabe, se asume APAGADO (nunca se ofrece algo que podría no existir).
 let actual: boolean = false
 let cargado = false

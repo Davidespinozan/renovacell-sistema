@@ -8,6 +8,7 @@ begin;
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes
 \ir ../../../rollback/pedidos_previos/99_down.sql   -- PEDIDOS-PREVIOS (20270207) se baja primero: esta prueba fija la versión anterior de pertenencia del doctor
+\ir ../../../rollback/cs_bb_3ds/99_down.sql   -- CS-BB (20270407410000) cuelga de card_payment_attempts (FK): se baja antes que la 187
 \ir ../../../rollback/cs1a7_cierre_manual/99_down.sql   -- CS-1A.7 (187)
 \ir ../../../rollback/cs1a6_reversa/99_down.sql   -- CS-1A.6 (186)
 \ir ../../../rollback/cs1b_reserva_guard/99_down.sql   -- CS-1A.1b (185): la guarda vive en payment_entries; se baja antes que 1a

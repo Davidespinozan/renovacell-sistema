@@ -1,5 +1,6 @@
 -- CS-1A.1b (185) · el down retira solo la guarda; CS-1A.1a sigue íntegro; bajar ambos respeta el ledger; se reaplican idénticas.
 begin;
+\ir ../../../rollback/cs_bb_3ds/99_down.sql   -- CS-BB (20270407410000) cuelga de card_payment_attempts: se baja ANTES de la foto y se reaplica al final
 create temp table _cs1b as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') as n_tablas,
@@ -32,5 +33,9 @@ do $t$ begin
    || md5(pg_get_functiondef('public.revisar_pago(uuid,uuid,text,numeric,date,text)'::regprocedure))
    || md5(pg_get_functiondef('public.vender_pos(uuid,text,numeric,text,uuid,jsonb,jsonb,jsonb,boolean,jsonb,uuid,numeric,uuid)'::regprocedure)), '184+185 · registrar_cobro / revisar_pago / vender_pos sin cambios');
   perform tests.ok(exists (select 1 from pg_trigger where tgname = 'trg_cs_reserva_guard'), '185 · guarda de vuelta');
+end $t$;
+\ir ../../../migrations/20270407410000_cs_bb_3ds_bitacora.sql   -- CS-BB se reaplica sobre la cadena reconstruida
+do $t$ begin
+  perform tests.ok(to_regclass('public.card_payment_3ds_auth') is not null and to_regclass('public.cs_bitacora_pruebas') is not null, 'CS-BB · se reaplica sobre 184–187');
 end $t$;
 rollback;

@@ -1,20 +1,31 @@
 // Edge Function · CS-1A.5 · Autorización + captura + contabilización (CyberSource / BanBajío) para el portal del doctor.
+// CS-BB (21 nov 2026) · alineado al manual de BanBajío §11–13: VENTA (capture:true) por omisión, tokenInformation.jti, valores 3DS
+// por marca desde card_payment_3ds_auth (sin actionList VALIDATE_CONSUMER_AUTHENTICATION), commerceIndicator devuelto por 3DS
+// (respaldo por marca; Carnet por CS_COMMERCE_INDICATOR_CARNET, sin valor supuesto), processorInformation.transactionId guardado.
 //
 // Camino seguro: auth_validated → authz_sent (ANTES del banco; reconfirma el saldo) → POST /pts/v2/payments (UNA vez, sin reintentos)
 //   → authorized → captura (misma llamada en modo 'venta' o POST /{id}/captures en modo 'auth_captura') → captured
 //   → cs_intento_contabilizar (registrar_cobro con op_id derivado del id de pago; consume su propia reserva) → posted.
-// Reglas: solo el doctor dueño verificado (o Dirección); importe, moneda y referencia salen del intento; el token transitorio solo
-// se reenvía al banco; una autorización sin captura NO se contabiliza; timeout/5xx tras enviar = unknown_requires_reconciliation
-// (la reserva se conserva); dos solicitudes simultáneas → la segunda recibe 'already' en authz_sent y NO llama al banco.
+// Antes de authz_sent (sin cargo posible) el intento puede cerrarse como failed_safe_to_retry cuando: el token del navegador es
+// de OTRA tarjeta que la autenticada (jti distinto → 'reautenticar') o el token transitorio ya caducó (15 min → 'tarjeta_expirada').
+// Reglas: solo el doctor dueño verificado (o Dirección); importe, moneda y referencia salen del intento; el jti solo va al banco;
+// una autorización sin captura NO se contabiliza; timeout/5xx tras enviar = unknown_requires_reconciliation (la reserva se conserva);
+// dos solicitudes simultáneas → la segunda recibe 'already' en authz_sent y NO llama al banco. Al doctor nunca se le muestra el
+// texto técnico del banco: solo mensajes en español (MENSAJES_RECHAZO_CLIENTE); el detalle técnico va a logs y a la bitácora del intento.
 // La Edge no escribe en payment_entries: la contabilización es exclusivamente cs_intento_contabilizar (ledger W2).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { RESPUESTA_APAGADO, tarjetaEnLineaActiva } from '../_shared/pagosEnLinea.ts'   // PAGOS EN LÍNEA · interruptor de Dirección
 import { conCors } from '../_shared/cors.ts'
 import { observador } from '../_shared/observa.ts'
-import { csConfig, solicitarCS, RUTAS_CS } from '../_shared/cybersource.ts'
-import { buildBillTo } from '../cs-3ds/contrato.ts'
-import { modoCaptura, buildPaymentRequest, leerPago, buildCaptureRequest, leerCaptura, datosAutorizacion, datosCaptura, MENSAJES_ESTADO, ESTADO_PAGABLE, ESTADOS_EN_CURSO } from './contrato.ts'
+import { csConfig, RUTAS_CS } from '../_shared/cybersource.ts'
+import { verificarTokenTransitorio } from '../_shared/csJwt.ts'
+import { llamarCS, obtenedorJwkCS } from '../_shared/csEdge.ts'
+import { buildBillTo, politicaPares, MENSAJE_TARJETA_EXPIRADA, MENSAJE_REAUTENTICAR } from '../cs-3ds/contrato.ts'
+import {
+  modoCaptura, rutaTransactionMode, normalizarMarca, indicadorComercio, buildPaymentRequest, leerPago, buildCaptureRequest, leerCaptura, datosAutorizacion, datosCaptura,
+  mensajeRechazoCliente, reasonDeError, MENSAJES_ESTADO, ESTADO_PAGABLE, ESTADOS_EN_CURSO, type Datos3dsPago,
+} from './contrato.ts'
 
 const obs = observador('cs-pago')
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
@@ -85,6 +96,34 @@ Deno.serve(conCors(async (req) => {
   if (cfg.ambiente !== intento.ambiente) return json(409, { error: 'ambiente_distinto', message: 'Este intento pertenece a otro ambiente. Empieza de nuevo.' })
   const modo = modoCaptura(Deno.env.get('CS_MODO_CAPTURA'))
   const amount = Number(intento.amount)
+  const borrar3ds = async () => { try { await admin.from('card_payment_3ds_auth').delete().eq('attempt_id', attemptId) } catch { /* la tarea de limpieza lo borra a la hora */ } }
+  // Sin cargo posible todavía (antes de authz_sent): cerrar el intento como fallo seguro y pedir otra captura.
+  const cerrarSinCargo = async (error: string, motivo: string, message: string) => {
+    await avanzar('failed_safe_to_retry', { error: motivo }); await borrar3ds()
+    return json(409, { error, estado: 'failed_safe_to_retry', message })
+  }
+
+  // CS-BB · token del navegador: firma RS256 + jti + exp. El jti DEBE ser el autenticado en 3DS (nunca una tarjeta nueva con 3DS viejo).
+  const lt = await verificarTokenTransitorio(token, obtenedorJwkCS(cfg))
+  if (!lt.ok) {
+    if (lt.motivo === 'expirado') return await cerrarSinCargo('tarjeta_expirada', 'token transitorio expirado antes de la venta', MENSAJE_TARJETA_EXPIRADA)
+    if (lt.motivo === 'firma') obs('pagar', 'provider_error', { code: 'token_sin_firma_valida', mensaje: 'token transitorio con firma inválida o llave no disponible' })
+    return json(400, { error: 'token_invalido', message: 'La captura de la tarjeta caducó. Vuelve a capturarla.' })
+  }
+  const { data: d3 } = await admin.from('card_payment_3ds_auth')
+    .select('jti, token_exp, card_brand, authentication_transaction_id, pares_status, eci, eci_raw, cavv, xid, ucaf_collection_indicator, ucaf_authentication_data, directory_server_transaction_id, specification_version, ecommerce_indicator').eq('attempt_id', attemptId).maybeSingle()
+  const auth = (d3 as Datos3dsPago | null) ?? null
+  if (!auth) return await cerrarSinCargo('reautenticar', 'sin datos 3DS para la venta', MENSAJE_REAUTENTICAR)
+  if (auth.jti !== lt.token.jti) return await cerrarSinCargo('reautenticar', 'el token de la venta no es el autenticado en 3DS', MENSAJE_REAUTENTICAR)
+  if (new Date(auth.token_exp).getTime() <= Date.now()) return await cerrarSinCargo('tarjeta_expirada', 'token transitorio expirado antes de la venta', MENSAJE_TARJETA_EXPIRADA)
+  if (politicaPares(auth.pares_status) !== 'cobrar') return await cerrarSinCargo('reautenticar', `paresStatus ${auth.pares_status ?? 'ninguno'} no permite cobrar`, MENSAJE_REAUTENTICAR)
+  const marca = normalizarMarca(auth.card_brand) ?? normalizarMarca(lt.token.marca)
+  const ind = indicadorComercio({ devuelto: auth.ecommerce_indicator, marca, carnetEnv: Deno.env.get('CS_COMMERCE_INDICATOR_CARNET') })
+  if (!ind.ok || !marca) {
+    // configuración incompleta (p. ej. Carnet sin CS_COMMERCE_INDICATOR_CARNET): falla cerrado, sin enviar nada al banco
+    obs('pagar', 'internal_error', { code: ind.ok ? 'marca_desconocida' : ind.motivo, mensaje: 'commerceIndicator no determinable' })
+    return json(500, { error: 'configuracion', message: 'Por ahora no podemos cobrar con esta tarjeta en línea. Usa otra tarjeta o Transferencia; no se realizó ningún cargo.' })
+  }
 
   // Bill-to del ERP (mismo armado que en 3DS); el navegador no manda nada de esto.
   const [{ data: o }, { data: pr }] = await Promise.all([
@@ -100,8 +139,8 @@ Deno.serve(conCors(async (req) => {
   const bt = buildBillTo({ nombre: String(address?.nombre ?? cliente.full_name ?? perfil.full_name ?? ''), email: String(cliente.email ?? perfil.email ?? q.quien.email ?? ''), phone: String(address?.phone ?? cliente.phone ?? ''), address })
   if (!bt.ok) return json(409, { error: 'datos_incompletos', faltan: bt.faltan, message: 'Faltan datos de facturación del pedido.' })
   let cuerpo
-  try { cuerpo = buildPaymentRequest({ attemptId, amount, token, authenticationTransactionId: intento.cs_auth_transaction_id, billTo: bt.billTo, modo }) }
-  catch (e) { return json(400, { error: 'solicitud_invalida', message: (e as Error).message }) }
+  try { cuerpo = buildPaymentRequest({ attemptId, amount, jti: lt.token.jti, auth, marca, commerceIndicator: ind.valor, billTo: bt.billTo, modo, rutaModo: rutaTransactionMode(Deno.env.get('CS_TRANSACTION_MODE_RUTA')) }) }
+  catch (e) { obs('pagar', 'internal_error', { code: 'solicitud_invalida', mensaje: (e as Error).message }); return json(400, { error: 'solicitud_invalida', message: 'No se pudo preparar el pago. Vuelve a capturar tu tarjeta; no se realizó ningún cargo.' }) }
 
   // 1) authz_sent ANTES de llamar: reconfirma el saldo bajo bloqueo; una segunda solicitud simultánea recibe 'already' y NO llama al banco.
   const envio = await avanzar('authz_sent')
@@ -109,37 +148,43 @@ Deno.serve(conCors(async (req) => {
   if (envio.status === 'already') return json(409, { error: 'en_proceso', estado: 'authz_sent', message: 'Tu pago ya se está procesando. No lo envíes de nuevo.' })
 
   // 2) autorización (o venta) — UNA llamada, sin reintentos. Desde aquí, cualquier incertidumbre = conciliación.
-  const r = await solicitarCS(cfg, { metodo: 'POST', ruta: RUTAS_CS.pagos, cuerpo })
+  const r = await llamarCS(cfg, admin, attemptId, 'pago', { metodo: 'POST', ruta: RUTAS_CS.pagos, cuerpo })
+  await borrar3ds()   // la venta ya se envió: los valores 3DS no vuelven a usarse (nunca hay reenvío)
   if (!r.ok) {
     if (r.clase === 'http' && r.status >= 400 && r.status < 500) {
       // rechazo explícito del proveedor antes de procesar: sin cargo
       obs('pagar', 'provider_error', { code: r.status, mensaje: r.mensaje })
       await avanzar('declined', { cs_reason: r.mensaje.slice(0, 120), error: r.mensaje })
-      return respuestaEstado('declined', { detalle: r.mensaje })
+      return respuestaEstado('declined', { detalle: mensajeRechazoCliente(reasonDeError(r.data)) })
     }
     obs('pagar', 'unknown', { code: r.clase === 'http' ? r.status : r.clase, mensaje: r.mensaje })
     await avanzar('unknown_requires_reconciliation', { error: `autorización: ${r.mensaje}` })
     return respuestaEstado('unknown_requires_reconciliation')
   }
   const lp = leerPago(r.data)
-  if (lp.resultado === 'rechazada') { await avanzar('declined', { ...datosAutorizacion(lp.evidencia, false), cs_reason: lp.motivo.slice(0, 120) }); return respuestaEstado('declined', { detalle: lp.motivo }) }
+  if (lp.resultado === 'rechazada') { await avanzar('declined', { ...datosAutorizacion(lp.evidencia, false), cs_reason: lp.motivo.slice(0, 120) }); return respuestaEstado('declined', { detalle: mensajeRechazoCliente(lp.evidencia.reason) }) }
   if (lp.resultado !== 'autorizada') {
     obs('pagar', 'unknown', { code: lp.evidencia.status ?? 'sin_status', mensaje: lp.motivo })
     await avanzar('unknown_requires_reconciliation', { ...datosAutorizacion(lp.evidencia, false), error: lp.motivo })
     return respuestaEstado('unknown_requires_reconciliation')
   }
   await avanzar('authorized', datosAutorizacion(lp.evidencia, modo === 'venta'))
+  // manual §11.4: processorInformation.transactionId (reconciliationId ya va en cs_reconciliation_id)
+  if (lp.evidencia.processorTransactionId) {
+    const { error: eTx } = await admin.rpc('cs_intento_procesador', { p_attempt: attemptId, p_transaction_id: lp.evidencia.processorTransactionId })
+    if (eTx) obs('pagar', 'internal_error', { code: 'procesador', error: eTx })
+  }
 
   // 3) captura
   if (modo === 'venta') {
     await avanzar('captured', { cs_payment_status: 'AUTHORIZED+CAPTURE' })
   } else {
-    const rc = await solicitarCS(cfg, { metodo: 'POST', ruta: `${RUTAS_CS.pagos}/${encodeURIComponent(lp.evidencia.id!)}/captures`, cuerpo: buildCaptureRequest(attemptId, amount) })
+    const rc = await llamarCS(cfg, admin, attemptId, 'captura', { metodo: 'POST', ruta: `${RUTAS_CS.pagos}/${encodeURIComponent(lp.evidencia.id!)}/captures`, cuerpo: buildCaptureRequest(attemptId, amount) })
     if (!rc.ok) {
       if (rc.clase === 'http' && rc.status >= 400 && rc.status < 500) {
         // autorizada pero NO capturada: queda `authorized` (retención en el banco, sin asiento). La resuelve conciliación (captura o reversa).
         obs('capturar', 'provider_error', { code: rc.status, mensaje: rc.mensaje })
-        return respuestaEstado('authorized', { detalle: rc.mensaje })
+        return respuestaEstado('authorized')
       }
       obs('capturar', 'unknown', { code: rc.clase === 'http' ? rc.status : rc.clase, mensaje: rc.mensaje })
       await avanzar('unknown_requires_reconciliation', { error: `captura: ${rc.mensaje}` })

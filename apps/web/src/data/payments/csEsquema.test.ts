@@ -2,7 +2,9 @@
 //   1) toda columna que una Edge cs-* lee con .from('tabla').select('…') existe en el contrato de tipos del esquema (database.types.ts,
 //      cuyas entradas CyberSource se tomaron del esquema remoto regenerado). Detecta referencias a columnas inexistentes como la que
 //      hubo con profiles.phone.
-//   2) supabase/config.toml declara cs-3ds-return sin JWT y NO declara ninguna otra función cs-* (conservan la verificación por defecto).
+//   2) supabase/config.toml NO declara ninguna función cs-* (todas conservan la verificación de JWT por defecto). CS-BB: cs-3ds-return
+//      (antes declarada sin JWT) se retiró: el returnUrl del reto vive en Netlify (/pago/3ds-retorno) porque Supabase servía su HTML
+//      como text/plain.
 import { describe, it, expect } from 'vitest'
 import tipos from '../database.types.ts?raw'
 import config from '../../../../../supabase/config.toml?raw'
@@ -10,13 +12,12 @@ import ccIndex from '../../../../../supabase/functions/cs-capture-context/index.
 import ccContrato from '../../../../../supabase/functions/cs-capture-context/contrato.ts?raw'
 import tdsIndex from '../../../../../supabase/functions/cs-3ds/index.ts?raw'
 import tdsContrato from '../../../../../supabase/functions/cs-3ds/contrato.ts?raw'
-import retIndex from '../../../../../supabase/functions/cs-3ds-return/index.ts?raw'
 import pagoIndex from '../../../../../supabase/functions/cs-pago/index.ts?raw'
 import pagoContrato from '../../../../../supabase/functions/cs-pago/contrato.ts?raw'
 import concIndex from '../../../../../supabase/functions/cs-conciliar/index.ts?raw'
 import concContrato from '../../../../../supabase/functions/cs-conciliar/contrato.ts?raw'
 
-const EDGES: Record<string, string> = { 'cs-capture-context': ccIndex + ccContrato, 'cs-3ds': tdsIndex + tdsContrato, 'cs-3ds-return': retIndex, 'cs-pago': pagoIndex + pagoContrato, 'cs-conciliar': concIndex + concContrato }
+const EDGES: Record<string, string> = { 'cs-capture-context': ccIndex + ccContrato, 'cs-3ds': tdsIndex + tdsContrato, 'cs-pago': pagoIndex + pagoContrato, 'cs-conciliar': concIndex + concContrato }
 
 /** Columnas del Row de una tabla o vista en database.types.ts (Tables y Views comparten la forma `nombre: { Row: { col: tipo … } }`). */
 function columnasRow(tabla: string): string[] {
@@ -53,7 +54,7 @@ describe('CS · esquema: las Edges solo leen columnas que existen', () => {
     }
   })
   it('las tablas y RPC CyberSource del contrato de tipos coinciden con las migraciones 184–187', () => {
-    for (const t of ['card_payment_attempts', 'card_payment_attempt_events', 'v_order_disponible']) expect(columnasRow(t).length).toBeGreaterThan(5)
+    for (const t of ['card_payment_attempts', 'card_payment_attempt_events', 'v_order_disponible', 'card_payment_3ds_auth', 'cs_bitacora_pruebas']) expect(columnasRow(t).length).toBeGreaterThan(5)
     for (const f of ['cs_intento_abrir', 'cs_intento_avanzar', 'cs_intento_contabilizar', 'cs_intento_cerrar_manual', 'cs_reservas_activas', 'cs_intentos_expirar', 'saldo_disponible']) expect(tipos, f).toMatch(new RegExp(`^      ${f}: \\{`, 'm'))
     // y las Edges no invocan ninguna RPC cs_* que no esté en el contrato
     const rpcs = new Set(Object.values(EDGES).flatMap((s) => [...s.matchAll(/\.rpc\('([a-z_]+)'/g)].map((m) => m[1])))
@@ -62,10 +63,10 @@ describe('CS · esquema: las Edges solo leen columnas que existen', () => {
 })
 
 describe('CS · config.toml: JWT por función', () => {
-  it('cs-3ds-return declarada sin JWT; ninguna otra cs-* declarada (JWT por defecto)', () => {
-    expect(config).toMatch(/^\[functions\.cs-3ds-return\]\nverify_jwt = false$/m)
+  it('ninguna cs-* declarada (JWT por defecto); cs-3ds-return ya no existe', () => {
+    expect(config).not.toMatch(/^\[functions\.cs-3ds-return\]/m)
     const declaradas = [...config.matchAll(/^\[functions\.([a-z0-9-]+)\]/gm)].map((m) => m[1])
-    expect(declaradas.filter((d) => d.startsWith('cs-'))).toEqual(['cs-3ds-return'])
+    expect(declaradas.filter((d) => d.startsWith('cs-'))).toEqual([])
     for (const f of ['cs-capture-context', 'cs-3ds', 'cs-pago', 'cs-conciliar']) expect(declaradas).not.toContain(f)
   })
 })

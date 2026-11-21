@@ -25,3 +25,16 @@ export const csPago = {
   /** Estado real del intento (recuperación tras recarga o cierre). Nunca dispara un cargo. */
   estado: (attemptId: string) => llamar({ accion: 'estado', attempt_id: attemptId }),
 }
+
+/**
+ * CS-BB · red de seguridad del portal: el servidor ya manda mensajes en español, pero si alguna vez llegara texto técnico del banco
+ * (códigos en MAYÚSCULAS, "CyberSource", status=…, separadores "·"), el doctor ve un mensaje genérico. El detalle técnico vive solo
+ * en los logs del servidor y en la bitácora del intento.
+ */
+export const MENSAJE_GENERICO_PAGO = 'Tu banco rechazó el pago. Puedes intentar con otra tarjeta u otra forma de pago.'
+export function mensajeSeguroPago(texto: string | null | undefined): string {
+  const t = String(texto ?? '').trim()
+  if (!t) return ''
+  if (/cybersource|cardinal|\b[A-Z]{2,}_[A-Z_]+\b|\b(DECLINED|INVALID_REQUEST|AUTHORIZED|PENDING)\b|status=|paresStatus|·|\{|\bHTTP\b|\b[45]\d\d:/i.test(t)) return MENSAJE_GENERICO_PAGO
+  return t.slice(0, 300)
+}

@@ -108,4 +108,44 @@ describe('CS-1A.4 · Autenticacion3DS', () => {
     await esperarFase('completada')
     expect(d3.llamadas.filter((x) => x === 'validate')).toHaveLength(1)
   })
+  // CS-BB · manual de BanBajío: ventana 05 a pantalla completa, TransactionId del retorno hasta el servidor, recaptura por caducidad
+  // (15 min) o por tarjeta distinta de la autenticada.
+  it('reto 05: capa fija a pantalla completa (100vw × 100vh) y el iframe sin tamaño fijo; el TransactionId del retorno va a validate', async () => {
+    const reto05 = { ok: true as const, data: { ...reto.data, ventana: '05' as const, ventana_px: null, authentication_transaction_id: 'MRePvyjPQ17kf36reXb0' } }
+    let liberar: (v: { regreso: boolean; transactionId?: string }) => void = () => {}
+    const d = deps({ enroll: reto05 }); d.stepUp = vi.fn(() => new Promise<{ regreso: boolean; transactionId?: string }>((r) => { liberar = r })) as unknown as Deps['stepUp']
+    render(<Autenticacion3DS attemptId={ATT} token={TOKEN} deps={d} />)
+    await esperarFase('reto')
+    const capa = screen.getByTestId('a3ds-reto')
+    expect(capa.getAttribute('data-pantalla-completa')).toBe('si')
+    expect(capa.style.position).toBe('fixed'); expect(capa.style.width).toBe('100vw'); expect(capa.style.height).toBe('100vh')
+    const su = (d.stepUp as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(su).toMatchObject({ ventana: null, transactionId: 'MRePvyjPQ17kf36reXb0' })
+    liberar({ regreso: true, transactionId: 'MRePvyjPQ17kf36reXb0' })
+    await esperarFase('completada')
+    expect((d.cs3ds!.validate as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual([ATT, 'MRePvyjPQ17kf36reXb0'])
+  })
+  it('reto 01–04: recuadro del tamaño de la tabla, no pantalla completa', async () => {
+    let liberar: (v: { regreso: boolean }) => void = () => {}
+    const d = deps({ enroll: reto }); d.stepUp = vi.fn(() => new Promise<{ regreso: boolean }>((r) => { liberar = r })) as unknown as Deps['stepUp']
+    render(<Autenticacion3DS attemptId={ATT} token={TOKEN} deps={d} />)
+    await esperarFase('reto')
+    expect(screen.getByTestId('a3ds-reto').getAttribute('data-pantalla-completa')).toBe('no')
+    expect(screen.getByTestId('a3ds-reto').style.minHeight).toBe('400px')
+    liberar({ regreso: false })
+  })
+  it('token caducado o tarjeta recapturada (setup/enroll/validate) → recapturar con el mensaje del servidor; rechazo 3DS → mensaje §10.5', async () => {
+    for (const over of [
+      { setup: { ok: false, error: 'tarjeta_expirada', message: 'Por seguridad, los datos de tu tarjeta caducan a los 15 minutos.' } },
+      { setup: { ok: false, error: 'reautenticar', message: 'Capturaste una tarjeta nueva.' } },
+      { enroll: { ok: false, error: 'tarjeta_expirada', message: 'Por seguridad, los datos de tu tarjeta caducan a los 15 minutos.' } },
+      { enroll: reto, validate: { ok: false, error: 'tarjeta_expirada', message: 'Por seguridad, los datos de tu tarjeta caducan a los 15 minutos.' } },
+    ]) {
+      render(<Autenticacion3DS attemptId={ATT} token={TOKEN} deps={deps(over)} />)
+      await esperarFase('recapturar'); cleanup()
+    }
+    render(<Autenticacion3DS attemptId={ATT} token={TOKEN} deps={deps({ enroll: { ok: true, data: { estado: 'declined', message: 'x' } } })} />)
+    await esperarFase('rechazada')
+    expect(document.body.textContent).toContain('Tu banco no pudo autenticar esta tarjeta. Por favor usa otra tarjeta u otra forma de pago')
+  })
 })

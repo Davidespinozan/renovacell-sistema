@@ -1,5 +1,6 @@
 -- CS-1A.1a (184) · el down retira tablas, vista, RPC y tarea; el ledger y registrar_cobro no cambian; se reaplica idéntica.
 begin;
+\ir ../../../rollback/cs_bb_3ds/99_down.sql   -- CS-BB (20270407410000) cuelga de card_payment_attempts: se baja ANTES de la foto y se reaplica al final
 create temp table _cs1 as select
   (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') as todas,
   (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') as n_tablas,
@@ -21,5 +22,9 @@ end $t$;
 do $t$ begin
   perform tests.ok((select todas from _cs1) = (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'), '184 · se reaplica idéntica (todas las funciones)');
   perform tests.eq((select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'), (select n_tablas from _cs1), '184 · mismas tablas tras reaplicar');
+end $t$;
+\ir ../../../migrations/20270407410000_cs_bb_3ds_bitacora.sql   -- CS-BB se reaplica sobre la cadena reconstruida
+do $t$ begin
+  perform tests.ok(to_regclass('public.card_payment_3ds_auth') is not null and to_regclass('public.cs_bitacora_pruebas') is not null, 'CS-BB · se reaplica sobre 184–187');
 end $t$;
 rollback;

@@ -412,10 +412,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
-# CyberSource · CS-1A.4 · returnUrl del reto 3DS: la llama el ACS del banco dentro del iframe, sin sesión de Renovacell.
-# Página estática sin datos, sin base ni secretos. Las demás funciones cs-* NO se declaran: conservan la verificación de JWT.
-[functions.cs-3ds-return]
-verify_jwt = false
+# CyberSource · CS-BB · el returnUrl del reto 3DS ya NO es una Edge de Supabase (servían text/html como text/plain): vive en el
+# dominio de la app (netlify/edge-functions/pago-3ds-retorno.ts, ruta /pago/3ds-retorno). Ninguna función cs-* se declara aquí:
+# todas conservan la verificación de JWT.
 
 # WA-RESTORE-R2 · meta-send la invoca la tarea de cada minuto (_whatsapp_despachar) con x-cron-secret y SIN JWT; con la
 # verificación del gateway la rechazaba (401) antes del código. La función autentica por sí misma: secreto de la tarea

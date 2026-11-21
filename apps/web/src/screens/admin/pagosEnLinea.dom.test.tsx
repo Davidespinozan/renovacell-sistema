@@ -25,6 +25,25 @@ describe('Pagos en línea · Dirección', () => {
   })
 })
 
+describe('Pagos en línea · bitácora de pruebas de BanBajío (CS-BB)', () => {
+  const ver = async () => ({ ok: true as const, data: { tarjeta_en_linea: false, updated_at: null } })
+  it('sin filas no hay botón; con filas, «Descargar bitácora de pruebas (CSV)» arma el CSV enmascarado que da el servidor', async () => {
+    render(<PagosEnLineaEditor ver={ver} contarBitacora={async () => 0} />)
+    await waitFor(() => expect(screen.getByTestId('pagos-estado')).toBeInTheDocument())
+    expect(screen.queryByTestId('bitacora-pruebas')).toBeNull()
+    cleanup()
+    const descargar = vi.fn()
+    const fila = { created_at: '2026-11-21T18:00:00Z', attempt_id: 'a-1', paso: 'enroll', metodo: 'POST', ruta: '/risk/v1/authentications', http_status: 201, resultado: 'ok', duracion_ms: 90, request: { tokenInformation: { jti: '1C66OQ…66ED' } }, response: { consumerAuthenticationInformation: { paresStatus: 'Y', cavv: '••••AAA=' } } }
+    render(<PagosEnLineaEditor ver={ver} contarBitacora={async () => 1} leerBitacora={async () => ({ ok: true as const, filas: [fila] })} descargar={descargar} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Descargar bitácora de pruebas (CSV)' }))
+    await waitFor(() => expect(descargar).toHaveBeenCalledTimes(1))
+    const [nombre, csv] = descargar.mock.calls[0] as [string, string]
+    expect(nombre).toMatch(/^bitacora-pruebas-cybersource-\d{4}-\d{2}-\d{2}\.csv$/)
+    expect(csv.split('\r\n')[0]).toBe('created_at,attempt_id,paso,metodo,ruta,http_status,resultado,duracion_ms,request,response')
+    expect(csv).toContain('1C66OQ…66ED'); expect(csv).toContain('••••AAA=')
+  })
+})
+
 describe('Pagos en línea · portal del doctor', () => {
   it('apagado: sin opción de tarjeta, directo a transferencia', () => {
     _fijarPagosEnLinea(false)

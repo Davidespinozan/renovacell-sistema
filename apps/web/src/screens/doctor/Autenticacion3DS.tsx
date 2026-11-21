@@ -4,7 +4,7 @@
 // `auth_validated` a la espera de CS-1A.5. El token transitorio solo se reenvía a la Edge; nunca se persiste ni se registra.
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
-import { cs3ds as cs3dsReal, recolectarDispositivo as recolectarReal, ejecutarDDC as ddcReal, ejecutarStepUp as stepUpReal, type RespEnroll } from '../../data/payments/cybersource3ds'
+import { cs3ds as cs3dsReal, recolectarDispositivo as recolectarReal, ejecutarDDC as ddcReal, ejecutarStepUp as stepUpReal, estiloVentanaReto, type RespEnroll } from '../../data/payments/cybersource3ds'
 
 export type Fase = 'preparando' | 'verificando' | 'reto' | 'validando' | 'completada' | 'rechazada' | 'pendiente' | 'error' | 'recapturar'
 export interface Deps { cs3ds?: typeof cs3dsReal; recolectar?: typeof recolectarReal; ddc?: typeof ddcReal; stepUp?: typeof stepUpReal; stepUpTimeoutMs?: number }
@@ -15,7 +15,7 @@ const TEXTO: Record<Fase, string> = {
   reto: 'Tu banco requiere una verificación adicional. Complétala en el recuadro.',
   validando: 'Confirmando la verificación…',
   completada: 'Autenticación completada. Aún no se ha realizado ningún cargo; el cobro se habilitará en el siguiente paso.',
-  rechazada: 'Tu banco no autenticó la tarjeta. Intenta con otra tarjeta.',
+  rechazada: 'Tu banco no pudo autenticar esta tarjeta. Por favor usa otra tarjeta u otra forma de pago para completar tu compra; no se realizó ningún cargo.',
   pendiente: 'Pendiente de verificación. Te avisamos en cuanto se resuelva.',
   error: 'No se pudo completar la verificación.',
   recapturar: 'La captura de la tarjeta caducó. Vuelve a capturarla.',
@@ -36,7 +36,7 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
   const stepUp = deps?.stepUp ?? stepUpReal
   const [fase, setFase] = useState<Fase>('preparando')
   const [detalle, setDetalle] = useState('')
-  const [ventana, setVentana] = useState<{ w: number; h: number } | null | undefined>(undefined)
+  const [ventana, setVentana] = useState<RespEnroll['ventana'] | null>(null)
   const contenedorDdc = useRef<HTMLDivElement>(null)
   const contenedorReto = useRef<HTMLDivElement>(null)
   const corriendo = useRef(false)
@@ -48,14 +48,15 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
     if (corriendo.current) return
     corriendo.current = true
     let vivo = true
-    const validar = async (): Promise<void> => {
+    const validar = async (transactionId?: string | null): Promise<void> => {
       if (validando.current) return
       validando.current = true
       setFase('validando')
-      const v = await cs.validate(attemptId)
+      const v = await cs.validate(attemptId, transactionId)
       validando.current = false
       if (!vivo) return
       if (!v.ok) {
+        if (v.error === 'tarjeta_expirada') { terminar('recapturar', v.message); return }
         if (v.error === 'estado_invalido' && v.estado === 'auth_validated') { terminar('completada'); return }
         if (v.error === 'estado_invalido' && v.estado === 'declined') { terminar('rechazada'); return }
         terminar('error', v.message); return
@@ -65,13 +66,14 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
       terminar('pendiente', v.data.message ?? 'La verificación con tu banco aún no termina. Intenta de nuevo en un momento.')
     }
     const reto = async (e: RespEnroll): Promise<void> => {
-      setFase('reto'); setVentana(e.ventana_px ?? null)
+      setFase('reto'); setVentana(e.ventana ?? null)
       await new Promise((r) => setTimeout(r, 0))   // el contenedor existe tras pintar
       if (!vivo || !contenedorReto.current) return
-      const r = await stepUp({ url: e.step_up_url!, token: e.step_up_token!, md: attemptId, retornoOrigen: e.retorno_origen!, ventana: e.ventana_px ?? null, timeoutMs: deps?.stepUpTimeoutMs ?? 10 * 60 * 1000, contenedor: contenedorReto.current })
+      // CS-BB · ventana 05 = pantalla completa real; el resto, el tamaño exacto de la tabla del manual
+      const r = await stepUp({ url: e.step_up_url!, token: e.step_up_token!, md: attemptId, retornoOrigen: e.retorno_origen!, transactionId: e.authentication_transaction_id ?? null, ventana: e.ventana === '05' ? null : (e.ventana_px ?? null), timeoutMs: deps?.stepUpTimeoutMs ?? 10 * 60 * 1000, contenedor: contenedorReto.current })
       if (!vivo) return
       if (!r.regreso) { terminar('pendiente', 'No recibimos la respuesta de tu banco. Puedes reintentar la confirmación.'); return }
-      await validar()
+      await validar(r.transactionId ?? null)
     }
     ;(async () => {
       if (modo === 'validar') { await validar(); return }
@@ -80,7 +82,8 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
       const s = await cs.setup(attemptId, token)
       if (!vivo) return
       if (!s.ok) {
-        if (s.error === 'token_rechazado' || s.error === 'token_invalido') { terminar('recapturar', s.message); return }
+        // CS-BB · token caducado (15 min) o tarjeta distinta de la autenticada: se vuelve a capturar (nunca un 3DS viejo para otra tarjeta)
+        if (s.error === 'token_rechazado' || s.error === 'token_invalido' || s.error === 'tarjeta_expirada' || s.error === 'reautenticar') { terminar('recapturar', s.message); return }
         if (s.error === 'estado_invalido' && s.estado === 'auth_challenge') { await validar(); return }
         if (s.error === 'estado_invalido' && s.estado === 'auth_validated') { terminar('completada'); return }
         terminar('error', s.message); return
@@ -91,6 +94,7 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
       const e = await cs.enroll(attemptId, token, recolectar())
       if (!vivo) return
       if (!e.ok) {
+        if (e.error === 'tarjeta_expirada' || e.error === 'reautenticar' || e.error === 'token_invalido' || e.error === 'token_rechazado') { terminar('recapturar', e.message); return }
         if (e.error === 'datos_incompletos') { terminar('error', e.message); return }
         terminar('error', e.message); return
       }
@@ -107,9 +111,12 @@ export function Autenticacion3DS({ attemptId, token, modo = 'completo', onFin, d
              : fase === 'rechazada' || fase === 'error' || fase === 'recapturar' ? { background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' } : {}
   return (
     <div data-testid="a3ds" data-fase={fase}>
-      <div className="sysnote" style={{ marginTop: 12, ...tono }}><Icon name={icono} /><span><b>{TEXTO[fase]}</b>{detalle && <> {detalle}</>}</span></div>
+      <div className="sysnote" style={{ marginTop: 12, ...tono }}><Icon name={icono} /><span><b>{TEXTO[fase]}</b>{detalle && fase !== 'rechazada' && <> {detalle}</>}</span></div>
       <div ref={contenedorDdc} data-testid="a3ds-ddc" aria-hidden="true" />
-      {fase === 'reto' && <div ref={contenedorReto} data-testid="a3ds-reto" style={{ marginTop: 12, display: 'flex', justifyContent: 'center', minHeight: ventana ? ventana.h : 400 }} />}
+      {fase === 'reto' && (() => {
+        const st = estiloVentanaReto(ventana)
+        return <div ref={contenedorReto} data-testid="a3ds-reto" data-pantalla-completa={st.pantallaCompleta ? 'si' : 'no'} role={st.pantallaCompleta ? 'dialog' : undefined} aria-modal={st.pantallaCompleta ? true : undefined} aria-label="Verificación de tu banco" style={st.contenedor} />
+      })()}
       {fase === 'pendiente' && <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}><button type="button" className="btn ghost sm" data-testid="a3ds-reintentar" onClick={() => { validando.current = false; void cs.validate(attemptId).then((v) => { if (!v.ok) { terminar('error', v.message); return } terminar(v.data.estado === 'auth_validated' ? 'completada' : v.data.estado === 'declined' ? 'rechazada' : 'pendiente', v.data.message ?? '') }) }}>Reintentar confirmación</button></div>}
     </div>
   )

@@ -2,7 +2,7 @@
 // CS-1A.4 · mecánica del navegador: recolección de dispositivo (iframe oculto + postMessage de Cardinal) y reto step-up
 // (iframe visible + aviso del returnUrl), con verificación estricta de orígenes, timeouts y limpieza. Sin red.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ejecutarDDC, ejecutarStepUp, recolectarDispositivo, ORIGENES_CARDINAL } from './cybersource3ds'
+import { ejecutarDDC, ejecutarStepUp, recolectarDispositivo, ORIGENES_CARDINAL, estiloVentanaReto, TAMANOS_RETO } from './cybersource3ds'
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))
 beforeEach(() => { document.body.innerHTML = '' })
@@ -40,32 +40,49 @@ describe('CS-1A.4 · recolección de dispositivo', () => {
   })
 })
 
+// CS-BB: el aviso del reto ya no viene de la Edge de Supabase (`renovacell-3ds-return`, targetOrigin "*"): viene de la página de la
+// app /pago/3ds-retorno con { tipo: 'cs-3ds-retorno', transactionId } y targetOrigin = su origen. Se exige el MISMO origen que la
+// página y el transactionId del enrolamiento.
 describe('CS-1A.4 · reto step-up', () => {
-  it('iframe visible con el tamaño indicado, form POST (JWT + MD) a stepUpUrl; termina solo con el aviso del origen de retorno; un segundo aviso no hace nada', async () => {
+  const PROPIO = window.location.origin
+  it('iframe visible con el tamaño indicado, form POST (JWT + MD) a stepUpUrl; termina solo con el aviso del propio origen y el transactionId esperado; un segundo aviso no hace nada', async () => {
     const cont = document.createElement('div'); document.body.appendChild(cont)
     const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
-    const p = ejecutarStepUp({ url: 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp', token: 'jwt.stepup', md: 'att-1', retornoOrigen: 'https://proy.supabase.co', ventana: { w: 390, h: 400 }, timeoutMs: 2000, contenedor: cont })
+    const p = ejecutarStepUp({ url: 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp', token: 'jwt.stepup', md: 'att-1', retornoOrigen: PROPIO, transactionId: 'MRePvyjPQ17kf36reXb0', ventana: { w: 390, h: 400 }, timeoutMs: 2000, contenedor: cont })
     const iframe = cont.querySelector('iframe')!; expect(iframe.style.width).toBe('390px'); expect(iframe.style.height).toBe('400px'); expect(iframe.name).toBe('rc-stepup')
     const form = submit.mock.instances[0] as unknown as HTMLFormElement
     expect((form.querySelector('input[name=JWT]') as HTMLInputElement).value).toBe('jwt.stepup'); expect((form.querySelector('input[name=MD]') as HTMLInputElement).value).toBe('att-1')
-    window.dispatchEvent(new MessageEvent('message', { origin: 'https://evil.example', data: { tipo: 'renovacell-3ds-return' } }))
-    window.dispatchEvent(new MessageEvent('message', { origin: 'https://proy.supabase.co', data: { tipo: 'otra-cosa' } }))
+    window.dispatchEvent(new MessageEvent('message', { origin: 'https://evil.example', data: { tipo: 'cs-3ds-retorno', transactionId: 'MRePvyjPQ17kf36reXb0' } }))
+    window.dispatchEvent(new MessageEvent('message', { origin: 'https://proy.supabase.co', data: { tipo: 'cs-3ds-retorno', transactionId: 'MRePvyjPQ17kf36reXb0' } }))
+    window.dispatchEvent(new MessageEvent('message', { origin: PROPIO, data: { tipo: 'renovacell-3ds-return' } }))                       // formato viejo: ignorado
+    window.dispatchEvent(new MessageEvent('message', { origin: PROPIO, data: { tipo: 'cs-3ds-retorno', transactionId: 'OTRA-TX' } }))      // otra transacción: ignorado
     await esperar(5)
     let resuelto = false; void p.then(() => { resuelto = true }); await esperar(5); expect(resuelto).toBe(false)
-    window.dispatchEvent(new MessageEvent('message', { origin: 'https://proy.supabase.co', data: { tipo: 'renovacell-3ds-return' } }))
-    window.dispatchEvent(new MessageEvent('message', { origin: 'https://proy.supabase.co', data: { tipo: 'renovacell-3ds-return' } }))
-    expect(await p).toEqual({ regreso: true })
+    window.dispatchEvent(new MessageEvent('message', { origin: PROPIO, data: { tipo: 'cs-3ds-retorno', transactionId: 'MRePvyjPQ17kf36reXb0' } }))
+    window.dispatchEvent(new MessageEvent('message', { origin: PROPIO, data: { tipo: 'cs-3ds-retorno', transactionId: 'MRePvyjPQ17kf36reXb0' } }))
+    expect(await p).toEqual({ regreso: true, transactionId: 'MRePvyjPQ17kf36reXb0' })
     expect(cont.querySelector('iframe')).toBeNull()
     submit.mockRestore()
   })
-  it('timeout (el doctor abandona el reto) → sin regreso; URL fuera de Cardinal → no monta nada', async () => {
+  it('timeout (el doctor abandona el reto) → sin regreso; URL fuera de Cardinal o retorno en otro origen → no monta nada', async () => {
     const cont = document.createElement('div'); document.body.appendChild(cont)
     const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
-    expect(await ejecutarStepUp({ url: 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp', token: 'j', md: 'a', retornoOrigen: 'https://proy.supabase.co', ventana: null, timeoutMs: 20, contenedor: cont })).toEqual({ regreso: false })
+    expect(await ejecutarStepUp({ url: 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp', token: 'j', md: 'a', retornoOrigen: PROPIO, transactionId: 'tx', ventana: null, timeoutMs: 20, contenedor: cont })).toEqual({ regreso: false })
     submit.mockClear()
-    expect(await ejecutarStepUp({ url: 'https://evil.example/stepup', token: 'j', md: 'a', retornoOrigen: 'https://proy.supabase.co', ventana: null, timeoutMs: 20, contenedor: cont })).toEqual({ regreso: false })
+    expect(await ejecutarStepUp({ url: 'https://evil.example/stepup', token: 'j', md: 'a', retornoOrigen: PROPIO, transactionId: 'tx', ventana: null, timeoutMs: 20, contenedor: cont })).toEqual({ regreso: false })
+    expect(await ejecutarStepUp({ url: 'https://centinelapistag.cardinalcommerce.com/V2/Cruise/StepUp', token: 'j', md: 'a', retornoOrigen: 'https://proy.supabase.co', transactionId: 'tx', ventana: null, timeoutMs: 20, contenedor: cont })).toEqual({ regreso: false })
     expect(submit).not.toHaveBeenCalled()
     submit.mockRestore()
+  })
+  it('tamaño del recuadro (manual §9.2): 01–04 en px exactos; 05 = pantalla completa real (capa fija 100vw × 100vh)', () => {
+    expect(estiloVentanaReto('01')).toMatchObject({ pantallaCompleta: false, iframe: { w: 250, h: 400 } })
+    expect(estiloVentanaReto('02')).toMatchObject({ pantallaCompleta: false, iframe: { w: 390, h: 400 } })
+    expect(estiloVentanaReto('03')).toMatchObject({ pantallaCompleta: false, iframe: { w: 500, h: 600 } })
+    expect(estiloVentanaReto('04')).toMatchObject({ pantallaCompleta: false, iframe: { w: 600, h: 400 } })
+    expect(estiloVentanaReto(null)).toMatchObject({ pantallaCompleta: false, iframe: { w: 390, h: 400 } })
+    const c = estiloVentanaReto('05')
+    expect(c).toMatchObject({ pantallaCompleta: true, iframe: null, contenedor: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' } })
+    expect(TAMANOS_RETO).toEqual({ '01': { w: 250, h: 400 }, '02': { w: 390, h: 400 }, '03': { w: 500, h: 600 }, '04': { w: 600, h: 400 } })
   })
 })
 

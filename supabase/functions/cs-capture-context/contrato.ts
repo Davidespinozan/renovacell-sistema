@@ -28,7 +28,7 @@ function base64UrlJson(parte: string): unknown {
   return JSON.parse(new TextDecoder().decode(bytes))
 }
 
-/** Lee el payload del capture context (sin verificar firma: llegó por TLS desde CyberSource y el navegador la valida al cargar Flex). */
+/** Lee el payload del capture context. La FIRMA (RS256, llave del kid) la verifica antes la Edge con verificarJwtCS (manual §3). */
 export function leerCaptureContext(jwt: string, origenEsperado: string, ahora: Date = new Date()): LecturaCaptureContext {
   const partes = (jwt ?? '').trim().split('.')
   if (partes.length !== 3 || !partes[1]) return { ok: false, motivo: 'no_jwt' }
