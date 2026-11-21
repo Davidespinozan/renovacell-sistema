@@ -13,6 +13,7 @@ export interface VolumeRule {
   discount_percent?: number | null
   active: boolean
   nivel?: 'medio' | 'mayoreo'   // MAYOREO-REGLAS · qué nivel es el escalón (lo dice el servidor)
+  junta?: boolean               // ULT-MEDIA · false = no se junta con otros para el medio en 10 (ultrafiltrados por media caja)
   promo?: { nombre: string; hasta: string }   // PROMO-1 · escalón de una promoción vigente (no es regla de volumen)
 }
 
@@ -48,12 +49,13 @@ export function cantidadesVolumen(lines: ReadonlyArray<{ product_id: string; qty
   const datos = Object.entries(q).map(([pid, n]) => {
     const t = rules.filter((r) => r.product_id === pid && r.active && !r.promo)
     const min = (f: (r: VolumeRule) => boolean) => { const xs = t.filter(f).map((r) => r.min_quantity); return xs.length ? Math.min(...xs) : null }
-    return { pid, n, max: t.length ? Math.max(...t.map((r) => r.min_quantity)) : null, medio: min((r) => (r.nivel ?? 'medio') === 'medio'), mayoreo: min((r) => r.nivel === 'mayoreo') }
+    return { pid, n, max: t.length ? Math.max(...t.map((r) => r.min_quantity)) : null, medio: min((r) => (r.nivel ?? 'medio') === 'medio'), mayoreo: min((r) => r.nivel === 'mayoreo'),
+      junta: !t.some((r) => (r.nivel ?? 'medio') === 'medio' && r.junta === false) }
   })
   const enMayoreo = datos.some((d) => d.mayoreo != null && d.n >= d.mayoreo)
-  const junta10 = datos.filter((d) => d.medio === 10).reduce((s, d) => s + d.n, 0)
+  const junta10 = datos.filter((d) => d.medio === 10 && d.junta).reduce((s, d) => s + d.n, 0)
   const out: Record<string, number> = {}
-  for (const d of datos) out[d.pid] = Math.max(d.n, enMayoreo ? d.max ?? 0 : 0, d.medio === 10 && junta10 >= 10 ? 10 : 0)
+  for (const d of datos) out[d.pid] = Math.max(d.n, enMayoreo ? d.max ?? 0 : 0, d.medio === 10 && d.junta && junta10 >= 10 ? 10 : 0)
   return out
 }
 

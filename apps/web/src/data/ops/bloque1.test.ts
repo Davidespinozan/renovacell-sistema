@@ -45,3 +45,19 @@ describe('contratos de pantalla', () => {
     expect(leer('data/store/escritura.ts')).toMatch(/registrarError\('escritura'/)
   })
 })
+
+import { cantidadesVolumen } from './volumePricing'
+describe('ultrafiltrados por media caja (no se juntan)', () => {
+  const rules = [
+    { product_id: 'ult', min_quantity: 10, price: 6750, active: true, nivel: 'medio' as const, junta: false },
+    { product_id: 'ult', min_quantity: 20, price: 4500, active: true, nivel: 'mayoreo' as const, junta: false },
+    { product_id: 'rel', min_quantity: 10, price: 900, active: true, nivel: 'medio' as const },
+    { product_id: 'otro', min_quantity: 10, price: 90, active: true, nivel: 'medio' as const },
+  ]
+  it('6 medias + 4 de otro: nadie llega al medio', () => {
+    expect(cantidadesVolumen([{ product_id: 'ult', qty: 6 }, { product_id: 'rel', qty: 4 }], rules)).toEqual({ ult: 6, rel: 4 })
+  })
+  it('los demás se siguen juntando', () => {
+    expect(cantidadesVolumen([{ product_id: 'otro', qty: 6 }, { product_id: 'rel', qty: 4 }], rules)).toEqual({ otro: 10, rel: 10 })
+  })
+})

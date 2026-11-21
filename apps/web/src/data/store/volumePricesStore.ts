@@ -19,12 +19,13 @@ interface PvpQuery {
 const pvp = (): PvpQuery => (supabase.from as unknown as (t: string) => PvpQuery)('product_volume_prices')
 
 const live = makeLive<VolumeRule>(async () => {
-  const { data, error } = await pvp().select('id, product_id, min_quantity, price, discount_percent, active, nivel').order('product_id').order('min_quantity')
+  const { data, error } = await pvp().select('id, product_id, min_quantity, price, discount_percent, active, nivel, junta').order('product_id').order('min_quantity')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r) => ({
     id: r.id as string, product_id: r.product_id as string, min_quantity: Number(r.min_quantity),
     price: Number(r.price), discount_percent: r.discount_percent == null ? null : Number(r.discount_percent), active: !!r.active,
     nivel: r.nivel === 'mayoreo' ? 'mayoreo' as const : 'medio' as const,
+    junta: r.junta !== false,
   }))
 }, [])
 
