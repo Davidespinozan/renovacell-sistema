@@ -121,7 +121,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <div className="side-vercomo-g">
             {ROLES_VISTA.map((x) => (
               <button key={x.key} type="button" className={(vistaPrevia ?? 'admin') === x.key ? 'on' : undefined} aria-pressed={(vistaPrevia ?? 'admin') === x.key}
-                title={x.key === 'admin' ? 'Tu vista' : `Ver el sistema como ${x.label}`}
+                title={x.key === 'admin' ? 'Tu vista' : x.key === 'doctor' ? 'Vista de prueba del portal del doctor' : `Trabajar como ${x.label}`}
                 onClick={() => { verComo(x.key === 'admin' ? null : x.key); onNavigate?.() }} data-testid={`ver-como-${x.key}`}>{x.label}</button>
             ))}
           </div>

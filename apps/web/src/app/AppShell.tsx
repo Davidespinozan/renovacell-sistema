@@ -61,8 +61,12 @@ export function AppShell() {
         {vistaPrevia && (
           // VER COMO (23 nov 2026, Toño): siempre visible que es una vista previa y con quién se actúa de verdad.
           <div className="barra-vista-previa" role="status" data-testid="barra-vista-previa">
-            <p><span className="bvp-t">Trabajando como</span><span className="bvp-sep">·</span><b>{NOMBRE_VISTA[vistaPrevia] ?? vistaPrevia}</b><span className="bvp-sep">·</span>
-              <span className="bvp-nota">Acceso de dueño: ves y haces lo de todos</span></p>
+            {vistaPrevia === 'doctor'
+              // DUEÑO · el portal del doctor es solo VISTA DE PRUEBA (el carrito y el checkout solo aceptan cuentas de doctor).
+              ? <p><span className="bvp-t">Vista de prueba</span><span className="bvp-sep">·</span><b>Portal del Doctor</b><span className="bvp-sep">·</span>
+                  <span className="bvp-nota">Así lo ve un doctor; aquí no se compra ni se guarda nada</span></p>
+              : <p><span className="bvp-t">Trabajando como</span><span className="bvp-sep">·</span><b>{NOMBRE_VISTA[vistaPrevia] ?? vistaPrevia}</b><span className="bvp-sep">·</span>
+                  <span className="bvp-nota">Acceso de dueño: ves y haces lo de todos</span></p>}
             <button type="button" onClick={() => verComo(null)} data-testid="vista-previa-volver">← Volver a Dirección</button>
           </div>
         )}
