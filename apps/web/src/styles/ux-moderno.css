@@ -168,6 +168,12 @@ button.cifra-v{cursor:pointer}
 .entrega-foto img{width:40px;height:40px;border-radius:8px;object-fit:cover}
 .entrega-foto svg{width:22px;height:22px;color:var(--ux-accent)}
 .entrega-quien{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--ux-line);border-radius:var(--r-ui);font:inherit;font-size:var(--fs-md);background:var(--ux-surface);color:var(--ux-ink)}
+/* FIRMA DE ENTREGA (23 nov 2026) · el lienzo es un documento: fondo blanco también en modo oscuro; sin desplazar la página al firmar */
+.entrega-pasos li.entrega-firma{align-items:start}
+.firma-entrega{display:grid;gap:6px}
+.firma-lienzo{width:100%;height:170px;display:block;border:1.5px dashed var(--ux-line);border-radius:var(--r-ui);background:#fff;touch-action:none;cursor:crosshair}
+.entrega-pasos li.hecho .firma-lienzo{border-style:solid;border-color:var(--ux-accent)}
+.firma-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-sm, 13px);color:var(--ux-ink-3)}
 .entrega-ok{width:100%;min-height:50px;justify-content:center;font-size:var(--fs-md)}
 .entrega-ok:disabled{opacity:.45;cursor:not-allowed}
 /* Fase 4 · Tablero: 4 cifras clave, estatus en una línea, el resto plegado */
