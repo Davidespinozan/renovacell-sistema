@@ -22,8 +22,11 @@ const leerSecciones = (): Record<string, boolean> | null => { try { const v = lo
 const guardarSecciones = (m: Record<string, boolean>) => { try { localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(m)) } catch { /* almacenamiento no disponible: no pasa nada */ } }
 
 // VER COMO · los roles que Dirección puede previsualizar (nombres cortos, como en CuboPolar).
-const NOMBRE_CORTO: Partial<Record<RoleKey, string>> = { pos: 'Ventas', warehouse: 'Almacén', packing: 'Auxiliar de almacén', driver: 'Chofer', doctor: 'Doctor' }
-const ROLES_VISTA = availableRoles().filter((r) => r.key !== 'admin' && r.ready).map((r) => ({ key: r.key as RoleKey, label: NOMBRE_CORTO[r.key as RoleKey] ?? r.label }))
+const NOMBRE_CORTO: Partial<Record<RoleKey, string>> = { admin: 'Dirección', pos: 'Ventas', warehouse: 'Almacén', packing: 'Auxiliar', driver: 'Chofer', doctor: 'Doctor' }
+const ORDEN_VISTA: RoleKey[] = ['admin', 'pos', 'warehouse', 'packing', 'driver', 'doctor']
+const ROLES_VISTA = availableRoles().filter((r) => r.ready)
+  .sort((a, b) => (ORDEN_VISTA.indexOf(a.key as RoleKey) + 99) % 99 - (ORDEN_VISTA.indexOf(b.key as RoleKey) + 99) % 99)
+  .map((r) => ({ key: r.key as RoleKey, label: NOMBRE_CORTO[r.key as RoleKey] ?? r.label }))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, screen, setScreen, user, logout, capabilities, rolReal, vistaPrevia, verComo } = useRole()
@@ -117,8 +120,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <div className="side-vercomo-t">Ver como…</div>
           <div className="side-vercomo-g">
             {ROLES_VISTA.map((x) => (
-              <button key={x.key} type="button" className={vistaPrevia === x.key ? 'on' : undefined} aria-pressed={vistaPrevia === x.key}
-                onClick={() => { verComo(vistaPrevia === x.key ? null : x.key); onNavigate?.() }} data-testid={`ver-como-${x.key}`}>{x.label}</button>
+              <button key={x.key} type="button" className={(vistaPrevia ?? 'admin') === x.key ? 'on' : undefined} aria-pressed={(vistaPrevia ?? 'admin') === x.key}
+                title={x.key === 'admin' ? 'Tu vista' : `Ver el sistema como ${x.label}`}
+                onClick={() => { verComo(x.key === 'admin' ? null : x.key); onNavigate?.() }} data-testid={`ver-como-${x.key}`}>{x.label}</button>
             ))}
           </div>
         </div>
