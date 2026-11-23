@@ -2,7 +2,7 @@
 // MODO de la app (público=landing, login, app). Hoy el rol/usuario vienen del
 // login mock; al conectar Supabase Auth vendrán del perfil y los componentes que
 // usan useRole() no cambian.
-import React, { useCallback, createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getRole, getEntryScreen, type RoleKey, getNav, resolverDestino } from '../app/roles'
 import { pedirPestana } from '../app/Pestanas'
 import { FEATURES } from '../app/config'
@@ -15,6 +15,9 @@ import { abrirVisitante, adoptarVisitante } from '../data/ops/visitante'
 
 export type AppMode = 'app' | 'landing' | 'login' | 'reset'
 
+/** VER COMO · permisos con que se previsualiza cada rol (los de una persona típica de ese rol). */
+const CAPS_VISTA_PREVIA: Partial<Record<RoleKey, string[]>> = { pos: ['conversaciones', 'nuevos_clientes'] }
+
 export interface SessionUser { name: string; email: string; avatarUrl?: string }
 
 interface RoleState {
@@ -25,6 +28,11 @@ interface RoleState {
   user: SessionUser | null
   capabilities: string[]
   setRole: (r: RoleKey) => void
+  /** VER COMO (23 nov 2026, Toño): rol que Dirección está previsualizando (null = su vista normal). */
+  vistaPrevia: RoleKey | null
+  /** El rol con que se entró (en vista previa, 'admin'). */
+  rolReal: RoleKey
+  verComo: (r: RoleKey | null) => void
   setScreen: (s: string) => void
   setMode: (m: AppMode) => void
   login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
@@ -42,6 +50,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [verified, setVerified] = useState(true)
   const [user, setUser] = useState<SessionUser | null>(null)
   const [capabilities, setCapabilities] = useState<string[]>([])
+  // VER COMO (23 nov 2026, Toño · como en CuboPolar): Dirección ve el sistema como otro rol. Solo cambia LO QUE SE VE
+  // (menú, Inicio, pantallas); los datos y las acciones siguen siendo con su cuenta de Dirección (la base decide por la
+  // sesión real). No se guarda: recargar la página regresa a su vista.
+  const [vistaPrevia, setVistaPrevia] = useState<RoleKey | null>(null)
+  const capsReales = useRef<string[]>([])
 
   // Cambiar de rol manteniendo sesión (no usado por el flujo real; útil interno).
   const setRole = (r: RoleKey) => {
@@ -54,6 +67,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   // Login: entra con un rol, su verificación, el perfil y sus capabilities.
   const login = (r: RoleKey, v: boolean, profile?: SessionUser, caps: string[] = []) => {
+    setVistaPrevia(null)
     setRoleState(r)
     setCapabilities(caps)
     setScreen(getEntryScreen(getRole(r), FEATURES, caps))
@@ -62,7 +76,21 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setMode('app')
   }
 
+  const verComo = useCallback((r: RoleKey | null) => {
+    if (r === null || r === 'admin') {
+      if (vistaPrevia === null) return
+      setVistaPrevia(null); setRoleState('admin'); setCapabilities(capsReales.current); setVerified(true)
+      setScreen(getEntryScreen(getRole('admin'), FEATURES, capsReales.current))
+      return
+    }
+    if (vistaPrevia === null) { if (role !== 'admin') return; capsReales.current = capabilities }
+    const caps = CAPS_VISTA_PREVIA[r] ?? []
+    setVistaPrevia(r); setRoleState(r); setCapabilities(caps); setVerified(true)
+    setScreen(getEntryScreen(getRole(r), FEATURES, caps))
+  }, [vistaPrevia, role, capabilities])
+
   const logout = () => {
+    if (vistaPrevia !== null) { verComo(null); return }   // en vista previa, «salir» regresa a Dirección
     setUser(null)
     setCapabilities([])
     setMode('login')
@@ -151,8 +179,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setScreen(d.screen)
   }, [role, capabilities])
   const value = useMemo(
-    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen: irA, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified }),
-    [role, screen, mode, verified, user, capabilities, irA],
+    () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen: irA, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified,
+      vistaPrevia, rolReal: (vistaPrevia ? 'admin' : role) as RoleKey, verComo }),
+    [role, screen, mode, verified, user, capabilities, irA, vistaPrevia, verComo],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>
 }

@@ -14,11 +14,12 @@ describe('<Sidebar> admin — navegación Clientes', () => {
   // MENÚ AGRUPADO (dueño, 17 oct 2026): "Por verificar" ya no es entrada del menú: es pestaña dentro de "Clientes"
   // (g_clientes); Clientes y Ventas NO van en la misma sección (Ventas vive en Mi trabajo).
   it('renderiza UNA entrada "Clientes" (g_clientes) y ninguna "Por verificar" suelta', () => {
-    renderWithRole(<Sidebar />)
-    expect(screen.queryByText('Por verificar')).toBeNull()
-    const clientes = screen.getAllByText('Clientes').map((el) => el.closest('a')).filter(Boolean)
+    const { container } = renderWithRole(<Sidebar />)
+    const nav = container.querySelector('nav.nav') as HTMLElement   // «Ventas» también es un botón de VER COMO (fuera del menú)
+    expect(within(nav).queryByText('Por verificar')).toBeNull()
+    const clientes = within(nav).getAllByText('Clientes').map((el) => el.closest('a')).filter(Boolean)
     expect(clientes).toHaveLength(1)
-    expect(screen.getByText('Ventas').closest('a')).toBeTruthy()
+    expect(within(nav).getByText('Ventas').closest('a')).toBeTruthy()
   })
 
   it('MENÚ ORDENADO · Clientes y Conversaciones van en la misma sección; "Ventas" sigue bajo Mi trabajo', () => {

@@ -474,3 +474,12 @@ button.cifra-v{cursor:pointer}
 .repetidos-aviso { color: var(--st-warn); font-size: 12px; font-weight: 600; }
 .repetidos-acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .repetidos-obvios { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }
+
+/* VER COMO (23 nov 2026, Toño · como en CuboPolar) · roles al pie del menú y barra de vista previa */
+.side-vercomo { margin: 8px 12px 0; padding: 10px; border: 1px solid var(--ux-line); border-radius: var(--r-ui); }
+.side-vercomo-t { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ux-ink-3); margin-bottom: 8px; }
+.side-vercomo-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.side-vercomo-g button { font: inherit; font-size: 12px; font-weight: 600; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--ux-line); background: var(--ux-surface); color: var(--ux-ink); cursor: pointer; }
+.side-vercomo-g button:hover { border-color: var(--ux-accent); }
+.side-vercomo-g button.on { background: var(--ux-accent); border-color: var(--ux-accent); color: var(--ds-on-ink, var(--ux-surface)); }
+.barra-vista-previa { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 14px; background: var(--ux-accent-soft); border-bottom: 1px solid var(--ux-line); font-size: 13px; color: var(--ux-ink); }

@@ -22,8 +22,10 @@ import { PuertaAvisos } from './PuertaAvisos'
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
 
+const NOMBRE_VISTA: Record<string, string> = { pos: 'Ventas', warehouse: 'Almacén', packing: 'Auxiliar de almacén', driver: 'Chofer', doctor: 'Portal del Doctor' }
+
 export function AppShell() {
-  const { role, screen, verified, user, setScreen } = useRole()
+  const { role, screen, verified, user, setScreen, vistaPrevia, verComo } = useRole()
   const [drawer, setDrawer] = useState(false)
 
   // La pestaña: "Sistema operativo" es solo del equipo (ERP); el doctor ve la marca del negocio (decisión del dueño).
@@ -56,6 +58,13 @@ export function AppShell() {
     <div className="app">
       <Sidebar onNavigate={() => setDrawer(false)} />
       <div className="main" data-area={role}>
+        {vistaPrevia && (
+          // VER COMO (23 nov 2026, Toño): siempre visible que es una vista previa y con quién se actúa de verdad.
+          <div className="barra-vista-previa" role="status" data-testid="barra-vista-previa">
+            <span><b>Vista previa · {NOMBRE_VISTA[vistaPrevia] ?? vistaPrevia}.</b> Ves lo que ve este rol, pero los datos y lo que hagas son con tu cuenta de Dirección (sí se guarda).</span>
+            <button type="button" className="btn sm" onClick={() => verComo(null)} data-testid="vista-previa-volver">Volver a Dirección</button>
+          </div>
+        )}
         <TopBar onMenu={() => setDrawer(true)} />
         <main className="canvas">
           {/* Fuera de #content: no se desmonta al cambiar de pantalla. */}

@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react'
 import { confirmar } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { ChevronRight, LogOut, Settings } from 'lucide-react'
 import { Icon } from './icons'
-import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, type ScreenDef } from './roles'
+import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, availableRoles, type RoleKey, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
@@ -21,8 +21,12 @@ const ABIERTAS_POR_DEFECTO = new Set([HUB, 'Mi trabajo', 'Clientes y conversacio
 const leerSecciones = (): Record<string, boolean> | null => { try { const v = localStorage.getItem(CLAVE_SECCIONES); return v ? JSON.parse(v) as Record<string, boolean> : null } catch { return null } }
 const guardarSecciones = (m: Record<string, boolean>) => { try { localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(m)) } catch { /* almacenamiento no disponible: no pasa nada */ } }
 
+// VER COMO · los roles que Dirección puede previsualizar (nombres cortos, como en CuboPolar).
+const NOMBRE_CORTO: Partial<Record<RoleKey, string>> = { pos: 'Ventas', warehouse: 'Almacén', packing: 'Auxiliar de almacén', driver: 'Chofer', doctor: 'Doctor' }
+const ROLES_VISTA = availableRoles().filter((r) => r.key !== 'admin' && r.ready).map((r) => ({ key: r.key as RoleKey, label: NOMBRE_CORTO[r.key as RoleKey] ?? r.label }))
+
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { role, screen, setScreen, user, logout, capabilities } = useRole()
+  const { role, screen, setScreen, user, logout, capabilities, rolReal, vistaPrevia, verComo } = useRole()
   const [profileOpen, setProfileOpen] = useState(false)
   const [ajustesOpen, setAjustesOpen] = useState(false)
   const r = getRole(role)
@@ -107,6 +111,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </>}
       </nav>
 
+      {/* VER COMO (23 nov 2026, Toño · como en CuboPolar): Dirección ve el sistema como cada rol. */}
+      {rolReal === 'admin' && (
+        <div className="side-vercomo" data-testid="ver-como">
+          <div className="side-vercomo-t">Ver como…</div>
+          <div className="side-vercomo-g">
+            {ROLES_VISTA.map((x) => (
+              <button key={x.key} type="button" className={vistaPrevia === x.key ? 'on' : undefined} aria-pressed={vistaPrevia === x.key}
+                onClick={() => { verComo(vistaPrevia === x.key ? null : x.key); onNavigate?.() }} data-testid={`ver-como-${x.key}`}>{x.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="side-foot">
         {/* 18 oct 2026 (dueño: "roba demasiado espacio"): una sola fila: avatar + nombre (abre el perfil) y dos íconos. */}
         {user && (
@@ -123,7 +139,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <button className="su-ic" type="button" aria-label="Ajustes" title="Ajustes" onClick={() => setAjustesOpen(true)}>
               <Settings size={16} />
             </button>
-            <button className="su-ic" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={async () => { if ((await confirmar('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).'))) logout() }}>
+            <button className="su-ic" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={async () => { if (vistaPrevia) { logout(); return } if ((await confirmar('¿Cerrar sesión? Se perderá lo que no hayas guardado (por ejemplo, el carrito).'))) logout() }}>
               <LogOut size={16} />
             </button>
           </div>
