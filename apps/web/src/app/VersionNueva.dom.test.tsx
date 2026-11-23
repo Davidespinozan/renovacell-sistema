@@ -27,23 +27,31 @@ describe('Versión nueva publicada', () => {
     const leer2 = vi.fn(async () => 'bbb'); cleanup(); render(<VersionNueva actual="desconocida" leer={leer2} />)
     await new Promise((r) => setTimeout(r, 10)); expect(leer2).not.toHaveBeenCalled()
   })
-  it('se actualiza SOLA al volver a la app si no dejó nada a medio hacer; si está trabajando, espera', async () => {
-    const recargar = vi.fn(); let ocupado = true
-    render(<VersionNueva actual="aaa" leer={async () => 'bbb'} recargar={recargar} trabajoAbierto={() => ocupado} />)
+  it('se actualiza SOLA al volver a la app tras irse un rato, si no dejó nada a medio hacer; si está trabajando, espera', async () => {
+    const recargar = vi.fn(); let ocupado = true; let vis: DocumentVisibilityState = 'visible'
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => vis })
+    render(<VersionNueva actual="aaa" leer={async () => 'bbb'} recargar={recargar} fueraMs={0} trabajoAbierto={() => ocupado} />)
     await screen.findByTestId('version-nueva')
-    document.dispatchEvent(new Event('visibilitychange'))
+    vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange'))
+    vis = 'visible'; document.dispatchEvent(new Event('visibilitychange'))
     expect(recargar).not.toHaveBeenCalled()          // tiene algo a medio escribir: no recarga
     ocupado = false
-    document.dispatchEvent(new Event('visibilitychange'))
+    vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange'))
+    vis = 'visible'; document.dispatchEvent(new Event('visibilitychange'))
     expect(recargar).toHaveBeenCalledTimes(1)        // ya no: recarga al volver
   })
-  it('se actualiza SOLA tras un rato sin tocar nada', async () => {
+  it('23 nov · NUNCA recarga mientras está en la pantalla (ni tras mucho rato sin tocar nada), ni si se fue solo un momento', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const recargar = vi.fn()
-    render(<VersionNueva actual="aaa" leer={async () => 'bbb'} recargar={recargar} quietoMs={1000} trabajoAbierto={() => false} />)
+    const recargar = vi.fn(); let vis: DocumentVisibilityState = 'visible'
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => vis })
+    render(<VersionNueva actual="aaa" leer={async () => 'bbb'} recargar={recargar} fueraMs={120_000} trabajoAbierto={() => false} />)
     await screen.findByTestId('version-nueva')
-    await vi.advanceTimersByTimeAsync(16_000)
-    expect(recargar).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(recargar).not.toHaveBeenCalled()
+    vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(5_000)
+    vis = 'visible'; document.dispatchEvent(new Event('visibilitychange'))
+    expect(recargar).not.toHaveBeenCalled()          // se fue 5 s (p. ej. a WhatsApp y volvió): no recarga
     vi.useRealTimers()
   })
   it('detecta trabajo abierto: ventana abierta o texto escrito (los buscadores no cuentan)', () => {
