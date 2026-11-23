@@ -27,7 +27,6 @@ import { resolverQuien } from '../_shared/quien.ts'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import { generarToken, hashToken, limpiarAtribucion, limpiarRef, mapearErrorAdopcion, limpiarPrerregistro, mapearErrorPrerregistro, MENSAJE_PRERREGISTRO, validarVerificarme } from '../_shared/visitante.ts'
-import { decodificarFoto } from '../_shared/verificacion.ts'
 import { configPush, avisarVerificacion } from '../_shared/push.ts'
 import webpush from 'npm:web-push@3.6.7'
 
@@ -137,8 +136,7 @@ Deno.serve(conCors(async (req) => {
     if (!v.permitido) return respuestaLimite(v)
     const val = validarVerificarme(p)
     if (!val.ok) return json(400, { error: 'datos_invalidos', campo: val.campo, message: val.mensaje })
-    const frente = decodificarFoto(p.ineFront); const reverso = decodificarFoto(p.ineBack)
-    if (!frente || frente === 'invalida' || !reverso || reverso === 'invalida') return json(400, { error: 'datos_invalidos', campo: 'ine', message: 'Sube las fotos del frente y del reverso de tu INE (JPG o PNG).' })
+    // SIN-INE (23 nov 2026, dueño: «ya no lo vamos a pedir»): la cuenta se crea solo con la cédula; sin fotos de la INE.
     const { data: pre } = await admin.rpc('cc_prerregistro_datos', { p_hash: hash })
     if (!pre) return json(403, { error: 'prerregistro_requerido', message: 'Antes, déjanos tus datos de contacto.' })
     const d = pre as { nombre: string; email: string; telefono: string; consent_at: string }
@@ -152,12 +150,6 @@ Deno.serve(conCors(async (req) => {
     const uid = creado.user.id
     const deshacer = async () => { await admin.auth.admin.deleteUser(uid).then(() => {}, () => {}) }
     const evidencia: Record<string, string> = {}
-    for (const [clave, foto] of [['ine-front', frente], ['ine-back', reverso]] as const) {
-      const ruta = `identity/${uid}/${clave}.${foto.ext}`
-      const { error: eS } = await admin.storage.from('proofs').upload(ruta, foto.bytes, { contentType: foto.tipo, upsert: true })
-      if (eS) { await deshacer(); return json(503, { error: 'no_disponible', message: 'No se pudieron guardar tus fotos. Intenta de nuevo.' }) }
-      evidencia[clave] = ruta
-    }
     const meta = {
       cedula: val.cedula, capturedVia: 'chat',
       identity: { status: 'pending', evidence: evidencia },

@@ -1,30 +1,29 @@
-// MI VERIFICACIÓN · el doctor ve en qué va su verificación y completa o corrige su cédula y las fotos del INE.
+// MI VERIFICACIÓN · el doctor ve en qué va su verificación y completa o corrige su cédula.
+// SIN-INE (23 nov 2026, dueño: «ya no lo vamos a pedir»): solo cédula; ya no se piden fotos de la INE.
 // Mandarlo la deja otra vez en revisión y avisa a Dirección y a su vendedor; aprobar nunca es automático.
 import React, { useCallback, useEffect, useState } from 'react'
 import { Cargando } from '../../app/EmptyState'
 import { useRole } from '../../auth/RoleContext'
-import { completarVerificacion as completarPorDefecto, miVerificacion as leerPorDefecto, reducirFoto, type MiVerificacion as Estado } from '../../data/ops/verificacion'
+import { completarVerificacion as completarPorDefecto, miVerificacion as leerPorDefecto, type MiVerificacion as Estado } from '../../data/ops/verificacion'
 import { textoFaltan } from './AvisoVerificacion'
-import { FotoIne } from '../../app/FotoIne'
 import { Icon } from '../../app/icons'
 
 const ESTADO: Record<string, string> = { pending: 'En revisión', verified: 'Verificada', rejected: 'No aprobada', revoked: 'Acceso retirado' }
 
-export function MiVerificacion({ leer = leerPorDefecto, completar = completarPorDefecto, reducir = reducirFoto }: { leer?: typeof leerPorDefecto; completar?: typeof completarPorDefecto; reducir?: typeof reducirFoto }) {
+export function MiVerificacion({ leer = leerPorDefecto, completar = completarPorDefecto }: { leer?: typeof leerPorDefecto; completar?: typeof completarPorDefecto }) {
   const { actualizarVerificacion, setScreen } = useRole()
   const [v, setV] = useState<Estado | null>(null)
-  const [cedula, setCedula] = useState(''); const [frente, setFrente] = useState<string | null>(null); const [reverso, setReverso] = useState<string | null>(null)
+  const [cedula, setCedula] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null); const [enviando, setEnviando] = useState(false)
   const cargar = useCallback(async () => { const r = await leer(); if (r) { setV(r); setCedula((c) => c || r.cedula || ''); if (r.verificado) actualizarVerificacion(true) } }, [leer, actualizarVerificacion])
   useEffect(() => { void cargar() }, [cargar])
-  const foto = (set: (s: string | null) => void) => async (f: File) => { set(await reducir(f)); setMsg(null) }
   const enviar = async () => {
     if (enviando) return
     setEnviando(true); setMsg(null)
-    const r = await completar({ cedula: cedula.trim(), ineFront: frente, ineBack: reverso })
+    const r = await completar({ cedula: cedula.trim() })
     setEnviando(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
-    setFrente(null); setReverso(null); setMsg({ ok: true, texto: 'Listo: lo revisaremos y te avisaremos aquí.' }); await cargar()
+    setMsg({ ok: true, texto: 'Listo: lo revisaremos y te avisaremos aquí.' }); await cargar()
   }
   if (!v) return <Cargando filas={4} />
   // Verificada: bloque de éxito con salida directa al catálogo (antes era una frase suelta sin acción).
@@ -50,13 +49,9 @@ export function MiVerificacion({ leer = leerPorDefecto, completar = completarPor
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div style={{ fontWeight: 600 }}>{rechazado ? 'Corrige tus datos' : 'Completa o corrige tus datos'}</div>
         <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>Cédula profesional<input style={campo} value={cedula} onChange={(e) => { setCedula(e.target.value); setMsg(null) }} inputMode="numeric" maxLength={40} aria-label="Cédula profesional" /></label>
-        <div className="rc-fotos">
-          <FotoIne etiqueta="INE frente" valor={frente} onArchivo={foto(setFrente)} testId="mi-ine-frente" />
-          <FotoIne etiqueta="INE reverso" valor={reverso} onArchivo={foto(setReverso)} testId="mi-ine-reverso" />
-        </div>
         {msg && <div role={msg.ok ? 'status' : 'alert'} style={{ color: msg.ok ? 'var(--green-deep)' : 'var(--danger)', fontSize: 13 }}>{msg.texto}</div>}
-        <button type="button" className="btn" disabled={enviando || (!cedula.trim() && !frente && !reverso)} onClick={() => void enviar()} data-testid="mi-verificacion-enviar">{enviando ? 'Enviando…' : 'Enviar a revisión'}</button>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Tus fotos se guardan de forma privada y solo las ve quien revisa tu verificación.</div>
+        <button type="button" className="btn" disabled={enviando || !cedula.trim()} onClick={() => void enviar()} data-testid="mi-verificacion-enviar">{enviando ? 'Enviando…' : 'Enviar a revisión'}</button>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Tu cédula solo la ve quien revisa tu verificación.</div>
       </div>
     </div>
   )

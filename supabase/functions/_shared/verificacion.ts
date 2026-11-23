@@ -32,6 +32,7 @@ export function validarCompletar(p: unknown): { ok: true; cedula: string | null;
   if (ced && ced.replace(/\D/g, '').length < 5) return { ok: false, mensaje: 'La cédula profesional no parece válida.' }
   const f = decodificarFoto(o.ineFront); const b = decodificarFoto(o.ineBack)
   if (f === 'invalida' || b === 'invalida') return { ok: false, mensaje: 'Las fotos deben ser JPG o PNG de menos de 3 MB.' }
-  if (!ced && !f && !b) return { ok: false, mensaje: 'Manda al menos un dato: cédula o fotos del INE.' }
+  // SIN-INE (23 nov 2026, dueño): la verificación es solo con la cédula; ya no se piden fotos de la INE.
+  if (!ced) return { ok: false, mensaje: 'Escribe tu cédula profesional.' }
   return { ok: true, cedula: ced || null, ineFront: f, ineBack: b }
 }

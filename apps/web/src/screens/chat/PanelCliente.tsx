@@ -8,7 +8,7 @@ import { EtiquetasCliente } from './EtiquetasCliente'   // ETIQUETAS EN LA FICHA
 import { confirmar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link2, Search, UserCheck, KeyRound, UserPlus, IdCard, FileText, ShoppingBag, Banknote, Receipt, Contact, Send } from 'lucide-react'
+import { Link2, Search, UserCheck, KeyRound, UserPlus, FileText, ShoppingBag, Banknote, Receipt, Contact, Send } from 'lucide-react'
 import { expediente as expedientePorDefecto, ETIQUETA_MOTIVO, textoVinculo, type ClienteExpediente, type FichaConversacion, type SugerenciaCliente } from '../../data/ops/expediente'
 import { BuscadorClientes, type ClienteBusqueda } from '../../data/ops/buscarClientes'
 import { crearInvitacion } from '../../data/ops/invitacion'
@@ -151,7 +151,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   }
   const darDeAlta = async () => {
     setOcupado(true); setMsg(null)
-    const r = await cliente.alta(conversationId, { ...form, ineFrente: ine.frente, ineReverso: ine.reverso })
+    const r = await cliente.alta(conversationId, { ...form })   // SIN-INE (23 nov 2026): ya no se piden fotos de la INE
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     olvidarIne(conversationId); cerrarHoja(conversationId); setRevisado(false); setForm({ nombre: '', cedula: '', email: '', ciudad: '' })
@@ -361,7 +361,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   const acciones: AccionChat[] = []
   if (!ficha.vinculado) {
     acciones.push({ clave: 'vincular', etiqueta: 'Vincular a un cliente', detalle: 'Ya es cliente: búscala y liga esta conversación a su ficha', icono: <Link2 size={18} />, onElegir: () => abrir('pc:quien') })
-    acciones.push({ clave: 'alta', etiqueta: 'Verificar y dar de alta', detalle: 'Cliente nuevo: su cédula y las fotos de su INE de este chat', icono: <UserPlus size={18} />, onElegir: () => abrir('pc:alta') })
+    acciones.push({ clave: 'alta', etiqueta: 'Verificar y dar de alta', detalle: 'Cliente nuevo: su cédula', icono: <UserPlus size={18} />, onElegir: () => abrir('pc:alta') })
   } else if (ficha.es_tuyo) {
     if (!ficha.tiene_cuenta && chat) acciones.push({ clave: 'acceso', etiqueta: ficha.invitacion_vigente ? 'Reenviar acceso al portal' : 'Mandar acceso al portal', detalle: 'Le llega aquí un enlace para crear su contraseña', icono: <KeyRound size={18} />, onElegir: () => abrir('pc:acceso') })
     acciones.push({ clave: 'cotizar', etiqueta: 'Cotizar', detalle: 'Arma la cotización y mándasela por este chat', icono: <FileText size={18} />, onElegir: () => setModal('cotizar') })
@@ -386,12 +386,6 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
       <span className="pc-cand-tx"><b>{capitalizarNombre(n)}</b><small>{sub}</small>{extra}</span>
       <button type="button" className="btn sm" disabled={ocupado} onClick={() => void vincular(id, n)} data-testid="pc-vincular">Es este cliente</button>
     </li>
-  )
-  const Foto = ({ uso, etiqueta }: { uso: UsoFoto; etiqueta: string }) => (
-    <span className={'pc-foto' + (ine[uso] ? ' ok' : '')}>
-      {ine.url?.[uso] ? <img src={ine.url[uso]} alt={etiqueta} /> : <IdCard size={16} aria-hidden />}
-      <small>{ine[uso] ? `${etiqueta} ✓` : `${etiqueta} pendiente`}</small>
-    </span>
   )
   let cuerpo: React.ReactNode = null
   if (hoja === 'pc:quien') cuerpo = (
@@ -419,14 +413,13 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     </HojaMarco>
   )
   else if (hoja === 'pc:alta' && !ficha.vinculado) cuerpo = (
-    <HojaMarco titulo="Verificar y dar de alta" sub="Pídele sus datos y las fotos de su INE por este chat; marca cada foto debajo de ella." onCerrar={cerrar} testid="pc-hoja-alta">
+    <HojaMarco titulo="Verificar y dar de alta" sub="Pídele su nombre y su cédula profesional por este chat." onCerrar={cerrar} testid="pc-hoja-alta">
       <form className="pc-form" onSubmit={(e) => { e.preventDefault(); void darDeAlta() }} data-testid="pc-alta">
         <input className="pc-campo" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre completo" aria-label="Nombre completo" required />
         <input className="pc-campo" value={form.cedula} onChange={(e) => setForm({ ...form, cedula: e.target.value })} placeholder="Cédula profesional" inputMode="numeric" aria-label="Cédula profesional" required />
         <input className="pc-campo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Correo (para su acceso)" aria-label="Correo" />
         <input className="pc-campo" value={form.ciudad} onChange={(e) => setForm({ ...form, ciudad: e.target.value })} placeholder="Ciudad" aria-label="Ciudad" />
-        <div className="pc-fotos"><Foto uso="frente" etiqueta="INE frente" /><Foto uso="reverso" etiqueta="INE reverso" /></div>
-        <label className="pc-check"><input type="checkbox" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} data-testid="pc-alta-revisado" /> Revisé su cédula{ine.frente ? ' y su INE' : ''}: es quien dice ser</label>
+        <label className="pc-check"><input type="checkbox" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} data-testid="pc-alta-revisado" /> Revisé su cédula: es quien dice ser</label>
         {aviso}
         <div className="pc-acciones">
           <button type="submit" className="btn" disabled={ocupado || !revisado || !form.nombre.trim() || !form.cedula.trim()} data-testid="pc-alta-guardar">Dar de alta verificada</button>
@@ -660,13 +653,5 @@ export function accionesIneVisitante(conversationId: string, sel: { frente?: str
         {sel.comprobante === m.adjunto.id ? 'Comprobante ✓' : 'Usar como comprobante de pago'}
       </button>
     </span>
-  ) : m.actor === 'visitor' && m.adjunto && !m.adjunto.uso ? (
-    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine-visitante">
-      {(['frente', 'reverso'] as const).map((lado) => (
-        <button key={lado} type="button" className={'btn ghost sm' + (sel[lado] === m.adjunto!.id ? ' on' : '')} onClick={() => usar(lado, m.adjunto!)}>
-          {sel[lado] === m.adjunto!.id ? `INE ${lado} ✓` : `Usar como INE ${lado}`}
-        </button>
-      ))}
-    </span>
-  ) : null)
+  ) : null)   // SIN-INE (23 nov 2026): las fotos ya no se marcan como INE
 }

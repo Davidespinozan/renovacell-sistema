@@ -60,18 +60,18 @@ describe('PanelCliente', () => {
     await waitFor(() => expect(c.ficha).toHaveBeenCalled())
     expect(container.querySelector('[data-testid=panel-cliente]')).toBeNull()
   })
-  it('no es cliente: alta verificada con sus datos y la INE marcada en el chat', async () => {
+  it('no es cliente: alta verificada con su nombre y cédula (sin INE)', async () => {
     const c = falso([{ vinculado: false, con_cuenta: false }, VINCULADA])
     render(<PanelCliente conversationId="C7" cliente={c} />)
     fireEvent.click(await screen.findByTestId('accion-alta'))
     fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Ana Gómez Ruiz' } })
     fireEvent.change(screen.getByLabelText('Cédula profesional'), { target: { value: '12345678' } })
-    elegirIne('C7', 'frente', 'AD1')
-    expect(await screen.findByText('INE frente ✓')).toBeInTheDocument()
-    expect(screen.getByTestId('pc-alta-guardar')).toBeDisabled()   // sin confirmar que revisó su cédula e INE no se da de alta
+    expect(screen.queryByText(/INE/)).toBeNull()
+    expect(screen.getByTestId('pc-alta-guardar')).toBeDisabled()   // sin confirmar que revisó su cédula no se da de alta
     fireEvent.click(screen.getByTestId('pc-alta-revisado'))
     fireEvent.click(screen.getByTestId('pc-alta-guardar'))
-    await waitFor(() => expect(c.alta).toHaveBeenCalledWith('C7', expect.objectContaining({ nombre: 'Ana Gómez Ruiz', cedula: '12345678', ineFrente: 'AD1' })))
+    await waitFor(() => expect(c.alta).toHaveBeenCalledWith('C7', expect.objectContaining({ nombre: 'Ana Gómez Ruiz', cedula: '12345678' })))
+    expect(c.alta).toHaveBeenCalledWith('C7', expect.not.objectContaining({ ineFrente: expect.anything() }))
     expect(await screen.findByTestId('pc-msg')).toHaveTextContent(/quedó dada de alta/)
   })
   it('pago desde la conversación: reporta con la foto marcada como comprobante y, validado, manda el recibo', async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // MI VERIFICACIÓN · la franja consulta sola y desbloquea al aprobarse; rechazado muestra el motivo; la pantalla deja
-// corregir cédula e INE y manda solo lo que cambió. Validación de fotos del servidor.
+// corregir la cédula (SIN-INE 23 nov 2026: ya no se piden fotos). Validación del servidor.
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
@@ -32,16 +32,15 @@ describe('Franja de verificación', () => {
 })
 
 describe('Mi verificación', () => {
-  it('corrige cédula y fotos; manda solo lo capturado y queda en revisión', async () => {
+  it('corrige la cédula (sin INE) y queda en revisión', async () => {
     const completar = vi.fn().mockResolvedValue({ ok: true })
-    let n = 0; const leer = vi.fn(async () => (n++ === 0 ? est({ estado: 'rejected', motivo: 'Cédula ilegible', cedula: '123', faltan: ['ine-back'] }) : est({})))
-    render(<MiVerificacion leer={leer} completar={completar} reducir={async () => 'data:image/jpeg;base64,/9j/AA=='} />)
+    let n = 0; const leer = vi.fn(async () => (n++ === 0 ? est({ estado: 'rejected', motivo: 'Cédula ilegible', cedula: '123', faltan: [] }) : est({})))
+    render(<MiVerificacion leer={leer} completar={completar} />)
     expect((await screen.findByTestId('mi-verificacion-motivo')).textContent).toMatch(/Cédula ilegible/)
+    expect(screen.queryByText(/INE/)).toBeNull()
     fireEvent.change(screen.getByLabelText('Cédula profesional'), { target: { value: '1234567' } })
-    fireEvent.change(screen.getByTestId('mi-ine-reverso'), { target: { files: [new File(['x'], 'r.jpg', { type: 'image/jpeg' })] } })
-    await screen.findByAltText('INE reverso')
     fireEvent.click(screen.getByTestId('mi-verificacion-enviar'))
-    await waitFor(() => expect(completar).toHaveBeenCalledWith({ cedula: '1234567', ineFront: null, ineBack: 'data:image/jpeg;base64,/9j/AA==' }))
+    await waitFor(() => expect(completar).toHaveBeenCalledWith({ cedula: '1234567' }))
     expect(await screen.findByText(/lo revisaremos/)).toBeTruthy()
   })
   it('ya verificado: lo dice y desbloquea', async () => {
@@ -56,7 +55,8 @@ describe('Servidor: fotos válidas', () => {
     const ok = decodificarFoto('data:image/jpeg;base64,/9j/AA=='); expect(ok && ok !== 'invalida' && ok.ext).toBe('jpg')
     expect(decodificarFoto('data:image/jpeg;base64,iVBORw==')).toBe('invalida')          // dice JPEG pero es PNG
     expect(decodificarFoto('data:text/html;base64,PGh0bWw+')).toBe('invalida')
-    expect(validarCompletar({})).toEqual({ ok: false, mensaje: 'Manda al menos un dato: cédula o fotos del INE.' })
+    expect(validarCompletar({})).toEqual({ ok: false, mensaje: 'Escribe tu cédula profesional.' })
+    expect(validarCompletar({ ineFront: 'data:image/jpeg;base64,/9j/AA==' })).toMatchObject({ ok: false })   // sin cédula ya no basta
     expect(validarCompletar({ cedula: '12' })).toMatchObject({ ok: false })
     expect(validarCompletar({ cedula: '1234567' })).toMatchObject({ ok: true, cedula: '1234567', ineFront: null })
   })

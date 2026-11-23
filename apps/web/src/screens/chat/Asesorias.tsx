@@ -38,7 +38,7 @@ import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { MessageCirclePlus } from 'lucide-react'
 import { BotonAvisos } from '../../app/BotonAvisos'
 import { Vacio, Cargando } from '../../app/EmptyState'
-import { usarFotoComoIne, pendienteDeConversacion } from '../../data/ops/verificacion'
+import { pendienteDeConversacion } from '../../data/ops/verificacion'
 import type { DoctorPendiente } from '../../data/ops/verificacion'
 import type { Mensaje } from '../../data/ops/chat'
 
@@ -68,15 +68,8 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
     void contactoDe(abierta).then((c) => { if (vivo) setContacto(c) })
     return () => { vivo = false }
   }, [abierta, contactoDe])
-  // FOTOS · si el dueño de la conversación es un doctor por verificar, sus fotos ofrecen "Usar como INE".
   const [pendiente, setPendiente] = useState<DoctorPendiente | null>(null)
-  const [versionPanel, setVersionPanel] = useState(0)
-  const usarComo = async (m: Mensaje, clave: 'ine-front' | 'ine-back') => {
-    if (!m.adjunto) return
-    const r = await usarFotoComoIne(m.adjunto.id, clave)
-    setHerr(r.ok ? `Foto guardada como ${clave === 'ine-front' ? 'INE frente' : 'INE reverso'} en su verificación.` : r.mensaje)
-    if (r.ok) { setVersionPanel((n) => n + 1); if (abierta) abrirHoja(abierta, 'verif') }
-  }
+  const [versionPanel] = useState(0)
   // EXPEDIENTE EN EL CHAT · ¿quien escribe es un doctor con cuenta por verificar? (franja + hoja de verificación)
   useEffect(() => {
     setPendiente(null)
@@ -87,12 +80,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
   }, [abierta])
   const ineVisitante = useIne(abierta ?? '')
   const accionesVisitante = abierta ? accionesIneVisitante(abierta, ineVisitante, (lado, a, url) => elegirIne(abierta, lado, a, url)) : () => null
-  const accionesAdjunto = (m: Mensaje) => (m.actor === 'visitor' ? accionesVisitante(m) : pendiente && m.actor === 'doctor' && m.adjunto && !m.adjunto.uso ? (
-    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="acciones-ine">
-      <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-front')}>Usar como INE frente</button>
-      <button type="button" className="btn ghost sm" onClick={() => void usarComo(m, 'ine-back')}>Usar como INE reverso</button>
-    </span>
-  ) : null)
+  const accionesAdjunto = (m: Mensaje) => (m.actor === 'visitor' ? accionesVisitante(m) : null)   // SIN-INE (23 nov 2026): sin «Usar como INE»
   // Herramientas del asesor: mandar en ESTA conversación el enlace de registro o la invitación a crear cuenta.
   const [herr, setHerr] = useState<string | null>(null)
   const mandar = async (texto: string, listo: string) => {
@@ -100,7 +88,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
     const r = await cliente.enviar(abierta, texto)
     setHerr(r.ok ? listo : r.error.codigo === 'asesoria_no_iniciada' ? 'Inicia la asesoría para poder escribirle.' : r.error.mensaje)
   }
-  const mandarRegistro = () => void mandar('Para verificarte, toca «Verificar mi cuenta» arriba en este chat: te pedirá tu cédula, las fotos de tu INE y una contraseña. No tienes que salir de aquí.', 'Le mandaste el enlace de registro.')
+  const mandarRegistro = () => void mandar('Para verificarte, toca «Verificar mi cuenta» arriba en este chat: te pedirá tu cédula y una contraseña. No tienes que salir de aquí.', 'Le mandaste el enlace de registro.')
   const mandarInvitacion = async (customerId: string, nombre: string) => {
     if (!(await confirmar(`¿Confirmaste que hablas con ${nombre}? La invitación crea una cuenta YA VERIFICADA ligada a ese cliente.`))) return
     const inv = await crearInvitacion(customerId)
@@ -182,7 +170,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
     {pc.tira}
   </> : null
   const acciones: AccionChat[] = abierta ? [
-    ...(pendiente ? [{ clave: 'verificar', etiqueta: `Verificar a ${capitalizarNombre(pendiente.nombre ?? 'este doctor')}`, detalle: 'Su cédula y las fotos de su INE; apruebas o rechazas', icono: <ShieldCheck size={18} />, onElegir: () => abrirHoja(abierta, 'verif') }] : []),
+    ...(pendiente ? [{ clave: 'verificar', etiqueta: `Verificar a ${capitalizarNombre(pendiente.nombre ?? 'este doctor')}`, detalle: 'Su cédula; apruebas o rechazas', icono: <ShieldCheck size={18} />, onElegir: () => abrirHoja(abierta, 'verif') }] : []),
     ...(contacto && !contacto.confirmado ? [
       { clave: 'registro', etiqueta: 'Mandar enlace de registro', detalle: 'Para que se verifique sin salir de este chat', icono: <LinkIco size={18} />, onElegir: mandarRegistro },
       ...(contacto.posible_cliente_id ? [{ clave: 'invitacion', etiqueta: 'Ya es cliente: mandar invitación', detalle: `Cuenta verificada ligada a ${contacto.posible_cliente ?? contacto.nombre}`, icono: <Llave size={18} />, onElegir: () => void mandarInvitacion(contacto.posible_cliente_id!, contacto.posible_cliente ?? contacto.nombre) }] : []),
@@ -190,7 +178,7 @@ export function Asesorias({ cliente = clientePorDefecto, intervaloMs = 20_000, e
     ...pc.acciones,
   ] : []
   const hoja = abierta && hojaAbierta === 'verif' ? (
-    <HojaMarco titulo="Verificación" sub="Revisa su cédula y su INE; sin verificación automática." onCerrar={() => cerrarHoja(abierta)} testid="hoja-verificacion">
+    <HojaMarco titulo="Verificación" sub="Revisa su cédula; sin verificación automática." onCerrar={() => cerrarHoja(abierta)} testid="hoja-verificacion">
       <PanelVerificacion conversationId={abierta} onCambio={() => void cargar()} onDoctor={setPendiente} version={versionPanel} />
     </HojaMarco>
   ) : pc.hoja

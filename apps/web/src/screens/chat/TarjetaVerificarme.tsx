@@ -1,12 +1,10 @@
 // VERIFICARME EN EL CHAT · tarjeta dentro de la conversación: quien entró por el enlace crea su cuenta sin salir.
-// Nombre, correo y celular ya están en su prerregistro; aquí da su cédula, las fotos del INE, su domicilio de entrega
-// (opcional, igual que en la landing) y una contraseña.
+// Nombre, correo y celular ya están en su prerregistro; aquí da su cédula, su domicilio de entrega (opcional, igual que
+// en la landing) y una contraseña. SIN-INE (23 nov 2026): ya no se piden fotos de la INE.
 // La cuenta queda PENDIENTE: la aprueba una persona (su vendedor o Dirección) en esta misma conversación.
 import React, { useEffect, useState } from 'react'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { adoptarVisitante, misDatos as leerPorDefecto, verificarme as enviarPorDefecto, type MisDatos } from '../../data/ops/visitante'
-import { reducirFoto } from '../../data/ops/verificacion'
-import { FotoIne } from '../../app/FotoIne'
 
 async function entrarPorDefecto(email: string, password: string): Promise<boolean> {
   if (!hasSupabase) return false
@@ -17,43 +15,35 @@ async function entrarPorDefecto(email: string, password: string): Promise<boolea
   return true
 }
 
-export function TarjetaVerificarme({ onCerrar, leer = leerPorDefecto, enviar = enviarPorDefecto, entrar = entrarPorDefecto, reducir = reducirFoto }: {
-  onCerrar: () => void; leer?: typeof leerPorDefecto; enviar?: typeof enviarPorDefecto; entrar?: (e: string, p: string) => Promise<boolean>; reducir?: (f: File) => Promise<string | null>
+export function TarjetaVerificarme({ onCerrar, leer = leerPorDefecto, enviar = enviarPorDefecto, entrar = entrarPorDefecto }: {
+  onCerrar: () => void; leer?: typeof leerPorDefecto; enviar?: typeof enviarPorDefecto; entrar?: (e: string, p: string) => Promise<boolean>
 }) {
   const [datos, setDatos] = useState<MisDatos | null>(null)
-  const [cedula, setCedula] = useState(''); const [frente, setFrente] = useState<string | null>(null); const [reverso, setReverso] = useState<string | null>(null)
+  const [cedula, setCedula] = useState('')
   const [pass, setPass] = useState(''); const [pass2, setPass2] = useState('')
   const [dom, setDom] = useState({ line1: '', colonia: '', cp: '', city: '', state: '' })
   const campoDom = (k: keyof typeof dom) => (e: React.ChangeEvent<HTMLInputElement>) => { setDom((x) => ({ ...x, [k]: e.target.value })); setError(null) }
   const [error, setError] = useState<{ texto: string; cuenta?: boolean } | null>(null); const [enviando, setEnviando] = useState(false); const [lista, setLista] = useState(false)
   useEffect(() => { void leer().then((d) => { if (d) { setDatos(d); setCedula((c) => c || d.cedula || '') } }) }, [leer])
-  const foto = (set: (s: string | null) => void) => async (f: File) => { set(await reducir(f)); setError(null) }
   const crear = async (e: React.FormEvent) => {
     e.preventDefault()
     if (enviando) return
     if (!/^[0-9]{5,12}$/.test(cedula.replace(/\s+/g, ''))) { setError({ texto: 'Escribe solo los números de tu cédula profesional.' }); return }
-    if (!frente || !reverso) { setError({ texto: 'Sube las fotos del frente y del reverso de tu INE.' }); return }
     if (dom.cp.trim() && !/^[0-9]{5}$/.test(dom.cp.trim())) { setError({ texto: 'El código postal debe tener 5 dígitos.' }); return }
     if (pass.length < 8) { setError({ texto: 'La contraseña debe tener al menos 8 caracteres.' }); return }
     if (pass !== pass2) { setError({ texto: 'Las contraseñas no coinciden.' }); return }
     setEnviando(true); setError(null)
-    const r = await enviar({ cedula: cedula.replace(/\s+/g, ''), password: pass, ineFront: frente, ineBack: reverso, domicilio: { ...dom, cp: dom.cp.trim() } })
+    const r = await enviar({ cedula: cedula.replace(/\s+/g, ''), password: pass, domicilio: { ...dom, cp: dom.cp.trim() } })
     if (!r.ok) { setEnviando(false); setError({ texto: r.mensaje, cuenta: r.codigo === 'correo_con_cuenta' }); return }
     setLista(true)
     if (!(await entrar(r.email, pass))) setEnviando(false)
   }
-  if (lista) return <div className="rc-pre-tarjeta rc-pre-enhilo" role="status" data-testid="verificarme-lista"><b>¡Listo! Tu cuenta quedó creada.</b><p>Revisaremos tu cédula e identificación aquí mismo; te avisaremos en esta conversación. Entrando con tu cuenta…</p></div>
+  if (lista) return <div className="rc-pre-tarjeta rc-pre-enhilo" role="status" data-testid="verificarme-lista"><b>¡Listo! Tu cuenta quedó creada.</b><p>Revisaremos tu cédula aquí mismo; te avisaremos en esta conversación. Entrando con tu cuenta…</p></div>
   return (
     <form className="rc-pre-tarjeta rc-pre-enhilo" onSubmit={crear} noValidate data-testid="verificarme">
       <h1>Verificar mi cuenta</h1>
-      <p>{datos ? <>Tu cuenta: <b>{datos.nombre}</b> · {datos.email} · {datos.telefono}. </> : null}Solo nos falta tu cédula, tu INE y una contraseña.</p>
+      <p>{datos ? <>Tu cuenta: <b>{datos.nombre}</b> · {datos.email} · {datos.telefono}. </> : null}Solo nos falta tu cédula y una contraseña.</p>
       <div className="rc-campo"><label htmlFor="vm-cedula">Cédula profesional</label><input id="vm-cedula" value={cedula} onChange={(e) => { setCedula(e.target.value); setError(null) }} inputMode="numeric" maxLength={20} placeholder="Solo números" /></div>
-      <div className="rc-campo"><span className="rc-campo-titulo">Tu INE</span>
-        <div className="rc-fotos">
-          <FotoIne etiqueta="INE frente" valor={frente} onArchivo={foto(setFrente)} testId="vm-frente" />
-          <FotoIne etiqueta="INE reverso" valor={reverso} onArchivo={foto(setReverso)} testId="vm-reverso" />
-        </div>
-      </div>
       <fieldset className="rc-campo rc-domicilio"><legend className="rc-campo-titulo">Domicilio de entrega <span className="rc-opcional">(opcional · para tus envíos)</span></legend>
         <input aria-label="Calle y número" value={dom.line1} onChange={campoDom('line1')} placeholder="Calle y número" maxLength={160} autoComplete="address-line1" />
         <div className="rc-domicilio-fila">
