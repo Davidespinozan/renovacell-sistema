@@ -466,3 +466,10 @@ button.cifra-v{cursor:pointer}
 .alta-seccion summary small { font-weight: 400; color: var(--ink-3); margin-left: 6px; }
 .alta-nota { font-size: 12px; color: var(--ink-3); }
 @media (max-width: 420px) { .alta-fila .alta-ancho { grid-column: auto; } }
+
+/* CLIENTES REPETIDOS (23 nov 2026) · revisar y fusionar fichas repetidas */
+.repetidos-grupo { display: grid; gap: 10px; }
+.repetidos-cab { font-size: 13px; color: var(--ink-2); }
+.repetidos-queda td { background: var(--ux-accent-soft); }
+.repetidos-aviso { color: var(--st-warn); font-size: 12px; font-weight: 600; }
+.repetidos-acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
