@@ -4,7 +4,7 @@
 import { useState, type FormEvent } from 'react'
 import { hasSupabase, supabase } from '../../lib/supabase'
 
-export interface ProspectoCreado { customer_id: string; nombre: string; status: 'creado' | 'asignado' | 'existente' }
+export interface ProspectoCreado { customer_id: string; nombre: string; status: 'creado' | 'asignado' | 'existente'; celular?: string }
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) as never) as unknown as PromiseLike<{ data: unknown; error: { message?: string } | null }>
 
@@ -33,7 +33,7 @@ export function NuevoProspectoForm({ onListo, onCancelar, rpc }: { onListo: (p: 
     const r = await crearProspecto(f, rpc)
     setOcupado(false)
     if (!r.ok) { setError(r.error); return }
-    onListo(r.data)
+    onListo({ ...r.data, celular: f.celular.replace(/\D/g, '').slice(-10) })
   }
   return (
     <form className="prospecto-form" onSubmit={(e) => void enviar(e)} data-testid="prospecto-form">

@@ -7,18 +7,17 @@ import { CustomerDirectory } from '../app/CustomerDirectory'
 import { PorVerificar } from './PorVerificar'   // AVISO-VERIF · los que mandaron su verificación
 import { ClasificarCartera } from './ClasificarCartera'   // HERRAMIENTAS DEL VENDEDOR · doctor/clínica y especialidad
 import { useState } from 'react'
-import { AltaClienteForm, avisoAlta } from './pos/AltaCliente'   // ALTA COMPLETA (23 nov 2026; antes NuevoProspectoForm)
-import { avisar } from '../app/dialogos'
+import { Prospectar } from './pos/Prospectar'   // NUEVO CLIENTE (alta completa) → y su primer WhatsApp
 
 export function Clientes() {
   const [registrando, setRegistrando] = useState(false)
   return (
     <div className="grid" style={{ gap: 16 }}>
       {/* NUEVO PROSPECTO · registrar a alguien que la vendedora consiguió por su cuenta */}
+      {/* PROSPECTAR (23 nov 2026) · mismo flujo que en Inicio: registrar y mandarle su primer WhatsApp en un paso */}
       <div className="card prospecto-card">
-        {registrando
-          ? <AltaClienteForm onCancelar={() => setRegistrando(false)} onListo={(p) => { setRegistrando(false); void avisar(`${avisoAlta(p, 'vendedora')} Ya está en tu embudo; desde Inicio → «Escribir a un cliente» le mandas su primer WhatsApp.`) }} />
-          : <button type="button" className="btn" onClick={() => setRegistrando(true)} data-testid="clientes-nuevo-prospecto">＋ Nuevo cliente</button>}
+        <button type="button" className="btn" onClick={() => setRegistrando(true)} data-testid="clientes-nuevo-prospecto">＋ Nuevo cliente</button>
+        <Prospectar abierto={registrando} onCerrar={() => setRegistrando(false)} />
       </div>
       <PorVerificar />
       <CustomerDirectory title="Clientes" scope="all" carteraToggle />

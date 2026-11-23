@@ -9,12 +9,14 @@ import { primerNombre } from '../../lib/nombres'
 import { fmtDate } from '../../lib/format'
 import { useRoleOpcional } from '../../auth/RoleContext'
 
-export function EscribirWhatsApp({ cliente: c, onCerrar, onListo, api: inyectada }: {
+export function EscribirWhatsApp({ cliente: c, onCerrar, onListo, api: inyectada, sugerida }: {
   cliente: { id: string; nombre: string } | null
   onCerrar: () => void
   /** Ya quedó (o ya se puede escribir normal): la conversación de ese cliente. */
   onListo: (conversacion: string, ventanaAbierta: boolean) => void
   api?: ReturnType<typeof plantillasPorDefecto>
+  /** PROSPECTAR · mensaje que se elige solo (p. ej. la presentación para un prospecto nuevo), si está aprobado. */
+  sugerida?: string
 }) {
   const api = useRef(inyectada ?? plantillasPorDefecto()).current
   const sesion = useRoleOpcional()
@@ -26,7 +28,7 @@ export function EscribirWhatsApp({ cliente: c, onCerrar, onListo, api: inyectada
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!c || lista) return
-    void api.lista().then((r) => { const l = (r ?? []).filter(paraEscribir); setLista(l); if (l.length === 1) setElegida(l[0].nombre) })
+    void api.lista().then((r) => { const l = (r ?? []).filter(paraEscribir); setLista(l); const s = sugerida && l.find((x) => x.nombre === sugerida); if (s) setElegida(s.nombre); else if (l.length === 1) setElegida(l[0].nombre) })
     void api.promos().then(setPromos)
   }, [c, lista, api])
   useEffect(() => { setError(null) }, [c?.id])

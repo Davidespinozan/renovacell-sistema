@@ -10,6 +10,7 @@
 // Datos: los MISMOS stores/RPC que el resto del sistema. Mi bandeja e Inicio salen de `useBandeja`
 // (no pueden contradecirse) y lo comercial del store compartido (`useAtencionComercial`). Ningún
 // tiempo de espera se calcula aquí: lo da el servidor.
+import { Prospectar } from '../pos/Prospectar'   // PROSPECTAR · registrar + primer WhatsApp
 import { Icon } from '../../app/icons'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
@@ -78,6 +79,7 @@ export function HomeVendedor() {
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={detalle} etiqueta="Ventas" />
       <CifrasVendedor esperan={solicitudes.length + activas.reduce((n, c) => n + (c.sin_leer > 0 ? 1 : 0), 0)} onEsperan={() => setScreen('asesorias')} />
+      <BandaProspectar />
       {fuente && (
         <Seccion titulo="Requiere tu atención" nivel="atencion" conteo={solicitudes.length} id="atencion">
           {est.error && <ErrorLectura texto={`No se pudieron actualizar tus solicitudes. ${est.error}`} onReintentar={() => void recargarAtencion()} />}
@@ -123,6 +125,21 @@ export function HomeVendedor() {
       {/* UX MODERNO · los envíos de su cartera, plegados (antes un bloque rojo con tarjetas completas encima de todo) */}
       <EnviosPlegados />
       <AtajosMovil items={atajos} />
+    </div>
+  )
+}
+
+/** PROSPECTAR (23 nov 2026) · a la vista en Inicio: registrar a alguien nuevo y mandarle su primer WhatsApp en un paso. */
+function BandaProspectar() {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px' }} data-testid="home-prospectar">
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <b style={{ display: 'block' }}>¿Conseguiste un cliente nuevo?</b>
+        <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Regístralo con su nombre y celular y mándale su primer WhatsApp desde aquí.</span>
+      </div>
+      <button type="button" className="btn" onClick={() => setAbierto(true)} data-testid="home-prospectar-abrir">＋ Prospectar</button>
+      <Prospectar abierto={abierto} onCerrar={() => setAbierto(false)} />
     </div>
   )
 }
