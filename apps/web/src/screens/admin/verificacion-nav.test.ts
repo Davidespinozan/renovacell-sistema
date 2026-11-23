@@ -37,7 +37,8 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
     expect(nav.find((s) => s.key === 'av_ventas')?.section).toBe('Mi trabajo')
     expect(GRUPOS.g_equipo).toContain('av_comisiones')
     expect(nav.some((s) => s.key === 'av_import')).toBe(false)   // la migración vive en Configuración
-    expect(nav.length).toBeLessThanOrEqual(17)   // 31 → 14 módulos (+ Inicio, Avisos, Chat)
+    expect(nav.find((s) => s.key === 'caja')?.section).toBe('Mi trabajo')   // DIRECCIÓN-POS (23 nov 2026, Toño): Dirección también vende
+    expect(nav.length).toBeLessThanOrEqual(18)   // 31 → 15 módulos (+ Inicio, Avisos, Chat); +1 Punto de venta (Toño, 23 nov)
   })
 })
 

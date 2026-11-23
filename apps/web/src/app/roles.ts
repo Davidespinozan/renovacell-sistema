@@ -59,6 +59,7 @@ export const ROLES: RoleDef[] = [
       // internas (registry g_*) que renderizan las pantallas de siempre. Clientes y Ventas NO van juntas (decisión del dueño).
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Mi trabajo' },
+      { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Mi trabajo' },   // DIRECCIÓN-POS (23 nov 2026, Toño): Dirección también vende en mostrador
       { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // Clientes · Por verificar · Invitar
       { key: 'g_conversaciones', label: 'Conversaciones', icon: 'chat', section: 'Conversaciones' },   // Bandeja · Asignadas · Correos
       { key: 'g_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },           // Productos · Precios · Conocimiento
