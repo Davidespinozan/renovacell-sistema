@@ -411,7 +411,7 @@ export interface DatosNegocio {
   // es la fiscal: el 6–11 nov la IA mandaba a clientes a Pedro Infante, en remodelación).
   sucursal?: { nombre: string; direccion: string } | null
   horario?: Array<{ dia: number; abierto: boolean; abre: string | null; cierra: string | null }> | null
-  entrega?: { recoge_lugar?: string | null; recoge_horario?: string | null; cp_local_desde?: string | null; cp_local_hasta?: string | null; dias_chofer?: number[] | null; local_mismo_dia?: boolean | null; corte?: string | null
+  entrega?: { recoge_lugar?: string | null; recoge_horario?: string | null; cp_local_desde?: string | null; cp_local_hasta?: string | null; cp_local_extra?: string[] | null; dias_chofer?: number[] | null; local_mismo_dia?: boolean | null; corte?: string | null
     local_gratis_desde?: number | null; local_costo?: number | null; dias_paqueteria?: number[] | null; dhl_transito_min?: number | null; dhl_transito_max?: number | null; foraneo_costo?: number | null; foraneo_gratis_desde?: number | null } | null
   // R4-C10 · Manual de ventas APROBADO (audiencia pública) y promociones vigentes (nombre, vigencia y productos; nunca precios)
   manual?: Array<{ tema: string; titulo: string; contenido: string }> | null
@@ -500,7 +500,8 @@ export function textoNegocio(n: DatosNegocio): string {
   if (n.sucursal?.direccion && (e.recoge_lugar || e.recoge_horario)) l.push(`Recoger pedidos: en la sucursal${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
   else if (e.recoge_lugar) l.push(`Recoger pedidos: ${e.recoge_lugar}${e.recoge_horario ? `, ${e.recoge_horario.charAt(0).toLowerCase()}${e.recoge_horario.slice(1)}` : ''}.`)
   if (e.cp_local_desde && e.cp_local_hasta) {
-    const partes = [`Entregas en Culiacán (C.P. ${e.cp_local_desde} a ${e.cp_local_hasta}): con chofer${rangoDias(e.dias_chofer) ? ` de ${rangoDias(e.dias_chofer)}` : ''}`]
+    const extra = (e.cp_local_extra ?? []).filter(Boolean)   // ENT-CPX · CP fuera del rango que también son locales (p. ej. Aguaruto)
+    const partes = [`Entregas en Culiacán (C.P. ${e.cp_local_desde} a ${e.cp_local_hasta}${extra.length ? `, además ${extra.join(', ')}` : ''}): con chofer${rangoDias(e.dias_chofer) ? ` de ${rangoDias(e.dias_chofer)}` : ''}`]
     if (e.local_mismo_dia) partes.push(`el mismo día si el pedido se confirma antes de las ${hhmm(e.corte) || '15:30'}`)
     if (typeof e.local_gratis_desde === 'number' && e.local_gratis_desde > 0) partes.push(`envío gratis en compras desde ${pesos(e.local_gratis_desde)} (en compras menores se recoge en sucursal)`)
     l.push(partes.join('; ') + '.')

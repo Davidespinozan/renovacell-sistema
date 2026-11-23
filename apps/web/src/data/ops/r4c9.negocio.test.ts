@@ -26,6 +26,10 @@ describe('texto del negocio desde el ERP', () => {
     expect(t).toContain('Entregas en Culiacán (C.P. 80000 a 80299): con chofer de lunes a sábado; el mismo día si el pedido se confirma antes de las 15:30; envío gratis en compras desde $500 (en compras menores se recoge en sucursal).')
     expect(t).toContain('Envíos al resto del país: por paquetería de lunes a viernes; 1 a 3 días hábiles de tránsito; costo de envío $600, gratis en compras desde $5,000.')
   })
+  it('ENT-CPX · los CP locales extra (Aguaruto) se dicen junto al rango', () => {
+    const t2 = politica.textoNegocio({ ...ERP, entrega: { ...ERP.entrega, cp_local_extra: ['80301', '80308', '80316'] } })
+    expect(t2).toContain('Entregas en Culiacán (C.P. 80000 a 80299, además 80301, 80308, 80316): con chofer')
+  })
   it('lo que falta en el ERP no se inventa', () => {
     expect(politica.textoNegocio({})).toBe('')
     const sin = politica.textoNegocio({ empresa: { ciudad: 'Culiacan', estado: 'Sinaloa' } })

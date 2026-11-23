@@ -12,11 +12,19 @@ const NOMBRE_DIA: Record<number, string> = { 1: 'lunes', 2: 'martes', 3: 'miérc
 interface Form {
   corte: string; foraneo_gratis_desde: string; foraneo_costo: string; local_gratis_desde: string; local_costo: string
   cp_local_desde: string; cp_local_hasta: string; dias_paqueteria: number[]; dias_chofer: number[]; dias_entrega_foranea: number[]
+  /** ENT-CPX · CP extra locales, como texto "80301, 80308" mientras se edita. */
+  cp_local_extra: string
   dhl_transito_min: string; dhl_transito_max: string; t1_activo: boolean; t1_transito_min: string; t1_transito_max: string
   estafeta_activo: boolean; estafeta_transito_min: string; estafeta_transito_max: string   // PAQ-SIMPLE
   local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string
   /** ENT-H · bloques "10:30-13:30, 15:30-17:30", intervalo, cupo, margen y días hacia adelante (texto mientras se edita). */
   horario_franjas: string; horario_intervalo_min: string; horario_cupo: string; horario_margen_min: string; horario_dias_adelante: string
+}
+/** ENT-CPX · "80301, 80308" ⇄ ['80301','80308'] (null si algún CP no tiene 5 dígitos). */
+export function textoACps(s: string): string[] | null {
+  const partes = s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean)
+  if (partes.length > 50 || partes.some((x) => !/^\d{5}$/.test(x))) return null
+  return [...new Set(partes)].sort()
 }
 /** "10:30-13:30, 15:30-17:30" ⇄ [{desde,hasta}] */
 export function franjasATexto(f: Array<{ desde: string; hasta: string }> | null | undefined): string { return (f ?? []).map((x) => `${x.desde}-${x.hasta}`).join(', ') }
@@ -35,7 +43,7 @@ export function textoAFranjas(s: string): Array<{ desde: string; hasta: string }
 }
 const aForm = (c: EntregaConfig): Form => ({
   corte: String(c.corte).slice(0, 5), foraneo_gratis_desde: String(c.foraneo_gratis_desde), foraneo_costo: String(c.foraneo_costo), local_gratis_desde: String(c.local_gratis_desde), local_costo: String(c.local_costo),
-  cp_local_desde: c.cp_local_desde, cp_local_hasta: c.cp_local_hasta, dias_paqueteria: [...c.dias_paqueteria], dias_chofer: [...c.dias_chofer], dias_entrega_foranea: [...c.dias_entrega_foranea],
+  cp_local_desde: c.cp_local_desde, cp_local_hasta: c.cp_local_hasta, cp_local_extra: (c.cp_local_extra ?? []).join(', '), dias_paqueteria: [...c.dias_paqueteria], dias_chofer: [...c.dias_chofer], dias_entrega_foranea: [...c.dias_entrega_foranea],
   dhl_transito_min: String(c.dhl_transito_min), dhl_transito_max: String(c.dhl_transito_max), t1_activo: c.t1_activo, t1_transito_min: String(c.t1_transito_min), t1_transito_max: String(c.t1_transito_max),
   estafeta_activo: c.estafeta_activo ?? true, estafeta_transito_min: String(c.estafeta_transito_min ?? 2), estafeta_transito_max: String(c.estafeta_transito_max ?? 4),
   local_mismo_dia: c.local_mismo_dia, recoge_lugar: c.recoge_lugar, recoge_horario: c.recoge_horario,
@@ -51,6 +59,7 @@ export function validarEntrega(f: Form): string | null {
   }
   if (!/^\d{5}$/.test(f.cp_local_desde) || !/^\d{5}$/.test(f.cp_local_hasta)) return 'Los códigos postales locales deben tener 5 dígitos.'
   if (f.cp_local_desde > f.cp_local_hasta) return 'El C.P. "hasta" debe ser mayor o igual que el "desde".'
+  if (!textoACps(f.cp_local_extra)) return 'C.P. locales extra: escribe códigos de 5 dígitos separados por coma (máximo 50).'
   if (f.dias_paqueteria.length === 0) return 'Elige al menos un día de salida de paquetería.'
   if (f.dias_chofer.length === 0) return 'Elige al menos un día de salida del chofer.'
   if (f.dias_entrega_foranea.length === 0) return 'Elige al menos un día en que la paquetería entrega.'
@@ -67,7 +76,7 @@ export function validarEntrega(f: Form): string | null {
 }
 const aDatos = (f: Form): Partial<EntregaConfig> => ({
   corte: f.corte, foraneo_gratis_desde: num(f.foraneo_gratis_desde), foraneo_costo: num(f.foraneo_costo), local_gratis_desde: num(f.local_gratis_desde), local_costo: num(f.local_costo),
-  cp_local_desde: f.cp_local_desde, cp_local_hasta: f.cp_local_hasta, dias_paqueteria: [...f.dias_paqueteria].sort(), dias_chofer: [...f.dias_chofer].sort(), dias_entrega_foranea: [...f.dias_entrega_foranea].sort(),
+  cp_local_desde: f.cp_local_desde, cp_local_hasta: f.cp_local_hasta, cp_local_extra: textoACps(f.cp_local_extra) ?? undefined, dias_paqueteria: [...f.dias_paqueteria].sort(), dias_chofer: [...f.dias_chofer].sort(), dias_entrega_foranea: [...f.dias_entrega_foranea].sort(),
   dhl_transito_min: Number(f.dhl_transito_min), dhl_transito_max: Number(f.dhl_transito_max), t1_activo: f.t1_activo, t1_transito_min: Number(f.t1_transito_min), t1_transito_max: Number(f.t1_transito_max),
   estafeta_activo: f.estafeta_activo, estafeta_transito_min: Number(f.estafeta_transito_min), estafeta_transito_max: Number(f.estafeta_transito_max),
   local_mismo_dia: f.local_mismo_dia, recoge_lugar: f.recoge_lugar.trim(), recoge_horario: f.recoge_horario.trim(),
@@ -127,6 +136,7 @@ export function EntregaConfigEditor({ ver = verConfigEntrega, guardar = guardarC
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
           <label style={{ fontSize: 12 }}>C.P. local desde (Culiacán)<input style={input} inputMode="numeric" maxLength={5} value={f.cp_local_desde} onChange={texto('cp_local_desde')} aria-label="C.P. local desde" /></label>
           <label style={{ fontSize: 12 }}>C.P. local hasta<input style={input} inputMode="numeric" maxLength={5} value={f.cp_local_hasta} onChange={texto('cp_local_hasta')} aria-label="C.P. local hasta" /></label>
+          <label style={{ fontSize: 12 }}>Otros C.P. locales (fuera del rango, separados por coma)<input style={input} inputMode="numeric" value={f.cp_local_extra} onChange={texto('cp_local_extra')} placeholder="80301, 80308, 80316" aria-label="Otros C.P. locales" /></label>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, alignSelf: 'end', minHeight: 40 }}><input type="checkbox" checked={f.local_mismo_dia} onChange={(e) => set('local_mismo_dia')(e.target.checked)} aria-label="El chofer entrega el mismo día" /> El chofer entrega el mismo día que sale</label>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>

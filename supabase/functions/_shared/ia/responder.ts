@@ -26,7 +26,7 @@ export async function leerNegocio(admin: any): Promise<politica.DatosNegocio> {
   const [empresa, horario, entrega, manual, promos] = await Promise.all([
     q(() => admin.from('company_settings').select('razon_social, direccion, cp, ciudad, estado, telefono, aviso_ia, aviso_ia_hasta').eq('id', 'default').maybeSingle()),
     q(() => admin.from('cc_horario_semanal').select('dia, abierto, abre, cierra').order('dia')),
-    q(() => admin.from('entrega_config').select('recoge_lugar, recoge_horario, cp_local_desde, cp_local_hasta, dias_chofer, local_mismo_dia, corte, local_gratis_desde, local_costo, dias_paqueteria, dhl_transito_min, dhl_transito_max, foraneo_costo, foraneo_gratis_desde').eq('id', 1).maybeSingle()),
+    q(() => admin.from('entrega_config').select('recoge_lugar, recoge_horario, cp_local_desde, cp_local_hasta, cp_local_extra, dias_chofer, local_mismo_dia, corte, local_gratis_desde, local_costo, dias_paqueteria, dhl_transito_min, dhl_transito_max, foraneo_costo, foraneo_gratis_desde').eq('id', 1).maybeSingle()),
     // R4-C10 · solo lo APROBADO y para cualquier contacto (el canal es público)
     q(() => admin.from('cc_company_knowledge').select('tema, titulo, contenido').eq('estado', 'approved').eq('audiencia', 'public').order('tema').order('titulo')),
     // R4-C10 · promociones activas y vigentes hoy: nombre, fin y productos (nunca el precio de la línea)

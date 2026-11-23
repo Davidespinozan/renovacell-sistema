@@ -315,6 +315,8 @@ export function textoErrorHorario(msg: string): string {
 export interface EntregaConfig {
   corte: string; foraneo_gratis_desde: number; foraneo_costo: number; local_gratis_desde: number; local_costo: number
   cp_local_desde: string; cp_local_hasta: string; dias_paqueteria: number[]; dias_chofer: number[]; dias_entrega_foranea: number[]
+  /** ENT-CPX · CP fuera del rango que también son locales (p. ej. 80308 Aguaruto). */
+  cp_local_extra?: string[]
   dhl_transito_min: number; dhl_transito_max: number; t1_activo: boolean; t1_transito_min: number; t1_transito_max: number
   /** PAQ-SIMPLE · Estafeta: activa y días de tránsito (fecha por regla hasta integrar su API). */
   estafeta_activo: boolean; estafeta_transito_min: number; estafeta_transito_max: number
