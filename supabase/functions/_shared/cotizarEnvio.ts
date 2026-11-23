@@ -20,6 +20,36 @@ export function sinServiciosExcluidos<T extends { serviceCode?: string | null }>
   return tarifas.filter((x) => !x.serviceCode || servicioDhlPermitido(x.serviceCode, excluidos))
 }
 
+// ═══ DHL-FECHA (23 nov 2026) · la cotización se pide para la SALIDA REAL del paquete, no para "el siguiente día hábil".
+// Antes se cotizaba siempre como si saliera mañana: a Valle de Santiago (38406) DHL prometía el lunes 30 cuando, saliendo
+// el lunes 23 antes del corte, llega el viernes 27 (Alberto). Misma regla que public._entrega_salida en la base:
+// hoy si es antes del corte y es día de paquetería (y no está cerrado); si no, el siguiente día válido.
+export interface ReglaSalida { corte: string; dias: number[]; cerrados?: string[]; zona?: string }
+/** Fecha y hora local (AAAA-MM-DD, HH:MM) y desfase "GMT-07:00" de un instante en la zona del negocio. */
+export function relojLocal(ahoraMs: number, zona = 'America/Mazatlan'): { dia: string; hora: string; desfase: string } {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'longOffset' }).formatToParts(new Date(ahoraMs))
+  const de = (t: string) => p.find((x) => x.type === t)?.value ?? ''
+  const off = de('timeZoneName').replace('GMT', '') || '+00:00'
+  return { dia: `${de('year')}-${de('month')}-${de('day')}`, hora: `${de('hour')}:${de('minute')}`, desfase: `GMT${off}` }
+}
+const sumarDia = (dia: string, n: number) => { const [y, m, d] = dia.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10) }
+const isoDow = (dia: string) => { const [y, m, d] = dia.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay() || 7 }
+/** El día en que el paquete sale de verdad (AAAA-MM-DD), con la regla de la base. */
+export function salidaPaqueteria(ahoraMs: number, r: ReglaSalida): string {
+  const { dia, hora } = relojLocal(ahoraMs, r.zona)
+  const valido = (x: string) => r.dias.includes(isoDow(x)) && !(r.cerrados ?? []).includes(x)
+  if (hora < r.corte.slice(0, 5) && valido(dia)) return dia
+  for (let i = 1; i <= 60; i++) { const x = sumarDia(dia, i); if (valido(x)) return x }
+  return sumarDia(dia, 1)
+}
+/** plannedShippingDateAndTime para MyDHL: el día de salida; si es hoy, dentro de 30 min (nunca en el pasado), si no 12:00. */
+export function fechaPlaneadaDhl(ahoraMs: number, r: ReglaSalida): string {
+  const salida = salidaPaqueteria(ahoraMs, r)
+  const { dia, desfase } = relojLocal(ahoraMs, r.zona)
+  const hora = salida === dia ? relojLocal(ahoraMs + 30 * 60_000, r.zona).hora : '12:00'
+  return `${salida}T${hora}:00 ${desfase}`
+}
+
 export function paqueteEstimado(piezas: number, c: ConfigPaquete) {
   const kg = Math.round((Number(c.paquete_kg_base ?? 1) + Math.max(0, piezas) * Number(c.paquete_kg_pieza ?? 0.3)) * 100) / 100
   return { weightKg: Math.max(0.5, kg), lengthCm: Number(c.paquete_largo_cm ?? 30), widthCm: Number(c.paquete_ancho_cm ?? 25), heightCm: Number(c.paquete_alto_cm ?? 20), pieces: 1 }

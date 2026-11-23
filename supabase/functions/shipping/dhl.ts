@@ -80,14 +80,14 @@ function packagesOf(p: NeutralPackage, referencia?: string) {
 }
 
 // ---- Cotización -----------------------------------------------------------
-export function buildRateRequest(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, accountNumber: string) {
+export function buildRateRequest(shipper: NeutralShipper, receiver: NeutralReceiver, pkg: NeutralPackage, accountNumber: string, planeada?: string) {   // DHL-FECHA · `planeada`: la salida real (cotizar al vender)
   return {
     customerDetails: {
       shipperDetails: shipperAddress(shipper),
       receiverDetails: postalAddress(receiver.address),
     },
     accounts: [{ typeCode: 'shipper', number: accountNumber }],
-    plannedShippingDateAndTime: plannedDate(),
+    plannedShippingDateAndTime: planeada ?? plannedDate(),
     unitOfMeasurement: 'metric',
     isCustomsDeclarable: false, // doméstico MX
     packages: packagesOf(pkg),

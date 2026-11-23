@@ -9,7 +9,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { buildRateRequest, dhlBaseUrl, fetchConTimeout, parseRates, TIMEOUT_COTIZACION_MS, type NeutralShipper } from '../shipping/dhl.ts'
-import { paqueteEstimado, promesaDeServicios, serviciosCotizados } from '../_shared/cotizarEnvio.ts'
+import { fechaPlaneadaDhl, paqueteEstimado, promesaDeServicios, serviciosCotizados } from '../_shared/cotizarEnvio.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -33,17 +33,28 @@ Deno.serve(conCors(async (req) => {
   const user = Deno.env.get('DHL_API_USERNAME'), pass = Deno.env.get('DHL_API_PASSWORD'), account = Deno.env.get('DHL_ACCOUNT_NUMBER')
   if (!user || !pass || !account) return json(501, { error: 'sin_paqueteria', message: 'La cotización en línea no está disponible: se usa la regla de entrega.' })
   const [{ data: cfg }, { data: c }] = await Promise.all([
-    admin.from('entrega_config').select('paquete_kg_base, paquete_kg_pieza, paquete_largo_cm, paquete_ancho_cm, paquete_alto_cm').eq('id', 1).maybeSingle(),
+    admin.from('entrega_config').select('paquete_kg_base, paquete_kg_pieza, paquete_largo_cm, paquete_ancho_cm, paquete_alto_cm, corte, dias_paqueteria').eq('id', 1).maybeSingle(),
     admin.from('company_settings').select('shipping_name, shipping_address, shipping_cp, shipping_city, shipping_state, shipping_country, shipping_phone, shipping_email').eq('id', 'default').maybeSingle(),
   ])
   const shipper: NeutralShipper = { name: t(c?.shipping_name), addressLine1: t(c?.shipping_address), cp: t(c?.shipping_cp), city: t(c?.shipping_city), state: t(c?.shipping_state), country: t(c?.shipping_country) || 'MX', phone: t(c?.shipping_phone), email: t(c?.shipping_email) }
   if (!shipper.cp || !shipper.city) return json(422, { error: 'origen', message: 'Falta el origen de envíos en Configuración.' })
   const pkg = paqueteEstimado(piezas, cfg ?? {})
+  // DHL-FECHA (23 nov 2026) · se cotiza para la SALIDA REAL (hoy antes del corte), no para "mañana": antes cada promesa
+  // de DHL quedaba un día hábil tarde (38406: decía lunes 30, sale hoy lunes 23 → viernes 27).
+  const ahora = Date.now()
+  const [{ data: hz }, { data: exc }] = await Promise.all([
+    admin.from('cc_horario_config').select('zona').eq('id', 1).maybeSingle(),
+    admin.from('cc_horario_excepciones').select('fecha').eq('tipo', 'cerrado').gte('fecha', new Date(ahora - 86_400_000).toISOString().slice(0, 10)),
+  ])
+  const regla = { corte: String(cfg?.corte ?? '15:30'), dias: ((cfg?.dias_paqueteria as number[] | null) ?? [1, 2, 3, 4, 5]).map(Number), cerrados: (exc ?? []).map((x: { fecha: string }) => String(x.fecha)), zona: String(hz?.zona ?? 'America/Mazatlan') }
+  const receptor = { name: 'Cliente', address: { line1: 'Por confirmar', cp, city: t(b.ciudad) || 'Mexico', state: t(b.estado) } }
+  const pedir = (planeada?: string) => fetchConTimeout(fetch, `${dhlBaseUrl(Deno.env.get('DHL_API_ENV'))}/rates`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + btoa(`${user}:${pass}`) },
+    body: JSON.stringify(buildRateRequest(shipper, receptor, pkg, account, planeada)),
+  }, Math.min(TIMEOUT_COTIZACION_MS, 15_000))
   try {
-    const r = await fetchConTimeout(fetch, `${dhlBaseUrl(Deno.env.get('DHL_API_ENV'))}/rates`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + btoa(`${user}:${pass}`) },
-      body: JSON.stringify(buildRateRequest(shipper, { name: 'Cliente', address: { line1: 'Por confirmar', cp, city: t(b.ciudad) || 'Mexico', state: t(b.estado) } }, pkg, account)),
-    }, Math.min(TIMEOUT_COTIZACION_MS, 15_000))
+    let r = await pedir(fechaPlaneadaDhl(ahora, regla))
+    if (!r.ok) { await r.body?.cancel().catch(() => {}); r = await pedir() }   // DHL no acepta esa salida (p. ej. ya no recoge hoy): la de siempre, siguiente día hábil
     const data = await r.json().catch(() => ({}))
     if (!r.ok) return json(502, { error: 'paqueteria', message: 'DHL no respondió la cotización: se usa la regla de entrega.' })
     const servicios = serviciosCotizados(parseRates(data))   // PAQ-SIMPLE · sin los servicios prohibidos
