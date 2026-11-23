@@ -32,7 +32,7 @@ export function MisEntregas() {
   const { data: shipments, reportIncident, confirmLoad } = useShipments()
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
-  const { user } = useRole()
+  const { user, vistaPrevia } = useRole()
   const driverId = driverIdByEmail(user?.email)
 
   const prodName = useMemo(() => {
@@ -97,7 +97,9 @@ export function MisEntregas() {
 
   // Solo con chofer resuelto: si driverId es null (aún cargando) no se listan
   // envíos —evita que un envío sin chofer (driver_id null) entre por null===null.
-  const myAll = driverId ? shipments.filter((s) => s.driver_id === driverId) : []
+  // DUEÑO (23 nov 2026) · trabajando como Chofer, el dueño ve TODAS las entregas en ruta (no solo las de un chofer).
+  const comoDueno = vistaPrevia === 'driver'
+  const myAll = comoDueno ? shipments.filter((s) => !!s.driver_id) : driverId ? shipments.filter((s) => s.driver_id === driverId) : []
   // Un envío cancelado (pedido cancelado o guía anulada) sale de la ruta: ya no se entrega.
   const mine = myAll.filter((s) => s.status !== 'delivered' && s.status !== 'cancelado')
   const entregadas = myAll.filter((s) => s.status === 'delivered')
@@ -190,7 +192,7 @@ export function MisEntregas() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="eyebrow">Mi ruta · {driverName(driverId)}</div>
+      <div className="eyebrow">{comoDueno ? 'Todas las rutas' : `Mi ruta · ${driverName(driverId)}`}</div>
 
       {/* CHOFER EN EL MAPA · aviso honesto de que se comparte la ubicación (solo en ruta) */}
       {enRuta && rastreo === 'activo' && (

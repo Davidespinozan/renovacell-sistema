@@ -14,13 +14,20 @@ const estado = () => screen.getByTestId('estado').textContent
 describe('Ver como', () => {
   it('Dirección ve como Ventas y «salir» la regresa a Dirección con sus permisos', () => {
     render(<RoleProvider><Sonda /></RoleProvider>)
-    act(() => api!.login('admin', true, { name: 'Toño', email: 't@x.mx' }, ['anuncios']))
+    act(() => api!.login('admin', true, { name: 'Toño', email: 't@x.mx' }, ['anuncios', 'dueno']))
     act(() => api!.verComo('pos'))
     expect(estado()).toBe('pos|admin|pos|conversaciones,nuevos_clientes|app')
     act(() => api!.verComo('driver'))
     expect(estado()).toBe('driver|admin|driver||app')
     act(() => api!.logout())   // en vista previa, salir = volver a Dirección (no cierra sesión)
-    expect(estado()).toBe('admin|admin|-|anuncios|app')
+    expect(estado()).toBe('admin|admin|-|anuncios,dueno|app')
+  })
+  it('Dirección SIN el permiso de dueño no cambia de rol', () => {
+    render(<RoleProvider><Sonda /></RoleProvider>)
+    act(() => api!.login('admin', true, { name: 'Claudia', email: 'c@x.mx' }, ['diseno']))
+    act(() => api!.verComo('pos'))
+    expect(estado()).toBe('admin|admin|-|diseno|app')
+    expect(api!.multirol).toBe(false)
   })
   it('otro rol no puede previsualizar', () => {
     render(<RoleProvider><Sonda /></RoleProvider>)

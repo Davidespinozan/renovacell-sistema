@@ -128,10 +128,10 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .barra-vista-previa p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .barra-vista-previa .bvp-t{font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:11px}
 .barra-vista-previa .bvp-sep{margin:0 7px;color:rgba(255,255,255,.35)}
-.barra-vista-previa .bvp-aviso{color:#fcd34d}
+.barra-vista-previa .bvp-nota{color:rgba(255,255,255,.6)}
 .barra-vista-previa button{flex-shrink:0;height:26px;padding:0 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .barra-vista-previa button:hover{background:rgba(255,255,255,.16)}
-@media (max-width:640px){.barra-vista-previa .bvp-aviso{display:none}}
+@media (max-width:640px){.barra-vista-previa .bvp-nota{display:none}}
 .side-foot{margin:0 13px;padding:13px 11px 2px;border-top:1px solid rgba(255,255,255,.14)}
 .side-foot .comp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9aa291;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:8px}
 .side-foot .comp svg{width:13px;height:13px;color:var(--green-soft)}

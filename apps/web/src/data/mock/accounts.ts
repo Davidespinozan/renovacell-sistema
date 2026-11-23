@@ -21,6 +21,7 @@ export interface MockAccount {
 // y el equipo se hidrata de `profiles` (teamStore), así que vacío no rompe nada.
 const DEMO_ACCOUNTS: MockAccount[] = [
   { email: 'direccion@renovacell.mx', password: 'demo', role: 'admin', verified: true, name: 'Claudia · Dirección', capabilities: [] },
+  { email: 'dueno@renovacell.mx', password: 'demo', role: 'admin', verified: true, name: 'Toño · Dueño', capabilities: ['dueno'] },   // DUEÑO · todos los roles
   { email: 'almacen@renovacell.mx', password: 'demo', role: 'warehouse', verified: true, name: 'Alberto · Almacén / Empaque', capabilities: ['diseno', 'anuncios'] },
   { email: 'ventas1@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Lucía · Ventas', capabilities: ['eventos', 'conversaciones'] },
   { email: 'ventas2@renovacell.mx', password: 'demo', role: 'pos', verified: true, name: 'Diego · Ventas', capabilities: [] },

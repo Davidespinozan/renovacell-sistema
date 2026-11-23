@@ -303,12 +303,13 @@ export function HomeAlmacen({ etiqueta = 'Almacén y empaque' }: { etiqueta?: st
 
 // ── CHOFER ────────────────────────────────────────────────────────────────────────────────────────────
 export function HomeChofer() {
-  const { user, setScreen } = useRole()
+  const { user, setScreen, vistaPrevia } = useRole()
+  const comoDueno = vistaPrevia === 'driver'   // DUEÑO · trabajando como Chofer ve todas las rutas
   const { data: shipments } = useShipments()
   const { data: orders } = useAllOrders()
   const driverId = driverIdByEmail(user?.email)
   // Misma regla que "Mis entregas": solo con chofer resuelto (evita que driver_id null entre por null===null).
-  const mias = driverId ? shipments.filter((s) => s.driver_id === driverId && s.status !== 'delivered' && s.status !== 'cancelado') : []
+  const mias = (comoDueno || driverId) ? shipments.filter((s) => (comoDueno ? !!s.driver_id : s.driver_id === driverId) && s.status !== 'delivered' && s.status !== 'cancelado') : []
   const incidencias = mias.filter((s) => s.incident && !s.incident.resolved)
   // Siguiente parada = el orden de ruta que el chofer eligió en "Mis entregas" (solo lectura).
   const siguiente = useMemo(() => {

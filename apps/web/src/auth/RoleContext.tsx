@@ -33,6 +33,8 @@ interface RoleState {
   /** El rol con que se entró (en vista previa, 'admin'). */
   rolReal: RoleKey
   verComo: (r: RoleKey | null) => void
+  /** DUEÑO · Dirección con el permiso «dueno»: trabaja en todos los roles (no es vista previa). */
+  multirol: boolean
   setScreen: (s: string) => void
   setMode: (m: AppMode) => void
   login: (role: RoleKey, verified: boolean, profile?: SessionUser, capabilities?: string[]) => void
@@ -50,9 +52,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [verified, setVerified] = useState(true)
   const [user, setUser] = useState<SessionUser | null>(null)
   const [capabilities, setCapabilities] = useState<string[]>([])
-  // VER COMO (23 nov 2026, Toño · como en CuboPolar): Dirección ve el sistema como otro rol. Solo cambia LO QUE SE VE
-  // (menú, Inicio, pantallas); los datos y las acciones siguen siendo con su cuenta de Dirección (la base decide por la
-  // sesión real). No se guarda: recargar la página regresa a su vista.
+  // VER COMO / DUEÑO (23 nov 2026, Toño · como en CuboPolar): el dueño (Dirección + permiso «dueno») trabaja en cualquier
+  // rol: cambia el menú, el Inicio y las pantallas; los datos y las acciones son con su cuenta de Dirección (acceso total:
+  // ve lo de todos y hace lo de todos). No se guarda: recargar la página regresa a Dirección.
   const [vistaPrevia, setVistaPrevia] = useState<RoleKey | null>(null)
   const capsReales = useRef<string[]>([])
 
@@ -83,7 +85,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       setScreen(getEntryScreen(getRole('admin'), FEATURES, capsReales.current))
       return
     }
-    if (vistaPrevia === null) { if (role !== 'admin') return; capsReales.current = capabilities }
+    if (vistaPrevia === null) { if (role !== 'admin' || !capabilities.includes('dueno')) return; capsReales.current = capabilities }
     const caps = CAPS_VISTA_PREVIA[r] ?? []
     setVistaPrevia(r); setRoleState(r); setCapabilities(caps); setVerified(true)
     setScreen(getEntryScreen(getRole(r), FEATURES, caps))
@@ -180,7 +182,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, [role, capabilities])
   const value = useMemo(
     () => ({ role, screen, mode, verified, user, capabilities, setRole, setScreen: irA, setMode, login, logout, updateProfile, actualizarVerificacion: setVerified,
-      vistaPrevia, rolReal: (vistaPrevia ? 'admin' : role) as RoleKey, verComo }),
+      vistaPrevia, rolReal: (vistaPrevia ? 'admin' : role) as RoleKey, verComo,
+      multirol: vistaPrevia !== null || (role === 'admin' && capabilities.includes('dueno')) }),
     [role, screen, mode, verified, user, capabilities, irA, vistaPrevia, verComo],
   )
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>

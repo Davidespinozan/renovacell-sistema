@@ -29,7 +29,7 @@ const ROLES_VISTA = availableRoles().filter((r) => r.ready)
   .map((r) => ({ key: r.key as RoleKey, label: NOMBRE_CORTO[r.key as RoleKey] ?? r.label }))
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { role, screen, setScreen, user, logout, capabilities, rolReal, vistaPrevia, verComo } = useRole()
+  const { role, screen, setScreen, user, logout, capabilities, vistaPrevia, verComo, multirol } = useRole()
   const [profileOpen, setProfileOpen] = useState(false)
   const [ajustesOpen, setAjustesOpen] = useState(false)
   const r = getRole(role)
@@ -115,7 +115,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* VER COMO (23 nov 2026, Toño · como en CuboPolar): Dirección ve el sistema como cada rol. */}
-      {rolReal === 'admin' && (
+      {multirol && (
         <div className="side-vercomo" data-testid="ver-como">
           <div className="side-vercomo-t">Ver como…</div>
           <div className="side-vercomo-g">

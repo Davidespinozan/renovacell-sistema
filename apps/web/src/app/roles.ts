@@ -14,7 +14,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas' | 'dueno'
 
 export interface ScreenDef {
   key: string
@@ -191,6 +191,9 @@ export const CAPABILITIES: CapabilityDef[] = [
   { key: 'nuevos_clientes', label: 'Recibir clientes nuevos', modules: [] },
   // Jefe de ventas: ve Metas y comisiones de TODO el equipo (lectura; metas y tasas las define Dirección). El servidor
   // exige esta capacidad (comisiones_equipo).
+  // DUEÑO (23 nov 2026, Toño): superusuario. Con el rol de Dirección, trabaja en TODOS los roles («Ver como…» al pie del
+  // menú): en cada uno ve lo de todos y hace lo de todos con su cuenta (el servidor ya le da acceso total a Dirección).
+  { key: 'dueno', label: 'Dueño: todos los roles', modules: [] },
   { key: 'jefe_ventas', label: 'Jefe de ventas', modules: [{ key: 'av_comisiones', label: 'Metas y comisiones', icon: 'chart', section: 'Mi cartera' }] },
   {
     key: 'contenido', label: 'Catálogo y sitio web',
