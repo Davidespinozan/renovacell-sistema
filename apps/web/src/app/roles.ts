@@ -95,10 +95,13 @@ export const ROLES: RoleDef[] = [
       // La remisión del paquete no es una pantalla: se imprime desde "Por enviar" y desde "Guías".
       // El menú cuenta la historia del inventario (dueño, 15 oct 2026): lo que HAY (Inventario, Por caducar) y lo que
       // ENTRA (una compra se pide en Compras a proveedores y se vuelve inventario al Recibir mercancía).
+      // Pedidos ARRIBA (23 nov 2026, dueño): es el trabajo del día; antes quedaba suelto debajo de «Compras y entradas» y
+      // parecía parte de esa sección. Mismo lugar para Blanca.
+      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
       { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
-      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Inventario' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
-      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Inventario' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
+      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
+      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
       { key: 'carga_inventario', label: 'Cargar inventario (CSV)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
@@ -107,7 +110,6 @@ export const ROLES: RoleDef[] = [
       // UX MODERNO · Fase 3 (15 nov 2026, auditoría: "un pedido se trabaja en seis menús"): UNA entrada "Pedidos" con
       // pestañas por etapa (Preparar → Por enviar → Guías → Despacho → Seguimiento → Horarios). Las claves sueltas
       // siguen abriendo su pestaña (resolverDestino).
-      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
     ],
   },
   {
@@ -117,11 +119,11 @@ export const ROLES: RoleDef[] = [
     key: 'packing', label: 'Auxiliar de almacén', group: 'Empaque y despacho',
     icon: 'pkg', isStaff: true, ready: true,
     modules: [
+      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
       { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
       // MISMO ORDEN QUE ALBERTO (23 nov 2026, dueño: "él debe poder ver todo lo que ve Blanca porque es su jefe"):
       // una entrada «Pedidos» con las MISMAS pestañas y nombres que la de Almacén, sin las que son solo de Alberto.
-      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
     ],
   },
   {
