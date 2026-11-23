@@ -1,6 +1,7 @@
 // Cola de empaque: pedidos en estado "Empacado" (surtidos por Almacén), listos
 // para enviar. Asignar envío por paquetería (carrier+guía) o chofer propio.
 // Al asignar se crea el shipment y el pedido pasa a "En camino".
+import { clienteDePedido } from '../../data/mock/profiles'   // nombre del cliente junto al folio
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
@@ -126,6 +127,7 @@ export function Cola() {
           <div key={o.id} className="card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
+              <b style={{ fontSize: 14 }}>{clienteDePedido(o).name}</b>
               <span className="pill p-blue"><span className="d" /> Empacado</span>
               <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
             </div>

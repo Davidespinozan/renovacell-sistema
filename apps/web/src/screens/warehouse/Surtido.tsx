@@ -21,6 +21,7 @@ import { creditoAbierto, creditoVencido } from '../../data/ops/moneyView'
 import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 import { cantidadVista, esMediaCaja } from '../../lib/cajas'
+import { clienteDePedido } from '../../data/mock/profiles'   // el nombre del cliente junto al folio (Almacén lo pidió)
 
 export function Surtido() {
   const { data: orders } = useAllOrders()
@@ -147,6 +148,7 @@ export function Surtido() {
                     />
                   )}
                   <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
+                  <b style={{ fontSize: 14 }} data-testid="surtido-cliente">{clienteDePedido(o).name}</b>
                   {(() => {
                     // Un pedido liberado por CRÉDITO no está pagado: se surte, pero Almacén lo ve.
                     const d = byOrder[o.id]
@@ -184,6 +186,7 @@ export function Surtido() {
             return (
               <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--line)', fontSize: 13 }} data-testid="surtido-programado">
                 <span className="mono">{o.external_ref}</span>
+                <b>{clienteDePedido(o).name}</b>
                 <span style={{ flex: 1, color: 'var(--ink-3)' }}>{o.items.reduce((n, it) => n + it.qty, 0)} pzas · se prepara el {fechaCorta(sumarDias(e?.salida ?? manana, -1))}</span>
                 <b>Sale el {fechaCorta(e?.salida)}</b>
                 <ProgramarSalida orderId={o.id} folio={o.external_ref} entrega={e} />
@@ -242,7 +245,7 @@ export function SurtirModal({
           <>
             <div className="mhead">
               <div>
-                <h3>Preparar {order.external_ref}</h3>
+                <h3>Preparar {order.external_ref} · {clienteDePedido(order).name}</h3>
                 <div className="ms">Toma cada producto del lote que te indicamos (el que caduca primero).</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
