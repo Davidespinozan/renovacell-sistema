@@ -66,7 +66,7 @@ export function AppShell() {
               ? <p><span className="bvp-t">Vista de prueba</span><span className="bvp-sep">·</span><b>Portal del Doctor</b><span className="bvp-sep">·</span>
                   <span className="bvp-nota">Así lo ve un doctor; aquí no se compra ni se guarda nada</span></p>
               : <p><span className="bvp-t">Trabajando como</span><span className="bvp-sep">·</span><b>{NOMBRE_VISTA[vistaPrevia] ?? vistaPrevia}</b><span className="bvp-sep">·</span>
-                  <span className="bvp-nota">Acceso de dueño: ves y haces lo de todos</span></p>}
+                  <span className="bvp-nota">{vistaPrevia === 'pos' ? 'Eres vendedor: tu cartera, tus clientes y tus ventas' : 'Acceso de dueño: ves y haces lo de todos'}</span></p>}
             <button type="button" onClick={() => verComo(null)} data-testid="vista-previa-volver">← Volver a Dirección</button>
           </div>
         )}

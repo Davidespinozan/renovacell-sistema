@@ -8,6 +8,8 @@ import { pedirPestana } from '../app/Pestanas'
 import { FEATURES } from '../app/config'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
+import { fijarActuarComo } from '../lib/supabase.region'
+import { avisarCambioDeRol } from '../lib/sesion'
 import { tokenRecuperacion } from './enlaceRecuperacion'
 import { anotarSalida, fueSalidaPedida, subirDiagnostico } from './diagnosticoSesion'
 import { confirmar } from '../data/store/escritura'
@@ -69,7 +71,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   // Login: entra con un rol, su verificación, el perfil y sus capabilities.
   const login = (r: RoleKey, v: boolean, profile?: SessionUser, caps: string[] = []) => {
-    setVistaPrevia(null)
+    setVistaPrevia(null); fijarActuarComo(null)
     setRoleState(r)
     setCapabilities(caps)
     setScreen(getEntryScreen(getRole(r), FEATURES, caps))
@@ -79,14 +81,19 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }
 
   const verComo = useCallback((r: RoleKey | null) => {
+    // DUEÑO COMO VENDEDOR · en «Ventas» el servidor lo trata como vendedor; al cambiar, los datos se recargan.
+    const eraVendedor = vistaPrevia === 'pos', seraVendedor = r === 'pos'
+    const cambiarIdentidad = () => { if (eraVendedor !== seraVendedor) { fijarActuarComo(seraVendedor ? 'pos' : null); avisarCambioDeRol() } }
     if (r === null || r === 'admin') {
       if (vistaPrevia === null) return
+      cambiarIdentidad()
       setVistaPrevia(null); setRoleState('admin'); setCapabilities(capsReales.current); setVerified(true)
       setScreen(getEntryScreen(getRole('admin'), FEATURES, capsReales.current))
       return
     }
     if (vistaPrevia === null) { if (role !== 'admin' || !capabilities.includes('dueno')) return; capsReales.current = capabilities }
     const caps = CAPS_VISTA_PREVIA[r] ?? []
+    cambiarIdentidad()
     setVistaPrevia(r); setRoleState(r); setCapabilities(caps); setVerified(true)
     setScreen(getEntryScreen(getRole(r), FEATURES, caps))
   }, [vistaPrevia, role, capabilities])

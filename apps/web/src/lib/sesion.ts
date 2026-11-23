@@ -8,9 +8,14 @@ import { supabase } from './supabase'
 // cuenta) y 'refresco' a lo más cada REFRESCO_MIN_MS, para no servir datos de hace horas.
 export type EventoSesion = 'cambio' | 'refresco'
 export const REFRESCO_MIN_MS = 5 * 60_000
+// DUEÑO COMO VENDEDOR · al entrar/salir de «Ventas» los datos se recargan como si cambiara la sesión (lo cargado como
+// Dirección no es lo que ve un vendedor, y al revés).
+const oyentes = new Set<() => void>()
+export function avisarCambioDeRol(): void { oyentes.forEach((f) => { try { f() } catch { /* cada store se recupera solo */ } }) }
 export function alCambiarSesion(cb: (e: EventoSesion, uid: string | null) => void): void {
   let ultimo: string | null | undefined
   let ultimoAviso = 0
+  oyentes.add(() => cb('cambio', ultimo ?? null))
   supabase.auth?.onAuthStateChange?.((ev, session) => {
     const uid = session?.user?.id ?? null
     if (uid !== ultimo) { ultimo = uid; ultimoAviso = Date.now(); cb('cambio', uid); return }
