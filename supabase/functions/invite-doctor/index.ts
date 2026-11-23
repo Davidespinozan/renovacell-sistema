@@ -39,11 +39,14 @@ Deno.serve(conCors(async (req) => {
   const email = (payload.email ?? '').trim().toLowerCase()
   if (!email) return json(400, { error: 'Falta el correo del doctor.' })
 
-  // 4) ¿Ya existe ese correo? Reutiliza el usuario en vez de duplicar.
+  // 4) ¿Ya existe ese correo? Se salta (no se duplica ni se reescribe).
   let userId: string | null = null
   const { data: existing } = await admin.from('profiles').select('id').eq('email', email).maybeSingle()
+  // AUDITORÍA ALTAS (23 nov 2026) · P0: antes reutilizaba la cuenta y la reescribía como doctor PENDIENTE con un meta
+  // nuevo. Un correo del equipo (o de un doctor ya verificado) en un archivo de importación lo degradaba y borraba sus
+  // datos. Una cuenta que ya existe NUNCA se toca desde aquí.
   if (existing) {
-    userId = existing.id
+    return json(200, { ok: false, omitido: 'ya_existe', message: 'Ese correo ya tiene una cuenta: no se modificó.', id: existing.id })
   } else {
     // Crea el usuario de auth (sin enviar correo: el enlace de acceso es fase SMTP).
     const { data: created, error: cErr } = await admin.auth.admin.createUser({

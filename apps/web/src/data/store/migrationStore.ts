@@ -66,6 +66,7 @@ export async function importDoctores(rows: DoctorRow[]): Promise<MigrationResult
       },
     })
     const err = error?.message ?? (data as { error?: string } | null)?.error
+    if (!err && (data as { omitido?: string } | null)?.omitido) { conocidos.add(email); res.skipped += 1; continue }   // cuenta existente: no se toca
     if (err) { rej(res, r as unknown as Record<string, unknown>, `${r.name || email}: ${err}`); continue }
     conocidos.add(email)
     res.created += 1
