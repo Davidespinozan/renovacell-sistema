@@ -40,7 +40,8 @@ export function ClientesRepetidos({ rpc = rpcPorDefecto }: { rpc?: Rpc }) {
       <div className="card" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
         Fichas que comparten <b>teléfono, correo o cédula</b>. Revisa cada grupo: si es la misma persona, <b>fusiona</b> en la que se queda
         (pasan sus teléfonos, domicilios, facturación, conversaciones, cartera y notas; la otra queda archivada, no se borra). Si son
-        personas distintas (p. ej. una clínica que comparte teléfono), márcalas como <b>distintas</b> y no se vuelven a sugerir.
+        personas distintas, márcalas como <b>distintas</b> y no se vuelven a sugerir. Si solo comparten teléfono y los nombres no
+        se parecen en nada, no se muestran (son personas distintas que comparten un número).
         Los pedidos nunca cambian de ficha: la que tiene pedidos es la que se queda.
       </div>
       {error && <div className="sysnote" role="alert">{error}</div>}
