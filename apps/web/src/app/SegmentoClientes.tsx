@@ -3,24 +3,26 @@
 import React, { useEffect, useState } from 'react'
 import { hasSupabase, supabase } from '../lib/supabase'
 
-export type Segmento = 'todos' | 'verificados' | 'por_verificar' | 'sin_portal'
+export type Segmento = 'todos' | 'verificados' | 'por_invitar' | 'por_verificar' | 'prospectos'
+/** portal = tiene cuenta en el portal; verificado = CLIENTE verificado (cuenta verificada, o cliente de Odoo: ya compra
+ *  y su cuenta nace verificada al aceptar la invitación — decisión del dueño, 14 oct 2026). */
 export interface DatosSegmento { portal: boolean; verificado: boolean }
 
 export function segmentoDe(c: DatosSegmento): Exclude<Segmento, 'todos'> {
-  if (!c.portal) return 'sin_portal'
-  return c.verificado ? 'verificados' : 'por_verificar'
+  if (c.portal) return c.verificado ? 'verificados' : 'por_verificar'
+  return c.verificado ? 'por_invitar' : 'prospectos'
 }
 export function filtrarSegmento<T>(filas: T[], seg: Segmento, datos: (f: T) => DatosSegmento): T[] {
   return seg === 'todos' ? filas : filas.filter((f) => segmentoDe(datos(f)) === seg)
 }
 export function contarSegmentos<T>(filas: T[], datos: (f: T) => DatosSegmento): Record<Segmento, number> {
-  const n: Record<Segmento, number> = { todos: filas.length, verificados: 0, por_verificar: 0, sin_portal: 0 }
+  const n: Record<Segmento, number> = { todos: filas.length, verificados: 0, por_invitar: 0, por_verificar: 0, prospectos: 0 }
   for (const f of filas) n[segmentoDe(datos(f))]++
   return n
 }
 
-const OPCIONES: Array<[Segmento, string]> = [['todos', 'Todos'], ['verificados', 'Verificados'], ['por_verificar', 'Con portal sin verificar'], ['sin_portal', 'Sin portal']]
-export const TEXTO_SEGMENTO: Record<Exclude<Segmento, 'todos'>, string> = { verificados: 'Verificado', por_verificar: 'Portal · sin verificar', sin_portal: 'Sin portal' }
+const OPCIONES: Array<[Segmento, string]> = [['todos', 'Todos'], ['verificados', 'Verificados con portal'], ['por_invitar', 'Verificados sin portal (por invitar)'], ['por_verificar', 'Con portal sin verificar'], ['prospectos', 'Prospectos']]
+export const TEXTO_SEGMENTO: Record<Exclude<Segmento, 'todos'>, string> = { verificados: 'Verificado · con portal', por_invitar: 'Verificado · por invitar', por_verificar: 'Portal · sin verificar', prospectos: 'Prospecto' }
 
 export function FiltroSegmento({ valor, onChange, conteo }: { valor: Segmento; onChange: (s: Segmento) => void; conteo: Record<Segmento, number> }) {
   return (
@@ -36,7 +38,7 @@ export function FiltroSegmento({ valor, onChange, conteo }: { valor: Segmento; o
 
 export function MarcaSegmento({ datos }: { datos: DatosSegmento }) {
   const s = segmentoDe(datos)
-  const clase = s === 'verificados' ? 'p-ok' : s === 'por_verificar' ? 'p-warn' : 'p-neu'
+  const clase = s === 'verificados' || s === 'por_invitar' ? 'p-ok' : s === 'por_verificar' ? 'p-warn' : 'p-neu'
   return <span className={'pill ' + clase} style={{ whiteSpace: 'nowrap' }} data-testid={`marca-${s}`}>{TEXTO_SEGMENTO[s]}</span>
 }
 

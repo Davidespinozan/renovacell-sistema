@@ -17,7 +17,7 @@ import { useRole } from '../auth/RoleContext'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
 import { DirectorioVentas } from './DirectorioVentas'
-import { FiltroSegmento, MarcaSegmento, contarSegmentos, filtrarSegmento, useCuentasVerificadas, type Segmento } from './SegmentoClientes'
+import { FiltroSegmento, MarcaSegmento, TEXTO_SEGMENTO, contarSegmentos, filtrarSegmento, segmentoDe, useCuentasVerificadas, type Segmento } from './SegmentoClientes'
 
 const PAGE_SIZE = 100
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
@@ -62,7 +62,8 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
   // SEG-CLI · Verificados / Con portal sin verificar / Sin portal (mismo filtro que la cartera de Ventas).
   const verificadas = useCuentasVerificadas(true)
   const [segmento, setSegmento] = useState<Segmento>('todos')
-  const datosSeg = (c: Customer) => ({ portal: !!c.profile_id, verificado: !!c.profile_id && verificadas.has(c.profile_id) })
+  // Verificado = cuenta verificada, o cliente de Odoo sin cuenta (ya compra; su cuenta nace verificada al invitarlo).
+  const datosSeg = (c: Customer) => ({ portal: !!c.profile_id, verificado: c.profile_id ? verificadas.has(c.profile_id) : c.source === 'odoo' })
   const conteoSeg = useMemo(() => contarSegmentos(customers, datosSeg), [customers, verificadas])   // eslint-disable-line react-hooks/exhaustive-deps
   const delSegmento = useMemo(() => filtrarSegmento(customers, segmento, datosSeg), [customers, segmento, verificadas])   // eslint-disable-line react-hooks/exhaustive-deps
   const shown = useCustomerSearch(delSegmento, q) // filtro cartera + segmento + búsqueda, SOBRE TODOS (antes de paginar)
@@ -112,7 +113,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
           { key: 'seller_name', label: 'Vendedor histórico (Odoo)' },
           ...(carteraToggle && !isAdmin ? [{ key: 'id' as const, label: 'Relación conmigo', format: (_: unknown, c: Customer) => (asignado(c) ? 'Asignación vigente' : historico(c) ? 'Histórico (Odoo)' : '') }] : []),
           { key: 'profile_id', label: 'Portal', format: (v) => (v ? 'Con acceso' : 'Sin acceso') },
-          { key: 'profile_id', label: 'Verificado', format: (v) => (v && verificadas.has(String(v)) ? 'Sí' : 'No') },
+          { key: 'id', label: 'Segmento', format: (_: unknown, c: Customer) => TEXTO_SEGMENTO[segmentoDe(datosSeg(c))] },
         ]} />
       </div>
 
