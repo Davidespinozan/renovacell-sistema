@@ -468,11 +468,11 @@ function LandingTab() {
         <T label="Rótulo pequeño" value={draft.ciencia.small} onChange={(v) => upSec('ciencia', { small: v })} hint="El rótulo chico sobre el título (p. ej. Stem Cell Released Molecules)." />
         <A label="Título" value={draft.ciencia.title} onChange={(v) => upSec('ciencia', { title: v })} hint="Admite HTML." />
         <A label="Texto" value={draft.ciencia.body} onChange={(v) => upSec('ciencia', { body: v })} hint="Admite HTML." />
-        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Etiquetas de los 4 iconos</div>
+        <div className="eyebrow" style={{ marginTop: 16, marginBottom: 0 }}>Etiquetas de los 3 iconos</div>
         <div className="form-grid-2">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2].map((i) => (   // 23 nov 2026 · se quitó «Regeneración tejidual» (dueño): quedan 3
             <T key={i} label={`Icono ${i + 1}`} value={(draft.ciencia.iconos ?? [])[i] ?? ''}
-              onChange={(v) => { const arr = [...(draft.ciencia.iconos ?? ['', '', '', ''])]; arr[i] = v; upSec('ciencia', { iconos: arr }) }} />
+              onChange={(v) => { const arr = [...(draft.ciencia.iconos ?? ['', '', ''])]; arr[i] = v; upSec('ciencia', { iconos: arr }) }} />
           ))}
         </div>
       </SecCard>

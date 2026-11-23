@@ -148,5 +148,7 @@ Deno.serve(conCors(async (req) => {
   // vendedor se la pide (en "Por verificar" aparece sin fotos).
   avisarAVendedora(admin, uid)
 
-  return json(200, { decision: 'pending', reasons: conIne ? [] : ['Para terminar tu verificación sube tu INE en "Mi verificación" al entrar.'] })
+  // SIN-INE (23 nov 2026, dueño): la verificación es solo con la cédula; ya no se le pide la INE al terminar.
+  void conIne
+  return json(200, { decision: 'pending', reasons: [] })
 }))
