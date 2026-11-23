@@ -2,7 +2,7 @@
 // FIRMA de quien recibe (23 nov 2026: antes era foto). Al confirmar, envío y pedido pasan a Entregado (cierra el ciclo).
 import { Vacio } from '../../app/EmptyState'
 import { Phone, Navigation } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
@@ -90,6 +90,7 @@ export function MisEntregas() {
   // Entregar SIN firma cuando no se pudo guardar por mala señal: exige un motivo y lo deja en
   // el registro (received_by) para que Almacén/Dirección reclamen la evidencia después.
   const deliverNoPhoto = async (shipmentId: string, orderId: string, folio: string, who: string, motivo: string) => {
+    if (!(await asegurarUbicacion(shipmentId))) return   // GPS EN LA ENTREGA
     const r = await entregar(shipmentId, orderId, null, `${who} (sin firma: ${motivo})`)
     if (r.ok) marcarLugar(shipmentId)
     avisar(r.ok, r.ok ? `Entrega registrada sin firma: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
@@ -173,6 +174,32 @@ export function MisEntregas() {
     return wp.length ? base + '&waypoints=' + wp.map(encodeURIComponent).join('%7C') : base
   })()
 
+  // GPS EN LA ENTREGA (23 nov 2026, dueño: 3 entregas sin un solo punto) · antes de cerrar la entrega se lee la ubicación
+  // y se guarda el punto de entrega. Sin ubicación, la app explica cómo activarla; como último recurso «Entregar sin
+  // ubicación» con motivo (queda para la oficina). El dueño viendo todas las rutas no pasa por aquí.
+  const [sinUbic, setSinUbic] = useState<Record<string, boolean>>({})
+  const [buscandoUbic, setBuscandoUbic] = useState<Record<string, boolean>>({})
+  const [motivoUbic, setMotivoUbic] = useState<Record<string, string>>({})
+  const ubicLista = useRef<Record<string, boolean>>({})
+  const asegurarUbicacion = async (shipmentId: string): Promise<boolean> => {
+    if (comoDueno || ubicLista.current[shipmentId]) return true
+    setBuscandoUbic((b) => ({ ...b, [shipmentId]: true }))
+    const p = await ubicacionAhora(12_000)
+    setBuscandoUbic((b) => ({ ...b, [shipmentId]: false }))
+    if (!p) { setSinUbic((m) => ({ ...m, [shipmentId]: true })); return false }
+    void ubicacionChofer().registrar({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy, tipo: 'entrega', shipmentId })
+    ubicLista.current[shipmentId] = true
+    setSinUbic((m) => ({ ...m, [shipmentId]: false }))
+    return true
+  }
+  const entregarSinUbicacion = async (shipmentId: string, orderId: string, folio: string) => {
+    const r = await ubicacionChofer().sinUbicacion(shipmentId, (motivoUbic[shipmentId] ?? '').trim())
+    if (!r.ok) { setToast(r.error); return }
+    ubicLista.current[shipmentId] = true
+    setSinUbic((m) => ({ ...m, [shipmentId]: false }))
+    if (firmas[shipmentId]) await deliver(shipmentId, orderId, folio)
+    else setToast('Listo: ahora termina la entrega (nombre y firma).')
+  }
   // CHOFER EN EL MAPA · dónde se entregó (prueba de entrega). Nunca frena la entrega: si no hay GPS, no se guarda.
   const marcarLugar = (shipmentId: string) => { void ubicacionAhora().then((p) => { if (p) void ubicacionChofer().registrar({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy, tipo: 'entrega', shipmentId }) }) }
   // FIRMA DE ENTREGA · primero se guarda la firma (bucket privado); solo si quedó guardada se marca entregado.
@@ -180,6 +207,7 @@ export function MisEntregas() {
   const deliver = async (shipmentId: string, orderId: string, folio: string) => {
     const firma = firmas[shipmentId]
     if (!firma) return
+    if (!(await asegurarUbicacion(shipmentId))) return   // GPS EN LA ENTREGA
     setUpErr((e) => ({ ...e, [shipmentId]: false }))
     setUploading((u) => ({ ...u, [shipmentId]: true }))
     const path = await uploadPrivate(firma, 'proofs')
@@ -364,15 +392,29 @@ export function MisEntregas() {
                   <span className="entrega-n" aria-hidden>3</span>
                   {(() => {
                     // FIRMA DE ENTREGA · nombre + firma; la firma se guarda al tocar el botón y solo entonces se cierra.
-                    const ready = Boolean(firmas[s.id]) && Boolean(received[s.id]?.trim()) && !uploading[s.id]
+                    const ready = Boolean(firmas[s.id]) && Boolean(received[s.id]?.trim()) && !uploading[s.id] && !buscandoUbic[s.id]
                     return (
                       <button className="btn entrega-ok" type="button" disabled={!ready} onClick={() => deliver(s.id, order.id, order.external_ref ?? order.id)} data-testid="entrega-marcar">
-                        <Icon name="check" /> {uploading[s.id] ? 'Guardando firma…' : 'Marcar entregado'}
+                        <Icon name="check" /> {buscandoUbic[s.id] ? 'Leyendo tu ubicación…' : uploading[s.id] ? 'Guardando firma…' : 'Marcar entregado'}
                       </button>
                     )
                   })()}
                 </li>
               </ol>
+              {sinUbic[s.id] && (
+                <div className="sysnote" role="alert" style={{ background: 'var(--warn-bg, #FFF7E6)', borderColor: 'var(--warn)', color: 'var(--ink)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }} data-testid="ubic-falta">
+                  <b>📍 No pudimos leer tu ubicación. Actívala para entregar:</b>
+                  <span style={{ fontSize: 13 }}><b>Android:</b> toca el candado junto a la dirección (arriba) → Permisos → Ubicación → <b>Permitir</b>, y revisa que la ubicación del teléfono esté encendida.</span>
+                  <span style={{ fontSize: 13 }}><b>iPhone:</b> Ajustes → Privacidad → Localización → Safari → <b>Al usar la app</b>.</span>
+                  <button className="btn sm" type="button" disabled={buscandoUbic[s.id]} onClick={() => void deliver(s.id, order.id, order.external_ref ?? order.id)} data-testid="ubic-reintentar">{buscandoUbic[s.id] ? 'Leyendo tu ubicación…' : 'Ya la activé: reintentar'}</button>
+                  <span style={{ fontSize: 12, opacity: 0.85 }}>Si de plano no hay señal, entrega sin ubicación y escribe el motivo (queda registrado para la oficina):</span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input value={motivoUbic[s.id] ?? ''} onChange={(e) => setMotivoUbic((m) => ({ ...m, [s.id]: e.target.value }))} placeholder="Motivo: ej. sin señal en la zona" maxLength={300}
+                      style={{ flex: 1, minWidth: 180, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', backgroundColor: 'var(--cp-surface)', color: 'var(--ink)' }} data-testid="ubic-motivo" />
+                    <button className="btn ghost sm" type="button" disabled={(motivoUbic[s.id] ?? '').trim().length < 5} onClick={() => void entregarSinUbicacion(s.id, order.id, order.external_ref ?? order.id)} data-testid="ubic-sin">Entregar sin ubicación</button>
+                  </div>
+                </div>
+              )}
               {upErr[s.id] && (
                 <div className="sysnote" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                   <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Icon name="x" /> No se pudo guardar la firma (revisa tu señal). Vuelve a tocar «Marcar entregado», o si ya entregaste, ciérrala registrando el motivo.</span>

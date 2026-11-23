@@ -67,5 +67,12 @@ export function useRastreoRuta(enRuta: boolean, cadaMs = 50_000): EstadoRastreo 
     document.addEventListener('visibilitychange', alCambiar)
     return () => { detener(); document.removeEventListener('visibilitychange', alCambiar) }
   }, [enRuta, cadaMs])
+  // GPS EN LA ENTREGA (23 nov 2026) · la oficina se entera si el chofer en ruta trae la ubicación bloqueada o sin señal.
+  const reportado = useRef<string | null>(null)
+  useEffect(() => {
+    if (estado === 'apagado' || reportado.current === estado) return
+    reportado.current = estado
+    void api.reportarGps(estado)
+  }, [estado])
   return estado
 }

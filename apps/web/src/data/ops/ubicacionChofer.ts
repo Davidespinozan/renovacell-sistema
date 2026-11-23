@@ -9,6 +9,10 @@ export interface EntregaMapa { shipment_id: string; folio: string | null; estado
   direccion?: string | null; destino?: DestinoMapa | null; distancia_m?: number | null; lejos?: boolean }
 export interface ChoferMapa { driver_id: string; nombre: string; ultima: PuntoMapa | null; recorrido: Array<[number, number]>; entregas: EntregaMapa[] }
 
+export interface GpsOficina {
+  gps: Array<{ driver_id: string; estado: 'activo' | 'denegado' | 'no_disponible'; desde: string; at: string }>
+  sin_ubicacion: Array<{ shipment_id: string; driver_id: string; motivo: string; at: string; folio: string | null }>
+}
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) as never) as unknown as PromiseLike<{ data: unknown; error: { message?: string } | null }>
 
@@ -37,6 +41,24 @@ export const ubicacionChofer = (rpc: Rpc = rpcPorDefecto) => ({
   geocodificar: async (): Promise<number> => {
     if (!hasSupabase && rpc === rpcPorDefecto) return 0
     try { const { data } = await supabase.functions.invoke('destinos-geocodificar', { body: {} }); return Number((data as { ubicadas?: number } | null)?.ubicadas ?? 0) } catch { return 0 }
+  },
+  /** GPS EN LA ENTREGA · el teléfono del chofer avisa si su ubicación está activa o bloqueada (la oficina lo ve). Nunca lanza. */
+  reportarGps: async (estado: 'activo' | 'denegado' | 'no_disponible'): Promise<void> => {
+    if (!hasSupabase && rpc === rpcPorDefecto) return
+    try { await rpc('chofer_gps_reportar', { p_estado: estado }) } catch { /* es un aviso, no frena */ }
+  },
+  /** Entrega cerrada sin ubicación, con su motivo (queda para la oficina). */
+  sinUbicacion: async (shipmentId: string, motivo: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+    if (!hasSupabase && rpc === rpcPorDefecto) return { ok: true }
+    try {
+      const { error } = await rpc('entrega_sin_ubicacion', { p_shipment: shipmentId, p_motivo: motivo })
+      return error ? { ok: false, error: (error.message ?? '').replace(/^[A-Z_]+:\s*/, '') || 'No se pudo registrar.' } : { ok: true }
+    } catch { return { ok: false, error: 'Sin conexión: vuelve a intentarlo.' } }
+  },
+  /** Oficina · GPS de cada chofer y entregas de hoy cerradas sin ubicación. */
+  gpsEstado: async (): Promise<GpsOficina> => {
+    if (!hasSupabase && rpc === rpcPorDefecto) return { gps: [], sin_ubicacion: [] }
+    try { const { data, error } = await rpc('choferes_gps_estado'); return error || !data ? { gps: [], sin_ubicacion: [] } : data as GpsOficina } catch { return { gps: [], sin_ubicacion: [] } }
   },
   entrega: async (shipmentId: string): Promise<PuntoMapa | null> => {
     if (!hasSupabase && rpc === rpcPorDefecto) return null

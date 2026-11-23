@@ -6,7 +6,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { PageHead } from '../../app/PageHead'
 import { Vacio } from '../../app/EmptyState'
-import { ubicacionChofer, enlaceMapa, type ChoferMapa } from '../../data/ops/ubicacionChofer'
+import { ubicacionChofer, enlaceMapa, type ChoferMapa, type GpsOficina } from '../../data/ops/ubicacionChofer'
 
 const api = ubicacionChofer()
 const CULIACAN: [number, number] = [24.8091, -107.394]
@@ -31,13 +31,14 @@ export function MapaChoferes() {
   const [lista, setLista] = useState<ChoferMapa[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<string | null>(null)
+  const [gps, setGps] = useState<GpsOficina>({ gps: [], sin_ubicacion: [] })   // GPS EN LA ENTREGA · ubicación apagada y entregas sin punto
   const div = useRef<HTMLDivElement | null>(null)
   const mapa = useRef<L.Map | null>(null)
   const capa = useRef<L.LayerGroup | null>(null)
 
   useEffect(() => {
     let vivo = true
-    const cargar = async () => { const r = await api.mapa(); if (!vivo) return; if (r.ok) { setLista(r.data); setError(null) } else setError(r.error) }
+    const cargar = async () => { const [r, g] = await Promise.all([api.mapa(), api.gpsEstado()]); if (!vivo) return; setGps(g); if (r.ok) { setLista(r.data); setError(null) } else setError(r.error) }
     // DESTINO EN EL MAPA · si hay entregas vivas sin pin, se piden a OpenStreetMap (a lo más cada 2 min) y se recarga.
     let ultimaBusqueda = 0
     const cargarYUbicar = async () => {
@@ -103,6 +104,14 @@ export function MapaChoferes() {
         marcó entregado lejos del destino. Se actualiza cada minuto mientras el chofer tiene su app abierta en ruta.
       </PageHead>
       {error && <div className="card">{error}</div>}
+      {gps.sin_ubicacion.length > 0 && (
+        <div className="card" data-testid="mapa-sin-ubicacion">
+          <b>Entregas de hoy sin ubicación ({gps.sin_ubicacion.length})</b>
+          {gps.sin_ubicacion.map((e) => (
+            <div key={e.shipment_id} className="mapa-entrega"><span className="mono">{e.folio ?? '—'}</span> · {(lista ?? []).find((c) => c.driver_id === e.driver_id)?.nombre ?? 'Chofer'} · «{e.motivo}» · {new Date(e.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
+          ))}
+        </div>
+      )}
       <div className="mapa-choferes-wrap">
         <div ref={div} className="mapa-choferes" data-testid="mapa-choferes" />
         <div className="mapa-lista card">
@@ -119,6 +128,12 @@ export function MapaChoferes() {
                   <span className={'pill ' + (!c.ultima ? 'p-neu' : viejo ? 'p-warn' : 'p-ok')}>{!c.ultima ? 'Sin ubicación hoy' : hace(c.ultima.at)}</span>
                 </button>
                 <div className="lt">{pendientes} por entregar · {hechas} entregadas hoy</div>
+                {(() => {
+                  // GPS EN LA ENTREGA · con entregas pendientes y la ubicación bloqueada o sin señal: que alguien le llame.
+                  const g = gps.gps.find((x) => x.driver_id === c.driver_id)
+                  if (!g || g.estado === 'activo' || pendientes === 0) return null
+                  return <div className="mapa-lejos" data-testid="mapa-gps-apagado">⚠ {g.estado === 'denegado' ? 'Ubicación bloqueada en su teléfono' : 'Su teléfono no da ubicación'} desde las {new Date(g.desde).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}. Llámale para que la active.</div>
+                })()}
                 {sel === c.driver_id && c.entregas.map((e) => (
                   <div key={e.shipment_id} className="mapa-entrega">
                     <span className="mono">{e.folio}</span> · {e.cliente} · <b>{ESTADO[e.estado] ?? e.estado}</b>
