@@ -13,6 +13,7 @@ import { initials, avatarColor } from '../lib/format'
 import { useRole } from '../auth/RoleContext'
 import { BuscadorClientes, mensajeBusqueda, plegar, validarBusqueda, type ClienteBusqueda, type EstadoBusqueda } from '../data/ops/buscarClientes'
 import { cartera as carteraPorDefecto, type ClienteCartera } from '../data/ops/cartera'
+import { FiltroSegmento, MarcaSegmento, contarSegmentos, filtrarSegmento, type Segmento } from './SegmentoClientes'
 import type { ClienteC360 } from '../data/ops/customer360'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
@@ -23,7 +24,7 @@ type Busqueda =
   | { fase: 'buscando'; q: string }
   | { fase: 'resultados'; q: string; clientes: ClienteBusqueda[] }
   | { fase: 'aviso'; q: string; estado: Exclude<EstadoBusqueda, 'ok' | 'cancelada'> }
-interface FilaCartera { clave: string; customer_id: string | null; nombre: string }
+interface FilaCartera { clave: string; customer_id: string | null; nombre: string; portal: boolean; verificado: boolean }
 type Cartera = { fase: 'cargando' } | { fase: 'lista'; filas: FilaCartera[] } | { fase: 'error'; mensaje: string }
 interface Abierto { id: string; nombre: string }
 
@@ -48,6 +49,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
   const [busqueda, setBusqueda] = useState<Busqueda>({ fase: 'inicial' })
   const [miCartera, setMiCartera] = useState<Cartera>({ fase: 'cargando' })
   const [filtro, setFiltro] = useState('')
+  const [segmento, setSegmento] = useState<Segmento>('todos')   // SEG-CLI
   const [abierto, setAbierto] = useState<Abierto | null>(null)
   const [pedido, setPedido] = useState<Abierto | null>(null)
   const vivo = useRef(true)
@@ -62,8 +64,8 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
     const r = await clienteCartera.miCartera()
     if (!vivo.current || mio !== turno.current) return
     if (!r.ok) { setMiCartera({ fase: 'error', mensaje: r.error }); return }
-    // Del contrato solo se usa identificador y nombre.
-    setMiCartera({ fase: 'lista', filas: r.data.map((a) => ({ clave: a.customer_id ?? `p:${a.profile_id}`, customer_id: a.customer_id ?? null, nombre: a.nombre })) })
+    // Del contrato se usa identificador, nombre y su segmento (SEG-CLI · portal / verificado).
+    setMiCartera({ fase: 'lista', filas: r.data.map((a) => ({ clave: a.customer_id ?? `p:${a.profile_id}`, customer_id: a.customer_id ?? null, nombre: a.nombre, portal: a.portal ?? !!a.profile_id, verificado: !!a.verificado })) })
   }, [clienteCartera])
   // La cartera se pide solo al entrar a su pestaña (y al refrescar); "Todos" no consulta nada por sí sola.
   const carteraPedida = useRef(false)
@@ -82,8 +84,10 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
   const filasCartera = useMemo(() => {
     if (miCartera.fase !== 'lista') return []
     const f = plegar(filtro.trim())
-    return f ? miCartera.filas.filter((c) => plegar(c.nombre).includes(f)) : miCartera.filas
-  }, [miCartera, filtro])
+    const porNombre = f ? miCartera.filas.filter((c) => plegar(c.nombre).includes(f)) : miCartera.filas
+    return filtrarSegmento(porNombre, segmento, (c) => c)
+  }, [miCartera, filtro, segmento])
+  const conteoSeg = useMemo(() => contarSegmentos(miCartera.fase === 'lista' ? miCartera.filas : [], (c) => c), [miCartera])
 
   if (abierto) {
     return (
@@ -175,6 +179,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
             </label>
             <button className="btn ghost" type="button" onClick={() => void cargarCartera()} disabled={miCartera.fase === 'cargando'} data-testid="cartera-refrescar">Actualizar</button>
           </div>
+          {miCartera.fase === 'lista' && miCartera.filas.length > 0 && <FiltroSegmento valor={segmento} onChange={setSegmento} conteo={conteoSeg} />}
           {miCartera.fase === 'cargando' ? (
             <Cargando etiqueta="Cargando tu cartera…" />
           ) : miCartera.fase === 'error' ? (
@@ -182,7 +187,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
           ) : miCartera.filas.length === 0 ? (
             <Vacio icono="usercheck" data-testid="cartera-vacia" titulo="No tienes clientes asignados." pista="Dirección asigna la cartera. Mientras tanto puedes ubicar una cuenta en Todos." />
           ) : filasCartera.length === 0 ? (
-            <Vacio icono="search" titulo={<>Ninguno coincide con “{filtro}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setFiltro('')}>Limpiar búsqueda</button>} />
+            <Vacio icono="search" titulo={filtro ? <>Ninguno coincide con “{filtro}”.</> : 'Ningún cliente de tu cartera está en este grupo.'} accion={<button type="button" className="btn ghost sm" onClick={() => { setFiltro(''); setSegmento('todos') }}>Ver todos</button>} />
           ) : (
             <div className="card op-lista">
             {filasCartera.map((c) => (
@@ -193,6 +198,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
                   <div style={{ fontWeight: 600 }}>{c.nombre}</div>
                   {!c.customer_id && <div style={tenue}>Aún sin cuenta comercial: no tiene ficha que abrir.</div>}
                 </div>
+                <MarcaSegmento datos={c} />
                 <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-asignado">Asignado</span>
               </button>
             ))}

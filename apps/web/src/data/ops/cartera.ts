@@ -5,7 +5,9 @@
 //     Dirección (igualdad exacta). NO son asignaciones.
 import { hasSupabase, supabase } from '../../lib/supabase'
 
-export interface AsignacionCartera { profile_id: string; customer_id: string | null; nombre: string; asignado_at: string }
+export interface AsignacionCartera { profile_id: string; customer_id: string | null; nombre: string; asignado_at: string
+  /** SEG-CLI · tiene acceso al portal / su cuenta está verificada. */
+  portal?: boolean; verificado?: boolean }
 export interface CarteraHistorica { equivalencias: string[]; clientes: Array<{ customer_id: string; seller_name: string }> }
 export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string }
 

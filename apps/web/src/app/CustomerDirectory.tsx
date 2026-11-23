@@ -6,7 +6,7 @@
 // equivalencia EXPLÍCITA; no son asignaciones). Ambas carteras vienen del servidor por id, nunca por nombre.
 import { Vacio, Cargando } from './EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
-import { UserCheck, UserX, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { initials, avatarColor } from '../lib/format'
 import { ExportButton } from './ExportButton'
 import { useCustomers, useCustomerSearch } from '../data/hooks/useCustomers'
@@ -17,6 +17,7 @@ import { useRole } from '../auth/RoleContext'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
 import { DirectorioVentas } from './DirectorioVentas'
+import { FiltroSegmento, MarcaSegmento, contarSegmentos, filtrarSegmento, useCuentasVerificadas, type Segmento } from './SegmentoClientes'
 
 const PAGE_SIZE = 100
 const dash = (v: string | null | undefined) => (v ?? '').toString().trim() || '—'
@@ -58,14 +59,20 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
   const historico = (c: Customer) => mi.historicos.has(c.id)
   const enCartera = effectiveScope !== 'all' && !isAdmin
   const [q, setQ] = useState('')
-  const shown = useCustomerSearch(customers, q) // filtro cartera + búsqueda, SOBRE TODOS (antes de paginar)
+  // SEG-CLI · Verificados / Con portal sin verificar / Sin portal (mismo filtro que la cartera de Ventas).
+  const verificadas = useCuentasVerificadas(true)
+  const [segmento, setSegmento] = useState<Segmento>('todos')
+  const datosSeg = (c: Customer) => ({ portal: !!c.profile_id, verificado: !!c.profile_id && verificadas.has(c.profile_id) })
+  const conteoSeg = useMemo(() => contarSegmentos(customers, datosSeg), [customers, verificadas])   // eslint-disable-line react-hooks/exhaustive-deps
+  const delSegmento = useMemo(() => filtrarSegmento(customers, segmento, datosSeg), [customers, segmento, verificadas])   // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = useCustomerSearch(delSegmento, q) // filtro cartera + segmento + búsqueda, SOBRE TODOS (antes de paginar)
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState<Customer | null>(null)
   const [pedidoFor, setPedidoFor] = useState<Customer | null>(null)
   const conPortal = useMemo(() => customers.filter((c) => c.profile_id).length, [customers])
 
   // Reset a página 1 al cambiar búsqueda, vista o el conjunto filtrado.
-  useEffect(() => { setPage(1) }, [q, shown.length, effectiveScope])
+  useEffect(() => { setPage(1) }, [q, shown.length, effectiveScope, segmento])
 
   const pg = paginate(shown, page, PAGE_SIZE) // clamp interno a rango válido
   const visible = pg.items
@@ -105,6 +112,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
           { key: 'seller_name', label: 'Vendedor histórico (Odoo)' },
           ...(carteraToggle && !isAdmin ? [{ key: 'id' as const, label: 'Relación conmigo', format: (_: unknown, c: Customer) => (asignado(c) ? 'Asignación vigente' : historico(c) ? 'Histórico (Odoo)' : '') }] : []),
           { key: 'profile_id', label: 'Portal', format: (v) => (v ? 'Con acceso' : 'Sin acceso') },
+          { key: 'profile_id', label: 'Verificado', format: (v) => (v && verificadas.has(String(v)) ? 'Sí' : 'No') },
         ]} />
       </div>
 
@@ -116,6 +124,8 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
         </div>
       )}
       {enCartera && EXPLICACION[effectiveScope] && <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: -8 }} data-testid="cartera-explicacion">{EXPLICACION[effectiveScope]}</div>}
+
+      {!loading && !error && customers.length > 0 && <FiltroSegmento valor={segmento} onChange={setSegmento} conteo={conteoSeg} />}
 
       <label className="searchbox op-search">
         <Search aria-hidden />
@@ -140,7 +150,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
           : effectiveScope === 'historica' ? (mi.equivalencias.length ? 'No hay registros históricos de Odoo para tus equivalencias.' : 'Dirección aún no ha registrado una equivalencia entre tu usuario y un vendedor de Odoo.')
           : 'No hay registros en el directorio.'} />
       ) : shown.length === 0 ? (
-        <Vacio icono="search" titulo={<>Ninguno coincide con “{q}”.</>} accion={<button type="button" className="btn ghost sm" onClick={() => setQ('')}>Limpiar búsqueda</button>} />
+        <Vacio icono="search" titulo={q ? <>Ninguno coincide con “{q}”.</> : 'Ningún cliente está en este grupo.'} accion={<button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSegmento('todos') }}>Ver todos</button>} />
       ) : (
         <>
           {/* Una tarjeta-lista con divisores (no una tarjeta alta por cliente): en 100 renglones por página
@@ -157,9 +167,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
               </div>
               {carteraToggle && !isAdmin && asignado(c) && <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-asignado">Asignado</span>}
               {carteraToggle && !isAdmin && !asignado(c) && historico(c) && <span className="pill p-neu" style={{ whiteSpace: 'nowrap' }} data-testid="marca-historico">Histórico (Odoo)</span>}
-              <span className={'pill ' + (c.profile_id ? 'p-ok' : 'p-neu')} style={{ display: 'inline-flex', gap: 5, whiteSpace: 'nowrap' }}>
-                {c.profile_id ? <UserCheck size={12} /> : <UserX size={12} />} {c.profile_id ? 'Portal' : 'Sin portal'}
-              </span>
+              <MarcaSegmento datos={datosSeg(c)} />
             </button>
           ))}
           </div>
