@@ -50,10 +50,10 @@ describe('Verificarme (servidor)', () => {
     expect(validarVerificarme({ cedula: '12-AB', password: 'secreto123' })).toMatchObject({ ok: false, campo: 'cedula' })
     expect(validarVerificarme({ cedula: '1234567', password: 'corta' })).toMatchObject({ ok: false, campo: 'password' })
   })
-  it('usa el correo del PRERREGISTRO, exige las dos fotos, no duplica cuentas, deshace si algo falla y la deja pendiente', () => {
+  it('usa el correo del PRERREGISTRO, ya no pide INE, no duplica cuentas, deshace si algo falla y la deja pendiente', () => {
     const b = edge.slice(edge.indexOf("if (action === 'verificarme')"), edge.indexOf('// adoptar: sesión obligatoria'))
     expect(b).toMatch(/admin\.rpc\('cc_prerregistro_datos'/); expect(b).toMatch(/createUser\(\{ email: d\.email/)
-    expect(b).toMatch(/!frente \|\| frente === 'invalida' \|\| !reverso \|\| reverso === 'invalida'/)
+    expect(b).not.toMatch(/ineFront|ineBack|frente|reverso/)   // SIN-INE (23 nov 2026): la cuenta se crea solo con la cédula
     expect(b.indexOf("ilike('email', d.email)")).toBeLessThan(b.indexOf('createUser'))
     expect(b).toMatch(/verification: \{ status: 'pending' \}/); expect(b).not.toMatch(/verified: true/)
     expect(b).toMatch(/await deshacer\(\)/); expect(b).toMatch(/cc_visitante_vincular_registro/)

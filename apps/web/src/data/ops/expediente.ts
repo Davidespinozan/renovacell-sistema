@@ -38,7 +38,7 @@ export function mensajeExpediente(t: string | undefined): string {
   if (/CLIENTE_INACTIVO/.test(m)) return 'Ese cliente está dado de baja: reactívalo antes de vincularlo.'
   if (/CLIENTE_INEXISTENTE/.test(m)) return 'Ese cliente ya no existe.'
   if (/DATO_INVALIDO:nombre/.test(m)) return 'Escribe su nombre completo (nombre y apellido).'
-  if (/DATO_INVALIDO:cedula/.test(m)) return 'La cédula profesional son 7 u 8 dígitos.'
+  if (/DATO_INVALIDO:cedula/.test(m)) return 'La cédula profesional son solo números, de 5 a 8 dígitos.'
   if (/DATO_INVALIDO:email/.test(m)) return 'Revisa el correo.'
   if (/POSIBLE_DUPLICADO/.test(m)) return 'Ya hay una ficha con ese correo o cédula: búscala arriba y vincúlala en lugar de darla de alta.'
   if (/YA_VINCULADA/.test(m)) return 'Esta conversación ya tiene ficha.'

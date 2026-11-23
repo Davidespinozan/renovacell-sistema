@@ -22,7 +22,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MENSAJE: Record<string, string> = {
   POSIBLE_DUPLICADO: 'Ya hay una ficha con ese correo o cédula: vincúlala desde el panel del cliente en lugar de crear otra.',
   YA_VINCULADA: 'Esta conversación ya tiene ficha.', NO_AUTORIZADO: 'No puedes aprobar esta verificación.',
-  'DATO_INVALIDO:nombre': 'El nombre debe tener nombre y apellido.', 'DATO_INVALIDO:cedula': 'La cédula debe tener 7 u 8 dígitos.', 'DATO_INVALIDO:email': 'El correo no es válido.',
+  'DATO_INVALIDO:nombre': 'El nombre debe tener nombre y apellido.', 'DATO_INVALIDO:cedula': 'La cédula profesional son solo números, de 5 a 8 dígitos.', 'DATO_INVALIDO:email': 'El correo no es válido.',
   ADJUNTO_NO_ES_DEL_CLIENTE: 'La foto debe ser una que mandó esta persona en esta conversación.',
 }
 const mensajeDe = (m?: string) => { const k = Object.keys(MENSAJE).find((x) => (m ?? '').includes(x)); return k ? MENSAJE[k] : 'No se pudo completar la aprobación. Intenta de nuevo.' }

@@ -4,6 +4,7 @@
 // KYC ni selfie. El registro guarda lo que el doctor capturó (cédula, teléfono, domicilio, consentimiento) y las fotos
 // de su INE en el bucket privado `proofs`; Dirección o su vendedor revisan y aprueban (doctor_verificar /
 // admin_approve_doctor). Cuenta ≠ verificación: con la cuenta entra al portal sin precios hasta que lo aprueben.
+import { cedulaCanonica, MENSAJE_CEDULA } from '../_shared/cedula.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico } from '../_shared/limite.ts'
@@ -79,11 +80,11 @@ Deno.serve(conCors(async (req) => {
 
   const name = (p.name ?? '').trim().slice(0, 120)
   const email = (p.email ?? '').trim().toLowerCase().slice(0, 160)
-  const cedula = (p.cedula ?? '').trim().slice(0, 40)
+  const cedula = cedulaCanonica(p.cedula) ?? ''   // CÉDULA ÚNICA (23 nov 2026): solo dígitos, 5 a 8
   const password = p.password ?? ''
   if (name.length < 3) return json(400, { error: 'Escribe tu nombre completo.' })
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { error: 'Correo inválido.' })
-  if (cedula.replace(/\D/g, '').length < 5) return json(400, { error: 'Escribe tu número de cédula.' })
+  if (!cedula) return json(400, { error: MENSAJE_CEDULA })
   if (password.length < 6) return json(400, { error: 'La contraseña debe tener al menos 6 caracteres.' })
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })

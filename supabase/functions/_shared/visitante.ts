@@ -7,6 +7,10 @@
 // en hex: con esa entropía un HMAC no añade seguridad y el hash no es reversible.
 // El token nunca lleva PII y nunca se registra en bitácoras.
 
+// CÉDULA ÚNICA (23 nov 2026) · este módulo no importa nada (cc1.guard): la MISMA regla que _shared/cedula.ts, aquí en línea.
+const MENSAJE_CEDULA = 'La cédula profesional son solo números, de 5 a 8 dígitos.'
+const cedulaCanonica = (s: unknown): string | null => { const d = (typeof s === 'string' ? s : '').replace(/\D/g, ''); return /^[0-9]{5,8}$/.test(d) ? d : null }
+
 export const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/
 export const HASH_RE = /^[0-9a-f]{64}$/
 export const CLAVES_ATRIBUCION = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid', 'referrer', 'landing_path'] as const
@@ -66,7 +70,7 @@ export const MENSAJE_PRERREGISTRO: Record<CampoPrerregistro, string> = {
   nombre: 'Escribe tu nombre completo.',
   telefono: 'Escribe tu celular a 10 dígitos.',
   email: 'El correo no parece válido.',
-  cedula: 'La cédula profesional no parece válida.',
+  cedula: 'La cédula profesional son solo números, de 5 a 8 dígitos.',
   consentimiento: 'Para continuar, acepta el Aviso de privacidad.',
 }
 export function limpiarPrerregistro(entrada: unknown): { ok: true; datos: Prerregistro } | { ok: false; campo: CampoPrerregistro } {
@@ -79,8 +83,9 @@ export function limpiarPrerregistro(entrada: unknown): { ok: true; datos: Prerre
   if (!/^\d{10}$/.test(telefono)) return { ok: false, campo: 'telefono' }
   const email = txt(o.email, 160).toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, campo: 'email' }
-  const cedula = txt(o.cedula, 40) || null
-  if (cedula !== null && cedula.length < 5) return { ok: false, campo: 'cedula' }
+  const cedulaTxt = txt(o.cedula, 40) || null
+  const cedula = cedulaTxt === null ? null : cedulaCanonica(cedulaTxt)   // CÉDULA ÚNICA · se guarda limpia
+  if (cedulaTxt !== null && cedula === null) return { ok: false, campo: 'cedula' }
   if (o.consent !== true) return { ok: false, campo: 'consentimiento' }
   return { ok: true, datos: { nombre, telefono, email, es_medico: o.es_medico === true, cedula, consent: true } }
 }
@@ -96,8 +101,8 @@ export function mapearErrorPrerregistro(mensaje: string | undefined): { status: 
 export interface DomicilioVerificarme { line1: string; colonia: string; cp: string; city: string; state: string }
 export function validarVerificarme(p: unknown): { ok: true; cedula: string; password: string; domicilio: DomicilioVerificarme } | { ok: false; campo: string; mensaje: string } {
   const o = (p && typeof p === 'object' && !Array.isArray(p) ? p : {}) as Record<string, unknown>
-  const cedula = (typeof o.cedula === 'string' ? o.cedula : '').replace(/\s+/g, '')
-  if (!/^[0-9]{5,12}$/.test(cedula)) return { ok: false, campo: 'cedula', mensaje: 'Escribe solo los números de tu cédula profesional.' }
+  const cedula = cedulaCanonica(o.cedula)   // CÉDULA ÚNICA (23 nov 2026)
+  if (!cedula) return { ok: false, campo: 'cedula', mensaje: MENSAJE_CEDULA }
   const password = typeof o.password === 'string' ? o.password : ''
   if (password.length < 8 || password.length > 72) return { ok: false, campo: 'password', mensaje: 'La contraseña debe tener entre 8 y 72 caracteres.' }
   // Domicilio de entrega: opcional, igual que en el registro de la landing (si falta, se pide al hacer el pedido).

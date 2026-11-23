@@ -17,6 +17,7 @@ import { useEspecialidades } from '../../app/PerfilComercialEditor'
 import { FiscalFields } from '../../app/FiscalFields'
 import { emptyFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { TIPOS_DOMICILIO } from '../../data/ops/doctorLocation'
+import { cedulaCanonica, MENSAJE_CEDULA } from '../../../../../supabase/functions/_shared/cedula'   // CÉDULA ÚNICA
 
 type Rpc = Parameters<typeof crearProspecto>[1]
 export interface AltaResultado extends ProspectoCreado { faltas: string[] }
@@ -32,7 +33,7 @@ export function erroresAlta(f: { nombre: string; celular: string; correo: string
   if (f.nombre.trim().length < 3) e.push('Escribe el nombre completo.')
   if (digitos(f.celular).length < 10) e.push('El celular necesita 10 dígitos (o su lada si es del extranjero).')
   if (f.correo.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.correo.trim())) e.push('Revisa el correo.')
-  if (f.cedula.trim() && !/^[0-9]{7,8}$/.test(digitos(f.cedula))) e.push('La cédula profesional tiene 7 u 8 dígitos.')
+  if (f.cedula.trim() && !cedulaCanonica(f.cedula)) e.push(MENSAJE_CEDULA)
   if (f.tel2.trim() && (digitos(f.tel2).length < 10 || digitos(f.tel2).length > 15)) e.push('El otro teléfono debe tener de 10 a 15 dígitos.')
   if (hayDom(f.dom)) {
     if (!f.dom.line1.trim()) e.push('Domicilio: falta la calle.')
@@ -117,7 +118,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
       <details className="alta-seccion">
         <summary>Profesional y contacto <small>cédula · otro teléfono</small></summary>
         <div className="alta-fila">
-          <label>Cédula profesional<input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" maxLength={12} placeholder="7 u 8 dígitos" data-testid="alta-cedula" /></label>
+          <label>Cédula profesional<input value={cedula} onChange={(e) => setCedula(e.target.value)} inputMode="numeric" maxLength={12} placeholder="5 a 8 dígitos" data-testid="alta-cedula" /></label>
         </div>
         <div className="alta-fila">
           <label>Otro teléfono<input value={tel2} onChange={(e) => setTel2(e.target.value)} inputMode="tel" placeholder="Consultorio, recepción…" data-testid="alta-tel2" /></label>

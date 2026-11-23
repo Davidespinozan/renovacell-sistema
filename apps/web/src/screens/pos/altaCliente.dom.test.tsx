@@ -33,7 +33,7 @@ describe('Alta completa', () => {
   it('valida antes de crear (no se crea nada si algo está mal)', () => {
     const dom = { tipo: 'CASA', line1: 'Obregón', exterior_number: '', interior_number: '', neighborhood: '', postal_code: '800', city: '', state: '', reference_notes: '' }
     expect(erroresAlta({ nombre: 'Ana López', celular: '6671234567', correo: 'x', cedula: '123', tel2: '12', dom, fiscal: { ...emptyFiscalProfile(), rfc: 'MAL' } }))
-      .toEqual(['Revisa el correo.', 'La cédula profesional tiene 7 u 8 dígitos.', 'El otro teléfono debe tener de 10 a 15 dígitos.', 'Domicilio: el código postal tiene 5 dígitos.', 'Domicilio: falta la ciudad.', 'Domicilio: falta el estado.', 'Facturación: revisa los datos fiscales marcados.'])
+      .toEqual(['Revisa el correo.', 'La cédula profesional son solo números, de 5 a 8 dígitos.', 'El otro teléfono debe tener de 10 a 15 dígitos.', 'Domicilio: el código postal tiene 5 dígitos.', 'Domicilio: falta la ciudad.', 'Domicilio: falta el estado.', 'Facturación: revisa los datos fiscales marcados.'])
   })
   it('Dirección: crea y guarda especialidad, cédula, teléfono, domicilio, vendedora y nota con los comandos de la ficha', async () => {
     const f = falsos(); const rpc = rpcCrea()

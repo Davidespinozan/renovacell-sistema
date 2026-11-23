@@ -4,6 +4,7 @@
 // La cuenta queda PENDIENTE: la aprueba una persona (su vendedor o Dirección) en esta misma conversación.
 import React, { useEffect, useState } from 'react'
 import { hasSupabase, supabase } from '../../lib/supabase'
+import { cedulaCanonica, MENSAJE_CEDULA } from '../../../../../supabase/functions/_shared/cedula'   // CÉDULA ÚNICA
 import { adoptarVisitante, misDatos as leerPorDefecto, verificarme as enviarPorDefecto, type MisDatos } from '../../data/ops/visitante'
 
 async function entrarPorDefecto(email: string, password: string): Promise<boolean> {
@@ -28,7 +29,7 @@ export function TarjetaVerificarme({ onCerrar, leer = leerPorDefecto, enviar = e
   const crear = async (e: React.FormEvent) => {
     e.preventDefault()
     if (enviando) return
-    if (!/^[0-9]{5,12}$/.test(cedula.replace(/\s+/g, ''))) { setError({ texto: 'Escribe solo los números de tu cédula profesional.' }); return }
+    if (!cedulaCanonica(cedula)) { setError({ texto: MENSAJE_CEDULA }); return }
     if (dom.cp.trim() && !/^[0-9]{5}$/.test(dom.cp.trim())) { setError({ texto: 'El código postal debe tener 5 dígitos.' }); return }
     if (pass.length < 8) { setError({ texto: 'La contraseña debe tener al menos 8 caracteres.' }); return }
     if (pass !== pass2) { setError({ texto: 'Las contraseñas no coinciden.' }); return }

@@ -8,6 +8,7 @@
 //
 // El token es opaco y sin PII; aun así se descarta en cuanto el servidor confirma la
 // adopción (o dice que pertenece a otra cuenta): un token viejo no debe seguir circulando.
+import { cedulaCanonica, MENSAJE_CEDULA } from '../../../../../supabase/functions/_shared/cedula'
 import { hasSupabase, supabase } from '../../lib/supabase'
 
 export const LLAVE_VISITANTE = 'rc_visitor'
@@ -116,7 +117,7 @@ export function validarPrerregistro(d: DatosPrerregistro, acepta: boolean): { ca
   if (d.nombre.trim().length < 3) return { campo: 'nombre', mensaje: 'Escribe tu nombre completo.' }
   if (d.telefono.replace(/\D/g, '').length !== 10) return { campo: 'telefono', mensaje: 'Escribe tu celular a 10 dígitos.' }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim())) return { campo: 'email', mensaje: 'El correo no parece válido.' }
-  if (d.es_medico && d.cedula.trim() !== '' && d.cedula.trim().length < 5) return { campo: 'cedula', mensaje: 'La cédula profesional no parece válida.' }
+  if (d.es_medico && d.cedula.trim() !== '' && !cedulaCanonica(d.cedula)) return { campo: 'cedula', mensaje: MENSAJE_CEDULA }   // CÉDULA ÚNICA
   if (!acepta) return { campo: 'consentimiento', mensaje: 'Para continuar, acepta el Aviso de privacidad.' }
   return null
 }
