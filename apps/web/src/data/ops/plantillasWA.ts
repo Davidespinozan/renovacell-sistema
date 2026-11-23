@@ -73,7 +73,7 @@ export const plantillasWA = (rpc: Rpc = rpcPorDefecto, invocar: Invocar = invoca
     try {
       const { error } = await rpc('cc_wa_plantilla_guardar', { p_nombre: p.nombre, p_etiqueta: p.etiqueta, p_categoria: p.categoria, p_cuerpo: p.cuerpo, p_variables: p.variables, p_botones: p.botones })
       if (!error) return null
-      return datosPlantilla(error.message) ?? (/NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección crea plantillas.' : 'No se pudo guardar la plantilla.')
+      return datosPlantilla(error.message) ?? (/NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección o Almacén crean plantillas.' : 'No se pudo guardar la plantilla.')
     } catch { return 'Sin conexión con el servidor.' }
   },
   borrar: async (nombre: string): Promise<string | null> => {

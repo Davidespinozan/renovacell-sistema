@@ -40,7 +40,8 @@ Deno.serve(conCors(async (req) => {
     const caller = createClient(url, anon, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } })
     const q = await resolverQuien(caller, admin)
     if (!q.ok) return json(q.status, q.body)
-    if (q.quien.role !== 'admin') return json(403, { error: 'solo_direccion', message: 'Solo Dirección maneja las plantillas.' })
+    // WA-PLANTILLAS-ALM (23 nov 2026, dueño): Alberto (Almacén) también manda plantillas a autorización de Meta.
+    if (q.quien.role !== 'admin' && q.quien.role !== 'warehouse') return json(403, { error: 'solo_direccion', message: 'Solo Dirección o Almacén manejan las plantillas.' })
   }
 
   // deno-lint-ignore no-explicit-any

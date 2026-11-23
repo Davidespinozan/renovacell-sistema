@@ -98,6 +98,7 @@ export const ROLES: RoleDef[] = [
       { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
       { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Inventario' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
+      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Inventario' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
       { key: 'carga_inventario', label: 'Cargar inventario (CSV)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
@@ -118,10 +119,9 @@ export const ROLES: RoleDef[] = [
     modules: [
       { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
       { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
-      { key: 'surtido', label: 'Preparar pedidos', icon: 'layers', section: 'Pedidos y envíos' },
-      { key: 'cola', label: 'Por enviar', icon: 'pkg', section: 'Pedidos y envíos' },
-      { key: 'despacho', label: 'Despacho', icon: 'truck', section: 'Pedidos y envíos' },
-      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Pedidos y envíos' },
+      // MISMO ORDEN QUE ALBERTO (23 nov 2026, dueño: "él debe poder ver todo lo que ve Blanca porque es su jefe"):
+      // una entrada «Pedidos» con las MISMAS pestañas y nombres que la de Almacén, sin las que son solo de Alberto.
+      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
     ],
   },
   {
@@ -246,6 +246,7 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
   g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }, { key: 'sistema_errores', label: 'Errores' }],
+  g_pedidos_aux: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'despacho', label: 'Despacho' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Auxiliar (Blanca): mismas pestañas que Alberto
   g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }
 export const GRUPOS: Record<string, string[]> = Object.fromEntries(Object.entries(SUBPANTALLAS).map(([g, xs]) => [g, xs.map((x) => x.key)]))
