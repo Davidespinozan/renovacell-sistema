@@ -226,7 +226,7 @@ describe('SEC-C4-B5b · guardas de fuente', () => {
     for (const p of [/set_order_fiscal_snapshot|setOrderFiscalSnapshot/, /cliente_fiscal_guardar|customer_fiscal_profiles|cliente_perfiles_fiscales/, /service_role/, /console\./, /localStorage|sessionStorage/]) expect(c).not.toMatch(p)
   })
   it('la huella de idempotencia no cambió', () => {
-    expect(c).toContain("const fp = JSON.stringify({ posLines, total, method, client: client?.id ?? null, invoiceReq, invoiceMeta })")
+    expect(c).toContain("const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq, invoiceMeta })")   // COBRO-U · la forma de pago también es parte de la venta
     expect(c).toContain('const op = posOpRef.current?.op ?? newPosOp()')
   })
 })

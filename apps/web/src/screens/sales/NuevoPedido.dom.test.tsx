@@ -37,6 +37,10 @@ vi.mock('../../data/hooks/useOrders', () => ({ useOrders: () => ({ createOrder: 
 // ENT-2 · el domicilio del cliente comercial y la entrega tienen sus propias pruebas (DomicilioClientePicker / SelectorEntrega);
 // aquí se simulan: un domicilio elegido y la opción de entrega sugerida por el servidor.
 vi.mock('../../app/DomicilioClientePicker', () => ({ DomicilioClientePicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ address: { line1: 'Calle 1', city: 'Culiacán', cp: '82000', phone: '6690000000' } })}>poner domicilio</button> }))
+// COBRO-U · la forma de pago tiene sus propias pruebas (cobro.test / FormaDePago); aquí se elige efectivo.
+vi.mock('../../app/FormaDePago', () => ({
+  FormaDePago: ({ onChange }: { onChange: (c: unknown) => void }) => { React.useEffect(() => { onChange({ forma: 'efectivo' }) }, []); return <div data-testid="forma-pago" /> },   // eslint-disable-line react-hooks/exhaustive-deps
+}))
 vi.mock('../../app/SelectorEntrega', () => ({
   SelectorEntrega: ({ onChange }: { onChange: (e: unknown, ops: unknown) => void }) => { React.useEffect(() => { onChange({ opcion: 'foraneo_dhl' }, { corte: { hoy: '2026-10-21' }, opciones: [{ id: 'foraneo_dhl', tipo: 'foraneo', flete: 600, permitido: true, disponible: true }] }) }, []); return <div data-testid="sel-entrega" /> },   // eslint-disable-line react-hooks/exhaustive-deps
   eleccionCompleta: (v: unknown) => !!v,

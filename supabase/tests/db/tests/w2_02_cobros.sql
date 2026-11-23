@@ -17,7 +17,7 @@ begin
   perform tests.act_as(v_doc);
   perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 100)', v_o),
     'NO_AUTORIZADO', 'el doctor no registra cobros');
-  -- SEC-B (139) · D-SEC-1: POS cobra SOLO dentro de vender_pos; no registra cobros sobre pedidos existentes.
+  -- COBRO-U (23 nov 2026): POS cobra solo SUS ventas/cartera; este pedido de doctor sin vendedor no es suyo.
   perform tests.act_as(v_pos);
   perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 120)', v_o),
     'NO_AUTORIZADO', 'POS no registra cobros directos (ni anticipos)');

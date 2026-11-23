@@ -21,6 +21,9 @@ import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
 import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
+import { FormaDePago } from '../../app/FormaDePago'
+import { cobroParaServidor, faltaEnCobro, resultadoCobro, type CobroElegido } from '../../data/ops/cobro'
+import { hoyNegocio } from '../../data/periodo'
 import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
@@ -41,6 +44,7 @@ const huellaDe = (s: Solicitud) => JSON.stringify([
   [...s.lines].map((l) => `${l.product_id}:${l.qty}`).sort(), s.doctor_id ?? null, s.customer_id ?? null, s.location_id ?? null,
   s.shipping ?? null, s.invoice_requested, s.invoice_requested && s.receiver ? normalizeFiscalProfile(s.receiver) : null,
   s.entrega ?? null,   // ENT-2 · cómo se entrega (opción, flete ajustado y motivo)
+  s.cobro ?? null,     // COBRO-U · cómo paga
 ])
 
 // Levantar pedido "a nombre de" un DOCTOR (portal/legacy) o un CUSTOMER comercial (sin Auth).
@@ -113,6 +117,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const tipoEntrega = opcionDe(opsEntrega, entrega?.opcion)?.tipo ?? null
   const entregaNecesitaDireccion = opsEntrega ? requiereDireccion(tipoEntrega) : true   // sin opciones (demo) se exige dirección como antes
   const entregaLista = hasSupabase ? eleccionCompleta(entrega, opsEntrega) : true
+  // COBRO-U · la MISMA «Forma de pago» que la Caja y todos los puntos de venta; el pedido no se crea sin elegirla.
+  const [cobro, setCobro] = useState<CobroElegido | null>(null)
+  const [cobroHecho, setCobroHecho] = useState<CobroElegido | null>(null)
 
   // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
@@ -179,6 +186,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     shipping,
     receiver: invoice ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3)
     ...(hasSupabase && entrega ? { entrega } : {}),   // ENT-2 · la entrega viaja con el pedido (una transacción)
+    ...(hasSupabase && cobro ? { cobro: cobroParaServidor(cobro) } : {}),   // COBRO-U · y la forma de pago, en la misma transacción
     ...(isCustomer
       ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null }, location_id: locationId }
       : { doctor_id: doctor!.id, location_id: locationId }),
@@ -192,7 +200,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     try {
       const r = await createOrder({ ...it.solicitud, operacion: it.op })
       if (r.ok) {
-        intento.current = null; setRepetido(!!r.repetido)
+        intento.current = null; setRepetido(!!r.repetido); setCobroHecho(cobro)
         const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; paqueteria?: string | null; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
         if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: resumenPaqueteria({ tipo: e.tipo as 'foraneo', paqueteria: (e.paqueteria ?? null) as 'dhl' | null, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta }, opsEntrega?.corte.hoy) ?? e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
         borrarBorrador(claveBorrador)
@@ -213,7 +221,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     if (enviando.current || bloqueado) return
     const previo = intento.current
     if (previo?.incierto) { enviando.current = true; await enviar(previo); return }   // MISMA operación, mismo contenido
-    if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista) return
+    if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
     enviando.current = true
     if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
@@ -227,8 +235,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     // Mismo contenido que un intento anterior ya resuelto sin pedido (rechazo, sesión) ⇒ mismo id; si cambió ⇒ id nuevo.
     await enviar({ op: previo && previo.huella === huella ? previo.op : nuevaOperacion(), huella, solicitud, incierto: false })
   }
+  const fleteCobro = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0
+  const cobroListo = !hasSupabase || faltaEnCobro(cobro, total + fleteCobro, 'pedido', tipoEntrega, hoyNegocio()) == null
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
-  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || (invoice && !fiscalOk)))
+  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || (invoice && !fiscalOk)))
   const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // PAQ-SIMPLE · solo la regla (o el ajuste con motivo)
 
   return (
@@ -239,7 +249,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
             <div className="success">
               <div className="ck"><Plus size={26} /></div>
               <h3>{repetido ? 'Pedido confirmado' : 'Pedido creado'}</h3>
-              <p>El pedido <b>{folio}</b> para <b>{target.name}</b> quedó <b>pendiente de pago</b>. Dirección ya recibió el aviso: en cuanto registre el cobro o autorice el crédito, pasa a Almacén para prepararse.</p>
+              <p data-testid="np-cobro">El pedido <b>{folio}</b> para <b>{target.name}</b> {cobroHecho ? resultadoCobro(cobroHecho, cobroHecho.vence).texto : <>quedó <b>pendiente de pago</b>: cóbralo en «Cobrar pedidos».</>}</p>
               {promesa && <p data-testid="np-promesa" style={{ fontSize: 13.5 }}><b>{promesa.texto}</b>{promesa.flete > 0 ? ` · flete ${money(promesa.flete)}` : ' · sin flete'}<br />{promesa.promesa}</p>}
               {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
@@ -307,6 +317,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Entrega</div>
                   <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                  <div className="eyebrow" style={{ marginTop: 14 }}>Forma de pago</div>
+                  <FormaDePago total={total + fleteCobro} modo="pedido" tipoEntrega={tipoEntrega} value={cobro} onChange={setCobro} testId="np-forma-pago" />
                 </>
               )}
 

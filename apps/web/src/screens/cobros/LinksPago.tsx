@@ -1,7 +1,11 @@
 // LINKS DE PAGO (2 nov 2026) · lo que los clientes pidieron para pagar con tarjeta. El vendedor saca el link en la app de
 // BanBajío por el monto exacto y lo pega aquí: el sistema se lo manda al cliente (WhatsApp vinculado, correo y su pedido).
 // Dirección y Facturación lo marcan pagado al ver el cobro en el banco (queda en el libro como cobro con tarjeta).
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { FormaDePago } from '../../app/FormaDePago'
+import { cobrarVenta, faltaEnCobro, resultadoCobro, type CobroElegido } from '../../data/ops/cobro'
+import { hoyNegocio } from '../../data/periodo'
+import { reloadOrders } from '../../data/store/ordersStore'
 import { Check, CreditCard, Send, X } from 'lucide-react'
 import { linksPago as clientePorDefecto, dominioDe, esBanBajio, type ClienteLinksPago, type LinkPago } from '../../data/ops/linksPago'
 import { useRoleOpcional } from '../../auth/RoleContext'
@@ -15,7 +19,8 @@ const VIA: Record<LinkPago['via'], string> = { portal: 'lo pidió en el portal',
 
 export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLinksPago }) {
   const rol = useRoleOpcional()
-  const cobra = rol?.role === 'admin'   // el servidor también acepta Facturación (billing)
+  // COBRO-U (23 nov 2026, dueño): Ventas también cobra (sus ventas y su cartera; el servidor lo acota).
+  const cobra = rol?.role === 'admin' || rol?.role === 'pos'
   const [lista, setLista] = useState<LinkPago[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -28,8 +33,9 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
   const { data: pedidos } = useAllOrders()
   const conLink = new Set(activos.map((l) => l.order_id))
   const porCobrar = pedidos.filter((o) => o.status !== 'cancelled' && o.status !== 'draft' && o.payment_status !== 'paid' && o.payment_status !== 'refunded'
-    && (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos' && !conLink.has(o.id) && (o.total ?? 0) > 0)
+    && !conLink.has(o.id) && (o.total ?? 0) > 0)   // COBRO-U · también las ventas de Caja a crédito
   const [pidiendo, setPidiendo] = useState<string | null>(null)
+  const [cobrando, setCobrando] = useState<{ id: string; external_ref: string | null; total: number | null; shipping_meta?: unknown } | null>(null)
   const pedir = async (id: string, folio: string) => {
     setPidiendo(id); setError(null)
     const r = await cliente.solicitar(id)
@@ -41,8 +47,9 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
 
   return (
     <div className="card sgs" data-testid="links-pago">
-      <div className="sgs-h"><h2>Links de pago</h2><span>{activos.length ? `${activos.length} por atender` : ''}</span></div>
-      <p className="sgs-sub">Cuando un cliente quiere pagar con tarjeta: saca el link en la app de BanBajío por el <b>monto exacto</b> y pégalo aquí. Se lo mandamos por su WhatsApp, por correo y queda en su pedido.{cobra ? ' Al ver el cobro en el banco, márcalo pagado.' : ' Dirección lo marca pagado al ver el cobro en el banco.'}</p>
+      {cobrando && <CobrarPedido pedido={cobrando} onClose={() => setCobrando(null)} onHecho={(t) => { setCobrando(null); setAviso(t); void cargar() }} />}
+      <div className="sgs-h"><h2>Cobrar pedidos</h2><span>{activos.length ? `${activos.length} por atender` : ''}</span></div>
+      <p className="sgs-sub">Pedidos sin pagar: cóbralos con cualquier forma de pago (efectivo, tarjeta, transferencia, link, al recibir o crédito). Con link: saca el link en la app de BanBajío por el <b>monto exacto</b> y pégalo aquí. Se lo mandamos por su WhatsApp, por correo y queda en su pedido.{cobra ? ' Al ver el cobro en el banco, márcalo pagado.' : ' Dirección lo marca pagado al ver el cobro en el banco.'}</p>
       {error && <div className="pce-error" role="alert">{error}</div>}
       {aviso && <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)' }}>{aviso}</div>}
       {porCobrar.length > 0 && (
@@ -50,7 +57,8 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
           <ul>{porCobrar.slice(0, 30).map((o) => (
             <li key={o.id} className="sgs-item">
               <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'}</b><span>{money(o.total ?? 0)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
-              <button type="button" className="btn sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
+              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar">Cobrar</button>}
+              <button type="button" className="btn ghost sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
             </li>))}</ul>
         </section>
       )}
@@ -93,5 +101,42 @@ function Fila({ l, cobra, cliente, hecho }: { l: LinkPago; cobra: boolean; clien
         </div>
       )}
     </li>
+  )
+}
+
+// COBRO-U · cobrar un pedido que ya existe con la MISMA «Forma de pago» de todos los puntos de venta.
+function CobrarPedido({ pedido, onClose, onHecho }: { pedido: { id: string; external_ref: string | null; total: number | null; shipping_meta?: unknown }; onClose: () => void; onHecho: (texto: string) => void }) {
+  const [cobro, setCobro] = useState<CobroElegido | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const opId = useRef(globalThis.crypto?.randomUUID?.() ?? '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12))
+  const total = Number(pedido.total ?? 0)
+  const tipoEntrega = (pedido.shipping_meta as { entrega?: { tipo?: string } } | null)?.entrega?.tipo ?? null
+  const falta = faltaEnCobro(cobro, total, 'pedido', tipoEntrega, hoyNegocio())
+  const folio = pedido.external_ref ?? 'el pedido'
+  const cobrar = async () => {
+    if (!cobro || falta || enviando) return
+    setEnviando(true); setError(null)
+    const r = await cobrarVenta(pedido.id, cobro, opId.current)
+    setEnviando(false)
+    if (!r.ok) { setError(r.error); return }
+    reloadOrders()
+    onHecho(`${folio}: ${resultadoCobro(cobro, cobro.vence).texto}`)
+  }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="cobrar-pedido">
+        <div className="mhead"><h3>Cobrar {folio} · {money(total)}</h3></div>
+        <div className="mbody">
+          <FormaDePago total={total} modo="pedido" tipoEntrega={tipoEntrega} value={cobro}
+            onChange={(c) => { setCobro(c); if (c?.forma !== cobro?.forma) opId.current = globalThis.crypto?.randomUUID?.() ?? opId.current }} testId="cobrar-forma" />
+          {error && <div className="pce-error" role="alert" style={{ marginTop: 10 }}>{error}</div>}
+        </div>
+        <div className="mfoot" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 14 }}>
+          <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn" disabled={!cobro || !!falta || enviando} onClick={() => void cobrar()} data-testid="cobrar-confirmar">{enviando ? 'Registrando…' : 'Registrar'}</button>
+        </div>
+      </div>
+    </div>
   )
 }

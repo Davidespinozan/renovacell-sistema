@@ -223,9 +223,9 @@ r = await admin.rpc('efectivo_esperado', { p_fecha: hoy, p_alcance: 'dia', p_caj
 expect('tras cortar, el esperado del siguiente corte es 0 (no se recuenta)', Number(r.data) === 0, r.data)
 r = await admin.rpc('tramo_corte_caja', { p_fecha: hoy, p_alcance: 'dia', p_cajero: null })
 expect('el tramo siguiente CONTINÚA al corte cerrado', r.data?.primer_corte === false && r.data?.continua_de === closingId, r.error ?? r.data)
-// SEC-B (139) · D-SEC-1: el POS cobra SOLO dentro de vender_pos; un cobro directo por la API se rechaza sin asentar
+// COBRO-U (23 nov 2026): el POS cobra sus ventas, pero nunca de más: su venta de mostrador ya está pagada ⇒ se rechaza sin asentar
 r = await pos.rpc('registrar_cobro', { p_op_id: uuid(), p_order: saleId, p_method: 'efectivo', p_amount: 60 })
-expect('POS no registra cobros directos por la API', /NO_AUTORIZADO/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
+expect('POS no cobra de más sobre su venta ya pagada', /NO_AUTORIZADO|MONTO_MAYOR/.test(r.error?.message ?? '') && !r.data, r.error ?? r.data)
 // D-SECB-2: el POS no cierra el corte del día
 r = await pos.rpc('registrar_corte_caja', { p_op_id: uuid(), p_fecha: hoy, p_alcance: 'dia', p_fondo: 0, p_contado: 0 })
 expect('POS no cierra el corte del día por la API', /NO_AUTORIZADO/.test(r.error?.message ?? ''), r.error ?? r.data)

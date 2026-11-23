@@ -68,7 +68,8 @@ begin
   perform tests.throws(format(q_cobro, oA, 0.01), 'NO_AUTORIZADO', 'N1 · pos no registra un cobro simbólico sobre pedido ajeno');
   perform tests.throws(format(q_cobro, oB, 100), 'NO_AUTORIZADO', 'N2 · pos no marca como pagado un pedido ajeno (cobro por el total)');
   perform tests.throws(format(q_cobro, oB, 5000), 'NO_AUTORIZADO', 'N3 · pos no registra sobrepagos');
-  perform tests.throws(format(q_cobro, oCart, 100), 'NO_AUTORIZADO', 'N4 · pos no cobra ni pedidos de SU cartera (D-SEC-1: solo vender_pos)');
+  -- COBRO-U (23 nov 2026, dueño): Ventas cobra SUS ventas y su cartera, pero nunca de más (sin residuo aquí).
+  perform tests.throws(format(q_cobro, oCart, 9999999), 'MONTO_MAYOR', 'N4 · COBRO-U: pos cobra su cartera, pero nunca de más');
   perform tests.throws(format('select public.registrar_cobro(gen_random_uuid(), %L, ''efectivo'', 100, null, null, null, ''{"role":"service_role"}'')', oB), 'NO_AUTORIZADO', 'N4b · la evidencia del cliente no suplanta al webhook');
   perform tests.throws(format(q_reemb, oA, 50), 'NO_AUTORIZADO', 'N5 · pos no autoriza reembolsos de pedidos ajenos');
   perform tests.throws(format(q_reemb, oCart, 50), 'NO_AUTORIZADO', 'N5b · ni de su cartera');

@@ -68,7 +68,9 @@ export async function venderPOS(
   opts: { doctorId?: string | null; customerId?: string | null; customer?: { name: string; phone?: string | null } | null; seller?: string | null; eventId?: string | null; invoiceRequested?: boolean; invoiceMeta?: Record<string, unknown> | null; op?: PosOp; efectivoRecibido?: number | null
     // W2-C: venta DESDE CUSTODIA. Con esto la venta descuenta el saldo del tenedor y
     // se registra en su libro, por la MISMA ruta económica (no hay un segundo motor).
-    custodyId?: string | null } = {},
+    custodyId?: string | null
+    /** COBRO-U · forma de pago: referencia de la transferencia o fecha del crédito (viaja en shipping_meta.cobro). */
+    cobro?: Record<string, unknown> | null } = {},
 ): Promise<PosResult & { ambiguous?: boolean }> {
   if (lines.length === 0) return { ok: false }
 
@@ -107,7 +109,7 @@ export async function venderPOS(
       p_payment_method: paymentMethod,
       p_doctor_id: (isUuid(opts.doctorId) ? opts.doctorId : null) as unknown as string, // NULL = mostrador (válido en SQL)
       p_customer_id: (isUuid(opts.customerId) ? opts.customerId : undefined),
-      p_shipping_meta: posShippingMeta(orderInput) as Json,
+      p_shipping_meta: { ...(posShippingMeta(orderInput) as Record<string, unknown>), ...(opts.cobro ? { cobro: opts.cobro } : {}) } as Json,
       p_lines: posLines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price })),
       p_allocations: allocations,
       p_invoice_requested: opts.invoiceRequested ?? false,

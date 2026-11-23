@@ -28,6 +28,10 @@ import { SelectorClienteVentas } from './SelectorCliente'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { stockByProduct, stockInfoFor, LOW_STOCK, type StockInfo } from '../../data/ops/stock'
 import { venderPOS, newPosOp, type PosOp, type PosResult } from '../../data/ops/pos'
+import { FormaDePago } from '../../app/FormaDePago'
+import { cobroParaServidor, faltaEnCobro, type CobroElegido } from '../../data/ops/cobro'
+import { hoyNegocio } from '../../data/periodo'
+import { textoMetodoPago } from '../../data/ops/money'
 import { estadoOperacion } from '../../data/ops/w1Command'
 import { CUSTODY_INVENTORY_DISABLED, CUSTODY_DISABLED_MSG } from '../../data/ops/w1Flags'
 import { orderClientName } from '../../data/ops/orderClient'
@@ -37,7 +41,6 @@ import type { OrderWithItems } from '../../data/hooks/useOrders'
 import type { ProductSafe } from '../../data/types'
 import { miembrosEventos } from '../../data/ops/custody'   // EVENTOS CON EQUIPO (2 nov 2026)
 
-type PayMethod = 'efectivo' | 'tarjeta'
 interface Line { product: ProductSafe; qty: number }
 interface Client { id: string; name: string; phone?: string | null }
 
@@ -113,7 +116,9 @@ export function Caja() {
   const [cart, setCart] = useState<Record<string, number>>({})
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
   const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
-  const [method, setMethod] = useState<PayMethod>('efectivo')
+  // COBRO-U · la misma «Forma de pago» que en todos los puntos de venta (en mostrador: con pago o crédito).
+  const [cobro, setCobro] = useState<CobroElegido | null>({ forma: 'efectivo' })
+  const method = cobro?.forma ?? 'efectivo'
   // ENT-POS (dueño, 17 oct 2026): desde el Punto de venta también se levantan pedidos CON ENTREGA (domicilio del cliente,
   // local/foráneo/recoger, flete y fecha). 'ahora' = venta de mostrador (cobro inmediato, como siempre); 'entrega' = pedido.
   const [entrega, setEntrega] = useState<'ahora' | 'entrega'>('ahora')
@@ -123,7 +128,6 @@ export function Caja() {
   const [done, setDone] = useState<OrderWithItems | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [cobrando, setCobrando] = useState(false)
-  const [recibido, setRecibido] = useState('') // efectivo con el que paga el cliente
   const [lastPago, setLastPago] = useState<{ recibido: number; cambio: number } | null>(null) // para el recibo
   // CFDI: el cliente puede pedir factura en la venta. El receptor viaja en `invoice_meta.receiver` y el servidor lo
   // registra en la MISMA operación del cobro (vender_pos, atómico e idempotente).
@@ -174,10 +178,10 @@ export function Caja() {
   const unidades = lines.reduce((s, l) => s + l.qty, 0)
   const ticketRef = useRef<HTMLDivElement>(null)
   const savings = lines.reduce((s, l) => s + volumeSavings(l.product.price, volRules, l.product.id, l.qty, vq[l.product.id]), 0)
-  const recibidoN = Math.max(0, Number(recibido) || 0)
-  const cambio = recibidoN - total
-  // En efectivo, no se cobra hasta que el recibido alcance el total (evita cambio negativo).
-  const efectivoOk = method !== 'efectivo' || recibido === '' ? true : recibidoN >= total
+  const recibidoN = cobro?.forma === 'efectivo' && cobro.recibido != null ? cobro.recibido : null
+  const cambio = recibidoN != null ? recibidoN - total : 0
+  // Efectivo que alcance, transferencia con referencia, crédito con fecha: lo mismo que valida el servidor.
+  const efectivoOk = faltaEnCobro(cobro, total, 'mostrador', null, hoyNegocio()) == null
 
   // No vender más de lo disponible en inventario.
   const add = (id: string) => setCart((c) => {
@@ -214,7 +218,7 @@ export function Caja() {
         }
         invoiceMeta = { receiver: normalizeFiscalProfile(fiscal) }
       }
-      const fp = JSON.stringify({ posLines, total, method, client: client?.id ?? null, invoiceReq, invoiceMeta })
+      const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq, invoiceMeta })
       if (posOpRef.current && posOpRef.current.fp !== fp) {
         // La venta anterior quedó AMBIGUA y el carrito cambió: antes de cobrar otra, verifica.
         const prev = await estadoOperacion(posOpRef.current.op.orderId)
@@ -236,21 +240,22 @@ export function Caja() {
         custodyId,
         // Efectivo con el que paga el cliente: viaja al servidor como evidencia del
         // asiento (recibido/cambio) para que el corte de caja pueda explicarse.
-        efectivoRecibido: method === 'efectivo' && recibido !== '' ? recibidoN : null,
+        efectivoRecibido: recibidoN,
+        cobro: cobro ? cobroParaServidor(cobro) : null,
       })
       if (!(res as { ambiguous?: boolean }).ambiguous) posOpRef.current = null
     }
     setCobrando(false)
     if (res.ok && res.order) {
       const order = res.order
-      const pago = method === 'efectivo' && recibido !== '' ? { recibido: recibidoN, cambio } : null
+      const pago = recibidoN != null ? { recibido: recibidoN, cambio } : null
       setLastPago(pago)
       setVentasTurno((v) => [{ order, clientName: clientNameFor(order), pago }, ...v].slice(0, 50))
       setReprint(null)
       setDone(order)
       setCart({})
       setClient(null)
-      setRecibido('')
+      setCobro({ forma: 'efectivo' })
       setInvoiceReq(false)
       setFiscal(emptyFiscalProfile())
       setShowFiscalErr(false)
@@ -404,33 +409,15 @@ export function Caja() {
             {entrega === 'entrega' ? (
               <div style={{ marginTop: 12 }} data-testid="pos-pedido-entrega">
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 10 }}>
-                  {client ? <>Pedido para <b>{client.name}</b>: eliges su domicilio, el tipo de entrega (chofer, DHL o recoger) con el flete y la fecha —la entrega local se agenda en un horario disponible—, y queda <b>pendiente de pago</b>: pasa a Almacén cuando Dirección registre el cobro o autorice el crédito.</> : <>Primero elige el <b>cliente</b> arriba: el pedido con entrega va a su nombre y usa sus domicilios.</>}
+                  {client ? <>Pedido para <b>{client.name}</b>: eliges su domicilio, el tipo de entrega (chofer, DHL o recoger) con el flete y la fecha —la entrega local se agenda en un horario disponible—, y eliges cómo paga: efectivo, tarjeta, transferencia, link de pago, paga al recibir o crédito.</> : <>Primero elige el <b>cliente</b> arriba: el pedido con entrega va a su nombre y usa sus domicilios.</>}
                 </div>
                 <button className="btn" type="button" style={{ width: '100%' }} disabled={!client} onClick={() => setPedidoAbierto(true)} data-testid="pos-continuar-entrega">
                   <Icon name="truck" /> Continuar con la entrega
                 </button>
               </div>
             ) : (<>
-            <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '14px 0 6px' }}>Pago</div>
-            <div className="seg">
-              <button type="button" className={method === 'efectivo' ? 'active' : undefined} onClick={() => setMethod('efectivo')}>Efectivo</button>
-              <button type="button" className={method === 'tarjeta' ? 'active' : undefined} onClick={() => setMethod('tarjeta')}>Tarjeta</button>
-            </div>
-
-            {method === 'efectivo' && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 56 }}>Recibí</span>
-                  <input type="number" min={0} value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="¿con cuánto paga? (opcional)"
-                    style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 15, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
-                </div>
-                {recibido !== '' && (
-                  <div className="tket-total" style={{ marginTop: 8, color: cambio < 0 ? 'var(--danger)' : 'var(--green-deep)' }}>
-                    <span>{cambio < 0 ? 'Falta' : 'Cambio'}</span><b>{money(Math.abs(cambio))}</b>
-                  </div>
-                )}
-              </div>
-            )}
+            <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '14px 0 6px' }}>Forma de pago</div>
+            <FormaDePago total={total} modo="mostrador" value={cobro} onChange={setCobro} testId="caja-forma-pago" />
 
             {!custodyId && (
               <div style={{ marginTop: 12 }}>
@@ -457,7 +444,7 @@ export function Caja() {
             <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(puede ? {} : { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' }) }} onClick={cobrar} disabled={!puede}>
               <Icon name="check" /> {cobrando ? 'Cobrando…' : `Cobrar ${money(total)}`}
             </button>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Pago inmediato · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>Sale con pago o crédito · descuenta del inventario de Almacén por lote (FEFO). Para vender lo que traes en consignación, usa Clientes → Venta directa.</div>
               </>)
             })()}
             </>)}
@@ -514,7 +501,7 @@ export function Caja() {
                 <div className="ck"><Icon name="check" /></div>
                 <h3>Venta registrada</h3>
                 <p>
-                  <b>{done.external_ref}</b> · {money(done.total)} · {done.payment_method === 'tarjeta' ? 'Tarjeta' : 'Efectivo'}
+                  <b>{done.external_ref}</b> · {money(done.total)} · {textoMetodoPago(done.payment_method) || 'Efectivo'}
                   {' · '}{clientNameFor(done)}.
                   Inventario descontado por lote. Ya suma en el Tablero.
                 </p>

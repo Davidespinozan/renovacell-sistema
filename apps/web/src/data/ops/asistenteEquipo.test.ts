@@ -73,7 +73,7 @@ describe('piezas', () => {
   it('el manual solo nombra pantallas que existen en el menú (o botones del chat)', () => {
     const BOTONES = ['Iniciar', 'Vincular a un cliente', 'Verificar y dar de alta', 'Mandar acceso al portal', 'Cotizar', 'Levantar pedido', 'Registrar pago', 'Mandar recibo', 'Ver su ficha',
       'Pasar a otro vendedor', 'Mandar ubicación', 'Dejar seguimiento', 'Eliminar conversación', '/', '+', 'Parece un bot', 'Aviso para el asistente', 'Regla de entrega', 'Configuración', 'Atender conversaciones',
-      'Conversaciones', 'Asesora IA']
+      'Conversaciones', 'Asesora IA', 'Forma de pago']
     const nombres = [...MANUAL_SISTEMA.matchAll(/«([^»]+)»/g)].map((m) => m[1])
     expect(nombres.length).toBeGreaterThan(40)
     const faltan = nombres.filter((n) => !BOTONES.includes(n) && !roles.includes(`'${n}'`))

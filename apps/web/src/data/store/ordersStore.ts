@@ -14,6 +14,7 @@ import type { ShippingAddress } from '../ops/shippingAddress'
 import { decideTransferReview } from '../ops/transferReview'
 import { normalizeFiscalProfile, validateFiscalProfile, type FiscalProfile } from '../ops/fiscal'
 import type { EleccionEntregaServidor } from '../ops/entrega'
+import { mensajeCobro } from '../ops/cobro'
 import { DOCTOR_ID, MOCK_ORDERS, MOCK_ORDER_ITEMS } from '../mock/orders'
 import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
@@ -168,6 +169,8 @@ export async function createOrder(input: {
   customer?: { name: string; phone?: string | null } | null // snapshot mínimo para historial (customer-only)
   receiver?: FiscalProfile | null   // receptor del pedido (solo con factura); el servidor lo valida y lo congela
   operacion?: OperacionPedido       // id + folio estables entre reintentos de la MISMA solicitud
+  /** COBRO-U · forma de pago elegida (misma en todos los puntos de venta); viaja con el pedido en una transacción. */
+  cobro?: Record<string, unknown> | null
   entrega?: EleccionEntregaServidor | null   // ENT-2 · cómo se entrega (id de la opción; el personal puede ajustar el flete con motivo)
 }): Promise<PedidoCreado> {
   const op = input.operacion ?? nuevaOperacionPedido()
@@ -241,7 +244,7 @@ export async function createOrder(input: {
     p_shipping_meta: (order.shipping_meta ?? null) as unknown as Json,
   }
   // ENT-2 · Con entrega: UNA llamada (crear_pedido_con_entrega = pedido + receptor + entrega en una transacción).
-  if (input.entrega) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar, { entrega: input.entrega, factura: input.invoice_requested })
+  if (input.entrega) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar, { entrega: input.entrega, factura: input.invoice_requested, cobro: input.cobro ?? null })
   // Con factura: UNA llamada, UNA transacción (pedido + receptor). Sin factura: el contrato histórico, sin receptor.
   if (input.invoice_requested) return crearConReceptor(base, input.receiver ?? null, folio, QUE, asentar)
 
@@ -294,14 +297,17 @@ export async function createOrder(input: {
 async function crearConReceptor(
   base: { p_order_id: string; p_folio: string; p_doctor_id: string; p_customer_id: string; p_lines: Json; p_shipping_meta: Json },
   receiver: FiscalProfile | null, folio: string, QUE: string, asentar: (total?: number) => OrderWithItems,
-  conEntrega?: { entrega: EleccionEntregaServidor; factura: boolean },
+  conEntrega?: { entrega: EleccionEntregaServidor; factura: boolean; cobro?: Record<string, unknown> | null },
 ): Promise<PedidoCreado> {
   let data: unknown = null
   let error: { message: string; code?: string; status?: number } | null = null
   try {
     // Exactamente los 6 campos del receptor (normalizados); nada de estados, UUID de CFDI ni datos del proveedor.
     const p_receiver = ((conEntrega ? conEntrega.factura : true) && receiver ? normalizeFiscalProfile(receiver) : null) as unknown as Json
-    const r = conEntrega
+    const r = conEntrega?.cobro
+      // COBRO-U · pedido + receptor + entrega + COBRO (o crédito) en una sola transacción.
+      ? await supabase.rpc('crear_pedido_con_entrega_y_cobro' as never, { ...base, p_invoice_requested: conEntrega.factura, p_receiver, p_entrega: conEntrega.entrega as unknown as Json, p_cobro: conEntrega.cobro as unknown as Json } as never)
+      : conEntrega
       // ENT-2 · pedido + receptor + ENTREGA en una transacción. Viaja el id de la opción y, solo si el vendedor lo
       // cambió, el flete con su motivo; el servidor valida contra su regla (ENTREGA_*).
       ? await supabase.rpc('crear_pedido_con_entrega', { ...base, p_invoice_requested: conEntrega.factura, p_receiver, p_entrega: conEntrega.entrega as unknown as Json })
@@ -326,6 +332,11 @@ async function crearConReceptor(
     const msg = mensajeDeError(e, 'comando')
     reportarFallo(QUE, msg, false)
     return { ok: false, error: msg, ambiguous: false, motivo: 'fiscal' }
+  }
+  if (/REFERENCIA_REQUERIDA|VENCIMIENTO_|AL_RECIBIR_SOLO_LOCAL|EFECTIVO_INSUFICIENTE|MONTO_MAYOR|FORMA_PAGO_|CREDITO_YA_AUTORIZADO|no puedes cobrar/.test(e.message) && mensajeCobro(e.message)) {   // COBRO-U · la forma de pago no pasó la regla: se corrige y se vuelve a mandar
+    const msg = mensajeCobro(e.message)!
+    reportarFallo(QUE, msg, false)
+    return { ok: false, error: msg, ambiguous: false, motivo: 'rechazo' }
   }
   if (/\bENTREGA_[A-Z_]+\b/.test(e.message)) {   // ENT-2 · la regla de entrega rechazó la elección: se corrige y se vuelve a mandar
     const msg = mensajeDeError(e, 'comando')
