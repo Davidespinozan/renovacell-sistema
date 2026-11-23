@@ -1,4 +1,4 @@
--- Reversa de 20270407540000_saludo_sin_titulo.sql (SALUDO · 23 nov 2026).
+-- Reversa de 20270407600000_saludo_sin_titulo.sql (SALUDO · 23 nov 2026).
 do $d$
 declare v text := pg_get_functiondef('public.cc_wa_plantilla_enviar'::regproc);
 begin

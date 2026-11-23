@@ -8,10 +8,10 @@ import { render, screen, fireEvent } from '@testing-library/react'
 const h = vi.hoisted(() => ({ setScreen: vi.fn(), irA: vi.fn(), sugerida: '' as string | undefined }))
 vi.mock('../../auth/RoleContext', () => ({ useRoleOpcional: () => ({ setScreen: h.setScreen, user: { name: 'Ale' } }) }))
 vi.mock('../../data/store/navIntentStore', () => ({ irAConversacion: (...a: unknown[]) => h.irA(...a) }))
-vi.mock('./NuevoProspecto', () => ({
-  avisoProspecto: (p: { nombre: string }) => `${p.nombre} quedó en tu cartera.`,
-  NuevoProspectoForm: ({ onListo }: { onListo: (p: unknown) => void }) => (
-    <button type="button" data-testid="fake-registrar" onClick={() => onListo({ customer_id: 'c1', nombre: 'Dra. Ana', status: 'creado', celular: '6671234567' })}>registrar</button>),
+vi.mock('./AltaCliente', () => ({
+  avisoAlta: (p: { nombre: string }) => `${p.nombre} quedó en tu cartera. Está en tu Embudo como «Primer contacto».`,
+  AltaClienteForm: ({ onListo }: { onListo: (p: unknown) => void }) => (
+    <button type="button" data-testid="fake-registrar" onClick={() => onListo({ customer_id: 'c1', nombre: 'Dra. Ana', status: 'creado', celular: '6671234567', faltas: [] })}>registrar</button>),
 }))
 vi.mock('../chat/EscribirWhatsApp', () => ({
   EscribirWhatsApp: ({ cliente, onCerrar, onListo, sugerida }: { cliente: { nombre: string } | null; onCerrar: () => void; onListo: (c: string, v: boolean) => void; sugerida?: string }) => {

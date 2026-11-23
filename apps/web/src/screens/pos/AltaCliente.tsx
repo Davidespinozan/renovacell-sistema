@@ -74,7 +74,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
     if (!r.ok) { setOcupado(false); setErrores([r.error]); return }
     const p = r.data
     // Ya existía (mismo celular), aunque ahora pase a su cartera: no se le escribe encima; se completa desde su ficha.
-    if (p.status !== 'creado') { setOcupado(false); onListo({ ...p, faltas: [] }); return }
+    if (p.status !== 'creado') { setOcupado(false); onListo({ ...p, faltas: [], celular: digitos(f.celular).slice(-10) }); return }
     const id = p.customer_id
     const faltas: string[] = []
     const paso = async (que: string, hacer: () => PromiseLike<{ ok: boolean; error?: string; mensaje?: string }>) => {
@@ -88,7 +88,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
     if (esDireccion && vendedor) await paso('Vendedora', () => c360.asignarVendedor(id, vendedor, 'Asignada al darlo de alta'))
     if (nota.trim()) await paso('Nota', () => c360.agregarNota(id, nota.trim()))
     setOcupado(false)
-    onListo({ ...p, faltas })
+    onListo({ ...p, faltas, celular: digitos(f.celular).slice(-10) })   // PROSPECTAR · para «Llamarle»
   }
 
   return (
