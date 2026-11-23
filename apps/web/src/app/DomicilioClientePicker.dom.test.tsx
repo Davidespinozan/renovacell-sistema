@@ -51,4 +51,13 @@ describe('ENT-2 · DomicilioClientePicker', () => {
     await waitFor(() => expect(screen.getByTestId('valor')).toHaveTextContent('"locationId":"N1"'))
     expect(guardarDomicilio).toHaveBeenCalledWith('C1', null, expect.objectContaining({ line1: 'Av. Nueva 5', postal_code: '80030', tipo: 'OTRO' }), false)
   })
+  it('PEDIDO-TELÉFONO · domicilio sin teléfono de quien recibe: usa el teléfono principal del cliente (caso Body Fillers)', async () => {
+    const lista = [L('A', { is_default: true, contact_phone: null })]
+    const listar = vi.fn(async () => lista as never)
+    const leer = vi.fn(async () => ({ ok: true, data: { contacto: { telefonos: [{ id: 't', numero: '3313280637', etiqueta: 'whatsapp', es_principal: true, origen: 'manual' }] } } }))
+    const Caso = () => { const [v, setV] = useState<DomicilioElegido | null>(null); return <div><DomicilioClientePicker customerId="C1" onChange={setV} listar={listar} cliente={{ leer } as never} /><pre data-testid="valor">{JSON.stringify(v)}</pre></div> }
+    render(<Caso />)
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('valor').textContent || 'null')?.address?.phone).toBe('3313280637'))
+    expect(screen.queryByTestId('domicilio-incompleto')).toBeNull()
+  })
 })

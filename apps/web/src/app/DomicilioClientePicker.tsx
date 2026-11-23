@@ -6,9 +6,9 @@ import { Icon } from './icons'
 import { AddressPicker } from './AddressPicker'
 import { LocationForm, EMPTY_LOCATION, isLocationValid } from './LocationForm'
 import { listLocationsForCustomer, type LocationFields } from '../data/store/doctorLocationsStore'
-import { cliente360 as clientePorDefecto } from '../data/ops/customer360'
+import { cliente360 as clientePorDefecto, telefonoPrincipal } from '../data/ops/customer360'
 import { locationToShippingAddress, summarizeLocation, type DoctorLocation } from '../data/ops/doctorLocation'
-import { faltantesDeEntrega, isAddressDeliverable, type ShippingAddress } from '../data/ops/shippingAddress'
+import { esTelefonoEntregaValido, faltantesDeEntrega, isAddressDeliverable, type ShippingAddress } from '../data/ops/shippingAddress'
 
 export interface DomicilioElegido { address: ShippingAddress | null; locationId?: string }
 type Modo = 'guardado' | 'otro' | 'nuevo'
@@ -16,8 +16,10 @@ type Modo = 'guardado' | 'otro' | 'nuevo'
 const DATOS = ['name', 'line1', 'exterior_number', 'interior_number', 'neighborhood', 'postal_code', 'city', 'state', 'country', 'reference_notes', 'contact_name', 'contact_phone'] as const
 const datosDe = (f: LocationFields) => ({ ...Object.fromEntries(DATOS.map((k) => [k, (f as Record<string, unknown>)[k] ?? null])), tipo: 'OTRO' })
 
-export function DomicilioClientePicker({ customerId, onChange, listar = listLocationsForCustomer, cliente = clientePorDefecto }: {
+export function DomicilioClientePicker({ customerId, onChange, listar = listLocationsForCustomer, cliente = clientePorDefecto, telefonoRespaldo }: {
   customerId: string
+  /** PEDIDO-TELÉFONO (23 nov 2026) · si el domicilio no trae teléfono de quien recibe, se usa el del cliente. */
+  telefonoRespaldo?: string | null
   onChange: (d: DomicilioElegido | null) => void
   listar?: typeof listLocationsForCustomer
   cliente?: typeof clientePorDefecto
@@ -29,6 +31,18 @@ export function DomicilioClientePicker({ customerId, onChange, listar = listLoca
   const [form, setForm] = useState<LocationFields>(EMPTY_LOCATION)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // PEDIDO-TELÉFONO (23 nov 2026, Toño · Body Fillers): el cliente tenía su WhatsApp principal pero el domicilio no traía
+  // «teléfono de quien recibe» y el pedido quedaba bloqueado. Respaldo: el teléfono principal de su ficha.
+  const [telFicha, setTelFicha] = useState<string | null>(telefonoRespaldo ?? null)
+  useEffect(() => {
+    if (telefonoRespaldo && esTelefonoEntregaValido(telefonoRespaldo)) { setTelFicha(telefonoRespaldo); return }
+    let vivo = true
+    if (typeof cliente.leer !== 'function') return
+    void Promise.resolve(cliente.leer(customerId)).then((r) => { if (vivo && r?.ok) setTelFicha(telefonoPrincipal(r.data)?.numero ?? null) }).catch(() => {})
+    return () => { vivo = false }
+  }, [customerId, telefonoRespaldo, cliente])
+  const conTelefono = (a: ShippingAddress | null): ShippingAddress | null =>
+    a && !esTelefonoEntregaValido(a.phone) && telFicha && esTelefonoEntregaValido(telFicha) ? { ...a, phone: telFicha } : a
 
   const cargar = async () => {
     const l = (await listar(customerId)).filter((x) => x.active)
@@ -50,12 +64,12 @@ export function DomicilioClientePicker({ customerId, onChange, listar = listLoca
   useEffect(() => {
     if (modo === 'guardado') {
       const loc = lista?.find((x) => x.id === sel)
-      const a = loc ? locationToShippingAddress(loc) : null
-      onChange(loc && isAddressDeliverable(a) ? { address: a, locationId: loc.id } : null)
+      const a = loc ? conTelefono(locationToShippingAddress(loc)) : null
+      onChange(loc && a && isAddressDeliverable(a) ? { address: a, locationId: loc.id } : null)
     } else if (modo === 'otro') onChange(isAddressDeliverable(otro) ? { address: otro } : null)
     else onChange(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modo, sel, otro, lista])
+  }, [modo, sel, otro, lista, telFicha])
 
   const guardarNuevo = async () => {
     if (!isLocationValid(form) || guardando) return
@@ -76,7 +90,7 @@ export function DomicilioClientePicker({ customerId, onChange, listar = listLoca
       <div style={{ display: 'grid', gap: 8 }}>
         {lista.map((loc) => {
           const on = modo === 'guardado' && sel === loc.id
-          const a = locationToShippingAddress(loc)
+          const a = conTelefono(locationToShippingAddress(loc))
           return (
             <label key={loc.id} className="addr-opt" data-testid={`domicilio-${loc.id}`} style={opt(on)} onClick={() => { setModo('guardado'); setSel(loc.id) }}>
               <input type="radio" checked={on} onChange={() => { setModo('guardado'); setSel(loc.id) }} />

@@ -84,7 +84,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
     if (esp) await paso('Especialidad', () => perfil.guardar(id, f.tipo, esp, esp === 'otra' ? (espOtra.trim() || null) : null))
     if (cedula.trim()) await paso('Cédula', () => c360.guardarCedula(id, digitos(cedula)))
     if (tel2.trim()) await paso('Otro teléfono', () => c360.guardarTelefono(id, null, tel2.trim(), tel2Etq, false))
-    if (hayDom(dom)) await paso('Domicilio', () => c360.guardarDomicilio(id, null, { ...dom, name: TIPOS_DOMICILIO.find((t) => t.key === dom.tipo)?.label ?? 'Principal', municipio: '', country: 'México', contact_name: '', contact_phone: '' }, true))
+    if (hayDom(dom)) await paso('Domicilio', () => c360.guardarDomicilio(id, null, { ...dom, name: TIPOS_DOMICILIO.find((t) => t.key === dom.tipo)?.label ?? 'Principal', municipio: '', country: 'México', contact_name: '', contact_phone: f.celular.trim() }, true))
     if (esDireccion && fiscal.rfc.trim()) await paso('Facturación', () => c360.guardarFiscal(id, null, { ...fiscal, alias: fiscal.razon_social || f.nombre }, true))
     if (esDireccion && vendedor) await paso('Vendedora', () => c360.asignarVendedor(id, vendedor, 'Asignada al darlo de alta'))
     if (nota.trim()) await paso('Nota', () => c360.agregarNota(id, nota.trim()))

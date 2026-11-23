@@ -310,7 +310,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega{opsEntrega && !entregaNecesitaDireccion ? <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}> · opcional para esta entrega</span> : null}</div>
               {isCustomer
-                ? <DomicilioClientePicker customerId={customer!.id} onChange={setCustDom} />
+                ? <DomicilioClientePicker customerId={customer!.id} onChange={setCustDom} telefonoRespaldo={customer!.phone ?? null} />
                 : <DeliveryLocationPicker doctorId={doctor!.id} legacyBase={baseAddr} allowManage={false} onChange={setChoice} />}
 
               {hasSupabase && (
