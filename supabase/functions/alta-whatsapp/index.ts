@@ -67,6 +67,8 @@ Deno.serve(conCors(async (req) => {
       customer = ids[0]
     } else return json(409, { error: 'alta', message: mensajeDe(eAlta?.message) })
   }
+  // IDENTIDAD (23 nov 2026, auditoría de altas) · la especialidad que capturó la IA ya no se pierde: va a la ficha si no tiene.
+  if (customer && s.especialidad) await admin.rpc('_cliente_especialidad_si_falta', { p_customer: customer, p_texto: s.especialidad }).then(() => {}, () => {})
   // 2) Cuenta verificada ligada a la ficha (si la ficha o el correo ya tienen cuenta, se usa esa: no se crea otra).
   let perfil: string | null = null
   let cuentaNueva = false
