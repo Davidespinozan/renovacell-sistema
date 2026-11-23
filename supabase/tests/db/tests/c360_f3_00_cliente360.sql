@@ -142,7 +142,7 @@ begin
   perform public.cliente_telefono_guardar(cA, null, '6695554433', 'recepcion');
   perform public.cliente_contacto_guardar(cA, '{"email":"nuevo@test.local","city":"Zapopan"}'::jsonb);
   perform public.cliente_nota_agregar(cA, 'Prefiere entregas por la mañana.');
-  -- VENDEDOR-NOMBRE (0753, dueño 23 nov 2026): la vendedora ASIGNADA corrige el nombre; se copia a la cuenta del portal.
+  -- VENDEDOR-NOMBRE (0754, dueño 23 nov 2026): la vendedora ASIGNADA corrige el nombre; se copia a la cuenta del portal.
   perform tests.ok(public.cliente_360(cA) -> 'permisos' -> 'contacto' ? 'full_name', '37 · la vendedora asignada ve el nombre editable');
   perform public.cliente_contacto_guardar(cA, '{"full_name":"  Dra. Ana Corregida  "}'::jsonb);
   perform tests.act_as_service();

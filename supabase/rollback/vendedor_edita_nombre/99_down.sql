@@ -1,4 +1,4 @@
--- VENDEDOR-NOMBRE (0753) · down: el nombre vuelve a ser solo de Dirección (cliente_contacto_guardar como antes, sin copiar a la cuenta).
+-- VENDEDOR-NOMBRE (0754) · down: el nombre vuelve a ser solo de Dirección (cliente_contacto_guardar como antes, sin copiar a la cuenta).
 CREATE OR REPLACE FUNCTION public.cliente_contacto_guardar(p_customer uuid, p_patch jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
