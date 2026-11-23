@@ -372,7 +372,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
               <h3>Listo para recoger</h3>
-              <p><b>{order.external_ref}</b> queda listo en sucursal. Cuando el cliente pase por él, márcalo como entregado en <b>Seguimiento</b>.</p>
+              <p><b>{order.external_ref}</b> queda listo en sucursal. Cuando el cliente pase por él, márcalo como entregado en <b>Pedidos → Para recoger</b>.</p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>

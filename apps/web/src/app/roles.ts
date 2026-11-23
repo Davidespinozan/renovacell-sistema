@@ -242,13 +242,13 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
   g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }, { key: 'eventos', label: 'Eventos' }],
   g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }],
-  g_pedidos: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'guia', label: 'Guías' }, { key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Almacén (Alberto)
+  g_pedidos: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'guia', label: 'Guías' }, { key: 'despacho', label: 'Despacho' }, { key: 'para_recoger', label: 'Para recoger' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Almacén (Alberto)
   g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],
   g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_links', label: 'Cobrar pedidos' }, { key: 'av_revision', label: 'Revisión económica' }],
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
   g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }, { key: 'sistema_errores', label: 'Errores' }],
-  g_pedidos_aux: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'despacho', label: 'Despacho' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Auxiliar (Blanca): mismas pestañas que Alberto
+  g_pedidos_aux: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'despacho', label: 'Despacho' }, { key: 'para_recoger', label: 'Para recoger' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Auxiliar (Blanca): mismas pestañas que Alberto
   g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }
 export const GRUPOS: Record<string, string[]> = Object.fromEntries(Object.entries(SUBPANTALLAS).map(([g, xs]) => [g, xs.map((x) => x.key)]))
