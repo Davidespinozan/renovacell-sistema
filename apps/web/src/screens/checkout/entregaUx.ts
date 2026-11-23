@@ -3,7 +3,7 @@
 // CX-V2-B · solo se muestran las alternativas relevantes (lo que no aplica a esa dirección o no está activo no ocupa una
 // tarjeta), cada tarjeta dice una cosa y el faltante se explica UNA vez. La regla de selección es la de CX-V2-A.
 import { money } from '../../lib/format'
-import { MOTIVO_ENTREGA, faltantePara, fleteTexto, promesaDe, requiereHorario, type HorarioElegido, type OpcionEntrega, type OpcionesEntrega } from '../../data/ops/entrega'
+import { MOTIVO_ENTREGA, NOMBRE_PAQUETERIA, faltantePara, fleteTexto, promesaDe, requiereHorario, textoLlegada, type HorarioElegido, type OpcionEntrega, type OpcionesEntrega } from '../../data/ops/entrega'
 
 // ENT-P · el faltante vive en data/ops/entrega.ts (lo comparten todas las pantallas que venden); aquí se re-exporta.
 export { faltantePara, type Faltante } from '../../data/ops/entrega'
@@ -15,8 +15,7 @@ export const puedeElegir = (o: Pick<OpcionEntrega, 'permitido' | 'disponible'>):
 export function tituloModalidad(o: Pick<OpcionEntrega, 'tipo' | 'paqueteria' | 'texto'>): string {
   if (o.tipo === 'recoge') return 'Recoger en sucursal'
   if (o.tipo === 'local') return 'Entrega con chofer'   // CX-V2-C · dentro de "Enviar a domicilio": el servicio, no la intención
-  if (o.tipo === 'foraneo' && o.paqueteria === 'dhl') return 'Envío por DHL'
-  if (o.tipo === 'foraneo' && o.paqueteria === 't1') return 'Envío por T1'
+  if (o.tipo === 'foraneo' && o.paqueteria && o.paqueteria !== 'chofer') return NOMBRE_PAQUETERIA[o.paqueteria] ?? o.texto   // PAQ-SIMPLE · «DHL» / «Estafeta»
   return o.texto
 }
 
@@ -29,7 +28,9 @@ export interface Tarjeta {
   /** Se muestra pero aún no se puede elegir (mínimo no alcanzado, falta la dirección). */
   bloqueada: boolean
 }
-export interface ContextoTarjeta { hoy: string | null; seleccionada: boolean; horario: HorarioElegido | null }
+export interface ContextoTarjeta { hoy: string | null; seleccionada: boolean; horario: HorarioElegido | null
+  /** PAQ-SIMPLE · fecha prometida por DHL con su cotización en vivo (AAAA-MM-DD); 'cargando' mientras se consulta; null = la regla. */
+  llegaDhl?: string | 'cargando' | null }
 
 /**
  * La tarjeta de una opción, o null si NO es relevante para esta dirección y este pedido (se oculta):
@@ -43,6 +44,7 @@ export function tarjetaEntrega(o: OpcionEntrega, ops: Pick<OpcionesEntrega, 'reg
     if (o.tipo === 'mostrador') return null
     const linea = requiereHorario(o)
       ? (ctx.seleccionada && ctx.horario ? `Llega ${ctx.horario.fecha === ctx.hoy ? 'hoy' : 'el ' + ctx.horario.fecha.slice(8, 10) + '/' + ctx.horario.fecha.slice(5, 7)} a las ${ctx.horario.inicio}` : 'Eliges un horario de media hora')
+      : o.tipo === 'foraneo' ? lineaForanea(o, ctx)   // PAQ-SIMPLE · «Llega el lunes 24 de nov» / «Llega entre el … y el …»
       : promesaDe(o, ctx.hoy)
     const f = faltantePara(ops, o)
     const conCosto = o.flete > 0 && !!f && f.faltante > 0
@@ -61,11 +63,18 @@ export function tarjetaEntrega(o: OpcionEntrega, ops: Pick<OpcionesEntrega, 'reg
   return null
 }
 
+/** PAQ-SIMPLE · llegada de un envío foráneo: DHL con la fecha de su cotización en vivo; si no (o Estafeta), el rango de la regla. */
+export function lineaForanea(o: Pick<OpcionEntrega, 'paqueteria' | 'llega_desde' | 'llega_hasta'>, ctx: Pick<ContextoTarjeta, 'hoy' | 'llegaDhl'>): string {
+  if (o.paqueteria === 'dhl' && ctx.llegaDhl === 'cargando') return 'Consultando la fecha con DHL…'
+  if (o.paqueteria === 'dhl' && ctx.llegaDhl) return textoLlegada(ctx.llegaDhl, ctx.llegaDhl, ctx.hoy)
+  return textoLlegada(o.llega_desde, o.llega_hasta, ctx.hoy)
+}
+
 /** Tarjetas en el orden del servidor, solo las relevantes. */
-export function tarjetasEntrega(ops: OpcionesEntrega, sel: string | null, horario: HorarioElegido | null): Tarjeta[] {
+export function tarjetasEntrega(ops: OpcionesEntrega, sel: string | null, horario: HorarioElegido | null, llegaDhl: ContextoTarjeta['llegaDhl'] = null): Tarjeta[] {
   const hoy = ops.corte.hoy ?? null
   return ops.opciones
-    .map((o) => tarjetaEntrega(o, ops, { hoy, seleccionada: o.id === sel, horario }))
+    .map((o) => tarjetaEntrega(o, ops, { hoy, seleccionada: o.id === sel, horario, llegaDhl }))
     .filter((t): t is Tarjeta => t !== null)
 }
 
@@ -127,8 +136,8 @@ export function elegirEnIntencion(ops: OpcionesEntrega, intencion: Intencion | n
 }
 
 /** Opciones de envío a domicilio que se muestran DENTRO de "Enviar a domicilio" (la dirección se elige arriba de ellas). */
-export function tarjetasDomicilio(ops: OpcionesEntrega, sel: string | null, horario: HorarioElegido | null): Tarjeta[] {
-  return tarjetasEntrega(ops, sel, horario).filter((t) => esDomicilio(ops.opciones.find((o) => o.id === t.id)) && t.accion !== 'direccion')
+export function tarjetasDomicilio(ops: OpcionesEntrega, sel: string | null, horario: HorarioElegido | null, llegaDhl: ContextoTarjeta['llegaDhl'] = null): Tarjeta[] {
+  return tarjetasEntrega(ops, sel, horario, llegaDhl).filter((t) => esDomicilio(ops.opciones.find((o) => o.id === t.id)) && t.accion !== 'direccion')
 }
 
 /** Aviso breve cuando la modalidad elegida dejó de ser válida (cambió el carrito o la dirección). */

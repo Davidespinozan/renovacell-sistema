@@ -14,7 +14,7 @@ import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/o
 import type { OrderMoney } from '../../data/ops/money'
 import type { ProductSafe } from '../../data/types'
 import { cantidadVista } from '../../lib/cajas'
-import { promesaDe, type EntregaPedido } from '../../data/ops/entrega'
+import { promesaDe, resumenPaqueteria, type EntregaPedido } from '../../data/ops/entrega'
 
 export function OrderCard({
   order,
@@ -164,12 +164,12 @@ function EntregaLine({ meta, destacada = false }: { meta: OrderWithItems['shippi
   if (destacada) return (
     <div className="pedido-llega" data-testid="pedido-entrega">
       <b>{promesaDe(e)}</b>
-      <span>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}{e.programada ? ' · salida agendada con tu asesor' : ''}</span>
+      <span>{resumenPaqueteria(e) ?? e.texto}{e.programada ? ' · salida agendada con tu asesor' : ''}</span>
     </div>
   )
   return (
     <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }} data-testid="pedido-entrega">
-      <b style={{ color: 'var(--ink-2)' }}>{e.texto}{e.servicio?.nombre ? ` · ${e.servicio.nombre}` : ''}</b> · {promesaDe(e)}{e.programada ? ' · salida agendada con tu asesor' : ''}
+      <b style={{ color: 'var(--ink-2)' }}>{resumenPaqueteria(e) ?? e.texto}</b>{resumenPaqueteria(e) ? '' : ` · ${promesaDe(e)}`}{e.programada ? ' · salida agendada con tu asesor' : ''}
     </div>
   )
 }

@@ -17,9 +17,8 @@ async function compraPortal(b, email, { buscar, horario = false, servicio = null
   await clic(p, '^Agregar$'); await sleep(1500)
   await clic(p, 'Revisar y crear pedido'); await sleep(4000)
   if (horario) { await p.evaluate(() => document.querySelector('[data-testid=horario-picker] [role=radio]:not([disabled])')?.click()); await sleep(2500) }
-  if (servicio) {
-    await p.waitForSelector('[data-testid=servicio-paqueteria]', { timeout: 15000 }).catch(() => console.log('sin selector de servicio'))
-    await p.click(`[data-testid=servicio-${servicio}] input`).catch(() => {}); await sleep(1200)
+  if (servicio) {   // PAQ-SIMPLE · ya no hay lista de servicios: se espera la fecha de DHL en su tarjeta
+    await p.waitForFunction(() => /Llega el/.test(document.querySelector('[data-testid=entrega-foraneo_dhl]')?.textContent ?? ''), { timeout: 15000 }).catch(() => console.log('sin fecha de DHL'))
   }
   console.log('checkout:', (await modal(p)).slice(0, 700))
   await p.screenshot({ path: `${OUT}/${foto}-1.png` })
@@ -46,9 +45,9 @@ try {
     ok(Number(total) === 15000 && Number(flete) === 0 && opcion === 'foraneo_dhl', 'doctor Mazatlán ≥ 5,000: DHL gratis (sin llaves de DHL: regla de siempre)')
   }
   if (paso === 'doctor_servicio') {
-    await compraPortal(b, 'doctor2@e2e.mx', { buscar: 'golden placenta', servicio: '1', foto: 'f3' })
-    const o = db(`select left(o.id::text, 8) || '|' || total || '|' || shipping_cost || '|' || coalesce(shipping_meta->'entrega'->'servicio'->>'codigo','-') || '|' || coalesce(shipping_meta->'entrega'->>'llega_hasta','-') from orders o join profiles p on p.id = o.doctor_id where p.email = 'doctor2@e2e.mx' order by o.created_at desc limit 1`)
-    console.log('pedido:', o); const [, total, flete, cod, llega] = o.split('|')
-    ok(cod === '1' && Number(flete) === 91 && Number(total) === 15091 && llega === '2026-11-05', 'servicio 12:00 elegido: envío normal gratis + 91 de diferencia, llega el 5 nov')
+    await compraPortal(b, 'doctor2@e2e.mx', { buscar: 'golden placenta', servicio: true, foto: 'f3' })
+    const o = db(`select left(o.id::text, 8) || '|' || total || '|' || shipping_cost || '|' || coalesce(shipping_meta->'entrega'->'servicio'->>'llega_fecha','-') || '|' || coalesce(shipping_meta->'entrega'->>'llega_hasta','-') from orders o join profiles p on p.id = o.doctor_id where p.email = 'doctor2@e2e.mx' order by o.created_at desc limit 1`)
+    console.log('pedido:', o); const [, total, flete, prometida, llega] = o.split('|')
+    ok(Number(flete) === 0 && Number(total) === 15000 && prometida !== '-' && llega === prometida, 'PAQ-SIMPLE · DHL: solo la regla (gratis desde 5,000, sin recargo) y la fecha más tardía de la cotización')
   }
 } finally { await b.close() }

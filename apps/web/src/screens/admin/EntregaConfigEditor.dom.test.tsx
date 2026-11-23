@@ -10,7 +10,7 @@ import type { EntregaConfig } from '../../data/ops/entrega'
 vi.mock('../../lib/supabase', () => ({ hasSupabase: true, supabase: { rpc: vi.fn() } }))
 beforeEach(cleanup)
 const CFG: EntregaConfig = { corte: '15:30:00', foraneo_gratis_desde: 5000, foraneo_costo: 600, local_gratis_desde: 500, local_costo: 0, cp_local_desde: '80000', cp_local_hasta: '80299',
-  dias_paqueteria: [1, 2, 3, 4, 5], dias_chofer: [1, 2, 3, 4, 5, 6], dias_entrega_foranea: [1, 2, 3, 4, 5], dhl_transito_min: 1, dhl_transito_max: 3, t1_activo: false, t1_transito_min: 2, t1_transito_max: 5,
+  dias_paqueteria: [1, 2, 3, 4, 5], dias_chofer: [1, 2, 3, 4, 5, 6], dias_entrega_foranea: [1, 2, 3, 4, 5], dhl_transito_min: 1, dhl_transito_max: 3, t1_activo: false, t1_transito_min: 2, t1_transito_max: 5, estafeta_activo: true, estafeta_transito_min: 2, estafeta_transito_max: 4,
   local_mismo_dia: true, recoge_lugar: 'Sucursal Renovacell, Culiacán', recoge_horario: 'Lunes a sábado de 10:00 a 18:00',
   horario_franjas: [{ desde: '10:30', hasta: '13:30' }, { desde: '15:30', hasta: '17:30' }], horario_intervalo_min: 30, horario_cupo: 1, horario_margen_min: 60, horario_dias_adelante: 7 }
 
@@ -59,7 +59,7 @@ describe('ENT-CFG · regla de entrega', () => {
     expect((screen.getByLabelText('C.P. local hasta') as HTMLInputElement).value).toBe('80500')
   })
   it('validación: días vacíos, tránsito invertido y sucursal sin texto', () => {
-    const base = { corte: '15:30', foraneo_gratis_desde: '5000', foraneo_costo: '600', local_gratis_desde: '500', local_costo: '0', cp_local_desde: '80000', cp_local_hasta: '80299', dias_paqueteria: [1], dias_chofer: [1], dias_entrega_foranea: [1], dhl_transito_min: '1', dhl_transito_max: '3', t1_activo: false, t1_transito_min: '2', t1_transito_max: '5', local_mismo_dia: true, recoge_lugar: 'Sucursal', recoge_horario: '10 a 18', horario_franjas: '10:30-13:30, 15:30-17:30', horario_intervalo_min: '30', horario_cupo: '1', horario_margen_min: '60', horario_dias_adelante: '7' }
+    const base = { corte: '15:30', foraneo_gratis_desde: '5000', foraneo_costo: '600', local_gratis_desde: '500', local_costo: '0', cp_local_desde: '80000', cp_local_hasta: '80299', dias_paqueteria: [1], dias_chofer: [1], dias_entrega_foranea: [1], dhl_transito_min: '1', dhl_transito_max: '3', t1_activo: false, t1_transito_min: '2', t1_transito_max: '5', estafeta_activo: true, estafeta_transito_min: '2', estafeta_transito_max: '4', local_mismo_dia: true, recoge_lugar: 'Sucursal', recoge_horario: '10 a 18', horario_franjas: '10:30-13:30, 15:30-17:30', horario_intervalo_min: '30', horario_cupo: '1', horario_margen_min: '60', horario_dias_adelante: '7' }
     expect(validarEntrega(base)).toBeNull()
     // ENT-H · bloques de entrega: forma HH:MM-HH:MM, fin después de inicio; cupo e intervalo acotados
     expect(validarEntrega({ ...base, horario_franjas: '10:30-09:00' })).toMatch(/Bloques de entrega/)

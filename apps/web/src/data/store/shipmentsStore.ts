@@ -39,6 +39,11 @@ export interface ShipmentInput {
   driver_id: string | null
   estimated_delivery_at: string | null
   status: string
+  /** PAQ-SIMPLE · guía manual (Estafeta): proveedor, costo y datos de la captura. Opcionales; el resto de envíos no los manda. */
+  provider?: string | null
+  provider_cost?: number | null
+  currency?: string | null
+  provider_meta?: Record<string, unknown> | null
 }
 
 // Un envío solo "se registró" cuando el servidor lo confirmó.
@@ -51,12 +56,17 @@ export async function createShipment(input: ShipmentInput): Promise<EnvioCreado>
     label_url: input.label_url ?? null, driver_id: input.driver_id, status: input.status,
     estimated_delivery_at: input.estimated_delivery_at, delivered_at: null, proof_image_url: null,
     received_by: null, incident: null, created_at: new Date().toISOString(),
+    ...(input.provider_meta ? { provider_meta: input.provider_meta } : {}),
   }
   if (hasSupabase && isUuid(input.order_id)) {
     const r = await confirmar('registrar el envío', supabase.from('shipments').insert({
       id, order_id: input.order_id, carrier: input.carrier, tracking_number: input.tracking_number,
       label_url: input.label_url ?? null, driver_id: isUuid(input.driver_id) ? input.driver_id : null,
       status: input.status, estimated_delivery_at: input.estimated_delivery_at,
+      ...(input.provider ? { provider: input.provider } : {}),
+      ...(input.provider_cost != null ? { provider_cost: input.provider_cost } : {}),
+      ...(input.currency ? { currency: input.currency } : {}),
+      ...(input.provider_meta ? { provider_meta: input.provider_meta as Json } : {}),
     }))
     if (!r.ok) return r
   }

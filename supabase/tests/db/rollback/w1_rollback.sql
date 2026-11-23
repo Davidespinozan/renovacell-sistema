@@ -9,6 +9,7 @@ begin;
 \ir ../../../rollback/equipo_adjuntos/99_down.sql   -- EQUIPO-ADJUNTOS (20270323) parcha el aviso del chat del equipo: se baja antes
 \ir ../../../rollback/compradores_promo/99_down.sql   -- COMPRADORES-PROMO (20270322) reescribe los comandos del bloque A: se baja antes
 \ir ../../../rollback/crm_embudo/99_down.sql   -- CRM (20270321) cuelga de cotizaciones, conversaciones y pedidos: se baja antes
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/importar_lote_fecha/99_down.sql   -- IMPORTAR-LOTE-FECHA (20270319) parcha importar_lote: se baja antes
 \ir ../../../rollback/avisos_pedido_exactos/99_down.sql   -- AVISOS-EXACTOS (20270317) parcha los avisos de pedido y crea un disparador diferido: se baja antes

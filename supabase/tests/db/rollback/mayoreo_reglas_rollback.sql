@@ -1,6 +1,7 @@
 -- MAYOREO-REGLAS (20270222) · el down devuelve el precio renglón por renglón exacto y retira el cálculo del pedido y el nivel;
 -- se reaplica idéntica.
 begin;
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/eventos_equipo/99_down.sql   -- EVENTOS-EQUIPO (20270313) parcha abrir/cerrar/estado de custodia, vender_pos y políticas: se baja antes

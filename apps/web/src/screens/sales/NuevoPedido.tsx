@@ -21,7 +21,7 @@ import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
 import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
-import { fleteDeEleccion, promesaDe, requiereDireccion, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
+import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
@@ -193,8 +193,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
       const r = await createOrder({ ...it.solicitud, operacion: it.op })
       if (r.ok) {
         intento.current = null; setRepetido(!!r.repetido)
-        const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
-        if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
+        const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; paqueteria?: string | null; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
+        if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: resumenPaqueteria({ tipo: e.tipo as 'foraneo', paqueteria: (e.paqueteria ?? null) as 'dhl' | null, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta }, opsEntrega?.corte.hoy) ?? e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
         borrarBorrador(claveBorrador)
         setFolio(r.order.external_ref ?? it.op.folio); onCreado?.({ id: r.order.id, external_ref: r.order.external_ref ?? null }); return
       }
@@ -229,7 +229,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   }
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
   const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || (invoice && !fiscalOk)))
-  const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // ENTREGA-SERVICIO · regla + diferencia del servicio elegido
+  const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // PAQ-SIMPLE · solo la regla (o el ajuste con motivo)
 
   return (
     <div className={'overlay' + (acoplado ? ' overlay--acoplado' : '')} onClick={acoplado ? undefined : onClose} hidden={oculto}>

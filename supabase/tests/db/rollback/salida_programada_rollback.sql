@@ -1,5 +1,6 @@
 -- SALIDA-PROGRAMADA (20270320) · el down regresa la regla y quita el comando; se reaplica idéntica.
 begin;
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 create temp table _sp as select (select md5(string_agg(p.oid::regprocedure::text || ':' || md5(pg_get_functiondef(p.oid)), ',' order by p.oid::regprocedure::text)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f') todas;
 \ir ../../../rollback/salida_programada/99_down.sql
 do $t$ begin

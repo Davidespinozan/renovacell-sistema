@@ -22,9 +22,9 @@ import { clientOf } from '../../data/mock/profiles'
 import { DOCTOR_ID } from '../../data/mock/orders'
 import { hasSupabase, currentUserId } from '../../lib/supabase'
 import { textoProblemasCheckout, useCheckoutCanonico, type ConfigServidor, type EleccionEntrega, type LineaVista, type PedidoMin, type ResultadoPedido } from './checkoutMotor'
-import { fleteTexto, opcionDe, promesaDe, requiereDireccion, requiereHorario, type HorarioElegido, type OpcionEntrega, type ServicioElegido } from '../../data/ops/entrega'
+import { fleteTexto, opcionDe, promesaDe, requiereDireccion, resumenPaqueteria, requiereHorario, type HorarioElegido, type OpcionEntrega, type ServicioElegido } from '../../data/ops/entrega'
 import { HorarioEntregaPicker } from '../../app/HorarioEntregaPicker'
-import { ServicioPaqueteria } from '../../app/ServicioPaqueteria'
+import { usePromesaDhl } from '../../app/PromesaPaqueteria'   // PAQ-SIMPLE · DHL promete con su cotización en vivo
 import { avisoInvalidada, claveDireccion, elegirEnIntencion, intencionInicial, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad, type Intencion, type Tarjeta } from './entregaUx'   // CX-V2-A/B/C
 import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 
@@ -126,7 +126,6 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const [choice, setChoice] = useState<EleccionEntrega | null>(null)
   const [opcion, setOpcion] = useState<string | null>(null)   // ENT-0 · id de la opción de entrega elegida (servidor)
   const [horario, setHorario] = useState<HorarioElegido | null>(null)   // ENT-H · horario de entrega local elegido (solo chofer)
-  const [servicio, setServicio] = useState<ServicioElegido | null>(null)   // ENTREGA-SERVICIO · servicio de paquetería elegido (con su fecha exacta)
   const [order, setOrder] = useState<PedidoMin | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [payNow, setPayNow] = useState(false)
@@ -202,12 +201,16 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
     void motor.revisar({ address: choice?.address ?? null, locationId: choice?.locationId, opcion, horario: null })
   }, [claveDir, dirRevision])   // eslint-disable-line react-hooks/exhaustive-deps
   const necesitaDireccion = ops ? (intencion === 'domicilio' || requiereDireccion(sel?.tipo)) : true   // sin opciones (demo/fixtures) se exige dirección como antes
-  // ENTREGA-SERVICIO · con paquetería se elige el servicio (fecha exacta); el más rápido suma solo su diferencia.
-  const conServicio = !!ops && sel?.tipo === 'foraneo' && sel.paqueteria === 'dhl' && !!choice?.address?.cp
-  const servicioSel = conServicio ? servicio : null
-  const envio = ops ? (sel ? sel.flete + (servicioSel?.diferencia ?? 0) : null) : null
+  // PAQ-SIMPLE (23 nov 2026) · solo se elige la paquetería (DHL o Estafeta) y se paga SOLO la regla. DHL promete la llegada
+  // más tardía de los servicios permitidos de su cotización en vivo; si falla, el rango de la regla (nunca se bloquea).
+  const hayDhl = !!ops?.opciones.some((o) => o.tipo === 'foraneo' && o.paqueteria === 'dhl' && o.permitido && o.disponible)
+  const promesaDhl = usePromesaDhl({ activa: conServidor && hayDhl && intencion === 'domicilio', cp: choice?.address?.cp ?? null, piezas: lineas.reduce((a, l) => a + l.qty, 0),
+    destino: { ciudad: choice?.address?.city, estado: choice?.address?.state }, cargar: servidor?.cargarServicios })
+  const servicioSel: ServicioElegido | null = sel?.tipo === 'foraneo' && sel.paqueteria === 'dhl' ? promesaDhl.servicio : null
+  const llegaDhl = promesaDhl.estado === 'cargando' ? 'cargando' as const : promesaDhl.llega_fecha
+  const envio = ops ? (sel ? sel.flete : null) : null
   // Total: el del servidor con envío cuando la revisión ya normalizó ESTA opción; si no, productos + flete de la opción (ambos del servidor).
-  const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && (motor.revision.entrega.servicio?.codigo ?? null) === (servicioSel?.codigo ?? null) && typeof motor.revision.total_con_envio === 'number'
+  const totalConEnvio = ops && sel && motor.revision?.entrega?.opcion === sel.id && typeof motor.revision.total_con_envio === 'number'
     ? motor.revision.total_con_envio
     : total != null && envio != null ? total + envio : total
   const necesitaHorario = !!ops && requiereHorario(sel)
@@ -215,8 +218,8 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const conVolumen = lineas.some((l) => l.por_volumen)
   // CX-V2-B · solo las alternativas relevantes; la dirección aparece cuando hay entrega a domicilio en juego.
   const esDomicilioSel = sel?.tipo === 'local' || sel?.tipo === 'foraneo'
-  const tarjetaRecoge: Tarjeta | null = ops ? tarjetasEntrega(ops, opcion, horario).find((t) => opcionDe(ops, t.id)?.tipo === 'recoge') ?? null : null
-  const opcionesCasa: Tarjeta[] = ops ? tarjetasDomicilio(ops, opcion, horario) : []
+  const tarjetaRecoge: Tarjeta | null = ops ? tarjetasEntrega(ops, opcion, horario, llegaDhl).find((t) => opcionDe(ops, t.id)?.tipo === 'recoge') ?? null : null
+  const opcionesCasa: Tarjeta[] = ops ? tarjetasDomicilio(ops, opcion, horario, llegaDhl) : []
   // CX-V2-B hotfix · estados de carga ESTABLES: mientras llega la primera revisión se muestra un esqueleto (sin el selector
   // completo que luego desaparecería); al cambiar de dirección, las opciones quedan atenuadas y bloqueadas hasta que el
   // servidor responda por la dirección nueva; si la revisión falla, no se confirma con los datos anteriores.
@@ -285,7 +288,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
               </p>
               {order.entrega && (
                 <p data-testid="checkout-promesa" style={{ fontSize: 13.5 }}>
-                  <b>{order.entrega.texto}</b>{order.entrega.flete > 0 ? ` · envío ${money(order.entrega.flete)}` : ' · sin costo de envío'}<br />
+                  <b>{resumenPaqueteria(order.entrega, hoy) ?? order.entrega.texto}</b>{order.entrega.flete > 0 ? ` · envío ${money(order.entrega.flete)}` : ' · sin costo de envío'}<br />
                   {promesaDe(order.entrega, hoy)}
                 </p>
               )}
@@ -412,12 +415,6 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                           <HorarioEntregaPicker value={horario} onChange={setHorario} cargar={servidor?.cargarHorarios} compacto />
                         </div>
                       )}
-                      {conServicio && sel && choice?.address?.cp && (
-                        <div style={{ marginTop: 10 }} data-testid="checkout-servicio">
-                          <ServicioPaqueteria cp={choice.address.cp} piezas={lineas.reduce((a, l) => a + l.qty, 0)} fleteRegla={sel.flete} hoy={hoy}
-                            destino={{ ciudad: choice.address.city, estado: choice.address.state }} value={servicio} onChange={(sv) => setServicio(sv)} cargar={servidor?.cargarServicios} />
-                        </div>
-                      )}
                       {sel && esDomicilioSel && (
                         <div style={{ ...NOTA, marginTop: 8 }} data-testid="checkout-corte">
                           {ops.corte.antes_de_corte ? `Pedidos antes de las ${ops.corte.hora} salen el mismo día.` : `Después de las ${ops.corte.hora} sale el siguiente día hábil.`}
@@ -457,7 +454,7 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                   <div data-testid="checkout-desglose" style={{ display: 'grid', gap: 4, marginBottom: 8 }}>
                     <div style={FILA} data-testid="checkout-productos"><span>Productos</span><span className="mono">{total != null ? money(total) : '—'}</span></div>
                     {conVolumen && <div style={{ ...FILA, color: 'var(--green-deep)' }} data-testid="checkout-volumen"><span>Precio por volumen aplicado</span><span /></div>}
-                    {sel && <div style={FILA} data-testid="checkout-envio"><span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.paqueteria === 'dhl' || sel.paqueteria === 't1' ? sel.paqueteria.toUpperCase() : tituloModalidad(sel).toLowerCase()}</span></span><span className="mono">{fleteTexto(envio ?? sel.flete, money)}</span></div>}
+                    {sel && <div style={FILA} data-testid="checkout-envio"><span>Envío <span style={{ color: 'var(--ink-3)' }}>· {sel.tipo === 'foraneo' ? tituloModalidad(sel) : tituloModalidad(sel).toLowerCase()}</span></span><span className="mono">{fleteTexto(envio ?? sel.flete, money)}</span></div>}
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>

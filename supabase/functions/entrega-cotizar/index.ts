@@ -2,13 +2,14 @@
 // Alberto: "los vendedores son los que tienen que elegir la paquetería del cliente y el cliente también… y al usuario tiene
 // que salirle exactamente cuándo llega su pedido". El doctor (en el portal) o su vendedor (pedido, caja, chat) ve los
 // servicios de la paquetería con su FECHA EXACTA de entrega antes de comprar; la cotización queda guardada (2 h) y el
-// pedido la usa (_entrega_servicio). El paquete es un estimado por piezas (Configuración → Regla de entrega); la guía
-// real la genera Almacén con el servicio elegido.
+// pedido la usa (_entrega_servicio). El paquete es un estimado por piezas (Configuración → Regla de entrega).
+// PAQ-SIMPLE (23 nov 2026) · ya no se elige servicio al vender: la cotización solo da la FECHA que se promete (la llegada
+// más tardía de los servicios permitidos; ECONOMY SELECT nunca entra). Almacén elige el servicio al generar la guía.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { buildRateRequest, dhlBaseUrl, fetchConTimeout, parseRates, TIMEOUT_COTIZACION_MS, type NeutralShipper } from '../shipping/dhl.ts'
-import { paqueteEstimado, serviciosCotizados } from '../_shared/cotizarEnvio.ts'
+import { paqueteEstimado, promesaDeServicios, serviciosCotizados } from '../_shared/cotizarEnvio.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -45,11 +46,12 @@ Deno.serve(conCors(async (req) => {
     }, Math.min(TIMEOUT_COTIZACION_MS, 15_000))
     const data = await r.json().catch(() => ({}))
     if (!r.ok) return json(502, { error: 'paqueteria', message: 'DHL no respondió la cotización: se usa la regla de entrega.' })
-    const servicios = serviciosCotizados(parseRates(data))
-    if (!servicios.length) return json(502, { error: 'sin_servicios', message: 'DHL no ofrece servicio a ese código postal: se usa la regla de entrega.' })
+    const servicios = serviciosCotizados(parseRates(data))   // PAQ-SIMPLE · sin los servicios prohibidos
+    const promesa = promesaDeServicios(servicios)
+    if (!servicios.length || !promesa) return json(502, { error: 'sin_servicios', message: 'DHL no ofrece servicio a ese código postal: se usa la regla de entrega.' })
     const { data: ins, error } = await admin.from('entrega_cotizaciones').insert({ proveedor: 'dhl', cp, piezas, paquete: pkg, servicios, creado_por: q.quien.uid }).select('id, expira_at').single()
     if (error || !ins) return json(500, { error: 'guardar' })
-    return json(200, { cotizacion_id: ins.id, expira_at: ins.expira_at, proveedor: 'dhl', servicios })
+    return json(200, { cotizacion_id: ins.id, expira_at: ins.expira_at, proveedor: 'dhl', servicios, promesa })
   } catch {
     return json(504, { error: 'tiempo', message: 'DHL tardó demasiado: se usa la regla de entrega.' })
   }

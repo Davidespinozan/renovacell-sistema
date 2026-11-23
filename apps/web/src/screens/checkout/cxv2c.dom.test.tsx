@@ -196,7 +196,7 @@ describe('dirección dentro del envío', () => {
     montar({ subtotal: 500 })
     await listo(); await waitFor(() => expect(marcado('foraneo_dhl')).toBe(true))
     elegirUbicacion(/Consultorio/)
-    await waitFor(() => expect(screen.getByTestId('checkout-entrega-aviso')).toHaveTextContent('Envío por DHL: no aplica para esta dirección.'))
+    await waitFor(() => expect(screen.getByTestId('checkout-entrega-aviso')).toHaveTextContent('DHL: no aplica para esta dirección.'))
     expect(marcado('domicilio')).toBe(true)
     expect(screen.queryByTestId('entrega-foraneo_dhl')).toBeNull()
     fireEvent.click(screen.getByTestId('entrega-local_chofer'))

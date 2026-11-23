@@ -39,7 +39,7 @@ begin
   perform tests.throws('select public.entrega_horarios_disponibles()', 'permission denied', '0.7 · anónimo no ve horarios');
   perform tests.act_as(v_pos);
   perform tests.throws('select * from public.entrega_horarios', 'permission denied', '0.8 · Ventas no lee la tabla directo');
-  perform tests.eq(jsonb_array_length(public.entrega_opciones('staff', 1000, '80020', mie) -> 'opciones'), 5, '0.9 · entrega_opciones conserva su forma (5 opciones)');
+  perform tests.eq(jsonb_array_length(public.entrega_opciones('staff', 1000, '80020', mie) -> 'opciones'), 6, '0.9 · entrega_opciones conserva su forma (6 opciones; PAQ-SIMPLE suma Estafeta)');
 
   -- ══ 1 · horarios disponibles ═══════════════════════════════════════════════════════════════════════
   disp := public.entrega_horarios_disponibles(mie);

@@ -1,6 +1,7 @@
 -- ENTREGA DEL PEDIDO (171) · el down retira la entrega (tabla, columnas, funciones, guarda) y el checkout vuelve a la 119/137;
 -- se reaplica idéntica. Con pedidos que ya llevan entrega o flete, el down se niega (no destruye información).
 begin;
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial

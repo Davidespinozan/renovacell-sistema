@@ -49,11 +49,11 @@ const DISP: HorariosDisponibles = {
 }
 const OPS_LOCAL: OpcionesEntrega = { ...OPS, cp: '80020', local: true, sugerida: 'local_chofer', opciones: OPS.opciones.map((o) => o.id === 'local_chofer' ? { ...o, permitido: true, motivo: null } : o.id === 'foraneo_dhl' || o.id === 'foraneo_t1' ? { ...o, permitido: false, motivo: 'ZONA_LOCAL' } : o) }
 
-function montar(confirmacion: ResultadoCheckout = { confirmado: true, cart_id: 'K', order_id: 'O1', folio: 'S100009', total: 1650, envio: 600, entrega: ENTREGA_DHL }, ops: OpcionesEntrega = OPS) {
-  const rev: Array<{ loc: string | null | undefined; dir: unknown; entrega: string | null | undefined; horario?: unknown }> = []
+function montar(confirmacion: ResultadoCheckout = { confirmado: true, cart_id: 'K', order_id: 'O1', folio: 'S100009', total: 1650, envio: 600, entrega: ENTREGA_DHL }, ops: OpcionesEntrega = OPS, cargarServicios?: typeof import('../../data/ops/entrega').cotizarEnvio) {
+  const rev: Array<{ loc: string | null | undefined; dir: unknown; entrega: string | null | undefined; horario?: unknown; servicio?: unknown }> = []
   const cliente = {
-    revisarCheckout: async (_c: string, loc?: string | null, dir?: unknown, entrega?: string | null, horario?: { fecha: string; inicio: string } | null) => {
-      rev.push({ loc, dir, entrega, horario })
+    revisarCheckout: async (_c: string, loc?: string | null, dir?: unknown, entrega?: string | null, horario?: { fecha: string; inicio: string } | null, servicio?: unknown) => {
+      rev.push({ loc, dir, entrega, horario, ...(servicio ? { servicio } : {}) })
       if (!entrega) return { ok: true as const, data: { ...sinEntrega(), entrega_opciones: ops } }
       const o = ops.opciones.find((x) => x.id === entrega)!
       if (o.tipo === 'local' && !horario) return { ok: true as const, data: { ...sinEntrega(), problemas: ['HORARIO_REQUERIDO'], entrega_opciones: ops } }
@@ -63,7 +63,7 @@ function montar(confirmacion: ResultadoCheckout = { confirmado: true, cart_id: '
     confirmarCheckout: async () => ({ ok: true as const, data: confirmacion }),
   }
   const onPay = vi.fn(); const onDone = vi.fn()
-  render(<CheckoutCanonico base={null} servidor={{ cliente: cliente as never, obtenerCartId: async () => 'K', cargarHorarios: async () => ({ ok: true, data: DISP }) }} onPay={onPay} onDone={onDone} onClose={() => {}} />)
+  render(<CheckoutCanonico base={null} servidor={{ cliente: cliente as never, obtenerCartId: async () => 'K', cargarHorarios: async () => ({ ok: true, data: DISP }), ...(cargarServicios ? { cargarServicios } : {}) }} onPay={onPay} onDone={onDone} onClose={() => {}} />)
   return { rev, onDone }
 }
 
@@ -75,13 +75,24 @@ describe('ENT-1 · entrega en el checkout', () => {
     expect(screen.queryByTestId('entrega-mostrador')).toBeNull()   // lo que es solo del personal ni se muestra
     const dhl = screen.getByTestId('entrega-foraneo_dhl')
     await waitFor(() => expect(dhl.querySelector('input')).toBeChecked())   // la sugerida se preselecciona al llegar las opciones
-    expect(dhl).toHaveTextContent(/\$600/); expect(dhl).toHaveTextContent(/Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct/)
+    expect(dhl).toHaveTextContent(/\$600/); await waitFor(() => expect(dhl).toHaveTextContent(/Llega entre el jueves 22 de oct y el lunes 26 de oct/))   // PAQ-SIMPLE · sin cotización de DHL: el rango de la regla
     expect(screen.queryByTestId('entrega-local_chofer')).toBeNull()   // CX-V2-B · fuera de zona: no ocupa tarjeta
     expect(screen.queryByTestId('entrega-foraneo_t1')).toBeNull()     // CX-V2-B · T1 inactivo: oculto
     expect(screen.getByTestId('checkout-envio')).toHaveTextContent(/\$600/)
     expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,650/)
     expect(screen.getByTestId('checkout-corte')).toHaveTextContent(/antes de las 15:30 salen el mismo día/)
     expect(screen.queryByTestId('checkout-aviso')).toBeNull()   // REQUIERE_ENTREGA no se grita: la entrega se elige aquí
+  })
+  it('PAQ-SIMPLE · DHL con cotización: la fecha más tardía en la tarjeta, el flete de la regla y la promesa viaja al confirmar', async () => {
+    const cot = { cotizacion_id: 'cot-9', expira_at: new Date(Date.now() + 7_200_000).toISOString(), proveedor: 'dhl' as const, servicios: [
+      { codigo: '1', nombre: 'EXPRESS 12:00', costo: 420, llega_fecha: '2026-10-22' }, { codigo: 'N', nombre: 'EXPRESS', costo: 330, llega_fecha: '2026-10-23' }, { codigo: 'G', nombre: 'ECONOMY SELECT', costo: 200, llega_fecha: '2026-10-28' }] }
+    const { rev } = montar(undefined, OPS, async () => ({ ok: true, data: cot }))
+    const dhl = await screen.findByTestId('entrega-foraneo_dhl')
+    await waitFor(() => expect(dhl).toHaveTextContent(/Llega el viernes 23 de oct/))   // G (28 oct) nunca cuenta
+    expect(dhl).toHaveTextContent(/\$600/); expect(screen.getByTestId('checkout-total')).toHaveTextContent(/1,650/)
+    fireEvent.click(screen.getByTestId('checkout-crear'))
+    await waitFor(() => expect(screen.getByTestId('checkout-exito')).toBeInTheDocument())
+    expect(rev[rev.length - 1]).toMatchObject({ entrega: 'foraneo_dhl', servicio: { cotizacion_id: 'cot-9', codigo: 'N' } })
   })
   it('al confirmar revisa con el id de la opción elegida (nunca el flete) y muestra la promesa del pedido', async () => {
     const { rev, onDone } = montar()
@@ -90,7 +101,7 @@ describe('ENT-1 · entrega en el checkout', () => {
     await waitFor(() => expect(screen.getByTestId('checkout-exito')).toBeInTheDocument())
     expect(rev).toHaveLength(2); expect(rev[1]).toMatchObject({ loc: 'L1', entrega: 'foraneo_dhl' })
     expect(JSON.stringify(rev[1])).not.toMatch(/600|flete/)
-    expect(screen.getByTestId('checkout-promesa')).toHaveTextContent(/Envío por DHL · envío \$600/)
+    expect(screen.getByTestId('checkout-promesa')).toHaveTextContent(/DHL · llega entre el jueves 22 de oct y el lunes 26 de oct · envío \$600/)   // PAQ-SIMPLE
     expect(screen.getByTestId('checkout-promesa')).toHaveTextContent(/llega entre el jueves 22 oct y el lunes 26 oct/)
     expect(onDone).toHaveBeenCalledTimes(1)
   })

@@ -55,10 +55,9 @@ describe('ENT-2 · SelectorEntrega', () => {
     await waitFor(() => expect(screen.getByTestId('selector-entrega')).toBeInTheDocument())
     expect(cargar).toHaveBeenCalledWith('staff', 1000, '82000')
     expect(screen.getByTestId('valor')).toHaveTextContent('{"opcion":"foraneo_dhl"}')
-    expect(screen.getByTestId('entrega-foraneo_dhl')).toHaveTextContent(/\$600/); expect(screen.getByTestId('entrega-foraneo_dhl')).toHaveTextContent(/Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct/)
+    expect(screen.getByTestId('entrega-foraneo_dhl')).toHaveTextContent(/\$600/); expect(screen.getByTestId('entrega-foraneo_dhl')).toHaveTextContent(/^DHL/); expect(screen.getByTestId('entrega-foraneo_dhl')).toHaveTextContent(/Llega entre el jueves 22 de oct y el lunes 26 de oct/)
     expect(screen.getByTestId('entrega-local_chofer')).toHaveTextContent(/el CP no es de Culiacán/)
-    expect(screen.getByTestId('entrega-foraneo_t1')).toHaveTextContent(/Pendiente de integrar/)
-    expect(screen.getByTestId('entrega-foraneo_t1').querySelector('input')).toBeDisabled()
+    expect(screen.queryByTestId('entrega-foraneo_t1')).toBeNull()   // PAQ-SIMPLE · paquetería apagada: no se ofrece
     expect(screen.getByTestId('completa')).toHaveTextContent('true')
   })
   it('cambiar el flete exige motivo; con motivo viaja {opcion, flete, motivo}; volver al de la regla lo quita', async () => {

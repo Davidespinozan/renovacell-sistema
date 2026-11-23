@@ -1,4 +1,4 @@
-// CX-V2-A · fixture de pruebas: opciones de entrega como las arma el SERVIDOR para un doctor (espejo de entrega_opciones, 171).
+// CX-V2-A · fixture de pruebas: opciones de entrega como las arma el SERVIDOR para un doctor (espejo de entrega_opciones, 171; PAQ-SIMPLE suma Estafeta).
 import type { OpcionEntrega, OpcionesEntrega } from '../../data/ops/entrega'
 
 const base = { salida: '2026-10-21', antes_de_corte: true, llega_desde: '2026-10-21', llega_hasta: '2026-10-21' }
@@ -18,6 +18,8 @@ export function opsPara(cp: string | null, subtotal: number): OpcionesEntrega {
       o({ id: 'recoge', tipo: 'recoge', paqueteria: null, texto: 'Recoger en Sucursal Renovacell, Culiacán' }),
       o({ id: 'local_chofer', tipo: 'local', paqueteria: 'chofer', texto: 'Entrega local (chofer de Renovacell)', permitido: local && subtotal >= 500, motivo: !cp ? 'REQUIERE_DIRECCION' : !local ? 'ZONA_FORANEA' : subtotal < 500 ? 'MINIMO_LOCAL' : null }),
       o({ id: 'foraneo_dhl', tipo: 'foraneo', paqueteria: 'dhl', texto: 'Envío por DHL', flete: fletFor, permitido: !!cp && !local, motivo: !cp ? 'REQUIERE_DIRECCION' : local ? 'ZONA_LOCAL' : null, llega_desde: '2026-10-22', llega_hasta: '2026-10-26' }),
+      // PAQ-SIMPLE · Estafeta: misma regla de precio, fecha por regla (2–4 días)
+      o({ id: 'foraneo_estafeta', tipo: 'foraneo', paqueteria: 'estafeta', texto: 'Envío por Estafeta', flete: fletFor, permitido: !!cp && !local, motivo: !cp ? 'REQUIERE_DIRECCION' : local ? 'ZONA_LOCAL' : null, llega_desde: '2026-10-23', llega_hasta: '2026-10-27' }),
       o({ id: 'foraneo_t1', tipo: 'foraneo', paqueteria: 't1', texto: 'Envío por T1', flete: fletFor, permitido: !!cp && !local, motivo: !cp ? 'REQUIERE_DIRECCION' : local ? 'ZONA_LOCAL' : null, disponible: false }),
     ],
   }

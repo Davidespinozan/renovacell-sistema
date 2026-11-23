@@ -1,5 +1,6 @@
 -- CC-6 · El rollback retira revisiones/operaciones/eventos/comandos sin tocar CC-5 ni W1.
 begin;
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/link_pago/99_down.sql   -- LINK DE PAGO (20270309) redefine el push de avisos y usa helpers de pedido por WhatsApp: se baja antes

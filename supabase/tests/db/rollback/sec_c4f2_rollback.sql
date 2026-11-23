@@ -2,6 +2,7 @@
 -- (misma huella, dueño, permisos y forma), elimina las auxiliares y no toca datos. Revertir REABRE los dos hallazgos
 -- (se demuestra abajo). Después se vuelve a aplicar la 146 sobre el estado revertido y queda igual que antes.
 begin;
+\ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes
 \ir ../../../rollback/mayoreo_reglas/99_down.sql   -- MAYOREO-REGLAS (20270222) redefine precio y cobro: se baja antes de la foto inicial

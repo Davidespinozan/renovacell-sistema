@@ -26,6 +26,7 @@ import {
   consultarDHL, decisionPrevia, guiasDistintas, horasDesde, fetchConTimeout, TIMEOUT_COTIZACION_MS, TIMEOUT_GUIA_MS, TIMEOUT_CONSULTA_MS, MINUTOS_MINIMOS_SIN_GUIA, MINUTOS_VIGENCIA_CONSULTA,   // DHL D1 · reconciliación
   type NeutralShipper, type NeutralReceiver, type NeutralPackage, fechaEntregaDhl,   // ENTREGA-SERVICIO
 } from './dhl.ts'
+import { SERVICIOS_DHL_EXCLUIDOS, servicioDhlPermitido, sinServiciosExcluidos } from '../_shared/cotizarEnvio.ts'   // PAQ-SIMPLE · servicios de DHL prohibidos (ECONOMY SELECT)
 import { conCors } from '../_shared/cors.ts'   // CC-0B.2 · lista blanca de orígenes (antes '*')
 import { resumenDhl, recibioSegunPaqueteria, debeConsultar } from './rastreo.ts'   // PAQ-A · rastreo neutral
 import { errorRecoleccion, limpiarRecoleccion, ahoraLocalOrigen, type RecoleccionSolicitada } from './recoleccion.ts'   // PAQ-B · recolección
@@ -81,18 +82,10 @@ async function companyShipper(admin: any): Promise<{ shipper: OrigenEnvios; miss
   return { shipper, missing }
 }
 
-// PAQUETERÍA AL VENDER (2 nov 2026) · la paquetería y el servicio los eligen el cliente o su vendedor al comprar; Almacén
-// solo genera la guía con eso. Cambiarlo exige un motivo (queda en la guía). Sin servicio elegido (pedidos de antes o si la
-// paquetería no respondió al vender), Almacén elige como siempre.
-// deno-lint-ignore no-explicit-any
-async function revisarServicioVendido(admin: any, orderId: string, proveedor: string, codigo: string, motivo: string): Promise<{ ok: true; cambio: string | null } | { ok: false; vendido: Record<string, unknown> }> {
-  const { data: o } = await admin.from('orders').select('shipping_meta').eq('id', orderId).maybeSingle()
-  const sv = ((o?.shipping_meta as Record<string, any> | null)?.entrega?.servicio ?? null) as Record<string, unknown> | null
-  if (!sv || !sv.codigo) return { ok: true, cambio: null }
-  if (String(sv.proveedor ?? 'dhl') === proveedor && String(sv.codigo) === codigo) return { ok: true, cambio: null }
-  if (motivo.trim().length >= 5) return { ok: true, cambio: motivo.trim().slice(0, 300) }
-  return { ok: false, vendido: { proveedor: sv.proveedor, codigo: sv.codigo, nombre: sv.nombre, llega_fecha: sv.llega_fecha } }
-}
+// PAQ-SIMPLE (23 nov 2026) · al vender solo se elige la paquetería (DHL o Estafeta) y se promete una fecha; el SERVICIO lo
+// elige Almacén aquí al generar la guía, sin motivo (antes: 409 si no era el vendido). ECONOMY SELECT ('G') nunca se ofrece
+// ni se acepta (lista única en _shared/cotizarEnvio.ts).
+const errorServicioExcluido = (codigo: string) => ({ error: 'servicio_no_permitido', codigo, excluidos: SERVICIOS_DHL_EXCLUIDOS, message: `El servicio ${codigo} de DHL (Economy Select) no se usa en Renovacell. Elige otro servicio.` })
 
 const safeErr = (msg: string) => msg.slice(0, 300)
 // deno-lint-ignore no-explicit-any
@@ -397,8 +390,6 @@ Deno.serve(conCors(async (req) => {
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!serviceCode) return json(400, { error: 'Falta el servicio (elige una tarifa).' })
       if (!Number.isFinite(montoVisto) || montoVisto <= 0) return json(400, { error: 'Falta la tarifa confirmada (vuelve a cotizar).' })
-      const svT1 = await revisarServicioVendido(admin, orderId, 't1', serviceCode, s(p.cambio_motivo))   // PAQUETERÍA AL VENDER
-      if (!svT1.ok) return json(409, { error: 'servicio_vendido', vendido: svT1.vendido, message: `Este pedido se vendió con ${String(svT1.vendido.nombre ?? svT1.vendido.codigo)}. Usa ese servicio o escribe el motivo del cambio.` })
       // Origen: la MISMA fuente que DHL (company_settings · Origen de envíos, nunca el fiscal), por CAMPOS (183): sin heurísticas.
       const origen = datosOrigenT1(shipper), destino = datosDestinoT1(receiver)
       const faltaG = faltantesGuia(origen, destino)
@@ -601,7 +592,7 @@ Deno.serve(conCors(async (req) => {
         const r = await fetchConTimeout(fetch, `${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) }, TIMEOUT_COTIZACION_MS)
         const data = await r.json().catch(() => ({}))
         if (!r.ok) { obs('rate', 'provider_error', { code: r.status, mensaje: 'DHL respondió error en cotización' }); return json(502, { error: dhlErrorMessage(r.status, data) }) }
-        const rates = parseRates(data)
+        const rates = sinServiciosExcluidos(parseRates(data))   // PAQ-SIMPLE · sin ECONOMY SELECT
         if (!rates.length) { obs('rate', 'provider_error', { code: 'sin_tarifas', mensaje: 'DHL no devolvió tarifas' }); return json(502, { error: 'DHL no devolvió tarifas para estos datos.' }) }
         return json(200, { rates })
       }
@@ -613,8 +604,7 @@ Deno.serve(conCors(async (req) => {
       const idemKey = s(p.idempotencyKey) || `${orderId}:${productCode}`
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!productCode) return json(400, { error: 'Falta el código de servicio (elige una tarifa).' })
-      const sv = await revisarServicioVendido(admin, orderId, 'dhl', productCode, s(p.cambio_motivo))
-      if (!sv.ok) return json(409, { error: 'servicio_vendido', vendido: sv.vendido, message: `Este pedido se vendió con ${String(sv.vendido.nombre ?? sv.vendido.codigo)}${sv.vendido.llega_fecha ? ` (llega el ${sv.vendido.llega_fecha})` : ''}. Usa ese servicio o escribe el motivo del cambio.` })
+      if (!servicioDhlPermitido(productCode)) return json(422, errorServicioExcluido(productCode))   // PAQ-SIMPLE · Almacén elige el servicio (sin motivo), nunca ECONOMY SELECT
 
       // 0) Guía existente → idempotente (0 llamadas a DHL).
       const { data: existing } = await admin.from('shipments')
@@ -673,7 +663,7 @@ Deno.serve(conCors(async (req) => {
         const rq = await fetchConTimeout(fetch, `${base}/rates`, { method: 'POST', headers: H, body: JSON.stringify(buildRateRequest(shipper, receiver, pkg, account)) }, TIMEOUT_COTIZACION_MS)
         const rd = await rq.json().catch(() => ({}))
         if (!rq.ok) { obs('create_shipment', 'provider_error', { code: rq.status, mensaje: 'DHL respondió error en cotización previa a la guía' }); await failAttempt(admin, attemptId, dhlErrorMessage(rq.status, rd)); return json(502, { error: dhlErrorMessage(rq.status, rd) }) }
-        serverRate = parseRates(rd).find((x) => String(x.serviceCode) === productCode)
+        serverRate = sinServiciosExcluidos(parseRates(rd)).find((x) => String(x.serviceCode) === productCode)
       } catch (e) {
         obs('create_shipment', 'provider_error', { code: 'rate_exception', error: e })
         await failAttempt(admin, attemptId, `rate: ${(e as Error).message}`)
@@ -726,7 +716,7 @@ Deno.serve(conCors(async (req) => {
         order_id: orderId, carrier: 'DHL', tracking_number: tracking, status: 'in_transit',
         estimated_delivery_at: estimatedDeliveryAt, provider: 'dhl', service_code: productCode,
         label_path: labelPath, package: pkg, ship_from: shipper, ship_to: receiver,
-        provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')), ...(sv.cambio ? { cambio_servicio_motivo: sv.cambio } : {}) }, provider_cost: serverRate.amount,
+        provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')) }, provider_cost: serverRate.amount,
         currency: serverRate.currency, quote_ref: quoteRef,
       }
       const { error: finErr } = await admin.rpc('finalize_shipment', { p_attempt_id: attemptId, p_shipment: shipmentRow as unknown as never })

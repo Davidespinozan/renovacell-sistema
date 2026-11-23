@@ -42,7 +42,7 @@ begin
   update public.entrega_cotizaciones set expira_at = mie + interval '2 hours' where id = q;
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   r := public._entrega_normalizar('staff', 1000, '82000', jsonb_build_object('opcion', 'foraneo_dhl', 'salida_programada', v_prog::text, 'servicio', jsonb_build_object('cotizacion_id', q, 'codigo', 'N')), mie);
-  perform tests.ok((r -> 'servicio' ->> 'llega_fecha')::date = v_prog + 2 and r ->> 'llega_hasta' = (v_prog + 2)::text and r -> 'servicio' ->> 'llega_at' like (v_prog + 2)::text || 'T23:59%', '3 · llega 2 días después de la salida agendada (como lo cotizó DHL)');
+  perform tests.ok((r -> 'servicio' ->> 'llega_fecha')::date = v_prog + 2 and r ->> 'llega_hasta' = (v_prog + 2)::text, '3 · llega 2 días después de la salida agendada (como lo cotizó DHL)');
 
   -- ══ 4 · reprogramar un pedido hecho: no cambia el precio; permisos; motivo ══
   perform tests.act_as(v_pos);

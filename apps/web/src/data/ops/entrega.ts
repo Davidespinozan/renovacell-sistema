@@ -1,9 +1,10 @@
 // ENT-0 · Entrega del pedido: lo que el SERVIDOR decide (opciones permitidas, flete por regla, promesa de llegada con el
 // corte de las 15:30) y lo que aquí solo se muestra. El cliente nunca manda el flete: manda el id de la opción elegida.
 import { hasSupabase, supabase } from '../../lib/supabase'
+import { promesaDeServicios } from '../../../../../supabase/functions/_shared/cotizarEnvio'   // PAQ-SIMPLE · la MISMA regla de promesa que la base
 
 export type TipoEntrega = 'mostrador' | 'recoge' | 'local' | 'foraneo'
-export type Paqueteria = 'chofer' | 'dhl' | 't1'
+export type Paqueteria = 'chofer' | 'dhl' | 't1' | 'estafeta'   // PAQ-SIMPLE · Estafeta (fecha por regla hasta integrar su API)
 export interface OpcionEntrega {
   id: string; tipo: TipoEntrega; paqueteria: Paqueteria | null; flete: number; permitido: boolean; motivo: string | null; disponible: boolean
   salida: string; antes_de_corte: boolean; llega_desde: string; llega_hasta: string; texto: string
@@ -26,7 +27,8 @@ export interface EntregaPedido {
   /** ENT-H · solo la entrega local por chofer: el horario reservado en la agenda. */
   horario?: HorarioEntrega | null
   reprogramado?: { anterior?: HorarioEntrega | null; motivo: string; at: string } | null
-  /** ENTREGA-SERVICIO · el servicio de paquetería elegido al vender, con su fecha exacta. */
+  /** PAQ-SIMPLE · la PROMESA de DHL (fecha de la cotización en vivo). No ata a Almacén: el servicio lo elige al hacer la guía.
+   *  Los pedidos de antes del 23 nov pueden traer codigo/nombre del servicio que se vendió. */
   servicio?: ServicioPedido | null
   /** SALIDA PROGRAMADA · la salida la agendó el personal (no es la del día). */
   programada?: boolean
@@ -34,15 +36,17 @@ export interface EntregaPedido {
 /** Lo que manda quien pide: la opción, el horario (entrega local) y, SOLO el personal, un flete distinto con su motivo. */
 export interface EleccionEntregaServidor { opcion: string; flete?: number; motivo?: string; horario?: HorarioElegido | null; servicio?: ServicioElegido | null; salida_programada?: string | null }   // SALIDA PROGRAMADA · AAAA-MM-DD, solo personal
 
-// ═══ ENTREGA-SERVICIO (2 nov 2026) · el cliente o su vendedor eligen el SERVICIO de la paquetería al vender, con su fecha
-// exacta de entrega; Almacén solo genera la guía de ese servicio. Precio: la regla de siempre + la diferencia contra el
-// servicio más barato (la pone el servidor; aquí solo se muestra). Si la paquetería no responde, se vende con la regla.
-export interface ServicioCotizado { codigo: string; nombre: string; costo: number; diferencia: number; llega_at?: string; llega_fecha: string }
-export interface CotizacionEnvio { cotizacion_id: string; expira_at: string; proveedor: 'dhl' | 't1'; servicios: ServicioCotizado[] }
-/** Lo que viaja al servidor: la cotización y el código. `diferencia` es solo para mostrar el total (el servidor la recalcula). */
-export interface ServicioElegido { cotizacion_id: string; codigo: string; diferencia?: number }
-/** El servicio que quedó en el pedido (shipping_meta.entrega.servicio). */
-export interface ServicioPedido { proveedor: string; codigo: string; nombre: string; llega_at?: string; llega_fecha: string; costo_paqueteria?: number; diferencia?: number; cotizacion_id?: string }
+// ═══ PAQ-SIMPLE (23 nov 2026, reemplaza ENTREGA-SERVICIO del 2 nov) · al vender solo se elige la PAQUETERÍA (DHL o
+// Estafeta). El cliente paga SOLO la regla (gratis desde el mínimo; si no, el costo fijo): ya no hay recargo por servicio.
+// DHL promete la llegada MÁS TARDÍA de los servicios permitidos de la cotización en vivo (Almacén elige el servicio
+// después); si la cotización falla, el rango de la regla. Estafeta (aún sin API): el rango de la regla.
+export interface ServicioCotizado { codigo: string; nombre: string; costo: number; llega_at?: string; llega_fecha: string }
+export interface CotizacionEnvio { cotizacion_id: string; expira_at: string; proveedor: 'dhl' | 't1'; servicios: ServicioCotizado[]; promesa?: { codigo: string; llega_fecha: string } | null }
+/** Lo que viaja al servidor para la promesa de DHL: la cotización (y el servicio en que se basa la fecha, solo informativo).
+ *  La base recalcula la fecha con la cotización guardada; nunca cambia el precio. */
+export interface ServicioElegido { cotizacion_id: string; codigo: string; llega_fecha?: string }
+/** La promesa que quedó en el pedido (shipping_meta.entrega.servicio). codigo/nombre solo en pedidos de antes. */
+export interface ServicioPedido { proveedor: string; llega_fecha: string; llega_at?: string; cotizacion_id?: string; promesa?: string; codigo?: string; nombre?: string; costo_paqueteria?: number; diferencia?: number }
 type ResultadoCot = { ok: true; data: CotizacionEnvio } | { ok: false; error: string }
 export async function cotizarEnvio(cp: string, piezas: number, destino?: { ciudad?: string | null; estado?: string | null }): Promise<ResultadoCot> {
   if (!hasSupabase) return { ok: false, error: 'Sin conexión con el servidor.' }
@@ -57,14 +61,40 @@ export async function cotizarEnvio(cp: string, piezas: number, destino?: { ciuda
     return d?.cotizacion_id && Array.isArray(d.servicios) && d.servicios.length ? { ok: true, data: d } : { ok: false, error: 'Sin servicios para ese código postal.' }
   } catch { return { ok: false, error: 'No se pudo cotizar el envío: se usa la regla de entrega.' } }
 }
-/** El flete que verá el cliente con la elección actual: el ajuste del personal si lo hay; si no, la regla + la diferencia del servicio. */
+/** El flete que verá el cliente con la elección actual: el ajuste del personal si lo hay; si no, SOLO la regla de la opción
+ *  (PAQ-SIMPLE · la paquetería o la cotización no cambian el precio). */
 export function fleteDeEleccion(e: EleccionEntregaServidor | null | undefined, ops: OpcionesEntrega | null | undefined): number {
   if (!e) return 0
   if (e.flete != null) return e.flete
-  return Math.round(((opcionDe(ops, e.opcion)?.flete ?? 0) + (e.servicio?.diferencia ?? 0)) * 100) / 100
+  return opcionDe(ops, e.opcion)?.flete ?? 0
 }
-/** Lo que paga el cliente por ese servicio: la regla de la opción + la diferencia contra el más barato. */
-export function precioServicio(fleteRegla: number, s: Pick<ServicioCotizado, 'diferencia'>): number { return Math.round((fleteRegla + (s.diferencia || 0)) * 100) / 100 }
+/** PAQ-SIMPLE · la promesa de DHL de una cotización: la llegada más tardía de los servicios permitidos (misma regla que la base). */
+export function promesaCotizacion(c: Pick<CotizacionEnvio, 'servicios'> | null | undefined): { codigo: string; llega_fecha: string } | null {
+  return c ? promesaDeServicios(c.servicios ?? []) : null
+}
+/** Nombre corto de la paquetería para el cliente («DHL», «Estafeta»). */
+export const NOMBRE_PAQUETERIA: Record<string, string> = { dhl: 'DHL', estafeta: 'Estafeta', t1: 'T1', chofer: 'Chofer' }
+/** «lunes 24 de nov» (PAQ-SIMPLE · la fecha de llegada que ve el cliente). */
+export function fechaLlegada(iso: string | null | undefined, hoy?: string | null): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return ''
+  if (hoy && iso.slice(0, 10) === hoy) return 'hoy'
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
+  return `${DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} de ${MESES[m - 1]}`   // DIAS/MESES: abajo, con fechaCorta
+}
+/** «Llega el lunes 24 de nov» o «Llega entre el lunes 24 de nov y el miércoles 26 de nov». */
+export function textoLlegada(desde: string | null | undefined, hasta: string | null | undefined, hoy?: string | null): string {
+  const a = fechaLlegada(desde, hoy), b = fechaLlegada(hasta || desde, hoy)
+  if (!a) return ''
+  if (!b || a === b) return a === 'hoy' ? 'Llega hoy' : `Llega el ${a}`
+  return `Llega entre ${a === 'hoy' ? 'hoy' : 'el ' + a} y el ${b}`
+}
+/** PAQ-SIMPLE · «DHL · llega el lunes 24 de nov» / «Estafeta · llega entre el … y el …» (pedidos foráneos). Null si no aplica. */
+export function resumenPaqueteria(e: Pick<EntregaPedido, 'tipo' | 'llega_desde' | 'llega_hasta'> & Partial<Pick<EntregaPedido, 'paqueteria'>> | null | undefined, hoy?: string | null): string | null {
+  if (!e || e.tipo !== 'foraneo' || !e.paqueteria || e.paqueteria === 'chofer') return null
+  const nombre = NOMBRE_PAQUETERIA[e.paqueteria] ?? e.paqueteria.toUpperCase()
+  const f = textoLlegada(e.llega_desde, e.llega_hasta, hoy)   // la base deja aquí la fecha de DHL (o el rango de la regla)
+  return f ? `${nombre} · ${f.charAt(0).toLowerCase()}${f.slice(1)}` : nombre
+}
 /** "jueves 5 nov · antes de las 12:00" (la hora solo si la paquetería la da y no es fin del día). */
 export function llegadaServicio(s: Pick<ServicioCotizado, 'llega_fecha' | 'llega_at'>, hoy?: string | null): string {
   const dia = hoy && s.llega_fecha === hoy ? 'hoy' : fechaCorta(s.llega_fecha)
@@ -75,7 +105,7 @@ export function llegadaServicio(s: Pick<ServicioCotizado, 'llega_fecha' | 'llega
 export function mensajeServicio(msg: string): string | null {
   if (/ENTREGA_COTIZACION_VENCIDA/.test(msg)) return 'La cotización del envío venció; vuelve a cotizar.'
   if (/ENTREGA_COTIZACION_INVALIDA/.test(msg)) return 'La cotización del envío es de otra dirección; vuelve a cotizar.'
-  if (/ENTREGA_SERVICIO_INVALIDO/.test(msg)) return 'Ese servicio de paquetería ya no está disponible; elige otro.'
+  if (/ENTREGA_SERVICIO_INVALIDO/.test(msg)) return 'Ese servicio de paquetería ya no está disponible; elige otro.'   // (pedidos de antes de PAQ-SIMPLE)
   return null
 }
 
@@ -286,6 +316,8 @@ export interface EntregaConfig {
   corte: string; foraneo_gratis_desde: number; foraneo_costo: number; local_gratis_desde: number; local_costo: number
   cp_local_desde: string; cp_local_hasta: string; dias_paqueteria: number[]; dias_chofer: number[]; dias_entrega_foranea: number[]
   dhl_transito_min: number; dhl_transito_max: number; t1_activo: boolean; t1_transito_min: number; t1_transito_max: number
+  /** PAQ-SIMPLE · Estafeta: activa y días de tránsito (fecha por regla hasta integrar su API). */
+  estafeta_activo: boolean; estafeta_transito_min: number; estafeta_transito_max: number
   local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string; updated_at?: string
   /** ENT-H · bloques de entrega local, intervalo, cupo por horario, margen del mismo día y días hacia adelante. */
   horario_franjas: Array<{ desde: string; hasta: string }>; horario_intervalo_min: number; horario_cupo: number; horario_margen_min: number; horario_dias_adelante: number

@@ -172,7 +172,7 @@ begin
   cart := (public.cc_carrito_abrir('doctor', null, v_doc) ->> 'cart_id')::uuid; perform public.cc_carrito_agregar(cart, 'doctor', null, v_doc, p, 2, 'e1');
   perform tests.act_as(v_doc);
   r := public.cc_checkout_revisar(cart);
-  perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["REQUIERE_ENTREGA"]' and jsonb_array_length(r -> 'entrega_opciones' -> 'opciones') = 5, '5.1 · sin elegir entrega no hay revisión lista, pero sí las opciones para elegir');
+  perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["REQUIERE_ENTREGA"]' and jsonb_array_length(r -> 'entrega_opciones' -> 'opciones') = 6, '5.1 · sin elegir entrega no hay revisión lista, pero sí las opciones para elegir');
   r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"local_chofer"}');
   perform tests.ok(not (r ->> 'listo')::boolean and r -> 'problemas' @> '["ENTREGA_NO_PERMITIDA"]', '5.2 · una opción que la regla no permite (chofer a Mazatlán) no pasa');
   r := public.cc_checkout_revisar(cart, null, null, '{"opcion":"foraneo_dhl"}');

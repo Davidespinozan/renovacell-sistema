@@ -1,7 +1,7 @@
 // CX-V2-A/B · presentación de la entrega: todo importe viene de la revisión del servidor (regla + subtotal + flete por
 // opción); solo se muestran las alternativas relevantes; cada tarjeta dice una cosa; la regla de selección es la de CX-V2-A.
 import { describe, it, expect } from 'vitest'
-import { avisoInvalidada, claveDireccion, elegirEnIntencion, elegirOpcion, faltantePara, intencionInicial, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad } from './entregaUx'
+import { avisoInvalidada, claveDireccion, elegirEnIntencion, elegirOpcion, faltantePara, intencionInicial, lineaForanea, resumenDireccion, tarjetasDomicilio, tarjetasEntrega, tituloModalidad } from './entregaUx'
 import type { OpcionesEntrega } from '../../data/ops/entrega'
 import { opsPara } from './entregaUx.fixtures'
 
@@ -29,8 +29,8 @@ describe('qué se muestra (solo lo relevante)', () => {
     expect(ids(opsPara('80020', 350))).toEqual(['recoge', 'local_chofer'])
     expect(ids(opsPara('80020', 500))).toEqual(['recoge', 'local_chofer'])
   })
-  it('foráneo: recoger + DHL; el chofer (fuera de zona) y T1 no aparecen', () => {
-    expect(ids(opsPara('82000', 1050))).toEqual(['recoge', 'foraneo_dhl'])
+  it('foráneo: recoger + DHL + Estafeta (PAQ-SIMPLE); el chofer (fuera de zona) y T1 no aparecen', () => {
+    expect(ids(opsPara('82000', 1050))).toEqual(['recoge', 'foraneo_dhl', 'foraneo_estafeta'])
   })
   it('sin dirección: recoger + una sola tarjeta de entrega a domicilio que pide la dirección (no se duplica con DHL)', () => {
     expect(ids(opsPara(null, 350))).toEqual(['recoge', 'local_chofer'])
@@ -53,10 +53,24 @@ describe('texto de cada tarjeta (una cosa por tarjeta)', () => {
     expect(JSON.stringify(t)).not.toMatch(/Sucursal Renovacell|dirección/)
   })
   it('DHL foráneo con costo: precio real, promesa y el faltante UNA vez (nota + acción)', () => {
-    expect(tarjeta(opsPara('82000', 1050), 'foraneo_dhl')).toEqual({ id: 'foraneo_dhl', titulo: 'Envío por DHL', precio: '$600', linea: 'Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct', nota: 'Gratis desde $5,000 · agrega $3,950', accion: 'agregar', bloqueada: false })
+    expect(tarjeta(opsPara('82000', 1050), 'foraneo_dhl')).toEqual({ id: 'foraneo_dhl', titulo: 'DHL', precio: '$600', linea: 'Llega entre el jueves 22 de oct y el lunes 26 de oct', nota: 'Gratis desde $5,000 · agrega $3,950', accion: 'agregar', bloqueada: false })
   })
   it('DHL foráneo gratis: "Gratis" y la promesa, sin nota ni acción', () => {
-    expect(tarjeta(opsPara('82000', 5000), 'foraneo_dhl')).toEqual({ id: 'foraneo_dhl', titulo: 'Envío por DHL', precio: 'Gratis', linea: 'Sale hoy · llega entre el jueves 22 oct y el lunes 26 oct', bloqueada: false })
+    expect(tarjeta(opsPara('82000', 5000), 'foraneo_dhl')).toEqual({ id: 'foraneo_dhl', titulo: 'DHL', precio: 'Gratis', linea: 'Llega entre el jueves 22 de oct y el lunes 26 de oct', bloqueada: false })
+  })
+  it('PAQ-SIMPLE · DHL con cotización: la fecha prometida; cargando: lo dice; sin cotización: el rango de la regla', () => {
+    const ops = opsPara('82000', 1050)
+    const dhl = (ll: string | 'cargando' | null) => tarjetasDomicilio(ops, 'foraneo_dhl', null, ll).find((t) => t.id === 'foraneo_dhl')!
+    expect(dhl('2026-10-24').linea).toBe('Llega el sábado 24 de oct')
+    expect(dhl('cargando').linea).toBe('Consultando la fecha con DHL…')
+    expect(dhl(null).linea).toBe('Llega entre el jueves 22 de oct y el lunes 26 de oct')
+    expect(dhl('2026-10-24').precio).toBe('$600')   // la fecha nunca cambia el precio
+  })
+  it('PAQ-SIMPLE · Estafeta: tarjeta «Estafeta», misma regla de precio y el rango de su regla (no usa la fecha de DHL)', () => {
+    const t = tarjetasDomicilio(opsPara('82000', 1050), null, null, '2026-10-24').find((x) => x.id === 'foraneo_estafeta')!
+    expect(t).toMatchObject({ titulo: 'Estafeta', precio: '$600', linea: 'Llega entre el viernes 23 de oct y el martes 27 de oct' })
+    expect(tarjetasDomicilio(opsPara('82000', 5000), null, null).find((x) => x.id === 'foraneo_estafeta')!.precio).toBe('Gratis')
+    expect(lineaForanea({ paqueteria: 'estafeta', llega_desde: '2026-10-23', llega_hasta: '2026-10-23' }, { hoy: null, llegaDhl: '2026-10-30' })).toBe('Llega el viernes 23 de oct')
   })
   it('ninguna tarjeta repite "Próximamente" ni el precio en su línea', () => {
     for (const ops of [opsPara('80020', 350), opsPara('80020', 500), opsPara('82000', 1050), opsPara('82000', 5000), opsPara(null, 350)]) {
@@ -82,9 +96,9 @@ describe('regla de selección (CX-V2-A, sin cambios)', () => {
     expect(r.opcion).toBeNull(); expect(r.invalidada?.id).toBe('local_chofer')
     expect(avisoInvalidada(r.invalidada!, opsPara('80020', 350))).toBe('Entrega con chofer: faltan $150 para el mínimo de $500. Elige otra opción.')
     const z = elegirOpcion(opsPara('80020', 1050), 'foraneo_dhl')
-    expect(z.opcion).toBeNull(); expect(avisoInvalidada(z.invalidada!, opsPara('80020', 1050))).toBe('Envío por DHL: no aplica para esta dirección. Elige otra opción.')
+    expect(z.opcion).toBeNull(); expect(avisoInvalidada(z.invalidada!, opsPara('80020', 1050))).toBe('DHL: no aplica para esta dirección. Elige otra opción.')
     const t = elegirOpcion(opsPara('82000', 1050), 'foraneo_t1')
-    expect(avisoInvalidada(t.invalidada!, opsPara('82000', 1050))).toBe('Envío por T1: ya no está disponible. Elige otra opción.')
+    expect(avisoInvalidada(t.invalidada!, opsPara('82000', 1050))).toBe('T1: ya no está disponible. Elige otra opción.')
   })
   it('sin dirección: recoger única; sugerida no elegible y varias opciones → ninguna', () => {
     expect(elegirOpcion(opsPara(null, 350), null)).toEqual({ opcion: 'recoge', invalidada: null, unica: true })
@@ -97,7 +111,7 @@ describe('CX-V2-C · intención, dirección y modalidad separadas', () => {
     expect(intencionInicial(opsPara('80020', 350))).toBe('recoge')
     expect(intencionInicial(opsPara('80020', 500))).toBe('domicilio')
     expect(intencionInicial(opsPara('82000', 350))).toBe('domicilio')
-    expect(intencionInicial({ ...opsPara('82000', 350), sugerida: 'foraneo_t1', opciones: opsPara('82000', 350).opciones.map((o) => o.id === 'foraneo_dhl' ? { ...o, disponible: false } : o) })).toBe('recoge')
+    expect(intencionInicial({ ...opsPara('82000', 350), sugerida: 'foraneo_t1', opciones: opsPara('82000', 350).opciones.map((o) => o.id === 'foraneo_dhl' || o.id === 'foraneo_estafeta' ? { ...o, disponible: false } : o) })).toBe('recoge')
   })
   it('recoger → la modalidad recoge; domicilio con $350 local → ninguna (NO recoge en su lugar)', () => {
     expect(elegirEnIntencion(opsPara('80020', 350), 'recoge', null)).toEqual({ opcion: 'recoge', invalidada: null })
@@ -114,14 +128,14 @@ describe('CX-V2-C · intención, dirección y modalidad separadas', () => {
   })
   it('tarjetas de domicilio: solo servicios a domicilio, sin la de "falta dirección" (la dirección se elige arriba)', () => {
     expect(tarjetasDomicilio(opsPara('80020', 350), null, null).map((t) => t.id)).toEqual(['local_chofer'])
-    expect(tarjetasDomicilio(opsPara('82000', 350), null, null).map((t) => t.id)).toEqual(['foraneo_dhl'])
+    expect(tarjetasDomicilio(opsPara('82000', 350), null, null).map((t) => t.id)).toEqual(['foraneo_dhl', 'foraneo_estafeta'])
     expect(tarjetasDomicilio(opsPara(null, 350), null, null)).toEqual([])
   })
 })
 
 describe('auxiliares', () => {
   it('títulos, clave y resumen de dirección', () => {
-    expect(tituloModalidad(find(opsPara('80020', 1), 'foraneo_t1'))).toBe('Envío por T1')
+    expect(tituloModalidad(find(opsPara('80020', 1), 'foraneo_t1'))).toBe('T1')
     expect(claveDireccion(null)).toBe('ninguna')
     expect(claveDireccion({ address: { line1: 'x' }, locationId: 'L1' })).toBe('loc:L1')
     expect(claveDireccion({ address: { line1: 'x' } })).toBe('dir:{"line1":"x"}')

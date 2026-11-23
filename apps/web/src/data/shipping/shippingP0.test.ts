@@ -59,12 +59,19 @@ describe('edge create_shipment — orden e invariantes', () => {
     expect(edgeSrc).toMatch(/if \(claimErr \|\| !claim\) return json\(409, \{ error: 'in_progress'/)
   })
   it('P0-B: re-cotización server-side es autoridad; ignora amount/eta del cliente', () => {
-    expect(edgeSrc).toMatch(/serverRate = parseRates\(rd\)\.find/)
+    expect(edgeSrc).toMatch(/serverRate = sinServiciosExcluidos\(parseRates\(rd\)\)\.find/)   // PAQ-SIMPLE · sin ECONOMY SELECT
     expect(edgeSrc).toMatch(/provider_cost: serverRate\.amount/)
     expect(edgeSrc).toMatch(/const etaDays = Number\(serverRate\.etaDays/)
     // El flujo NEUTRO ya no ecoa el precio/eta del cliente al éxito (patrón viejo eliminado):
     expect(edgeSrc).not.toMatch(/amount: Number\(rate\.amount \?\? 0\)/)
     expect(edgeSrc).not.toMatch(/etaDays: Number\(rate\.etaDays \?\? 2\)/)
+  })
+  it('PAQ-SIMPLE · Almacén elige el servicio sin motivo; ECONOMY SELECT se filtra en tarifas y se rechaza al crear la guía', () => {
+    expect(edgeSrc).not.toMatch(/servicio_vendido|cambio_motivo|revisarServicioVendido/)
+    expect(edgeSrc).toMatch(/const rates = sinServiciosExcluidos\(parseRates\(data\)\)/)
+    expect(edgeSrc).toMatch(/if \(!servicioDhlPermitido\(productCode\)\) return json\(422, errorServicioExcluido\(productCode\)\)/)
+    // el rechazo va ANTES de cualquier llamada a DHL (idempotencia, intento, re-cotización)
+    expect(edgeSrc.indexOf('errorServicioExcluido(productCode)')).toBeLessThan(edgeSrc.indexOf("// 0) Guía existente → idempotente (0 llamadas a DHL)."))
   })
   it('timeout/excepción durante creación → unknown_requires_reconciliation (sin retry)', () => {
     expect(edgeSrc).toMatch(/markUnknown\(admin, attemptId, `create timeout\/network/)

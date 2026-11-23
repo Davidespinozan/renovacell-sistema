@@ -33,7 +33,7 @@ import type { AccionChat } from './ChatCanonico'
 import { useSolicitudVerificacion } from './SolicitudVerificacion'   // VERIFICACIÓN POR WHATSAPP
 import { MapPin, LocateFixed, ArrowRightLeft } from 'lucide-react'
 import { SUCURSAL, sucursalDe, coordsDeTexto, textoUbicacion, type Ubicacion } from '../../../../../supabase/functions/_shared/ubicacion'
-import { verConfigEntrega } from '../../data/ops/entrega'   // SUCURSAL · la vigente sale de Configuración   // UBICACIÓN EN EL CHAT
+import { resumenPaqueteria, verConfigEntrega } from '../../data/ops/entrega'   // SUCURSAL · la vigente sale de Configuración   // UBICACIÓN EN EL CHAT
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
@@ -593,6 +593,7 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
               <div key={p.id} className="pc-cot">
                 <b>{p.folio ?? '—'}</b><span>{money(p.total)}</span>
                 <span className={'pill p-' + e.tono}>{e.texto}</span>
+                {p.entrega && resumenPaqueteria(p.entrega) && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="pc-pedido-paqueteria">{resumenPaqueteria(p.entrega)}</span>}{/* PAQ-SIMPLE */}
                 <span className="pc-cot-acc">
                   {p.saldo > 0 && !p.en_revision && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => abrirPago(p)} data-testid="pc-reportar-pago">Registrar pago</button>}
                   {p.ultimo_pago && chat && <button type="button" className="btn ghost sm" disabled={ocupado} onClick={() => void mandarRecibo(p)}>Mandar recibo</button>}

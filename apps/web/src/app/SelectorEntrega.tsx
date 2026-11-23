@@ -3,10 +3,10 @@
 // (o regalarlo), lo escribe con su motivo. Nunca se inventa una fecha: todo viene de entrega_opciones.
 import React, { useEffect, useRef, useState } from 'react'
 import { money } from '../lib/format'
-import { MOTIVO_ENTREGA, fechaCorta, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, type EleccionEntregaServidor, type HorarioElegido, type OpcionesEntrega, type ServicioElegido } from '../data/ops/entrega'
+import { MOTIVO_ENTREGA, NOMBRE_PAQUETERIA, fechaCorta, avisoEnvioGratis, faltantePara, fleteTexto, localBajoMinimo, opcionDe, opcionesEntrega, promesaDe, requiereHorario, textoLlegada, type EleccionEntregaServidor, type HorarioElegido, type OpcionEntrega, type OpcionesEntrega, type ServicioElegido } from '../data/ops/entrega'
 import { HorarioEntregaPicker } from './HorarioEntregaPicker'
 import { AvisoEnvioGratisVista } from './AvisoEnvioGratis'
-import { ServicioPaqueteria } from './ServicioPaqueteria'
+import { usePromesaDhl } from './PromesaPaqueteria'   // PAQ-SIMPLE · solo la paquetería; DHL promete con su cotización en vivo
 import { diasEntre, sumarDias } from '../data/periodo'   // SALIDA PROGRAMADA · fechas del negocio
 
 /** ENT-H · el horario elegido viaja solo cuando existe (sin la llave en null). */
@@ -15,10 +15,10 @@ const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: Horario
 export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios, piezas = 0, destino, cargarServicios }: {
   subtotal: number
   cp: string | null
-  /** ENTREGA-SERVICIO · piezas del pedido para cotizar el servicio de paquetería (0 = sin cotizar). */
+  /** PAQ-SIMPLE · piezas del pedido para cotizar la FECHA de DHL (0 = sin cotizar: rango de la regla). */
   piezas?: number
   destino?: { ciudad?: string | null; estado?: string | null }
-  cargarServicios?: React.ComponentProps<typeof ServicioPaqueteria>['cargar']
+  cargarServicios?: Parameters<typeof usePromesaDhl>[0]['cargar']
   value: EleccionEntregaServidor | null
   onChange: (e: EleccionEntregaServidor | null, ops: OpcionesEntrega | null) => void
   cargar?: typeof opcionesEntrega
@@ -58,6 +58,24 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
 
   const sel = opcionDe(ops, value?.opcion)
   const hoy = ops?.corte.hoy ?? null
+  // PAQ-SIMPLE (23 nov 2026) · DHL: la fecha sale de su cotización en vivo (la llegada más tardía de los servicios
+  // permitidos); si falla, el rango de la regla. El precio es SIEMPRE el de la regla (sin recargo por servicio).
+  const opDhl = ops?.opciones.find((o) => o.tipo === 'foraneo' && o.paqueteria === 'dhl' && o.permitido && o.disponible) ?? null
+  const promesaDhl = usePromesaDhl({ activa: !!opDhl && piezas > 0, cp, piezas, destino, cargar: cargarServicios,
+    corrimientoDias: opDhl && value?.salida_programada ? diasEntre(opDhl.salida, value.salida_programada) : 0 })
+  const esDhl = sel?.tipo === 'foraneo' && sel.paqueteria === 'dhl'
+  const servicioQuiere = esDhl ? promesaDhl.servicio : null
+  // La promesa de DHL viaja con la elección (la base fija la misma fecha); con otra opción, nada.
+  useEffect(() => {
+    if (!value || !sel) return
+    if ((value.servicio?.cotizacion_id ?? null) === (servicioQuiere?.cotizacion_id ?? null)) return
+    const { servicio: _s, ...resto } = value; void _s
+    onChange({ ...resto, ...(servicioQuiere ? { servicio: servicioQuiere } : {}) }, ops)
+  }, [servicioQuiere?.cotizacion_id, value?.opcion, value?.servicio?.cotizacion_id])   // eslint-disable-line react-hooks/exhaustive-deps
+  /** Línea de llegada de una opción foránea: la fecha de DHL cotizada o el rango de la regla. */
+  const llegadaForanea = (o: OpcionEntrega) => o.paqueteria === 'dhl' && promesaDhl.llega_fecha ? textoLlegada(promesaDhl.llega_fecha, promesaDhl.llega_fecha, hoy)
+    : o.paqueteria === 'dhl' && promesaDhl.estado === 'cargando' ? 'Consultando la fecha con DHL…'
+    : textoLlegada(o.llega_desde, o.llega_hasta, hoy)
   const elegir = (id: string) => { const o = opcionDe(ops, id); if (!o || !o.permitido || !o.disponible) return; setAjustar(false); setFleteTxt(''); setMotivo(''); onChange({ opcion: id }, ops) }
   const aplicarAjuste = (txt: string, mot: string) => {
     if (!sel) return
@@ -85,7 +103,7 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
   return (
     <div data-testid="selector-entrega">
       <div style={{ display: 'grid', gap: 8 }}>
-        {ops.opciones.map((o) => {
+        {ops.opciones.filter((o) => !(o.tipo === 'foraneo' && !o.disponible)).map((o) => {   // PAQ-SIMPLE · paquetería apagada (T1, Estafeta sin activar): no se ofrece
           const on = value?.opcion === o.id
           const puede = o.permitido && o.disponible
           const fueraZona = o.tipo === 'local' && ops.cp != null && !ops.local
@@ -95,9 +113,9 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
               onClick={() => elegir(o.id)}>
               <input type="radio" name="entrega-staff" checked={on} disabled={!puede} onChange={() => elegir(o.id)} />
               <span style={{ flex: 1 }}>
-                <b style={{ display: 'block', fontSize: 13 }}>{o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
+                <b style={{ display: 'block', fontSize: 13 }}>{o.tipo === 'foraneo' && o.paqueteria ? NOMBRE_PAQUETERIA[o.paqueteria] ?? o.texto : o.texto} <span className="mono" style={{ fontWeight: 600, color: o.flete ? 'var(--ink-2)' : 'var(--green-deep)', marginLeft: 6 }}>{fleteTexto(o.flete, money)}</span></b>
                 <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  {puede ? (requiereHorario(o) ? (on && value?.horario ? promesaDe({ ...o, horario: { ...value.horario, fin: '' } }, hoy) : 'Se agenda en un horario de media hora') : promesaDe(o, hoy)) : !o.disponible ? 'Pendiente de integrar' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica'}
+                  {puede ? (requiereHorario(o) ? (on && value?.horario ? promesaDe({ ...o, horario: { ...value.horario, fin: '' } }, hoy) : 'Se agenda en un horario de media hora') : o.tipo === 'foraneo' ? llegadaForanea(o) : promesaDe(o, hoy)) : !o.disponible ? 'Pendiente de integrar' : MOTIVO_ENTREGA[o.motivo ?? ''] ?? 'No aplica'}
                   {fueraZona && puede ? ' · el CP no es de Culiacán: confirma que el chofer sí llega' : ''}
                 </span>
                 {puede && !on && (() => {
@@ -124,13 +142,7 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
           </label>
         </div>
       )}
-      {sel && sel.tipo === 'foraneo' && sel.paqueteria === 'dhl' && piezas > 0 && cp && (
-        <div style={{ marginTop: 10 }} data-testid="entrega-servicio">
-          <ServicioPaqueteria cp={cp} piezas={piezas} fleteRegla={sel.flete} destino={destino} hoy={hoy} cargar={cargarServicios} corrimientoDias={value?.salida_programada ? diasEntre(sel.salida, value.salida_programada) : 0}
-            value={value?.servicio ?? null}
-            onChange={(sv) => { const { servicio: _s, ...resto } = value ?? { opcion: sel.id }; void _s; onChange({ ...resto, opcion: sel.id, ...(sv ? { servicio: sv } : {}) }, ops) }} />
-        </div>
-      )}
+      {sel && esDhl && promesaDhl.aviso && <div className="ms" style={{ marginTop: 8, color: 'var(--ink-3)' }} data-testid="entrega-dhl-regla">{promesaDhl.aviso}</div>}
       {sel && necesitaHorario && (
         <div style={{ marginTop: 10, padding: 10, border: '1px solid ' + (value?.horario ? 'var(--line)' : 'var(--warn)'), borderRadius: 10, background: 'var(--surface-2, #fafafa)' }} data-testid="entrega-horario">
           <div className="eyebrow" style={{ margin: '0 0 8px' }}>Horario de entrega {!value?.horario && <span style={{ fontWeight: 400, color: 'var(--warn)' }}>· elige uno para continuar</span>}</div>

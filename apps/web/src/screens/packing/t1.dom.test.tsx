@@ -29,7 +29,7 @@ describe('T1 · proveedor de la guía en Empaque', () => {
     expect(srv.quote.mock.calls[0][4]).toBe('t1'); expect(srv.quote.mock.calls[0][5]).toBe('o1')   // el pedido viaja: el servidor toma de ahí el valor de la mercancía
     expect(await screen.findByText(/FedEx/)).toBeTruthy()
     fireEvent.click(screen.getByTestId('proveedor-dhl'))
-    expect(screen.getByTestId('proveedor-guia')).toHaveTextContent(/Se vendió con T1 Envíos; estás generando con otro proveedor/)
+    expect(screen.getByTestId('proveedor-guia')).toHaveTextContent(/Se vendió con T1; estás generando con otra paquetería/)
     expect(screen.queryByText(/FedEx/)).toBeNull()   // al cambiar de proveedor se recotiza
   })
   it('T1 sin llaves: mensaje en palabras, nada de guía mock', async () => {

@@ -12,6 +12,11 @@ import { markShipped } from '../../data/store/ordersStore'
 import { getDrivers, driverName } from '../../data/mock/shipments'
 import { envioVigente } from '../../data/ops/seguimiento'
 import { quoteShipment, createShipmentReal, NOMBRE_PROVEEDOR, type RateQuote, type LabelResult, type ProveedorPaqueteria } from '../../data/shipping/provider'
+
+// PAQ-SIMPLE · con qué se hace la guía: DHL (API), Estafeta (manual por ahora) o T1 (agregador).
+type GuiaCon = ProveedorPaqueteria | 'estafeta'
+const GUIAS_CON: GuiaCon[] = ['dhl', 'estafeta', 't1']
+const NOMBRE_GUIA: Record<GuiaCon, string> = { ...NOMBRE_PROVEEDOR, estafeta: 'Estafeta (guía manual)' }
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
 import { currentCompany } from '../../data/store/companyStore'
@@ -24,7 +29,9 @@ import { useRole, useRoleOpcional } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
-import { estimadaDe, llegadaServicio, promesaDe, type EntregaPedido } from '../../data/ops/entrega'
+import { NOMBRE_PAQUETERIA, estimadaDe, promesaDe, resumenPaqueteria, type EntregaPedido } from '../../data/ops/entrega'
+import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared/cotizarEnvio'   // PAQ-SIMPLE · la MISMA lista de servicios prohibidos que el servidor
+import { registrarGuiaEstafeta, urlRastreoEstafeta, validarCostoGuia, validarGuiaEstafeta } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 import { cantidadVista } from '../../lib/cajas'
 
@@ -63,7 +70,7 @@ export function EntregaPill({ e }: { e: EntregaPedido | null }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px', fontSize: 12.5 }} data-testid="cola-entrega">
       <span className={'pill ' + (atrasado ? 'p-dang' : e.salida === hoy ? 'p-warn' : 'p-neu')}>{atrasado ? 'Debió salir el ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7) : e.salida === hoy ? 'Sale hoy' : 'Sale ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7)}</span>
-      <b>{e.texto}</b>
+      <b>{e.tipo === 'foraneo' && e.paqueteria ? NOMBRE_PAQUETERIA[e.paqueteria] ?? e.texto : e.texto}</b>
       <span style={{ color: 'var(--ink-3)' }}>· {promesaDe(e, hoy)}{e.flete ? ` · flete ${money(e.flete)}` : ''}</span>
     </div>
   )
@@ -178,8 +185,9 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)
   const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
-  // T1 · proveedor de la guía: lo que se vendió (DHL o T1) sugiere; Empaque puede cambiarlo. T1 cotiza varias paqueterías a la vez.
-  const [proveedor, setProveedor] = useState<ProveedorPaqueteria>(entregaPedido?.paqueteria === 't1' ? 't1' : 'dhl')
+  // PAQ-SIMPLE (23 nov 2026) · con qué se genera la guía: la paquetería que se vendió (DHL o Estafeta) viene preseleccionada;
+  // Almacén puede cambiarla. T1 cotiza varias paqueterías a la vez. Estafeta, por ahora, es guía MANUAL (sin API).
+  const [proveedor, setProveedor] = useState<GuiaCon>(entregaPedido?.paqueteria === 't1' ? 't1' : entregaPedido?.paqueteria === 'estafeta' ? 'estafeta' : 'dhl')
   const [doneRecoge, setDoneRecoge] = useState(false)
   const [driverId, setDriverId] = useState('')
 
@@ -206,13 +214,10 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   }
   const [rates, setRates] = useState<RateQuote[] | null>(null)
   const [rateId, setRateId] = useState('')
-  // PAQUETERÍA AL VENDER · el servicio que eligió el cliente (o su vendedor) manda: se preselecciona y, si Almacén genera
-  // otro, escribe el motivo (el servidor lo exige y lo deja en la guía).
-  const vendido = entregaPedido?.servicio ?? null
-  const [cambioMotivo, setCambioMotivo] = useState('')
-  const rateSel = rates?.find((r) => r.id === rateId) ?? null
-  const cambiaServicio = !!vendido && !!rateSel && (vendido.proveedor !== proveedor || rateSel.serviceCode !== vendido.codigo)
-  const faltaMotivoCambio = cambiaServicio && cambioMotivo.trim().length < 5
+  // PAQ-SIMPLE · Almacén elige el servicio de DHL (cualquiera de los permitidos, sin motivo); al cliente se le prometió una fecha.
+  const prometido = resumenPaqueteria(entregaPedido, hoyLocal())
+  // Estafeta (guía manual): número de guía, costo opcional y fecha estimada (de inicio, la prometida).
+  const [guiaManual, setGuiaManual] = useState({ guia: '', costo: '', fecha: entregaPedido?.llega_hasta ?? '' })
   const [busy, setBusy] = useState<false | 'quote' | 'label' | 'chofer'>(false)
   const [result, setResult] = useState<LabelResult | null>(null)
   // Chofer asignado: el envío queda "por despachar". Si la carga se le entrega en este momento, se despacha aquí
@@ -236,23 +241,23 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     if (missing.length) return
     setBusy('quote'); setRates(null); setRateId('')
     try {
-      const r = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor, order.id)
-      setRates(r); setRateId((vendido && vendido.proveedor === proveedor ? r.find((x) => x.serviceCode === vendido.codigo)?.id : undefined) ?? r[0]?.id ?? '')
+      if (proveedor === 'estafeta') return
+      const r0 = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor, order.id)
+      const r = proveedor === 'dhl' ? sinServiciosExcluidos(r0) : r0   // PAQ-SIMPLE · ECONOMY SELECT nunca se ofrece
+      setRates(r); setRateId(r[0]?.id ?? '')
     } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo cotizar.') }
     setBusy(false)
   }
 
   const generarGuia = async () => {
     const rate = rates?.find((r) => r.id === rateId)
-    if (!rate || busy) return
+    if (!rate || busy || proveedor === 'estafeta') return
     if (missing.length) return
-    if (faltaMotivoCambio) { setError('Este pedido se vendió con otro servicio: escribe el motivo del cambio.'); return }
     setBusy('label'); setError(null)
     try {
       const { label } = await createShipmentReal({
         order_id: order.id, orderRef, idempotencyKey: `${order.id}:${rate.id}`,
         shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor,
-        ...(cambiaServicio ? { cambio_motivo: cambioMotivo.trim() } : {}),
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
@@ -276,6 +281,24 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
       setResult(label)
       if (!enviado.ok) setError(`La guía ${label.tracking} sí se generó, pero el pedido NO se marcó como enviado. ${enviado.error}`)
     } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo generar la guía. El pedido NO se marcó como enviado.') }
+    setBusy(false)
+  }
+
+  // PAQ-SIMPLE · Estafeta MANUAL: se registra la guía hecha en el portal de Estafeta y sigue el flujo normal (En camino).
+  const guardarGuiaEstafeta = async () => {
+    if (busy) return
+    const g = validarGuiaEstafeta(guiaManual.guia)
+    if (!g.ok) { setError(g.error); return }
+    const c = validarCostoGuia(guiaManual.costo)
+    if (!c.ok) { setError(c.error); return }
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(guiaManual.fecha) ? guiaManual.fecha : entregaPedido?.llega_hasta ?? null
+    setBusy('label'); setError(null)
+    const r = await registrarGuiaEstafeta({ orderId: order.id, guia: g.guia, costo: c.costo, llegaFecha: fecha, registradoPor: sesion?.user?.name ?? null }, createShipment)
+    if (!r.ok) { setBusy(false); setError(`No se guardó la guía de Estafeta. ${r.error}`); return }
+    const label: LabelResult = { provider: 'estafeta', carrier: 'Estafeta', service: 'guía manual', tracking: g.guia, labelUrl: '', amount: c.costo ?? 0, etaDays: 0, estimatedDeliveryAt: r.shipment.estimated_delivery_at ?? '' }
+    const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: 'Estafeta', tracking: g.guia })
+    setResult(label)
+    if (!enviado.ok) setError(`La guía ${g.guia} sí quedó registrada, pero el pedido NO se marcó como enviado. ${enviado.error}`)
     setBusy(false)
   }
 
@@ -330,12 +353,14 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
               <h3>Guía generada</h3>
               <p>
                 <b>{order.external_ref}</b> va por <b>{result.carrier} · {result.service}</b>.{result.ambiente === 'test' && <> <span className="pill p-warn" data-testid="guia-sandbox">{result.carrier} · ambiente de pruebas: no es un envío real</span></>}
-                Guía <b className="mono">{result.tracking}</b> · entrega estimada {fmtDate(result.estimatedDeliveryAt)}.
+                Guía <b className="mono">{result.tracking}</b>{result.estimatedDeliveryAt ? <> · entrega estimada {fmtDate(result.estimatedDeliveryAt)}</> : null}.
                 {!error && result.ambiente !== 'test' && <> El doctor ya la ve en su seguimiento.</>}
               </p>
               {error && <div className="sysnote" style={{ marginTop: 10, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }} data-testid="guia-aviso">{error}</div>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-                <a className="btn" href={result.labelUrl} target="_blank" rel="noreferrer"><Icon name="download" /> Imprimir etiqueta</a>
+                {result.provider === 'estafeta'
+                  ? <a className="btn" href={urlRastreoEstafeta(result.tracking)} target="_blank" rel="noreferrer" data-testid="estafeta-rastreo"><Icon name="truck" /> Ver rastreo en Estafeta</a>
+                  : <a className="btn" href={result.labelUrl} target="_blank" rel="noreferrer"><Icon name="download" /> Imprimir etiqueta</a>}
                 <button className="btn ghost" type="button" onClick={onClose}>Listo</button>
               </div>
             </div>
@@ -421,17 +446,17 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                   <div style={{ marginBottom: 12 }} data-testid="proveedor-guia">
                     <label style={labelStyle}>Generar la guía con</label>
                     <div className="seg">
-                      {(['dhl', 't1'] as ProveedorPaqueteria[]).map((pv) => (
-                        <button key={pv} type="button" className={proveedor === pv ? 'active' : undefined} onClick={() => { setProveedor(pv); setRates(null); setError(null) }} data-testid={`proveedor-${pv}`}>{NOMBRE_PROVEEDOR[pv]}</button>
+                      {GUIAS_CON.map((pv) => (
+                        <button key={pv} type="button" className={proveedor === pv ? 'active' : undefined} onClick={() => { setProveedor(pv); setRates(null); setError(null) }} data-testid={`proveedor-${pv}`}>{NOMBRE_GUIA[pv]}</button>
                       ))}
                     </div>
-                    {vendido && (
-                      <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--ok-bg, #EAF4EC)' }} data-testid="servicio-vendido">
-                        <b>Se vendió: {vendido.nombre}</b> ({vendido.proveedor.toUpperCase()}) · el cliente espera su pedido el {llegadaServicio(vendido)}. Genera la guía con ese servicio.
+                    {prometido && (
+                      <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--ok-bg)' }} data-testid="paqueteria-vendida">
+                        <b>Se vendió: {prometido}.</b> {proveedor === 'dhl' ? 'Elige el servicio de DHL que llegue a tiempo.' : proveedor === 'estafeta' ? 'Haz la guía en el portal de Estafeta y regístrala aquí.' : ''}
                       </div>
                     )}
                     {entregaPedido?.paqueteria && entregaPedido.paqueteria !== 'chofer' && entregaPedido.paqueteria !== proveedor && (
-                      <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 4 }}>Se vendió con {NOMBRE_PROVEEDOR[entregaPedido.paqueteria]}; estás generando con otro proveedor.</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--warn)', marginTop: 4 }}>Se vendió con {NOMBRE_PAQUETERIA[entregaPedido.paqueteria] ?? entregaPedido.paqueteria}; estás generando con otra paquetería.</div>
                     )}
                   </div>
                   {/* Destino/Origen REALES (snapshot del pedido + config de empresa) */}
@@ -443,6 +468,30 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                     </span>
                   </div>
 
+                  {proveedor === 'estafeta' ? (
+                    <div style={{ display: 'grid', gap: 10 }} data-testid="estafeta-manual">
+                      <label style={labelStyle}>Guía manual de Estafeta</label>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: -6 }}>Genera la guía en el portal de Estafeta con este destino y registra aquí el número. El cliente la ve en su seguimiento.</div>
+                      <input style={f2} aria-label="Número de guía de Estafeta" placeholder="Número de guía (22 caracteres) o código de rastreo (10 dígitos)" maxLength={30}
+                        value={guiaManual.guia} onChange={(e) => setGuiaManual({ ...guiaManual, guia: e.target.value })} data-testid="estafeta-guia" />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Costo (opcional)
+                          <input style={{ ...f2, marginTop: 4 }} inputMode="decimal" aria-label="Costo de la guía" placeholder="$" value={guiaManual.costo} onChange={(e) => setGuiaManual({ ...guiaManual, costo: e.target.value })} data-testid="estafeta-costo" />
+                        </label>
+                        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Llega (estimado)
+                          <input style={{ ...f2, marginTop: 4 }} type="date" aria-label="Fecha estimada de entrega" value={guiaManual.fecha} onChange={(e) => setGuiaManual({ ...guiaManual, fecha: e.target.value })} data-testid="estafeta-fecha" />
+                        </label>
+                      </div>
+                      {error && <div style={{ fontSize: 12.5, color: 'var(--danger)' }} data-testid="estafeta-error">{error}</div>}
+                      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                        <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+                        <button className="btn" type="button" onClick={() => void guardarGuiaEstafeta()} disabled={busy === 'label' || !guiaManual.guia.trim()} data-testid="estafeta-guardar">
+                          {busy === 'label' ? 'Guardando…' : <><Icon name="check" /> Guardar guía y enviar</>}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   {missing.length > 0 && (
                     <div className="sysnote" style={{ marginBottom: 14, alignItems: 'flex-start', background: 'var(--warn-bg, #fff7ed)', border: '1px solid var(--warn, #f59e0b)' }}>
                       <Icon name="bell" />
@@ -512,26 +561,22 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                           <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', border: '1px solid ' + (rateId === r.id ? 'var(--green)' : 'var(--line)'), borderRadius: 11, cursor: 'pointer', background: rateId === r.id ? 'var(--ok-bg)' : '#fff' }}>
                             <input type="radio" name="rate" checked={rateId === r.id} onChange={() => setRateId(r.id)} />
                             <span style={{ flex: 1 }}>
-                              <b>{r.carrier}</b> · {r.service}{vendido && vendido.proveedor === proveedor && r.serviceCode === vendido.codigo && <span className="chip" style={{ marginLeft: 6, fontSize: 11 }} data-testid="tarifa-vendida">Vendido</span>}
+                              <b>{r.carrier}</b> · {r.service}
                               <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>Entrega en {r.etaDays} {r.etaDays === 1 ? 'día' : 'días'}</span>
                             </span>
                             <b className="mono">{money(r.amount)}</b>
                           </label>
                         ))}
                       </div>
-                      {cambiaServicio && (
-                        <label style={{ ...labelStyle, marginTop: 12, color: faltaMotivoCambio ? 'var(--warn)' : undefined }} data-testid="cambio-servicio">
-                          El cliente pagó otro servicio ({vendido!.nombre}). ¿Por qué se cambia?
-                          <input type="text" maxLength={200} value={cambioMotivo} onChange={(e) => setCambioMotivo(e.target.value)} placeholder="p. ej. DHL no ofrece ese servicio hoy a este C.P." style={{ width: '100%', marginTop: 4 }} data-testid="cambio-servicio-motivo" />
-                        </label>
-                      )}
                       <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
                         <button className="btn ghost" type="button" onClick={() => setRates(null)}>Recotizar</button>
-                        <button className="btn" type="button" onClick={generarGuia} disabled={busy === 'label' || !rateId || faltaMotivoCambio} style={busy === 'label' ? { opacity: .6 } : undefined}>
+                        <button className="btn" type="button" onClick={generarGuia} disabled={busy === 'label' || !rateId} style={busy === 'label' ? { opacity: .6 } : undefined}>
                           {busy === 'label' ? 'Generando guía…' : <><Icon name="check" /> Generar guía</>}
                         </button>
                       </div>
                     </>
+                  )}
+                  </>
                   )}
                 </>
               ) : (
