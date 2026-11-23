@@ -101,7 +101,7 @@ export async function upsertCustomerContact(customerId: string, patch: { full_na
   if (!hasSupabase) return { ok: true }
   const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
   const { error } = await rpc('upsert_customer_contact', { p_customer_id: customerId, p_patch: patch })
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: /CORREO_INVALIDO/.test(error.message) ? 'El correo no es válido.' : /TELEFONO_INVALIDO/.test(error.message) ? 'El teléfono debe tener de 10 a 15 dígitos.' : error.message }
   return { ok: true }
 }
 
