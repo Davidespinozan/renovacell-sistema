@@ -33,7 +33,7 @@ describe('Alta completa', () => {
   it('valida antes de crear (no se crea nada si algo está mal)', () => {
     const dom = { tipo: 'CASA', line1: 'Obregón', exterior_number: '', interior_number: '', neighborhood: '', postal_code: '800', city: '', state: '', reference_notes: '' }
     expect(erroresAlta({ nombre: 'Ana López', celular: '6671234567', correo: 'x', cedula: '123', tel2: '12', dom, fiscal: { ...emptyFiscalProfile(), rfc: 'MAL' } }))
-      .toEqual(['Revisa el correo.', 'La cédula profesional tiene 7 u 8 dígitos.', 'El otro teléfono debe tener de 10 a 15 dígitos.', 'Domicilio: el código postal tiene 5 dígitos.', 'Domicilio: falta el estado.', 'Facturación: revisa los datos fiscales marcados.'])
+      .toEqual(['Revisa el correo.', 'La cédula profesional tiene 7 u 8 dígitos.', 'El otro teléfono debe tener de 10 a 15 dígitos.', 'Domicilio: el código postal tiene 5 dígitos.', 'Domicilio: falta la ciudad.', 'Domicilio: falta el estado.', 'Facturación: revisa los datos fiscales marcados.'])
   })
   it('Dirección: crea y guarda especialidad, cédula, teléfono, domicilio, vendedora y nota con los comandos de la ficha', async () => {
     const f = falsos(); const rpc = rpcCrea()
@@ -46,6 +46,7 @@ describe('Alta completa', () => {
     fireEvent.change(screen.getByTestId('alta-calle'), { target: { value: 'Av. Obregón 100' } })
     fireEvent.change(screen.getByTestId('alta-cp'), { target: { value: '80000' } })
     fireEvent.change(screen.getByTestId('alta-estado'), { target: { value: 'Sinaloa' } })
+    fireEvent.change(screen.getByTestId('alta-ciudad-dom'), { target: { value: 'Culiacán' } })
     await waitFor(() => expect(screen.getByTestId('alta-vendedora').querySelectorAll('option').length).toBe(2))
     fireEvent.change(screen.getByTestId('alta-vendedora'), { target: { value: 'V1' } })
     fireEvent.change(screen.getByTestId('alta-nota'), { target: { value: 'Prefiere mañanas' } })
@@ -55,16 +56,16 @@ describe('Alta completa', () => {
     expect(f.perfil.guardar).toHaveBeenCalledWith('C1', 'doctor', 'derma', null)
     expect(f.c360.guardarCedula).toHaveBeenCalledWith('C1', '1234567')
     expect(f.c360.guardarTelefono).toHaveBeenCalledWith('C1', null, '667 700 0000', 'consultorio', false)
-    expect(f.c360.guardarDomicilio).toHaveBeenCalledWith('C1', null, expect.objectContaining({ line1: 'Av. Obregón 100', postal_code: '80000', state: 'Sinaloa', country: 'México' }), true)
+    expect(f.c360.guardarDomicilio).toHaveBeenCalledWith('C1', null, expect.objectContaining({ name: 'Consultorio', line1: 'Av. Obregón 100', postal_code: '80000', city: 'Culiacán', state: 'Sinaloa', country: 'México' }), true)
     expect(f.c360.asignarVendedor).toHaveBeenCalledWith('C1', 'V1', 'Asignada al darlo de alta')
     expect(f.c360.agregarNota).toHaveBeenCalledWith('C1', 'Prefiere mañanas')
     expect(f.c360.guardarFiscal).not.toHaveBeenCalled()   // sin RFC no se guarda facturación
   })
-  it('si el celular ya existía, no toca su ficha', async () => {
-    const f = falsos(); const onListo = montar(rpcCrea('existente'), f)
+  it.each(['existente', 'asignado'])('si el celular ya existía (%s), no toca su ficha', async (st) => {
+    const f = falsos(); const onListo = montar(rpcCrea(st), f)
     llenarBase(); fireEvent.change(screen.getByTestId('alta-cedula'), { target: { value: '1234567' } })
     fireEvent.click(screen.getByTestId('prospecto-guardar'))
-    await waitFor(() => expect(onListo).toHaveBeenCalledWith(expect.objectContaining({ status: 'existente', faltas: [] })))
+    await waitFor(() => expect(onListo).toHaveBeenCalledWith(expect.objectContaining({ status: st, faltas: [] })))
     expect(f.c360.guardarCedula).not.toHaveBeenCalled()
   })
   it('una parte opcional que falla no tumba el alta: queda dicho qué faltó', async () => {

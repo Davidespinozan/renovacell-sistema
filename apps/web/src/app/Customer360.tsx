@@ -134,6 +134,7 @@ function Resumen({ d, irA }: { d: Cliente360; irA: (t: Pestana) => void }) {
       </div>
       <div style={grid2}>
         <Field label="Correo" value={d.contacto.email} />
+        {d.resumen.cedula && <Field label="Cédula profesional" value={d.resumen.cedula} />}
         <Field label="Teléfono" value={tel?.numero ?? null} note={tel ? undefined : null} />
         <Field label="Entrega" value={dom ? `${dom.name} · ${lineaDomicilio(dom)}` : null} />
         <Field label="Facturación" value={fis ? `${fis.alias} · ${fis.rfc}` : (d.facturacion.length ? `${d.facturacion.length} perfil(es)` : null)} />

@@ -32,6 +32,7 @@ export interface Cliente360 {
   rol: RolC360
   permisos: { contacto: string[]; telefonos: boolean; domicilios: boolean; fiscal: boolean; notas: boolean; cartera: boolean; adoptar_alta: boolean; estado?: boolean }
   resumen: {
+    cedula?: string | null   // ALTA COMPLETA (23 nov 2026) · de la cuenta del portal o, sin cuenta, de la ficha
     nombre: string; activo: boolean; creado_at: string | null; origen: string | null
     portal: { tiene: boolean; verificado: boolean; activo: boolean; profile_id?: string | null }
     vendedor: { id?: string | null; nombre: string | null; desde: string | null; elegible: boolean } | null

@@ -5,7 +5,8 @@
 //                  Dirección: el vendedor no edita datos fiscales) · vendedora asignada (solo Dirección) · nota interna
 // Primero se crea el cliente (cliente_prospecto_crear: misma regla de duplicados por celular) y luego cada parte se guarda
 // con el MISMO comando que usa la ficha (con sus validaciones). Todo se valida antes de crear; si algo opcional no se pudo
-// guardar, el cliente queda registrado y se dice exactamente qué faltó. Si el celular ya existía, no se toca su ficha.
+// guardar, el cliente queda registrado y se dice exactamente qué faltó. Si el celular ya existía (aunque pase a tu cartera),
+// no se toca su ficha: se completa desde ahí.
 import React, { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { crearProspecto, type ProspectoCreado } from './NuevoProspecto'
@@ -36,6 +37,7 @@ export function erroresAlta(f: { nombre: string; celular: string; correo: string
   if (hayDom(f.dom)) {
     if (!f.dom.line1.trim()) e.push('Domicilio: falta la calle.')
     if (!/^\d{5}$/.test(f.dom.postal_code.trim())) e.push('Domicilio: el código postal tiene 5 dígitos.')
+    if (!f.dom.city.trim()) e.push('Domicilio: falta la ciudad.')
     if (!f.dom.state.trim()) e.push('Domicilio: falta el estado.')
   }
   if (f.fiscal && f.fiscal.rfc.trim() && !validateFiscalProfile(f.fiscal).ok) e.push('Facturación: revisa los datos fiscales marcados.')
@@ -71,8 +73,8 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
     const r = await crearProspecto(f, rpc)
     if (!r.ok) { setOcupado(false); setErrores([r.error]); return }
     const p = r.data
-    // Ya existía (mismo celular): no se toca su ficha; quien lo atiende la completa desde ahí.
-    if (p.status === 'existente') { setOcupado(false); onListo({ ...p, faltas: [] }); return }
+    // Ya existía (mismo celular), aunque ahora pase a su cartera: no se le escribe encima; se completa desde su ficha.
+    if (p.status !== 'creado') { setOcupado(false); onListo({ ...p, faltas: [] }); return }
     const id = p.customer_id
     const faltas: string[] = []
     const paso = async (que: string, hacer: () => PromiseLike<{ ok: boolean; error?: string; mensaje?: string }>) => {
@@ -81,7 +83,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
     if (esp) await paso('Especialidad', () => perfil.guardar(id, f.tipo, esp, esp === 'otra' ? (espOtra.trim() || null) : null))
     if (cedula.trim()) await paso('Cédula', () => c360.guardarCedula(id, digitos(cedula)))
     if (tel2.trim()) await paso('Otro teléfono', () => c360.guardarTelefono(id, null, tel2.trim(), tel2Etq, false))
-    if (hayDom(dom)) await paso('Domicilio', () => c360.guardarDomicilio(id, null, { ...dom, name: '', municipio: '', country: 'México', contact_name: '', contact_phone: '' }, true))
+    if (hayDom(dom)) await paso('Domicilio', () => c360.guardarDomicilio(id, null, { ...dom, name: TIPOS_DOMICILIO.find((t) => t.key === dom.tipo)?.label ?? 'Principal', municipio: '', country: 'México', contact_name: '', contact_phone: '' }, true))
     if (esDireccion && fiscal.rfc.trim()) await paso('Facturación', () => c360.guardarFiscal(id, null, { ...fiscal, alias: fiscal.razon_social || f.nombre }, true))
     if (esDireccion && vendedor) await paso('Vendedora', () => c360.asignarVendedor(id, vendedor, 'Asignada al darlo de alta'))
     if (nota.trim()) await paso('Nota', () => c360.agregarNota(id, nota.trim()))
@@ -137,7 +139,7 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
         </div>
         <div className="alta-fila">
           <label>C.P.<input value={dom.postal_code} onChange={campoDom('postal_code')} inputMode="numeric" maxLength={5} data-testid="alta-cp" /></label>
-          <label>Ciudad<input value={dom.city} onChange={campoDom('city')} maxLength={80} /></label>
+          <label>Ciudad<input value={dom.city} onChange={campoDom('city')} maxLength={80} data-testid="alta-ciudad-dom" /></label>
           <label>Estado<input value={dom.state} onChange={campoDom('state')} maxLength={80} data-testid="alta-estado" /></label>
         </div>
         <label>Referencias <small>(cómo llegar, horario)</small><input value={dom.reference_notes} onChange={campoDom('reference_notes')} maxLength={200} /></label>
@@ -178,8 +180,8 @@ export function AltaClienteForm({ onListo, onCancelar, rpc, c360 = c360PorDefect
 export function avisoAlta(r: AltaResultado, quien: 'vendedora' | 'direccion'): string {
   const base = r.status === 'existente'
     ? `${r.nombre} ya estaba registrado (mismo celular). No se cambiaron sus datos: complétalos desde su ficha.`
-    : quien === 'direccion'
-      ? `${r.nombre} quedó registrado${r.faltas.length ? '' : ' con todos sus datos'}.`
-      : r.status === 'asignado' ? `${r.nombre} ya existía sin vendedora: ahora es de tu cartera.` : `${r.nombre} quedó en tu cartera.`
+    : r.status === 'asignado'
+      ? `${r.nombre} ya existía sin vendedora: ahora es de tu cartera. No se cambiaron sus datos: complétalos desde su ficha.`
+      : quien === 'direccion' ? `${r.nombre} quedó registrado${r.faltas.length ? '' : ' con todos sus datos'}.` : `${r.nombre} quedó en tu cartera.`
   return r.faltas.length ? `${base} No se pudo guardar: ${r.faltas.join(' · ')}. Complétalo desde su ficha.` : base
 }
