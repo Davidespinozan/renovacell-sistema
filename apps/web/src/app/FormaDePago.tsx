@@ -3,7 +3,7 @@
 import React from 'react'
 import { money } from '../lib/format'
 import { hoyNegocio } from '../data/periodo'
-import { FORMAS, MAX_DIAS_CREDITO, faltaEnCobro, formaNoDisponible, sumarDiasISO, type CobroElegido, type FormaPago, type ModoCobro } from '../data/ops/cobro'
+import { CON_AL_RECIBIR, FORMAS, MAX_DIAS_CREDITO, faltaEnCobro, formaNoDisponible, sumarDiasISO, type CobroElegido, type FormaPago, type ModoCobro } from '../data/ops/cobro'
 
 const input: React.CSSProperties = { flex: 1, minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface, #fff)' }
 
@@ -27,8 +27,13 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
 
   return (
     <div data-testid={testId}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-        {FORMAS.map((f) => {
+      {(['ya', 'despues'] as const).map((g) => (
+        <div key={g} style={{ marginTop: g === 'despues' ? 12 : 0 }} data-testid={`${testId}-grupo-${g}`}>
+          <div style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '0 0 6px' }}>
+            {g === 'ya' ? (modo === 'mostrador' ? 'Cobra ahora' : 'Ya pagó') : 'Paga después'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+        {FORMAS.filter((f) => f.grupo === g).map((f) => {
           const no = formaNoDisponible(f.id, modo, tipoEntrega)
           const on = value?.forma === f.id
           return (
@@ -40,7 +45,9 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
             </button>
           )
         })}
-      </div>
+          </div>
+        </div>
+      ))}
 
       {value?.forma === 'efectivo' && (
         <div style={{ marginTop: 10 }}>
@@ -83,7 +90,15 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>Después de crear el pedido, saca el link en la app de BanBajío por {money(total)} y pégalo en «Cobrar pedidos»: el sistema se lo manda al cliente.</div>
       )}
       {value?.forma === 'al_recibir' && (
-        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>El pedido se prepara y se cobra al entregarlo (el chofer registra el cobro) o al recogerlo en sucursal.</div>
+        <div style={{ marginTop: 10 }} data-testid={`${testId}-con`}>
+          <div style={{ fontSize: 12.5, marginBottom: 6 }}>¿Cómo va a pagar al recibir?</div>
+          <div className="seg">
+            {CON_AL_RECIBIR.map((x) => (
+              <button key={x.id} type="button" className={value.con === x.id ? 'active' : undefined} aria-pressed={value.con === x.id} onClick={() => onChange({ ...value, con: x.id })} data-testid={`${testId}-con-${x.id}`}>{x.texto}</button>
+            ))}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-3)' }}>El pedido se prepara y el chofer lo cobra al entregarlo (o se cobra al recogerlo en sucursal).</div>
+        </div>
       )}
       {value && falta && <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--warn)' }} data-testid={`${testId}-falta`}>{falta}</div>}
     </div>

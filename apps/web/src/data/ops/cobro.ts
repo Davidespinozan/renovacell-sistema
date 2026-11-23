@@ -15,17 +15,25 @@ export interface CobroElegido {
   /** Crédito: fecha límite de pago (YYYY-MM-DD). */
   vence?: string | null
   motivo?: string | null
+  /** Paga al recibir: cómo va a pagar en la puerta (lo ve el chofer). */
+  con?: 'efectivo' | 'tarjeta' | 'transferencia' | null
 }
 /** Dónde se cobra: en mostrador el producto sale en el momento (solo con pago o crédito); en pedido, todas las formas. */
 export type ModoCobro = 'mostrador' | 'pedido'
 
-export const FORMAS: Array<{ id: FormaPago; texto: string; ayuda: string }> = [
-  { id: 'efectivo', texto: 'Efectivo', ayuda: 'Se cobra ahora' },
-  { id: 'tarjeta', texto: 'Tarjeta (terminal)', ayuda: 'Se cobra ahora' },
-  { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya la recibiste: escribe la referencia' },
-  { id: 'link', texto: 'Link de pago', ayuda: 'Le mandas un link de BanBajío; queda por cobrar' },
-  { id: 'al_recibir', texto: 'Paga al recibir', ayuda: 'Cobra el chofer o se cobra al recoger' },
-  { id: 'credito', texto: 'Crédito', ayuda: 'Paga después, con fecha límite' },
+// AL-RECIBIR (23 nov 2026): «Tarjeta (terminal)» se leía como «pagará con terminal al recibir» y se registraba como YA
+// pagado. Ahora las formas van en dos grupos que no se confunden: lo que YA pagó y lo que paga DESPUÉS.
+export type GrupoForma = 'ya' | 'despues'
+export const FORMAS: Array<{ id: FormaPago; texto: string; ayuda: string; grupo: GrupoForma }> = [
+  { id: 'efectivo', texto: 'Efectivo', ayuda: 'Ya te lo dio', grupo: 'ya' },
+  { id: 'tarjeta', texto: 'Tarjeta', ayuda: 'Ya la pasaste en la terminal', grupo: 'ya' },
+  { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya llegó: escribe la referencia', grupo: 'ya' },
+  { id: 'al_recibir', texto: 'Paga al recibir', ayuda: 'Al chofer o al recoger: efectivo, terminal o transferencia', grupo: 'despues' },
+  { id: 'link', texto: 'Link de pago', ayuda: 'Le mandas un link de BanBajío', grupo: 'despues' },
+  { id: 'credito', texto: 'Crédito', ayuda: 'Paga después, con fecha límite', grupo: 'despues' },
+]
+export const CON_AL_RECIBIR: Array<{ id: 'efectivo' | 'tarjeta' | 'transferencia'; texto: string }> = [
+  { id: 'efectivo', texto: 'Efectivo' }, { id: 'tarjeta', texto: 'Terminal' }, { id: 'transferencia', texto: 'Transferencia' },
 ]
 
 export const MAX_DIAS_CREDITO = 180
@@ -44,6 +52,7 @@ export function faltaEnCobro(c: CobroElegido | null, total: number, modo: ModoCo
   if (no) return no
   if (c.forma === 'efectivo' && c.recibido != null && c.recibido < total) return 'El efectivo recibido no alcanza.'
   if (c.forma === 'transferencia' && (c.referencia ?? '').trim().length < 3) return 'Escribe la referencia o clave de rastreo de la transferencia.'
+  if (c.forma === 'al_recibir' && !c.con) return '¿Cómo va a pagar al recibir? Efectivo, terminal o transferencia.'
   if (c.forma === 'credito') {
     if (!c.vence) return 'Elige la fecha límite de pago del crédito.'
     if (hoy && c.vence < hoy) return 'La fecha límite no puede ser anterior a hoy.'
@@ -58,6 +67,7 @@ export function cobroParaServidor(c: CobroElegido): Record<string, unknown> {
   if (c.forma === 'efectivo' && c.recibido != null) o.recibido = c.recibido
   if ((c.forma === 'transferencia' || c.forma === 'tarjeta') && c.referencia?.trim()) o.referencia = c.referencia.trim()
   if (c.forma === 'credito') { o.vence = c.vence; if (c.motivo?.trim()) o.motivo = c.motivo.trim() }
+  if (c.forma === 'al_recibir' && c.con) o.con = c.con
   return o
 }
 
@@ -68,8 +78,10 @@ export function resultadoCobro(c: CobroElegido, vence?: string | null): { pagado
       return { pagado: true, texto: 'quedó pagado y pasa a Almacén para prepararse.' }
     case 'credito':
       return { pagado: false, texto: `quedó a crédito${vence ? ` (paga a más tardar el ${fechaCorta(vence)})` : ''} y pasa a Almacén para prepararse. Dirección recibió el aviso.` }
-    case 'al_recibir':
-      return { pagado: false, texto: 'pasa a Almacén y se cobra al entregarlo (o al recogerlo en sucursal).' }
+    case 'al_recibir': {
+      const con = c.con === 'tarjeta' ? ' con terminal' : c.con === 'transferencia' ? ' por transferencia' : c.con === 'efectivo' ? ' en efectivo' : ''
+      return { pagado: false, texto: `pasa a Almacén y se cobra${con} al entregarlo (o al recogerlo en sucursal).` }
+    }
     case 'link':
       return { pagado: false, texto: 'quedó por cobrar con link de pago: sácalo en la app de BanBajío y pégalo en «Cobrar pedidos». Pasa a Almacén cuando se pague.' }
   }

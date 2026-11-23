@@ -292,7 +292,7 @@ export function MisEntregas() {
                 <div className={'parada-pago ' + (order.payment_status === 'paid' ? 'parada-pago--ok' : 'parada-pago--cobrar')} data-testid="parada-pago">
                   {order.payment_status === 'paid' ? 'Pagado · solo entregar'
                     : order.payment_status === 'parcial' ? 'Pago incompleto · cobra el saldo abajo al entregar'
-                    : `Por cobrar${order.total != null ? ` · ${money(order.total)}` : ''} · regístralo abajo al entregar`}
+                    : `Por cobrar${order.total != null ? ` · ${money(order.total)}` : ''}${(() => { const c = (order.shipping_meta as { cobro_al_recibir?: string } | null)?.cobro_al_recibir; return c === 'tarjeta' ? ' con terminal' : c === 'efectivo' ? ' en efectivo' : c === 'transferencia' ? ' por transferencia' : '' })()} · regístralo abajo al entregar`}
                 </div>
                 <div className="parada-botones">
                   {telParaMarcar(deliv.phone) && <a className="btn ghost" href={`tel:${telParaMarcar(deliv.phone)}`} aria-label={`Llamar al ${deliv.phone}`}><Phone size={18} /> Llamar</a>}
@@ -357,7 +357,7 @@ export function MisEntregas() {
                 {order.payment_status !== 'paid' && (
                   <li className="entrega-cobro">
                     <span className="entrega-n" aria-hidden>$</span>
-                    <CobroEntrega shipmentId={s.id} />
+                    <CobroEntrega shipmentId={s.id} con={(order.shipping_meta as { cobro_al_recibir?: string } | null)?.cobro_al_recibir ?? null} />
                   </li>
                 )}
                 <li>
