@@ -17,7 +17,7 @@ import { BrandLogo } from './BrandLogo'
 // uso diario abierto (Mi trabajo, Clientes, Conversaciones) y el resto plegado; los demás roles ven todo abierto.
 const CLAVE_SECCIONES = 'rc_sidebar_secciones'
 const HUB = 'Hub Renovacell'
-const ABIERTAS_POR_DEFECTO = new Set([HUB, 'Mi trabajo', 'Clientes', 'Conversaciones'])
+const ABIERTAS_POR_DEFECTO = new Set([HUB, 'Mi trabajo', 'Clientes y conversaciones'])
 const leerSecciones = (): Record<string, boolean> | null => { try { const v = localStorage.getItem(CLAVE_SECCIONES); return v ? JSON.parse(v) as Record<string, boolean> : null } catch { return null } }
 const guardarSecciones = (m: Record<string, boolean>) => { try { localStorage.setItem(CLAVE_SECCIONES, JSON.stringify(m)) } catch { /* almacenamiento no disponible: no pasa nada */ } }
 

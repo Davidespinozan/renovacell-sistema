@@ -21,7 +21,7 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
   it('la navegación admin abre "Por verificar" como pestaña de Clientes (g_clientes)', () => {
     const nav = getNav(getRole('admin'))
     const entry = nav.find((s) => s.key === 'g_clientes')
-    expect(entry).toBeTruthy(); expect(entry?.label).toBe('Clientes'); expect(entry?.section).toBe('Clientes')
+    expect(entry).toBeTruthy(); expect(entry?.label).toBe('Clientes'); expect(entry?.section).toBe('Clientes y conversaciones')
     expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'llamar_hoy', label: 'Prospección' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_invitar', label: 'Invitar clientes' }])   // INVITA-1 · CRM (2 nov 2026) · CARTERA-PLAZO (3 nov 2026)
     // un aviso "por verificar" (screen av_verif) abre el grupo con esa pestaña pedida
     expect(resolverDestino(nav, 'av_verif')).toEqual({ screen: 'g_clientes', pestana: 'av_verif' })
@@ -31,9 +31,10 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
     expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'crm_embudo', label: 'Embudo de ventas' \}, \{ key: 'llamar_hoy', label: 'Prospección' \}, \{ key: 'cartera_plazos', label: 'Plazos de cartera' \}, \{ key: 'av_verif', label: 'Por verificar' \}, \{ key: 'av_invitar', label: 'Invitar clientes' \}\]/)
     expect(registrySrc).toMatch(/g_clientes: \(\) => <Pestanas grupo="g_clientes"[\s\S]*key: 'av_verif', label: 'Por verificar', render: \(\) => <Doctores \/>/)
   })
-  it('menú de Dirección: Clientes solo con Clientes; Ventas en Mi trabajo (no con Clientes); Comisiones dentro de Equipo', () => {
+  it('menú de Dirección: Clientes con Conversaciones; Ventas en Mi trabajo (no con Clientes); Comisiones dentro de Equipo', () => {
     const nav = getNav(getRole('admin'))
-    expect(nav.filter((s) => s.section === 'Clientes').map((s) => s.label)).toEqual(['Clientes'])
+    // MENÚ ORDENADO (23 nov 2026): Clientes comparte sección con Conversaciones, NUNCA con Ventas (regla del dueño).
+    expect(nav.filter((s) => s.section === 'Clientes y conversaciones').map((s) => s.label)).toEqual(['Clientes', 'Conversaciones'])
     expect(nav.find((s) => s.key === 'av_ventas')?.section).toBe('Mi trabajo')
     expect(GRUPOS.g_equipo).toContain('av_comisiones')
     expect(nav.some((s) => s.key === 'av_import')).toBe(false)   // la migración vive en Configuración

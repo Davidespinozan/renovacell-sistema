@@ -60,8 +60,10 @@ export const ROLES: RoleDef[] = [
       { key: 'tablero', label: 'Tablero', icon: 'dashboard', section: 'Mi trabajo' },
       { key: 'av_ventas', label: 'Ventas', icon: 'chart', section: 'Mi trabajo' },
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Mi trabajo' },   // DIRECCIÓN-POS (23 nov 2026, Toño): Dirección también vende en mostrador
-      { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes' },          // Clientes · Por verificar · Invitar
-      { key: 'g_conversaciones', label: 'Conversaciones', icon: 'chat', section: 'Conversaciones' },   // Bandeja · Asignadas · Correos
+      // MENÚ ORDENADO (dueño, 23 nov 2026: «un orden lógico», sin secciones de una sola opción): del día a día al
+      // back-office. Ninguna sección queda con una sola entrada (lo vigila Sidebar.dom.test).
+      { key: 'g_clientes', label: 'Clientes', icon: 'usercheck', section: 'Clientes y conversaciones' },          // Clientes · Por verificar · Invitar
+      { key: 'g_conversaciones', label: 'Conversaciones', icon: 'chat', section: 'Clientes y conversaciones' },   // Bandeja · Asignadas · Correos
       { key: 'g_catalogo', label: 'Catálogo', icon: 'bag', section: 'Catálogo y web' },           // Productos · Precios · Conocimiento
       { key: 'av_sitio', label: 'Sitio web', icon: 'image', section: 'Catálogo y web' },
       { key: 'av_inv', label: 'Compras a proveedores', icon: 'cart', section: 'Operación' },
@@ -70,8 +72,8 @@ export const ROLES: RoleDef[] = [
       { key: 'g_finanzas', label: 'Finanzas', icon: 'dashboard', section: 'Finanzas' },          // Finanzas · Cierre de caja
       { key: 'g_cobros', label: 'Cobros', icon: 'receipt', section: 'Finanzas' },                // Pagos por validar · Revisión económica
       { key: 'g_facturacion', label: 'Facturación', icon: 'receipt', section: 'Finanzas' },      // Facturación · Revisión fiscal
-      { key: 'g_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo' },                // Personas · Cartera y horario · Metas
-      { key: 'g_sistema', label: 'Configuración', icon: 'store', section: 'Sistema' },           // Configuración · Bitácora
+      { key: 'g_equipo', label: 'Equipo', icon: 'usercheck', section: 'Equipo y sistema' },                // Personas · Cartera y horario · Metas
+      { key: 'g_sistema', label: 'Configuración', icon: 'store', section: 'Equipo y sistema' },           // Configuración · Bitácora
     ],
   },
   {
@@ -98,16 +100,16 @@ export const ROLES: RoleDef[] = [
       // ENTRA (una compra se pide en Compras a proveedores y se vuelve inventario al Recibir mercancía).
       // Pedidos ARRIBA (23 nov 2026, dueño): es el trabajo del día; antes quedaba suelto debajo de «Compras y entradas» y
       // parecía parte de esa sección. Mismo lugar para Blanca.
-      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
-      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
-      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
-      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
+      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Día a día' },
+      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Día a día' },
+      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Día a día' },
       { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
       { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
       { key: 'carga_inventario', label: 'Cargar inventario (CSV)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
       { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
       { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Compras y entradas' },
+      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
+      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
       // UX MODERNO · Fase 3 (15 nov 2026, auditoría: "un pedido se trabaja en seis menús"): UNA entrada "Pedidos" con
       // pestañas por etapa (Preparar → Por enviar → Guías → Despacho → Seguimiento → Horarios). Las claves sueltas
       // siguen abriendo su pestaña (resolverDestino).
@@ -120,9 +122,9 @@ export const ROLES: RoleDef[] = [
     key: 'packing', label: 'Auxiliar de almacén', group: 'Empaque y despacho',
     icon: 'pkg', isStaff: true, ready: true,
     modules: [
-      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Pedidos y envíos' },
-      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Inventario' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Inventario' },
+      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Día a día' },
+      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Día a día' },
+      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Día a día' },
       // MISMO ORDEN QUE ALBERTO (23 nov 2026, dueño: "él debe poder ver todo lo que ve Blanca porque es su jefe"):
       // una entrada «Pedidos» con las MISMAS pestañas y nombres que la de Almacén, sin las que son solo de Alberto.
     ],
@@ -136,23 +138,24 @@ export const ROLES: RoleDef[] = [
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'links_pago', label: 'Cobrar pedidos', icon: 'receipt', section: 'Vender' },
       { key: 'mis_ventas', label: 'Mis ventas', icon: 'chart', section: 'Vender' },   // MIS VENTAS (23 nov 2026) · los pedidos detrás de "Vendido este mes" y "Por cobrar"   // LINK DE PAGO (2 nov 2026) · el cliente pide pagar con tarjeta; el vendedor pega el de BanBajío
+      // MENÚ ORDENADO (23 nov 2026): Mi cartera = clientes y su seguimiento; Herramientas = lo que usa para vender.
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'llamar_hoy', label: 'A quién llamar hoy', icon: 'phone', section: 'Mi cartera' },   // PROSPECCIÓN (15 nov 2026) · cartera histórica sin cuenta
-      { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },
-      { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
-      { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Primer contacto → En seguimiento → Cotizado → Ganado
-      { key: 'cartera_plazos', label: 'Por vencer', icon: 'clock', section: 'Mi cartera' },   // CARTERA-PLAZO (3 nov 2026) · 6 meses por cliente + competencia
       { key: 'seguimientos', label: 'Pendientes', icon: 'clock', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · seguimientos por retomar
-      { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
-      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Mi cartera' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers
+      { key: 'cartera_plazos', label: 'Por vencer', icon: 'clock', section: 'Mi cartera' },   // CARTERA-PLAZO (3 nov 2026) · 6 meses por cliente + competencia
+      { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Primer contacto → En seguimiento → Cotizado → Ganado
+      { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Herramientas' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
+      { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Herramientas' },
+      { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Herramientas' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
+      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Herramientas' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers
     ],
   },
   {
     key: 'driver', label: 'Chofer', group: 'Chofer · Entregas',
     icon: 'truck', isStaff: true, ready: true, requiresFeature: 'chofer',
     modules: [
-      { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck' },
-      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock' },   // ENT-H · el chofer ve a qué hora se prometió cada entrega local
+      { key: 'driver_home', label: 'Chofer / Seguimiento', icon: 'truck', section: 'Entregas' },
+      { key: 'agenda_entregas', label: 'Horarios de entrega', icon: 'clock', section: 'Entregas' },   // ENT-H · el chofer ve a qué hora se prometió cada entrega local
     ],
   },
 ]
