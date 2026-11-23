@@ -14,7 +14,7 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import {
-  channelSplit, doctorActivity, topDoctors, topProducts, lineMix,
+  ventasPorCanal, CANALES, CANAL_TEXTO, doctorActivity, topDoctors, topProducts, lineMix,
   cfdiSolicitados, monthlySales, doctoresEnRiesgo, DIAS_RIESGO,
 } from '../../data/metrics'
 import { useKpiVentas } from '../../data/hooks/useKpis'
@@ -81,7 +81,8 @@ function VentasResumen() {
   const ordDelta = pPrev && cur.data && prev.data && prev.data.pedidos > 0 ? (cur.data.pedidos - prev.data.pedidos) / prev.data.pedidos : null
 
   const act = doctorActivity(filtered)
-  const channel = channelSplit(filtered)
+  const porCanal = ventasPorCanal(filtered)   // CANAL DE VENTA · quién capturó cada pedido
+  const totalCanales = CANALES.reduce((n, c) => n + porCanal[c].revenue, 0)
   const mix = lineMix(filtered, productsById)
   const docs = topDoctors(filtered, doctorsById)
   const prods = topProducts(filtered, productsById)
@@ -162,8 +163,9 @@ function VentasResumen() {
       {/* Canal + Línea + Facturación */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16 }}>
         <Bloque titulo={<><Store size={14} style={ic} /> Por canal</>}>
-          <SplitRow label="Portal del Doctor" amount={channel.portal.revenue} total={channel.portal.revenue + channel.pos.revenue} />
-          <SplitRow label="Punto de Venta" amount={channel.pos.revenue} total={channel.portal.revenue + channel.pos.revenue} />
+          {CANALES.filter((c) => porCanal[c].orders > 0 || c === 'vendedor' || c === 'portal').map((c) => (
+            <SplitRow key={c} label={CANAL_TEXTO[c]} amount={porCanal[c].revenue} total={totalCanales} sub={`${porCanal[c].orders} pedido${porCanal[c].orders === 1 ? '' : 's'}`} />
+          ))}
         </Bloque>
         <Bloque titulo={<><Package size={14} style={ic} /> Por línea</>}>
           <SplitRow label="Home Care" amount={mix.cosm.revenue} total={mix.cosm.revenue + mix.prof.revenue} sub={`${mix.cosm.units} pzas`} />

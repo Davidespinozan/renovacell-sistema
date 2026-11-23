@@ -109,7 +109,9 @@ export function calcularVentas(
 export function calcularPorCobrar(orders: OrderWithItems[], money: MoneyIndex): KpiPorCobrar {
   const r: KpiPorCobrar = { total: 0, pedidos: 0, a_credito: 0, vencido: 0 }
   orders.forEach((o) => {
-    if (o.status === 'cancelled' || o.status === 'draft' || isPosOrder(o)) return
+    if (o.status === 'cancelled' || o.status === 'draft') return
+    // El mostrador se cobra en el acto y queda fuera… salvo la venta a CRÉDITO en Caja (COBRO-U): esa sí es deuda.
+    if (isPosOrder(o) && !money[o.id]?.credito_autorizado) return
     const saldo = saldoDe(o, money)
     if (saldo <= 0.0001) return
     const m = money[o.id]

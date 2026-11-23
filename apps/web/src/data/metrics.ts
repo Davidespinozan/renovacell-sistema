@@ -22,6 +22,29 @@ export function salesSummary(orders: OrderWithItems[]): SalesSummary {
   return { revenue, orders: count, avgTicket: count ? revenue / count : 0 }
 }
 
+// CANAL DE VENTA (23 nov 2026, dueño: «todas las ventas de hoy dicen Portal del Doctor… ni siquiera tienen portal»).
+// Antes: folio «POS…» = caja y TODO lo demás = «Portal del Doctor» (de cuando solo existían esos dos caminos). Ahora el
+// canal sale de quién capturó el pedido, dato que pone el SERVIDOR y que el navegador no puede alterar (crear_pedido
+// / vender_pos): «Pedido directo del portal» o «Checkout canónico (CC-6)» = el cliente; «Nombre (Ventas)» = vendedor;
+// «Administración» = Dirección; channel 'pos' (Caja) = mostrador, con evento si trae event_id.
+export type CanalVenta = 'vendedor' | 'mostrador' | 'portal' | 'direccion' | 'evento'
+export const CANALES: CanalVenta[] = ['vendedor', 'mostrador', 'portal', 'direccion', 'evento']
+export const CANAL_TEXTO: Record<CanalVenta, string> = { vendedor: 'Vendedor', mostrador: 'Punto de venta', portal: 'Portal del cliente', direccion: 'Dirección', evento: 'Evento' }
+export function canalDeVenta(o: Pick<OrderWithItems, 'external_ref' | 'shipping_meta' | 'doctor_id'>): CanalVenta {
+  const m = (o.shipping_meta ?? {}) as { channel?: string | null; event_id?: string | null; placed_by?: string | null }
+  if (isPosOrder(o as OrderWithItems) || m.channel === 'pos') return m.event_id ? 'evento' : 'mostrador'
+  const p = (m.placed_by ?? '').trim()
+  if (p === 'Administración') return 'direccion'
+  if (p === 'Ventas' || /\(Ventas\)$/.test(p)) return 'vendedor'
+  if (p === 'Pedido directo del portal' || p.startsWith('Checkout canónico')) return 'portal'
+  return o.doctor_id ? 'portal' : 'vendedor'   // históricos sin capturista: con cuenta de doctor = portal; si no, lo capturó el personal
+}
+export function ventasPorCanal(orders: OrderWithItems[]): Record<CanalVenta, { orders: number; revenue: number }> {
+  const acc = Object.fromEntries(CANALES.map((c) => [c, { orders: 0, revenue: 0 }])) as Record<CanalVenta, { orders: number; revenue: number }>
+  orders.filter(isSale).forEach((o) => { const c = acc[canalDeVenta(o)]; c.orders += 1; c.revenue += o.total ?? 0 })
+  return acc
+}
+
 export interface ChannelSplit {
   pos: { orders: number; revenue: number }
   portal: { orders: number; revenue: number }

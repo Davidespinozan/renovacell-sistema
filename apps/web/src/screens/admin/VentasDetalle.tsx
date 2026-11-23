@@ -21,7 +21,7 @@ import { METODOS, reembolsoPagado, type OrderMoney, type PaymentEntry, type Paym
 import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
-import { salesSummary, channelSplit, topProducts, isPosOrder } from '../../data/metrics'
+import { salesSummary, topProducts, canalDeVenta, ventasPorCanal, CANALES, CANAL_TEXTO, type CanalVenta } from '../../data/metrics'
 import { statusView } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
@@ -30,7 +30,7 @@ import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 import { enPeriodo } from '../../data/periodo'
 
-type ChannelFilter = 'todos' | 'portal' | 'pos'
+type ChannelFilter = 'todos' | CanalVenta
 type PayFilter = 'todos' | 'pagado' | 'parcial' | 'contra' | 'pendiente'
 
 // W2 · El estado de cobro sale del LIBRO. "Contra pedido" ya no es una forma de pago
@@ -47,7 +47,7 @@ function payInfo(o: OrderWithItems, m?: OrderMoney | null): PayInfo {
   if (m.estado_pago === 'refunded') return { key: 'pendiente', label: 'Reembolsado', pill: 'p-neu' }
   return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
 }
-const channelOf = (o: OrderWithItems): 'portal' | 'pos' => (isPosOrder(o) ? 'pos' : 'portal')
+const channelOf = (o: OrderWithItems): CanalVenta => canalDeVenta(o)   // CANAL DE VENTA · quién capturó el pedido
 
 const sel: React.CSSProperties = {
   padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 12,
@@ -106,7 +106,7 @@ export function VentasDetalle() {
   }, [orders, from, to, channel, pay, q, doctorsById])
 
   const sum = salesSummary(rows)
-  const ch = channelSplit(rows)
+  const ch = ventasPorCanal(rows)
   const prods = topProducts(rows, productsById, 3)
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
 
@@ -115,7 +115,7 @@ export function VentasDetalle() {
   }
   if (orders.length === 0) {
     return (
-      <Vacio icono="chart" titulo="Aún no hay ventas." pista="Crea un pedido en el Portal del Doctor o cobra en Punto de Venta." />
+      <Vacio icono="chart" titulo="Aún no hay ventas." pista="Levanta un pedido, cobra en Punto de venta o espera un pedido del portal." />
     )
   }
 
@@ -126,7 +126,7 @@ export function VentasDetalle() {
         <Stat icon={<TrendingUp size={18} />} v={money(sum.revenue)} k="Total vendido" s={`${sum.orders} ventas`} />
         <Stat icon={<ShoppingBag size={18} />} v={String(sum.orders)} k="Nº de ventas" s="en el filtro" />
         <Stat icon={<Receipt size={18} />} v={money(sum.avgTicket)} k="Ticket promedio" s="por venta" />
-        <Stat icon={<Store size={18} />} v={`${money(ch.portal.revenue)} / ${money(ch.pos.revenue)}`} k="Portal / POS" s={`${ch.portal.orders} · ${ch.pos.orders}`} />
+        <Stat icon={<Store size={18} />} v={`${money(ch.vendedor.revenue + ch.direccion.revenue)} / ${money(ch.mostrador.revenue + ch.evento.revenue)} / ${money(ch.portal.revenue)}`} k="Vendedores / Caja / Portal" s={`${ch.vendedor.orders + ch.direccion.orders} · ${ch.mostrador.orders + ch.evento.orders} · ${ch.portal.orders}`} />
         <Stat icon={<Receipt size={18} />} v={prods[0]?.name ?? '—'} k="Top producto" s={prods[0] ? money(prods[0].revenue) : ''} />
       </div>
 
@@ -140,8 +140,7 @@ export function VentasDetalle() {
         <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>al <input type="date" style={sel} value={to} onChange={(e) => setTo(e.target.value)} /></label>
         <select style={sel} value={channel} onChange={(e) => setChannel(e.target.value as ChannelFilter)}>
           <option value="todos">Todos los canales</option>
-          <option value="portal">Portal del Doctor</option>
-          <option value="pos">Punto de Venta</option>
+          {CANALES.map((c) => <option key={c} value={c}>{CANAL_TEXTO[c]}</option>)}
         </select>
         <select style={sel} value={pay} onChange={(e) => setPay(e.target.value as PayFilter)}>
           <option value="todos">Todo cobro</option>
@@ -158,7 +157,7 @@ export function VentasDetalle() {
           { key: 'created_at', label: 'Fecha', format: (v) => (v ? fmtDate(v as string) : '') },
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
           { key: 'id', label: 'Productos', format: (_v, o) => productsSummary(o) },
-          { key: 'id', label: 'Canal', format: (_v, o) => (channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal') },
+          { key: 'id', label: 'Canal', format: (_v, o) => CANAL_TEXTO[channelOf(o)] },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
           { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
           { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o) }).label },
@@ -171,7 +170,7 @@ export function VentasDetalle() {
             const p = productsById[it.product_id ?? '']
             return {
               folio: o.external_ref, fecha: o.created_at, cliente: clientName(o),
-              canal: channelOf(o) === 'pos' ? 'Punto de Venta' : 'Portal',
+              canal: CANAL_TEXTO[channelOf(o)],
               sku: p?.sku ?? '', producto: p?.name ?? 'Producto',
               cantidad: it.qty, precio_unitario: it.unit_price ?? 0, importe: (it.unit_price ?? 0) * it.qty,
             }
@@ -199,12 +198,12 @@ export function VentasDetalle() {
             </thead>
             <tbody>
               {rows.map((o) => {
-                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o) }); const isPos = channelOf(o) === 'pos'
+                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o) }); const canal = channelOf(o)
                 return (
                   <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
-                    <td data-label="Canal"><span className={'pill ' + (isPos ? 'p-neu' : 'p-blue')}>{isPos ? 'POS' : 'Portal'}</span></td>
+                    <td data-label="Canal"><span className={'pill ' + (canal === 'portal' ? 'p-blue' : 'p-neu')}>{CANAL_TEXTO[canal]}</span></td>
                     <td data-label="Cliente">{clientName(o)}</td>
                     <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
@@ -245,7 +244,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
-  channel: 'portal' | 'pos'
+  channel: CanalVenta
   dinero?: OrderMoney | null
   onClose: () => void
   onCancel: () => void
@@ -271,7 +270,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
         <div className="mhead">
           <div>
             <h3>{order.external_ref}</h3>
-            <div className="ms">{clientName} · {channel === 'pos' ? 'Punto de Venta' : 'Portal del Doctor'} · {fmtDate(order.created_at)}</div>
+            <div className="ms">{clientName} · {CANAL_TEXTO[channel]}{(order.shipping_meta as { placed_by?: string } | null)?.placed_by && channel !== 'portal' && channel !== 'mostrador' ? ` · ${(order.shipping_meta as { placed_by?: string }).placed_by}` : ''} · {fmtDate(order.created_at)}</div>
           </div>
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
