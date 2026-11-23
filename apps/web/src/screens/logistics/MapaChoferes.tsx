@@ -11,6 +11,7 @@ import { ubicacionChofer, enlaceMapa, type ChoferMapa } from '../../data/ops/ubi
 const api = ubicacionChofer()
 const CULIACAN: [number, number] = [24.8091, -107.394]
 const COLORES = ['#2563eb', '#16a34a', '#db2777', '#ea580c', '#7c3aed', '#0891b2']   // líneas del recorrido (datos del mapa, no tema)
+const PRECISION: Record<string, string> = { calle: 'por calle', colonia: 'solo la colonia', cp: 'solo el código postal' }
 const ESTADO: Record<string, string> = { despachado: 'Por salir', out_for_delivery: 'En camino', incident: 'Con incidencia', delivered: 'Entregado' }
 
 function hace(iso?: string): string {
@@ -37,8 +38,18 @@ export function MapaChoferes() {
   useEffect(() => {
     let vivo = true
     const cargar = async () => { const r = await api.mapa(); if (!vivo) return; if (r.ok) { setLista(r.data); setError(null) } else setError(r.error) }
-    void cargar()
-    const t = setInterval(() => { if (document.visibilityState === 'visible') void cargar() }, 60_000)
+    // DESTINO EN EL MAPA · si hay entregas vivas sin pin, se piden a OpenStreetMap (a lo más cada 2 min) y se recarga.
+    let ultimaBusqueda = 0
+    const cargarYUbicar = async () => {
+      await cargar()
+      if (!vivo || Date.now() - ultimaBusqueda < 120_000) return
+      const r = await api.mapa(); if (!vivo || !r.ok) return
+      if (!r.data.some((c) => c.entregas.some((e) => e.estado !== 'delivered' && !e.destino))) return
+      ultimaBusqueda = Date.now()
+      if (await api.geocodificar() > 0 && vivo) void cargar()
+    }
+    void cargarYUbicar()
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void cargarYUbicar() }, 60_000)
     return () => { vivo = false; clearInterval(t) }
   }, [])
 
@@ -62,8 +73,16 @@ export function MapaChoferes() {
       if (sel && sel !== c.driver_id) continue
       const col = color[c.driver_id]
       if (c.recorrido.length > 1) L.polyline(c.recorrido, { color: col, weight: 4, opacity: 0.6 }).addTo(g)
+      // DESTINO EN EL MAPA · a dónde va: pin exacto (aprendido de entregas) o aproximado (OpenStreetMap), en orden de ruta.
+      c.entregas.filter((e) => e.estado !== 'delivered' && e.destino).forEach((e, i) => {
+        const d = e.destino!
+        const aprox = d.fuente === 'osm'
+        L.marker([d.lat, d.lng], { icon: icono(String(i + 1), col, 'mapa-pin-destino' + (aprox ? ' aprox' : '')) })
+          .bindPopup(`<b>${e.folio ?? ''}</b> · ${ESTADO[e.estado] ?? e.estado}<br>${e.cliente}${e.direccion ? `<br>${e.direccion}` : ''}<br><i>${aprox ? `Ubicación aproximada (${PRECISION[d.precision] ?? d.precision})` : 'Ubicación exacta (de entregas anteriores)'}</i>`).addTo(g)
+        puntos.push([d.lat, d.lng])
+      })
       for (const e of c.entregas) if (e.lat != null && e.lng != null) {
-        L.marker([e.lat, e.lng], { icon: icono('✓', col, 'mapa-pin-entrega') }).bindPopup(`<b>${e.folio ?? ''}</b><br>${e.cliente}<br>Entregado ${e.entregado_at ? new Date(e.entregado_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}`).addTo(g)
+        L.marker([e.lat, e.lng], { icon: icono(e.lejos ? '!' : '✓', e.lejos ? 'var(--danger)' : col, 'mapa-pin-entrega') }).bindPopup(`<b>${e.folio ?? ''}</b><br>${e.cliente}<br>Entregado ${e.entregado_at ? new Date(e.entregado_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}`).addTo(g)
         puntos.push([e.lat, e.lng])
       }
       if (c.ultima) {
@@ -79,8 +98,9 @@ export function MapaChoferes() {
   return (
     <div className="grid" style={{ gap: 12 }}>
       <PageHead title="Choferes en ruta">
-        Dónde va cada chofer y por dónde ha pasado hoy. Se actualiza cada minuto mientras el chofer tiene su app abierta en ruta;
-        las palomitas marcan dónde se entregó cada pedido.
+        Dónde va cada chofer, por dónde ha pasado hoy y a dónde va: los números son sus entregas pendientes (pin lleno = ubicación
+        exacta aprendida de entregas anteriores; punteado = aproximada). Las palomitas marcan dónde se entregó; un «!» rojo, que se
+        marcó entregado lejos del destino. Se actualiza cada minuto mientras el chofer tiene su app abierta en ruta.
       </PageHead>
       {error && <div className="card">{error}</div>}
       <div className="mapa-choferes-wrap">
@@ -102,7 +122,10 @@ export function MapaChoferes() {
                 {sel === c.driver_id && c.entregas.map((e) => (
                   <div key={e.shipment_id} className="mapa-entrega">
                     <span className="mono">{e.folio}</span> · {e.cliente} · <b>{ESTADO[e.estado] ?? e.estado}</b>
+                    {e.estado !== 'delivered' && e.destino?.fuente === 'osm' && <> · <span className="mapa-aprox">destino aproximado</span></>}
+                    {e.estado !== 'delivered' && !e.destino && <> · <span className="mapa-aprox">sin ubicar</span></>}
                     {e.lat != null && e.lng != null && <> · <a href={enlaceMapa(e.lat, e.lng)} target="_blank" rel="noreferrer">dónde se entregó</a></>}
+                    {e.lejos && <div className="mapa-lejos" data-testid="mapa-lejos">⚠ Se marcó entregado a {e.distancia_m != null && e.distancia_m >= 1000 ? `${(e.distancia_m / 1000).toFixed(1)} km` : `${e.distancia_m ?? '?'} m`} del destino</div>}
                   </div>
                 ))}
               </div>

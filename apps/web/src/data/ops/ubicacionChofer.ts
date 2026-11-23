@@ -3,7 +3,10 @@
 import { hasSupabase, supabase } from '../../lib/supabase'
 
 export interface PuntoMapa { lat: number; lng: number; at?: string; precision?: number | null }
-export interface EntregaMapa { shipment_id: string; folio: string | null; estado: string; cliente: string; entregado_at: string | null; lat: number | null; lng: number | null }
+/** DESTINO EN EL MAPA (23 nov 2026) · pin de la dirección: 'entrega' = aprendido de una entrega real (puerta); 'osm' = aproximado. */
+export interface DestinoMapa { lat: number; lng: number; fuente: 'entrega' | 'osm'; precision: 'puerta' | 'calle' | 'colonia' | 'cp' }
+export interface EntregaMapa { shipment_id: string; folio: string | null; estado: string; cliente: string; entregado_at: string | null; lat: number | null; lng: number | null
+  direccion?: string | null; destino?: DestinoMapa | null; distancia_m?: number | null; lejos?: boolean }
 export interface ChoferMapa { driver_id: string; nombre: string; ultima: PuntoMapa | null; recorrido: Array<[number, number]>; entregas: EntregaMapa[] }
 
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
@@ -26,8 +29,14 @@ export const ubicacionChofer = (rpc: Rpc = rpcPorDefecto) => ({
       const lista = (Array.isArray(data) ? data : []) as ChoferMapa[]
       return { ok: true, data: lista.map((c) => ({ ...c, ultima: c.ultima ? { ...c.ultima, lat: Number(c.ultima.lat), lng: Number(c.ultima.lng) } : null,
         recorrido: (c.recorrido ?? []).map(([a, b]) => [Number(a), Number(b)] as [number, number]),
-        entregas: (c.entregas ?? []).map((e) => ({ ...e, lat: e.lat == null ? null : Number(e.lat), lng: e.lng == null ? null : Number(e.lng) })) })) }
+        entregas: (c.entregas ?? []).map((e) => ({ ...e, lat: e.lat == null ? null : Number(e.lat), lng: e.lng == null ? null : Number(e.lng),
+          destino: e.destino ? { ...e.destino, lat: Number(e.destino.lat), lng: Number(e.destino.lng) } : null })) })) }
     } catch { return { ok: false, error: 'Sin conexión.' } }
+  },
+  /** Pide a la Edge ubicar (OpenStreetMap) las direcciones de entregas vivas que aún no tienen pin. Nunca lanza. */
+  geocodificar: async (): Promise<number> => {
+    if (!hasSupabase && rpc === rpcPorDefecto) return 0
+    try { const { data } = await supabase.functions.invoke('destinos-geocodificar', { body: {} }); return Number((data as { ubicadas?: number } | null)?.ubicadas ?? 0) } catch { return 0 }
   },
   entrega: async (shipmentId: string): Promise<PuntoMapa | null> => {
     if (!hasSupabase && rpc === rpcPorDefecto) return null

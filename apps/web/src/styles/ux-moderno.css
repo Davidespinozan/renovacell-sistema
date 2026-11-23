@@ -436,6 +436,11 @@ button.cifra-v{cursor:pointer}
 .mapa-pin-wrap { background: none; border: 0; }
 .mapa-pin { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ds-on-accent, var(--cp-surface)); border: 2px solid var(--cp-surface); box-shadow: var(--ds-shadow-pop); }
 .mapa-pin-entrega { width: 22px; height: 22px; font-size: 12px; opacity: 0.9; }
+/* DESTINO EN EL MAPA · a dónde va (número = orden); punteado = ubicación aproximada de OpenStreetMap */
+.mapa-pin-destino { width: 24px; height: 24px; font-size: 11px; border-radius: 7px; }
+.mapa-pin-destino.aprox { opacity: 0.75; border-style: dashed; }
+.mapa-aprox { color: var(--ink-3); font-size: 12px; }
+.mapa-lejos { color: var(--danger); font-size: 12px; font-weight: 600; margin-top: 2px; }
 @media (max-width: 820px) { .mapa-choferes-wrap { grid-template-columns: 1fr; } .mapa-choferes { height: 55vh; } .mapa-lista { max-height: none; } }
 
 /* NUEVO PROSPECTO */
