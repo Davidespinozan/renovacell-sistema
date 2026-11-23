@@ -29,6 +29,7 @@ vi.mock('./Customer360', async (orig) => {
 })
 vi.mock('../screens/sales/NuevoPedido', () => ({ NuevoPedido: (p: Record<string, unknown>) => { h.pedidos.push(p); return <div data-testid="pedido-falso" /> } }))
 vi.mock('./ExportButton', () => ({ ExportButton: () => { h.exporta++; return null } }))
+vi.mock('./InvitarCliente', () => ({ InvitarCliente: ({ customerId, onGenerada }: { customerId: string; onGenerada?: () => void }) => <button type="button" data-testid="invitar-falso" onClick={() => onGenerada?.()}>{customerId}</button> }))
 import { DirectorioVentas } from './DirectorioVentas'
 import { CustomerDirectory } from './CustomerDirectory'
 
@@ -193,6 +194,17 @@ describe('SEC-C4-B4 · Todos (buscador seguro)', () => {
 })
 
 describe('SEC-C4-B4 · Mi cartera', () => {
+  it('INVITAR · el cliente de Odoo sin portal (verificado) tiene «Invitar»; al generar su enlace queda «Invitado»', async () => {
+    montar([], [[{ profile_id: null, customer_id: ID1, nombre: 'Álvaro Núñez', portal: false, verificado: true }, { profile_id: null, customer_id: ID3, nombre: 'Prospecto Nuevo', portal: false, verificado: false }, { profile_id: 'P1', customer_id: ID2, nombre: 'Con Portal', portal: true, verificado: true }] as unknown as Asig[]])
+    irACartera()
+    await waitFor(() => expect(screen.getAllByTestId('cartera-fila')).toHaveLength(3))
+    expect(screen.getAllByTestId('cartera-invitar')).toHaveLength(1)   // ni el prospecto ni quien ya tiene portal
+    fireEvent.click(screen.getByTestId('cartera-invitar'))
+    expect(screen.getByTestId('invitar-falso').textContent).toBe(ID1)
+    fireEvent.click(screen.getByTestId('invitar-falso'))
+    expect(screen.getByTestId('marca-invitado')).toBeTruthy()
+    expect(screen.queryAllByTestId('cartera-invitar')).toHaveLength(0)
+  })
   const CARTERA: Asig[] = [{ profile_id: 'P1', customer_id: ID3, nombre: 'Doctora Cartera' }, { profile_id: 'P2', customer_id: ID1, nombre: 'Álvaro Núñez' }, { profile_id: 'P3', customer_id: null, nombre: 'Perfil Sin Cuenta' }]
   it('vacía: estado informativo', async () => {
     const m = montar()
@@ -205,7 +217,7 @@ describe('SEC-C4-B4 · Mi cartera', () => {
     irACartera()
     await waitFor(() => expect(screen.getAllByTestId('cartera-fila')).toHaveLength(3))
     expect(m.rpcs).toEqual(['cc_mi_cartera']); expect(m.llamadas).toHaveLength(0); expect(h.listados).toBe(0)
-    expect(screen.getAllByTestId('marca-asignado')).toHaveLength(3)
+    expect(screen.queryAllByTestId('marca-asignado')).toHaveLength(0)   // en «Mi cartera» todos son asignados: la etiqueta ya no repite eso
     sinSensibles()
   })
   it('filtro local (sin acentos) solo sobre las cuentas autorizadas, sin solicitudes', async () => {

@@ -13,7 +13,9 @@ import { initials, avatarColor } from '../lib/format'
 import { useRole } from '../auth/RoleContext'
 import { BuscadorClientes, mensajeBusqueda, plegar, validarBusqueda, type ClienteBusqueda, type EstadoBusqueda } from '../data/ops/buscarClientes'
 import { cartera as carteraPorDefecto, type ClienteCartera } from '../data/ops/cartera'
-import { FiltroSegmento, MarcaSegmento, contarSegmentos, filtrarSegmento, type Segmento } from './SegmentoClientes'
+import { FiltroSegmento, MarcaSegmento, contarSegmentos, filtrarSegmento, segmentoDe, type Segmento } from './SegmentoClientes'
+import { InvitarCliente } from './InvitarCliente'
+import { Hoja } from './Hoja'
 import type { ClienteC360 } from '../data/ops/customer360'
 import { Customer360Page } from './Customer360'
 import { NuevoPedido } from '../screens/sales/NuevoPedido'
@@ -50,6 +52,8 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
   const [miCartera, setMiCartera] = useState<Cartera>({ fase: 'cargando' })
   const [filtro, setFiltro] = useState('')
   const [segmento, setSegmento] = useState<Segmento>('todos')   // SEG-CLI
+  const [invitando, setInvitando] = useState<{ id: string; nombre: string; clave: string } | null>(null)   // INVITAR desde la cartera
+  const [invitados, setInvitados] = useState<Set<string>>(() => new Set())
   const [abierto, setAbierto] = useState<Abierto | null>(null)
   const [pedido, setPedido] = useState<Abierto | null>(null)
   const vivo = useRef(true)
@@ -110,6 +114,12 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
 
   return (
     <div className="grid" style={{ gap: 16 }} data-testid="directorio-ventas">
+      <Hoja abierta={!!invitando} onCerrar={() => setInvitando(null)} titulo={invitando ? `Invitar a ${invitando.nombre}` : ''} testid="cartera-invitar-hoja">
+        {invitando && <>
+          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-3)' }}>Ya es cliente verificado: con este enlace crea su contraseña y entra a su portal con sus precios, pedidos y envíos.</p>
+          <InvitarCliente key={invitando.id} customerId={invitando.id} auto onGenerada={() => setInvitados((s) => new Set(s).add(invitando.clave))} />
+        </>}
+      </Hoja>
       <div className="eyebrow crumb">{title} · Directorio comercial</div>
 
       {conCartera && (
@@ -191,16 +201,21 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
           ) : (
             <div className="card op-lista">
             {filasCartera.map((c) => (
-              <button key={c.clave} type="button" className="op-fila" style={c.customer_id ? undefined : { cursor: 'default', opacity: 0.7 }} disabled={!c.customer_id}
+              <div key={c.clave} className="op-fila-env">
+              <button type="button" className="op-fila" style={c.customer_id ? undefined : { cursor: 'default', opacity: 0.7 }} disabled={!c.customer_id}
                 onClick={() => { if (c.customer_id) setAbierto({ id: c.customer_id, nombre: c.nombre }) }} data-testid="cartera-fila">
                 <div className="avatar" style={{ background: avatarColor(c.nombre || '?') }}>{initials(c.nombre || '?')}</div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 600 }}>{c.nombre}</div>
                   {!c.customer_id && <div style={tenue}>Aún sin cuenta comercial: no tiene ficha que abrir.</div>}
                 </div>
-                <MarcaSegmento datos={c} />
-                <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-asignado">Asignado</span>
+                {invitados.has(c.clave) ? <span className="pill p-ok" style={{ whiteSpace: 'nowrap' }} data-testid="marca-invitado">Invitado</span> : <MarcaSegmento datos={c} />}
               </button>
+              {/* INVITAR (23 nov 2026, dueño: «eso lo harán los vendedores»): el cliente verificado sin portal se invita desde la lista */}
+              {c.customer_id && segmentoDe(c) === 'por_invitar' && !invitados.has(c.clave) && (
+                <button type="button" className="btn sm" onClick={() => setInvitando({ id: c.customer_id!, nombre: c.nombre, clave: c.clave })} data-testid="cartera-invitar">Invitar</button>
+              )}
+              </div>
             ))}
             </div>
           )}

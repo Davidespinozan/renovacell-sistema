@@ -41,12 +41,12 @@ const filas = () => screen.queryAllByRole('button').filter((b) => b.className ==
 beforeEach(() => { cleanup(); h.role = 'pos'; h.name = 'Lucía · Ventas'; h.customers = [DAVID, H1, H2, OTRO] })
 
 describe('CARTERA-P1 · Mi cartera (vigente)', () => {
-  it('David aparece en la cartera de Lucía aunque seller_name sea NULL, marcado "Asignado"', async () => {
+  it('David aparece en la cartera de Lucía aunque seller_name sea NULL', async () => {
     const f = carteraFalsa([{ profile_id: 'P-DAVID', customer_id: 'CU-DAVID' }])
     render(<CustomerDirectory title="Clientes" scope="all" carteraToggle clienteCartera={f.c} />)
     fireEvent.click(screen.getByTestId('vista-cartera'))
     await waitFor(() => expect(filas()).toHaveLength(1))
-    expect(filas()[0]).toHaveTextContent('david espinoza'); expect(within(filas()[0]).getByTestId('marca-asignado')).toHaveTextContent('Asignado')
+    expect(filas()[0]).toHaveTextContent('david espinoza'); expect(within(filas()[0]).queryByTestId('marca-asignado')).toBeNull()   // en «Mi cartera» todos son asignados
     expect(screen.getByTestId('cartera-explicacion')).toHaveTextContent('asignados a ti por Dirección')
   })
   it('también por PERFIL cuando la asignación no trae id de cliente', async () => {

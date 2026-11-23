@@ -5,7 +5,8 @@ import { pedirTexto } from './dialogos'   // CALIDAD VISUAL · diálogos del sis
 import { Copy, Mail, Send, UserPlus } from 'lucide-react'
 import { crearInvitacion, whatsappInvitacion, TEXTO_CORREO, type InvitacionCreada } from '../data/ops/invitacion'
 
-export function InvitarCliente({ customerId, crear = crearInvitacion }: { customerId: string; crear?: typeof crearInvitacion }) {
+export function InvitarCliente({ customerId, crear = crearInvitacion, auto = false, onGenerada }: { customerId: string; crear?: typeof crearInvitacion
+  /** CARTERA · genera la invitación al abrir (el vendedor ya dijo «Invitar»). */ auto?: boolean; onGenerada?: () => void }) {
   const [inv, setInv] = useState<InvitacionCreada | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -16,8 +17,10 @@ export function InvitarCliente({ customerId, crear = crearInvitacion }: { custom
     const r = await crear(customerId, { correo })
     setOcupado(false)
     if (!r.ok) { setMsg(r.mensaje); return }
-    setInv(r.data); setMsg(TEXTO_CORREO[r.data.correo] || null)
+    setInv(r.data); setMsg(TEXTO_CORREO[r.data.correo] || null); onGenerada?.()
   }
+  const autoHecho = React.useRef(false)
+  React.useEffect(() => { if (auto && !autoHecho.current) { autoHecho.current = true; void generar(false) } }, [auto])   // eslint-disable-line react-hooks/exhaustive-deps
   const copiar = async () => {
     if (!inv) return
     try { await navigator.clipboard.writeText(inv.enlace); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500) } catch { (await pedirTexto('Copia el enlace:', inv.enlace)) }
