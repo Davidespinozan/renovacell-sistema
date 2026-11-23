@@ -473,3 +473,4 @@ button.cifra-v{cursor:pointer}
 .repetidos-queda td { background: var(--ux-accent-soft); }
 .repetidos-aviso { color: var(--st-warn); font-size: 12px; font-weight: 600; }
 .repetidos-acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.repetidos-obvios { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }

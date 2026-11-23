@@ -39,4 +39,14 @@ describe('Clientes repetidos', () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('clientes_marcar_distintos', { p_ids: ['A', 'B', 'C'] }))
     await waitFor(() => expect(screen.queryByTestId('grupo-repetido')).toBeNull())
   })
+  it('los obvios se fusionan en un clic y la lista se recarga', async () => {
+    let llamadas = 0
+    const obvio: GrupoRepetido = { ids: ['T1', 'T2'], por: ['telefono'], obvio: true, fichas: [f('T1', 'MARIA TERESA SALAS HERNANDEZ'), f('T2', 'Tere Salas')] }
+    const rpc = vi.fn(async (fn: string) => (fn === 'clientes_duplicados' ? { data: llamadas++ === 0 ? [obvio, grupo] : [grupo], error: null } : { data: { grupos: 1 }, error: null }))
+    render(<ClientesRepetidos rpc={rpc} />)
+    fireEvent.click(await screen.findByTestId('repetidos-fusionar-obvios'))
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('clientes_fusionar_obvios'))
+    await waitFor(() => expect(screen.queryByTestId('repetidos-obvios')).toBeNull())
+    expect(screen.getAllByTestId('grupo-repetido').length).toBe(1)
+  })
 })

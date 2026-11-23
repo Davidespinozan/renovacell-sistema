@@ -10,7 +10,7 @@ import { Cargando, Vacio } from '../../app/EmptyState'
 import { fmtDate, money } from '../../lib/format'
 
 export interface FichaRepetida { id: string; nombre: string; correo: string | null; telefono: string | null; ciudad: string | null; origen: string | null; portal: boolean; cedula: boolean; vendedor: string | null; pedidos: number; total: number; creado: string }
-export interface GrupoRepetido { ids: string[]; por: Array<'telefono' | 'correo' | 'cedula'>; fichas: FichaRepetida[] }
+export interface GrupoRepetido { ids: string[]; por: Array<'telefono' | 'correo' | 'cedula'>; fichas: FichaRepetida[]; obvio?: boolean }   // obvio: un nombre contiene al otro (REPETIDOS OBVIOS)
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const rpcPorDefecto: Rpc = (fn, args) => supabase.rpc(fn as never, (args ?? {}) as never) as unknown as PromiseLike<{ data: unknown; error: { message?: string } | null }>
 const POR: Record<string, string> = { telefono: 'teléfono', correo: 'correo', cedula: 'cédula' }
@@ -34,6 +34,19 @@ export function ClientesRepetidos({ rpc = rpcPorDefecto }: { rpc?: Rpc }) {
   }, [rpc])
   useEffect(() => { void cargar() }, [cargar])
 
+  // REPETIDOS OBVIOS (23 nov 2026, dueño: «es evidente que Tere Salas y María Teresa Salas son la misma persona»)
+  const [fusionandoObvios, setFusionandoObvios] = useState(false)
+  const obvios = (grupos ?? []).filter((g) => g.obvio)
+  const fusionarObvios = async () => {
+    if (!obvios.length || fusionandoObvios) return
+    const ej = obvios.slice(0, 4).map((g) => g.fichas.map((f) => `«${f.nombre}»`).join(' y ')).join('; ')
+    if (!(await confirmar(`Fusionar los ${obvios.length} grupos obvios (en cada uno, un nombre contiene al otro). Ej.: ${ej}${obvios.length > 4 ? '…' : ''}. En cada grupo se queda la ficha con pedidos (o con portal, o la más antigua) y las demás quedan archivadas.`, { aceptar: `Fusionar ${obvios.length}` }))) return
+    setFusionandoObvios(true)
+    const { error: e } = await rpc('clientes_fusionar_obvios')
+    setFusionandoObvios(false)
+    if (e) { setError(limpiar(e.message)); return }
+    await cargar()
+  }
   if (!grupos) return <Cargando etiqueta="Buscando fichas repetidas…" />
   return (
     <div className="grid" style={{ gap: 14 }} data-testid="clientes-repetidos">
@@ -44,6 +57,12 @@ export function ClientesRepetidos({ rpc = rpcPorDefecto }: { rpc?: Rpc }) {
         se parecen en nada, no se muestran (son personas distintas que comparten un número).
         Los pedidos nunca cambian de ficha: la que tiene pedidos es la que se queda.
       </div>
+      {obvios.length > 0 && (
+        <div className="card repetidos-obvios" data-testid="repetidos-obvios">
+          <span><b>{obvios.length} {obvios.length === 1 ? 'grupo es obvio' : 'grupos son obvios'}:</b> un nombre contiene al otro (p. ej. «Tere Salas» y «María Teresa Salas Hernández»). No hace falta revisarlos uno por uno.</span>
+          <button type="button" className="btn sm" onClick={() => void fusionarObvios()} disabled={fusionandoObvios} data-testid="repetidos-fusionar-obvios">{fusionandoObvios ? 'Fusionando…' : `Fusionar los ${obvios.length} obvios`}</button>
+        </div>
+      )}
       {error && <div className="sysnote" role="alert">{error}</div>}
       {grupos.length === 0 && !error && <Vacio icono="usercheck" titulo="No hay fichas repetidas por revisar." />}
       {grupos.map((g) => <Grupo key={g.ids.join(',')} g={g} rpc={rpc} onListo={() => setGrupos((xs) => (xs ?? []).filter((x) => x !== g))} />)}
@@ -83,7 +102,7 @@ function Grupo({ g, rpc, onListo }: { g: GrupoRepetido; rpc: Rpc; onListo: () =>
 
   return (
     <div className="card repetidos-grupo" data-testid="grupo-repetido">
-      <div className="repetidos-cab">Coinciden por <b>{g.por.map((p) => POR[p] ?? p).join(' y ')}</b> · {g.fichas.length} fichas</div>
+      <div className="repetidos-cab">Coinciden por <b>{g.por.map((p) => POR[p] ?? p).join(' y ')}</b> · {g.fichas.length} fichas{g.obvio && <span className="pill p-ok" style={{ marginLeft: 6 }}>Obvio</span>}</div>
       <table className="tbl-cards">
         <thead><tr><th>Se queda</th><th>Nombre</th><th>Contacto</th><th>Origen</th><th>Vendedora</th><th>Pedidos</th><th>Fusionar</th></tr></thead>
         <tbody>
