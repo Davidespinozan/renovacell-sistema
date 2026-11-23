@@ -84,7 +84,7 @@ body,.main{background:var(--ux-bg)}
 .page-h,.page-h.page-h--lead{background:none !important;border:0 !important;box-shadow:none !important;padding:0 !important;margin:0 0 4px !important;overflow:visible}
 .page-h::before,.page-h::after{display:none !important}
 .page-h:not(:has(h1)):not(:has(.page-h-p--abierta)){margin:-4px 0 0 !important}
-.nav-solo{margin-top:8px}
+.nav-solo{margin-top:6px}
 
 /* ══ FASE 1 · Portal del doctor como tienda ═════════════════════════════════════════════════════════ */
 .tienda{display:grid;gap:18px}
