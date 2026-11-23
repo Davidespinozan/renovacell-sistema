@@ -94,10 +94,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {estaAbierta(HUB) && hub.map(Link)}
           </div>
         )}
-        {groups.map((g) => g.items.length === 1 ? (
-          // UX MODERNO · un grupo de UNA opción ("CLIENTES → Clientes") es solo el enlace, sin encabezado que plegar.
-          <div key={g.header} className="nav-solo">{Link(g.items[0])}</div>
-        ) : (
+        {/* MISMO PATRÓN SIEMPRE (dueño, 23 nov 2026: los enlaces sueltos «rompen el patrón»): toda sección lleva su
+            encabezado plegable, aunque tenga una sola opción. */}
+        {groups.map((g) => (
           <React.Fragment key={g.header}>
             <button type="button" className={`grp grp-btn${estaAbierta(g.header) ? ' abierta' : ''}`} aria-expanded={estaAbierta(g.header)} onClick={() => alternar(g.header)} data-testid={`seccion-${g.header}`}>
               <span>{g.header}</span><ChevronRight size={13} aria-hidden="true" />

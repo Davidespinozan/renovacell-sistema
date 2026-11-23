@@ -21,13 +21,13 @@ describe('<Sidebar> admin — navegación Clientes', () => {
     expect(screen.getByText('Ventas').closest('a')).toBeTruthy()
   })
 
-  it('UX MODERNO · "Clientes" (grupo de una sola opción) es un enlace directo, sin encabezado; "Ventas" sigue bajo Mi trabajo', () => {
+  it('MISMO PATRÓN · "Clientes" (sección de una sola opción) también lleva su encabezado plegable; "Ventas" sigue bajo Mi trabajo', () => {
     const { container } = renderWithRole(<Sidebar />)
     const nav = container.querySelector('nav.nav') as HTMLElement
     expect(nav).toBeTruthy()
     const headers = Array.from(nav.querySelectorAll('.grp')).map((el) => el.textContent)
-    expect(headers).not.toContain('Clientes'); expect(headers).toContain('Mi trabajo')
-    expect(within(nav).getByText('Clientes').closest('a')).toBeTruthy()
+    expect(headers).toContain('Clientes'); expect(headers).toContain('Mi trabajo')
+    expect(within(nav).getByText('Clientes', { selector: 'a *' }).closest('a')).toBeTruthy()
     const link = within(nav).getByText('Ventas').closest('a')
     expect(link).toBeTruthy()
     expect(link?.getAttribute('role')).toBe('button')
@@ -44,7 +44,7 @@ describe('<Sidebar> · secciones plegables (como en CuboPolar)', () => {
     fireEvent.click(fin)
     expect(screen.getByText('Cobros')).toBeTruthy(); expect(fin.getAttribute('aria-expanded')).toBe('true')
     expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones') ?? '{}').Finanzas).toBe(true)
-    expect(screen.queryByTestId('seccion-Clientes')).toBeNull()   // UX MODERNO · grupo de una opción: sin encabezado que plegar
+    expect(screen.getByTestId('seccion-Clientes').getAttribute('aria-expanded')).toBe('true')   // MISMO PATRÓN · también con encabezado (abierta por defecto)
     expect(screen.queryAllByText('Clientes').filter((el) => el.closest('a'))).toHaveLength(1)
     // el Hub también se pliega (y la pantalla activa, Inicio, lo vuelve a abrir al navegar a él)
     fireEvent.click(screen.getByTestId('seccion-Hub Renovacell'))
