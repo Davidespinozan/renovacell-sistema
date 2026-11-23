@@ -131,7 +131,8 @@ export const ROLES: RoleDef[] = [
     modules: [
       // MENÚ (dueño, 17 oct 2026): Inicio ES la bandeja y el seguimiento de su cartera; menos pestañas.
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
-      { key: 'links_pago', label: 'Links de pago', icon: 'receipt', section: 'Vender' },   // LINK DE PAGO (2 nov 2026) · el cliente pide pagar con tarjeta; el vendedor pega el de BanBajío
+      { key: 'links_pago', label: 'Links de pago', icon: 'receipt', section: 'Vender' },
+      { key: 'mis_ventas', label: 'Mis ventas', icon: 'chart', section: 'Vender' },   // MIS VENTAS (23 nov 2026) · los pedidos detrás de "Vendido este mes" y "Por cobrar"   // LINK DE PAGO (2 nov 2026) · el cliente pide pagar con tarjeta; el vendedor pega el de BanBajío
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
       { key: 'llamar_hoy', label: 'A quién llamar hoy', icon: 'phone', section: 'Mi cartera' },   // PROSPECCIÓN (15 nov 2026) · cartera histórica sin cuenta
       { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Mi cartera' },

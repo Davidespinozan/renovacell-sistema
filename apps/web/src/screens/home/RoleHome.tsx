@@ -34,6 +34,7 @@ import { oportunidadesPromo, type OportunidadPromo } from '../../data/ops/busque
 import { carteraPlazos, textoPlazo, textoSinCompra, tonoPlazo, type ClientePlazo } from '../../data/ops/carteraPlazos'
 import { fmtDate, money } from '../../lib/format'
 import { diaNegocio, hoyNegocio } from '../../data/periodo'
+import { abrirMisVentas } from '../sales/MisVentas'
 
 export function RoleHome() {
   const { role } = useRole()
@@ -144,14 +145,15 @@ function EnviosPlegados() {
 // y cuántos clientes lo esperan en Conversaciones.
 export function CifrasVendedor({ esperan, onEsperan }: { esperan: number; onEsperan: () => void }) {
   const { data: pedidos } = useAllOrders()
+  const { setScreen } = useRole()
   const mes = hoyNegocio().slice(0, 7)
   const vivos = pedidos.filter((o) => o.status !== 'cancelled' && o.status !== 'draft')
   const vendido = vivos.filter((o) => diaNegocio(o.created_at).startsWith(mes)).reduce((s, o) => s + Number(o.total ?? 0), 0)
   const porCobrar = vivos.filter((o) => o.payment_status !== 'paid' && o.payment_status !== 'refunded').reduce((s, o) => s + Number(o.total ?? 0), 0)
   return (
     <div className="cifras-v" data-testid="cifras-vendedor">
-      <div className="cifra-v"><span>Vendido este mes</span><b>{money(vendido)}</b></div>
-      <div className="cifra-v"><span>Por cobrar</span><b className={porCobrar > 0 ? 'cifra-v--warn' : undefined}>{money(porCobrar)}</b></div>
+      <button type="button" className="cifra-v" onClick={() => abrirMisVentas(setScreen, 'mes')} data-testid="cifra-vendido"><span>Vendido este mes</span><b>{money(vendido)}</b></button>
+      <button type="button" className="cifra-v" onClick={() => abrirMisVentas(setScreen, 'cobrar')} data-testid="cifra-por-cobrar"><span>Por cobrar</span><b className={porCobrar > 0 ? 'cifra-v--warn' : undefined}>{money(porCobrar)}</b></button>
       <button type="button" className="cifra-v" onClick={onEsperan} data-testid="cifra-esperan"><span>Te esperan</span><b className={esperan > 0 ? 'cifra-v--ok' : undefined}>{esperan}</b></button>
     </div>
   )

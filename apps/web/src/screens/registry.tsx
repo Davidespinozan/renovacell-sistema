@@ -22,6 +22,7 @@ import { lazyPantalla } from '../app/lazyPantalla'
 // directos: son lo primero que se ve.
 const Difusiones = lazyPantalla(() => import('./sales/Difusiones').then((m) => m.Difusiones))
 const Seguimientos = lazyPantalla(() => import('./Seguimientos').then((m) => m.Seguimientos))
+const MisVentas = lazyPantalla(() => import('./sales/MisVentas').then((m) => m.MisVentas))   // MIS VENTAS (23 nov 2026)
 const LinksPago = lazyPantalla(() => import('./cobros/LinksPago').then((m) => m.LinksPago))   // LINK DE PAGO (2 nov 2026)
 const ClasificarCartera = lazyPantalla(() => import('./ClasificarCartera').then((m) => m.ClasificarCartera))
 const ProductosClientes = lazyPantalla(() => import('./sales/ProductosClientes').then((m) => m.ProductosClientes))
@@ -159,6 +160,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   productos_clientes: () => <ProductosClientes />,   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
   cartera_plazos: () => <CarteraPlazos />,   // CARTERA-PLAZO · por vencer + competencia
   links_pago: () => <LinksPago />,
+  mis_ventas: () => <MisVentas />,
   av_links: () => <LinksPago />,
   crm_embudo: () => <Embudo />,
   llamar_hoy: () => <LlamarHoy />,   // PROSPECCIÓN (15 nov 2026) · a quién llamar hoy   // CRM (2 nov 2026) · embudo de ventas
