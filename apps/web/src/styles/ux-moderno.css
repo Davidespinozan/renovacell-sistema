@@ -456,3 +456,13 @@ button.cifra-v{cursor:pointer}
 .prospecto-form input { padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 16px; color: var(--ink); background: var(--cp-surface); }
 .prospecto-tipo { display: flex; gap: 6px; }
 .prospecto-acciones { display: flex; gap: 8px; justify-content: flex-end; }
+/* ALTA COMPLETA (23 nov 2026) · secciones plegables con todo lo que guarda la ficha */
+.prospecto-form select { padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 16px; color: var(--ink); background: var(--cp-surface); }
+.alta-fila { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.alta-fila .alta-ancho { grid-column: span 2; }
+.alta-seccion { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.alta-seccion[open] { display: grid; gap: 8px; }
+.alta-seccion summary { cursor: pointer; font-weight: 600; color: var(--ink); font-size: 14px; }
+.alta-seccion summary small { font-weight: 400; color: var(--ink-3); margin-left: 6px; }
+.alta-nota { font-size: 12px; color: var(--ink-3); }
+@media (max-width: 420px) { .alta-fila .alta-ancho { grid-column: auto; } }

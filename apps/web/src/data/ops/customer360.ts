@@ -112,6 +112,9 @@ export function mensajeError360(m: string | undefined): string {
   if (/CLIENTE_INEXISTENTE/.test(t)) return 'No encontramos el expediente de este cliente.'
   if (/VENDEDOR_NO_ELEGIBLE/.test(t)) return 'Ese vendedor no puede recibir clientes: en Equipo actívale "Atender conversaciones" y "Recibir clientes nuevos".'
   if (/MOTIVO_REQUERIDO/.test(t)) return 'Escribe el motivo del cambio.'
+  if (/CEDULA_INVALIDA/.test(t)) return 'La cédula profesional tiene 7 u 8 dígitos.'
+  if (/CEDULA_DUPLICADA: (.+)/.test(t)) return 'Esa cédula ya está registrada: ' + (t.match(/CEDULA_DUPLICADA: ([^\n]+)/)?.[1] ?? 'en otro cliente') + '.'
+  if (/CEDULA_DE_CUENTA/.test(t)) return 'Este cliente tiene cuenta del portal: su cédula la registra él en su verificación.'
   return 'No se pudo completar. Intenta de nuevo.'
 }
 
@@ -144,6 +147,8 @@ export class ClienteC360 {
   }
   fiscalPredeterminado(id: string) { return this.llamar('cliente_fiscal_predeterminar', { p_perfil: id }) }
   archivarFiscal(id: string) { return this.llamar('cliente_fiscal_archivar', { p_perfil: id }) }
+  /** ALTA COMPLETA (23 nov 2026) · cédula de un cliente SIN cuenta del portal (Dirección o su vendedora asignada). */
+  guardarCedula(customerId: string, cedula: string) { return this.llamar<{ customer_id: string }>('cliente_cedula_guardar', { p_customer: customerId, p_cedula: cedula }) }
   agregarNota(customerId: string, texto: string) { return this.llamar('cliente_nota_agregar', { p_customer: customerId, p_texto: texto }) }
   // CARTERA-CLIENTES · Dirección: vendedor de CUALQUIER cliente (con o sin cuenta) y baja / reactivación.
   asignarVendedor(customerId: string, vendedor: string | null, motivo?: string | null) {

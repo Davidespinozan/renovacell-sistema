@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '../../app/icons'
 import { BuscadorClientes, mensajeBusqueda, validarBusqueda, type ClienteBusqueda, type EstadoBusqueda } from '../../data/ops/buscarClientes'
 import { ClienteCartera, type AsignacionCartera } from '../../data/ops/cartera'
-import { NuevoProspectoForm } from './NuevoProspecto'   // NUEVO PROSPECTO
+import { AltaClienteForm } from './AltaCliente'   // ALTA COMPLETA (23 nov 2026)
 
 export interface ClienteElegido { id: string; name: string; phone: null; mascara: string | null; nuevo?: boolean }   // nuevo = prospecto recién registrado (ya trae su oportunidad)
 
@@ -82,7 +82,7 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
 
           {/* NUEVO PROSPECTO · alguien que la vendedora consiguió por su cuenta */}
           {registrando
-            ? <NuevoProspectoForm onCancelar={() => setRegistrando(false)} onListo={(p) => onPick({ id: p.customer_id, name: p.nombre, phone: null, mascara: null, nuevo: p.status !== 'existente' })} />
+            ? <AltaClienteForm onCancelar={() => setRegistrando(false)} onListo={(p) => onPick({ id: p.customer_id, name: p.nombre, phone: null, mascara: null, nuevo: p.status !== 'existente' })} />
             : <button type="button" className="btn ghost sm prospecto-abrir" onClick={() => setRegistrando(true)} data-testid="sc-nuevo-prospecto">＋ Nuevo prospecto (no está registrado)</button>}
 
           <div style={titulo}>Mi cartera</div>
