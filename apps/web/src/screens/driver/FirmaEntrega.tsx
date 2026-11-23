@@ -29,6 +29,9 @@ export function FirmaEntrega({ onCambio, deshabilitada = false }: { onCambio: (f
   const pos = (e: React.PointerEvent<HTMLCanvasElement>) => { const r = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
   const inicio = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (deshabilitada) return
+    // Si el lienzo se montó sin tamaño (oculto o aún sin layout), se prepara ahora, antes del primer trazo.
+    const rr = e.currentTarget.getBoundingClientRect(), kk = window.devicePixelRatio || 1
+    if (puntos.current === 0 && (e.currentTarget.width !== Math.round(rr.width * kk) || e.currentTarget.height !== Math.round(rr.height * kk))) preparar()
     const g = e.currentTarget.getContext('2d'); if (!g) return
     e.currentTarget.setPointerCapture?.(e.pointerId)
     trazando.current = true
@@ -65,6 +68,12 @@ export function FirmaEntrega({ onCambio, deshabilitada = false }: { onCambio: (f
 export function firmaComoArchivo(c: HTMLCanvasElement | null): Promise<File | null> {
   return new Promise((res) => {
     if (!c) { res(null); return }
-    try { c.toBlob((b) => res(b ? new File([b], 'firma.png', { type: 'image/png' }) : null), 'image/png') } catch { res(null) }
+    try {
+      // Se copia sobre un lienzo con fondo BLANCO: la firma nunca puede quedar transparente (en JPEG eso es negro).
+      const o = document.createElement('canvas'); o.width = c.width; o.height = c.height
+      const g = o.getContext('2d'); if (!g) { res(null); return }
+      g.fillStyle = FONDO; g.fillRect(0, 0, o.width, o.height); g.drawImage(c, 0, 0)
+      o.toBlob((b) => res(b ? new File([b], 'firma.png', { type: 'image/png' }) : null), 'image/png')
+    } catch { res(null) }
   })
 }

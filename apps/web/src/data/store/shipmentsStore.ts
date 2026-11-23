@@ -8,6 +8,7 @@ import { notify } from './notificationsStore'
 import { logAudit } from './auditStore'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
+import { refrescoSuave } from '../../lib/refrescoSuave'
 import type { Json } from '../database.types'
 import { confirmar, type Escritura } from './escritura'
 import { leerTodo } from './lectura'
@@ -29,6 +30,7 @@ const live = makeLive<Shipment>(async () => {
 export const subscribe = live.subscribe
 // PAQ-A · tras sincronizar el rastreo (la paquetería confirmó la entrega) se recarga la verdad del servidor.
 export const reloadShipments = (): void => { if (hasSupabase) void live.reload() }
+if (hasSupabase) refrescoSuave(() => live.reload())   // REFRESCO SUAVE · estados de envío al día sin recargar
 export const getSnapshot = live.getSnapshot
 
 export interface ShipmentInput {

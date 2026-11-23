@@ -50,7 +50,9 @@ export function comprimirImagen(file: File, max = 1280, calidad = 0.7): Promise<
     img.onload = () => {
       const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas')
       c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
-      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url)
+      const g = c.getContext('2d')
+      if (g) { g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height) }   // FIRMA · JPEG no tiene transparencia: sin esto el fondo salía negro
+      URL.revokeObjectURL(url)
       c.toBlob((b) => resolve(b ? new File([b], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', calidad)
     }
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }

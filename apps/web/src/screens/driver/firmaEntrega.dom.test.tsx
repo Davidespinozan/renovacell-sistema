@@ -7,7 +7,7 @@ import { FirmaEntrega, MIN_PUNTOS } from './FirmaEntrega'
 
 describe('FirmaEntrega', () => {
   it('un toque accidental no cuenta; un trazo sí; borrar la quita', async () => {
-    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} })) as never
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ setTransform() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, drawImage() {} })) as never
     HTMLCanvasElement.prototype.toBlob = function (cb: BlobCallback) { cb(new Blob(['x'], { type: 'image/png' })) }
     const onCambio = vi.fn()
     render(<FirmaEntrega onCambio={onCambio} />)

@@ -21,6 +21,7 @@ import { logAudit } from './auditStore'
 import { restockByReference } from './lotsStore'
 import { hasSupabase, supabase, currentUserId } from '../../lib/supabase'
 import { alCambiarSesion } from '../../lib/sesion'
+import { refrescoSuave } from '../../lib/refrescoSuave'
 import type { Json } from '../database.types'
 import { runW1Command, newOpId, codigoConocido, isAmbiguous } from '../ops/w1Command'
 import { confirmar, mensajeDeError, reportarFallo, type Escritura } from './escritura'
@@ -137,6 +138,7 @@ if (hasSupabase) {
     if (e === 'cambio') hydrated = false
     hydrate()
   })
+  refrescoSuave(() => { if (hydrated) return hydrate() })   // REFRESCO SUAVE · «Entregado» llega solo a quien lo ve
 }
 
 // El pedido solo "se creó" cuando el servidor lo confirmó. `ambiguous` = no se sabe.
