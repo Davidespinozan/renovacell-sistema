@@ -26,14 +26,19 @@ import { responderIA } from '../_shared/ia/responder.ts'
 import { avisarPush, enSegundoPlano } from '../_shared/avisoChat.ts'
 import { IA_PUEDE } from '../_shared/chat.ts'
 import { canalDe, cuentaDe, correlacion, clasificarError, lineaDiagnostico, type Diagnostico } from '../_shared/metaDiagnostico.ts'
+import { AGRUPAR_MS, hayMensajeQueResponder } from '../_shared/ia/conversacion.ts'
 
-const AGRUPAR_MS = 3_500
+// TANDA 1 · 1 (23 nov 2026) · antes 3.5 s: «Hola» / «Buen día» o «Tiene linurasse» / «?» llegaban con más separación y la IA
+// contestaba cada uno. Ahora 8 s (el cliente ya ve «escribiendo…»), y una reacción o un sticker que llega después NO cuenta
+// como «otro mensaje» (no dispara turno: el anterior se quedaría sin respuesta). El orquestador además cede ante un mensaje
+// que llegue mientras genera. Todo corre DESPUÉS de responder 200 a Meta: no provoca reintentos.
 // deno-lint-ignore no-explicit-any
 async function llegoOtroMensaje(admin: any, conv: string, seq: number): Promise<boolean> {
   await new Promise((ok) => setTimeout(ok, AGRUPAR_MS))
-  const { data, error } = await admin.from('cc_messages').select('seq').eq('conversation_id', conv).in('actor_type', ['visitor', 'doctor']).gt('seq', seq).limit(1)
+  const { data, error } = await admin.from('cc_messages').select('actor_type, content').eq('conversation_id', conv).in('actor_type', ['visitor', 'doctor']).gt('seq', seq).order('seq').limit(10)
     .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
-  return !error && Array.isArray(data) && data.length > 0   // ante un error se responde (nunca se deja sin respuesta)
+  if (error || !Array.isArray(data)) return false   // ante un error se responde (nunca se deja sin respuesta)
+  return hayMensajeQueResponder((data as Array<{ actor_type: string; content: string }>).map((m) => ({ actor: m.actor_type, content: m.content })))
 }
 
 // W6-A3.3 · telemetría opcional (no-op sin SENTRY_DSN; nunca altera la respuesta).
@@ -167,6 +172,7 @@ Deno.serve(async (req) => {
         if (!r.activo) return
         await avisarPush(admin, r.conversation_id, 'visitor', m.texto)
         if (IA_PUEDE(r.modo as never)) {
+          if (await llegoOtroMensaje(admin, r.conversation_id, r.seq)) return   // TANDA 1 · 1 · también en Instagram/Messenger
           const ia = await responderIA(admin, r.conversation_id, r.seq, 'visitor', null, r.visitor_hash, m.texto, 'meta:' + m.psid, m.canal)
           if (ia === 'respondio' || ia === 'transferida') await despacharMeta(admin)
         }

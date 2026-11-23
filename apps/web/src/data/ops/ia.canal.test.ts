@@ -138,7 +138,7 @@ describe('LIVE C1 · identidad por canal: fuera del portal la IA es audiencia p�
   })
   it('contexto de canal en la política: texto plano, límite por canal, sin documentos; nada en portal', () => {
     expect(politica.contextoCanal('portal')).toBe('')
-    const ig = politica.contextoCanal('instagram'); expect(ig).toContain('Instagram'); expect(ig).toContain('900 caracteres'); expect(ig).toContain('sin Markdown'); expect(ig).toContain('Nunca pidas contraseñas, datos bancarios ni tarjetas'); expect(ig).toContain('solicitar_verificacion')   // VERIFICACIÓN POR WHATSAPP (2 nov 2026): la cédula sí, para verificar aquí
+    const ig = politica.contextoCanal('instagram'); expect(ig).toContain('Instagram'); expect(ig).toContain('280 caracteres'); expect(ig).toContain('sin Markdown'); expect(ig).toContain('Nunca pidas contraseñas, datos bancarios ni tarjetas'); expect(ig).toContain('solicitar_verificacion')   // VERIFICACIÓN POR WHATSAPP (2 nov 2026): la cédula sí, para verificar aquí
     expect(politica.contextoCanal('whatsapp')).toContain('WhatsApp'); expect(politica.contextoCanal('messenger')).toContain('Facebook Messenger')
     const sys = politica.construirSistema({ ctx: { actor: 'visitor', audiencia: 'public', puede_precio: false, puede_stock: false, puede_pedidos: false, verificado: false }, intencion: 'PRICE', limiteClinico: false, reglasConocimiento: REGLAS_IA, evidencia: [], canal: 'whatsapp' })
     expect(sys).toContain('CANAL: el usuario escribe por WhatsApp'); expect(sys.indexOf('CANAL:')).toBeGreaterThan(sys.indexOf('TAREA:'))
@@ -160,7 +160,7 @@ describe('LIVE C1 · guardas de fuente: el canal viaja hasta la política y el p
     expect(sin(webhook)).toMatch(/responderIA\(admin, r\.conversation_id, r\.seq, 'visitor', null, r\.visitor_hash, m\.texto, 'meta:' \+ m\.psid, m\.canal\)/)
     expect(sin(chatEdge)).toMatch(/responderIA\(admin, conv, r\.seq, dueno, actor\.profile, hash, c\.texto, sujeto, 'portal', null, contacto\)/)   // portal explícito + datos de contacto pendientes
     expect(sin(responderSrc)).toMatch(/canal: CanalTurno = 'portal', adjunto: EntradaTurno\['adjunto'\] \| null = null, contacto: EntradaTurno\['contacto'\] = null\)/); expect(sin(responderSrc)).toMatch(/textoUsuario: texto, canal, \.\.\.\(adjunto \? \{ adjunto \} : \{\}\), \.\.\.\(contacto \? \{ contacto \} : \{\}\) \}/)   // R4-C13 + CONTACTO CONVERSACIONAL
-    expect(sin(responderSrc)).toMatch(/canal === 'portal' \? contacto : null\)/)   // los datos de contacto solo existen en el portal
+    expect(sin(responderSrc)).toMatch(/canal === 'portal' \? contacto : null(, info)?\)/)   // los datos de contacto solo existen en el portal (TANDA 1: + info del turno)
     // E (2 nov 2026) · fuera del portal el perfil solo llega con vínculo explícito de WhatsApp que valida la base (R4-B1 en pie)
     expect(sin(orqSrc)).toMatch(/let perfilIA: string \| null = canal === 'portal' \? e\.profile : null/)
     expect(sin(orqSrc)).toMatch(/if \(canal === 'whatsapp'\) \{ const idc = await rpc\('cc_ia_identidad_canal', \{ p_conv: e\.conv \}\); if \(!idc\.error && typeof idc\.data === 'string'\) perfilIA = idc\.data \}/)

@@ -55,6 +55,7 @@ describe('evidencia y validación', () => {
 describe('orquestador', () => {
   it('el límite fijo solo aplica a quien no tiene clínico (lo decide la base)', () => {
     expect(esLimiteClinico('cual es la dosis de botox para glabela')).toBe(true)
-    expect(orquestadorSrc).toMatch(/const limiteClinico = d\.politica\.esLimiteClinico\(e\.textoUsuario\) && !ctx\.clinico/)
+    // TANDA 1 · 1: mira la ráfaga completa del cliente (varios mensajes seguidos), no solo el último
+    expect(orquestadorSrc).toMatch(/const limiteClinico = d\.politica\.esLimiteClinico\(textoTurno\) && !ctx\.clinico/)
   })
 })

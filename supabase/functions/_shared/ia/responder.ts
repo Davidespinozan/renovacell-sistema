@@ -11,6 +11,7 @@ import { REGLAS_IA } from '../conocimiento.ts'
 import { limitar, limitarTodas, tokensEstimados } from '../limite.ts'
 import { esNumeroEmpresa, frenoBot, sinContenido } from './antibot.ts'
 import { sucursalDe } from '../ubicacion.ts'   // SUCURSAL · la dirección que da la IA (no la fiscal): la de Configuración
+import * as conversacion from './conversacion.ts'   // TANDA 1 · mensajes seguidos, cliente reconocido, forma corta
 
 // R4-B2-IA1 · la política de canal: su propio clasificador (sin falsos positivos de "quiere una persona") y sus mensajes
 // seguros. La tarea y el contexto del canal los decide construirSistema por `canal`. El portal usa `politica` tal cual.
@@ -83,7 +84,7 @@ export function dependenciasPortal(n: politica.DatosNegocio) {
 }
 
 // deno-lint-ignore no-explicit-any
-type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada'
+type ResultadoIA = 'respondio' | 'no_disponible' | 'silenciada' | 'descartada' | 'en_curso' | 'limitada' | 'superada'
 // R4-B2-IA1 · 'transferida' solo existe en canales: el portal conserva exactamente su contrato anterior.
 export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal?: 'portal', adjunto?: null, contacto?: EntradaTurno['contacto']): Promise<ResultadoIA>
 export async function responderIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, adjunto?: EntradaTurno['adjunto'] | null): Promise<ResultadoIA | 'transferida'>
@@ -127,7 +128,12 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
       }
     }
   }
-  const r = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto, canal === 'portal' ? contacto : null)
+  const info: { reconocido?: boolean } = {}
+  const r0 = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto, canal === 'portal' ? contacto : null, info)
+  // TANDA 1 · 1 · cedió ante un mensaje más nuevo del cliente: ESE turno contesta todo junto. Aquí no hay nada más que hacer
+  // (ni transferir ni avisar): un aviso de sistema por cada mensaje de la ráfaga era parte del ruido.
+  if (r0 === 'superada') return 'descartada'
+  const r = r0
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
@@ -136,6 +142,12 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
   // SEÑAL DE INTERÉS → HUMANO, SIEMPRE (2 nov 2026, dueño): si la IA respondió, la conversación SIGUE con la IA (la atiende de
   // punta a punta) y el responsable comercial recibe la señal con alarma; solo si la IA no pudo responder, se transfiere
   // como antes para que ningún comprador quede sin atención.
+  // TANDA 1 · 2 · la IA le dijo a un cliente reconocido que su asesor lo atiende con su historial: que el asesor se entere
+  // (la misma señal de interés, una vez por hora por conversación). Nunca le da a la IA nada de la cuenta.
+  if (!comercial && canal !== 'portal' && r === 'respondio' && info.reconocido) {
+    await admin.rpc('cc_senal_interes', { p_conv: conv, p_motivo: 'cliente_reconocido' }).then(() => {}, () => {})
+    return r
+  }
   if (comercial && canal !== 'portal' && r === 'respondio') {
     await admin.rpc('cc_senal_interes', { p_conv: conv, p_motivo: comercial }).then(() => {}, () => {})
     return r
@@ -150,7 +162,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
 }
 
 // deno-lint-ignore no-explicit-any
-async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null): Promise<ResultadoIA> {
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null, info: { reconocido?: boolean } = {}): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
   const cfg0 = configurar(env)
   // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
@@ -182,8 +194,10 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
       proveedor, config: cfg.config, politica: canalDeps.politica, herramientas: portalDeps ? portalDeps.herramientas : herramientas, validacion: canalDeps.validacion, reglasConocimiento: REGLAS_IA,
+      conversacion, esperaPublicar: esperaPublicar(admin),
     },
   )
+  info.reconocido = !!resultado.reconocido
   const usados = resultado.usage.input + resultado.usage.output
   if (usados > 0 && usados !== estimado) {
     await limitar(admin, 'ia_tokens_dia', 'global', { costo: usados - estimado })
@@ -191,7 +205,7 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   }
   switch (resultado.estado) {
     case 'respondio': case 'ya_respondido': return 'respondio'
-    case 'descartada': return 'descartada'
+    case 'descartada': return resultado.clase === 'superado' ? 'superada' : 'descartada'
     case 'en_curso': return 'en_curso'
     case 'silenciada': return 'silenciada'
     default: return 'no_disponible'   // fallo del proveedor o de persistencia (el orquestador ya dejó el aviso de sistema)
@@ -230,12 +244,32 @@ export function esfuerzoCanal(env: (k: string) => string | undefined): 'low' | '
   return e === 'medium' || e === 'high' ? e : 'low'
 }
 
+// TANDA 1 · 1 · ¿llegó otro mensaje del cliente que sí dispara un turno, y ya arrancó ese turno? (service_role, solo lectura)
+// deno-lint-ignore no-explicit-any
+export function esperaPublicar(admin: any) {
+  return {
+    hayNuevo: async (conv: string, seq: number): Promise<boolean> => {
+      // Chat V2-C1 · sin leer cc_messages directo: el último seq de la conversación y el contexto de SU sesión (RPC)
+      const { data: c, error: ec } = await admin.from('cc_conversations').select('ultimo_seq').eq('id', conv).maybeSingle()
+      const ultimo = Number((c as { ultimo_seq?: unknown } | null)?.ultimo_seq ?? 0)
+      if (ec || !(ultimo > seq)) return false   // ante la duda se publica (nunca se deja sin respuesta)
+      const nuevos = await leerInterno(admin, conv, ultimo, 20).catch(() => [])
+      return conversacion.hayMensajeQueResponder(nuevos.filter((m) => Number(m.seq ?? 0) > seq))
+    },
+    turnoNuevo: async (conv: string, seq: number): Promise<boolean> => {
+      const { data, error } = await admin.from('cc_ai_turns').select('id').eq('conversation_id', conv).gt('trigger_seq', seq).in('status', ['provider_running', 'completed']).limit(1)
+      return !error && Array.isArray(data) && data.length > 0
+    },
+    dormir: (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms)),
+  }
+}
+
 // Lectura interna con service_role (el orquestador corre en el servidor, no es un cliente).
 // Chat V2-C1 · la base acota el contexto a la SESIÓN del disparador (nunca el transcript eterno).
 // deno-lint-ignore no-explicit-any
-async function leerInterno(admin: any, conv: string, hastaSeq: number, limite: number): Promise<Array<{ actor: string; content: string }>> {
+async function leerInterno(admin: any, conv: string, hastaSeq: number, limite: number): Promise<Array<{ actor: string; content: string; seq?: number }>> {
   const { data, error } = await admin.rpc('cc_ia_contexto', { p_conv: conv, p_hasta_seq: hastaSeq, p_limite: limite })
   if (error) throw new Error('contexto_ia')
-  return ((data ?? []) as Array<{ actor: string; content: string }>).map((m) => ({ actor: m.actor, content: m.content }))
+  return ((data ?? []) as Array<{ actor: string; content: string; seq?: number }>).map((m) => ({ actor: m.actor, content: m.content, seq: m.seq }))   // TANDA 1 · seq para la espera de publicar
 }
 

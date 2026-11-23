@@ -9,7 +9,9 @@ export interface ContextoValidacion { evidencia: readonly string[]; nombresAutor
 export type Validacion = { ok: true; texto: string } | { ok: false; motivo: MotivoRechazo; detalle?: string }
 
 export const MAX_RESPUESTA = 2500
-const RE_PRECIO = /(\$\s?\d[\d,]*(\.\d+)?)|(\b\d[\d,]*(\.\d+)?\s?(mxn|pesos|usd|d[oó]lares)\b)|(\bcuesta[n]?\s+\d)|(\bprecio (es|de|sería|seria) (de )?\$?\d)/i
+// TANDA 1 · 6 · «cuesta 2 días llegar» o «el precio de 1 pieza» no son montos: un número seguido de una unidad que no es dinero no cuenta.
+const NO_DINERO = String.raw`(?![\d,.]*\s*(d[ií]as?|horas?|semanas?|meses|piezas?|cajas?|unidades|ui\b|u\b|ml\b|mg\b|viales?|frascos?|jeringas?))`
+const RE_PRECIO = new RegExp(String.raw`(\$\s?\d[\d,]*(\.\d+)?)|(\b\d[\d,]*(\.\d+)?\s?(mxn|pesos|usd|d[oó]lares)\b)|(\bcuesta[n]?\s+\d${NO_DINERO})|(\bprecio (es|de|sería|seria) (de )?\$?\d${NO_DINERO})`, 'i')
 // EXAMEN (2 nov 2026) · antes "piezas/unidades" y "queda" bastaban: "si llevas 5 piezas te queda a $4,370" se rechazaba como
 // afirmación de existencias y el doctor recibía un texto genérico. Ahora solo cuenta una afirmación de inventario real.
 const RE_STOCK = /\b(hay|tenemos|contamos con|disponemos de)\b[^.!?]{0,40}\b(existencia|existencias|stock|inventario|en almac[eé]n)\b|\b(hay|tenemos|quedan|nos quedan)\s+\d+\s+(piezas|unidades|cajas|frascos|viales)\b|\bagotad[oa]s?\b|\bsin (existencia|existencias|stock)\b|\ben (existencia|stock|inventario)\b|\bs[ií] (hay|tenemos) disponib|\best[aá] disponible (ahora|de inmediato|para env[ií]o)|\bno (hay|tenemos) disponib/i
@@ -54,6 +56,7 @@ export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Valid
   for (const n of ctx.nombresCatalogo) {
     const nn = norm(n)
     if (nn.length < 4 || autorizados.has(nn)) continue
+    if (!/[a-zñ]{3,}/.test(nn)) continue   // TANDA 1 · 6 · un nombre sin palabra (solo cifras/medidas) nunca bloquea: una cédula no es un producto
     // Un nombre autorizado puede contener a otro ("Hyalux" ⊂ "Hyalux Deep"): no se bloquea si está contenido en uno autorizado.
     if ([...autorizados].some((a) => a.includes(nn))) continue
     if (tn.includes(' ' + nn + ' ') || tn.includes(' ' + nn + ',') || tn.includes(' ' + nn + '.') || tn.includes(' ' + nn + '?') || tn.includes(' ' + nn + '!')) return { ok: false, motivo: 'producto_no_autorizado', detalle: n }
@@ -90,7 +93,7 @@ export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; e
   if (ctx.limiteClinico || motivo === 'clinico') return ctx.textoLimiteClinico
   if (motivo === 'precio_sin_evidencia') return 'Para darte un precio necesito consultarlo con tu cuenta verificada. ¿Te confirmo el producto exacto y lo reviso?'
   if (motivo === 'stock_sin_evidencia') return 'La disponibilidad la consulto en el sistema para cuentas verificadas; si me confirmas el producto lo reviso.'
-  if (motivo === 'producto_no_autorizado') return 'Prefiero no afirmar nada de un producto que no consulté. ¿Me dices el nombre exacto y lo busco en el catálogo?'
+  if (motivo === 'producto_no_autorizado') return 'Déjame revisarlo bien en el catálogo para no darte un dato equivocado. ¿Me confirmas el producto y la presentación que buscas?'
   if (motivo === 'carrito_mutacion_sin_evidencia') return 'No pude confirmar el cambio en tu carrito. ¿Me repites qué producto y cuántas piezas quieres?'
   if (motivo === 'pedido_sin_evidencia') return 'Yo no creo pedidos: cuando quieras, confirma el tuyo con el botón "Confirmar pedido" de tu carrito y ahí verás el total actual.'
   if (motivo === 'promesa_humano_sin_evidencia') return 'Tu solicitud de asesor quedó registrada y te avisaremos aquí cuando se una. Mientras tanto, sigo ayudándote con lo que necesites.'
@@ -101,20 +104,39 @@ export function respuestaSegura(motivo: string, ctx: { limiteClinico: boolean; e
 
 // R4-B2-IA1 · Textos seguros del CANAL (WhatsApp/Instagram/Messenger): ahí no hay cuenta, carrito ni pedidos, así que no
 // se promete "lo reviso" ni se remite a botones del portal; y solo se dice que la solicitud de asesor quedó registrada si
-// el servidor lo sostiene (evidencia). El portal conserva respuestaSegura sin cambios.
-export function respuestaSeguraCanal(motivo: string, ctx: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string }): string {
+// el servidor lo sostiene (evidencia). El portal conserva respuestaSegura.
+// TANDA 1 · 6 (23 nov 2026) · los respaldos espantaban («Prefiero no afirmar nada…» tras una cédula, «Por este medio no
+// registro pedidos» y la clienta se fue, «no puedo darte precios» sin que nadie preguntara precio). Ahora son naturales,
+// cortos, usan lo que dijo el cliente y siempre avanzan la venta con UNA pregunta. Nunca prometen tiempos ni dan cifras.
+export interface ContextoRespaldo { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string
+  rafaga?: string; reconocido?: boolean; asesor?: string | null }
+const sinAcentosV = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+export function respuestaSeguraCanal(motivo: string, ctx: ContextoRespaldo): string {
   if (ctx.limiteClinico || motivo === 'clinico') return ctx.textoLimiteClinico
-  if (motivo === 'precio_sin_evidencia') return 'Por este medio no puedo darte precios: se consultan en el portal para profesionales verificados. Si quieres, te comparto el enlace.'
-  if (motivo === 'stock_sin_evidencia') return 'Por este medio no consulto existencias: la disponibilidad se ve en el portal para profesionales verificados. Si quieres, te comparto el enlace.'
-  // EXPEDIENTE · antes preguntaba "¿me dices el nombre exacto?" aunque el cliente no hablara de productos (p. ej. al dar
-  // su cédula): ahora, la respuesta general del canal.
-  if (motivo === 'producto_no_autorizado') return ctx.textoGenerico
   if (motivo === 'clinico_sin_evidencia') return MENSAJE_CLINICO_SIN_FICHA
+  const r = sinAcentosV(ctx.rafaga ?? '')
+  const quien = ctx.asesor ?? 'nuestro equipo comercial'
+  const pidePrecio = /precio|cuanto|cuesta|costo|cotiz|lista de|mayoreo/.test(r)
+  const daDatos = /(^|\D)\d{7,8}(\D|$)|@/.test(r)
+  if (motivo === 'precio_sin_evidencia') {
+    if (ctx.reconocido) return `El precio te lo da ${quien} con tu historial, por aquí mismo. Para adelantar, ¿cuántas piezas necesitas?`
+    if (pidePrecio) return 'El precio te lo doy en cuanto quede verificado tu registro como profesional de la salud. Para adelantar, ¿cuántas piezas necesitas?'
+    return 'Va. Para avanzar, ¿qué producto y cuántas piezas necesitas?'
+  }
+  if (motivo === 'stock_sin_evidencia') {
+    if (ctx.reconocido) return `La disponibilidad te la confirma ${quien} por aquí mismo. Para adelantar, ¿cuántas piezas necesitas?`
+    return 'La disponibilidad te la confirmo en cuanto quede verificado tu registro. Para adelantar, ¿cuántas piezas necesitas?'
+  }
   if (motivo === 'pedido_sin_evidencia' || motivo === 'carrito_mutacion_sin_evidencia' || motivo === 'carrito_lectura_sin_evidencia')
-    return 'Por este medio no registro pedidos ni carritos: las compras se hacen en el portal para profesionales verificados. Si necesitas ayuda para completarla, un asesor de Renovacell puede atenderte.'
+    return 'Claro, aquí mismo te ayudo con tu pedido. ¿Cuántas piezas necesitas y a qué ciudad sería?'
   if (motivo === 'promesa_humano_sin_evidencia') {
     const pedida = ctx.evidencia.includes('HUMAN_REQUESTED') || ctx.evidencia.includes('HANDOFF_EN_CURSO') || ctx.evidencia.includes('HANDOFF_SOLICITADO')
-    return pedida ? 'Tu solicitud de asesor quedó registrada. Mientras tanto, sigo ayudándote con lo que necesites.' : ctx.textoGenerico
+    return pedida ? 'Tu solicitud quedó registrada con el equipo comercial. Mientras, ¿qué producto y cuántas piezas necesitas?' : ctx.textoGenerico
   }
-  return ctx.textoGenerico
+  if (motivo === 'producto_no_autorizado') {
+    if (ctx.reconocido) return `Va, ${quien} te atiende con tu historial por aquí mismo. Para adelantar, ¿qué producto y cuántas piezas necesitas?`
+    if (daDatos) return 'Gracias, con eso avanzamos. ¿Qué producto y cuántas piezas necesitas?'
+    return 'Déjame confirmarlo bien para no darte un dato equivocado. ¿Qué presentación y cuántas piezas necesitas?'
+  }
+  return ctx.reconocido ? `Va, ${quien} te atiende con tu historial por aquí mismo. Para adelantar, ¿qué producto y cuántas piezas necesitas?` : ctx.textoGenerico
 }

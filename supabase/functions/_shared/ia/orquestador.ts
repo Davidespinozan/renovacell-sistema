@@ -46,11 +46,33 @@ export interface DepsOrquestador {
   }
   validacion: {
     validarRespuesta: (t: unknown, c: { evidencia: readonly string[]; nombresAutorizados: readonly string[]; nombresCatalogo: readonly string[]; limiteClinico: boolean }) => { ok: true; texto: string } | { ok: false; motivo: string; detalle?: string }
-    respuestaSegura: (motivo: string, c: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string }) => string
+    respuestaSegura: (motivo: string, c: { limiteClinico: boolean; evidencia: readonly string[]; textoLimiteClinico: string; textoGenerico: string; rafaga?: string; reconocido?: boolean; asesor?: string | null }) => string
   }
   reglasConocimiento: readonly string[]
   observar?: (accion: string, clasificacion: 'internal_error' | 'provider_error' | 'unknown' | 'rejected', detalle?: { mensaje?: string; code?: string | number }) => void
   ahora?: () => number
+  // TANDA 1 (23 nov 2026) · opcional: conversación natural (./conversacion.ts). Sin ella, el turno se comporta como antes.
+  conversacion?: Conversacion
+  // TANDA 1 · 1 · antes de publicar: ¿llegó otro mensaje del cliente y ya arrancó su turno? (la base descarta el viejo)
+  esperaPublicar?: { hayNuevo: (conv: string, seq: number) => Promise<boolean>; turnoNuevo: (conv: string, seq: number) => Promise<boolean>; dormir: (ms: number) => Promise<void> }
+}
+type MensajeH = { actor: string; content: string; seq?: number }
+type Estado = { yaSaludo: boolean; promoDicha: boolean; horarioDicho: boolean; pedidosCedula: number; respuestasIA: number; dijoCliente: boolean }
+type CtxRev = { estado: Estado; rafaga: string; verificarDatos: boolean; reconocido: boolean; limite: number | null; nombresProducto?: readonly string[] }
+export interface Conversacion {
+  rafagaPendiente(h: readonly MensajeH[]): string[]
+  historialPrevio(h: readonly MensajeH[]): MensajeH[]
+  estadoConversacion(previo: readonly MensajeH[], rafaga?: readonly string[]): Estado
+  textoEstadoConversacion(e: Estado, o: { rafaga: number; verificarDatos: boolean }): string
+  textoClienteReconocido(e: { porServidor: boolean; porCliente: boolean; asesor?: string | null }): string | null
+  textoReconocidoRespaldo(asesor?: string | null): string
+  revisarRespuesta(t: string, c: CtxRev): { texto: string; problemas: readonly string[] }
+  notaEstilo(ps: readonly string[], limite: number | null): string
+  recortar(t: string, c: CtxRev): string
+  datosPedidos(t: string): Set<string>
+  decidirPublicar(e: { hayNuevo: boolean; turnoNuevo: boolean; esperadoMs: number; maxMs?: number }): 'publicar' | 'esperar' | 'ceder'
+  nombresQueEscribioElCliente(nombresCatalogo: readonly string[], textosCliente: readonly string[]): string[]
+  ESTILO_MENSAJE: string; LIMITE_CANAL: number; LIMITE_CANAL_RESUMEN: number
 }
 // LIVE C1 · `canal`: 'portal' (sesión del portal, por defecto) o un canal de Meta. Fuera del portal el PERFIL NUNCA llega a la
 // IA (audiencia pública, sin herramientas de cuenta ni carrito) aunque la conversación pertenezca a un doctor: la
@@ -63,6 +85,7 @@ export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visito
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; clase?: string; motivoValidacion?: string
+  reconocido?: boolean   // TANDA 1 · 2 · cliente reconocido en canal: responder.ts le avisa a su asesor (señal de interés)
 }
 
 // Qué no puede afirmar sin evidencia, dicho al modelo en la corrección interna (una sola por turno).
@@ -113,12 +136,19 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const turnId = rec.turn_id
 
   // 3) Contexto de conversación acotado + intención determinista.
-  const intencion = d.politica.clasificarIntencion(e.textoUsuario)
-  // IA-CLÍNICA · con información clínica habilitada para ESTE actor (lo dice la base) la pregunta de etiqueta se responde con
-  // las secciones aprobadas; el límite fijo queda para quien no puede verlas.
-  const limiteClinico = d.politica.esLimiteClinico(e.textoUsuario) && !ctx.clinico
   let historial: Array<{ actor: string; content: string }> = []
   try { historial = await d.leerMensajes(e.conv, e.triggerSeq, 30) } catch { historial = [] }
+  // TANDA 1 · 1 · el turno contesta TODO lo que el cliente mandó seguido desde la última respuesta («Tiene linurasse» + «?»):
+  // la intención, el límite clínico y la pre-búsqueda miran la ráfaga completa, no solo el último mensaje.
+  const cv = d.conversacion
+  const rafaga = cv ? cv.rafagaPendiente(historial) : []
+  const textoTurno = rafaga.length > 1 ? rafaga.join('\n') : e.textoUsuario
+  // la pre-búsqueda toma pocas palabras: primero las del mensaje más reciente («…una toxina» + «Xeomeen» + «100 u» → Xeomeen)
+  const textoPrebusqueda = rafaga.length > 1 ? [...rafaga].reverse().join(' . ') : e.textoUsuario
+  const intencion = d.politica.clasificarIntencion(textoTurno)
+  // IA-CLÍNICA · con información clínica habilitada para ESTE actor (lo dice la base) la pregunta de etiqueta se responde con
+  // las secciones aprobadas; el límite fijo queda para quien no puede verlas.
+  const limiteClinico = d.politica.esLimiteClinico(textoTurno) && !ctx.clinico
   const messages: Mensaje[] = d.politica.historialParaModelo(historial, d.config.historial)
   if (!messages.length) messages.push({ role: 'user', content: d.politica.envolverDatos('mensaje_del_usuario', e.textoUsuario.slice(0, 2000)) })
   const ultimo = messages[messages.length - 1]
@@ -139,7 +169,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   // R4-C14 · canal: los productos que el cliente nombró ya vienen buscados (no depende de que el modelo decida buscar)
   let productosMencionados = ''
   if (canal !== 'portal' && d.politica.prebuscarProductos) {
-    const pre = await d.politica.prebuscarProductos(e.textoUsuario, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }))
+    const pre = await d.politica.prebuscarProductos(textoPrebusqueda, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }))
     if (pre.length) {
       for (const id of d.herramientas.idsDe(pre)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pre)) nombresAutorizados.add(n)
       addEv(d.herramientas.evidenciaDe('buscar_productos', pre))
@@ -171,10 +201,30 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     }
   }
   // CC-7 · lo que el servidor sabe de la atención humana (horario, ruteo, rechazo) entra como EVIDENCIA, no como inferencia.
+  let estadoAtencion: Record<string, unknown> = {}
   if (d.herramientas.evidenciaHandoff) {
     const hs = await rpc('cc_ia_estado_handoff', { p_conv: e.conv })
-    if (!hs.error) addEv(d.herramientas.evidenciaHandoff(hs.data)); else addEv(['HORARIO_DESCONOCIDO'])   // sin dato: nunca prometer
+    if (!hs.error) { addEv(d.herramientas.evidenciaHandoff(hs.data)); if (hs.data && typeof hs.data === 'object') estadoAtencion = hs.data as Record<string, unknown> } else addEv(['HORARIO_DESCONOCIDO'])   // sin dato: nunca prometer
   }
+  // TANDA 1 · 2 y 4 · lo que ya pasó en la conversación (saludo, promo, horario, cédula pedida) y si el cliente ya es conocido.
+  // CLIENTE RECONOCIDO solo en canal sin vínculo: deja de pedir datos y lo encamina con su asesor; NO abre precios ni datos
+  // (R4-B1: el perfil de la IA sigue siendo público; esto solo cambia qué le pide y a quién lo pasa).
+  const enCanalSinVinculo = canal !== 'portal' && !identificado
+  const estadoConv = cv ? cv.estadoConversacion(cv.historialPrevio(historial), rafaga) : null
+  const reconocidoServidor = enCanalSinVinculo && estadoAtencion.cliente_reconocido === true
+  const reconocido = enCanalSinVinculo && (reconocidoServidor || !!estadoConv?.dijoCliente)
+  const asesorNombre = enCanalSinVinculo && typeof estadoAtencion.asesor_nombre === 'string' && estadoAtencion.asesor_nombre.trim() ? estadoAtencion.asesor_nombre.trim().slice(0, 40) : null
+  const toolsTurno = reconocidoServidor ? tools.filter((t) => t.name !== 'solicitar_verificacion') : tools   // ya es cliente: no se le verifica otra vez
+  if (cv) {
+    // TANDA 1 · 6 · un nombre del catálogo que el cliente escribió él mismo ya no bloquea la respuesta
+    for (const n of cv.nombresQueEscribioElCliente(nombresCatalogo, historial.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').map((m) => m.content))) nombresAutorizados.add(n)
+  }
+  const bloqueFijoConv = cv ? '\n\n' + cv.ESTILO_MENSAJE : ''
+  const bloqueVariableConv = cv && estadoConv ? [cv.textoEstadoConversacion(estadoConv, { rafaga: rafaga.length, verificarDatos: enCanalSinVinculo && !reconocido }),
+    reconocido ? cv.textoClienteReconocido({ porServidor: reconocidoServidor, porCliente: estadoConv.dijoCliente, asesor: asesorNombre }) : null].filter(Boolean).map((x) => '\n\n' + x).join('') : ''
+  const ctxRevision = (): CtxRev | null => estadoConv ? { estado: estadoConv, rafaga: textoTurno, verificarDatos: enCanalSinVinculo, reconocido,
+    limite: canal === 'portal' ? null : (evidencia.some((x) => x === 'PEDIDO_CREADO_EVIDENCE' || x === 'CHECKOUT_REVIEW_EVIDENCE' || x === 'CART_MUTATION_EVIDENCE') ? cv!.LIMITE_CANAL_RESUMEN : cv!.LIMITE_CANAL) + (evidencia.includes('PORTAL_LINK_EVIDENCE') ? 120 : 0),
+    nombresProducto: [...new Set([...nombresCatalogo, ...nombresAutorizados])] } : null
   const fallar = async (clase: string, ambiguo: boolean, rondas: number): Promise<ResultadoTurno> => {
     await rpc('cc_ia_turno_fallar', { p_turn: turnId, p_error_class: clase, p_desconocido: ambiguo, p_intent: intencion, p_tool_rounds: rondas, p_input_tokens: usage.input, p_output_tokens: usage.output })
     await rpc('cc_ia_aviso_no_disponible', { p_conv: e.conv })   // una vez por conversación (client_id fijo)
@@ -182,36 +232,84 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     return { estado: 'fallo', clase, turnId, intencion, evidencia, rondas, usage }
   }
   const persistir = async (texto: string, rondas: number, motivoValidacion?: string): Promise<ResultadoTurno> => {
+    // TANDA 1 · 1 · si mientras se generaba llegó otro mensaje del cliente, se espera a que arranque SU turno (que contesta
+    // todo junto) y este cede; la base lo descarta como 'superado'. Si no arranca a tiempo, se publica (nunca sin respuesta).
+    if (cv && d.esperaPublicar) {
+      const desde = ahora()
+      for (let i = 0; i < 60; i++) {
+        const hayNuevo = await d.esperaPublicar.hayNuevo(e.conv, e.triggerSeq).catch(() => false)
+        const turnoNuevo = hayNuevo ? await d.esperaPublicar.turnoNuevo(e.conv, e.triggerSeq).catch(() => false) : false
+        if (cv.decidirPublicar({ hayNuevo, turnoNuevo, esperadoMs: ahora() - desde }) !== 'esperar') break
+        await d.esperaPublicar.dormir(1000)
+      }
+    }
     const pr = await rpc('cc_ia_turno_responder', { p_turn: turnId, p_content: texto, p_intent: intencion, p_evidencia: evidencia, p_tool_rounds: rondas, p_input_tokens: usage.input, p_output_tokens: usage.output })
     const p = (pr.data ?? {}) as { persistido?: boolean; motivo?: string }
     if (pr.error) { obs('persistir', 'internal_error', { code: 'rpc' }); return { estado: 'fallo', clase: 'persistence_error', turnId, intencion, evidencia, rondas, usage, motivoValidacion } }
     // CC-7 · ya no hay "oferta" opcional: el handoff lo dispara el servidor al activarse el carrito.
-    return { estado: p.persistido ? 'respondio' : 'descartada', turnId, intencion, evidencia, rondas, usage, clase: p.persistido ? undefined : p.motivo, motivoValidacion }
+    return { estado: p.persistido ? 'respondio' : 'descartada', turnId, intencion, evidencia, rondas, usage, clase: p.persistido ? undefined : p.motivo, motivoValidacion, ...(reconocido ? { reconocido } : {}) }
   }
 
+  const respaldo = (motivo: string) => d.validacion.respuestaSegura(motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA,
+    rafaga: textoTurno, ...(cv ? { reconocido, asesor: asesorNombre } : {}) })
   // 4) Bucle de herramientas acotado.
   let corregido = false   // R4-C7 · una sola corrección por producto no consultado
+  let buscadoRespaldo = false   // TANDA 1 · 6 · una búsqueda del servidor antes de caer al texto de respaldo
+  let corregidoEstilo = false   // TANDA 1 · 4 · una sola regeneración por forma (largo, preguntas, datos)
+  let textoValidoPrevio: string | null = null   // si la regeneración por forma falla, se publica este (recortado)
   let notaCorreccion = ''   // R4-C11 · la corrección va como nota del SISTEMA en la siguiente ronda, nunca como mensaje en la conversación
   for (let ronda = 0; ronda < d.config.maxRondas; ronda++) {
     const restante = d.config.timeoutMs - (ahora() - inicio)
-    if (restante < 1500) return await fallar('provider_timeout', ronda > 0, ronda)
+    if (restante < 1500) return textoValidoPrevio !== null ? await persistir(textoValidoPrevio, ronda, 'estilo') : await fallar('provider_timeout', ronda > 0, ronda)
     // CACHÉ (2 nov 2026): lo fijo del turno (políticas, tarea, productos mencionados, perfil) va primero y se guarda en caché;
     // lo que cambia en cada ronda (evidencia, atención humana, corrección) va al final, fuera del caché.
     const base = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null })
     const marca = d.politica.MARCA_VARIABLE ? base.indexOf(d.politica.MARCA_VARIABLE) : -1
-    const fijo = (marca >= 0 ? base.slice(0, marca) : base) + productosMencionados + perfilComercial
-    const variable = (marca >= 0 ? base.slice(marca + d.politica.MARCA_VARIABLE!.length) : '') + notaCorreccion
+    const fijo = (marca >= 0 ? base.slice(0, marca) : base) + productosMencionados + perfilComercial + bloqueFijoConv
+    const variable = (marca >= 0 ? base.slice(marca + d.politica.MARCA_VARIABLE!.length) : '') + bloqueVariableConv + notaCorreccion
     const system = fijo + variable
-    const r = await d.proveedor.generar({ system, systemFijo: marca >= 0 ? fijo.length : undefined, messages, tools, max_tokens: d.config.maxTokens, timeoutMs: restante })
+    const r = await d.proveedor.generar({ system, systemFijo: marca >= 0 ? fijo.length : undefined, messages, tools: toolsTurno, max_tokens: d.config.maxTokens, timeoutMs: restante })
     usage.input += r.usage?.input ?? 0; usage.output += r.usage?.output ?? 0
     usage.cacheRead += r.usage?.cacheRead ?? 0; usage.cacheWrite += r.usage?.cacheWrite ?? 0
-    if (r.tipo === 'error') return await fallar(r.clase, r.ambiguo, ronda)
+    if (r.tipo === 'error') return textoValidoPrevio !== null ? await persistir(textoValidoPrevio, ronda, 'estilo') : await fallar(r.clase, r.ambiguo, ronda)
 
     if (r.tipo === 'texto') {
       const v = d.validacion.validarRespuesta(r.texto, { evidencia, nombresAutorizados: [...nombresAutorizados], nombresCatalogo, limiteClinico })
-      if (v.ok) return await persistir(v.texto, ronda)
+      if (v.ok) {
+        // TANDA 1 · 4 · forma: sin re-saludo ni promo/horario repetidos (determinista); si queda larga, con varias preguntas o
+        // pidiendo datos fuera de lugar, UNA regeneración (con tiempo de sobra); si tampoco, recorte determinista.
+        const cr = cv ? ctxRevision() : null
+        if (!cv || !cr) return await persistir(v.texto, ronda)
+        const rv = cv.revisarRespuesta(v.texto, cr)
+        if (!rv.problemas.length) return await persistir(rv.texto, ronda)
+        await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'revision_estilo', p_status: 'rechazada', p_product_ids: [], p_detalle: { problemas: rv.problemas } })
+        let final = cv.recortar(rv.texto, cr)
+        if (reconocido && cv.datosPedidos(final).size) final = cv.textoReconocidoRespaldo(asesorNombre)
+        if (!corregidoEstilo && ronda < d.config.maxRondas - 1 && d.config.timeoutMs - (ahora() - inicio) > 20_000) {
+          corregidoEstilo = true; textoValidoPrevio = final
+          notaCorreccion = cv.notaEstilo(rv.problemas, cr.limite)
+          continue
+        }
+        return await persistir(final, ronda, 'estilo')
+      }
+      if (textoValidoPrevio !== null) return await persistir(textoValidoPrevio, ronda, 'estilo')   // la regeneración salió peor: vale la anterior
       await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'validacion_salida', p_status: 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
       obs('validacion', 'rejected', { code: v.motivo })
+      // TANDA 1 · 6 · antes de caer al respaldo, el SERVIDOR busca el producto que nombró y se lo da como dato: con el
+      // resultado del catálogo vuelve a responder (el nombre queda autorizado solo si la búsqueda lo regresa).
+      if (cv && v.motivo === 'producto_no_autorizado' && v.detalle && !buscadoRespaldo && ronda < d.config.maxRondas - 1) {
+        buscadoRespaldo = true
+        const b = await rpc('cc_buscar_productos', { p_q: String(v.detalle).slice(0, 80), p_limite: 5, p_audiencia: ctx.audiencia })
+        if (!b.error && Array.isArray(b.data) && b.data.length) {
+          for (const id of d.herramientas.idsDe(b.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(b.data)) nombresAutorizados.add(n)
+          addEv(d.herramientas.evidenciaDe('buscar_productos', b.data))
+          await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'buscar_productos', p_status: 'ok', p_product_ids: d.herramientas.idsDe(b.data), p_detalle: { origen: 'respaldo', n: d.herramientas.idsDe(b.data).length } })
+          notaCorreccion = `\n\nANTES DE RESPONDER (instrucción interna, no la menciones ni pidas disculpas): consulté «${String(v.detalle)}» en el catálogo por ti; esto regresó:\n` +
+            d.politica.envolverDatos('resultado_buscar_productos', d.herramientas.acotarSalida(d.herramientas.salidaEnCajas ? d.herramientas.salidaEnCajas(b.data, mediaCaja) : b.data)) +
+            '\nResponde su último mensaje usando solo esto (si no hace falta nombrarlo, no lo nombres), directo y como si fuera tu primera respuesta.'
+          continue
+        }
+      }
       // R4-C7 · canal: nombró un producto del catálogo sin consultarlo → UNA corrección interna (el usuario no ve el intento
       // rechazado): que lo consulte y responda de nuevo. Sin rondas o tras la corrección, el texto seguro de siempre.
       if (canal !== 'portal' && v.motivo === 'producto_no_autorizado' && !corregido && ronda < d.config.maxRondas - 1) {
@@ -229,14 +327,15 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         notaCorreccion = `\n\nANTES DE RESPONDER (instrucción interna, no la menciones ni pidas disculpas): tu respuesta anterior se descartó porque ${nota} Vuelve a responder su último mensaje con los datos que ya consultaste (o consulta lo que falte), directo y como si fuera tu primera respuesta.`
         continue
       }
-      return await persistir(d.validacion.respuestaSegura(v.motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), ronda, v.motivo)
+      return await persistir(respaldo(v.motivo), ronda, v.motivo)
     }
 
     // Herramientas: validar → autorizar → ejecutar → acotar → devolver como DATA.
     messages.push({ role: 'assistant', content: r.bloques })
     const resultados: Bloque[] = []
     for (const ll of r.llamadas) {
-      const v = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente, identificado })
+      const v0 = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente, identificado })
+      const v: Validada = v0.ok && reconocidoServidor && v0.nombre === 'solicitar_verificacion' ? { ok: false, motivo: 'no_autorizada' } : v0
       if (!v.ok) {
         await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: String(ll.name).slice(0, 60), p_status: v.motivo === 'no_autorizada' || v.motivo === 'id_no_autorizado' ? 'no_autorizada' : 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
@@ -259,7 +358,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   }
   // Rondas agotadas con el modelo aún pidiendo herramientas → respuesta segura (nunca inventada).
   obs('rondas', 'rejected', { code: 'max_rondas' })
-  return await persistir(d.validacion.respuestaSegura('rondas', { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA }), d.config.maxRondas, 'rondas')
+  return await persistir(textoValidoPrevio ?? respaldo('rondas'), d.config.maxRondas, 'rondas')
 }
 
 async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string }; confirmacion?: boolean }): Promise<{ data: unknown; error: string | null }> {

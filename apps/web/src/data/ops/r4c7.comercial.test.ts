@@ -66,8 +66,9 @@ describe('A · nunca nombra un producto sin consultarlo (y el cliente nunca ve e
     const db = base()
     const d = deps(db, [respuestaTexto('Nabota 100 UI es lo mejor.'), respuestaTexto('Te recomiendo Nabota 200 UI.')])
     await ejecutarTurno(entrada('¿qué tal el nabota?'), d)
-    // EXPEDIENTE · el respaldo ya no pregunta por un producto: es la respuesta general del canal (nunca lo inventado).
-    expect(persistidos(db)).toEqual([politica.MENSAJE_SIN_RESPUESTA_CANAL])
+    // TANDA 1 · 6 (23 nov 2026): el respaldo es natural y avanza la venta (nunca lo inventado, nunca «Prefiero no afirmar…»).
+    expect(persistidos(db)).toEqual([validacion.respuestaSeguraCanal('producto_no_autorizado', { limiteClinico: false, evidencia: [], textoLimiteClinico: '', textoGenerico: '' })])
+    expect(persistidos(db)[0]).not.toContain(RESPALDO); expect(persistidos(db)[0]).not.toMatch(/Nabota/)
     expect(d.proveedor.solicitudes).toHaveLength(2)
   })
   it('el portal no cambia: sin corrección, texto seguro inmediato', async () => {
@@ -75,7 +76,8 @@ describe('A · nunca nombra un producto sin consultarlo (y el cliente nunca ve e
     const d = deps(db, [respuestaTexto('Nabota 100 UI es excelente.'), respuestaTexto('no debería pedirse')], politica as never, validacion as never)
     await ejecutarTurno(entrada('Quisiera comprar Nabota', 'portal'), d)
     expect(d.proveedor.solicitudes).toHaveLength(1)
-    expect(persistidos(db)[0]).toContain(RESPALDO)
+    // TANDA 1 · 6: el texto del portal ya no espanta («Prefiero no afirmar…»): pide confirmar el producto, sin inventar
+    expect(persistidos(db)[0]).toContain('para no darte un dato equivocado'); expect(persistidos(db)[0]).not.toMatch(/Nabota/)
   })
   it('el contexto del canal exige consultar cada producto en el turno', () => {
     expect(politica.contextoCanal('whatsapp')).toContain('consúltalo con buscar_productos en ESTE turno antes de responder')
@@ -99,7 +101,8 @@ describe('B · compra, recompra y negociación → la IA confirma y un asesor ci
   // VERIFICACIÓN POR WHATSAPP (2 nov 2026): la IA sigue atendiendo (verifica aquí); el asesor se entera por la señal del sistema.
   it('la tarea de compra: confirmar con el catálogo, verificar aquí, anotar presentación y cantidad, sin solicitar_asesor salvo que pida una persona', () => {
     const t = politica.tareaCanal('CHECKOUT', false)
-    for (const x of ['buscar_productos', 'presentación y cantidad', 'solicitar_verificacion', 'Su asesor ya está enterado', 'No uses solicitar_asesor salvo que pida una persona', 'Nunca digas que registraste']) expect(t, x).toContain(x)
+    // TANDA 1 · 2 (23 nov 2026): una pregunta a la vez y verificación por pasos (primero la cédula; nunca en la primera respuesta)
+    for (const x of ['buscar_productos', 'cuántas piezas', 'VERIFICACIÓN POR PASOS', 'primero solo su cédula profesional', 'nunca en tu primera respuesta', 'Si es cliente reconocido, no le pidas datos', 'Su asesor ya está enterado', 'No uses solicitar_asesor salvo que pida una persona', 'Nunca digas que registraste']) expect(t, x).toContain(x)
   })
 })
 
@@ -150,7 +153,7 @@ describe('EXPEDIENTE · fallas de la IA en canal', () => {
     expect(politica.atencionComercial('Ya me tiene registrada mi cédula es 11172305')).toBe('recompra')
     expect(politica.atencionComercial('ya soy cliente de ustedes')).toBe('recompra')
     expect(politica.atencionComercial('Si ustedes me han surtido siempre')).toBe('recompra')
-    expect(politica.contextoCanal('whatsapp')).toContain('ya es cliente o que ya está registrado')
+    expect(politica.contextoCanal('whatsapp')).toContain('ya es cliente, que ya compró o que ya está registrado')
   })
   it('"ya tiene un asesor asignado" sin que el servidor lo sostenga se bloquea', () => {
     const ctx = { evidencia: [] as string[], nombresAutorizados: [], nombresCatalogo: [], limiteClinico: false }

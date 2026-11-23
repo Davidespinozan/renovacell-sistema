@@ -13,6 +13,7 @@ import { configPortal, dependenciasPortal, leerNegocio } from '../_shared/ia/res
 import { REGLAS_IA } from '../_shared/conocimiento.ts'
 import { capturarErrores, costoUsd, mensajeJuez, mensajesDelCaso, parsearJuicio, reintentable, rpcExamen, SISTEMA_JUEZ, type Caso } from '../_shared/ia/examen.ts'
 import * as politica from '../_shared/ia/politica.ts'
+import * as conversacion from '../_shared/ia/conversacion.ts'   // TANDA 1 · el examen mide la misma forma (sin re-saludo, sin repetir)
 
 const MODELO_JUEZ = 'claude-opus-5-5'
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
@@ -69,7 +70,7 @@ async function correrCaso(admin: any, corridaId: string, casoId: string): Promis
   const t0 = Date.now()
   const r = await ejecutarTurno(
     { conv: '00000000-0000-4000-8000-00000000e4a1', triggerSeq: mensajes.length, actor: 'doctor', profile: corrida.perfil_id, visitorHash: null, textoUsuario: corrida.caso.pregunta, canal: 'portal' },
-    { rpc: ex.rpc, leerMensajes: async () => mensajes, proveedor, config, politica: deps.politica, herramientas: deps.herramientas, validacion: deps.validacion, reglasConocimiento: REGLAS_IA },
+    { rpc: ex.rpc, leerMensajes: async () => mensajes, proveedor, config, politica: deps.politica, herramientas: deps.herramientas, validacion: deps.validacion, reglasConocimiento: REGLAS_IA, conversacion },
   )
   const latencia = Date.now() - t0
   const respuesta = ex.capturado.respuesta ?? ''

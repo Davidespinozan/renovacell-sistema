@@ -139,7 +139,7 @@ describe('orquestador · autoridad y adversarial', () => {
   it('R · producto fuera del conjunto autorizado del turno → bloqueado; P · stock sin herramienta → bloqueado; T · T3 → límite sin respuesta clínica', async () => {
     const db1 = baseFalsa({ actor: 'doctor' })
     const r1 = await ejecutarTurno(entrada('qué hay para labios', 'doctor'), deps(db1, [respuestaHerramientas([{ name: 'buscar_productos', input: { consulta: 'hyalux' } }]), respuestaTexto('Te sugiero Hyalux Lips 1 ml o Colagex Plus.')]))
-    expect(r1.motivoValidacion).toBe('producto_no_autorizado'); expect(db1.estado.turno?.content).toMatch(/no consulté/)
+    expect(r1.motivoValidacion).toBe('producto_no_autorizado'); expect(db1.estado.turno?.content).toMatch(/dato equivocado/); expect(db1.estado.turno?.content).not.toMatch(/Hyalux|Colagex/)
     const db2 = baseFalsa({ actor: 'doctor' })
     const r2 = await ejecutarTurno(entrada('tienen hyalux?', 'doctor'), deps(db2, [respuestaHerramientas([{ name: 'buscar_productos', input: { consulta: 'hyalux' } }]), respuestaTexto('Sí, tenemos existencia de Hyalux Deep 1 ml.')]))
     expect(r2.motivoValidacion).toBe('stock_sin_evidencia')

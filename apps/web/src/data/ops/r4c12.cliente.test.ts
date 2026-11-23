@@ -25,10 +25,12 @@ describe('búsqueda y archivos', () => {
 
 describe('mensajes seguidos: una sola respuesta', () => {
   it('el webhook espera y no responde si ya llegó otro mensaje del cliente', () => {
-    expect(webhook).toMatch(/const AGRUPAR_MS = 3_500/)
+    // TANDA 1 · 1 (23 nov 2026): 8 s (vive en _shared/ia/conversacion.ts) y una reacción/sticker posterior no cuenta
+    expect(webhook).toMatch(/import \{ AGRUPAR_MS, hayMensajeQueResponder \} from '\.\.\/_shared\/ia\/conversacion\.ts'/)
     expect(webhook).toMatch(/await mostrarEscribiendo\(m\.wamid\)[^\n]*\n[\s\S]*?if \(await llegoOtroMensaje\(admin, r\.conversation_id, r\.seq\)\) return\n[\s\S]*?const ia = await responderIA\(/)   // R4-C13: la descarga del archivo va en medio
-    expect(webhook).toMatch(/\.in\('actor_type', \['visitor', 'doctor'\]\)\.gt\('seq', seq\)\.limit\(1\)/)
-    expect(webhook).toMatch(/return !error && Array\.isArray\(data\) && data\.length > 0/)
+    expect(webhook).toMatch(/\.in\('actor_type', \['visitor', 'doctor'\]\)\.gt\('seq', seq\)\.order\('seq'\)\.limit\(10\)/)
+    expect(webhook).toMatch(/if \(error \|\| !Array\.isArray\(data\)\) return false/)
+    expect(webhook).toMatch(/return hayMensajeQueResponder\(/)
   })
 })
 

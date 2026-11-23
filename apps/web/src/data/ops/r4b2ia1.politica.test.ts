@@ -37,7 +37,8 @@ describe('portal: idéntico a su línea base (antes de R4-B2-IA1)', () => {
     // re-anclada (2 nov 2026, caso Éclat de Vie): regla NUNCA DESECHES A UN CLIENTE
     // re-anclada (2 nov 2026, caché + examen): marca de la parte variable, 3d promociones, V7 recomendar, breve y un solo trato
     // re-anclada (2 nov 2026, V7 con búsqueda de respaldo cuando las recomendaciones vienen vacías)
-    expect(h.digest('hex')).toBe('c13141978964766cdc8ae9c9b0897976')
+    // re-anclada (TANDA 1 · 4, 23 nov 2026): «breve (2 o 3 líneas, una sola pregunta)» también en el portal
+    expect(h.digest('hex')).toBe('cc9755d48eaa2568ad47d6640e23e82f')
     expect(createHash('md5').update(politica.MENSAJE_SIN_RESPUESTA + '|' + politica.MENSAJE_LIMITE_CLINICO).digest('hex')).toBe('a80fa072fa6a2330676fe4a1716d30d1')
   })
 })
@@ -145,7 +146,8 @@ describe('canal: conversaciones simuladas (orquestador real + proveedor falso)',
     const db = base()
     const d = deps(db, [respuestaTexto('Cuesta $4,000 la pieza.'), respuestaTexto('Cuesta $4,000 la pieza.'), respuestaTexto('Cuesta $4,000 la pieza.')])
     await ejecutarTurno(entrada('¿cuánto cuesta?'), d)
-    expect(persistido(db)).toContain('se consultan en el portal'); expect(persistido(db)).not.toMatch(/\$\s?\d|lo reviso/)
+    // TANDA 1 · 6: preguntó precio → «el precio te lo doy en cuanto quede verificado…» y avanza con una pregunta (sin cifras)
+    expect(persistido(db)).toContain('en cuanto quede verificado'); expect(persistido(db)).not.toMatch(/\$\s?\d|lo reviso/)
   })
   it('«¿Manejan mayoreo con crédito?» → el modelo transfiere con solicitar_asesor y confirma UNA vez, sin prometer tiempos', async () => {
     const db = base()
@@ -219,9 +221,10 @@ describe('validación de canal: textos seguros honestos', () => {
     expect(validacion.respuestaSeguraCanal('promesa_humano_sin_evidencia', ctx)).toBe(politica.MENSAJE_SIN_RESPUESTA_CANAL)
     expect(validacion.respuestaSeguraCanal('promesa_humano_sin_evidencia', { ...ctx, evidencia: ['HUMAN_REQUESTED'] })).toContain('quedó registrada')
   })
-  it('precio, existencias, pedido y carrito: remite al portal; nunca "lo reviso" ni botones del carrito', () => {
+  // TANDA 1 · 6 (23 nov 2026): ya no remiten al portal ni espantan («Por este medio no…»): avanzan la venta con UNA pregunta.
+  it('precio, existencias, pedido y carrito: naturales, sin cifras, una pregunta; nunca "lo reviso" ni botones del carrito', () => {
     for (const m of ['precio_sin_evidencia', 'stock_sin_evidencia', 'pedido_sin_evidencia', 'carrito_mutacion_sin_evidencia', 'carrito_lectura_sin_evidencia']) {
-      const t = validacion.respuestaSeguraCanal(m, ctx); expect(t, m).toContain('portal'); expect(t, m).not.toMatch(/lo reviso|Confirmar pedido|tu carrito/)
+      const t = validacion.respuestaSeguraCanal(m, ctx); expect(t, m).not.toMatch(/lo reviso|Confirmar pedido|tu carrito|Por este medio no|\$\s?\d/); expect((t.match(/\?/g) ?? []).length, m).toBe(1); expect(t.length, m).toBeLessThanOrEqual(280)
     }
   })
   it('el portal conserva sus textos', () => {
