@@ -20,6 +20,8 @@ export type NombreHerramienta = 'buscar_productos' | 'obtener_ficha_producto' | 
 export type Evidencia = 'PRICE_EVIDENCE' | 'STOCK_EVIDENCE' | 'KNOWLEDGE_EVIDENCE' | 'CLINICAL_EVIDENCE' | 'PEDIDO_CREADO_EVIDENCE' | 'ORDER_EVIDENCE' | 'HUMAN_REQUESTED' | 'CART_READ_EVIDENCE' | 'CART_MUTATION_EVIDENCE' | 'CHECKOUT_REVIEW_EVIDENCE' | 'PORTAL_LINK_EVIDENCE'
   // CC-7 · estado de la atención humana derivado del SERVIDOR (horario, ruteo, rechazo); el modelo no lo infiere
   | 'HANDOFF_SOLICITADO' | 'HANDOFF_EN_CURSO' | 'ASESOR_ASIGNADO' | 'ASESOR_SIN_ASIGNAR' | 'EN_HORARIO' | 'FUERA_DE_HORARIO' | 'HORARIO_DESCONOCIDO' | 'HANDOFF_RECHAZADO'
+  // TANDA 2 · el servidor dijo que lo que pidió NO se puede surtir ahora (o esa presentación no la manejamos): la IA puede decirlo (sin cifras)
+  | 'SIN_EXISTENCIA_EVIDENCE'
 export interface DefinicionHerramienta { name: NombreHerramienta; description: string; input_schema: Record<string, unknown>; autoridad: 'cualquiera' | 'cuenta'; mutante: boolean }
 
 // LIVE C1 · CANAL por el que habla el usuario. Solo 'portal' tiene sesión del portal; en los canales de Meta la IA
@@ -308,6 +310,12 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
     case 'agregar_al_carrito': case 'actualizar_carrito': case 'quitar_del_carrito': case 'vaciar_carrito':
       return o.cart_id ? (['CART_MUTATION_EVIDENCE', ...evidenciaDeHandoffMutacion(o.handoff)] as Evidencia[]) : []
     case 'declinar_asesor': return o.rechazado === true ? ['HANDOFF_RECHAZADO'] : []
+    case 'buscar_productos': {
+      // TANDA 2 · `existencia` (cc_ia_producto_estado): «no está disponible ahora» / «esa presentación no la manejamos»
+      const ex = (o.existencia && typeof o.existencia === 'object' ? o.existencia : {}) as Record<string, unknown>
+      const sin = ex.presentacion_no_manejada === true || (Array.isArray(ex.pedidos) && ex.coincidencia === 'exacta' && (ex.pedidos as Array<Record<string, unknown>>).some((p) => p.disponible_ahora === false || p.se_vende === false))
+      return [...(noVacia ? ['KNOWLEDGE_EVIDENCE'] as Evidencia[] : []), ...(sin ? ['SIN_EXISTENCIA_EVIDENCE'] as Evidencia[] : [])]
+    }
     case 'enlace_portal': return o.url === URL_PORTAL_PUBLICA ? ['PORTAL_LINK_EVIDENCE'] : []
     case 'registrar_contacto': case 'solicitar_verificacion': case 'guardar_direccion': return []   // datos: no son evidencia comercial
     // PEDIDO POR WHATSAPP · la revisión trae total del servidor; la confirmación, el pedido creado (solo entonces puede decirlo)

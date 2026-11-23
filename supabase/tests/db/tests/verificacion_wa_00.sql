@@ -34,7 +34,7 @@ begin
   r := public.cc_alta_wa_cerrar(v_sol, null, d1, v_admin);
   perform tests.ok((r ->> 'vinculado')::boolean and public.cc_ia_identidad_canal(c1) = d1, '3 · su WhatsApp queda ligado: la IA lo reconoce');
   select content into t from public.cc_messages where conversation_id = c1 and client_message_id like 'tpl:alta_wa:%';
-  perform tests.ok(t like '¡Listo%Ya quedaste verificado(a)%' and t like '%ya tienes tu portal%¿Olvidaste tu contraseña?%kattya@clinica.mx%', '3 · se le avisa por el mismo chat, con su acceso al portal (ADOPCIÓN)');
+  perform tests.ok(t like '¡Listo%Tu cuenta quedó verificada%' and t not like '%(a)%' and t like '%ya tienes tu portal%¿Olvidaste tu contraseña?%kattya@clinica.mx%', '3 · se le avisa por el mismo chat, con su acceso al portal (ADOPCIÓN)');
   begin perform public.cc_alta_wa_cerrar(v_sol, null, d1, v_admin); ok := false; exception when check_violation then ok := true; end;
   perform tests.ok(ok, '3 · no se cierra dos veces');
   perform tests.eq((public.cc_ia_solicitar_alta(c1, 'Otra Persona', '7654321', 'o@x.mx') ->> 'campo'), 'ya_identificado', '3 · ya identificado: no se piden datos otra vez');

@@ -30,6 +30,9 @@ const RE_PROMESA_HUMANO = /\b(ahorita|ahora mismo|en (un )?momento|en breve|ense
 const RE_ASIGNADO = /\b(tiene[sn]?|cuenta[sn]? con|ya hay)\s+(un|una|tu|su)?\s*(asesor|asesora|vendedor|vendedora|ejecutivo|ejecutiva)(\s+o\s+(asesor|asesora|vendedor|vendedora))?[^.!?]{0,50}\basignad[oa]s?\b|\b(asesor|asesora|vendedor|vendedora)\s+asignad[oa]\b|\bte (asignamos|asignaron|asign[eé])\s+(un|una|a)\b/i
 const RE_CLINICO = /\b(apl[ií]ca(le|r)|iny[eé]cta(le|r)|adm[ií]nistra(le|r)|usa(r)? en (tu|el|la) paciente|col[oó]ca(le|r))\b[^.!?]{0,60}\b(\d+\s?(ml|mililitros|mg|unidades|u\b|jeringas?|viales?|sesiones?))|\b(\d+\s?(ml|mg|unidades|u\b))\b[^.!?]{0,40}\b(por (sesi[oó]n|zona|paciente|aplicaci[oó]n)|cada \d+\s?(semanas?|d[ií]as?|meses?))|\bdosis (recomendada|sugerida|habitual|es)\b|\bprotocolo (es|ser[ií]a|recomendado):/i
 
+const RE_NEGACION_EXISTENCIA = /\bagotad[oa]s?\b|\bsin (existencia|existencias|stock)\b|\bno (lo |la |los |las )?(hay|tenemos|tengo)\s+disponib\w*|\bno\b[^.!?]{0,40}\bdisponib\w*(\s+(ahora|ahorita|de inmediato|para env[ií]o|por ahora|en este momento))?/gi
+/** Quita las frases que NIEGAN existencias (para no confundirlas con una afirmación de stock). */
+export const sinNegacionesDeExistencia = (t: string): string => t.replace(RE_NEGACION_EXISTENCIA, ' ')
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
 
 export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Validacion {
@@ -40,7 +43,9 @@ export function validarRespuesta(texto: unknown, ctx: ContextoValidacion): Valid
   if (RE_HERRAMIENTAS.test(t)) return { ok: false, motivo: 'fuga_herramientas' }
   if (RE_SISTEMA.test(t)) return { ok: false, motivo: 'fuga_sistema' }
   if (!ctx.evidencia.includes('PRICE_EVIDENCE') && RE_PRECIO.test(t)) return { ok: false, motivo: 'precio_sin_evidencia' }
-  if (!ctx.evidencia.includes('STOCK_EVIDENCE') && RE_STOCK.test(t)) return { ok: false, motivo: 'stock_sin_evidencia' }
+  // TANDA 2 · con SIN_EXISTENCIA_EVIDENCE (el servidor dijo que no se puede surtir ahora) decir «no está disponible / agotado» es
+  // cierto; afirmar existencias («sí hay», «tenemos 10») sigue exigiendo STOCK_EVIDENCE.
+  if (!ctx.evidencia.includes('STOCK_EVIDENCE') && RE_STOCK.test(ctx.evidencia.includes('SIN_EXISTENCIA_EVIDENCE') ? sinNegacionesDeExistencia(t) : t)) return { ok: false, motivo: 'stock_sin_evidencia' }
   if (ctx.limiteClinico && RE_CLINICO.test(t)) return { ok: false, motivo: 'clinico' }
   // IA-CLÍNICA · fuera del límite, una cifra clínica (unidades, ml, dosis, protocolo) solo con una sección clínica aprobada del turno
   if (!ctx.limiteClinico && RE_CLINICO.test(t) && !ctx.evidencia.includes('CLINICAL_EVIDENCE')) return { ok: false, motivo: 'clinico_sin_evidencia' }

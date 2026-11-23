@@ -14,6 +14,7 @@ import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, esSesionDeUsuario, tieneRol } from '../_shared/quien.ts'
 import { hashToken } from '../_shared/visitante.ts'
 import { despacharWhatsApp } from '../_shared/whatsappEnvio.ts'
+import { enlaceCrearContrasena } from '../_shared/enlaceApp.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -93,7 +94,8 @@ Deno.serve(conCors(async (req) => {
   let enlace: string | null = null
   if (cuentaNueva) {
     const { data: link } = await admin.auth.admin.generateLink({ type: 'recovery', email: s.email, options: { redirectTo: 'https://sistema.renovacell.mx/sistema' } }).catch(() => ({ data: null }))
-    enlace = (link as { properties?: { action_link?: string } } | null)?.properties?.action_link ?? null
+    // TANDA 2 · 9 · al cliente solo el dominio de la app (el token va en el fragmento y la app lo canjea), nunca el enlace técnico
+    enlace = enlaceCrearContrasena((link as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token)
   }
   const { data: fin, error: eFin } = await admin.rpc('cc_alta_wa_cerrar', { p_solicitud: s.id, p_customer: customer, p_profile: perfil, p_actor: q.quien.uid, p_enlace: enlace, p_cuenta_nueva: cuentaNueva })
   if (eFin) return json(409, { error: 'cierre', message: 'La cuenta quedó creada, pero no se pudo cerrar la solicitud. Avísale a Dirección.' })

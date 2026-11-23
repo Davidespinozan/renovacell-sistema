@@ -43,7 +43,14 @@ const AUTOMATICO = [
   /\bvolver al inicio\b/,
   /\bnos perdimos de vista\b/,
   /\bestare aqui cuando me necesites\b/,
+  // TANDA 2 (A·C4 seq3, A·C11 seq2) · bienvenidas y avisos automáticos de otras empresas
+  /\bbienvenid[oa] a [a-z]/,
+  /\bsi me enviaste una imagen o nota de voz\b/,
+  /\b(gracias por (comunicarte|escribirnos|contactarnos|tu mensaje))\b.{0,80}\b(en breve|a la brevedad|lo antes posible|pronto)\b/,
+  /\b(este es un|es un) (mensaje|aviso) automatico\b/,
 ]
+// Menú numerado («1️⃣ Ventas 2️⃣ Soporte», «responde 1 para…», «opción 2»): solo lo manda un sistema.
+const MENU_NUMERADO = /(?:^|\s)[1-9]\ufe0f?\u20e3|\b(responde|marca|escribe|elige|selecciona)\b[^.?!]{0,20}\b[1-9]\b[^.?!]{0,20}\b(para|si)\b/
 
 /** ¿Suena a respuesta de un bot (menú, "no entendí", "asistente virtual")? */
 export function pareceAutomatico(texto: string): boolean {
@@ -81,7 +88,17 @@ export function frenoBot(historial: MensajeHist[], texto: string): MotivoFreno |
     if (primera >= 0 && previosUsuario.filter((p) => p === n).length >= 2 && hist.slice(primera + 1).some((m) => m.actor === 'ai')) return 'repetido'
   }
   if (pareceAutomatico(texto) && previosUsuario.slice(-8).some((p) => AUTOMATICO.some((r) => r.test(p)))) return 'automatico'
+  // TANDA 2 · un mensaje que ya en sí es claramente de un sistema (dos señales de bot, o un menú numerado) no se contesta:
+  // con una sola señal la IA contesta como mucho una vez (la regla de arriba frena la siguiente)
+  if (esClaramenteAutomatico(texto)) return 'automatico'
   return null
+}
+
+/** TANDA 2 · ¿es claramente un sistema? (dos o más señales de bot, o un menú numerado) */
+export function esClaramenteAutomatico(texto: string): boolean {
+  const t = normalizar(texto)
+  const crudo = (texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return AUTOMATICO.filter((r) => r.test(t)).length >= 2 || MENU_NUMERADO.test(crudo)
 }
 
 /** Número de empresa en México (800/900, con o sin el 1 de móvil): sujeto «wa:52800…» o «wa:521800…». */

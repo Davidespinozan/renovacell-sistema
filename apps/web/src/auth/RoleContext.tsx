@@ -8,6 +8,7 @@ import { pedirPestana } from '../app/Pestanas'
 import { FEATURES } from '../app/config'
 import { hasSupabase, supabase, currentUserId } from '../lib/supabase'
 import { currentSession } from './supabaseAuth'
+import { tokenRecuperacion } from './enlaceRecuperacion'
 import { anotarSalida, fueSalidaPedida, subirDiagnostico } from './diagnosticoSesion'
 import { confirmar } from '../data/store/escritura'
 import { abrirVisitante, adoptarVisitante } from '../data/ops/visitante'
@@ -101,7 +102,17 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     // #2: si llegan por el enlace de recuperación, NO auto-loguear: llevar a fijar
     // nueva contraseña.
     const recovery = typeof window !== 'undefined' && /type=recovery/.test(window.location.hash)
-    if (recovery) {
+    // TANDA 2 · 9 · enlace de la app con #token_hash (aviso de verificación por WhatsApp): se canjea aquí y se limpia la
+    // dirección; si ya venció o se usó, el login lo explica (enlaceVencido lee #error_code).
+    const th = typeof window !== 'undefined' ? tokenRecuperacion(window.location.hash) : null
+    if (th) {
+      setMode('reset')
+      void supabase.auth.verifyOtp({ token_hash: th, type: 'recovery' }).then(({ error }) => {
+        if (!active) return
+        try { window.history.replaceState(null, '', window.location.pathname + window.location.search + (error ? '#error_code=otp_expired' : '')) } catch { /* sin historial */ }
+        if (error) setMode('login')
+      }, () => { if (active) setMode('login') })
+    } else if (recovery) {
       setMode('reset')
     } else {
       currentSession().then((s) => {

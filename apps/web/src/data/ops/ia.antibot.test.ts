@@ -40,7 +40,10 @@ describe('ANTIBOT · frenoBot', () => {
     expect(frenoBot([v(OPCIONES), ai('ok')], 'Perdón, era el bot del banco. Quiero 2 Nabota')).toBeNull()
   })
   it('el disparador incluido al final del historial no cuenta contra sí mismo', () => {
-    expect(frenoBot([v(OPCIONES)], OPCIONES)).toBeNull()
+    const UNA = 'Selecciona una de las opciones.'   // una sola señal de bot
+    expect(frenoBot([v(UNA)], UNA)).toBeNull()
+    // TANDA 2 · OPCIONES trae DOS señales («no logré entender» + «selecciona una de las opciones»): es claramente un sistema
+    expect(frenoBot([v(OPCIONES)], OPCIONES)).toBe('automatico')
   })
   it('pareceAutomatico reconoce menús típicos', () => {
     expect(pareceAutomatico('Responde con el número de la opción')).toBe(true)

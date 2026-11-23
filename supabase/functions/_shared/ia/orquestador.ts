@@ -29,7 +29,7 @@ export interface DepsOrquestador {
     MARCA_VARIABLE?: string   // CACHÉ · dónde empieza lo que cambia en cada ronda
     // R4-C14 · opcional: pre-búsqueda determinista de los productos que nombró el cliente (canal)
     esConfirmacionExplicita?: (texto: string) => boolean   // PEDIDO POR WHATSAPP · el "sí" del doctor (determinista)
-    prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>) => Promise<Array<{ product_id: string; nombre: string }>>
+    prebuscarProductos?: (texto: string, buscar: (q: string) => PromiseLike<{ data: unknown; error: unknown }>, parecidos?: Array<{ product_id: string; nombre: string }>) => Promise<Array<{ product_id: string; nombre: string }>>
   }
   herramientas: {
     herramientasPara: (conCuenta: boolean, canal?: CanalTurno, contactoPendiente?: boolean, identificado?: boolean) => Array<{ name: string; description: string; input_schema: Record<string, unknown> }>
@@ -73,7 +73,26 @@ export interface Conversacion {
   decidirPublicar(e: { hayNuevo: boolean; turnoNuevo: boolean; esperadoMs: number; maxMs?: number }): 'publicar' | 'esperar' | 'ceder'
   nombresQueEscribioElCliente(nombresCatalogo: readonly string[], textosCliente: readonly string[]): string[]
   ESTILO_MENSAJE: string; LIMITE_CANAL: number; LIMITE_CANAL_RESUMEN: number
+  // TANDA 2 (opcionales: sin ellos el turno se comporta como en la Tanda 1)
+  existenciaVacia?(): Existencia
+  sumarExistencia?(acc: Existencia, estado: unknown): Existencia
+  notaExistencia?(estado: unknown): string | null
+  consultasExistencia?(texto: string): string[]
+  revisarTanda2?(t: string, c: CtxT2): { texto: string; problemas: readonly string[] }
+  notaTanda2?(ps: readonly string[], ex?: Existencia | null): string
+  corregirTanda2?(t: string, ps: readonly string[], c: CtxT2, asesor?: string | null): string
+  tipoContacto?(textos: readonly string[]): string | null
+  textoTipoContacto?(tipo: string | null): string | null
+  tratoCliente?(textos: readonly string[], nombreCuenta?: string | null): TratoT
+  textoTrato?(t: TratoT): string
+  medioSinTexto?(rafaga: readonly string[]): 'audio' | 'video' | null
+  textoAudio?(tipo: 'audio' | 'video', yaSaludo: boolean): string
+  equipoIncluyoEnvio?(previo: readonly MensajeH[]): boolean
+  hablaronDePago?(previo: readonly MensajeH[], rafaga: string): boolean
 }
+type Existencia = { confirmados: string[]; sinExistencia: string[]; presentacionNo: string[]; noEncontrado: string[]; alternativas: string[] }
+type TratoT = { trato: 'doctora' | 'doctor' | null; nombre: string | null }
+type CtxT2 = { existencia?: Existencia | null; adjuntoVisto?: boolean; hablaronDePago?: boolean; tipo?: string | null; trato?: TratoT | null; envioIncluido?: boolean; rafaga?: string; canal?: boolean; resumenPedido?: boolean }
 // LIVE C1 · `canal`: 'portal' (sesión del portal, por defecto) o un canal de Meta. Fuera del portal el PERFIL NUNCA llega a la
 // IA (audiencia pública, sin herramientas de cuenta ni carrito) aunque la conversación pertenezca a un doctor: la
 // vinculación comercial (cartera, asesor) se conserva en la conversación; la elevación de permisos solo existe con sesión.
@@ -97,6 +116,8 @@ const CORRECCION: Record<string, string> = {
   clinico_sin_evidencia: 'daba cifras clínicas (unidades, ml, dosis) sin haber consultado la ficha aprobada con obtener_ficha_producto en este turno.',
   pedido_sin_evidencia: 'decía que un pedido quedó creado o confirmado, y tú no creas pedidos.',
   promesa_humano_sin_evidencia: 'prometía que un asesor ya atiende o responderá, y eso solo lo dice el servidor.',
+  // TANDA 2 · 7 · la única dirección para clientes es la de la sucursal (la fiscal está en remodelación)
+  direccion_anterior: 'daba una dirección que ya no es donde se atiende: la ÚNICA dirección para clientes es la de la sucursal del bloque negocio.',
 }
 
 const LIMITE_RPC: Record<string, number> = { buscar_productos: 10, buscar_conocimiento: 6, candidatos_comerciales: 8 }
@@ -166,15 +187,45 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
+  // TANDA 2 · 3 · lo que el servidor dijo en este turno de lo que pidió (existencia sí/no, presentación, alternativas)
+  const t2 = !!(cv && cv.existenciaVacia && cv.sumarExistencia && cv.revisarTanda2)
+  const existencia: Existencia | null = t2 ? cv!.existenciaVacia!() : null
+  const estadoProducto = t2 ? async (q: string, hayResultados: boolean): Promise<unknown> => {
+    const est = await rpc('cc_ia_producto_estado', { p_q: q, p_audiencia: ctx.audiencia })
+    if (est.error || !est.data || typeof est.data !== 'object') return null
+    // «no aparece» solo cuenta si la búsqueda tampoco encontró nada (una categoría o un texto aprobado sí son evidencia)
+    if ((est.data as { coincidencia?: string }).coincidencia === 'ninguna' && hayResultados) return null
+    cv!.sumarExistencia!(existencia!, est.data)
+    for (const id of d.herramientas.idsDe(est.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(est.data)) nombresAutorizados.add(n)
+    if (existencia!.sinExistencia.length || existencia!.presentacionNo.length) addEv(['SIN_EXISTENCIA_EVIDENCE'])
+    return est.data
+  } : null
   // R4-C14 · canal: los productos que el cliente nombró ya vienen buscados (no depende de que el modelo decida buscar)
   let productosMencionados = ''
   if (canal !== 'portal' && d.politica.prebuscarProductos) {
-    const pre = await d.politica.prebuscarProductos(textoPrebusqueda, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }))
+    const parecidos: Array<{ product_id: string; nombre: string }> = []
+    const pre = await d.politica.prebuscarProductos(textoPrebusqueda, (q) => rpc('cc_buscar_productos', { p_q: q, p_limite: 5, p_audiencia: ctx.audiencia }), ...(t2 ? [parecidos] : []))
     if (pre.length) {
       for (const id of d.herramientas.idsDe(pre)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pre)) nombresAutorizados.add(n)
       addEv(d.herramientas.evidenciaDe('buscar_productos', pre))
       productosMencionados = '\n\n' + d.politica.envolverDatos('productos_del_catalogo_que_menciono_el_cliente', d.herramientas.acotarSalida(pre)) +
         '\nEstos productos de NUESTRO catálogo coinciden con lo que escribió el cliente (ya los busqué por ti): reconócelos por su nombre y confírmalos con naturalidad.'
+    }
+    // TANDA 2 · 3 · lo que escribió con error de dedo («Xomeen», «linurasse»): posibles, nunca confirmados solos
+    if (parecidos.length) {
+      for (const id of d.herramientas.idsDe(parecidos)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(parecidos)) nombresAutorizados.add(n)
+      productosMencionados += '\n\n' + d.politica.envolverDatos('productos_parecidos_a_lo_que_escribio', d.herramientas.acotarSalida(parecidos)) +
+        '\nLo que escribió se PARECE a estos productos (pudo ser un error de dedo): pregúntale si se refiere a alguno antes de afirmarlo.'
+    }
+    // TANDA 2 · 3 · presentaciones que pidió («nabota de 200 unidades»): si se puede surtir, si esa presentación existe, alternativas
+    if (estadoProducto && cv!.consultasExistencia && cv!.notaExistencia) {
+      const notas: string[] = []
+      for (const q of cv!.consultasExistencia(textoPrebusqueda)) {
+        const est = await estadoProducto(q, pre.length > 0)
+        const nota = est ? cv!.notaExistencia(est) : null
+        if (est && nota) notas.push(d.politica.envolverDatos('existencia_de_lo_que_pidio', d.herramientas.acotarSalida(est)) + '\n' + nota)
+      }
+      if (notas.length) productosMencionados += '\n\n' + notas.join('\n\n')
     }
   }
   // EXPEDIENTE · los productos que el cliente nombró ANTES en esta conversación también cuentan como consultados: la IA puede
@@ -220,8 +271,18 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     for (const n of cv.nombresQueEscribioElCliente(nombresCatalogo, historial.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').map((m) => m.content))) nombresAutorizados.add(n)
   }
   const bloqueFijoConv = cv ? '\n\n' + cv.ESTILO_MENSAJE : ''
+  // TANDA 2 · 8 y 9 · quién escribe (enfermería, paciente, revendedor, tercero) y cómo tratarlo, de lo que él mismo dijo
+  const textosCliente = historial.filter((m) => m.actor === 'visitor' || m.actor === 'doctor').map((m) => m.content)
+  const previoConv = cv ? cv.historialPrevio(historial) : []
+  const tipoContacto = t2 && cv!.tipoContacto ? cv!.tipoContacto(textosCliente) : null
+  const trato: TratoT | null = t2 && cv!.tratoCliente ? cv!.tratoCliente(textosCliente, null) : null
+  const ctxT2 = (): CtxT2 => ({ existencia, adjuntoVisto: !!e.adjunto && canal !== 'portal', hablaronDePago: cv!.hablaronDePago ? cv!.hablaronDePago(previoConv, textoTurno) : true,
+    tipo: tipoContacto, trato, envioIncluido: cv!.equipoIncluyoEnvio ? cv!.equipoIncluyoEnvio(previoConv) : false, rafaga: textoTurno,
+    canal: canal !== 'portal', resumenPedido: evidencia.some((x) => x === 'CHECKOUT_REVIEW_EVIDENCE' || x === 'PEDIDO_CREADO_EVIDENCE') })
   const bloqueVariableConv = cv && estadoConv ? [cv.textoEstadoConversacion(estadoConv, { rafaga: rafaga.length, verificarDatos: enCanalSinVinculo && !reconocido }),
-    reconocido ? cv.textoClienteReconocido({ porServidor: reconocidoServidor, porCliente: estadoConv.dijoCliente, asesor: asesorNombre }) : null].filter(Boolean).map((x) => '\n\n' + x).join('') : ''
+    reconocido ? cv.textoClienteReconocido({ porServidor: reconocidoServidor, porCliente: estadoConv.dijoCliente, asesor: asesorNombre }) : null,
+    tipoContacto && cv.textoTipoContacto ? cv.textoTipoContacto(tipoContacto) : null,
+    trato && cv.textoTrato ? cv.textoTrato(trato) : null].filter(Boolean).map((x) => '\n\n' + x).join('') : ''
   const ctxRevision = (): CtxRev | null => estadoConv ? { estado: estadoConv, rafaga: textoTurno, verificarDatos: enCanalSinVinculo, reconocido,
     limite: canal === 'portal' ? null : (evidencia.some((x) => x === 'PEDIDO_CREADO_EVIDENCE' || x === 'CHECKOUT_REVIEW_EVIDENCE' || x === 'CART_MUTATION_EVIDENCE') ? cv!.LIMITE_CANAL_RESUMEN : cv!.LIMITE_CANAL) + (evidencia.includes('PORTAL_LINK_EVIDENCE') ? 120 : 0),
     nombresProducto: [...new Set([...nombresCatalogo, ...nombresAutorizados])] } : null
@@ -250,6 +311,11 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     return { estado: p.persistido ? 'respondio' : 'descartada', turnId, intencion, evidencia, rondas, usage, clase: p.persistido ? undefined : p.motivo, motivoValidacion, ...(reconocido ? { reconocido } : {}) }
   }
 
+  // TANDA 2 · 8 · audio o video sin texto (no hay transcripción): una línea honesta pidiendo que lo escriba, sin llamar al modelo
+  if (t2 && canal !== 'portal' && cv!.medioSinTexto && cv!.textoAudio && estadoConv) {
+    const medio = cv!.medioSinTexto(rafaga.length ? rafaga : [e.textoUsuario])
+    if (medio) return await persistir(cv!.textoAudio(medio, estadoConv.yaSaludo), 0, 'medio_sin_texto')
+  }
   const respaldo = (motivo: string) => d.validacion.respuestaSegura(motivo, { limiteClinico, evidencia, textoLimiteClinico: d.politica.MENSAJE_LIMITE_CLINICO, textoGenerico: d.politica.MENSAJE_SIN_RESPUESTA,
     rafaga: textoTurno, ...(cv ? { reconocido, asesor: asesorNombre } : {}) })
   // 4) Bucle de herramientas acotado.
@@ -281,13 +347,17 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
         const cr = cv ? ctxRevision() : null
         if (!cv || !cr) return await persistir(v.texto, ronda)
         const rv = cv.revisarRespuesta(v.texto, cr)
-        if (!rv.problemas.length) return await persistir(rv.texto, ronda)
-        await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'revision_estilo', p_status: 'rechazada', p_product_ids: [], p_detalle: { problemas: rv.problemas } })
-        let final = cv.recortar(rv.texto, cr)
+        // TANDA 2 · lo que afirma de productos, imágenes, quién escribe y el trato (determinista; sin cifras nuevas)
+        const c2 = t2 ? ctxT2() : null
+        const r2 = c2 ? cv.revisarTanda2!(rv.texto, c2) : { texto: rv.texto, problemas: [] as readonly string[] }
+        if (!rv.problemas.length && !r2.problemas.length) return await persistir(r2.texto, ronda)
+        await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: 'revision_estilo', p_status: 'rechazada', p_product_ids: [], p_detalle: { problemas: [...rv.problemas, ...r2.problemas] } })
+        let final = cv.recortar(r2.texto, cr)
+        if (c2 && r2.problemas.length && cv.corregirTanda2) final = cv.recortar(cv.corregirTanda2(final, r2.problemas, c2, asesorNombre), cr)
         if (reconocido && cv.datosPedidos(final).size) final = cv.textoReconocidoRespaldo(asesorNombre)
         if (!corregidoEstilo && ronda < d.config.maxRondas - 1 && d.config.timeoutMs - (ahora() - inicio) > 20_000) {
           corregidoEstilo = true; textoValidoPrevio = final
-          notaCorreccion = cv.notaEstilo(rv.problemas, cr.limite)
+          notaCorreccion = (rv.problemas.length ? cv.notaEstilo(rv.problemas, cr.limite) : '') + (r2.problemas.length && cv.notaTanda2 ? cv.notaTanda2(r2.problemas, existencia) : '')
           continue
         }
         return await persistir(final, ronda, 'estilo')
@@ -344,7 +414,8 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
       const vc = d.herramientas.argsAInterno ? d.herramientas.argsAInterno(v.nombre, v.args, mediaCaja) : { ok: true as const, args: v.args }   // CAJAS-MEDIOS · cajas del modelo → medias internas
       if (!vc.ok) { resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: 'Ese producto se vende por pieza completa: usa una cantidad entera.' })) }); continue }
       v.args = vc.args
-      const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal, confirmacion: d.politica.esConfirmacionExplicita?.(e.textoUsuario) ?? false })
+      const ej0 = await ejecutar(v, e, ctx, rpc, { turnId, ronda, carrito, perfilIA, enlace: d.herramientas.ejecutarEnlacePortal, confirmacion: d.politica.esConfirmacionExplicita?.(e.textoUsuario) ?? false,
+        ...(estadoProducto ? { existencia: { estado: estadoProducto, nota: (x: unknown) => cv!.notaExistencia?.(x) ?? null } } : {}) })
       const ej = !ej0.error && d.herramientas.complementar ? { ...ej0, data: d.herramientas.complementar(v.nombre, ej0.data) } : ej0
       const salida = ej.error ? { error: 'Herramienta no disponible en este momento. No inventes el dato.' } : (d.herramientas.salidaEnCajas ? d.herramientas.salidaEnCajas(ej.data, mediaCaja) : ej.data)   // CAJAS-MEDIOS
       if (!ej.error) { for (const id of d.herramientas.idsDe(ej.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(ej.data)) nombresAutorizados.add(n); addEv(d.herramientas.evidenciaDe(v.nombre, ej.data)) }
@@ -361,7 +432,9 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   return await persistir(textoValidoPrevio ?? respaldo('rondas'), d.config.maxRondas, 'rondas')
 }
 
-async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string }; confirmacion?: boolean }): Promise<{ data: unknown; error: string | null }> {
+async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e: EntradaTurno, ctx: Ctx, rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>, t: { turnId: string; ronda: number; carrito: { id: string | null }; perfilIA: string | null; enlace?: () => { url: string; uso: string }; confirmacion?: boolean
+  // TANDA 2 · 3 · existencia de lo que buscó (cc_ia_producto_estado) y la nota de qué puede afirmar
+  existencia?: { estado: (q: string, hayResultados: boolean) => Promise<unknown>; nota: (estado: unknown) => string | null } }): Promise<{ data: unknown; error: string | null }> {
   const a = v.args
   // PEDIDO POR WHATSAPP · con el doctor vinculado, el dueño del carrito es SU cuenta (el mismo carrito del portal), sin ligarlo a la
   // conversación del contacto; si no, como siempre.
@@ -396,14 +469,28 @@ async function ejecutar(v: { nombre: string; args: Record<string, unknown> }, e:
       // NUNCA DESECHAR (2 nov 2026, caso Éclat de Vie: "no tengo Nabota 200" a una clínica que quería 3): un contacto sin
       // verificar solo ve lo publicado en la landing; si lo que pide existe en el catálogo profesional, se le dice que SÍ se
       // maneja (solo el nombre: sin id, precio ni existencias) para que la IA lo pase con un asesor en vez de negarlo.
-      if (!r.error && ctx.audiencia === 'public' && !(Array.isArray(r.data) && r.data.length)) {
+      // TANDA 2 · un resultado solo «parecido» (error de dedo) no basta: también se mira el catálogo profesional.
+      const filas = Array.isArray(r.data) ? r.data as Array<{ puntaje?: unknown }> : []
+      const sinFuerte = t.existencia ? !filas.some((p) => Number(p.puntaje ?? 0) >= 75) : !filas.length
+      let out: { data: unknown; error: string | null } = r
+      if (!r.error && ctx.audiencia === 'public' && sinFuerte) {
         const pro = await rpc('cc_buscar_productos', { p_q: a.consulta, p_limite: 5, p_audiencia: 'verified' })
         if (!pro.error && Array.isArray(pro.data) && pro.data.length) {
-          return { data: { productos: [], solo_para_profesionales: (pro.data as Array<{ nombre?: string }>).map((p) => ({ nombre: String(p.nombre ?? '') })).filter((p) => p.nombre),
+          out = { data: { productos: t.existencia ? filas : [], solo_para_profesionales: (pro.data as Array<{ nombre?: string }>).map((p) => ({ nombre: String(p.nombre ?? '') })).filter((p) => p.nombre),
             nota: 'Sí lo manejamos: es de venta exclusiva para profesionales verificados. Confírmale que lo tenemos y pásalo con un asesor (solicitar_asesor) para su precio y su pedido.' }, error: null }
         }
       }
-      return r
+      // TANDA 2 · 3 · lo que puede afirmar: se surte ahora (sí/no, sin cifras), presentación que no manejamos, alternativas
+      if (!out.error && t.existencia) {
+        const hay = filas.length > 0 || out.data !== r.data
+        const est = await t.existencia.estado(String(a.consulta ?? ''), hay)
+        if (est) {
+          const base = out.data && typeof out.data === 'object' && !Array.isArray(out.data) ? out.data as Record<string, unknown> : { productos: filas }
+          const nota = t.existencia.nota(est)
+          out = { data: { ...base, existencia: est, ...(nota ? { nota } : {}) }, error: null }
+        }
+      }
+      return out
     }
     case 'obtener_ficha_producto': return rpc('cc_ficha_producto', { p_product: a.product_id, p_audiencia: ctx.audiencia })
     case 'comparar_productos': return rpc('cc_comparar_productos', { p_ids: a.product_ids, p_audiencia: ctx.audiencia })

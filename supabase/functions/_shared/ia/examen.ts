@@ -8,7 +8,7 @@ type Rpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: un
 
 /** Lecturas que el examen deja pasar a la base (todas STABLE: verificado en prod el 2 nov 2026). */
 export const LECTURAS = new Set(['cc_ia_contexto_actor', 'cc_catalogo_para_ia', 'cc_buscar_productos', 'cc_ficha_producto', 'cc_comparar_productos', 'cc_buscar_conocimiento',
-  'cc_candidatos_recomendacion', 'cc_ia_precio', 'cc_ia_cotizar', 'cc_ia_recomendaciones', 'cc_ia_disponibilidad', 'cc_ia_estado_pedido', 'cc_ia_perfil_comercial'])
+  'cc_candidatos_recomendacion', 'cc_ia_precio', 'cc_ia_cotizar', 'cc_ia_recomendaciones', 'cc_ia_disponibilidad', 'cc_ia_estado_pedido', 'cc_ia_perfil_comercial', 'cc_ia_producto_estado'])
 
 /** Precio por millón de tokens (USD), página oficial de Anthropic consultada el 2 nov 2026. */
 // USD por millón de tokens. CACHÉ (docs oficiales, 2 nov 2026): escribir 1.25× la entrada; leer 0.1× (0.05× en Sonnet/Opus 5.5).

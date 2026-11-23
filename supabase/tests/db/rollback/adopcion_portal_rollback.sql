@@ -1,5 +1,6 @@
 -- ADOPCIÓN DEL PORTAL (20270308) · el down regresa el aviso de aprobación y la confirmación anteriores; se reaplica idéntica.
 begin;
+\ir ../../../rollback/ia_tanda2/99_down.sql   -- IA TANDA 2 (20270407480000) parcha cc_buscar_productos y cc_alta_wa_cerrar: se baja antes
 \ir ../../../rollback/paq_simple/99_down.sql   -- PAQ-SIMPLE (20270407460000) parcha la regla de entrega: se baja antes
 \ir ../../../rollback/salida_programada/99_down.sql   -- SALIDA PROGRAMADA (20270320) parcha la regla de entrega y los pedidos del chat: se baja antes
 \ir ../../../rollback/entrega_servicio/99_down.sql   -- PAQUETERÍA AL VENDER (20270314) parcha _entrega_normalizar y el checkout: se baja antes

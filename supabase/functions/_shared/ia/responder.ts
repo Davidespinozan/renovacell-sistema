@@ -48,13 +48,19 @@ export function dependenciasCanal(n: politica.DatosNegocio, o: { comercial?: boo
   // AVISO-IA · el aviso vigente y la fecha/hora van PRIMERO: mandan sobre la dirección y el horario.
   const aviso = politica.textoAviso(n); const ahora = politica.textoAhora(n)
   const bloques = [aviso && politica.envolverDatos('aviso_vigente', aviso), ahora && politica.envolverDatos('fecha_y_hora', ahora), texto && politica.envolverDatos('negocio', texto), manual && politica.envolverDatos('manual_de_ventas', manual), promos && politica.envolverDatos('promociones_vigentes', promos)].filter(Boolean)
+  // TANDA 2 · 7 · la dirección anterior/fiscal (Pedro Infante, en remodelación) nunca se le da a un cliente: la única es la sucursal
+  const anterior = n.empresa?.direccion ?? null; const sucursal = n.sucursal?.direccion ?? null
   return {
     politica: { ...politicaCanalBase, construirSistema: (e: politica.EntradaSistema) => politica.construirSistema(e) + (bloques.length ? '\n\n' + bloques.join('\n\n') : ''),
       // R4-C11 · si la conversación viene de una compra ("2 nabota" → "100"), el turno sigue con la tarea de compra
       clasificarIntencion: (t: string) => { const i = politica.clasificarIntencionCanal(t); return o.comercial && !['CLINICAL_BOUNDARY', 'HUMAN_REQUEST', 'ORDER_STATUS'].includes(i) ? 'CHECKOUT' : i } },
-    validacion: { ...validacionCanalBase, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
+    validacion: { ...validacionCanalBase,
+      respuestaSegura: (motivo: string, c: validacion.ContextoRespaldo) => motivo === 'direccion_anterior' && sucursal
+        ? `Estamos en ${sucursal}. ¿Pasarías a recoger o te lo enviamos?` : validacion.respuestaSeguraCanal(motivo, c),
+      validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
       if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
       const limpio = validacion.sinFrasesDeSistema(t.replace(/\r\n?/g, '\n').trim())
+      if (sucursal && conversacion.mencionaDireccionAnterior(limpio, anterior, sucursal)) return { ok: false as const, motivo: 'direccion_anterior' }
       // los productos de una promoción vigente vienen del servidor: cuentan como autorizados en este turno
       const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(limpio, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
       return v.ok ? { ok: true as const, texto: limpio } : v
@@ -77,6 +83,8 @@ export function dependenciasPortal(n: politica.DatosNegocio) {
     herramientas: { ...herramientas, complementar: (nombre: string, salida: unknown) => politica.conEnvioGratis(nombre, salida, n) },
     validacion: { ...validacion, validarRespuesta: (t: unknown, c: Parameters<typeof validacion.validarRespuesta>[1]) => {
       if (typeof t !== 'string') return validacion.validarRespuesta(t, c)
+      // TANDA 2 · 7 · tampoco en el portal se da la dirección anterior (la CORRECCIÓN interna la cambia por la de la sucursal)
+      if (n.sucursal?.direccion && conversacion.mencionaDireccionAnterior(t, n.empresa?.direccion, n.sucursal.direccion)) return { ok: false as const, motivo: 'direccion_anterior' }
       const v = validacion.validarRespuesta(validacion.sinMontosDeEnvio(t, montos), { ...c, nombresAutorizados: [...c.nombresAutorizados, ...nombresPromo] })
       return v.ok ? { ok: true as const, texto: t.replace(/\r\n?/g, '\n').trim() } : v
     } },
@@ -105,6 +113,9 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
     let hist: Array<{ actor: string; content: string }> = []
     if (!sinContenido(texto)) { try { hist = await leerInterno(admin, conv, seqUsuario, 20) } catch { hist = [] } }
     const freno = frenoBot(hist, texto)
+    // TANDA 2 · 8 · otro audio/video sin texto después de que la IA ya pidió que lo escribiera: no se repite la negativa (lo
+    // escucha el equipo: el archivo queda en la conversación). Antes de reclamar el turno: no gasta modelo ni deja turnos.
+    if (!freno && conversacion.medioSinTexto(conversacion.rafagaPendiente(hist.length ? hist : [{ actor: actor, content: texto }])) && conversacion.yaPidioEscribirAudio(conversacion.historialPrevio(hist))) return 'silenciada'
     if (freno) {
       // BOT DETECTADO · se avisa a Renovacell (evento + campana, una vez al día por conversación). Un mensaje sin contenido
       // solo no basta (una persona también manda reacciones o tipos raros); los 800/900 ya se cortaron arriba.

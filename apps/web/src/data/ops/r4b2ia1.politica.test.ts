@@ -38,7 +38,8 @@ describe('portal: idéntico a su línea base (antes de R4-B2-IA1)', () => {
     // re-anclada (2 nov 2026, caché + examen): marca de la parte variable, 3d promociones, V7 recomendar, breve y un solo trato
     // re-anclada (2 nov 2026, V7 con búsqueda de respaldo cuando las recomendaciones vienen vacías)
     // re-anclada (TANDA 1 · 4, 23 nov 2026): «breve (2 o 3 líneas, una sola pregunta)» también en el portal
-    expect(h.digest('hex')).toBe('cc9755d48eaa2568ad47d6640e23e82f')
+    // re-anclada (TANDA 2 · 3, 23 nov 2026): «NUNCA DESECHES» ya no autoriza afirmar sin evidencia (con/sin existencia, no aparece)
+    expect(h.digest('hex')).toBe('cf60196e07a658c0066810465c43b25d')
     expect(createHash('md5').update(politica.MENSAJE_SIN_RESPUESTA + '|' + politica.MENSAJE_LIMITE_CLINICO).digest('hex')).toBe('a80fa072fa6a2330676fe4a1716d30d1')
   })
 })

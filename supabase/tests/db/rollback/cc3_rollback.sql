@@ -1,5 +1,6 @@
 -- CC-3 · El rollback retira el dominio de conocimiento sin tocar products ni CC-1/CC-2.
 begin;
+\ir ../../../rollback/ia_tanda2/99_down.sql   -- IA TANDA 2 (20270407480000) parcha cc_buscar_productos y cc_alta_wa_cerrar: se baja antes
 \ir ../../../rollback/fichas_familia/99_down.sql   -- FICHAS POR FAMILIA (20270225) añade cc_conocimiento_aprobar_ficha: se baja antes
 \ir ../../../rollback/cc3/99_down.sql
 do $t$

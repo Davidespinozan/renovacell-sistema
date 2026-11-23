@@ -16,7 +16,8 @@ describe('búsqueda y archivos', () => {
       expect(politica.atencionComercial(t), t).toBe('adjunto')
     for (const t of ['Envió un sticker por WhatsApp.', 'Compartió una ubicación por WhatsApp.', 'Compartió un contacto por WhatsApp.'])
       expect(politica.atencionComercial(t), t).toBeNull()
-    expect(politica.contextoCanal('whatsapp')).toContain('y tú no lo ves (audio, video o no se pudo abrir), agradécelo y dile que un asesor de Renovacell lo revisa aquí mismo')   // R4-C13
+    // R4-C13 · re-anclada (TANDA 2 · 8): una línea honesta pidiendo que lo escriba, una sola vez (antes: «un asesor lo revisa»)
+    expect(politica.contextoCanal('whatsapp')).toContain('y tú no lo ves (audio, video o no se pudo abrir), dile en UNA línea que por aquí no alcanzas a escucharlo o abrirlo y pídele que te lo escriba')
   })
   it('"es de lo que me envían ustedes" es recompra', () => {
     for (const t of ['Pues es de lo q me envían ustedes', 'es lo que nos mandan siempre', 'lo que me surten ustedes']) expect(politica.atencionComercial(t.replace(' q ', ' que ')), t).toBe('recompra')
