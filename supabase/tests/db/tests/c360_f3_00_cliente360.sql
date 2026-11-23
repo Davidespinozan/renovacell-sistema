@@ -142,7 +142,17 @@ begin
   perform public.cliente_telefono_guardar(cA, null, '6695554433', 'recepcion');
   perform public.cliente_contacto_guardar(cA, '{"email":"nuevo@test.local","city":"Zapopan"}'::jsonb);
   perform public.cliente_nota_agregar(cA, 'Prefiere entregas por la mañana.');
-  perform tests.throws(format('select public.cliente_contacto_guardar(%L, %L)', cA, '{"full_name":"Otro"}'), 'CAMPO_NO_PERMITIDO', '37 · el vendedor no cambia la identidad');
+  -- VENDEDOR-NOMBRE (0753, dueño 23 nov 2026): la vendedora ASIGNADA corrige el nombre; se copia a la cuenta del portal.
+  perform tests.ok(public.cliente_360(cA) -> 'permisos' -> 'contacto' ? 'full_name', '37 · la vendedora asignada ve el nombre editable');
+  perform public.cliente_contacto_guardar(cA, '{"full_name":"  Dra. Ana Corregida  "}'::jsonb);
+  perform tests.act_as_service();
+  perform tests.ok((select full_name = 'Dra. Ana Corregida' from public.customers where id = cA), '37 · nombre corregido en la ficha');
+  perform tests.ok((select full_name = 'Dra. Ana Corregida' and meta ->> 'name' = 'Dra. Ana Corregida' from public.profiles where id = dA), '37 · y en la cuenta del portal (lo que muestran cartera y pedidos)');
+  perform tests.ok(exists (select 1 from public.customer_events e where e.customer_id = cA and e.tipo = 'contacto_actualizado' and e.detalle -> 'campos' ? 'full_name' and not e.detalle::text ilike '%Corregida%'), '37 · queda en la actividad, sin el valor personal');
+  perform tests.act_as(s1);
+  perform tests.throws(format('select public.cliente_contacto_guardar(%L, %L)', cA, '{"full_name":"   "}'), 'NOMBRE_REQUERIDO', '37 · no lo deja vacío');
+  perform tests.ok(not (public.cliente_360(cSin) -> 'permisos' -> 'contacto' ? 'full_name'), '37 · cliente sin vendedora: el nombre no es editable');
+  perform tests.throws(format('select public.cliente_contacto_guardar(%L, %L)', cSin, '{"full_name":"Otro"}'), 'CAMPO_NO_PERMITIDO', '37 · cliente sin vendedora: el nombre sigue siendo de Dirección');
   perform tests.throws(format('select public.cliente_fiscal_guardar(%L, null, %L)', cA, tests.fiscal('FFF010101FF6')), 'NO_AUTORIZADO', '20 · el vendedor no edita fiscal');
   perform tests.throws(format('select public.upsert_customer_fiscal(%L, %L)', cA, tests.fiscal('FFF010101FF6')), 'NO_AUTORIZADO', '37 · ni por la RPC heredada');
   perform tests.throws(format('select public.cliente_360(%L)', cB), 'NO_AUTORIZADO', '3 · cliente fuera de su cartera: no lo lee');
