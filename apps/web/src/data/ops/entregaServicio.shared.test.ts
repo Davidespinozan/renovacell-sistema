@@ -14,7 +14,8 @@ describe('PAQ-SIMPLE · cotizar al vender', () => {
     expect(paqueteEstimado(0, { paquete_kg_base: 0.1, paquete_kg_pieza: 0 }).weightKg).toBe(0.5)
   })
   it('ECONOMY SELECT (G) excluido en un solo lugar; la lista es configurable', () => {
-    expect(SERVICIOS_DHL_EXCLUIDOS).toEqual(['G'])
+    expect(SERVICIOS_DHL_EXCLUIDOS).toEqual(['G', '5'])
+    expect(servicioDhlPermitido('5')).toBe(false)   // GROUND SELECT
     expect(servicioDhlPermitido('G')).toBe(false)
     expect(servicioDhlPermitido('g')).toBe(false)
     expect(servicioDhlPermitido('N')).toBe(true)

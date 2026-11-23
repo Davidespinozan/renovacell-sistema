@@ -8,8 +8,9 @@ export interface ServicioCotizado { codigo: string; nombre: string; costo: numbe
 
 // ═══ PAQ-SIMPLE · servicios de DHL que NUNCA se ofrecen ni se usan (venta, Almacén y guía). Único lugar de la lista:
 // lo usan la Edge entrega-cotizar, la Edge shipping (tarifas y crear guía) y la pantalla de Almacén.
-//   'G' = ECONOMY SELECT (el más barato y lento).
-export const SERVICIOS_DHL_EXCLUIDOS: readonly string[] = ['G']
+//   'G' = ECONOMY SELECT (el más barato y lento en paquetes ligeros).
+//   '5' = GROUND SELECT (el más barato y lento en paquetes pesados; DUEÑO 23 nov 2026: «el más básico no se usa»).
+export const SERVICIOS_DHL_EXCLUIDOS: readonly string[] = ['G', '5']
 /** ¿Ese código de servicio de DHL se puede ofrecer/usar? */
 export function servicioDhlPermitido(codigo: string | null | undefined, excluidos: readonly string[] = SERVICIOS_DHL_EXCLUIDOS): boolean {
   const c = String(codigo ?? '').trim().toUpperCase()

@@ -85,7 +85,7 @@ async function companyShipper(admin: any): Promise<{ shipper: OrigenEnvios; miss
 // PAQ-SIMPLE (23 nov 2026) · al vender solo se elige la paquetería (DHL o Estafeta) y se promete una fecha; el SERVICIO lo
 // elige Almacén aquí al generar la guía, sin motivo (antes: 409 si no era el vendido). ECONOMY SELECT ('G') nunca se ofrece
 // ni se acepta (lista única en _shared/cotizarEnvio.ts).
-const errorServicioExcluido = (codigo: string) => ({ error: 'servicio_no_permitido', codigo, excluidos: SERVICIOS_DHL_EXCLUIDOS, message: `El servicio ${codigo} de DHL (Economy Select) no se usa en Renovacell. Elige otro servicio.` })
+const errorServicioExcluido = (codigo: string) => ({ error: 'servicio_no_permitido', codigo, excluidos: SERVICIOS_DHL_EXCLUIDOS, message: `El servicio ${codigo} de DHL (${codigo === '5' ? 'Ground Select' : 'Economy Select'}) no se usa en Renovacell: el más básico no se usa. Elige otro servicio.` })
 
 const safeErr = (msg: string) => msg.slice(0, 300)
 // deno-lint-ignore no-explicit-any
