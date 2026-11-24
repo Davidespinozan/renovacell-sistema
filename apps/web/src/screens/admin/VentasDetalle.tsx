@@ -12,6 +12,8 @@ import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/
 import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useTeam } from '../../data/hooks/useTeam'
+import { nombreVendedorDe, ventasPorVendedor } from '../../data/comisiones'   // VENTAS POR VENDEDOR
 import { useRefunds } from '../../data/hooks/useFinanzas'
 import { useOrderMoney, usePaymentEntries } from '../../data/hooks/useMoney'
 import { useOpId } from '../../data/hooks/useOpId'
@@ -65,6 +67,9 @@ export function VentasDetalle() {
   const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
+  const { data: team } = useTeam()
+  const vendedores = useMemo(() => team.map((u) => ({ id: u.id, email: u.email, name: u.name })), [team])
+  const vendedorDeVenta = (o: OrderWithItems) => nombreVendedorDe(o, vendedores)
 
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
   const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
@@ -81,6 +86,7 @@ export function VentasDetalle() {
   const [channel, setChannel] = useState<ChannelFilter>('todos')
   const [pay, setPay] = useState<PayFilter>('todos')
   const [entrega, setEntrega] = useState<EntregaFilter>('todos')
+  const [vendedor, setVendedor] = useState<string>('todos')
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
@@ -102,6 +108,7 @@ export function VentasDetalle() {
         if (channel !== 'todos' && channelOf(o) !== channel) return false
         if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
         if (entrega !== 'todos' && entregaDeVenta(o).tipo !== entrega) return false
+        if (vendedor !== 'todos' && vendedorDeVenta(o).clave !== vendedor) return false
         if (query) {
           const hay = `${o.external_ref ?? ''} ${clientName(o)}`.toLowerCase()
           if (!hay.includes(query)) return false
@@ -110,9 +117,11 @@ export function VentasDetalle() {
       })
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, from, to, channel, pay, entrega, q, doctorsById])
+  }, [orders, from, to, channel, pay, entrega, vendedor, vendedores, q, doctorsById])
 
   const sum = salesSummary(rows)
+  // Vendedores con ventas (cualquier periodo) para el filtro, del que más vende al que menos; «Sin vendedor» al final.
+  const opcionesVendedor = useMemo(() => ventasPorVendedor(orders, vendedores), [orders, vendedores])
   const ch = ventasPorCanal(rows)
   const prods = topProducts(rows, productsById, 3)
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
@@ -160,8 +169,12 @@ export function VentasDetalle() {
           <option value="todos">Toda entrega</option>
           {ENTREGA_FILTROS.map((t) => <option key={t} value={t}>{TIPO_ENTREGA_TEXTO[t]}</option>)}
         </select>
-        {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || q) && (
-          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setQ('') }}>Limpiar</button>
+        <select style={sel} value={vendedor} onChange={(e) => setVendedor(e.target.value)} aria-label="Vendedor" data-testid="ventas-filtro-vendedor">
+          <option value="todos">Todos los vendedores</option>
+          {opcionesVendedor.map((v) => <option key={v.clave} value={v.clave}>{v.nombre}</option>)}
+        </select>
+        {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || vendedor !== 'todos' || q) && (
+          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setQ('') }}>Limpiar</button>
         )}
         <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'var(--filters-end, auto)' }} columns={[
           { key: 'external_ref', label: 'Folio' },
@@ -169,6 +182,7 @@ export function VentasDetalle() {
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
           { key: 'id', label: 'Productos', format: (_v, o) => productsSummary(o) },
           { key: 'id', label: 'Canal', format: (_v, o) => CANAL_TEXTO[channelOf(o)] },
+          { key: 'id', label: 'Vendedor', format: (_v, o) => vendedorDeVenta(o).nombre },
           { key: 'id', label: 'Entrega', format: (_v, o) => entregaDeVenta(o).corto },
           { key: 'id', label: 'Destino', format: (_v, o) => { const a = orderAddress(o.shipping_meta); return a ? [a.city, (a as { state?: string }).state].filter(Boolean).join(', ') : '' } },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
@@ -207,7 +221,7 @@ export function VentasDetalle() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
+              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Vendedor</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
             </thead>
             <tbody>
               {rows.map((o) => {
@@ -217,6 +231,7 @@ export function VentasDetalle() {
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Canal"><span className={'pill ' + (canal === 'portal' ? 'p-blue' : 'p-neu')}>{CANAL_TEXTO[canal]}</span></td>
+                    <td data-label="Vendedor">{vendedorDeVenta(o).nombre}</td>
                     <td data-label="Entrega" data-testid="venta-entrega">{entregaDeVenta(o).corto}</td>
                     <td data-label="Cliente">{clientName(o)}</td>
                     <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
@@ -226,7 +241,7 @@ export function VentasDetalle() {
                   </tr>
                 )
               })}
-              {rows.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={10} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
             </tbody>
           </table>
         </div>

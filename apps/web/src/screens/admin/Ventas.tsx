@@ -13,6 +13,8 @@ import { money, initials, avatarColor } from '../../lib/format'
 import { useAllOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { useDoctors } from '../../data/hooks/useDoctors'
+import { useTeam } from '../../data/hooks/useTeam'
+import { ventasPorVendedor, sinCuentasOcultas } from '../../data/comisiones'   // VENTAS POR VENDEDOR
 import {
   ventasPorCanal, CANALES, CANAL_TEXTO, doctorActivity, topDoctors, topProducts, lineMix,
   cfdiSolicitados, monthlySales, doctoresEnRiesgo, DIAS_RIESGO,
@@ -62,6 +64,7 @@ function VentasResumen() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
+  const { data: team } = useTeam()
   const [periodo, setPeriodo] = useState<Periodo>('mes')
 
   const hoy = hoyNegocio()
@@ -83,6 +86,10 @@ function VentasResumen() {
   const act = doctorActivity(filtered)
   const porCanal = ventasPorCanal(filtered)   // CANAL DE VENTA · quién capturó cada pedido
   const totalCanales = CANALES.reduce((n, c) => n + porCanal[c].revenue, 0)
+  // VENTAS POR VENDEDOR · misma atribución que Metas y comisiones (vendedor de cartera del pedido, no quien lo capturó).
+  const vendedores = useMemo(() => team.map((u) => ({ id: u.id, email: u.email, name: u.name })), [team])
+  const porVendedor = ventasPorVendedor(sinCuentasOcultas(filtered, new Set(team.map((u) => u.id))), vendedores)
+  const totalVendedores = porVendedor.reduce((n, v) => n + v.revenue, 0)
   const mix = lineMix(filtered, productsById)
   const docs = topDoctors(filtered, doctorsById)
   const prods = topProducts(filtered, productsById)
@@ -159,6 +166,18 @@ function VentasResumen() {
           </table>
         </Bloque>
       </div>
+
+      {/* VENTAS POR VENDEDOR */}
+      <Bloque titulo={<><Users size={14} style={ic} /> Por vendedor</>}>
+        <div data-testid="ventas-por-vendedor">
+          {porVendedor.length === 0
+            ? <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Sin ventas en el periodo.</div>
+            : porVendedor.map((v) => (
+              <SplitRow key={v.clave} label={v.nombre} amount={v.revenue} total={totalVendedores} sub={`${v.orders} pedido${v.orders === 1 ? '' : 's'} · ticket ${money(v.orders ? v.revenue / v.orders : 0)}`} />
+            ))}
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>Cuenta para el vendedor del cliente (su cartera), aunque otra persona haya capturado el pedido; es la misma regla de Metas y comisiones. «Sin vendedor» = pedidos del portal de clientes sin vendedor asignado.</div>
+        </div>
+      </Bloque>
 
       {/* Canal + Línea + Facturación */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16 }}>

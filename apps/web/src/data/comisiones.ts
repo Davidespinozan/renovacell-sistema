@@ -118,3 +118,23 @@ export function estimarComisiones(d: {
       { vendido: 0, cobrado: 0, comisionEstimada: 0 }),
   }
 }
+
+// ═══ VENTAS POR VENDEDOR (24 nov 2026, dueño: "desde Dirección no hay manera de ver las ventas por vendedores").
+// MISMA atribución que Metas y comisiones (vendedorDe): el vendedor de cartera que el pedido trae congelado, no el
+// capturista. Lo que no tiene vendedor (autoservicio del portal, sin cartera) va en «Sin vendedor».
+export const SIN_VENDEDOR = '__sin__'
+export interface VentaVendedor { clave: string; nombre: string; orders: number; revenue: number }
+export function nombreVendedorDe(o: OrderWithItems, vendedores: Vendedor[]): { clave: string; nombre: string } {
+  const email = vendedorDe(o, vendedores)
+  if (!email) return { clave: SIN_VENDEDOR, nombre: 'Sin vendedor' }
+  return { clave: email, nombre: vendedores.find((v) => v.email === email)?.name ?? email }
+}
+export function ventasPorVendedor(orders: OrderWithItems[], vendedores: Vendedor[]): VentaVendedor[] {
+  const acc = new Map<string, VentaVendedor>()
+  orders.filter(isSale).forEach((o) => {
+    const { clave, nombre } = nombreVendedorDe(o, vendedores)
+    const r = acc.get(clave) ?? { clave, nombre, orders: 0, revenue: 0 }
+    r.orders += 1; r.revenue += o.total ?? 0; acc.set(clave, r)
+  })
+  return [...acc.values()].sort((a, b) => (a.clave === SIN_VENDEDOR ? 1 : b.clave === SIN_VENDEDOR ? -1 : b.revenue - a.revenue))
+}
