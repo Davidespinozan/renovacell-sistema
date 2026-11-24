@@ -129,7 +129,7 @@ export interface AgendaEntregas { desde: string; hasta: string; hoy: string; zon
 export const MOTIVO_ENTREGA: Record<string, string> = {
   SOLO_PERSONAL: 'solo en punto de venta',
   REQUIERE_DIRECCION: 'necesita una dirección de entrega',
-  ZONA_FORANEA: 'fuera de Culiacán',
+  ZONA_FORANEA: 'solo para Culiacán y alrededores: este C.P. es foráneo',
   ZONA_LOCAL: 'en Culiacán la entrega es por chofer',
   MINIMO_LOCAL: 'la entrega local es a partir del mínimo',
   HORARIO_REQUERIDO: 'elige el horario de entrega',

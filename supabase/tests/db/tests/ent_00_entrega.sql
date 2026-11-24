@@ -88,8 +88,10 @@ begin
   -- ══ 2 · opciones del PERSONAL y el calendario ═════════════════════════════════════════════════════
   perform tests.act_as(v_pos);
   ops := public.entrega_opciones('staff', 450, '82000', mie);
-  perform tests.ok((select bool_and((x ->> 'permitido')::boolean) from jsonb_array_elements(ops -> 'opciones') x), '2.1 · el personal puede elegir cualquier entrega');
-  select x into o from jsonb_array_elements(ops -> 'opciones') x where x ->> 'id' = 'local_chofer';
+  perform tests.ok((select bool_and((x ->> 'permitido')::boolean) from jsonb_array_elements(ops -> 'opciones') x where x ->> 'id' <> 'local_chofer'), '2.1 · el personal puede elegir cualquier paquetería o recoger');
+  -- ENT-LOCAL (24 nov 2026) · el chofer solo va a Culiacán y alrededores, también si vende el personal
+  perform tests.ok((select not (x ->> 'permitido')::boolean and x ->> 'motivo' = 'ZONA_FORANEA' from jsonb_array_elements(ops -> 'opciones') x where x ->> 'id' = 'local_chofer'), '2.1b · personal: chofer a Mazatlán no se permite');
+  select x into o from jsonb_array_elements(public.entrega_opciones('staff', 450, '80020', mie) -> 'opciones') x where x ->> 'id' = 'local_chofer';
   perform tests.eq((o ->> 'flete')::numeric, 0::numeric, '2.2 · chofer bajo el mínimo: flete propuesto $0 (configurable)');
   select x into o from jsonb_array_elements(public.entrega_opciones('staff', 1000, '82000', mie_tarde) -> 'opciones') x where x ->> 'id' = 'foraneo_dhl';
   perform tests.ok(not (o ->> 'antes_de_corte')::boolean and o ->> 'salida' = '2026-10-22' and o ->> 'llega_desde' = '2026-10-23' and o ->> 'llega_hasta' = '2026-10-27', '2.3 · a las 15:30 ya no sale hoy: sale jueves, llega viernes a martes');
@@ -152,8 +154,8 @@ begin
   perform tests.act_as(v_pos);
   perform tests.throws(format('select public.crear_pedido_con_entrega(%L, null, null, %L, %L, true, %L, null, ''{"opcion":"foraneo_dhl"}'')', gen_random_uuid(), lin, jsonb_build_object('address', dir), cu), 'DATOS_FISCALES_REQUERIDOS', '3.18 · con factura sin receptor: la regla de la 147 sigue');
   -- el personal también puede pedir a nombre de un doctor con la regla del personal (elige él)
-  r := public.crear_pedido_con_entrega(gen_random_uuid(), null, v_doc, lin_chica, jsonb_build_object('address', dir), false, cuD, null, jsonb_build_object('opcion', 'local_chofer', 'horario', hor));   -- ENT-H: con horario
-  perform tests.ok(r -> 'entrega' ->> 'actor' = 'staff' and (r ->> 'envio')::numeric = 0, '3.19 · a nombre de un doctor: el personal decide (chofer a Mazatlán, bajo su responsabilidad)');
+  -- ENT-LOCAL (24 nov 2026) · ni el personal manda al chofer fuera de Culiacán (antes: "bajo su responsabilidad")
+  perform tests.throws(format('select public.crear_pedido_con_entrega(%L, null, %L, %L, %L, false, %L, null, %L)', gen_random_uuid(), v_doc, lin_chica, jsonb_build_object('address', dir), cuD, jsonb_build_object('opcion', 'local_chofer', 'horario', hor)), 'ENTREGA_NO_PERMITIDA', '3.19 · a nombre de un doctor: el personal tampoco manda chofer a Mazatlán');
 
   -- ══ 4 · el doctor por el flujo directo: la regla estricta ═════════════════════════════════════════
   perform tests.act_as(v_doc);
