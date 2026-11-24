@@ -358,3 +358,31 @@ export function mensajeSalida(msg: string): string {
 export function esperaSalida(e: Pick<EntregaPedido, 'salida'> & Partial<Pick<EntregaPedido, 'programada'>> | null | undefined, manana: string): boolean {
   return !!e?.programada && !!e.salida && e.salida > manana
 }
+
+// ═══ ENTREGA EN VENTAS (24 nov 2026, dueño: "en Ventas no vienen las especificaciones de cada venta: local, foráneo,
+// domicilio…"). Una etiqueta corta por pedido para la tabla/filtro/Excel y la promesa para el detalle. Sale de
+// shipping_meta.entrega (lo que fijó el servidor al vender); los pedidos viejos sin ella caen al `method` o a la caja.
+export type TipoEntregaVenta = TipoEntrega | 'sin_dato'
+export const TIPO_ENTREGA_TEXTO: Record<TipoEntregaVenta, string> = {
+  mostrador: 'Mostrador', recoge: 'Recoge en sucursal', local: 'Local (domicilio)', foraneo: 'Foráneo (paquetería)', sin_dato: 'Sin dato',
+}
+export interface EntregaVenta { tipo: TipoEntregaVenta; corto: string; promesa: string | null; extras: number }
+export function entregaDeVenta(o: { shipping_meta?: unknown; external_ref?: string | null }, hoy?: string | null): EntregaVenta {
+  const m = (o.shipping_meta && typeof o.shipping_meta === 'object' ? o.shipping_meta : {}) as { method?: string; channel?: string; entrega?: (EntregaPedido & { extras?: unknown[] }) | null }
+  const e = m.entrega ?? null
+  if (e?.tipo) {
+    const extras = Array.isArray(e.extras) ? e.extras.length : 0
+    const paq = e.paqueteria ? (NOMBRE_PAQUETERIA[e.paqueteria] ?? e.paqueteria.toUpperCase()) : null
+    const base = e.tipo === 'local' ? `Local · ${paq && e.paqueteria !== 'chofer' ? paq : 'chofer'}`
+      : e.tipo === 'foraneo' ? `Foráneo · ${paq ?? 'paquetería'}`
+      : TIPO_ENTREGA_TEXTO[e.tipo]
+    const corto = extras > 0 ? `${base} +${extras} ${extras === 1 ? 'envío' : 'envíos'}` : base
+    let promesa: string | null = null
+    try { promesa = e.salida || e.horario ? promesaDe(e, hoy) : null } catch { promesa = null }
+    return { tipo: e.tipo, corto, promesa, extras }
+  }
+  if (m.method === 'recoge') return { tipo: 'recoge', corto: TIPO_ENTREGA_TEXTO.recoge, promesa: null, extras: 0 }
+  if (m.method === 'chofer') return { tipo: 'local', corto: 'Local · chofer', promesa: null, extras: 0 }
+  if (m.channel === 'pos' || (o.external_ref ?? '').startsWith('POS-')) return { tipo: 'mostrador', corto: TIPO_ENTREGA_TEXTO.mostrador, promesa: null, extras: 0 }
+  return { tipo: 'sin_dato', corto: TIPO_ENTREGA_TEXTO.sin_dato, promesa: null, extras: 0 }
+}

@@ -28,9 +28,14 @@ import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
-import { enPeriodo } from '../../data/periodo'
+import { enPeriodo, hoyNegocio } from '../../data/periodo'
+import { entregaDeVenta, TIPO_ENTREGA_TEXTO, type TipoEntregaVenta } from '../../data/ops/entrega'   // ENTREGA EN VENTAS
+import { extrasDe } from '../../data/ops/enviosExtra'
+import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
 
 type ChannelFilter = 'todos' | CanalVenta
+type EntregaFilter = 'todos' | TipoEntregaVenta
+const ENTREGA_FILTROS: TipoEntregaVenta[] = ['local', 'foraneo', 'recoge', 'mostrador']
 type PayFilter = 'todos' | 'pagado' | 'parcial' | 'contra' | 'pendiente'
 
 // W2 · El estado de cobro sale del LIBRO. "Contra pedido" ya no es una forma de pago
@@ -75,6 +80,7 @@ export function VentasDetalle() {
   const [to, setTo] = useState('')
   const [channel, setChannel] = useState<ChannelFilter>('todos')
   const [pay, setPay] = useState<PayFilter>('todos')
+  const [entrega, setEntrega] = useState<EntregaFilter>('todos')
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
@@ -95,6 +101,7 @@ export function VentasDetalle() {
         if (!enPeriodo(o.created_at, { desde: from || null, hasta: to || null })) return false
         if (channel !== 'todos' && channelOf(o) !== channel) return false
         if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
+        if (entrega !== 'todos' && entregaDeVenta(o).tipo !== entrega) return false
         if (query) {
           const hay = `${o.external_ref ?? ''} ${clientName(o)}`.toLowerCase()
           if (!hay.includes(query)) return false
@@ -103,7 +110,7 @@ export function VentasDetalle() {
       })
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, from, to, channel, pay, q, doctorsById])
+  }, [orders, from, to, channel, pay, entrega, q, doctorsById])
 
   const sum = salesSummary(rows)
   const ch = ventasPorCanal(rows)
@@ -149,8 +156,12 @@ export function VentasDetalle() {
           <option value="contra">A crédito</option>
           <option value="pendiente">Pendiente</option>
         </select>
-        {(from || to || channel !== 'todos' || pay !== 'todos' || q) && (
-          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setQ('') }}>Limpiar</button>
+        <select style={sel} value={entrega} onChange={(e) => setEntrega(e.target.value as EntregaFilter)} aria-label="Entrega" data-testid="ventas-filtro-entrega">
+          <option value="todos">Toda entrega</option>
+          {ENTREGA_FILTROS.map((t) => <option key={t} value={t}>{TIPO_ENTREGA_TEXTO[t]}</option>)}
+        </select>
+        {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || q) && (
+          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setQ('') }}>Limpiar</button>
         )}
         <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'var(--filters-end, auto)' }} columns={[
           { key: 'external_ref', label: 'Folio' },
@@ -158,6 +169,8 @@ export function VentasDetalle() {
           { key: 'id', label: 'Cliente', format: (_v, o) => clientName(o) },
           { key: 'id', label: 'Productos', format: (_v, o) => productsSummary(o) },
           { key: 'id', label: 'Canal', format: (_v, o) => CANAL_TEXTO[channelOf(o)] },
+          { key: 'id', label: 'Entrega', format: (_v, o) => entregaDeVenta(o).corto },
+          { key: 'id', label: 'Destino', format: (_v, o) => { const a = orderAddress(o.shipping_meta); return a ? [a.city, (a as { state?: string }).state].filter(Boolean).join(', ') : '' } },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
           { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
           { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o) }).label },
@@ -194,7 +207,7 @@ export function VentasDetalle() {
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
+              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
             </thead>
             <tbody>
               {rows.map((o) => {
@@ -204,6 +217,7 @@ export function VentasDetalle() {
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Canal"><span className={'pill ' + (canal === 'portal' ? 'p-blue' : 'p-neu')}>{CANAL_TEXTO[canal]}</span></td>
+                    <td data-label="Entrega" data-testid="venta-entrega">{entregaDeVenta(o).corto}</td>
                     <td data-label="Cliente">{clientName(o)}</td>
                     <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
@@ -212,7 +226,7 @@ export function VentasDetalle() {
                   </tr>
                 )
               })}
-              {rows.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -236,6 +250,23 @@ function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; 
       <div className="v" style={{ fontSize: 18 }}>{v}</div>
       <div className="k">{k}</div>
       <div className="s">{s}</div>
+    </div>
+  )
+}
+
+/** ENTREGA EN VENTAS · cómo y a dónde se entrega: tipo, paquetería u horario, promesa, flete, domicilio y envíos extra. */
+function EntregaDeLaVenta({ order }: { order: OrderWithItems }) {
+  const ev = entregaDeVenta(order, hoyNegocio())
+  const e = (order.shipping_meta as { entrega?: { flete?: number } } | null)?.entrega ?? null
+  const dir = ev.tipo === 'local' || ev.tipo === 'foraneo' ? orderAddress(order.shipping_meta) : null
+  const extras = extrasDe(order)
+  return (
+    <div className="sysnote" style={{ marginBottom: 14, display: 'grid', gap: 4 }} data-testid="venta-detalle-entrega">
+      <div><b>Entrega:</b> {ev.corto}{ev.promesa ? ` · ${ev.promesa}` : ''}{e && typeof e.flete === 'number' ? ` · envío ${e.flete > 0 ? money(e.flete) : 'gratis'}` : ''}</div>
+      {dir && <div style={{ color: 'var(--ink-2)' }}>{formatAddress(dir)}</div>}
+      {extras.map((x) => (
+        <div key={x.paquete} style={{ color: 'var(--ink-2)' }}>Envío extra {x.paquete}: {formatAddress(x.address)}{x.flete > 0 ? ` · ${money(x.flete)}` : ''}</div>
+      ))}
     </div>
   )
 }
@@ -280,6 +311,8 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
             <span className={'pill ' + sv.pill}>{sv.label}</span>
             {order.invoice_requested && <span className="pill p-blue"><FileText size={12} /> CFDI solicitado</span>}
           </div>
+
+          <EntregaDeLaVenta order={order} />
 
           {dinero && (
             <div className="sysnote" style={{ marginBottom: 14 }}>
