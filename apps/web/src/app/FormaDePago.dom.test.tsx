@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // COBRO-U · la misma «Forma de pago» en todos los puntos de venta: reglas y pantalla.
 import React, { useState } from 'react'
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FormaDePago } from './FormaDePago'
 import { cobroParaServidor, faltaEnCobro, formaNoDisponible, resultadoCobro, mensajeCobro, sumarDiasISO, type CobroElegido } from '../data/ops/cobro'
 
@@ -69,6 +69,7 @@ describe('pantalla «Forma de pago»', () => {
   it('efectivo calcula el cambio; transferencia pide referencia; crédito trae fecha a 15 días', () => {
     render(<Prueba modo="pedido" tipoEntrega="local" />)
     fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo-ya'))   // COBRO-ENTREGA · con chofer pregunta si ya lo tiene
     fireEvent.change(screen.getByTestId('forma-pago-recibido'), { target: { value: '1200' } })
     expect(screen.getByText('Cambio')).toBeTruthy()
     fireEvent.click(screen.getByTestId('forma-pago-transferencia'))
@@ -85,5 +86,27 @@ describe('pantalla «Forma de pago»', () => {
     // los grupos no se confunden: tarjeta está en «Ya pagó», paga al recibir en «Paga después»
     expect(screen.getByTestId('forma-pago-grupo-ya').textContent).toMatch(/Ya pagó.*Tarjeta/)
     expect(screen.getByTestId('forma-pago-grupo-despues').textContent).toMatch(/Paga después.*Paga al recibir/)
+  })
+  it('COBRO-ENTREGA · pedido con chofer: «Efectivo» pregunta si ya lo tiene; «No» lo deja por cobrar al chofer con el monto', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<FormaDePago total={1600} modo="pedido" tipoEntrega="local" value={null} onChange={onChange} />)
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo-al-recibir'))
+    expect(onChange).toHaveBeenLastCalledWith({ forma: 'al_recibir', con: 'efectivo' })
+    rerender(<FormaDePago total={1600} modo="pedido" tipoEntrega="local" value={{ forma: 'al_recibir', con: 'efectivo' }} onChange={onChange} />)
+    expect(screen.getByTestId('forma-pago-al-recibir-monto')).toHaveTextContent('el chofer cobra $1,600')
+  })
+  it('COBRO-ENTREGA · «Sí, ya me lo dio» lo registra como pagado; en mostrador o paquetería no pregunta', () => {
+    const onChange = vi.fn()
+    render(<FormaDePago total={900} modo="pedido" tipoEntrega="local" value={null} onChange={onChange} />)
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo-ya'))
+    expect(onChange).toHaveBeenLastCalledWith({ forma: 'efectivo' })
+    cleanup()
+    const o2 = vi.fn()
+    render(<FormaDePago total={900} modo="pedido" tipoEntrega="foraneo" value={null} onChange={o2} />)
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
+    expect(o2).toHaveBeenLastCalledWith({ forma: 'efectivo' })
   })
 })

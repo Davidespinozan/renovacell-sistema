@@ -17,9 +17,15 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
   testId?: string
 }) {
   const hoy = hoyNegocio()
+  // COBRO-ENTREGA (24 nov 2026) · en un pedido con chofer o para recoger, «Efectivo» de «Ya pagó» se confundía con «paga en
+  // efectivo al recibir» y el pedido quedaba pagado sin que el chofer supiera que debía cobrar: se pregunta antes.
+  const [preguntaEfectivo, setPreguntaEfectivo] = React.useState(false)
+  const cobraAlRecibir = modo === 'pedido' && (tipoEntrega === 'local' || tipoEntrega === 'recoge')
   const elegir = (forma: FormaPago) => {
     if (formaNoDisponible(forma, modo, tipoEntrega)) return
     if (value?.forma === forma) return
+    if (forma === 'efectivo' && cobraAlRecibir) { setPreguntaEfectivo(true); return }
+    setPreguntaEfectivo(false)
     onChange(forma === 'credito' ? { forma, vence: sumarDiasISO(hoy, 15) } : { forma })
   }
   const cambio = value?.forma === 'efectivo' && value.recibido != null ? value.recibido - total : null
@@ -49,6 +55,15 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
         </div>
       ))}
 
+      {preguntaEfectivo && (
+        <div role="group" aria-label="¿Ya pagó en efectivo?" data-testid={`${testId}-pregunta-efectivo`} style={{ marginTop: 10, padding: '10px 12px', border: '1px solid var(--warn, #b45309)', borderRadius: 12, background: 'var(--warn-bg, #fff7ed)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>¿Ya tienes el efectivo en la mano?</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="btn sm" data-testid={`${testId}-efectivo-al-recibir`} onClick={() => { setPreguntaEfectivo(false); onChange({ forma: 'al_recibir', con: 'efectivo' }) }}>No, {tipoEntrega === 'recoge' ? 'paga al recoger' : 'lo cobra el chofer'}</button>
+            <button type="button" className="btn ghost sm" data-testid={`${testId}-efectivo-ya`} onClick={() => { setPreguntaEfectivo(false); onChange({ forma: 'efectivo' }) }}>Sí, ya me lo dio</button>
+          </div>
+        </div>
+      )}
       {value?.forma === 'efectivo' && (
         <div style={{ marginTop: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -97,7 +112,7 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
               <button key={x.id} type="button" className={value.con === x.id ? 'active' : undefined} aria-pressed={value.con === x.id} onClick={() => onChange({ ...value, con: x.id })} data-testid={`${testId}-con-${x.id}`}>{x.texto}</button>
             ))}
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-3)' }}>El pedido se prepara y el chofer lo cobra al entregarlo (o se cobra al recogerlo en sucursal).</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-3)' }} data-testid={`${testId}-al-recibir-monto`}>El pedido queda <b>por cobrar</b>: {tipoEntrega === 'recoge' ? 'se cobran' : 'el chofer cobra'} <b>{money(total)}</b> al {tipoEntrega === 'recoge' ? 'recogerlo en sucursal' : 'entregarlo'}.</div>
         </div>
       )}
       {value && falta && <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--warn)' }} data-testid={`${testId}-falta`}>{falta}</div>}
