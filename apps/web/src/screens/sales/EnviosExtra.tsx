@@ -6,9 +6,9 @@ import { Minus, Plus, X } from 'lucide-react'
 import { money } from '../../lib/format'
 import { DomicilioClientePicker } from '../../app/DomicilioClientePicker'
 import { DeliveryLocationPicker } from '../../app/DeliveryLocationPicker'
-import { COSTO_ENVIO_EXTRA, MAX_ENVIOS_EXTRA, restoPrincipal, type EnvioExtraBorrador } from '../../data/ops/enviosExtra'
+import { COSTO_ENVIO_EXTRA, MAX_ENVIOS_EXTRA, PAQUETERIAS_EXTRA, restoPrincipal, type EnvioExtraBorrador, type PaqueteriaExtra } from '../../data/ops/enviosExtra'
 
-export function EnviosExtra({ cart, nombreDe, vista, value, onChange, customer, doctorId }: {
+export function EnviosExtra({ cart, nombreDe, vista, value, onChange, customer, doctorId, paqueterias, paqueteriaPrincipal }: {
   cart: Record<string, number>
   nombreDe: (id: string) => string
   /** CAJAS-MEDIOS · cómo se muestra una cantidad (cajas o piezas) */
@@ -17,7 +17,13 @@ export function EnviosExtra({ cart, nombreDe, vista, value, onChange, customer, 
   onChange: (v: EnvioExtraBorrador[]) => void
   customer?: { id: string; phone?: string | null }
   doctorId?: string
+  /** PAQUETERÍA POR ENVÍO · las paqueterías foráneas activas (de las opciones de entrega); sin dato, todas. */
+  paqueterias?: PaqueteriaExtra[] | null
+  /** La del envío principal: se preselecciona en cada envío extra nuevo. */
+  paqueteriaPrincipal?: PaqueteriaExtra | null
 }) {
+  const disponibles = PAQUETERIAS_EXTRA.filter((p) => !paqueterias || paqueterias.length === 0 || paqueterias.includes(p.id))
+  const inicial = paqueteriaPrincipal && disponibles.some((p) => p.id === paqueteriaPrincipal) ? paqueteriaPrincipal : null
   const resto = restoPrincipal(cart, value)
   const productos = Object.entries(cart).filter(([, q]) => q > 0)
   const cambiar = (i: number, x: Partial<EnvioExtraBorrador>) => onChange(value.map((e, j) => (j === i ? { ...e, ...x } : e)))
@@ -40,6 +46,14 @@ export function EnviosExtra({ cart, nombreDe, vista, value, onChange, customer, 
           {customer
             ? <DomicilioClientePicker customerId={customer.id} telefonoRespaldo={customer.phone ?? null} onChange={(d) => cambiar(i, { address: d?.address ?? null })} />
             : <DeliveryLocationPicker doctorId={doctorId} legacyBase={null} allowManage={false} onChange={(c) => cambiar(i, { address: c?.address ?? null })} />}
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '10px 0 4px' }}>¿Con qué paquetería va?</div>
+          <div role="radiogroup" aria-label={`Paquetería del envío extra ${i + 1}`} style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }} data-testid={`envio-extra-${i + 1}-paqueteria`}>
+            {disponibles.map((p) => (
+              <button key={p.id} type="button" role="radio" aria-checked={x.paqueteria === p.id}
+                className={x.paqueteria === p.id ? 'btn sm' : 'btn ghost sm'} onClick={() => cambiar(i, { paqueteria: p.id })}
+                data-testid={`envio-extra-${i + 1}-paq-${p.id}`}>{p.nombre}</button>
+            ))}
+          </div>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '10px 0 4px' }}>¿Qué va en este envío?</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {productos.map(([id]) => {
@@ -57,7 +71,7 @@ export function EnviosExtra({ cart, nombreDe, vista, value, onChange, customer, 
         </div>
       ))}
       {value.length < MAX_ENVIOS_EXTRA && productos.length > 0 && (
-        <button type="button" className="btn ghost sm" style={{ marginTop: 10 }} onClick={() => onChange([...value, { address: null, lineas: {} }])} data-testid="envio-extra-agregar">
+        <button type="button" className="btn ghost sm" style={{ marginTop: 10 }} onClick={() => onChange([...value, { address: null, lineas: {}, paqueteria: inicial }])} data-testid="envio-extra-agregar">
           <Plus size={14} /> Agregar otro envío (foráneo, {money(COSTO_ENVIO_EXTRA)})
         </button>
       )}

@@ -37,6 +37,12 @@ describe('confirmar() dice la verdad sobre el servidor', () => {
     }
   })
 
+  it('REF-PAGO · referencia de pago repetida: dice qué corregir, no «Ya existe un registro»', () => {
+    const m = mensajeDeError({ message: 'duplicate key value violates unique constraint "uq_entry_external_ref"', code: '23505' }, 'comando')
+    expect(m).toMatch(/referencia de pago ya está registrada/)
+    expect(m).not.toMatch(/Ya existe un registro/)
+  })
+
   it('una restricción que sabemos leer manda sobre la traducción genérica', async () => {
     const r = await confirmar('guardar', falla('new row for relation "product_fiscal" violates check constraint "ck_pf_tasa"', '23514'))
     if (!r.ok) expect(r.error).toMatch(/La tasa no corresponde al tratamiento/)

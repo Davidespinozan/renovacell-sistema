@@ -5,6 +5,7 @@ import { envioVigente } from './seguimiento'
 import type { Shipment } from '../types'
 import type { OrderWithItems } from '../store/ordersStore'
 import migracion from '../../../../../supabase/migrations/20270407850000_envios_extra.sql?raw'
+import migPaq from '../../../../../supabase/migrations/20270407880000_envios_extra_paqueteria.sql?raw'
 import edge from '../../../../../supabase/functions/shipping/index.ts?raw'
 import cola from '../../screens/packing/Cola.tsx?raw'
 
@@ -17,19 +18,39 @@ const pedido = { id: 'o1', shipping_meta: { address: { line1: 'Reforma 1', cp: '
 
 describe('ENVÍOS EXTRA · reparto al vender', () => {
   it('el principal se queda con lo que no se repartió', () => {
-    const ex: EnvioExtraBorrador[] = [{ address: MTY, lineas: { A: 1 } }, { address: MTY, lineas: { A: 1, B: 2 } }]
+    const ex: EnvioExtraBorrador[] = [{ address: MTY, lineas: { A: 1 }, paqueteria: 'dhl' }, { address: MTY, lineas: { A: 1, B: 2 }, paqueteria: 'estafeta' }]
     expect(restoPrincipal(cart, ex)).toEqual({ A: 1, B: 0 })
     expect(faltaEnExtras(cart, ex, () => false)).toBeNull()
   })
   it('pide domicilio con C.P., productos, no más piezas de las que hay, algo en el principal y nada local', () => {
     expect(faltaEnExtras(cart, [{ address: null, lineas: { A: 1 } }], () => false)).toMatch(/domicilio/)
-    expect(faltaEnExtras(cart, [{ address: MTY, lineas: {} }], () => false)).toMatch(/qué productos/)
-    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 4 } }], () => false)).toMatch(/más piezas/)
-    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 3, B: 2 } }], () => false)).toMatch(/principal/)
+    expect(faltaEnExtras(cart, [{ address: MTY, lineas: {}, paqueteria: 'dhl' }], () => false)).toMatch(/qué productos/)
+    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 4 }, paqueteria: 'dhl' }], () => false)).toMatch(/más piezas/)
+    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 3, B: 2 }, paqueteria: 'dhl' }], () => false)).toMatch(/principal/)
     expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 1 } }], () => true)).toMatch(/Culiacán/)
   })
   it('al servidor viaja domicilio y líneas con cantidad', () => {
     expect(extrasParaServidor([{ address: MTY, lineas: { A: 1, B: 0 } }])).toEqual([{ address: MTY, lineas: [{ product_id: 'A', qty: 1 }] }])
+  })
+})
+
+describe('ENVÍOS EXTRA · paquetería por envío', () => {
+  it('cada envío extra pide su paquetería y viaja al servidor con ella', () => {
+    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 1 } }], () => false)).toMatch(/paquetería/)
+    expect(faltaEnExtras(cart, [{ address: MTY, lineas: { A: 1 }, paqueteria: 'etn' }], () => false)).toBeNull()
+    expect(extrasParaServidor([{ address: MTY, lineas: { A: 1 }, paqueteria: 'estafeta' }, { address: MTY, lineas: { B: 1 }, paqueteria: 'dhl' }]).map((x) => x.paqueteria))
+      .toEqual(['estafeta', 'dhl'])
+  })
+  it('Almacén genera la guía del extra con SU paquetería preseleccionada; sin ella, la del principal', () => {
+    const conPaq = { ...pedido, shipping_meta: { ...(pedido.shipping_meta as object), entrega: { tipo: 'foraneo', paqueteria: 'dhl', extras: [] } } } as unknown as OrderWithItems
+    const x = { ...extrasDe(pedido)[0], paqueteria: 'estafeta' as const }
+    expect((pedidoDePaquete(conPaq, x).shipping_meta as { entrega: { paqueteria: string } }).entrega.paqueteria).toBe('estafeta')
+    expect((pedidoDePaquete(conPaq, { ...x, paqueteria: null }).shipping_meta as { entrega: { paqueteria: string } }).entrega.paqueteria).toBe('dhl')
+  })
+  it('base: valida que la paquetería exista y esté activa, y la guarda en el extra', () => {
+    expect(migPaq).toMatch(/v_paq not in \(''dhl'', ''estafeta'', ''etn'', ''tus'', ''tns''\)/)
+    expect(migPaq).toMatch(/v_paq = ''estafeta'' and not cfg\.estafeta_activo/)
+    expect(migPaq).toMatch(/''flete'', v_costo, ''paqueteria'', v_paq\);/)
   })
 })
 

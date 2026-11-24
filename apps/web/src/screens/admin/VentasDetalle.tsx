@@ -32,7 +32,7 @@ import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 import { enPeriodo, hoyNegocio } from '../../data/periodo'
 import { entregaDeVenta, TIPO_ENTREGA_TEXTO, type TipoEntregaVenta } from '../../data/ops/entrega'   // ENTREGA EN VENTAS
-import { extrasDe } from '../../data/ops/enviosExtra'
+import { extrasDe, nombrePaqueteriaExtra } from '../../data/ops/enviosExtra'
 import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
 
 type ChannelFilter = 'todos' | CanalVenta
@@ -280,7 +280,7 @@ function EntregaDeLaVenta({ order }: { order: OrderWithItems }) {
       <div><b>Entrega:</b> {ev.corto}{ev.promesa ? ` · ${ev.promesa}` : ''}{e && typeof e.flete === 'number' ? ` · envío ${e.flete > 0 ? money(e.flete) : 'gratis'}` : ''}</div>
       {dir && <div style={{ color: 'var(--ink-2)' }}>{formatAddress(dir)}</div>}
       {extras.map((x) => (
-        <div key={x.paquete} style={{ color: 'var(--ink-2)' }}>Envío extra {x.paquete}: {formatAddress(x.address)}{x.flete > 0 ? ` · ${money(x.flete)}` : ''}</div>
+        <div key={x.paquete} style={{ color: 'var(--ink-2)' }}>Envío extra {x.paquete}{nombrePaqueteriaExtra(x.paqueteria) ? ` (${nombrePaqueteriaExtra(x.paqueteria)})` : ''}: {formatAddress(x.address)}{x.flete > 0 ? ` · ${money(x.flete)}` : ''}</div>
       ))}
     </div>
   )

@@ -36,7 +36,7 @@ import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared
 import { PAQ_MANUALES, esPaqManual, registrarGuiaManual, urlRastreoEstafeta, validarCostoGuia, validarGuiaManual, type PaqManual } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 import { cantidadVista } from '../../lib/cajas'
-import { envioDePaquete, extrasDe, extrasSinGuia, lugarDe, pedidoDePaquete, type EnvioExtra } from '../../data/ops/enviosExtra'   // ENVÍOS EXTRA
+import { envioDePaquete, extrasDe, extrasSinGuia, lugarDe, nombrePaqueteriaExtra, pedidoDePaquete, type EnvioExtra } from '../../data/ops/enviosExtra'   // ENVÍOS EXTRA
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -148,7 +148,7 @@ export function Cola() {
                 {extrasDe(o).map((x) => { const env = envioDePaquete(shipments, o.id, x.paquete); return (
                   <div key={x.paquete} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }} data-testid={`cola-extra-${x.paquete}`}>
                     <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
-                      <b>Extra {x.paquete} · {lugarDe(x.address)}</b>{x.contacto ? ` · recibe ${x.contacto}` : ''}
+                      <b>Extra {x.paquete} · {lugarDe(x.address)}{nombrePaqueteriaExtra(x.paqueteria) ? ` · ${nombrePaqueteriaExtra(x.paqueteria)}` : ''}</b>{x.contacto ? ` · recibe ${x.contacto}` : ''}
                       <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>{x.lineas.map((l) => `${byId[l.product_id]?.name ?? l.nombre ?? 'Producto'} ×${cantidadVista(byId[l.product_id], l.qty)}`).join(' · ')}</span>
                     </span>
                     {env ? <span className="pill p-green"><span className="d" /> Guía {env.carrier ?? ''} <span className="mono">{env.tracking_number}</span></span>

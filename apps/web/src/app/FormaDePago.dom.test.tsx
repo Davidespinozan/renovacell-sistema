@@ -24,7 +24,14 @@ describe('reglas de la forma de pago', () => {
     expect(faltaEnCobro({ forma: 'efectivo', recibido: 50 }, 100, 'mostrador', null, hoy)).toMatch(/no alcanza/)
     expect(faltaEnCobro({ forma: 'efectivo' }, 100, 'mostrador', null, hoy)).toBeNull()
     expect(faltaEnCobro({ forma: 'transferencia' }, 100, 'pedido', null, hoy)).toMatch(/referencia/)
-    expect(faltaEnCobro({ forma: 'transferencia', referencia: 'SPEI 1' }, 100, 'pedido', null, hoy)).toBeNull()
+    expect(faltaEnCobro({ forma: 'transferencia', referencia: 'SPEI 1' }, 100, 'pedido', null, hoy)).toMatch(/comprobante/)
+    // REF-PAGO · lo que se escribía en producción en vez del comprobante: se rechaza antes de mandar
+    for (const r of ['9474', 'cuenta 9474', 'Transferencia a 7447', 'SCOTIABANK RENATO', 'cta 123456789']) {
+      expect(faltaEnCobro({ forma: 'transferencia', referencia: r }, 100, 'pedido', null, hoy)).toMatch(/comprobante/)
+    }
+    for (const r of ['036napp24112026313258636', 'MBAN01002611230071250489', '971658906', 'HSB5914880', 'SPEI 123456']) {
+      expect(faltaEnCobro({ forma: 'transferencia', referencia: r }, 100, 'pedido', null, hoy)).toBeNull()
+    }
     expect(faltaEnCobro({ forma: 'credito' }, 100, 'pedido', null, hoy)).toMatch(/fecha límite/)
     expect(faltaEnCobro({ forma: 'credito', vence: '2026-11-01' }, 100, 'pedido', null, hoy)).toMatch(/anterior a hoy/)
     expect(faltaEnCobro({ forma: 'credito', vence: sumarDiasISO(hoy, 181) }, 100, 'pedido', null, hoy)).toMatch(/180 días/)
@@ -74,7 +81,7 @@ describe('pantalla «Forma de pago»', () => {
     expect(screen.getByText('Cambio')).toBeTruthy()
     fireEvent.click(screen.getByTestId('forma-pago-transferencia'))
     expect(screen.getByTestId('forma-pago-falta').textContent).toMatch(/referencia/)
-    fireEvent.change(screen.getByTestId('forma-pago-referencia'), { target: { value: 'SPEI 123' } })
+    fireEvent.change(screen.getByTestId('forma-pago-referencia'), { target: { value: 'SPEI 123456' } })
     expect(screen.queryByTestId('forma-pago-falta')).toBeNull()
     fireEvent.click(screen.getByTestId('forma-pago-credito'))
     expect(valor().forma).toBe('credito')

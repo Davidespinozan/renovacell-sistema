@@ -82,8 +82,13 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
         <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 12.5, color: 'var(--ink-3)', minWidth: 72 }}>{value.forma === 'transferencia' ? 'Referencia' : 'Voucher'}</span>
           <input type="text" maxLength={200} value={value.referencia ?? ''} style={input} data-testid={`${testId}-referencia`}
-            placeholder={value.forma === 'transferencia' ? 'clave de rastreo o referencia (obligatoria)' : 'número de autorización (opcional)'}
+            placeholder={value.forma === 'transferencia' ? 'clave de rastreo del comprobante (obligatoria)' : 'número de autorización (opcional)'}
             onChange={(e) => onChange({ ...value, referencia: e.target.value })} />
+        </div>
+      )}
+      {value?.forma === 'transferencia' && (
+        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }} data-testid={`${testId}-referencia-ayuda`}>
+          La que viene en el comprobante, distinta en cada pago. No la cuenta que recibió (9474), el banco ni el nombre.
         </div>
       )}
       {value?.forma === 'credito' && (

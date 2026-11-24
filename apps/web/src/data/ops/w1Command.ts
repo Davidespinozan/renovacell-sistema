@@ -260,6 +260,9 @@ const MENSAJES: Record<string, string> = {
   ck_fpe_motivo: 'Una fila que no se pudo ligar a ningún producto debe explicar por qué.',
   ck_fpe_sin_referencia: 'Una fila sin referencia en el listado público no puede traer precio publicado.',
   ck_pf_procedencia: 'La procedencia de la evidencia debe ser coincidencia directa o a nivel de familia.',
+  // REF-PAGO (24 nov 2026) · antes salía «Ya existe un registro con esos datos» y nadie sabía qué corregir.
+  uq_entry_external_ref: 'Esa referencia de pago ya está registrada en otro cobro, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago (no el número de cuenta ni el banco).',
+  ENVIO_EXTRA_PAQUETERIA: 'La paquetería de un envío extra no está disponible. Elige otra.',
 }
 
 // El ÚNICO código cuyo detalle hay que anexar: TIPO_INVALIDO lo usan tres operaciones

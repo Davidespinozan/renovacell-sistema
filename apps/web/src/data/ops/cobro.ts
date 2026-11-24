@@ -38,6 +38,18 @@ export const CON_AL_RECIBIR: Array<{ id: 'efectivo' | 'tarjeta' | 'transferencia
 
 export const MAX_DIAS_CREDITO = 180
 
+// REF-PAGO (24 nov 2026) · se escribía la cuenta que recibió el dinero ("9474", "cuenta 9474", "Transferencia a 7447",
+// "SCOTIABANK RENATO") en vez de la referencia del comprobante. El libro no acepta la misma referencia dos veces, así que
+// el segundo cobro del día a esa cuenta tumbaba el pedido completo. La clave de rastreo / referencia del comprobante
+// siempre trae al menos 6 números; la terminación de una cuenta, no.
+export const MIN_DIGITOS_REFERENCIA = 6
+export const REFERENCIA_NO_COMPROBANTE = 'Escribe la clave de rastreo o la referencia que viene en el comprobante de la transferencia (al menos 6 números). No pongas la cuenta que recibió (por ejemplo 9474), el banco ni el nombre del cliente.'
+export function referenciaPareceComprobante(ref: string | null | undefined): boolean {
+  const r = (ref ?? '').trim()
+  if (/^(cuenta|cta\.?|transferencia|transf\.?)\b/i.test(r)) return false
+  return (r.match(/\d/g)?.length ?? 0) >= MIN_DIGITOS_REFERENCIA
+}
+
 /** ¿Esta forma se puede usar aquí? Devuelve el porqué si no. */
 export function formaNoDisponible(forma: FormaPago, modo: ModoCobro, tipoEntrega?: string | null): string | null {
   if (modo === 'mostrador' && (forma === 'link' || forma === 'al_recibir')) return 'En mostrador el producto sale con pago o crédito; para cobrar después usa «Enviar o recoger».'
@@ -52,6 +64,7 @@ export function faltaEnCobro(c: CobroElegido | null, total: number, modo: ModoCo
   if (no) return no
   if (c.forma === 'efectivo' && c.recibido != null && c.recibido < total) return 'El efectivo recibido no alcanza.'
   if (c.forma === 'transferencia' && (c.referencia ?? '').trim().length < 3) return 'Escribe la referencia o clave de rastreo de la transferencia.'
+  if (c.forma === 'transferencia' && !referenciaPareceComprobante(c.referencia)) return REFERENCIA_NO_COMPROBANTE
   if (c.forma === 'al_recibir' && !c.con) return '¿Cómo va a pagar al recibir? Efectivo, terminal o transferencia.'
   if (c.forma === 'credito') {
     if (!c.vence) return 'Elige la fecha límite de pago del crédito.'

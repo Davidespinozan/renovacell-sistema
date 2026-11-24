@@ -29,7 +29,7 @@ import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
 import { EnviosExtra } from './EnviosExtra'   // ENVÍOS EXTRA
-import { COSTO_ENVIO_EXTRA, extrasParaServidor, faltaEnExtras, type EnvioExtraBorrador } from '../../data/ops/enviosExtra'
+import { COSTO_ENVIO_EXTRA, esPaqueteriaExtra, extrasParaServidor, faltaEnExtras, type EnvioExtraBorrador, type PaqueteriaExtra } from '../../data/ops/enviosExtra'
 import type { MotivoFallo } from '../../data/store/ordersStore'
 
 // SEC-C4-FISCAL-3-FE · UNA operación de alta = un identificador estable (id + folio) que se reutiliza en cada reintento
@@ -328,6 +328,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                   <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
                   {tipoEntrega === 'foraneo' && (
                     <EnviosExtra cart={cart} value={extras} onChange={setExtras}
+                      paqueterias={(opsEntrega?.opciones ?? []).filter((o) => o.tipo === 'foraneo' && o.disponible && esPaqueteriaExtra(o.paqueteria)).map((o) => o.paqueteria as PaqueteriaExtra)}
+                      paqueteriaPrincipal={esPaqueteriaExtra(opcionDe(opsEntrega, entrega?.opcion)?.paqueteria) ? opcionDe(opsEntrega, entrega?.opcion)!.paqueteria as PaqueteriaExtra : null}
                       nombreDe={(id) => sellable.find((x) => x.id === id)?.name ?? 'Producto'}
                       vista={(id, q) => { const p = sellable.find((x) => x.id === id); return p ? numeroVista(p, q) : q }}
                       {...(isCustomer ? { customer: { id: customer!.id, phone: customer!.phone ?? null } } : { doctorId: doctor!.id })} />
