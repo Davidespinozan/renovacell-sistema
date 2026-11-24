@@ -129,7 +129,7 @@ describe('Edge shipping · guardas D1 en el fuente', () => {
     expect(codigo).toMatch(/const attemptId = crypto\.randomUUID\(\)/)
     expect(codigo).toMatch(/const msgRef = attemptId/)
     expect(codigo).toMatch(/const referencia = referenciaIntento\(attemptId\)/)
-    expect(codigo).toMatch(/\.insert\(\{ id: attemptId, order_id: orderId, provider: 'dhl'[^\n]*request: \{ shipper, receiver, pkg, productCode, orderRef \}/)
+    expect(codigo).toMatch(/\.insert\(\{ id: attemptId, order_id: orderId, paquete, provider: 'dhl'[^\n]*request: \{ shipper, receiver, pkg, productCode, orderRef \}/)
     expect(codigo).toMatch(/'Message-Reference': msgRef, 'Message-Reference-Date'/)
     expect(codigo).toMatch(/buildShipmentRequest\(shipper, receiver, pkg, account, productCode, orderRef, referencia\)/)
   })

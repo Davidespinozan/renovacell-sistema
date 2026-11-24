@@ -126,6 +126,9 @@ Deno.serve(conCors(async (req) => {
   let p: any
   try { p = await req.json() } catch { return json(400, { error: 'JSON inválido.' }) }
   const action = p.action
+  // ENVÍOS EXTRA (24 nov 2026) · un pedido puede llevar varios paquetes foráneos: 0 = el principal (lo de siempre), 1..n =
+  // los envíos extra. Guía, etiqueta, recolección, rastreo e intentos son POR PAQUETE; sin `paquete` todo es el principal.
+  const paquete = Math.max(0, Math.min(10, Math.floor(Number(p.paquete) || 0)))
   // AUXILIAR DE ALMACÉN (rol packing): empaca y despacha, pero las guías (crear, recolección, reconciliar) son de
   // Almacén/Dirección ("la guía la imprime Alberto"). Cotizar, rastrear y ver una etiqueta existente siguen igual.
   if (['create_shipment', 'label', 'schedule_pickup', 'cancel_pickup', 'reconciliar_guia'].includes(action) && !tieneRol(q.quien, ['admin', 'warehouse'])) {
@@ -140,7 +143,7 @@ Deno.serve(conCors(async (req) => {
     const orderId = s(p.order_id)
     if (!orderId) return json(400, { error: 'Falta order_id.' })
     const { data: sh, error: shErr } = await caller.from('shipments')
-      .select('id, tracking_number, provider, carrier, status').eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+      .select('id, tracking_number, provider, carrier, status').eq('order_id', orderId).eq('paquete', paquete).not('tracking_number', 'is', null).limit(1).maybeSingle()
     if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
     if (!sh) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería a tu alcance.' })
     const proveedor = s(sh.provider) || 'dhl'
@@ -204,7 +207,7 @@ Deno.serve(conCors(async (req) => {
     if (!orderId) return json(400, { error: 'Falta order_id.' })
     const { data: sh, error: shErr } = await admin.from('shipments')
       .select('tracking_number, label_path, carrier, service_code, estimated_delivery_at, provider_cost, currency')
-      .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+      .eq('order_id', orderId).eq('paquete', paquete).not('tracking_number', 'is', null).limit(1).maybeSingle()
     if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
     if (!sh?.tracking_number) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería.' })
     if (!sh.label_path) return json(404, { error: 'sin_etiqueta', message: 'Esa guía no tiene una etiqueta guardada.' })
@@ -221,7 +224,7 @@ Deno.serve(conCors(async (req) => {
     if (!orderId) return json(400, { error: 'Falta order_id.' })
     const { data: sh, error: shErr } = await admin.from('shipments')
       .select('id, tracking_number, provider, status, service_code, package, ship_from, pickup_confirmation, provider_meta')
-      .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+      .eq('order_id', orderId).eq('paquete', paquete).not('tracking_number', 'is', null).limit(1).maybeSingle()
     if (shErr) return json(500, { error: 'No se pudo leer el envío.' })
     if (!sh?.tracking_number) return json(404, { error: 'sin_guia', message: 'Ese pedido no tiene una guía de paquetería.' })
     if (sh.status === 'delivered' || sh.status === 'cancelado') return json(409, { error: 'envio_cerrado', message: 'Ese envío ya está cerrado.' })
@@ -386,7 +389,7 @@ Deno.serve(conCors(async (req) => {
       const orderRef = s(p.orderRef) || orderId
       const serviceCode = s(p.rate?.serviceCode) || s(p.serviceCode)
       const montoVisto = Number(p.rate?.amount)
-      const idemKey = s(p.idempotencyKey) || `${orderId}:${serviceCode}`
+      const idemKey = s(p.idempotencyKey) || (paquete ? `${orderId}:p${paquete}:${serviceCode}` : `${orderId}:${serviceCode}`)
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!serviceCode) return json(400, { error: 'Falta el servicio (elige una tarifa).' })
       if (!Number.isFinite(montoVisto) || montoVisto <= 0) return json(400, { error: 'Falta la tarifa confirmada (vuelve a cotizar).' })
@@ -397,11 +400,11 @@ Deno.serve(conCors(async (req) => {
       // 0) Guía existente → idempotente (0 llamadas a T1).
       const { data: existing } = await admin.from('shipments')
         .select('tracking_number, label_path, carrier, service_code, estimated_delivery_at, provider_cost, currency, provider, provider_meta')
-        .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+        .eq('order_id', orderId).eq('paquete', paquete).not('tracking_number', 'is', null).limit(1).maybeSingle()
       if (existing?.tracking_number) return json(200, { idempotent: true, label: await labelPayload(admin, existing) })
       // 1) Intento activo/desconocido previo → NO recomprar.
       const { data: active } = await admin.from('shipping_attempts')
-        .select('status').eq('order_id', orderId).in('status', ['pending', 'succeeded', 'unknown_requires_reconciliation']).limit(1).maybeSingle()
+        .select('status').eq('order_id', orderId).eq('paquete', paquete).in('status', ['pending', 'succeeded', 'unknown_requires_reconciliation']).limit(1).maybeSingle()
       if (active?.status === 'unknown_requires_reconciliation') return json(409, { error: 'unknown_requires_reconciliation', message: 'Un intento anterior quedó en estado desconocido; requiere reconciliación antes de reintentar.' })
       if (active?.status === 'pending') return json(409, { error: 'in_progress', message: 'Ya hay una guía en proceso para este pedido.' })
       const { data: cancelacion } = await admin.from('order_cancel_requests').select('id').eq('order_id', orderId).eq('status', 'pendiente').limit(1).maybeSingle()
@@ -410,7 +413,7 @@ Deno.serve(conCors(async (req) => {
       const fingerprint = await sha256Hex(JSON.stringify({ shipper, receiver, pkg, serviceCode, provider: 't1', ambiente }))
       const msgRef = `${orderId}-${idemKey}`.slice(0, 36)
       const { data: claim, error: claimErr } = await admin.from('shipping_attempts')
-        .insert({ order_id: orderId, provider: 't1', idempotency_key: idemKey, service_code: serviceCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending' })
+        .insert({ order_id: orderId, paquete, provider: 't1', idempotency_key: idemKey, service_code: serviceCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending' })
         .select('id').single()
       if (claimErr || !claim) return json(409, { error: 'in_progress', message: 'Otra solicitud está creando la guía de este pedido.' })
       const attemptId = claim.id as string
@@ -467,7 +470,7 @@ Deno.serve(conCors(async (req) => {
       const carrier = g.carrier || serverRate.carrier
       // 7) FINALIZE ATÓMICO. provider_meta.ambiente distingue una guía sandbox de una productiva (sin migración).
       const shipmentRow = {
-        order_id: orderId, carrier, tracking_number: g.tracking, status: 'in_transit',
+        order_id: orderId, paquete, carrier, tracking_number: g.tracking, status: 'in_transit',
         estimated_delivery_at: estimatedDeliveryAt, provider: 't1', service_code: serviceCode,
         label_path: labelPath, label_url: labelPath ? null : g.labelUrl, package: pkg, ship_from: shipper, ship_to: receiver,
         // Metadatos pequeños: NUNCA el PDF base64 (va al bucket). guide_link no es permanente: la etiqueta se sirve desde el bucket.
@@ -601,7 +604,7 @@ Deno.serve(conCors(async (req) => {
       const orderId = s(p.order_id)
       const orderRef = s(p.orderRef) || orderId
       const productCode = s(p.rate?.serviceCode) || s(p.serviceCode) // el cliente SOLO elige servicio
-      const idemKey = s(p.idempotencyKey) || `${orderId}:${productCode}`
+      const idemKey = s(p.idempotencyKey) || (paquete ? `${orderId}:p${paquete}:${productCode}` : `${orderId}:${productCode}`)
       if (!orderId) return json(400, { error: 'Falta order_id.' })
       if (!productCode) return json(400, { error: 'Falta el código de servicio (elige una tarifa).' })
       if (!servicioDhlPermitido(productCode)) return json(422, errorServicioExcluido(productCode))   // PAQ-SIMPLE · Almacén elige el servicio (sin motivo), nunca ECONOMY SELECT
@@ -609,12 +612,12 @@ Deno.serve(conCors(async (req) => {
       // 0) Guía existente → idempotente (0 llamadas a DHL).
       const { data: existing } = await admin.from('shipments')
         .select('tracking_number, label_path, carrier, service_code, estimated_delivery_at, provider_cost, currency')
-        .eq('order_id', orderId).not('tracking_number', 'is', null).limit(1).maybeSingle()
+        .eq('order_id', orderId).eq('paquete', paquete).not('tracking_number', 'is', null).limit(1).maybeSingle()
       if (existing?.tracking_number) return json(200, { idempotent: true, label: await labelPayload(admin, existing) })
 
       // 1) Intento activo/desconocido previo → NO recomprar.
       const { data: active } = await admin.from('shipping_attempts')
-        .select('status').eq('order_id', orderId).in('status', ['pending', 'succeeded', 'unknown_requires_reconciliation']).limit(1).maybeSingle()
+        .select('status').eq('order_id', orderId).eq('paquete', paquete).in('status', ['pending', 'succeeded', 'unknown_requires_reconciliation']).limit(1).maybeSingle()
       if (active?.status === 'unknown_requires_reconciliation')
         return json(409, { error: 'unknown_requires_reconciliation', message: 'Un intento anterior quedó en estado desconocido; requiere reconciliación antes de reintentar.' })
       if (active?.status === 'pending')
@@ -629,7 +632,7 @@ Deno.serve(conCors(async (req) => {
       //     (fail-closed). Un 404 sin resultados es lo único que deja seguir.
       const { data: cerrados } = await admin.from('shipping_attempts')
         .select('id, external_reference, created_at')
-        .eq('order_id', orderId).eq('status', 'failed_safe_to_retry').eq('reconciliacion->>resolucion', 'sin_guia')
+        .eq('order_id', orderId).eq('paquete', paquete).eq('status', 'failed_safe_to_retry').eq('reconciliacion->>resolucion', 'sin_guia')
         .order('reconciled_at', { ascending: false }).limit(3)
       for (const c of (cerrados ?? []) as Array<{ id: string; external_reference: string | null; created_at: string }>) {
         const previa = await consultarDHL({ base, authz, account, referencia: referenciaIntento(s(c.external_reference) || c.id), creadoEnMs: Date.parse(c.created_at), fetchImpl: fetch })
@@ -652,7 +655,7 @@ Deno.serve(conCors(async (req) => {
       const msgRef = attemptId
       const referencia = referenciaIntento(attemptId)
       const { data: claim, error: claimErr } = await admin.from('shipping_attempts')
-        .insert({ id: attemptId, order_id: orderId, provider: 'dhl', idempotency_key: idemKey, service_code: productCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending', request: { shipper, receiver, pkg, productCode, orderRef } })
+        .insert({ id: attemptId, order_id: orderId, paquete, provider: 'dhl', idempotency_key: idemKey, service_code: productCode, request_fingerprint: fingerprint, external_reference: msgRef, status: 'pending', request: { shipper, receiver, pkg, productCode, orderRef } })
         .select('id').single()
       if (claimErr || !claim) return json(409, { error: 'in_progress', message: 'Otra solicitud está creando la guía de este pedido.' })
 
@@ -713,7 +716,7 @@ Deno.serve(conCors(async (req) => {
       // 7) FINALIZE ATÓMICO: shipment + cierre del intento en una transacción. Falla = la guía EXISTE
       //    (tracking ya guardado) → reconciliación, nunca recompra.
       const shipmentRow = {
-        order_id: orderId, carrier: 'DHL', tracking_number: tracking, status: 'in_transit',
+        order_id: orderId, paquete, carrier: 'DHL', tracking_number: tracking, status: 'in_transit',
         estimated_delivery_at: estimatedDeliveryAt, provider: 'dhl', service_code: productCode,
         label_path: labelPath, package: pkg, ship_from: shipper, ship_to: receiver,
         provider_meta: { trackingNumber: tracking, labelFormat, ambiente: dhlAmbiente(Deno.env.get('DHL_API_ENV')) }, provider_cost: serverRate.amount,

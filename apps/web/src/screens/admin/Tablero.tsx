@@ -76,7 +76,7 @@ export function Tablero() {
   const atorados = useMemo(() => {
     return orders
       .filter((o) => ['packed', 'shipped'].includes(o.status ?? ''))
-      .map((o) => ({ order: o, dx: diagnoseShipment(o, shipments.find((s) => s.order_id === o.id)) }))
+      .map((o) => ({ order: o, dx: diagnoseShipment(o, shipments.find((s) => s.order_id === o.id && (s.paquete ?? 0) === 0)) }))
       .filter((r) => r.dx.stuck)
   }, [orders, shipments])
 

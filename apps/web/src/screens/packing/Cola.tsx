@@ -35,6 +35,7 @@ import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared
 import { registrarGuiaEstafeta, urlRastreoEstafeta, validarCostoGuia, validarGuiaEstafeta } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 import { cantidadVista } from '../../lib/cajas'
+import { envioDePaquete, extrasDe, extrasSinGuia, lugarDe, pedidoDePaquete, type EnvioExtra } from '../../data/ops/enviosExtra'   // ENVÍOS EXTRA
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
 // (shipping_meta.address + customer). NUNCA de mock ni con CP placeholder; si
@@ -114,7 +115,9 @@ export function Cola() {
     return m
   }, [products])
 
-  const queue = ordenarPorSalida(orders.filter((o) => o.status === 'packed'))   // ENT-3 · primero lo que debe salir antes
+  // ENVÍOS EXTRA · también se queda el pedido cuyo principal ya salió pero tiene envíos extra sin guía
+  const queue = ordenarPorSalida(orders.filter((o) => o.status === 'packed' || (o.status === 'shipped' && extrasSinGuia(o, shipments).length > 0)))   // ENT-3 · primero lo que debe salir antes
+  const [extraActivo, setExtraActivo] = useState<{ order: OrderWithItems; extra: EnvioExtra } | null>(null)
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -128,7 +131,7 @@ export function Cola() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
               <b style={{ fontSize: 14 }}>{clienteDePedido(o).name}</b>
-              <span className="pill p-blue"><span className="d" /> Empacado</span>
+              {o.status === 'shipped' ? <span className="pill p-green"><span className="d" /> Principal enviado</span> : <span className="pill p-blue"><span className="d" /> Empacado</span>}
               <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
             </div>
             <EntregaPill e={entregaDe(o)} />
@@ -138,14 +141,29 @@ export function Cola() {
                 <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}
+            {extrasDe(o).length > 0 && (
+              <div data-testid="cola-extras" style={{ marginTop: 10, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700 }}>{extrasDe(o).length === 1 ? '1 envío extra' : `${extrasDe(o).length} envíos extra`} · una guía por cada uno{o.status !== 'shipped' ? ' (el principal lleva lo demás)' : ''}</div>
+                {extrasDe(o).map((x) => { const env = envioDePaquete(shipments, o.id, x.paquete); return (
+                  <div key={x.paquete} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }} data-testid={`cola-extra-${x.paquete}`}>
+                    <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
+                      <b>Extra {x.paquete} · {lugarDe(x.address)}</b>{x.contacto ? ` · recibe ${x.contacto}` : ''}
+                      <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)' }}>{x.lineas.map((l) => `${byId[l.product_id]?.name ?? l.nombre ?? 'Producto'} ×${cantidadVista(byId[l.product_id], l.qty)}`).join(' · ')}</span>
+                    </span>
+                    {env ? <span className="pill p-green"><span className="d" /> Guía {env.carrier ?? ''} <span className="mono">{env.tracking_number}</span></span>
+                      : <button className="btn sm" type="button" disabled={!!sol} onClick={() => setExtraActivo({ order: o, extra: x })} data-testid={`cola-extra-guia-${x.paquete}`}><Icon name="truck" /> Generar guía</button>}
+                  </div>
+                ) })}
+              </div>
+            )}
             {sol && <AvisoCancelacion solicitud={sol} esDireccion={esDireccion} />}
-            {(() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
+            {o.status === 'packed' && (() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
               <div className="sysnote" style={{ marginTop: 10 }} data-testid="cola-asignado">
                 <Icon name="truck" /><span>Asignado a <b>{driverName(env.driver_id)}</b> · por despachar. Cuando le entregues la carga, despáchala.</span>
               </div>
             ) : null })()}
             {errDespacho[o.id] && <div style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{errDespacho[o.id]}</div>}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+            {o.status === 'packed' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
               {(() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
                 <button className="btn" type="button" disabled={!!sol || despachando === o.id} onClick={() => void despachar(o, env.id, env.driver_id!)} data-testid="cola-despachar">
                   <Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}
@@ -159,13 +177,14 @@ export function Cola() {
               {!sol && (esDireccion
                 ? <button className="btn ghost" type="button" style={{ color: 'var(--danger)', marginLeft: 'auto' }} onClick={() => setCancelando(o)} data-testid="btn-cancelar-pedido">Cancelar pedido</button>
                 : <span style={{ marginLeft: 'auto' }}><SolicitarCancelacion orderId={o.id} folio={o.external_ref ?? o.id} className="btn ghost" /></span>)}
-            </div>
+            </div>}
           </div>
         ) })
       )}
       {cancelando && <CancelOrderModal orderId={cancelando.id} folio={cancelando.external_ref ?? cancelando.id} requireReason actor="Administración" onClose={() => setCancelando(null)} />}
 
       {active && <AsignarModal order={active} onClose={() => setActive(null)} />}
+      {extraActivo && <AsignarModal order={pedidoDePaquete(extraActivo.order, extraActivo.extra)} paquete={extraActivo.extra.paquete} onClose={() => setExtraActivo(null)} />}
     </div>
   )
 }
@@ -178,7 +197,9 @@ export function mensajeProveedor(m: string): string {
   return m
 }
 
-export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClose: () => void }) {
+export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWithItems; onClose: () => void
+  /** ENVÍOS EXTRA · 1..n = guía de un envío extra: solo paquetería, al domicilio del extra, sin cambiar el estado del pedido. */
+  paquete?: number }) {
   const { createShipment, dispatchShipment } = useShipments()
   // AUXILIAR DE ALMACÉN (rol packing): empaca y despacha; la guía de paquetería la genera Almacén (Alberto). El servidor
   // también se la niega (Edge shipping), aquí solo se explica en vez de ofrecer un botón que fallaría.
@@ -186,7 +207,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
   const puedeGuia = sesion?.role !== 'packing'
   const entregaPedido = useMemo(() => entregaDe(order), [order])
   const sugerido = metodoSugerido(entregaPedido)
-  const [method, setMethod] = useState<Method>(sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
+  const [method, setMethod] = useState<Method>(paquete > 0 ? 'paqueteria' : sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
   // PAQ-SIMPLE (23 nov 2026) · con qué se genera la guía: la paquetería que se vendió (DHL o Estafeta) viene preseleccionada;
   // Almacén puede cambiarla. T1 cotiza varias paqueterías a la vez. Estafeta, por ahora, es guía MANUAL (sin API).
   const [proveedor, setProveedor] = useState<GuiaCon>(entregaPedido?.paqueteria === 't1' ? 't1' : entregaPedido?.paqueteria === 'estafeta' ? 'estafeta' : 'dhl')
@@ -258,14 +279,14 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     setBusy('label'); setError(null)
     try {
       const { label } = await createShipmentReal({
-        order_id: order.id, orderRef, idempotencyKey: `${order.id}:${rate.id}`,
-        shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor,
+        order_id: order.id, orderRef, idempotencyKey: paquete > 0 ? `${order.id}:p${paquete}:${rate.id}` : `${order.id}:${rate.id}`,
+        shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor, ...(paquete > 0 ? { paquete } : {}),
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
         await createShipment({
           order_id: order.id, carrier: label.carrier, tracking_number: label.tracking,
-          label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit',
+          label_url: label.labelUrl, driver_id: null, estimated_delivery_at: label.estimatedDeliveryAt, status: 'in_transit', ...(paquete > 0 ? { paquete } : {}),
         })
       }
       // Guía de AMBIENTE DE PRUEBAS (DHL o T1 en sandbox): no es un envío real. El pedido NO se marca enviado (eso le manda
@@ -276,6 +297,8 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
         setBusy(false)
         return
       }
+      // ENVÍOS EXTRA · la guía de un extra no cambia el pedido (su aviso al cliente lo manda el servidor con esta guía)
+      if (paquete > 0) { setResult(label); setBusy(false); return }
       const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: label.carrier, tracking: label.tracking, label_url: label.labelUrl })
       // La guía YA existe aunque el pedido no haya cambiado de estado: se muestra
       // siempre, para que el operador no pierda el número de rastreo, y se le dice
@@ -295,9 +318,10 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
     if (!c.ok) { setError(c.error); return }
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(guiaManual.fecha) ? guiaManual.fecha : entregaPedido?.llega_hasta ?? null
     setBusy('label'); setError(null)
-    const r = await registrarGuiaEstafeta({ orderId: order.id, guia: g.guia, costo: c.costo, llegaFecha: fecha, registradoPor: sesion?.user?.name ?? null }, createShipment)
+    const r = await registrarGuiaEstafeta({ orderId: order.id, guia: g.guia, costo: c.costo, llegaFecha: fecha, registradoPor: sesion?.user?.name ?? null, ...(paquete > 0 ? { paquete } : {}) }, createShipment)
     if (!r.ok) { setBusy(false); setError(`No se guardó la guía de Estafeta. ${r.error}`); return }
     const label: LabelResult = { provider: 'estafeta', carrier: 'Estafeta', service: 'guía manual', tracking: g.guia, labelUrl: '', amount: c.costo ?? 0, etaDays: 0, estimatedDeliveryAt: r.shipment.estimated_delivery_at ?? '' }
+    if (paquete > 0) { setResult(label); setBusy(false); return }   // ENVÍOS EXTRA · el pedido no cambia
     const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: 'Estafeta', tracking: g.guia })
     setResult(label)
     if (!enviado.ok) setError(`La guía ${g.guia} sí quedó registrada, pero el pedido NO se marcó como enviado. ${enviado.error}`)
@@ -403,8 +427,8 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
           <>
             <div className="mhead">
               <div>
-                <h3>Asignar envío · {order.external_ref}</h3>
-                <div className="ms">Genera la guía con la paquetería o asígnalo a un chofer propio.</div>
+                <h3>{paquete > 0 ? `Envío extra ${paquete}` : 'Asignar envío'} · {order.external_ref}</h3>
+                <div className="ms">{paquete > 0 ? `Guía de paquetería a ${lugarDe(receiver.address as EnvioExtra['address'])}. El envío principal no cambia.` : 'Genera la guía con la paquetería o asígnalo a un chofer propio.'}</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
             </div>
@@ -416,7 +440,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                     {method !== sugerido && <span style={{ color: 'var(--warn)' }}> Estás eligiendo otro método: el cliente espera lo prometido.</span>}</span>
                 </div>
               )}
-              <div className="seg" style={{ marginBottom: 16 }}>
+              {paquete === 0 && <div className="seg" style={{ marginBottom: 16 }}>
                 <button type="button" className={method === 'paqueteria' ? 'active' : undefined} onClick={() => setMethod('paqueteria')}>
                   <Icon name="truck" /> Paquetería
                 </button>
@@ -426,7 +450,7 @@ export function AsignarModal({ order, onClose }: { order: OrderWithItems; onClos
                 <button type="button" className={method === 'recoge' ? 'active' : undefined} onClick={() => setMethod('recoge')} data-testid="metodo-recoge">
                   <Icon name="pkg" /> Recoge en sucursal
                 </button>
-              </div>
+              </div>}
 
               {method === 'recoge' ? (
                 <>

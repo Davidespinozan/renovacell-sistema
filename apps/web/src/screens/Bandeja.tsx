@@ -80,7 +80,7 @@ function useTareasBase(): Task[] {
     }
 
     if (role === 'admin') {
-      const atorados = orders.filter((o) => ['packed', 'shipped'].includes(o.status ?? '') && diagnoseShipment(o, shipments.find((s) => s.order_id === o.id)).stuck)
+      const atorados = orders.filter((o) => ['packed', 'shipped'].includes(o.status ?? '') && diagnoseShipment(o, shipments.find((s) => s.order_id === o.id && (s.paquete ?? 0) === 0)).stuck)
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 

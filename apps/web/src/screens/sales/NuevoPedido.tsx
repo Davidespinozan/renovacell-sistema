@@ -28,6 +28,8 @@ import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcio
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
+import { EnviosExtra } from './EnviosExtra'   // ENVÍOS EXTRA
+import { COSTO_ENVIO_EXTRA, extrasParaServidor, faltaEnExtras, type EnvioExtraBorrador } from '../../data/ops/enviosExtra'
 import type { MotivoFallo } from '../../data/store/ordersStore'
 
 // SEC-C4-FISCAL-3-FE · UNA operación de alta = un identificador estable (id + folio) que se reutiliza en cada reintento
@@ -115,6 +117,11 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const shipping = isCustomer ? (custDom?.address ?? null) : (choice?.address ?? null)
   const locationId = isCustomer ? custDom?.locationId ?? null : choice?.locationId ?? null
   const tipoEntrega = opcionDe(opsEntrega, entrega?.opcion)?.tipo ?? null
+  // ENVÍOS EXTRA · solo en pedidos foráneos: otros domicilios del mismo pedido, $600 cada uno (lo cobra el servidor)
+  const [extras, setExtras] = useState<EnvioExtraBorrador[]>([])
+  useEffect(() => { if (tipoEntrega !== 'foraneo' && extras.length) setExtras([]) }, [tipoEntrega, extras.length])
+  const costoExtras = hasSupabase ? extras.length * COSTO_ENVIO_EXTRA : 0
+  const faltaExtras = extras.length ? faltaEnExtras(cart, extras, () => false) : null
   const entregaNecesitaDireccion = opsEntrega ? requiereDireccion(tipoEntrega) : true   // sin opciones (demo) se exige dirección como antes
   const entregaLista = hasSupabase ? eleccionCompleta(entrega, opsEntrega) : true
   // COBRO-U · la MISMA «Forma de pago» que la Caja y todos los puntos de venta; el pedido no se crea sin elegirla.
@@ -185,7 +192,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     placedBy,
     shipping,
     receiver: invoice ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3)
-    ...(hasSupabase && entrega ? { entrega } : {}),   // ENT-2 · la entrega viaja con el pedido (una transacción)
+    ...(hasSupabase && entrega ? { entrega: extras.length ? { ...entrega, extras: extrasParaServidor(extras) } as EleccionEntregaServidor : entrega } : {}),   // ENT-2 · la entrega viaja con el pedido (una transacción) · ENVÍOS EXTRA
     ...(hasSupabase && cobro ? { cobro: cobroParaServidor(cobro) } : {}),   // COBRO-U · y la forma de pago, en la misma transacción
     ...(isCustomer
       ? { customer_id: customer!.id, customer: { name: customer!.name, phone: customer!.phone ?? null }, location_id: locationId }
@@ -221,7 +228,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     if (enviando.current || bloqueado) return
     const previo = intento.current
     if (previo?.incierto) { enviando.current = true; await enviar(previo); return }   // MISMA operación, mismo contenido
-    if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo) return
+    if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || faltaExtras) return
     if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
     enviando.current = true
     if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
@@ -235,10 +242,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     // Mismo contenido que un intento anterior ya resuelto sin pedido (rechazo, sesión) ⇒ mismo id; si cambió ⇒ id nuevo.
     await enviar({ op: previo && previo.huella === huella ? previo.op : nuevaOperacion(), huella, solicitud, incierto: false })
   }
-  const fleteCobro = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0
+  const fleteCobro = (hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0) + costoExtras
   const cobroListo = !hasSupabase || faltaEnCobro(cobro, total + fleteCobro, 'pedido', tipoEntrega, hoyNegocio()) == null
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
-  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || (invoice && !fiscalOk)))
+  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || !!faltaExtras || (invoice && !fiscalOk)))
   const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // PAQ-SIMPLE · solo la regla (o el ajuste con motivo)
 
   return (
@@ -251,6 +258,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               <h3>{repetido ? 'Pedido confirmado' : 'Pedido creado'}</h3>
               <p data-testid="np-cobro">El pedido <b>{folio}</b> para <b>{target.name}</b> {cobroHecho ? resultadoCobro(cobroHecho, cobroHecho.vence).texto : <>quedó <b>pendiente de pago</b>: cóbralo en «Cobrar pedidos».</>}</p>
               {promesa && <p data-testid="np-promesa" style={{ fontSize: 13.5 }}><b>{promesa.texto}</b>{promesa.flete > 0 ? ` · flete ${money(promesa.flete)}` : ' · sin flete'}<br />{promesa.promesa}</p>}
+              {extras.length > 0 && <p data-testid="np-extras-ok" style={{ fontSize: 13.5 }}>Más <b>{extras.length === 1 ? '1 envío extra' : `${extras.length} envíos extra`}</b> ({money(costoExtras)}): Almacén saca una guía para cada uno y al cliente le llega su número de rastreo.</p>}
               {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
@@ -306,7 +314,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 disponible={(id) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }}
                 onAgregar={(id, n) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + n }))} />
               {flete > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-flete"><span>Flete</span><span className="mono">{money(flete)}</span></div>}
-              <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b data-testid="np-total">{money(total + flete)}</b></div>
+              {costoExtras > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-extras"><span>{extras.length === 1 ? 'Envío extra' : `${extras.length} envíos extra`}</span><span className="mono">{money(costoExtras)}</span></div>}
+              <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b data-testid="np-total">{money(total + flete + costoExtras)}</b></div>
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega{opsEntrega && !entregaNecesitaDireccion ? <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}> · opcional para esta entrega</span> : null}</div>
               {isCustomer
@@ -317,6 +326,13 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Entrega</div>
                   <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                  {tipoEntrega === 'foraneo' && (
+                    <EnviosExtra cart={cart} value={extras} onChange={setExtras}
+                      nombreDe={(id) => sellable.find((x) => x.id === id)?.name ?? 'Producto'}
+                      vista={(id, q) => { const p = sellable.find((x) => x.id === id); return p ? numeroVista(p, q) : q }}
+                      {...(isCustomer ? { customer: { id: customer!.id, phone: customer!.phone ?? null } } : { doctorId: doctor!.id })} />
+                  )}
+                  {faltaExtras && <div role="alert" style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)' }} data-testid="np-extras-falta">{faltaExtras}</div>}
                   <div className="eyebrow" style={{ marginTop: 14 }}>Forma de pago</div>
                   <FormaDePago total={total + fleteCobro} modo="pedido" tipoEntrega={tipoEntrega} value={cobro} onChange={setCobro} testId="np-forma-pago" />
                 </>
@@ -351,7 +367,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               )}
               {/* CALIDAD VISUAL · el total y «Crear pedido» siempre a la vista (pie fijo del modal) */}
               <div className="barra-accion np-pie">
-                <span className="np-pie-total">Total <b className="mono">{money(total + flete)}</b></span>
+                <span className="np-pie-total">Total <b className="mono">{money(total + flete + costoExtras)}</b></span>
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
                 <button className="btn" type="button" disabled={deshabilitado} style={deshabilitado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : pendienteIncierto ? 'Reintentar envío' : 'Crear pedido'}</button>
               </div>

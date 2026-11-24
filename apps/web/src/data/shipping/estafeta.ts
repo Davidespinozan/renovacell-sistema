@@ -40,11 +40,12 @@ export function estimadaDeFecha(dia: string | null | undefined): string | null {
 }
 
 /** Registra la guía manual de Estafeta como el envío del pedido (lo escribe Almacén; RLS shipments_insert_ops). */
-export async function registrarGuiaEstafeta(args: { orderId: string; guia: string; costo: number | null; llegaFecha: string | null; registradoPor: string | null }, crear: typeof createShipment = createShipment): Promise<EnvioCreado> {
+export async function registrarGuiaEstafeta(args: { orderId: string; guia: string; costo: number | null; llegaFecha: string | null; registradoPor: string | null; paquete?: number }, crear: typeof createShipment = createShipment): Promise<EnvioCreado> {
   return crear({
     order_id: args.orderId, carrier: 'Estafeta', tracking_number: args.guia, driver_id: null, label_url: null,
     estimated_delivery_at: estimadaDeFecha(args.llegaFecha), status: 'in_transit',
     provider: 'estafeta', provider_cost: args.costo, currency: args.costo != null ? 'MXN' : null,
     provider_meta: { manual: true, registrado_por: args.registradoPor, tracking_url: urlRastreoEstafeta(args.guia) },
+    ...(args.paquete ? { paquete: args.paquete } : {}),   // ENVÍOS EXTRA
   })
 }

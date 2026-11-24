@@ -13,7 +13,8 @@ export const esRecoge = (o: Pick<OrderWithItems, 'shipping_meta'>): boolean =>
 // El envío que cuenta para un pedido: el más reciente que no está cancelado (una guía anulada o un envío cancelado
 // no tapa al vigente); si todos están cancelados, el más reciente.
 export function envioVigente(shipments: Shipment[], orderId: string): Shipment | undefined {
-  const del = shipments.filter((s) => s.order_id === orderId).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  // ENVÍOS EXTRA · el envío del pedido es el del paquete principal (0); los extras tienen el suyo
+  const del = shipments.filter((s) => s.order_id === orderId && (s.paquete ?? 0) === 0).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   return del.find((s) => s.status !== 'cancelado') ?? del[0]
 }
 

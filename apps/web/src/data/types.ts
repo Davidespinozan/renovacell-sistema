@@ -141,6 +141,7 @@ export interface Shipment {
   created_at: ISODateTime
   pickup_confirmation?: string | null            // PAQ-B · confirmación de recolección de la paquetería (si se agendó)
   provider_meta?: Record<string, unknown> | null // PAQ-B · datos del proveedor (p. ej. la recolección agendada)
+  paquete?: number                               // ENVÍOS EXTRA · 0 = principal, 1..n = envío extra del pedido
 }
 
 export interface ShipmentIncident {

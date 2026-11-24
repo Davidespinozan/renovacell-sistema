@@ -21,7 +21,7 @@ const live = makeLive<Shipment>(async () => {
   // ya resuelven cuando la pantalla (que se suscribe a envíos) re-renderiza.
   await loadDrivers()
   const { data, error } = await leerTodo('los envíos', (a, b) => supabase.from('shipments')
-    .select('id, order_id, carrier, tracking_number, label_url, driver_id, status, estimated_delivery_at, delivered_at, proof_image_url, received_by, incident, dispatched_by, dispatched_at, load_confirmed_at, created_at, pickup_confirmation, provider_meta')
+    .select('id, order_id, carrier, tracking_number, label_url, driver_id, status, estimated_delivery_at, delivered_at, proof_image_url, received_by, incident, dispatched_by, dispatched_at, load_confirmed_at, created_at, pickup_confirmation, provider_meta, paquete')
     .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as Shipment[]
@@ -46,6 +46,7 @@ export interface ShipmentInput {
   provider_cost?: number | null
   currency?: string | null
   provider_meta?: Record<string, unknown> | null
+  paquete?: number   // ENVÍOS EXTRA · guía manual de un envío extra
 }
 
 // Un envío solo "se registró" cuando el servidor lo confirmó.
@@ -59,6 +60,7 @@ export async function createShipment(input: ShipmentInput): Promise<EnvioCreado>
     estimated_delivery_at: input.estimated_delivery_at, delivered_at: null, proof_image_url: null,
     received_by: null, incident: null, created_at: new Date().toISOString(),
     ...(input.provider_meta ? { provider_meta: input.provider_meta } : {}),
+    ...(input.paquete ? { paquete: input.paquete } : {}),
   }
   if (hasSupabase && isUuid(input.order_id)) {
     const r = await confirmar('registrar el envío', supabase.from('shipments').insert({
@@ -69,7 +71,8 @@ export async function createShipment(input: ShipmentInput): Promise<EnvioCreado>
       ...(input.provider_cost != null ? { provider_cost: input.provider_cost } : {}),
       ...(input.currency ? { currency: input.currency } : {}),
       ...(input.provider_meta ? { provider_meta: input.provider_meta as Json } : {}),
-    }))
+      ...(input.paquete ? { paquete: input.paquete } : {}),
+    } as never))
     if (!r.ok) return r
   }
   // Con el envío ya registrado: pantalla y aviso al chofer. Antes el chofer recibía
