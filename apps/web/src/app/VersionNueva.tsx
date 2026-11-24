@@ -4,6 +4,8 @@
 // la pantalla (antes recargaba tras 1 minuto sin tocar nada, p. ej. leyendo una conversación). Solo al REGRESAR a la app
 // después de haberse ido un rato (≥ 2 min fuera: cambió de app/pestaña o bloqueó el teléfono) y si no dejó nada a medio
 // escribir. Mientras tanto, aviso con «Actualizar ahora». Compara el commit compilado con /version.json del sitio.
+// 23 nov 2026 (noche, dueño: «la página se actualiza sola»): el día del arranque hubo ~25 publicaciones y bastaba irse
+// 2 min (contestar WhatsApp) para que al regresar recargara. Ahora solo tras ≥ 30 min fuera; si no, el aviso y ya.
 import React, { useEffect, useRef, useState } from 'react'
 
 type Leer = () => Promise<string | null>
@@ -27,7 +29,7 @@ export function hayTrabajoAbierto(doc: Document = document): boolean {
   })
 }
 
-export function VersionNueva({ actual = __VERSION__, leer = leerPorDefecto, cadaMs = 2 * 60_000, fueraMs = 2 * 60_000, recargar = () => window.location.reload(), trabajoAbierto = hayTrabajoAbierto }: {
+export function VersionNueva({ actual = __VERSION__, leer = leerPorDefecto, cadaMs = 2 * 60_000, fueraMs = 30 * 60_000, recargar = () => window.location.reload(), trabajoAbierto = hayTrabajoAbierto }: {
   actual?: string; leer?: Leer; cadaMs?: number; fueraMs?: number; recargar?: () => void; trabajoAbierto?: () => boolean
 }) {
   const [nueva, setNueva] = useState(false)
