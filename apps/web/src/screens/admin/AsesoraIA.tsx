@@ -3,7 +3,7 @@
 // orquestador del portal y calificadas por un juez, para elegir modelo y no empeorar con cada cambio; 3) qué modelo usa
 // la IA del portal. El examen corre caso por caso desde aquí (la Edge no escribe conversaciones ni carritos).
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { asesoraIa as clientePorDefecto, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Adopcion as AdopcionDatos, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ResultadoCaso } from '../../data/ops/asesoraIa'
+import { asesoraIa as clientePorDefecto, MODELOS, nombreModelo, type ClienteAsesoraIa, type ConfigIA, type ConfigSeguimiento, type ResumenSeguimiento, type Adopcion as AdopcionDatos, type Corrida, type DoctorExamen, type Esfuerzo, type IaVsHumano, type ModoIA as Modo, type ResultadoCaso } from '../../data/ops/asesoraIa'
 
 const sutil: React.CSSProperties = { fontSize: 12, color: 'var(--ink-3, #667)' }
 const input: React.CSSProperties = { padding: '9px 11px', border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, background: 'var(--card, #fff)', color: 'inherit' }
@@ -38,6 +38,7 @@ export function AsesoraIA({ cliente = clientePorDefecto }: { cliente?: ClienteAs
     <div style={{ display: 'grid', gap: 16 }} data-testid="asesora-ia">
       {error && <div role="alert" className="sysnote" style={{ color: 'var(--danger)' }}>{error}</div>}
       {aviso && <div role="status" className="sysnote" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)' }}>{aviso}</div>}
+      <ModoIA cliente={cliente} config={config} onGuardado={(c) => { setConfig(c); setAviso(c.modo === 'recepcion' ? 'Listo: la IA ahora solo recibe a los clientes y los pasa con su asesor.' : 'Listo: la IA vuelve a atender y vender de punta a punta.') }} />
       <VsEquipo vs={vs} />
       <Examen cliente={cliente} corridas={corridas} config={config} onCambio={cargar} onDetalle={async (k) => { const r = await cliente.resultados(k.id); if (r.ok) setDetalle({ corrida: k, filas: r.data ?? [] }) }} onAviso={setAviso} />
       {detalle && <Detalle corrida={detalle.corrida} filas={detalle.filas} onCerrar={() => setDetalle(null)} />}
@@ -45,6 +46,58 @@ export function AsesoraIA({ cliente = clientePorDefecto }: { cliente?: ClienteAs
       <Adopcion cliente={cliente} />
       <ModeloPortal cliente={cliente} config={config} corridas={corridas} onGuardado={(c) => { setConfig(c); setAviso(`La IA del portal ahora usa ${nombreModelo(c.modelo_portal)}.`) }} />
     </div>
+  )
+}
+
+// IA-MODO (24 nov 2026, dueño) · el interruptor de autonomía: «venta completa» o «solo recepción». Aplica al siguiente
+// mensaje en WhatsApp, Instagram, Messenger y el chat del portal (las Edges lo leen en cada turno).
+const MODOS: Array<{ id: Modo; titulo: string; texto: string; hace: string[] }> = [
+  { id: 'completo', titulo: 'Venta completa', texto: 'La IA atiende y vende de punta a punta; avisa a la vendedora de cada señal de compra.',
+    hace: ['Da precios y cotiza', 'Arma el carrito y toma pedidos', 'Da seguimiento a carritos y recompras'] },
+  { id: 'recepcion', titulo: 'Solo recepción', texto: 'La IA recibe al cliente con amabilidad, lo reconoce y entiende qué necesita; después lo pasa con su asesor y le pide esperar.',
+    hace: ['Saluda, pregunta nombre y qué busca', 'Confirma si manejamos el producto', 'Sin precios, carrito ni pedidos: eso lo hace la vendedora', 'Cada conversación pasa a una vendedora'] },
+]
+function ModoIA({ cliente, config, onGuardado }: { cliente: ClienteAsesoraIa; config: ConfigIA | null; onGuardado: (c: ConfigIA) => void }) {
+  const [ocupado, setOcupado] = useState<Modo | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  if (!config) return null
+  const actual: Modo = config.modo === 'recepcion' ? 'recepcion' : 'completo'
+  const elegir = async (m: Modo) => {
+    if (m === actual || ocupado) return
+    const ok = typeof window === 'undefined' || typeof window.confirm !== 'function' ? true : window.confirm(m === 'recepcion'
+      ? '¿Poner a la IA en «Solo recepción»? Desde el siguiente mensaje deja de dar precios y tomar pedidos, y cada conversación pasa a una vendedora.'
+      : '¿Regresar a la IA a «Venta completa»? Desde el siguiente mensaje vuelve a cotizar, armar carritos y tomar pedidos.')
+    if (!ok) return
+    setOcupado(m); setError(null)
+    const r = await cliente.guardarModo(m)
+    setOcupado(null)
+    if (r.ok) onGuardado(r.data); else setError(r.error)
+  }
+  const cuando = config.modo_at ? new Date(config.modo_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null
+  return (
+    <section className="card" data-testid="modo-ia">
+      <h2 style={{ margin: '0 0 4px' }}>¿Cómo atiende la IA?</h2>
+      <p style={{ margin: '0 0 12px', ...sutil }}>Aplica desde el siguiente mensaje en WhatsApp, Instagram, Messenger y el chat del portal.{cuando ? ` Último cambio: ${cuando}${config.modo_por ? ` · ${config.modo_por}` : ''}.` : ''}</p>
+      <div role="radiogroup" aria-label="Autonomía de la IA" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+        {MODOS.map((m) => {
+          const activo = m.id === actual
+          return (
+            <button key={m.id} type="button" role="radio" aria-checked={activo} onClick={() => void elegir(m.id)} disabled={!!ocupado} data-testid={`modo-${m.id}`}
+              style={{ textAlign: 'left', padding: '14px 16px', borderRadius: 14, cursor: activo ? 'default' : 'pointer', font: 'inherit', color: 'inherit',
+                border: activo ? '2px solid var(--ds-brand)' : '1px solid var(--line, #e5e7eb)', background: activo ? 'var(--ds-brand-soft)' : 'var(--card, #fff)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <b style={{ fontSize: 15 }}>{m.titulo}</b>
+                {activo ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--ds-brand)', color: '#fff' }}>ACTIVO</span>
+                  : <span style={{ ...sutil }}>{ocupado === m.id ? 'Guardando…' : 'Activar'}</span>}
+              </span>
+              <span style={{ display: 'block', margin: '6px 0 8px', fontSize: 13 }}>{m.texto}</span>
+              <ul style={{ margin: 0, paddingLeft: 18, ...sutil, display: 'grid', gap: 2 }}>{m.hace.map((h) => <li key={h}>{h}</li>)}</ul>
+            </button>
+          )
+        })}
+      </div>
+      {error && <div role="alert" style={{ marginTop: 8, fontSize: 13, color: 'var(--danger)' }}>No se guardó. {error}</div>}
+    </section>
   )
 }
 

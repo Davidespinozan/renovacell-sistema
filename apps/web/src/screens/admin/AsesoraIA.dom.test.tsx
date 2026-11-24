@@ -15,6 +15,7 @@ function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
   return {
     config: async () => ({ ok: true, data: { modelo_portal: null, esfuerzo_portal: 'low', updated_at: null, modelos: [] } }),
     guardarConfig: vi.fn(async (m) => ({ ok: true as const, data: { modelo_portal: m, esfuerzo_portal: 'low' as const, updated_at: null, modelos: [] } })),
+    guardarModo: vi.fn(async (m) => ({ ok: true as const, data: { modelo_portal: null, esfuerzo_portal: 'low' as const, updated_at: null, modelos: [], modo: m, modo_at: '2026-11-24T18:00:00Z', modo_por: 'Toño' } })),
     corridas: async () => ({ ok: true, data: [corrida] }),
     resultados: async () => ({ ok: true, data: [{ caso_id: 'P01', categoria: 'precio', pregunta: 'cuanto el botox', historial: [], ideal: null, respuesta: 'Está en $3,900.', estado: 'respondio', motivo_validacion: null, herramientas: [], latencia_ms: 5000, costo_usd: 0.02, puntaje: 9, aprobado: true, juicio: { puntaje: 9, aprobado: true, cumple: [], falla: [], comentario: 'Preciso.' }, error: null }] }),
     crearCorrida: vi.fn(async () => ({ ok: true as const, data: 'k2' })),
@@ -31,6 +32,27 @@ function falso(over: Partial<ClienteAsesoraIa> = {}): ClienteAsesoraIa {
 }
 
 describe('<AsesoraIA>', () => {
+  it('IA-MODO · muestra el modo activo y, con confirmación, pasa a «Solo recepción»', async () => {
+    const c = falso(); const conf = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<AsesoraIA cliente={c} />)
+    const completo = await screen.findByTestId('modo-completo')
+    expect(completo).toHaveAttribute('aria-checked', 'true')
+    expect(completo).toHaveTextContent('ACTIVO')
+    fireEvent.click(screen.getByTestId('modo-recepcion'))
+    await waitFor(() => expect(c.guardarModo).toHaveBeenCalledWith('recepcion'))
+    expect(await screen.findByText(/solo recibe a los clientes y los pasa con su asesor/)).toBeInTheDocument()
+    expect(screen.getByTestId('modo-recepcion')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('modo-ia')).toHaveTextContent('Toño')
+    conf.mockRestore()
+  })
+  it('IA-MODO · si Dirección cancela la confirmación no cambia nada', async () => {
+    const c = falso(); const conf = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<AsesoraIA cliente={c} />)
+    fireEvent.click(await screen.findByTestId('modo-recepcion'))
+    expect(c.guardarModo).not.toHaveBeenCalled()
+    expect(screen.getByTestId('modo-completo')).toHaveAttribute('aria-checked', 'true')
+    conf.mockRestore()
+  })
   it('compara IA vs equipo y lista las corridas con calificación, costo y su categoría más baja', async () => {
     render(<AsesoraIA cliente={falso()} />)
     const vs = await screen.findByTestId('ia-vs-equipo')

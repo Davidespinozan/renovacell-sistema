@@ -12,7 +12,9 @@ export const MODELOS: Array<{ id: string; nombre: string; nota: string }> = [
 ]
 export const nombreModelo = (id: string | null | undefined) => MODELOS.find((m) => m.id === id)?.nombre ?? (id || 'El de siempre (Haiku 4.5)')
 
-export interface ConfigIA { modelo_portal: string | null; esfuerzo_portal: Esfuerzo; updated_at: string | null; modelos: string[] }
+// IA-MODO (24 nov 2026) · 'completo' = vende de punta a punta; 'recepcion' = recibe, reconoce y pasa con el asesor
+export type ModoIA = 'completo' | 'recepcion'
+export interface ConfigIA { modelo_portal: string | null; esfuerzo_portal: Esfuerzo; updated_at: string | null; modelos: string[]; modo?: ModoIA; modo_at?: string | null; modo_por?: string | null }
 export interface Corrida {
   id: string; modelo: string; esfuerzo: Esfuerzo; nota: string | null; created_at: string; perfil: string | null
   estado: 'en_curso' | 'terminada' | 'detenida'; pendientes: number
@@ -50,6 +52,7 @@ const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Promise<R
 export const asesoraIa = {
   config: () => rpc<ConfigIA>('ia_config'),
   guardarConfig: (modelo: string | null, esfuerzo: Esfuerzo) => rpc<ConfigIA>('ia_config_guardar', { p_modelo: modelo ?? '', p_esfuerzo: esfuerzo }),
+  guardarModo: (modo: ModoIA) => rpc<ConfigIA>('ia_modo_guardar', { p_modo: modo }),
   corridas: () => rpc<Corrida[]>('ia_examen_corridas'),
   resultados: (corrida: string) => rpc<ResultadoCaso[]>('ia_examen_resultados', { p_corrida: corrida }),
   crearCorrida: (modelo: string, perfil: string, esfuerzo: Esfuerzo, casos: string[] | null, nota: string | null) =>

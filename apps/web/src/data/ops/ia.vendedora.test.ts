@@ -41,6 +41,6 @@ describe('reglas de vendedor', () => {
     expect(REGLA_ENVIO_GRATIS_PORTAL).not.toMatch(/No ofrezcas agregar productos/)
   })
   it('el perfil comercial entra al turno solo en el portal y con precio autorizado', () => {
-    expect(orquestadorSrc).toMatch(/if \(\(canal === 'portal' \|\| identificado\) && ctx\.puede_precio && perfilIA\) \{\n    const pc = await rpc\('cc_ia_perfil_comercial'/)
+    expect(orquestadorSrc).toMatch(/if \(!recepcion && \(canal === 'portal' \|\| identificado\) && ctx\.puede_precio && perfilIA\) \{[^\n]*\n    const pc = await rpc\('cc_ia_perfil_comercial'/)
   })
 })

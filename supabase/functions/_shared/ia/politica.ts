@@ -165,7 +165,20 @@ export function contextoCanal(canal: CanalPolitica, identificado = false): strin
   ].join('\n')
 }
 export interface EntradaSistema { ctx: ContextoActor; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalPolitica
-  contacto?: ContactoPendiente | null }
+  contacto?: ContactoPendiente | null
+  recepcion?: boolean }   // IA-MODO · Dirección limitó a la IA a recibir y pasar con el asesor (cc_ia_config.modo)
+
+// IA-MODO (24 nov 2026, dueño) · «que haga el reconocimiento del cliente, que lo reciba y lo trate con amabilidad, pero
+// siempre orientando la conversación a que espere a que el agente humano lo atienda». Reemplaza la TAREA del turno y manda
+// sobre cualquier otra instrucción de venta; el servidor quita las herramientas de precio, carrito y pedido.
+export const TAREA_RECEPCION = [
+  'MODO RECEPCIÓN (decidido por Dirección; manda sobre cualquier otra instrucción de venta de este mensaje): hoy NO llevas la venta. Tu trabajo es recibir al cliente con calidez, reconocerlo y dejarle todo listo a su asesor humano, que es quien cotiza y cierra.',
+  '- Saluda con amabilidad y, si no lo sabes, pregúntale su nombre y si es médico, clínica o qué tipo de cliente es (una pregunta a la vez).',
+  '- Entiende qué necesita: qué producto, presentación y más o menos cuántas piezas, o cuál es su duda. Puedes confirmar con buscar_productos que el producto lo manejamos y resolver dudas generales con lo aprobado (ficha, manual, negocio), sin extenderte.',
+  '- NO des precios, montos, descuentos, existencias ni promociones con cifras; NO armes carrito, NO cotices, NO tomes ni confirmes pedidos, NO pidas datos de pago ni direcciones para un envío. Si te lo piden, explícale con amabilidad que su asesor se lo da en un momento con su precio exacto.',
+  '- En cuanto entiendas lo que busca (o si pide una persona), usa solicitar_asesor; el sistema también se lo pasa a su asesor. Dile en una frase que su asesor lo atiende por aquí mismo con lo que ya platicaron, sin prometer tiempos y sin decir que ya está escribiendo.',
+  '- Mientras espera, sigue siendo amable y útil: contesta lo que pregunte dentro de estos límites y no le hagas repetir información.',
+].join('\n')
 /** CONTACTO CONVERSACIONAL · visitante del enlace del chat que aún no deja sus datos (lo dice el servidor). */
 export interface ContactoPendiente { pendiente: boolean; asesor?: string | null; recomienda?: string | null }
 
@@ -187,10 +200,11 @@ export function construirSistema(e: EntradaSistema): string {
   const enCanal = !!e.canal && e.canal !== 'portal'
   const identificado = enCanal && e.canal === 'whatsapp' && e.ctx.actor === 'doctor' && e.ctx.verificado   // la base solo da doctor en canal con vínculo
   const partes = [POLITICA_SISTEMA, '', POLITICA_NEGOCIO, '', contextoAutoridad(e.ctx), '', 'REGLAS DE CONOCIMIENTO:', ...e.reglasConocimiento.map((r) => `- ${r}`), '',
-    e.ctx.clinico && e.intencion === 'CLINICAL_BOUNDARY' ? TAREA_CLINICA : enCanal ? (identificado ? tareaCanalIdentificado(e.intencion, e.limiteClinico) : tareaCanal(e.intencion, e.limiteClinico)) : tarea(e.intencion, e.limiteClinico)]
+    e.recepcion ? (e.limiteClinico ? tareaCanal('CLINICAL_BOUNDARY', true) + '\n' : '') + TAREA_RECEPCION
+      : e.ctx.clinico && e.intencion === 'CLINICAL_BOUNDARY' ? TAREA_CLINICA : enCanal ? (identificado ? tareaCanalIdentificado(e.intencion, e.limiteClinico) : tareaCanal(e.intencion, e.limiteClinico)) : tarea(e.intencion, e.limiteClinico)]
   const canal = contextoCanal(e.canal ?? 'portal', identificado)
   if (canal) partes.push('', canal)
-  if (((e.canal ?? 'portal') === 'portal' || identificado) && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
+  if (!e.recepcion && ((e.canal ?? 'portal') === 'portal' || identificado) && e.ctx.actor === 'doctor' && e.ctx.verificado) partes.push('', POLITICA_VENDEDOR)
   if (e.ctx.clinico) partes.push('', POLITICA_CLINICA)
   const contacto = e.contacto ? tareaContacto(e.contacto) : null
   if (contacto) partes.push('', contacto)

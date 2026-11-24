@@ -140,11 +140,23 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
     }
   }
   const info: { reconocido?: boolean } = {}
-  const r0 = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto, canal === 'portal' ? contacto : null, info)
+  // IA-MODO (24 nov 2026) · Dirección decide si la IA vende de punta a punta o solo recibe y pasa con el asesor
+  const recepcion = (await leerModoIA(admin)) === 'recepcion'
+  const r0 = await turnoIA(admin, conv, seqUsuario, actor, profile, visitorHash, texto, sujeto, canal, !!comercial, canal === 'portal' ? null : adjunto, canal === 'portal' ? contacto : null, info, recepcion)
   // TANDA 1 · 1 · cedió ante un mensaje más nuevo del cliente: ESE turno contesta todo junto. Aquí no hay nada más que hacer
   // (ni transferir ni avisar): un aviso de sistema por cada mensaje de la ráfaga era parte del ruido.
   if (r0 === 'superada') return 'descartada'
   const r = r0
+  // IA-MODO · en recepción TODA conversación que la IA atiende pasa a un asesor (ruteo de siempre: cartera o reparto). Si la IA
+  // respondió, el aviso del servidor queda para el equipo (prefijo 'comercial', no sale por el canal); si no pudo, le llega
+  // al cliente para que nunca quede sin atención. Con la conversación ya en manos humanas (o pedida) no hace nada.
+  if (recepcion && (r === 'respondio' || r === 'no_disponible')) {
+    const prefijo = r === 'respondio' ? 'comercial' : canal === 'whatsapp' ? 'wa' : canal
+    const { data, error } = await admin.rpc('_cc_canal_transferir', { p_conv: conv, p_origen: canal, p_prefijo: prefijo, p_motivo: 'recepcion_ia', p_respiro: false })
+      .then((x: { data: unknown; error: unknown }) => x, () => ({ data: null, error: true }))
+    if (canal !== 'portal' && r !== 'respondio' && !error && data === true) return 'transferida'
+    return r
+  }
   // R4-C7 · compra, recompra o negociación en canal: la IA ya confirmó el producto y pidió lo que falta; ahora una persona
   // del equipo comercial toma la venta. Aviso NEUTRO del servidor (_cc_canal_transferir: disponibilidad real, respiro de
   // 12 h, solo si la conversación sigue con la IA). También si la IA no pudo responder: un comprador nunca queda sin atención.
@@ -173,7 +185,7 @@ export async function responderIA(admin: any, conv: string, seqUsuario: number, 
 }
 
 // deno-lint-ignore no-explicit-any
-async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null, info: { reconocido?: boolean } = {}): Promise<ResultadoIA> {
+async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'visitor' | 'doctor', profile: string | null, visitorHash: string | null, texto: string, sujeto: string, canal: CanalTurno, comercial = false, adjunto: EntradaTurno['adjunto'] | null = null, contacto: EntradaTurno['contacto'] = null, info: { reconocido?: boolean } = {}, recepcion = false): Promise<ResultadoIA> {
   const env = (k: string) => Deno.env.get(k)
   const cfg0 = configurar(env)
   // R4-C11 · los canales usan su propio modelo (por defecto Claude Opus 5.5 con esfuerzo bajo); el portal sigue igual
@@ -200,7 +212,7 @@ async function turnoIA(admin: any, conv: string, seqUsuario: number, actor: 'vis
   const canalDeps = portalDeps ?? dependenciasCanal(negocio, { comercial })
   const resultado = await ejecutarTurno(
     // LIVE C1 · `canal` manda: fuera del portal el orquestador ignora el perfil (audiencia pública) aunque venga.
-    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}), ...(contacto ? { contacto } : {}) },
+    { conv, triggerSeq: seqUsuario, actor, profile: actor === 'doctor' ? profile : null, visitorHash, textoUsuario: texto, canal, ...(adjunto ? { adjunto } : {}), ...(contacto ? { contacto } : {}), ...(recepcion ? { recepcion } : {}) },
     {
       rpc: (fn, args) => admin.rpc(fn, args),
       leerMensajes: (c, hasta, limite) => leerInterno(admin, c, hasta, limite),
@@ -241,6 +253,15 @@ export function configPortal(base: { model: string; timeoutMs: number; maxTokens
   return esModeloConPensamiento(modelo)
     ? { ...base, model: modelo, maxTokens: num('AI_MAX_TOKENS_PORTAL', 8000, 1000, 32000), timeoutMs: num('AI_TIMEOUT_MS_PORTAL', 45_000, 5_000, 120_000) }
     : { ...base, model: modelo }
+}
+// IA-MODO (24 nov 2026) · 'completo' (vende de punta a punta) o 'recepcion' (recibe y pasa con el asesor). Lo elige Dirección
+// en Asesora IA; si no se puede leer, la IA sigue como siempre (completo).
+// deno-lint-ignore no-explicit-any
+export async function leerModoIA(admin: any): Promise<'completo' | 'recepcion'> {
+  try {
+    const { data, error } = await admin.from('cc_ia_config').select('modo').eq('id', true).maybeSingle()
+    return !error && data?.modo === 'recepcion' ? 'recepcion' : 'completo'
+  } catch { return 'completo' }
 }
 // deno-lint-ignore no-explicit-any
 export async function leerModeloPortal(admin: any): Promise<{ modelo: string; esfuerzo: 'low' | 'medium' | 'high' } | null> {

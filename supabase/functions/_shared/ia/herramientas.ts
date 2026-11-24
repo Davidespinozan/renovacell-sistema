@@ -120,6 +120,11 @@ export const HERRAMIENTAS_PEDIDO_WA: DefinicionHerramienta[] = [
   { name: 'pedir_link_pago', autoridad: 'cuenta', mutante: true, description: 'Pide a su vendedor un link de pago con tarjeta (BanBajío) por el saldo de su pedido: úsala cuando el doctor quiera pagar con tarjeta. Sin folio usa su pedido más reciente con saldo. El link NO lo das tú: se lo manda el sistema por este chat en cuanto su vendedor lo genere (estado enviado = ya está arriba en este chat).', input_schema: { type: 'object', properties: { folio: texto('Folio del pedido (p. ej. S123456), solo si lo dijo.', 20) }, additionalProperties: false } },
 ]
 const soloPortal = (n: NombreHerramienta, identificado: boolean) => SOLO_PORTAL.includes(n) && !(identificado && SOLO_PORTAL_SIN_VINCULO.includes(n))
+// IA-MODO (24 nov 2026) · en «solo recepción» la IA reconoce, informa y pasa con el asesor: nada de precio, cotización,
+// recomendación comercial, existencias, carrito, checkout ni pedido. El orquestador filtra la lista y rechaza lo demás.
+export const HERRAMIENTAS_RECEPCION: ReadonlySet<string> = new Set(['buscar_productos', 'obtener_ficha_producto', 'comparar_productos', 'buscar_conocimiento',
+  'obtener_estado_pedido', 'solicitar_asesor', 'enlace_portal', 'registrar_contacto', 'solicitar_verificacion'])
+
 export function herramientasPara(conCuenta: boolean, canal: CanalIA = 'portal', contactoPendiente = false, identificado = false): Array<{ name: string; description: string; input_schema: Record<string, unknown> }> {
   return [...HERRAMIENTAS, ...(contactoPendiente && !conCuenta && canal === 'portal' ? [REGISTRAR_CONTACTO] : []), ...(canal !== 'portal' && !identificado && !conCuenta ? [SOLICITAR_VERIFICACION] : []), ...(canal === 'whatsapp' && identificado ? HERRAMIENTAS_PEDIDO_WA : [])]
     .filter((h) => h.autoridad === 'cualquiera' || conCuenta)

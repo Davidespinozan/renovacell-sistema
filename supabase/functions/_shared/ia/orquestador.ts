@@ -21,7 +21,7 @@ export interface DepsOrquestador {
   proveedor: { nombre: string; modelo: string; generar: (s: Solicitud) => Promise<Respuesta> }
   config: { maxTokens: number; timeoutMs: number; maxRondas: number; historial: number }
   politica: {
-    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalTurno; contacto?: EntradaTurno['contacto'] }) => string
+    construirSistema: (e: { ctx: Ctx; intencion: string; limiteClinico: boolean; reglasConocimiento: readonly string[]; evidencia: string[]; canal?: CanalTurno; contacto?: EntradaTurno['contacto']; recepcion?: boolean }) => string
     clasificarIntencion: (t: string) => string; esLimiteClinico: (t: string) => boolean
     historialParaModelo: (m: Array<{ actor: string; content: string }>, maximo?: number) => Array<{ role: 'user' | 'assistant'; content: string }>
     envolverDatos: (etiqueta: string, contenido: string) => string
@@ -43,6 +43,7 @@ export interface DepsOrquestador {
     evidenciaHandoff?: (estado: unknown) => string[]   // CC-7 · estado de atención humana (servidor)
     // ENT-P · opcional: completa la salida de una herramienta con datos del negocio (p. ej. envío gratis del carrito)
     complementar?: (nombre: string, salida: unknown) => unknown
+    HERRAMIENTAS_RECEPCION?: ReadonlySet<string>   // IA-MODO · lo único que puede usar en «solo recepción»
   }
   validacion: {
     validarRespuesta: (t: unknown, c: { evidencia: readonly string[]; nombresAutorizados: readonly string[]; nombresCatalogo: readonly string[]; limiteClinico: boolean }) => { ok: true; texto: string } | { ok: false; motivo: string; detalle?: string }
@@ -100,7 +101,9 @@ export type CanalTurno = 'portal' | 'whatsapp' | 'instagram' | 'messenger'
 // R4-C13 · `adjunto`: imagen o PDF del cliente en ESTE turno (canal); va junto a su último mensaje y no se persiste.
 export interface EntradaTurno { conv: string; triggerSeq: number; actor: 'visitor' | 'doctor'; profile: string | null; visitorHash: string | null; textoUsuario: string; canal?: CanalTurno; adjunto?: { tipo: 'image' | 'document'; media_type: string; data: string }
   // CONTACTO CONVERSACIONAL · visitante del enlace del chat sin datos todavía (lo dice el servidor): la IA los pide y los registra
-  contacto?: { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null }
+  contacto?: { pendiente: boolean; asesor?: string | null; recomienda?: string | null } | null
+  // IA-MODO · Dirección puso a la IA en «solo recepción» (cc_ia_config.modo): recibe, reconoce y pasa con el asesor
+  recepcion?: boolean }
 export interface ResultadoTurno {
   estado: 'respondio' | 'ya_respondido' | 'en_curso' | 'silenciada' | 'descartada' | 'fallo' | 'no_autorizado'
   turnId?: string; intencion?: string; evidencia?: string[]; rondas?: number; usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }; clase?: string; motivoValidacion?: string
@@ -183,7 +186,10 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
 
   const conCuenta = ctx.actor !== 'visitor'
   const contactoPendiente = !!e.contacto?.pendiente && e.actor === 'visitor' && canal === 'portal'
-  const tools = d.herramientas.herramientasPara(conCuenta, canal, contactoPendiente, identificado)
+  // IA-MODO · en recepción solo quedan las herramientas de reconocer, informar y pasar con el asesor (sin lista: ninguna)
+  const recepcion = !!e.recepcion
+  const enRecepcion = (nombre: string) => !recepcion || !!d.herramientas.HERRAMIENTAS_RECEPCION?.has(nombre)
+  const tools = d.herramientas.herramientasPara(conCuenta, canal, contactoPendiente, identificado).filter((t) => enRecepcion(t.name))
   const idsAutorizados = new Set<string>(); const nombresAutorizados = new Set<string>(); const evidencia: string[] = []
   const carrito = { id: null as string | null }   // CC-5 · se abre perezosamente con la primera herramienta de carrito
   const addEv = (xs: string[]) => { for (const x of xs) if (!evidencia.includes(x)) evidencia.push(x) }
@@ -241,7 +247,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
   // tipo de cliente, especialidad, lo que compra, su carrito con oportunidades y lo que buscó en el catálogo. Sus productos
   // cuentan como consultados en este turno y sus montos como precio autorizado (vienen de la misma autoridad que obtener_precio).
   let perfilComercial = ''
-  if ((canal === 'portal' || identificado) && ctx.puede_precio && perfilIA) {
+  if (!recepcion && (canal === 'portal' || identificado) && ctx.puede_precio && perfilIA) {   // IA-MODO · en recepción no hay montos que dar
     const pc = await rpc('cc_ia_perfil_comercial', { p_profile: perfilIA })
     if (!pc.error && pc.data && typeof pc.data === 'object') {
       for (const id of d.herramientas.idsDe(pc.data)) idsAutorizados.add(id); for (const n of d.herramientas.nombresDe(pc.data)) nombresAutorizados.add(n)
@@ -329,7 +335,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     if (restante < 1500) return textoValidoPrevio !== null ? await persistir(textoValidoPrevio, ronda, 'estilo') : await fallar('provider_timeout', ronda > 0, ronda)
     // CACHÉ (2 nov 2026): lo fijo del turno (políticas, tarea, productos mencionados, perfil) va primero y se guarda en caché;
     // lo que cambia en cada ronda (evidencia, atención humana, corrección) va al final, fuera del caché.
-    const base = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null })
+    const base = d.politica.construirSistema({ ctx, intencion, limiteClinico, reglasConocimiento: d.reglasConocimiento, evidencia, canal, contacto: contactoPendiente ? e.contacto : null, ...(recepcion ? { recepcion } : {}) })
     const marca = d.politica.MARCA_VARIABLE ? base.indexOf(d.politica.MARCA_VARIABLE) : -1
     const fijo = (marca >= 0 ? base.slice(0, marca) : base) + productosMencionados + perfilComercial + bloqueFijoConv
     const variable = (marca >= 0 ? base.slice(marca + d.politica.MARCA_VARIABLE!.length) : '') + bloqueVariableConv + notaCorreccion
@@ -405,7 +411,7 @@ export async function ejecutarTurno(e: EntradaTurno, d: DepsOrquestador): Promis
     const resultados: Bloque[] = []
     for (const ll of r.llamadas) {
       const v0 = d.herramientas.validarLlamada(ll.name, ll.input, { conCuenta, idsAutorizados, canal, contactoPendiente, identificado })
-      const v: Validada = v0.ok && reconocidoServidor && v0.nombre === 'solicitar_verificacion' ? { ok: false, motivo: 'no_autorizada' } : v0
+      const v: Validada = v0.ok && ((reconocidoServidor && v0.nombre === 'solicitar_verificacion') || !enRecepcion(v0.nombre)) ? { ok: false, motivo: 'no_autorizada' } : v0
       if (!v.ok) {
         await rpc('cc_ia_herramienta_registrar', { p_turn: turnId, p_round: ronda, p_tool: String(ll.name).slice(0, 60), p_status: v.motivo === 'no_autorizada' || v.motivo === 'id_no_autorizado' ? 'no_autorizada' : 'rechazada', p_product_ids: [], p_detalle: { motivo: v.motivo } })
         resultados.push({ type: 'tool_result', tool_use_id: ll.id, content: d.politica.envolverDatos('resultado', JSON.stringify({ error: d.herramientas.RECHAZO[v.motivo] ?? 'rechazada' })) })
