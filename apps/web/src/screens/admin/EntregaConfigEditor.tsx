@@ -16,6 +16,7 @@ interface Form {
   cp_local_extra: string
   dhl_transito_min: string; dhl_transito_max: string; t1_activo: boolean; t1_transito_min: string; t1_transito_max: string
   estafeta_activo: boolean; estafeta_transito_min: string; estafeta_transito_max: string   // PAQ-SIMPLE
+  etn_activo: boolean; tus_activo: boolean; tns_activo: boolean; autobus_transito_min: string; autobus_transito_max: string   // PAQ-AUTOBÚS
   local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string
   /** ENT-H · bloques "10:30-13:30, 15:30-17:30", intervalo, cupo, margen y días hacia adelante (texto mientras se edita). */
   horario_franjas: string; horario_intervalo_min: string; horario_cupo: string; horario_margen_min: string; horario_dias_adelante: string
@@ -46,6 +47,7 @@ const aForm = (c: EntregaConfig): Form => ({
   cp_local_desde: c.cp_local_desde, cp_local_hasta: c.cp_local_hasta, cp_local_extra: (c.cp_local_extra ?? []).join(', '), dias_paqueteria: [...c.dias_paqueteria], dias_chofer: [...c.dias_chofer], dias_entrega_foranea: [...c.dias_entrega_foranea],
   dhl_transito_min: String(c.dhl_transito_min), dhl_transito_max: String(c.dhl_transito_max), t1_activo: c.t1_activo, t1_transito_min: String(c.t1_transito_min), t1_transito_max: String(c.t1_transito_max),
   estafeta_activo: c.estafeta_activo ?? true, estafeta_transito_min: String(c.estafeta_transito_min ?? 2), estafeta_transito_max: String(c.estafeta_transito_max ?? 4),
+  etn_activo: c.etn_activo ?? true, tus_activo: c.tus_activo ?? true, tns_activo: c.tns_activo ?? true, autobus_transito_min: String(c.autobus_transito_min ?? 1), autobus_transito_max: String(c.autobus_transito_max ?? 2),
   local_mismo_dia: c.local_mismo_dia, recoge_lugar: c.recoge_lugar, recoge_horario: c.recoge_horario,
   horario_franjas: franjasATexto(c.horario_franjas), horario_intervalo_min: String(c.horario_intervalo_min ?? 30), horario_cupo: String(c.horario_cupo ?? 1), horario_margen_min: String(c.horario_margen_min ?? 60), horario_dias_adelante: String(c.horario_dias_adelante ?? 7),
 })
@@ -65,6 +67,7 @@ export function validarEntrega(f: Form): string | null {
   if (f.dias_entrega_foranea.length === 0) return 'Elige al menos un día en que la paquetería entrega.'
   if (!entero(f.dhl_transito_min, 0, 30) || !entero(f.dhl_transito_max, 0, 30) || Number(f.dhl_transito_min) > Number(f.dhl_transito_max)) return 'Tránsito DHL: días enteros de 0 a 30, mínimo ≤ máximo.'
   if (!entero(f.estafeta_transito_min, 0, 30) || !entero(f.estafeta_transito_max, 0, 30) || Number(f.estafeta_transito_min) > Number(f.estafeta_transito_max)) return 'Tránsito Estafeta: días enteros de 0 a 30, mínimo ≤ máximo.'
+  if (!entero(f.autobus_transito_min, 0, 30) || !entero(f.autobus_transito_max, 0, 30) || Number(f.autobus_transito_min) > Number(f.autobus_transito_max)) return 'Tránsito de autobús: días enteros de 0 a 30, mínimo ≤ máximo.'
   if (!entero(f.t1_transito_min, 0, 30) || !entero(f.t1_transito_max, 0, 30) || Number(f.t1_transito_min) > Number(f.t1_transito_max)) return 'Tránsito T1: días enteros de 0 a 30, mínimo ≤ máximo.'
   if (f.recoge_lugar.trim().length < 3 || f.recoge_horario.trim().length < 3) return 'Escribe dónde y a qué hora se recoge en sucursal.'
   if (!textoAFranjas(f.horario_franjas)) return 'Bloques de entrega: escribe horas como "10:30-13:30, 15:30-17:30" (cada bloque termina después de empezar).'
@@ -79,6 +82,7 @@ const aDatos = (f: Form): Partial<EntregaConfig> => ({
   cp_local_desde: f.cp_local_desde, cp_local_hasta: f.cp_local_hasta, cp_local_extra: textoACps(f.cp_local_extra) ?? undefined, dias_paqueteria: [...f.dias_paqueteria].sort(), dias_chofer: [...f.dias_chofer].sort(), dias_entrega_foranea: [...f.dias_entrega_foranea].sort(),
   dhl_transito_min: Number(f.dhl_transito_min), dhl_transito_max: Number(f.dhl_transito_max), t1_activo: f.t1_activo, t1_transito_min: Number(f.t1_transito_min), t1_transito_max: Number(f.t1_transito_max),
   estafeta_activo: f.estafeta_activo, estafeta_transito_min: Number(f.estafeta_transito_min), estafeta_transito_max: Number(f.estafeta_transito_max),
+  etn_activo: f.etn_activo, tus_activo: f.tus_activo, tns_activo: f.tns_activo, autobus_transito_min: Number(f.autobus_transito_min), autobus_transito_max: Number(f.autobus_transito_max),
   local_mismo_dia: f.local_mismo_dia, recoge_lugar: f.recoge_lugar.trim(), recoge_horario: f.recoge_horario.trim(),
   horario_franjas: textoAFranjas(f.horario_franjas) ?? undefined, horario_intervalo_min: Number(f.horario_intervalo_min), horario_cupo: Number(f.horario_cupo), horario_margen_min: Number(f.horario_margen_min), horario_dias_adelante: Number(f.horario_dias_adelante),
 })
@@ -151,6 +155,12 @@ export function EntregaConfigEditor({ ver = verConfigEntrega, guardar = guardarC
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}><input type="checkbox" checked={f.estafeta_activo} onChange={(e) => set('estafeta_activo')(e.target.checked)} aria-label="Estafeta activo" /> Ofrecer Estafeta</label>
           <label style={{ fontSize: 12 }}>Estafeta llega en (días) mín.<input style={input} type="number" min={0} max={30} value={f.estafeta_transito_min} onChange={texto('estafeta_transito_min')} aria-label="Estafeta tránsito mínimo" disabled={!f.estafeta_activo} /></label>
           <label style={{ fontSize: 12 }}>Estafeta máx.<input style={input} type="number" min={0} max={30} value={f.estafeta_transito_max} onChange={texto('estafeta_transito_max')} aria-label="Estafeta tránsito máximo" disabled={!f.estafeta_activo} /></label>
+          {/* PAQ-AUTOBÚS · paqueterías de autobús (sin API: Almacén captura la guía); la fecha sale de estos días */}
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}><input type="checkbox" checked={f.etn_activo} onChange={(e) => set('etn_activo')(e.target.checked)} aria-label="ETN activo" /> Ofrecer ETN</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}><input type="checkbox" checked={f.tus_activo} onChange={(e) => set('tus_activo')(e.target.checked)} aria-label="Unidos de Sinaloa activo" /> Ofrecer Unidos de Sinaloa</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}><input type="checkbox" checked={f.tns_activo} onChange={(e) => set('tns_activo')(e.target.checked)} aria-label="Norte de Sinaloa activo" /> Ofrecer Norte de Sinaloa</label>
+          <label style={{ fontSize: 12 }}>Autobús llega en (días) mín.<input style={input} type="number" min={0} max={30} value={f.autobus_transito_min} onChange={texto('autobus_transito_min')} aria-label="Autobús tránsito mínimo" /></label>
+          <label style={{ fontSize: 12 }}>Autobús máx.<input style={input} type="number" min={0} max={30} value={f.autobus_transito_max} onChange={texto('autobus_transito_max')} aria-label="Autobús tránsito máximo" /></label>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 40 }}><input type="checkbox" checked={f.t1_activo} onChange={(e) => set('t1_activo')(e.target.checked)} aria-label="T1 activo" /> Ofrecer T1</label>
           <label style={{ fontSize: 12 }}>T1 llega en (días) mín.<input style={input} type="number" min={0} max={30} value={f.t1_transito_min} onChange={texto('t1_transito_min')} aria-label="T1 tránsito mínimo" disabled={!f.t1_activo} /></label>
           <label style={{ fontSize: 12 }}>T1 máx.<input style={input} type="number" min={0} max={30} value={f.t1_transito_max} onChange={texto('t1_transito_max')} aria-label="T1 tránsito máximo" disabled={!f.t1_activo} /></label>

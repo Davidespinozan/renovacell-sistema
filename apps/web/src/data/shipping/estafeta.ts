@@ -49,3 +49,30 @@ export async function registrarGuiaEstafeta(args: { orderId: string; guia: strin
     ...(args.paquete ? { paquete: args.paquete } : {}),   // ENVÍOS EXTRA
   })
 }
+
+// ═══ PAQ-AUTOBÚS (24 nov 2026, dueño) · paqueterías SIN API: Estafeta y las de autobús (ETN, Unidos de Sinaloa, Norte de
+// Sinaloa). Se eligen al vender (opción foraneo_<id>, misma regla foránea) y Almacén registra aquí la guía a mano.
+export const PAQ_MANUALES = { estafeta: 'Estafeta', etn: 'ETN', tus: 'Unidos de Sinaloa', tns: 'Norte de Sinaloa' } as const
+export type PaqManual = keyof typeof PAQ_MANUALES
+export const esPaqManual = (x: string | null | undefined): x is PaqManual => !!x && Object.prototype.hasOwnProperty.call(PAQ_MANUALES, x)
+
+/** Número de guía: Estafeta con su formato; las de autobús, 4 a 30 letras, números o guiones (se guarda en mayúsculas). */
+export function validarGuiaManual(p: PaqManual, raw: string): { ok: true; guia: string } | { ok: false; error: string } {
+  if (p === 'estafeta') return validarGuiaEstafeta(raw)
+  const g = String(raw ?? '').toUpperCase().replace(/\s+/g, '')
+  if (!g) return { ok: false, error: `Escribe el número de guía de ${PAQ_MANUALES[p]}.` }
+  if (!/^[A-Z0-9-]{4,30}$/.test(g)) return { ok: false, error: 'La guía lleva de 4 a 30 letras, números o guiones.' }
+  return { ok: true, guia: g }
+}
+
+/** Registra la guía manual de cualquier paquetería sin API como el envío del pedido (o de un envío extra). */
+export async function registrarGuiaManual(args: { paqueteria: PaqManual; orderId: string; guia: string; costo: number | null; llegaFecha: string | null; registradoPor: string | null; paquete?: number }, crear: typeof createShipment = createShipment): Promise<EnvioCreado> {
+  if (args.paqueteria === 'estafeta') return registrarGuiaEstafeta(args, crear)
+  return crear({
+    order_id: args.orderId, carrier: PAQ_MANUALES[args.paqueteria], tracking_number: args.guia, driver_id: null, label_url: null,
+    estimated_delivery_at: estimadaDeFecha(args.llegaFecha), status: 'in_transit',
+    provider: args.paqueteria, provider_cost: args.costo, currency: args.costo != null ? 'MXN' : null,
+    provider_meta: { manual: true, autobus: true, registrado_por: args.registradoPor },
+    ...(args.paquete ? { paquete: args.paquete } : {}),
+  })
+}

@@ -15,9 +15,10 @@ import { envioVigente } from '../../data/ops/seguimiento'
 import { quoteShipment, createShipmentReal, NOMBRE_PROVEEDOR, type RateQuote, type LabelResult, type ProveedorPaqueteria } from '../../data/shipping/provider'
 
 // PAQ-SIMPLE · con qué se hace la guía: DHL (API), Estafeta (manual por ahora) o T1 (agregador).
-type GuiaCon = ProveedorPaqueteria | 'estafeta'
-const GUIAS_CON: GuiaCon[] = ['dhl', 'estafeta', 't1']
-const NOMBRE_GUIA: Record<GuiaCon, string> = { ...NOMBRE_PROVEEDOR, estafeta: 'Estafeta (guía manual)' }
+// PAQ-AUTOBÚS (24 nov 2026) · ETN, Unidos de Sinaloa y Norte de Sinaloa: guía manual, igual que Estafeta.
+type GuiaCon = ProveedorPaqueteria | PaqManual
+const GUIAS_CON: GuiaCon[] = ['dhl', 'estafeta', 'etn', 'tus', 'tns', 't1']
+const NOMBRE_GUIA: Record<GuiaCon, string> = { ...NOMBRE_PROVEEDOR, estafeta: 'Estafeta (guía manual)', etn: 'ETN (manual)', tus: 'Unidos de Sinaloa (manual)', tns: 'Norte de Sinaloa (manual)' }
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
 import { currentCompany } from '../../data/store/companyStore'
@@ -32,7 +33,7 @@ import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
 import { NOMBRE_PAQUETERIA, estimadaDe, promesaDe, resumenPaqueteria, type EntregaPedido } from '../../data/ops/entrega'
 import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared/cotizarEnvio'   // PAQ-SIMPLE · la MISMA lista de servicios prohibidos que el servidor
-import { registrarGuiaEstafeta, urlRastreoEstafeta, validarCostoGuia, validarGuiaEstafeta } from '../../data/shipping/estafeta'
+import { PAQ_MANUALES, esPaqManual, registrarGuiaManual, urlRastreoEstafeta, validarCostoGuia, validarGuiaManual, type PaqManual } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 import { cantidadVista } from '../../lib/cajas'
 import { envioDePaquete, extrasDe, extrasSinGuia, lugarDe, pedidoDePaquete, type EnvioExtra } from '../../data/ops/enviosExtra'   // ENVÍOS EXTRA
@@ -210,7 +211,8 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
   const [method, setMethod] = useState<Method>(paquete > 0 ? 'paqueteria' : sugerido)   // ENT-3 · lo que se vendió manda; Empaque puede cambiarlo a sabiendas
   // PAQ-SIMPLE (23 nov 2026) · con qué se genera la guía: la paquetería que se vendió (DHL o Estafeta) viene preseleccionada;
   // Almacén puede cambiarla. T1 cotiza varias paqueterías a la vez. Estafeta, por ahora, es guía MANUAL (sin API).
-  const [proveedor, setProveedor] = useState<GuiaCon>(entregaPedido?.paqueteria === 't1' ? 't1' : entregaPedido?.paqueteria === 'estafeta' ? 'estafeta' : 'dhl')
+  const [proveedor, setProveedor] = useState<GuiaCon>(entregaPedido?.paqueteria === 't1' ? 't1' : esPaqManual(entregaPedido?.paqueteria) ? entregaPedido!.paqueteria as PaqManual : 'dhl')
+  const manual: PaqManual | null = esPaqManual(proveedor) ? proveedor : null   // PAQ-AUTOBÚS · paquetería sin API: guía a mano
   const [doneRecoge, setDoneRecoge] = useState(false)
   const [driverId, setDriverId] = useState('')
 
@@ -264,8 +266,8 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
     if (missing.length) return
     setBusy('quote'); setRates(null); setRateId('')
     try {
-      if (proveedor === 'estafeta') return
-      const r0 = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor, order.id)
+      if (manual) return
+      const r0 = await quoteShipment(shipperInfo.config, receiver, pkg, orderRef, proveedor as ProveedorPaqueteria, order.id)
       const r = proveedor === 'dhl' ? sinServiciosExcluidos(r0) : r0   // PAQ-SIMPLE · ECONOMY SELECT nunca se ofrece
       setRates(r); setRateId(r[0]?.id ?? '')
     } catch (e) { setError(mensajeProveedor((e as Error).message) || 'No se pudo cotizar.') }
@@ -274,13 +276,13 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
 
   const generarGuia = async () => {
     const rate = rates?.find((r) => r.id === rateId)
-    if (!rate || busy || proveedor === 'estafeta') return
+    if (!rate || busy || manual) return
     if (missing.length) return
     setBusy('label'); setError(null)
     try {
       const { label } = await createShipmentReal({
         order_id: order.id, orderRef, idempotencyKey: paquete > 0 ? `${order.id}:p${paquete}:${rate.id}` : `${order.id}:${rate.id}`,
-        shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor, ...(paquete > 0 ? { paquete } : {}),
+        shipper: shipperInfo.config, receiver, pkg, rate, provider: proveedor as ProveedorPaqueteria, ...(paquete > 0 ? { paquete } : {}),
       })
       // DHL persiste el shipment server-side (idempotente). Solo el mock inserta en cliente.
       if (label.provider === 'mock' || !label.provider) {
@@ -312,17 +314,19 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
   // PAQ-SIMPLE · Estafeta MANUAL: se registra la guía hecha en el portal de Estafeta y sigue el flujo normal (En camino).
   const guardarGuiaEstafeta = async () => {
     if (busy) return
-    const g = validarGuiaEstafeta(guiaManual.guia)
+    if (!manual) return
+    const nombre = PAQ_MANUALES[manual]
+    const g = validarGuiaManual(manual, guiaManual.guia)
     if (!g.ok) { setError(g.error); return }
     const c = validarCostoGuia(guiaManual.costo)
     if (!c.ok) { setError(c.error); return }
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(guiaManual.fecha) ? guiaManual.fecha : entregaPedido?.llega_hasta ?? null
     setBusy('label'); setError(null)
-    const r = await registrarGuiaEstafeta({ orderId: order.id, guia: g.guia, costo: c.costo, llegaFecha: fecha, registradoPor: sesion?.user?.name ?? null, ...(paquete > 0 ? { paquete } : {}) }, createShipment)
-    if (!r.ok) { setBusy(false); setError(`No se guardó la guía de Estafeta. ${r.error}`); return }
-    const label: LabelResult = { provider: 'estafeta', carrier: 'Estafeta', service: 'guía manual', tracking: g.guia, labelUrl: '', amount: c.costo ?? 0, etaDays: 0, estimatedDeliveryAt: r.shipment.estimated_delivery_at ?? '' }
+    const r = await registrarGuiaManual({ paqueteria: manual, orderId: order.id, guia: g.guia, costo: c.costo, llegaFecha: fecha, registradoPor: sesion?.user?.name ?? null, ...(paquete > 0 ? { paquete } : {}) }, createShipment)
+    if (!r.ok) { setBusy(false); setError(`No se guardó la guía de ${nombre}. ${r.error}`); return }
+    const label: LabelResult = { provider: manual as LabelResult['provider'], carrier: nombre, service: 'guía manual', tracking: g.guia, labelUrl: '', amount: c.costo ?? 0, etaDays: 0, estimatedDeliveryAt: r.shipment.estimated_delivery_at ?? '' }
     if (paquete > 0) { setResult(label); setBusy(false); return }   // ENVÍOS EXTRA · el pedido no cambia
-    const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: 'Estafeta', tracking: g.guia })
+    const enviado = await markShipped(order.id, { method: 'paqueteria', carrier: nombre, tracking: g.guia })
     setResult(label)
     if (!enviado.ok) setError(`La guía ${g.guia} sí quedó registrada, pero el pedido NO se marcó como enviado. ${enviado.error}`)
     setBusy(false)
@@ -384,7 +388,9 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
               </p>
               {error && <div className="sysnote" style={{ marginTop: 10, background: 'var(--warn-bg)', borderColor: '#EEDDB6', color: 'var(--warn)' }} data-testid="guia-aviso">{error}</div>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-                {result.provider === 'estafeta'
+                {esPaqManual(result.provider) && result.provider !== 'estafeta'
+                  ? <span className="pill p-green" data-testid="guia-manual-ok"><span className="d" /> Guía {result.carrier} registrada</span>
+                  : result.provider === 'estafeta'
                   ? <a className="btn" href={urlRastreoEstafeta(result.tracking)} target="_blank" rel="noreferrer" data-testid="estafeta-rastreo"><Icon name="truck" /> Ver rastreo en Estafeta</a>
                   : <a className="btn" href={result.labelUrl} target="_blank" rel="noreferrer"><Icon name="download" /> Imprimir etiqueta</a>}
                 <button className="btn ghost" type="button" onClick={onClose}>Listo</button>
@@ -478,7 +484,7 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
                     </div>
                     {prometido && (
                       <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--ok-bg)' }} data-testid="paqueteria-vendida">
-                        <b>Se vendió: {prometido}.</b> {proveedor === 'dhl' ? 'Elige el servicio de DHL que llegue a tiempo.' : proveedor === 'estafeta' ? 'Haz la guía en el portal de Estafeta y regístrala aquí.' : ''}
+                        <b>Se vendió: {prometido}.</b> {proveedor === 'dhl' ? 'Elige el servicio de DHL que llegue a tiempo.' : proveedor === 'estafeta' ? 'Haz la guía en el portal de Estafeta y regístrala aquí.' : manual ? `Lleva el paquete a ${PAQ_MANUALES[manual]} y registra aquí el número de guía.` : ''}
                       </div>
                     )}
                     {entregaPedido?.paqueteria && entregaPedido.paqueteria !== 'chofer' && entregaPedido.paqueteria !== proveedor && (
@@ -494,11 +500,11 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
                     </span>
                   </div>
 
-                  {proveedor === 'estafeta' ? (
+                  {manual ? (
                     <div style={{ display: 'grid', gap: 10 }} data-testid="estafeta-manual">
-                      <label style={labelStyle}>Guía manual de Estafeta</label>
-                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: -6 }}>Genera la guía en el portal de Estafeta con este destino y registra aquí el número. El cliente la ve en su seguimiento.</div>
-                      <input style={f2} aria-label="Número de guía de Estafeta" placeholder="Número de guía (22 caracteres) o código de rastreo (10 dígitos)" maxLength={30}
+                      <label style={labelStyle}>Guía manual de {PAQ_MANUALES[manual]}</label>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: -6 }}>{manual === 'estafeta' ? 'Genera la guía en el portal de Estafeta con este destino y registra aquí el número.' : `Documenta el paquete en ${PAQ_MANUALES[manual]} con este destino y registra aquí el número de guía.`} El cliente la ve en su seguimiento.</div>
+                      <input style={f2} aria-label={`Número de guía de ${PAQ_MANUALES[manual]}`} placeholder={manual === 'estafeta' ? 'Número de guía (22 caracteres) o código de rastreo (10 dígitos)' : 'Número de guía'} maxLength={30}
                         value={guiaManual.guia} onChange={(e) => setGuiaManual({ ...guiaManual, guia: e.target.value })} data-testid="estafeta-guia" />
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Costo (opcional)

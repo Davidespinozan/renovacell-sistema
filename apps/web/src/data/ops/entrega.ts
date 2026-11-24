@@ -4,7 +4,7 @@ import { hasSupabase, supabase } from '../../lib/supabase'
 import { promesaDeServicios } from '../../../../../supabase/functions/_shared/cotizarEnvio'   // PAQ-SIMPLE · la MISMA regla de promesa que la base
 
 export type TipoEntrega = 'mostrador' | 'recoge' | 'local' | 'foraneo'
-export type Paqueteria = 'chofer' | 'dhl' | 't1' | 'estafeta'   // PAQ-SIMPLE · Estafeta (fecha por regla hasta integrar su API)
+export type Paqueteria = 'chofer' | 'dhl' | 't1' | 'estafeta' | 'etn' | 'tus' | 'tns'   // PAQ-AUTOBÚS · ETN, Unidos de Sinaloa, Norte de Sinaloa   // PAQ-SIMPLE · Estafeta (fecha por regla hasta integrar su API)
 export interface OpcionEntrega {
   id: string; tipo: TipoEntrega; paqueteria: Paqueteria | null; flete: number; permitido: boolean; motivo: string | null; disponible: boolean
   salida: string; antes_de_corte: boolean; llega_desde: string; llega_hasta: string; texto: string
@@ -73,7 +73,7 @@ export function promesaCotizacion(c: Pick<CotizacionEnvio, 'servicios'> | null |
   return c ? promesaDeServicios(c.servicios ?? []) : null
 }
 /** Nombre corto de la paquetería para el cliente («DHL», «Estafeta»). */
-export const NOMBRE_PAQUETERIA: Record<string, string> = { dhl: 'DHL', estafeta: 'Estafeta', t1: 'T1', chofer: 'Chofer' }
+export const NOMBRE_PAQUETERIA: Record<string, string> = { dhl: 'DHL', estafeta: 'Estafeta', t1: 'T1', chofer: 'Chofer', etn: 'ETN', tus: 'Unidos de Sinaloa', tns: 'Norte de Sinaloa' }
 /** «lunes 24 de nov» (PAQ-SIMPLE · la fecha de llegada que ve el cliente). */
 export function fechaLlegada(iso: string | null | undefined, hoy?: string | null): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return ''
@@ -320,6 +320,8 @@ export interface EntregaConfig {
   dhl_transito_min: number; dhl_transito_max: number; t1_activo: boolean; t1_transito_min: number; t1_transito_max: number
   /** PAQ-SIMPLE · Estafeta: activa y días de tránsito (fecha por regla hasta integrar su API). */
   estafeta_activo: boolean; estafeta_transito_min: number; estafeta_transito_max: number
+  /** PAQ-AUTOBÚS · ETN / Unidos de Sinaloa / Norte de Sinaloa: activas y días de tránsito (comunes). */
+  etn_activo?: boolean; tus_activo?: boolean; tns_activo?: boolean; autobus_transito_min?: number; autobus_transito_max?: number
   local_mismo_dia: boolean; recoge_lugar: string; recoge_horario: string; updated_at?: string
   /** ENT-H · bloques de entrega local, intervalo, cupo por horario, margen del mismo día y días hacia adelante. */
   horario_franjas: Array<{ desde: string; hasta: string }>; horario_intervalo_min: number; horario_cupo: number; horario_margen_min: number; horario_dias_adelante: number
