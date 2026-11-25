@@ -61,14 +61,19 @@ const sel: React.CSSProperties = {
   fontFamily: 'inherit', fontSize: 13, backgroundColor: 'var(--cp-surface)', outline: 'none',
 }
 
-export function VentasDetalle() {
-  const { data: orders, loading: cargandoPedidos } = useAllOrders()
-  const { byOrder } = useOrderMoney()
+/** `fuente`: pedidos y dinero ya leídos (Ventas del equipo del jefe de ventas); sin ella, los de la sesión.
+ *  `soloLectura`: sin acciones de Dirección (crédito, devoluciones, guía, cancelar). */
+export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orders: OrderWithItems[]; byOrder: Record<string, OrderMoney>; cargando: boolean; vendedores?: Array<{ id: string; email: string; name: string }> }; soloLectura?: boolean } = {}) {
+  const propios = useAllOrders()
+  const dineroPropio = useOrderMoney()
+  const orders = fuente ? fuente.orders : propios.data
+  const cargandoPedidos = fuente ? fuente.cargando : propios.loading
+  const byOrder = fuente ? fuente.byOrder : dineroPropio.byOrder
   const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
   const { data: team } = useTeam()
-  const vendedores = useMemo(() => team.map((u) => ({ id: u.id, email: u.email, name: u.name })), [team])
+  const vendedores = useMemo(() => fuente?.vendedores?.length ? fuente.vendedores : team.map((u) => ({ id: u.id, email: u.email, name: u.name })), [team, fuente?.vendedores])
   const vendedorDeVenta = (o: OrderWithItems) => nombreVendedorDe(o, vendedores)
 
   const productsById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])) as Record<string, ProductSafe | undefined>, [products])
@@ -248,7 +253,7 @@ export function VentasDetalle() {
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} />
+        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
       )}
       {cancelling && (
         <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
@@ -286,7 +291,8 @@ function EntregaDeLaVenta({ order }: { order: OrderWithItems }) {
   )
 }
 
-function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel }: {
+function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel, soloLectura = false }: {
+  soloLectura?: boolean
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
@@ -307,7 +313,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   const topeReembolso = Math.min(restante, dinero ? dinero.cobrado_neto : restante)
   // Un pedido CANCELADO que ya se cobró también se reembolsa (Revisión económica manda aquí); solo dinero: el
   // producto regresa por el reingreso de la cancelación.
-  const puedeDevolver = order.status !== 'draft' && topeReembolso > 0.0001
+  const puedeDevolver = !soloLectura && order.status !== 'draft' && topeReembolso > 0.0001
   const lib = dinero ? etiquetaLiberacion(dinero) : null
   const [showForm, setShowForm] = useState(false)
   return (
@@ -404,9 +410,9 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
             </div>
           )}
 
-          {order.status === 'packed' && <GuiaManualVoid orderId={order.id} />}
+          {!soloLectura && order.status === 'packed' && <GuiaManualVoid orderId={order.id} />}
 
-          {isCancelable(order.status) && (
+          {!soloLectura && isCancelable(order.status) && (
             <div style={{ marginTop: 16, textAlign: 'right' }}>
               <button className="btn ghost sm" type="button" style={{ color: 'var(--danger)' }} onClick={onCancel}>Cancelar pedido</button>
             </div>

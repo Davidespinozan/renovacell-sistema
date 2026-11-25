@@ -41,6 +41,6 @@ describe('Metas y comisiones · jefe de ventas', () => {
   })
   it('la capacidad "Jefe de ventas" suma el módulo al menú del vendedor', () => {
     expect(CAPABILITIES.find((c) => c.key === 'jefe_ventas')?.label).toBe('Jefe de ventas')
-    expect(capabilityModules(['jefe_ventas']).map((m) => m.key)).toEqual(['av_comisiones'])
+    expect(capabilityModules(['jefe_ventas']).map((m) => m.key)).toEqual(['av_comisiones', 'ventas_equipo'])
   })
 })

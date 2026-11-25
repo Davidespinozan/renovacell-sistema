@@ -75,6 +75,7 @@ const Promociones = lazyPantalla(() => import('./admin/Promociones').then((m) =>
 const RevisionFiscal = lazyPantalla(() => import('./admin/RevisionFiscal').then((m) => m.RevisionFiscal))
 const Comunicaciones = lazyPantalla(() => import('./admin/Comunicaciones').then((m) => m.Comunicaciones))
 const Comisiones = lazyPantalla(() => import('./admin/Comisiones').then((m) => m.Comisiones))
+const VentasEquipo = lazyPantalla(() => import('./sales/VentasEquipo').then((m) => m.VentasEquipo))   // VENTAS DEL EQUIPO (jefe de ventas)
 const Configuracion = lazyPantalla(() => import('./admin/Configuracion').then((m) => m.Configuracion))
 const Conocimiento = lazyPantalla(() => import('./admin/Conocimiento').then((m) => m.Conocimiento)) // CC-3
 const ManualVentas = lazyPantalla(() => import('./admin/ManualVentas').then((m) => m.ManualVentas)) // R4-C10
@@ -138,6 +139,7 @@ const SCREENS: Record<string, () => React.ReactNode> = {
   av_precios: () => <Precios />,
   av_promociones: () => <Promociones />,   // PROMO-2 · pestaña de Catálogo
   av_comisiones: () => <Comisiones />,
+  ventas_equipo: () => <VentasEquipo />,
   av_conocimiento: () => <Conocimiento />,
   av_manual_ventas: () => <ManualVentas />,   // R4-C10
   av_ia: () => <AsesoraIA />,
