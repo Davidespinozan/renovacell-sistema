@@ -92,7 +92,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="nav">
         {plano && <div className="nav-hub nav-plano">{[...hub, ...modules].map(Link)}</div>}
         {!plano && <>
-        {/* Inicio + Avisos/Chat del equipo. En móvil el hub del staff vive en el bottom-nav → se oculta aquí. */}
+        {/* Inicio + Avisos/Chat del equipo. También en móvil: la barra inferior lleva el trabajo del rol, no el hub. */}
         {hub.length > 0 && (
           <div className="nav-hub">
             <button type="button" className={`grp grp-btn${estaAbierta(HUB) ? ' abierta' : ''}`} aria-expanded={estaAbierta(HUB)} onClick={() => alternar(HUB)} data-testid={`seccion-${HUB}`}>

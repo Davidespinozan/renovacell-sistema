@@ -73,7 +73,8 @@
 /* --- Hub (Inicio/Chat) en el sidebar: visible en escritorio, oculto en móvil
    (en móvil ya está en el bottom-nav, evita duplicar). ----------------------- */
 .nav-hub { display: flex; flex-direction: column; gap: 2px; }
-@media (max-width: 900px) { .nav-hub:not(.nav-plano) { display: none; } }   /* el menú plano del doctor NO vive en la barra inferior: debe verse en el cajón */
+/* 25 nov 2026: ya NO se oculta en móvil. Desde el 15 nov la barra inferior lleva el trabajo de cada rol, así que Inicio,
+   Avisos y Chat del equipo solo están en el cajón del Menú; ocultarlos aquí los dejaba sin ningún acceso en el celular. */
 
 /* --- Indicador de rol activo en el sidebar (sobre el verde) ----------------- */
 .side-role { display: flex; align-items: center; gap: 8px; margin: 0 22px 14px; padding: 7px 13px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; }
