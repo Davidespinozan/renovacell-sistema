@@ -2,8 +2,10 @@
 // tiene además las suyas. Se leen con RLS y se escriben solo con cc_respuesta_guardar / cc_respuesta_borrar (migración 161).
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { primerNombre } from '../../lib/nombres'
+import { reducirFoto } from './verificacion'
 
-export interface RespuestaRapida { id: string; profile_id: string | null; titulo: string; texto: string; orden: number }
+export interface RespuestaRapida { id: string; profile_id: string | null; titulo: string; texto: string; orden: number; fotos?: string[] }   // RR-FOTOS · rutas del bucket «respuestas» (máx. 4)
+export const MAX_FOTOS_RESPUESTA = 4
 export type Resultado = { ok: true } | { ok: false; mensaje: string }
 
 // Sin backend (vista previa local): las mismas de la empresa que siembra la migración.
@@ -39,18 +41,19 @@ const rpc: Rpc = (fn, args) => (supabase.rpc as unknown as Rpc)(fn, args)
 export const respuestasRapidas = {
   async listar(): Promise<RespuestaRapida[]> {
     if (!hasSupabase) return RESPUESTAS_BASE
-    const { data, error } = await supabase.from('cc_respuestas_rapidas').select('id, profile_id, titulo, texto, orden').order('orden').order('created_at')
+    const { data, error } = await supabase.from('cc_respuestas_rapidas').select('id, profile_id, titulo, texto, orden, fotos').order('orden').order('created_at')
     if (error) return []
     // Primero las propias (las usa más quien las escribió), luego las de la empresa.
-    const filas = (data ?? []) as RespuestaRapida[]
+    const filas = (data ?? []).map((r) => ({ ...r, fotos: Array.isArray(r.fotos) ? (r.fotos as string[]) : [] })) as RespuestaRapida[]
     return [...filas.filter((r) => r.profile_id), ...filas.filter((r) => !r.profile_id)]
   },
-  async guardar(r: { id?: string; titulo: string; texto: string; empresa: boolean }): Promise<Resultado> {
+  async guardar(r: { id?: string; titulo: string; texto: string; empresa: boolean; fotos?: string[] }): Promise<Resultado> {
     if (!hasSupabase) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
     const titulo = r.titulo.trim(); const texto = r.texto.trim()
     if (titulo.length < 2 || texto.length < 2) return { ok: false, mensaje: 'Escribe un título y un texto.' }
-    const { error } = await rpc('cc_respuesta_guardar', { p_id: r.id ?? null, p_titulo: titulo, p_texto: texto, p_empresa: r.empresa })
+    const { error } = await rpc('cc_respuesta_guardar', { p_id: r.id ?? null, p_titulo: titulo, p_texto: texto, p_empresa: r.empresa, ...(r.fotos ? { p_fotos: r.fotos } : {}) })
     if (!error) return { ok: true }
+    if (/FOTOS_INVALIDAS/.test(error.message ?? '')) return { ok: false, mensaje: 'Una foto no se subió bien. Quítala y vuelve a agregarla.' }
     if (/DATOS_INVALIDOS/.test(error.message ?? '')) return { ok: false, mensaje: 'El título va de 2 a 40 caracteres y el texto hasta 1000.' }
     return { ok: false, mensaje: /NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección cambia las respuestas de la empresa.' : 'No se pudo guardar.' }
   },
@@ -60,4 +63,36 @@ export const respuestasRapidas = {
     return error ? { ok: false, mensaje: /NO_AUTORIZADO/.test(error.message ?? '') ? 'Solo Dirección borra las respuestas de la empresa.' : 'No se pudo borrar.' } : { ok: true }
   },
 }
-export type ClienteRespuestas = typeof respuestasRapidas
+// ═══ RR-FOTOS (24 nov 2026) · fotos de las respuestas: se reducen en el dispositivo (JPEG ≤1600 px), se suben a la carpeta
+// de quien las agrega y, al usar la respuesta, se mandan por el mismo camino que el botón de fotos del chat.
+const dataUrlABlob = async (u: string) => (await fetch(u)).blob()
+export const fotosRespuestas = {
+  async subirFoto(file: File): Promise<{ ok: true; ruta: string } | { ok: false; mensaje: string }> {
+    if (!hasSupabase) return { ok: false, mensaje: 'Requiere conexión con el servidor.' }
+    if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) return { ok: false, mensaje: 'Solo fotos (JPG o PNG).' }
+    const dataUrl = await reducirFoto(file)
+    if (!dataUrl) return { ok: false, mensaje: 'No se pudo leer la foto.' }
+    const { data: u } = await supabase.auth.getUser()
+    if (!u.user) return { ok: false, mensaje: 'Tu sesión expiró. Vuelve a entrar.' }
+    const ruta = `${u.user.id}/${crypto.randomUUID()}.jpg`
+    const { error } = await supabase.storage.from('respuestas').upload(ruta, await dataUrlABlob(dataUrl), { contentType: 'image/jpeg' })
+    return error ? { ok: false, mensaje: 'No se pudo subir la foto. Intenta de nuevo.' } : { ok: true, ruta }
+  },
+  /** Ligas temporales para ver las fotos (miniaturas). */
+  async urls(rutas: string[]): Promise<Record<string, string>> {
+    if (!hasSupabase || !rutas.length) return {}
+    const { data } = await supabase.storage.from('respuestas').createSignedUrls(rutas, 3600)
+    return Object.fromEntries((data ?? []).filter((x) => x.path && x.signedUrl).map((x) => [x.path as string, x.signedUrl as string]))
+  },
+  /** La foto lista para mandarse por el chat (data URL JPEG/PNG). */
+  async comoDataUrl(ruta: string): Promise<string | null> {
+    if (!hasSupabase) return null
+    const { data, error } = await supabase.storage.from('respuestas').download(ruta)
+    if (error || !data) return null
+    return new Promise((resolve) => { const fr = new FileReader(); fr.onload = () => resolve(typeof fr.result === 'string' ? fr.result : null); fr.onerror = () => resolve(null); fr.readAsDataURL(data) })
+  },
+}
+export type FotosRespuestas = typeof fotosRespuestas
+export type ClienteRespuestas = typeof respuestasRapidas & Partial<FotosRespuestas>
+/** Lo que usa el chat: respuestas + sus fotos. */
+export const respuestasConFotos: ClienteRespuestas = { ...respuestasRapidas, ...fotosRespuestas }

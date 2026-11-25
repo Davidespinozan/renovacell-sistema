@@ -315,6 +315,12 @@
 .rc-rr-form{display:flex;flex-direction:column;gap:6px;padding:4px 14px}
 .rc-rr-form input,.rc-rr-form textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--line);font:inherit;font-size:13px;resize:vertical;background:var(--bg);color:var(--ink)}
 .rc-rr-check{display:flex;align-items:center;gap:6px;font-size:12.5px}
+.rc-rr-tag svg{vertical-align:-1px}
+.rc-rr-fotos{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rc-rr-foto{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--cp-surface)}
+.rc-rr-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.rc-rr-foto-cargando{display:block;width:100%;height:100%;background:var(--line)}
+.rc-rr-foto-quitar{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:999px;border:0;display:grid;place-items:center;background:var(--ink);color:var(--cp-surface);cursor:pointer;opacity:.85}
 .rc-rr-acciones{display:flex;gap:6px}
 .rc-rr-error{color:var(--danger);font-size:12.5px;padding:0 14px 6px}
 .rc-enlace-cand{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;background:var(--hueso);border-radius:8px;padding:6px 10px}

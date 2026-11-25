@@ -10,7 +10,7 @@ import { MARCA_PROMO } from '../../data/ops/promociones'
 import { MARCA_DIFUSION } from '../../data/ops/difusiones'
 import { TarjetaDifusion } from './TarjetaDifusion'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, MapPin, Paperclip, Pencil, Plus, Reply, Search, Send, X, Zap } from 'lucide-react'
+import { Check, CheckCheck, ChevronDown, ChevronUp, Download, FileText, Image as ImageIcon, MapPin, Paperclip, Pencil, Plus, Reply, Search, Send, X, Zap } from 'lucide-react'
 import { enlaceMaps, leerUbicacion } from '../../../../../supabase/functions/_shared/ubicacion'   // UBICACIÓN EN EL CHAT
 import { ACEPTA, claseDe, pesoLegible, problemaArchivo, tipoDe } from '../../data/ops/adjuntosEquipo'
 import { normalizar, partesResaltadas } from '../../data/ops/busqueda'
@@ -27,7 +27,7 @@ import { etiquetaActor, type Visor } from '../../data/ops/sesionesPresentacion'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 import { RespuestasRapidas } from './RespuestasRapidas'
 import { RetomarWhatsApp } from './RetomarWhatsApp'   // WA-PLANTILLAS   // CHAT PRO · textos listos del personal
-import { aplicarNombre, filtrar, respuestasRapidas as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
+import { aplicarNombre, filtrar, respuestasConFotos as respuestasPorDefecto, type ClienteRespuestas, type RespuestaRapida } from '../../data/ops/respuestasRapidas'
 import { pedirAvisos } from '../../data/store/puertaAvisos'   // PUSH SIEMPRE
 import { EVENTO_ABRIR_CHAT, tomarBorrador } from '../../data/store/chatUiStore'   // IA-VENDEDORA
 
@@ -456,9 +456,11 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
   }, [accAbierto])
   const conAcciones = asesor && !!acciones?.length && !finAtencion
   useEffect(() => { if (!conAcciones) setAccAbierto(false) }, [conAcciones])
+  // RR-FOTOS · la respuesta elegida puede traer fotos: salen al enviar, después del texto y por la misma conversación.
+  const [rrFotos, setRrFotos] = useState<string[]>([])
   const elegirRespuesta = (r: RespuestaRapida) => {
     const t = aplicarNombre(r.texto, nombreCliente)
-    setRrBoton(false); setTexto(t)
+    setRrBoton(false); setTexto(t); setRrFotos(respuestas?.comoDataUrl ? r.fotos ?? [] : [])
     window.setTimeout(() => { const el = area.current; if (el) { el.focus(); autoAlto(el); el.setSelectionRange?.(t.length, t.length) } }, 0)
   }
 
@@ -495,8 +497,9 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (e.clientX - d.x > 60) responderA(m)
   }
   // Enviar con idempotencia: el MISMO client_message_id en cada reintento → nunca se duplica.
-  const enviarTexto = async (t: string, clientId: string, respondeA: string | null = null) => {
-    if (!convId || enviando) return
+  /** Devuelve la conversación por la que salió el texto (o null si no salió). */
+  const enviarTexto = async (t: string, clientId: string, respondeA: string | null = null): Promise<string | null> => {
+    if (!convId || enviando) return null
     setEnviando(true); setError(null)
     setPendiente({ clientId, texto: t, error: null })
     const otro = destinoEfectivo && destinoEfectivo !== convId ? destinoEfectivo : null
@@ -506,26 +509,41 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       if (!r.ok && ['asesoria_no_iniciada', 'no_autorizado', 'transicion_invalida'].includes(r.error.codigo)) {
         const rt = await retomar(otro)
         if (rt.ok) r = await cliente.enviar(otro, t, clientId, respondeA)
-        else { setPendiente({ clientId, texto: t, error: rt.mensaje }); setEnviando(false); return }
+        else { setPendiente({ clientId, texto: t, error: rt.mensaje }); setEnviando(false); return null }
       }
-      if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
+      if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return null }
       await recargarPersona()
       setPendiente(null); setEnviando(false)
-      return
+      return otro
     }
     if (soyResponsable || iniciaAlEscribir) {
       // CONV-WHATSAPP · primero retomar (o iniciar la asignada); si no se puede, el mensaje queda para reintentar.
       const previo = soyResponsable ? await retomar(convId)
         : await cliente.iniciar(convId).then((x) => (x.ok ? { ok: true as const } : { ok: false as const, mensaje: x.error.mensaje }))
-      if (!previo.ok) { setPendiente({ clientId, texto: t, error: previo.mensaje }); setEnviando(false); return }
+      if (!previo.ok) { setPendiente({ clientId, texto: t, error: previo.mensaje }); setEnviando(false); return null }
       await cargar(convId, 0)
     }
     const r = await cliente.enviar(convId, t, clientId, respondeA)
-    if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return }
+    if (!r.ok) { setPendiente({ clientId, texto: t, error: r.error.mensaje }); setEnviando(false); return null }
     if (r.data.ia === 'en_curso') setEsperaIA({ seq: r.data.seq, desde: Date.now() })
     await cargar(convId, ultimoSeq.current)
     setPendiente(null); setEnviando(false)
     if (!asesor) pedirAvisos('chat')   // PUSH SIEMPRE · el doctor acaba de escribir: que se entere cuando le respondan
+    return convId
+  }
+  // RR-FOTOS · manda las fotos de la respuesta rápida, una por una, por el mismo camino que el botón de fotos.
+  const mandarFotosRespuesta = async (destino: string, rutas: string[]) => {
+    if (!respuestas?.comoDataUrl) return
+    let fallidas = 0
+    for (let i = 0; i < rutas.length; i++) {
+      setSubiendo(`foto ${i + 1} de ${rutas.length}`)
+      const dataUrl = await respuestas.comoDataUrl(rutas[i])
+      const r = dataUrl ? await cliente.adjuntar(destino, dataUrl) : { ok: false }
+      if (!r.ok) fallidas++
+    }
+    setSubiendo(null)
+    if (fallidas) setError(fallidas === rutas.length ? 'El texto salió, pero las fotos no. Mándalas con el clip.' : `El texto salió, pero ${fallidas} ${fallidas === 1 ? 'foto no salió' : 'fotos no salieron'}. Mándala${fallidas === 1 ? '' : 's'} con el clip.`)
+    if (destino === convId) await cargar(convId, ultimoSeq.current); else await recargarPersona()
   }
   // EDITAR-MENSAJES · como WhatsApp: el texto sube al cuadro, se corrige y se guarda (el cliente ve «editado»).
   const [editando, setEditando] = useState<Mensaje | null>(null)
@@ -550,7 +568,10 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
     if (area.current) area.current.style.height = 'auto'
     const respondeA = respondiendo?.id ?? null
     setRespondiendo(null)
-    await enviarTexto(t, nuevoClientId(), respondeA)
+    const fotos = rrFotos
+    setRrFotos([])
+    const destino = await enviarTexto(t, nuevoClientId(), respondeA)
+    if (destino && fotos.length) await mandarFotosRespuesta(destino, fotos)
   }
   // FOTOS · mandar una imagen: se reduce en el dispositivo y viaja con su propio id (reintento sin duplicar).
   // CHAT-ARCHIVOS (3 nov 2026) · el mismo botón manda videos y documentos (hasta 50 MB) por la subida firmada.
@@ -908,6 +929,12 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
           onCambio={cargarRespuestas} cliente={respuestas} puedeEmpresa={puedeEmpresa} nombre={nombreCliente} />
       )}
       {subiendo && <div className="rc-subiendo" role="status" data-testid="subiendo">Subiendo {subiendo}…</div>}
+      {rrFotos.length > 0 && !editando && (
+        <div className="rc-respondiendo" data-testid="rr-fotos-pendientes">
+          <ImageIcon size={14} aria-hidden /><span><b>{rrFotos.length === 1 ? 'Va 1 foto' : `Van ${rrFotos.length} fotos`} con este mensaje</b><small>Salen después del texto, al enviar.</small></span>
+          <button type="button" className="rc-ico" onClick={() => setRrFotos([])} aria-label="No mandar las fotos" title="No mandar las fotos" data-testid="rr-fotos-quitar"><X size={16} /></button>
+        </div>
+      )}
       {persona && (
         <div className="rc-canal-sel" role="radiogroup" aria-label="Responder por" data-testid="responder-por">
           <span>Responder por</span>

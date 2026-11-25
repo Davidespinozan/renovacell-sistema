@@ -2440,6 +2440,7 @@ export type Database = {
       cc_respuestas_rapidas: {
         Row: {
           created_at: string
+          fotos: Json
           id: string
           orden: number
           profile_id: string | null
@@ -2449,6 +2450,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          fotos?: Json
           id?: string
           orden?: number
           profile_id?: string | null
@@ -2458,6 +2460,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          fotos?: Json
           id?: string
           orden?: number
           profile_id?: string | null
