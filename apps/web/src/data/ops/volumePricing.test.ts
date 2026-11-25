@@ -87,7 +87,8 @@ describe('reglas del pedido (espejo de _qty_volumen)', () => {
     expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 5 }], 'B', 800)).toBe(720)
     expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 4 }], 'B', 800)).toBe(800)
     expect(precio([{ product_id: 'A', qty: 5 }, { product_id: 'C', qty: 5 }], 'A', 1300)).toBe(1300)   // el de 5 no se junta
-    expect(precio([{ product_id: 'A', qty: 25 }, { product_id: 'B', qty: 25 }], 'A', 1300)).toBe(1170)  // juntar no llega a mayoreo
+    expect(precio([{ product_id: 'A', qty: 25 }, { product_id: 'B', qty: 24 }], 'A', 1300)).toBe(1170)  // 49 cajas: juntar solo da medio
+    expect(precio([{ product_id: 'A', qty: 25 }, { product_id: 'B', qty: 25 }], 'A', 1300)).toBe(800)   // MAYOREO-50 · 50 cajas: todo a mayoreo
   })
   it('uno en mayoreo: todo el pedido a su mayoreo', () => {
     const L = [{ product_id: 'A', qty: 50 }, { product_id: 'B', qty: 1 }, { product_id: 'C', qty: 1 }]
@@ -99,5 +100,35 @@ describe('reglas del pedido (espejo de _qty_volumen)', () => {
     expect(etiquetaNivel(800, r, 'B', 1, cantidadesVolumen(L, r).B)).toBe('Mayoreo por tu pedido')
     const J = [{ product_id: 'A', qty: 5 }, { product_id: 'B', qty: 5 }]
     expect(etiquetaNivel(800, r, 'B', 5, cantidadesVolumen(J, r).B)).toBe('Medio mayoreo juntando piezas')
+  })
+})
+
+// MAYOREO-50 (24 nov 2026) · 50 cajas del pedido (juntando productos) → todo a mayoreo; agujas y metabólicos no cuentan.
+import { cantidadesVolumen as cv50, cajasParaMayoreo, oportunidadesVolumen as op50 } from './volumePricing'
+describe('MAYOREO-50 · 50 cajas del pedido', () => {
+  const R = (product_id: string, medio: number, pm: number, may: number, pM: number) => [
+    { product_id, min_quantity: medio, price: pm, active: true, nivel: 'medio' as const },
+    { product_id, min_quantity: may, price: pM, active: true, nivel: 'mayoreo' as const }]
+  const rules = [...R('nab', 10, 1170, 50, 800), ...R('xel', 10, 1800, 20, 1500), ...R('h24', 10, 45, 50, 30), ...R('ult', 10, 6750, 20, 4500),
+    { product_id: 'mou', min_quantity: 5, price: 6745, active: true, nivel: 'medio' as const }]
+  const info = { h24: { junta_mayoreo: false }, mou: { junta_mayoreo: false }, ult: { unit: 'Media caja/10 viales' } }
+  it('40 NABOTA + 10 Xelaju = 50 cajas → los dos a mayoreo (el caso de Ventas)', () => {
+    expect(cv50([{ product_id: 'nab', qty: 40 }, { product_id: 'xel', qty: 10 }], rules, info)).toEqual({ nab: 50, xel: 20 })
+  })
+  it('49 cajas no alcanza', () => {
+    expect(cv50([{ product_id: 'nab', qty: 30 }, { product_id: 'xel', qty: 19 }], rules, info)).toEqual({ nab: 30, xel: 19 })
+  })
+  it('agujas y metabólicos no suman ni bajan por el pedido; una aguja en su mayoreo no arrastra a los demás', () => {
+    expect(cv50([{ product_id: 'mou', qty: 45 }, { product_id: 'nab', qty: 5 }], rules, info)).toEqual({ mou: 45, nab: 5 })
+    expect(cv50([{ product_id: 'h24', qty: 50 }, { product_id: 'nab', qty: 10 }], rules, info)).toEqual({ h24: 50, nab: 10 })
+    expect(cv50([{ product_id: 'nab', qty: 50 }, { product_id: 'mou', qty: 2 }], rules, info)).toEqual({ nab: 50, mou: 2 })
+  })
+  it('media caja cuenta 1/2: 18 medias (9 cajas) + 41 = 50', () => {
+    expect(cajasParaMayoreo([{ product_id: 'ult', qty: 18 }, { product_id: 'nab', qty: 41 }, { product_id: 'h24', qty: 100 }], info)).toBe(50)
+    expect(cv50([{ product_id: 'ult', qty: 18 }, { product_id: 'nab', qty: 41 }], rules, info)).toEqual({ ult: 20, nab: 50 })
+  })
+  it('la sugerencia de ahorro ve que con 1 pieza más se llega a 50 cajas', () => {
+    const ops = op50([{ product_id: 'nab', qty: 39, base: 1300 }, { product_id: 'xel', qty: 10, base: 2000 }], rules, info)
+    expect(ops.find((o) => o.product_id === 'nab')?.faltan).toBe(1)
   })
 })

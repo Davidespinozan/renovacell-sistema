@@ -16,6 +16,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useOrders } from '../../data/hooks/useOrders'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { useInfoMayoreo } from '../../data/hooks/useInfoMayoreo'
 import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { stockByProduct, stockInfoFor } from '../../data/ops/stock'
 import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryLocationPicker'
@@ -101,8 +102,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const claveBorrador = `pedido:${quien}:${customer?.id ?? doctor?.id ?? 'sin'}`   // por persona del equipo y cliente
   const [inicialB] = useState(() => (initialCart ? null : leerBorrador<{ cart: Record<string, number>; invoice: boolean }>(claveBorrador)))
   const [cart, setCart] = useState<Record<string, number>>(() => initialCart ?? inicialB?.cart ?? {})
+  const infoMayoreo = useInfoMayoreo()   // MAYOREO-50 · 50 cajas del pedido
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
-  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules, infoMayoreo), [cart, volRules, infoMayoreo])
   const [invoice, setInvoice] = useState(() => inicialB?.invoice ?? false)
   const [choice, setChoice] = useState<DeliveryChoice | null>(null)   // flujo doctor
   const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo

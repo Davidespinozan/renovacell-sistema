@@ -15,6 +15,7 @@ import { useOrders } from '../../data/hooks/useOrders'
 import { usePricing } from '../../data/hooks/usePricing'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel, volumeSavings, type VolumeRule } from '../../data/ops/volumePricing'
+import { useInfoMayoreo } from '../../data/hooks/useInfoMayoreo'
 import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { useStock } from '../../data/hooks/useStock'
 import { stockInfoFor, type StockInfo } from '../../data/ops/stock'
@@ -65,8 +66,9 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
   const canon = useCarritoCanonico(hasSupabase)            // CC-7 · carrito canónico (servidor)
   const [cartLocal, setCartLocal] = useState<Cart>({})      // solo modo demo (sin backend)
   const cart: Cart = hasSupabase ? canon.qty : cartLocal
+  const infoMayoreo = useInfoMayoreo()   // MAYOREO-50 · 50 cajas del pedido
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
-  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules, infoMayoreo), [cart, volRules, infoMayoreo])
   const setQty = (id: string, n: number) => {
     if (hasSupabase) { void canon.fijar(id, n); return }
     setCartLocal((c) => { if (n <= 0) { const { [id]: _d, ...rest } = c; return rest } return { ...c, [id]: n } })
@@ -527,7 +529,7 @@ function CartPanel({
             nombreDe={(id) => lines.find((l) => l.product.id === id)?.product.name ?? 'este producto'} onAgregar={onAgregar} disponible={disponible} />
           {/* MAYOREO-REGLAS · cómo se arma el precio por cantidad del pedido */}
           <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="reglas-mayoreo">
-            Puedes juntar piezas de distintos productos para llegar al medio mayoreo de 10. Si un producto llega a su mayoreo, todo tu pedido va a precio de mayoreo.
+            Puedes juntar piezas de distintos productos para llegar al medio mayoreo de 10. Con 50 cajas en tu pedido (juntando productos distintos), o si un producto llega a su mayoreo, todo tu pedido va a precio de mayoreo. No cuentan las microagujas H24/H36/HR ni Mounjaro, Wegovy y Saxenda.
           </div>
           <div className="tket-total" style={{ marginTop: 12, borderTop: '1px solid var(--line)' }}>
             <span>Total</span>

@@ -34,7 +34,7 @@ export function Precios() {
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Precios">
         <b>General</b> es el precio normal de cada producto. En <b>Descuentos por cantidad</b> viven el
-        <b> medio mayoreo</b> y el <b>mayoreo</b>, desde N piezas del mismo producto. Reglas del pedido: si un producto llega a su mayoreo, todo el pedido va a mayoreo; los productos con medio mayoreo de 10 piezas se pueden juntar (5 + 5) para el medio mayoreo.
+        <b> medio mayoreo</b> y el <b>mayoreo</b>, desde N piezas del mismo producto. Reglas del pedido: con 50 cajas en el pedido (juntando productos distintos) o si un producto llega a su mayoreo, todo el pedido va a mayoreo (no cuentan microagujas H24/H36/HR ni Mounjaro, Wegovy y Saxenda); los productos con medio mayoreo de 10 piezas se pueden juntar (5 + 5) para el medio mayoreo.
       </PageHead>
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>

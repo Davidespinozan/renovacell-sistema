@@ -21,6 +21,7 @@ import { saldoPorProducto, custodiaAbiertaDe, subscribeDisponible, getDisponible
 import { currentUserId } from '../../lib/supabase'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'   // PROMO-1 · volumen + promociones vigentes
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumeSavings, volumePromoLabel } from '../../data/ops/volumePricing'
+import { useInfoMayoreo } from '../../data/hooks/useInfoMayoreo'
 import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { useRole } from '../../auth/RoleContext'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
@@ -114,8 +115,9 @@ export function Caja() {
   }, [sellable, buscar])
 
   const [cart, setCart] = useState<Record<string, number>>({})
+  const infoMayoreo = useInfoMayoreo()   // MAYOREO-50 · 50 cajas del pedido
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
-  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules, infoMayoreo), [cart, volRules, infoMayoreo])
   // COBRO-U · la misma «Forma de pago» que en todos los puntos de venta (en mostrador: con pago o crédito).
   const [cobro, setCobro] = useState<CobroElegido | null>({ forma: 'efectivo' })
   const method = cobro?.forma ?? 'efectivo'

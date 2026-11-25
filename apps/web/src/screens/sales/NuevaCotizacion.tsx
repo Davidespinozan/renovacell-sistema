@@ -9,6 +9,7 @@ import { esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJ
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useReglasPrecio } from '../../data/hooks/useReglasPrecio'
 import { cantidadesVolumen, effectiveUnitPrice, etiquetaNivel, volumePromoLabel } from '../../data/ops/volumePricing'
+import { useInfoMayoreo } from '../../data/hooks/useInfoMayoreo'
 import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import type { ClienteChat } from '../../data/ops/chat'
@@ -32,8 +33,9 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
   const claveBorrador = `cotizacion:${quien}:${customer.id}`   // por persona del equipo y cliente
   const [inicial] = useState(() => leerBorrador<{ cart: Record<string, number>; notas: string }>(claveBorrador))
   const [cart, setCart] = useState<Record<string, number>>(() => inicial?.cart ?? {})
+  const infoMayoreo = useInfoMayoreo()   // MAYOREO-50 · 50 cajas del pedido
   // MAYOREO-REGLAS · piezas que cuentan para el volumen con TODO el pedido (juntar 10 / uno en mayoreo → todo a mayoreo).
-  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules), [cart, volRules])
+  const vq = useMemo(() => cantidadesVolumen(Object.entries(cart).map(([product_id, qty]) => ({ product_id, qty })), volRules, infoMayoreo), [cart, volRules, infoMayoreo])
   const [notas, setNotas] = useState(() => inicial?.notas ?? '')
   const [hecha, setHecha] = useState<Cotizacion | null>(null)
   const [ocupado, setOcupado] = useState(false)

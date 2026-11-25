@@ -30,8 +30,23 @@ begin
   perform tests.ok(public.precio_de(a, null, 5, (q ->> a::text)::int) = 1300, '2 · el Botox (medio en 5) no cuenta para juntar 10');
   q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', c, 'qty', 3), jsonb_build_object('product_id', c, 'qty', 2)));
   perform tests.eq((q ->> c::text)::int, 5, '2 · el mismo producto en dos renglones se suma');
+  q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', a, 'qty', 25), jsonb_build_object('product_id', b, 'qty', 24)));
+  perform tests.ok(public.precio_de(a, null, 25, (q ->> a::text)::int) = 1170 and public.precio_de(b, null, 24, (q ->> b::text)::int) = 720, '2 · 25 + 24 = 49 cajas: juntar solo da medio mayoreo');
+  -- ══ MAYOREO-50 · 50 cajas del pedido → todo a mayoreo; agujas/metabólicos (junta_mayoreo = false) no suman ni bajan ══
   q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', a, 'qty', 25), jsonb_build_object('product_id', b, 'qty', 25)));
-  perform tests.ok(public.precio_de(a, null, 25, (q ->> a::text)::int) = 1170 and public.precio_de(b, null, 25, (q ->> b::text)::int) = 720, '2 · 25 + 25 no llega al mayoreo: juntar solo da medio mayoreo');
+  perform tests.ok(public.precio_de(a, null, 25, (q ->> a::text)::int) = 800 and public.precio_de(b, null, 25, (q ->> b::text)::int) = 400, '50 · 25 + 25 = 50 cajas: los dos a mayoreo');
+  perform tests.act_as_owner();
+  update public.products set junta_mayoreo = false where id = b;
+  perform tests.act_as_service();
+  q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', a, 'qty', 25), jsonb_build_object('product_id', b, 'qty', 25)));
+  perform tests.ok(public.precio_de(a, null, 25, (q ->> a::text)::int) = 1170, '50 · el que no junta (agujas/metabólicos) no suma a las 50 cajas');
+  q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', a, 'qty', 50), jsonb_build_object('product_id', b, 'qty', 1)));
+  perform tests.ok(public.precio_de(b, null, 1, (q ->> b::text)::int) = 800, '50 · y no baja a mayoreo por el pedido');
+  q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', b, 'qty', 50), jsonb_build_object('product_id', a, 'qty', 1)));
+  perform tests.ok(public.precio_de(b, null, 50, (q ->> b::text)::int) = 400 and public.precio_de(a, null, 1, (q ->> a::text)::int) = 1300, '50 · en su propio mayoreo sí, pero no arrastra a los demás');
+  perform tests.act_as_owner();
+  update public.products set junta_mayoreo = true where id = b;
+  perform tests.act_as_service();
 
   -- ══ 1 · uno en mayoreo → todo el pedido a mayoreo ══
   q := public._qty_volumen(jsonb_build_array(jsonb_build_object('product_id', a, 'qty', 50), jsonb_build_object('product_id', b, 'qty', 1),

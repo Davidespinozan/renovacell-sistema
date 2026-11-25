@@ -1,4 +1,4 @@
-import { esMediaCaja, cantidadVista, precioVista, type ConUnidad } from '../../lib/cajas'
+import { esMediaCaja, cantidadVista, precioVista, factor, type ConUnidad } from '../../lib/cajas'
 // Precios por VOLUMEN (descuentos por cantidad) — helpers PUROS de PREVISUALIZACIÓN.
 // ⚠️ El servidor es la AUTORIDAD final: `precio_de(product, list, qty)` calcula
 //    LEAST(base [override de lista ∥ general], mejor regla de volumen activa con
@@ -42,9 +42,19 @@ export function bestPromoRule(rules: readonly VolumeRule[], productId: string, q
 /**
  * MAYOREO-REGLAS · espeja _qty_volumen: con TODO el pedido, cuántas piezas cuentan para el volumen de cada producto.
  *   1. Si un producto llega a su escalón de mayoreo → todos cuentan como su escalón más alto (cada uno a su mejor precio).
+ *      MAYOREO-50 (24 nov 2026) · también si el pedido suma 50 CAJAS (media caja = 1/2) entre los productos que juntan.
+ *      Las agujas H24/H36/HR y Mounjaro/Wegovy/Saxenda (junta_mayoreo = false) no suman ni bajan por el pedido.
  *   2. Los de medio mayoreo en 10 se juntan: si suman 10 o más, cada uno cuenta al menos 10 (solo medio, nunca mayoreo).
+ * `productos` (unidad y junta_mayoreo por id) afina las 50 cajas; sin él, cada pieza es una caja y todo junta.
  */
-export function cantidadesVolumen(lines: ReadonlyArray<{ product_id: string; qty: number }>, rules: readonly VolumeRule[]): Record<string, number> {
+export const MAYOREO_CAJAS = 50
+export type InfoMayoreo = Readonly<Record<string, (ConUnidad & { junta_mayoreo?: boolean | null }) | undefined>>
+const juntaMayoreo = (info: InfoMayoreo | undefined, pid: string) => info?.[pid]?.junta_mayoreo !== false
+/** MAYOREO-50 · cajas del pedido que cuentan para el mayoreo de 50 (sin agujas ni metabólicos; media caja = 1/2). */
+export function cajasParaMayoreo(lines: ReadonlyArray<{ product_id: string; qty: number }>, info?: InfoMayoreo): number {
+  return lines.reduce((s, l) => s + (l.qty > 0 && juntaMayoreo(info, l.product_id) ? l.qty / factor(info?.[l.product_id]) : 0), 0)
+}
+export function cantidadesVolumen(lines: ReadonlyArray<{ product_id: string; qty: number }>, rules: readonly VolumeRule[], info?: InfoMayoreo): Record<string, number> {
   const q: Record<string, number> = {}
   for (const l of lines) if (l.qty > 0) q[l.product_id] = (q[l.product_id] ?? 0) + l.qty
   const datos = Object.entries(q).map(([pid, n]) => {
@@ -53,10 +63,10 @@ export function cantidadesVolumen(lines: ReadonlyArray<{ product_id: string; qty
     return { pid, n, max: t.length ? Math.max(...t.map((r) => r.min_quantity)) : null, medio: min((r) => (r.nivel ?? 'medio') === 'medio'), mayoreo: min((r) => r.nivel === 'mayoreo'),
       junta: !t.some((r) => (r.nivel ?? 'medio') === 'medio' && r.junta === false) }
   })
-  const enMayoreo = datos.some((d) => d.mayoreo != null && d.n >= d.mayoreo)
+  const enMayoreo = datos.some((d) => d.mayoreo != null && d.n >= d.mayoreo && juntaMayoreo(info, d.pid)) || cajasParaMayoreo(lines, info) >= MAYOREO_CAJAS
   const junta10 = datos.filter((d) => d.medio === 10 && d.junta).reduce((s, d) => s + d.n, 0)
   const out: Record<string, number> = {}
-  for (const d of datos) out[d.pid] = Math.max(d.n, enMayoreo ? d.max ?? 0 : 0, d.medio === 10 && d.junta && junta10 >= 10 ? 10 : 0)
+  for (const d of datos) out[d.pid] = Math.max(d.n, enMayoreo && juntaMayoreo(info, d.pid) ? d.max ?? 0 : 0, d.medio === 10 && d.junta && junta10 >= 10 ? 10 : 0)
   return out
 }
 
@@ -167,11 +177,11 @@ export interface OportunidadVolumen {
   ahorro: number          // ahorro total del pedido (lo que ya lleva + lo que agrega) vs pagarlo a los precios de hoy
   arrastra: boolean       // el ahorro alcanza a otros productos del pedido
 }
-export function oportunidadesVolumen(lineas: ReadonlyArray<{ product_id: string; qty: number; base: number | null }>, rules: readonly VolumeRule[]): OportunidadVolumen[] {
+export function oportunidadesVolumen(lineas: ReadonlyArray<{ product_id: string; qty: number; base: number | null }>, rules: readonly VolumeRule[], info?: InfoMayoreo): OportunidadVolumen[] {
   const vivas = lineas.filter((l) => l.qty > 0 && l.base != null && l.base > 0)
   if (!vivas.length) return []
   const base = new Map(vivas.map((l) => [l.product_id, l.base as number]))
-  const vq = cantidadesVolumen(vivas, rules)
+  const vq = cantidadesVolumen(vivas, rules, info)
   const ahora = new Map(vivas.map((l) => [l.product_id, effectiveUnitPrice(l.base, rules, l.product_id, l.qty, vq[l.product_id]) ?? (l.base as number)]))
   const out: OportunidadVolumen[] = []
   for (const l of vivas) {
@@ -183,12 +193,12 @@ export function oportunidadesVolumen(lineas: ReadonlyArray<{ product_id: string;
     let faltan = 0
     for (let k = 1; k <= sig.min_quantity - l.qty; k++) {
       const prueba = vivas.map((x) => (x.product_id === l.product_id ? { ...x, qty: x.qty + k } : x))
-      const p2 = effectiveUnitPrice(l.base, rules, l.product_id, l.qty + k, cantidadesVolumen(prueba, rules)[l.product_id]) ?? Infinity
+      const p2 = effectiveUnitPrice(l.base, rules, l.product_id, l.qty + k, cantidadesVolumen(prueba, rules, info)[l.product_id]) ?? Infinity
       if (p2 < (ahora.get(l.product_id) as number)) { faltan = k; break }
     }
     if (faltan <= 0) continue
     const nuevas = vivas.map((x) => (x.product_id === l.product_id ? { ...x, qty: x.qty + faltan } : x))
-    const vq2 = cantidadesVolumen(nuevas, rules)
+    const vq2 = cantidadesVolumen(nuevas, rules, info)
     let ahorro = 0; let arrastra = false
     for (const x of nuevas) {
       const antes = ahora.get(x.product_id) as number

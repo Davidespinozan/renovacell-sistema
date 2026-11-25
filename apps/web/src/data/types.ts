@@ -47,6 +47,7 @@ export interface Product {
   family?: string | null
   parent_product_id?: UUID | null
   sellable?: boolean
+  junta_mayoreo?: boolean   // MAYOREO-50 · false = no suma a las 50 cajas del pedido (agujas H24/H36/HR, Mounjaro, Wegovy, Saxenda)
 }
 
 // Forma de la vista segura `products_safe` (sin metadata/costo/proveedor).
