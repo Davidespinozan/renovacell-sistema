@@ -1,5 +1,6 @@
 // WHATSAPP (WA-1) · piezas puras del canal: leer los mensajes entrantes del payload de Meta (Cloud API) y el modo del
 // canal. Sin red ni base de datos: se prueban en vitest.
+import { textoUbicacion } from './ubicacion.ts'
 
 // R4-C13 · `media`: imagen o PDF que la IA puede ver (se descarga de Meta al responder; no se guarda).
 export interface MediaWA { id: string; mime: string; tipo: 'image' | 'document' }
@@ -53,6 +54,16 @@ export function extraerWhatsApp(payload: unknown): EntranteWA[] {
         else if (tipo === 'interactive') {
           const i = (m.interactive ?? {}) as Record<string, Record<string, unknown> | undefined>
           texto = String(i.button_reply?.title ?? i.list_reply?.title ?? '')
+        }
+        else if (tipo === 'location') {
+          // UBICACIÓN DEL CLIENTE (26 nov 2026, Roberto: «me mandó una ubicación y no puedo verla»): antes solo quedaba el
+          // texto «Compartió una ubicación…» y se perdían las coordenadas. Ahora se guarda como la que manda el equipo
+          // («📍 nombre / dirección / enlace de Maps»), y en el hilo se ve como tarjeta con el mapa a un toque.
+          const l = (m.location ?? {}) as Record<string, unknown>
+          const lat = Number(l.latitude), lng = Number(l.longitude)
+          const ok = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0)
+          const direccion = String(l.address ?? '').trim()
+          if (ok || direccion) texto = textoUbicacion({ nombre: String(l.name ?? '').trim() || 'Ubicación que compartió el cliente', direccion, lat: ok ? lat : null, lng: ok ? lng : null })
         }
         else if (tipo === 'reaction') {
           // Reacción a un mensaje (👍, ❤️…). Quitar la reacción llega con emoji vacío: no es un mensaje nuevo.
