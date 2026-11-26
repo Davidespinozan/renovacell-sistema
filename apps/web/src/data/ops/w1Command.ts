@@ -262,6 +262,8 @@ const MENSAJES: Record<string, string> = {
   ck_pf_procedencia: 'La procedencia de la evidencia debe ser coincidencia directa o a nivel de familia.',
   // REF-PAGO (24 nov 2026) · antes salía «Ya existe un registro con esos datos» y nadie sabía qué corregir.
   uq_entry_external_ref: 'Esa referencia de pago ya está registrada en otro cobro, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago (no el número de cuenta ni el banco).',
+  // REF-DUP (26 nov 2026, Toño): el servidor dice EN QUÉ venta ya está esa referencia (folio y cliente) y se anexa.
+  REFERENCIA_DUPLICADA: 'Esa referencia de pago ya está registrada en otro cobro, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago',
   ENVIO_EXTRA_PAQUETERIA: 'La paquetería de un envío extra no está disponible. Elige otra.',
 }
 

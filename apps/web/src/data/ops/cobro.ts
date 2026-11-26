@@ -114,7 +114,12 @@ const MENSAJES: Array<[RegExp, string]> = [
   [/FORMA_PAGO_REQUERIDA/, 'Elige cómo paga el cliente.'],
   [/NO_AUTORIZADO|insufficient/i, 'No puedes cobrar este pedido: no es venta tuya ni cliente de tu cartera.'],
 ]
-export const mensajeCobro = (m?: string | null) => MENSAJES.find(([r]) => r.test(m ?? ''))?.[1] ?? null
+export const mensajeCobro = (m?: string | null): string | null => {
+  // REF-DUP · «ya está en el cobro de S220936 · RENATO VERA OSUNA»: se dice en qué venta, para corregir sin adivinar.
+  const dup = /REFERENCIA_DUPLICADA:\s*(.+)$/.exec(m ?? '')
+  if (dup) return `Esa referencia de pago ${dup[1].trim()}, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago.`
+  return MENSAJES.find(([r]) => r.test(m ?? ''))?.[1] ?? null
+}
 
 /** Cobrar un pedido que ya existe (lista de pedidos por cobrar). Idempotente por opId. */
 export async function cobrarVenta(orderId: string, c: CobroElegido, opId: string): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
