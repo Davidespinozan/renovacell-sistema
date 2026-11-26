@@ -22,6 +22,8 @@ import { pendingQty, isOpen, PUEDE_MARCAR_PAGADO } from '../../data/store/compra
 import { RecibirMercanciaModal, STATUS_LABEL, STATUS_PILL, TIPO_LABEL } from '../warehouse/RecibirMercanciaModal'
 import type { ProductSafe } from '../../data/types'
 import { aInterno, aVista, cantidadVista, esMediaCaja, factor, precioVista } from '../../lib/cajas'
+import { RegistrarCompraModal } from './RegistrarCompraModal'   // COMPRA CON FACTURA (26 nov 2026)
+import { reloadCompras } from '../../data/store/comprasStore'
 
 const LOW = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 const TARGET = 60   // stock objetivo tras reabastecer
@@ -37,6 +39,7 @@ export function Reabastecimiento() {
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [replen, setReplen] = useState<{ product: ProductSafe; suggested: number } | null>(null)
   const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(null)
+  const [conFactura, setConFactura] = useState(false)
   const toast = (ok: boolean, text: string) => { setFlash({ ok, text }); if (ok) setTimeout(() => setFlash(null), 5000) }
 
   const stock = useMemo(() => stockByProduct(lots), [lots])
@@ -69,6 +72,10 @@ export function Reabastecimiento() {
         : <PageHead title="Compras a proveedores">
             Registra <b>qué le compras a un proveedor</b>: producto, cantidad y costo. <b>No suma inventario</b> hasta que Almacén la recibe con lote y caducidad.
           </PageHead>}
+      {puedeComprar && (
+        <div><button className="btn" type="button" onClick={() => setConFactura(true)} data-testid="btn-compra-factura"><ShoppingCart size={14} /> Registrar compra (con o sin factura)</button></div>
+      )}
+      {conFactura && <RegistrarCompraModal productos={products} onClose={() => setConFactura(false)} onHecho={(t) => { setConFactura(false); toast(true, t); reloadCompras() }} />}
 
       {flash && (
         <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10, background: flash.ok ? 'var(--ok-bg)' : 'var(--danger-bg)', borderColor: 'transparent', color: flash.ok ? 'var(--green-deep)' : 'var(--danger)' }} role="status">
