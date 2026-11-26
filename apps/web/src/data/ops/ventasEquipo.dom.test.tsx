@@ -11,8 +11,9 @@ import mig from '../../../../../supabase/migrations/20270407920000_ventas_equipo
 const datos = aVentasEquipo({
   vendedores: [{ id: 'u-ale', email: 'ale@x', name: 'Alejandra' }, { id: 'u-rob', email: 'rob@x', name: 'Roberto' }],
   orders: [
-    { id: 'o1', external_ref: 'S1', status: 'paid', total: 500, created_at: '2026-11-24T18:00:00Z', shipping_meta: { seller_profile_id: 'u-ale', placed_by: 'Alejandra (Ventas)', customer: { name: 'Dra. Uno' } }, items: [] },
-    { id: 'o2', external_ref: 'S2', status: 'paid', total: 900, created_at: '2026-11-24T19:00:00Z', shipping_meta: { seller_profile_id: 'u-rob', placed_by: 'Roberto (Ventas)', customer: { name: 'Dr. Dos' } }, items: [] },
+    { id: 'o1', external_ref: 'S1', status: 'paid', total: 500, created_at: '2026-11-24T18:00:00Z', shipping_meta: { seller_profile_id: 'u-ale', placed_by: 'Alejandra (Ventas)', customer: { name: 'Dra. Uno' } }, items: [],
+      seguimiento: { empacado_at: '2026-11-24T22:04:43Z', salio_at: '2026-11-24T22:05:43Z', entregado_at: '2026-11-24T22:35:09Z', despacho_por: 'Alberto Gutiérrez', chofer: 'Manuel Octavio', recibio: 'Melyna', con_foto: true } },
+    { id: 'o2', external_ref: 'S2', status: 'paid', total: 900, created_at: '2026-11-24T19:00:00Z', shipping_meta: { seller_profile_id: 'u-rob', placed_by: 'Roberto (Ventas)', customer: { name: 'Dr. Dos' } }, items: [], seguimiento: {} },
   ],
   money: [{ order_id: 'o1', estado_pago: 'paid', total: 500, cobrado_neto: 500, saldo: 0 }],
 })
@@ -27,6 +28,19 @@ describe('Ventas del equipo (jefe de ventas)', () => {
     expect(screen.getAllByText('Alejandra').length).toBeGreaterThan(0)
     fireEvent.change(screen.getByTestId('ventas-filtro-vendedor'), { target: { value: 'ale@x' } })
     expect(screen.queryByText('S2')).toBeNull(); expect(screen.getByText('S1')).toBeTruthy()
+  })
+  it('SEGUIMIENTO: cuándo salió del almacén y cuándo se entregó, con chofer y quién recibió; filtra por etapa', () => {
+    render(<VentasEquipo />)
+    const celdas = screen.getAllByTestId('venta-seguimiento').map((c) => c.textContent)
+    expect(celdas.some((t) => /Entregado 24 nov/.test(t ?? ''))).toBe(true)
+    expect(celdas).toContain('Aún en almacén')
+    fireEvent.change(screen.getByTestId('ventas-filtro-seguimiento'), { target: { value: 'almacen' } })
+    expect(screen.queryByText('S1')).toBeNull(); expect(screen.getByText('S2')).toBeTruthy()
+    fireEvent.change(screen.getByTestId('ventas-filtro-seguimiento'), { target: { value: 'todos' } })
+    fireEvent.click(screen.getByText('S1'))
+    const det = screen.getByTestId('venta-detalle-seguimiento').textContent ?? ''
+    expect(det).toMatch(/Salió del almacén: 24 nov/); expect(det).toMatch(/despachó Alberto Gutiérrez/); expect(det).toMatch(/chofer Manuel Octavio/)
+    expect(det).toMatch(/recibió Melyna · con foto de evidencia/)
   })
   it('el detalle es solo consulta: sin cancelar ni devolver', () => {
     render(<VentasEquipo />)

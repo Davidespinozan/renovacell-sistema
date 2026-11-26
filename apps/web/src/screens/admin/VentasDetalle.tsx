@@ -34,6 +34,7 @@ import { enPeriodo, hoyNegocio } from '../../data/periodo'
 import { entregaDeVenta, TIPO_ENTREGA_TEXTO, type TipoEntregaVenta } from '../../data/ops/entrega'   // ENTREGA EN VENTAS
 import { extrasDe, nombrePaqueteriaExtra } from '../../data/ops/enviosExtra'
 import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
+import { etapaSeguimiento, seguimientoDe, fechaHora, type EtapaSeguimiento } from '../../data/ops/seguimientoVenta'   // SEGUIMIENTO (Roberto, 26 nov)
 
 type ChannelFilter = 'todos' | CanalVenta
 type EntregaFilter = 'todos' | TipoEntregaVenta
@@ -92,6 +93,9 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const [pay, setPay] = useState<PayFilter>('todos')
   const [entrega, setEntrega] = useState<EntregaFilter>('todos')
   const [vendedor, setVendedor] = useState<string>('todos')
+  // SEGUIMIENTO · solo en Ventas del equipo (el servidor manda cuándo se empacó, salió y se entregó cada pedido).
+  const conSeguimiento = !!fuente
+  const [etapa, setEtapa] = useState<'todos' | EtapaSeguimiento>('todos')
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
@@ -114,6 +118,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
         if (entrega !== 'todos' && entregaDeVenta(o).tipo !== entrega) return false
         if (vendedor !== 'todos' && vendedorDeVenta(o).clave !== vendedor) return false
+        if (conSeguimiento && etapa !== 'todos' && etapaSeguimiento(o).etapa !== etapa) return false
         if (query) {
           const hay = `${o.external_ref ?? ''} ${clientName(o)}`.toLowerCase()
           if (!hay.includes(query)) return false
@@ -122,7 +127,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
       })
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, from, to, channel, pay, entrega, vendedor, vendedores, q, doctorsById])
+  }, [orders, from, to, channel, pay, entrega, vendedor, etapa, vendedores, q, doctorsById])
 
   const sum = salesSummary(rows)
   // Vendedores con ventas (cualquier periodo) para el filtro, del que más vende al que menos; «Sin vendedor» al final.
@@ -178,8 +183,17 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           <option value="todos">Todos los vendedores</option>
           {opcionesVendedor.map((v) => <option key={v.clave} value={v.clave}>{v.nombre}</option>)}
         </select>
-        {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || vendedor !== 'todos' || q) && (
-          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setQ('') }}>Limpiar</button>
+        {conSeguimiento && (
+          <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
+            <option value="todos">Todo seguimiento</option>
+            <option value="almacen">Aún en almacén</option>
+            <option value="empacado">Empacado</option>
+            <option value="salio">Salió del almacén</option>
+            <option value="entregado">Entregado</option>
+          </select>
+        )}
+        {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || vendedor !== 'todos' || etapa !== 'todos' || q) && (
+          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setEtapa('todos'); setQ('') }}>Limpiar</button>
         )}
         <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'var(--filters-end, auto)' }} columns={[
           { key: 'external_ref', label: 'Folio' },
@@ -194,6 +208,13 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
           { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o) }).label },
           { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
+          ...(conSeguimiento ? [
+            { key: 'id' as const, label: 'Empacado', format: (_v: unknown, o: OrderWithItems) => fechaHora(seguimientoDe(o)?.empacado_at) },
+            { key: 'id' as const, label: 'Salió del almacén', format: (_v: unknown, o: OrderWithItems) => fechaHora(seguimientoDe(o)?.salio_at) },
+            { key: 'id' as const, label: 'Entregado', format: (_v: unknown, o: OrderWithItems) => fechaHora(seguimientoDe(o)?.entregado_at) },
+            { key: 'id' as const, label: 'Chofer / paquetería', format: (_v: unknown, o: OrderWithItems) => seguimientoDe(o)?.chofer ?? seguimientoDe(o)?.paqueteria ?? '' },
+            { key: 'id' as const, label: 'Recibió', format: (_v: unknown, o: OrderWithItems) => seguimientoDe(o)?.recibio ?? '' },
+          ] : []),
         ]} />
         <ExportButton
           name="ventas-partidas"
@@ -226,7 +247,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Vendedor</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th></tr>
+              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Vendedor</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th>{conSeguimiento && <th>Salida / entrega</th>}</tr>
             </thead>
             <tbody>
               {rows.map((o) => {
@@ -243,10 +264,11 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
                     <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span></td>
                     <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
+                    {conSeguimiento && (() => { const et = etapaSeguimiento(o); return <td data-label="Salida / entrega" data-testid="venta-seguimiento"><span className={'pill ' + et.pill}>{et.texto}</span></td> })()}
                   </tr>
                 )
               })}
-              {rows.length === 0 && <tr><td colSpan={10} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={conSeguimiento ? 11 : 10} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -287,6 +309,27 @@ function EntregaDeLaVenta({ order }: { order: OrderWithItems }) {
       {extras.map((x) => (
         <div key={x.paquete} style={{ color: 'var(--ink-2)' }}>Envío extra {x.paquete}{nombrePaqueteriaExtra(x.paqueteria) ? ` (${nombrePaqueteriaExtra(x.paqueteria)})` : ''}: {formatAddress(x.address)}{x.flete > 0 ? ` · ${money(x.flete)}` : ''}</div>
       ))}
+    </div>
+  )
+}
+
+/** SEGUIMIENTO · cuándo se empacó, salió del almacén y se entregó; quién despachó, el chofer y quién recibió. */
+function SeguimientoDeLaVenta({ order }: { order: OrderWithItems }) {
+  const s = seguimientoDe(order) ?? {}
+  const pasos: Array<[string, string | null | undefined, string?]> = [
+    ['Empacado', s.empacado_at],
+    ['Salió del almacén', s.salio_at, [s.despacho_por ? `despachó ${s.despacho_por}` : '', s.chofer ? `chofer ${s.chofer}` : '', s.paqueteria ? s.paqueteria.toUpperCase() : '', s.guia ? `guía ${s.guia}` : ''].filter(Boolean).join(' · ')],
+    ['El chofer recibió la carga', s.carga_recibida_at],
+    ['Entregado', s.entregado_at, [s.recibio ? `recibió ${s.recibio}` : '', s.con_foto ? 'con foto de evidencia' : ''].filter(Boolean).join(' · ')],
+  ]
+  return (
+    <div className="sysnote" style={{ marginBottom: 14, display: 'grid', gap: 4 }} data-testid="venta-detalle-seguimiento">
+      <div><b>Seguimiento</b></div>
+      {pasos.filter(([, at]) => !!at || false).map(([k, at, extra]) => (
+        <div key={k}>✓ {k}: {fechaHora(at)}{extra ? <span style={{ color: 'var(--ink-2)' }}> · {extra}</span> : null}</div>
+      ))}
+      {!s.empacado_at && !s.salio_at && !s.entregado_at && <div style={{ color: 'var(--ink-2)' }}>Aún en almacén: no se ha empacado.</div>}
+      {s.incidente && <div style={{ color: 'var(--dang, #b42318)' }}>Incidente: {s.incidente}</div>}
     </div>
   )
 }
@@ -334,6 +377,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
           </div>
 
           <EntregaDeLaVenta order={order} />
+          {seguimientoDe(order) && <SeguimientoDeLaVenta order={order} />}
 
           {dinero && (
             <div className="sysnote" style={{ marginBottom: 14 }}>
