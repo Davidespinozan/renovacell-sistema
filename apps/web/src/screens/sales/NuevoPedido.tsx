@@ -221,6 +221,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
       intento.current = motivo === 'fiscal' ? null : { ...it, incierto: motivo === 'incierto' }
       if (motivo === 'fiscal') { setShowFiscalErr(true); setEditingFiscal(true) }
       setErrorPedido({ msg: r.error, motivo })
+      // 26 nov 2026 (Toño: «metí la venta y no me aparece»): el aviso vivía al FINAL del formulario, fuera de la vista
+      // cuando el botón está en el pie fijo, y el pedido parecía enviado. Ahora además sale en una ventana del sistema.
+      void avisar(`${motivo === 'incierto' ? 'No se pudo confirmar el pedido.' : motivo === 'conflicto' ? 'No se creó un pedido nuevo.' : 'El pedido NO se creó.'} ${r.error}`)
     } finally {
       setCreando(false); enviando.current = false
     }
