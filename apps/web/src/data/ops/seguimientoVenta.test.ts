@@ -15,5 +15,7 @@ describe('seguimiento de entrega en Ventas del equipo', () => {
     expect(etapaSeguimiento({ status: 'paid', seguimiento: {} }).texto).toBe('Aún en almacén')
     expect(etapaSeguimiento({ status: 'cancelled', seguimiento: { salio_at: '2026-11-24T22:05:43Z' } }).etapa).toBe('cancelado')
     expect(fechaHora(null)).toBe('')
+    expect(etapaSeguimiento({ status: 'pending_payment', payment_method: 'por_cobrar', seguimiento: {} }).etapa).toBe('por_confirmar')
+    expect(etapaSeguimiento({ status: 'pending_payment', payment_method: 'contra_entrega', seguimiento: {} }).etapa).toBe('almacen')
   })
 })

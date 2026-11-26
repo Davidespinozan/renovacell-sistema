@@ -8,6 +8,7 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { clienteDePedido } from '../../data/mock/profiles'
 import { diaNegocio, hoyNegocio } from '../../data/periodo'
 import { statusView } from '../doctor/orderStatus'
+import { etapaSeguimiento, fechaHora, useSeguimiento } from '../../data/ops/seguimientoVenta'   // TRAZABILIDAD (26 nov)
 import { Cargando, Vacio } from '../../app/EmptyState'
 import { fmtDate, money } from '../../lib/format'
 
@@ -56,6 +57,7 @@ export function MisVentas() {
   }, [productos])
 
   const lista = useMemo(() => filtrarVentas(pedidos, filtro, mes), [pedidos, filtro, mes])
+  const seg = useSeguimiento(lista.map((o) => o.id))
   const total = lista.reduce((s, o) => s + Number(o.total ?? 0), 0)
 
   const cambiar = (k: FiltroVentas) => { filtroInicial = k; setFiltro(k); setAbierto(null) }
@@ -78,11 +80,13 @@ export function MisVentas() {
       ) : (
         <div className="card" style={{ padding: '6px 14px 14px' }}>
           <table className="tbl-cards">
-            <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Total</th><th>Pago</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Total</th><th>Pago</th><th>Dónde va</th></tr></thead>
             <tbody>
               {lista.map((o) => {
                 const pago = etiquetaPago(o)
                 const st = statusView(o.status)
+                const s = seg[o.id]
+                const et = s ? etapaSeguimiento({ status: o.status, payment_method: o.payment_method, seguimiento: s }) : null
                 const abiertoEste = abierto === o.id
                 return (
                   <React.Fragment key={o.id}>
@@ -92,7 +96,7 @@ export function MisVentas() {
                       <td data-label="Cliente">{clienteDePedido(o).name || '—'}</td>
                       <td data-label="Total" className="mono"><b>{money(Number(o.total ?? 0))}</b></td>
                       <td data-label="Pago"><span className={`pill ${pago.pill}`}>{pago.label}</span></td>
-                      <td data-label="Estado"><span className={`pill ${st.pill}`}>{st.label}</span></td>
+                      <td data-label="Dónde va" data-testid="mis-ventas-seguimiento"><span className={`pill ${et?.pill ?? st.pill}`}>{et?.texto ?? st.label}</span></td>
                     </tr>
                     {abiertoEste && (
                       <tr data-testid="mis-ventas-detalle">
@@ -105,6 +109,13 @@ export function MisVentas() {
                                 <span className="mono" style={{ minWidth: 90, textAlign: 'right' }}>{money(it.qty * Number(it.unit_price ?? 0))}</span>
                               </div>
                             ))}
+                            {s && (s.empacado_at || s.salio_at || s.entregado_at) && (
+                              <div style={{ color: 'var(--ink-2)', marginBottom: 4 }} data-testid="mis-ventas-traza">
+                                {s.empacado_at && <div>✓ Empacado: {fechaHora(s.empacado_at)}</div>}
+                                {s.salio_at && <div>✓ Salió del almacén: {fechaHora(s.salio_at)}{s.chofer ? ` · chofer ${s.chofer}` : ''}{s.guia ? ` · guía ${s.guia}` : ''}</div>}
+                                {s.entregado_at && <div>✓ Entregado: {fechaHora(s.entregado_at)}{s.recibio ? ` · recibió ${s.recibio}` : ''}</div>}
+                              </div>
+                            )}
                             {Number(o.shipping_cost ?? 0) > 0 && (
                               <div style={{ display: 'flex', gap: 8, color: 'var(--ink-3)' }}>
                                 <span style={{ flex: 1 }}>Envío</span>

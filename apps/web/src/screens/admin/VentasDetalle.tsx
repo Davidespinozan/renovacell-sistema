@@ -34,7 +34,7 @@ import { enPeriodo, hoyNegocio } from '../../data/periodo'
 import { entregaDeVenta, TIPO_ENTREGA_TEXTO, type TipoEntregaVenta } from '../../data/ops/entrega'   // ENTREGA EN VENTAS
 import { extrasDe, nombrePaqueteriaExtra } from '../../data/ops/enviosExtra'
 import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
-import { etapaSeguimiento, seguimientoDe, fechaHora, type EtapaSeguimiento } from '../../data/ops/seguimientoVenta'   // SEGUIMIENTO (Roberto, 26 nov)
+import { etapaSeguimiento, seguimientoDe, fechaHora, useSeguimiento, type EtapaSeguimiento } from '../../data/ops/seguimientoVenta'   // SEGUIMIENTO (Roberto, 26 nov)
 
 type ChannelFilter = 'todos' | CanalVenta
 type EntregaFilter = 'todos' | TipoEntregaVenta
@@ -67,7 +67,10 @@ const sel: React.CSSProperties = {
 export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orders: OrderWithItems[]; byOrder: Record<string, OrderMoney>; cargando: boolean; vendedores?: Array<{ id: string; email: string; name: string }> }; soloLectura?: boolean } = {}) {
   const propios = useAllOrders()
   const dineroPropio = useOrderMoney()
-  const orders = fuente ? fuente.orders : propios.data
+  // TRAZABILIDAD (26 nov 2026): Dirección también ve empacado / salió / entregado de cada venta.
+  const segPropio = useSeguimiento(propios.data.map((o) => o.id), !fuente)
+  const conSeg = useMemo(() => propios.data.map((o) => (segPropio[o.id] ? { ...o, seguimiento: segPropio[o.id] } : o)), [propios.data, segPropio])
+  const orders = fuente ? fuente.orders : conSeg
   const cargandoPedidos = fuente ? fuente.cargando : propios.loading
   const byOrder = fuente ? fuente.byOrder : dineroPropio.byOrder
   // REF-OPCIONAL · referencias de pago que están en más de un pedido (solo Dirección: ve todos los cobros).
@@ -99,7 +102,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const [entrega, setEntrega] = useState<EntregaFilter>('todos')
   const [vendedor, setVendedor] = useState<string>('todos')
   // SEGUIMIENTO · solo en Ventas del equipo (el servidor manda cuándo se empacó, salió y se entregó cada pedido).
-  const conSeguimiento = !!fuente
+  const conSeguimiento = true
   const [etapa, setEtapa] = useState<'todos' | EtapaSeguimiento>('todos')
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -191,6 +194,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         {conSeguimiento && (
           <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
             <option value="todos">Todo seguimiento</option>
+            <option value="por_confirmar">Por confirmar (falta el pago)</option>
             <option value="almacen">Aún en almacén</option>
             <option value="empacado">Empacado</option>
             <option value="salio">Salió del almacén</option>
