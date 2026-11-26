@@ -27,7 +27,7 @@ export type GrupoForma = 'ya' | 'despues'
 export const FORMAS: Array<{ id: FormaPago; texto: string; ayuda: string; grupo: GrupoForma }> = [
   { id: 'efectivo', texto: 'Efectivo', ayuda: 'Ya te lo dio', grupo: 'ya' },
   { id: 'tarjeta', texto: 'Tarjeta', ayuda: 'Ya la pasaste en la terminal', grupo: 'ya' },
-  { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya llegó: escribe la referencia', grupo: 'ya' },
+  { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya llegó (referencia opcional)', grupo: 'ya' },
   { id: 'al_recibir', texto: 'Paga al recibir', ayuda: 'Al chofer o al recoger: efectivo, terminal o transferencia', grupo: 'despues' },
   { id: 'link', texto: 'Link de pago', ayuda: 'Le mandas un link de BanBajío', grupo: 'despues' },
   { id: 'credito', texto: 'Crédito', ayuda: 'Paga después, con fecha límite', grupo: 'despues' },
@@ -63,8 +63,7 @@ export function faltaEnCobro(c: CobroElegido | null, total: number, modo: ModoCo
   const no = formaNoDisponible(c.forma, modo, tipoEntrega)
   if (no) return no
   if (c.forma === 'efectivo' && c.recibido != null && c.recibido < total) return 'El efectivo recibido no alcanza.'
-  if (c.forma === 'transferencia' && (c.referencia ?? '').trim().length < 3) return 'Escribe la referencia o clave de rastreo de la transferencia.'
-  if (c.forma === 'transferencia' && !referenciaPareceComprobante(c.referencia)) return REFERENCIA_NO_COMPROBANTE
+  // REF-OPCIONAL (26 nov 2026, dueño: «solo nos retrasa»): la referencia de la transferencia ya no detiene la venta.
   if (c.forma === 'al_recibir' && !c.con) return '¿Cómo va a pagar al recibir? Efectivo, terminal o transferencia.'
   if (c.forma === 'credito') {
     if (!c.vence) return 'Elige la fecha límite de pago del crédito.'

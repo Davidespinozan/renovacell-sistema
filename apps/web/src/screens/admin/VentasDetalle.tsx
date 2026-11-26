@@ -19,7 +19,7 @@ import { useOrderMoney, usePaymentEntries } from '../../data/hooks/useMoney'
 import { useOpId } from '../../data/hooks/useOpId'
 import { autorizarCreditoDePedido, revocarCreditoDePedido } from '../../data/store/ordersStore'
 import { useIntentoVentas, consumirIntentoVentas } from '../../data/store/ventasIntentStore'   // PAY-EXP-01A-3
-import { METODOS, reembolsoPagado, type OrderMoney, type PaymentEntry, type PaymentMethod } from '../../data/ops/money'
+import { METODOS, reembolsoPagado, referenciasRepetidas, type OrderMoney, type PaymentEntry, type PaymentMethod } from '../../data/ops/money'
 import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
@@ -70,6 +70,11 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const orders = fuente ? fuente.orders : propios.data
   const cargandoPedidos = fuente ? fuente.cargando : propios.loading
   const byOrder = fuente ? fuente.byOrder : dineroPropio.byOrder
+  // REF-OPCIONAL · referencias de pago que están en más de un pedido (solo Dirección: ve todos los cobros).
+  const { data: cobrosLibro } = usePaymentEntries()
+  const repetidas = useMemo(() => (fuente ? {} : referenciasRepetidas(cobrosLibro as PaymentEntry[])), [fuente, cobrosLibro])
+  const folioDe = (id: string) => orders.find((x) => x.id === id)?.external_ref ?? 'otro pedido'
+  const avisoRef = (id: string): string | null => { const r = repetidas[id]; return r?.length ? r.map((x) => `«${x.referencia}» también en ${x.otros.map(folioDe).join(', ')}`).join(' · ') : null }
   const [cancelling, setCancelling] = useState<OrderWithItems | null>(null)
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
@@ -262,7 +267,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
                     <td data-label="Cliente">{clientName(o)}</td>
                     <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
-                    <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span></td>
+                    <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span>{avisoRef(o.id) && <span className="pill p-warn" style={{ marginLeft: 4 }} title={`Referencia repetida: ${avisoRef(o.id)}`} data-testid="venta-ref-repetida">Ref. repetida</span>}</td>
                     <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
                     {conSeguimiento && (() => { const et = etapaSeguimiento(o); return <td data-label="Salida / entrega" data-testid="venta-seguimiento"><span className={'pill ' + et.pill}>{et.texto}</span></td> })()}
                   </tr>
@@ -275,7 +280,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
       </div>
 
       {selectedOrder && (
-        <SaleDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
+        <SaleDetail avisoRepetida={avisoRef(selectedOrder.id)} order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
       )}
       {cancelling && (
         <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
@@ -334,8 +339,9 @@ function SeguimientoDeLaVenta({ order }: { order: OrderWithItems }) {
   )
 }
 
-function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel, soloLectura = false }: {
+function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel, soloLectura = false, avisoRepetida = null }: {
   soloLectura?: boolean
+  avisoRepetida?: string | null
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
@@ -377,6 +383,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
           </div>
 
           <EntregaDeLaVenta order={order} />
+          {avisoRepetida && <div className="sysnote" style={{ marginBottom: 14, color: 'var(--warn, #b54708)' }} data-testid="venta-detalle-ref-repetida"><b>Referencia repetida:</b> {avisoRepetida}. Revisa que no sea el mismo pago registrado dos veces.</div>}
           {seguimientoDe(order) && <SeguimientoDeLaVenta order={order} />}
 
           {dinero && (

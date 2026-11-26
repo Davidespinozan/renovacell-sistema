@@ -243,3 +243,26 @@ export const anularCorteCaja = (opId: string, a: { closingId: string; motivo: st
   }, opId)
 
 export type MoneyResult<T = Record<string, unknown>> = W1Result<T>
+
+/** REF-OPCIONAL (26 nov 2026) · una referencia de pago (no tarjeta) que aparece en cobros de VARIOS pedidos: por pedido,
+ *  la referencia y los otros pedidos donde está. Dirección lo revisa (puede ser una transferencia que paga dos pedidos,
+ *  o el mismo dinero registrado dos veces). */
+export function referenciasRepetidas(entries: PaymentEntry[]): Record<string, Array<{ referencia: string; otros: string[] }>> {
+  const porRef = new Map<string, Set<string>>()
+  for (const e of entries) {
+    const ref = (e.external_ref ?? '').trim()
+    if (!ref || e.direction !== 'in' || e.reversal_of || e.method === 'tarjeta' || e.method === 'stripe') continue
+    const k = ref.toUpperCase()
+    if (!porRef.has(k)) porRef.set(k, new Set())
+    porRef.get(k)!.add(e.order_id)
+  }
+  const out: Record<string, Array<{ referencia: string; otros: string[] }>> = {}
+  for (const e of entries) {
+    const ref = (e.external_ref ?? '').trim(); const ids = porRef.get(ref.toUpperCase())
+    if (!ids || ids.size < 2) continue
+    const lista = (out[e.order_id] ??= [])
+    if (lista.some((x) => x.referencia.toUpperCase() === ref.toUpperCase())) continue
+    lista.push({ referencia: ref, otros: [...ids].filter((id) => id !== e.order_id) })
+  }
+  return out
+}

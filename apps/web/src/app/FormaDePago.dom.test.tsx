@@ -23,13 +23,8 @@ describe('reglas de la forma de pago', () => {
     expect(faltaEnCobro(null, 100, 'pedido', null, hoy)).toMatch(/Elige/)
     expect(faltaEnCobro({ forma: 'efectivo', recibido: 50 }, 100, 'mostrador', null, hoy)).toMatch(/no alcanza/)
     expect(faltaEnCobro({ forma: 'efectivo' }, 100, 'mostrador', null, hoy)).toBeNull()
-    expect(faltaEnCobro({ forma: 'transferencia' }, 100, 'pedido', null, hoy)).toMatch(/referencia/)
-    expect(faltaEnCobro({ forma: 'transferencia', referencia: 'SPEI 1' }, 100, 'pedido', null, hoy)).toMatch(/comprobante/)
-    // REF-PAGO · lo que se escribía en producción en vez del comprobante: se rechaza antes de mandar
-    for (const r of ['9474', 'cuenta 9474', 'Transferencia a 7447', 'SCOTIABANK RENATO', 'cta 123456789']) {
-      expect(faltaEnCobro({ forma: 'transferencia', referencia: r }, 100, 'pedido', null, hoy)).toMatch(/comprobante/)
-    }
-    for (const r of ['036napp24112026313258636', 'MBAN01002611230071250489', '971658906', 'HSB5914880', 'SPEI 123456']) {
+    // REF-OPCIONAL (26 nov 2026, dueño) · la referencia de la transferencia ya no detiene la venta: vacía o como sea.
+    for (const r of [undefined, '', '9474', 'SCOTIABANK RENATO', 'MBAN01002611230071250489']) {
       expect(faltaEnCobro({ forma: 'transferencia', referencia: r }, 100, 'pedido', null, hoy)).toBeNull()
     }
     expect(faltaEnCobro({ forma: 'credito' }, 100, 'pedido', null, hoy)).toMatch(/fecha límite/)
@@ -73,14 +68,14 @@ describe('pantalla «Forma de pago»', () => {
     fireEvent.click(screen.getByTestId('forma-pago-tarjeta'))
     expect(valor()).toEqual({ forma: 'tarjeta' })
   })
-  it('efectivo calcula el cambio; transferencia pide referencia; crédito trae fecha a 15 días', () => {
+  it('efectivo calcula el cambio; transferencia con referencia opcional; crédito trae fecha a 15 días', () => {
     render(<Prueba modo="pedido" tipoEntrega="local" />)
     fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
     fireEvent.click(screen.getByTestId('forma-pago-efectivo-ya'))   // COBRO-ENTREGA · con chofer pregunta si ya lo tiene
     fireEvent.change(screen.getByTestId('forma-pago-recibido'), { target: { value: '1200' } })
     expect(screen.getByText('Cambio')).toBeTruthy()
     fireEvent.click(screen.getByTestId('forma-pago-transferencia'))
-    expect(screen.getByTestId('forma-pago-falta').textContent).toMatch(/referencia/)
+    expect(screen.queryByTestId('forma-pago-falta')).toBeNull()   // REF-OPCIONAL · sin referencia ya se puede
     fireEvent.change(screen.getByTestId('forma-pago-referencia'), { target: { value: 'SPEI 123456' } })
     expect(screen.queryByTestId('forma-pago-falta')).toBeNull()
     fireEvent.click(screen.getByTestId('forma-pago-credito'))
