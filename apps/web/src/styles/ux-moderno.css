@@ -475,3 +475,5 @@ button.cifra-v{cursor:pointer}
 .repetidos-acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .repetidos-obvios { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }
 
+/* POR CONFIRMAR (26 nov 2026) · contador de pedidos por confirmar junto a «Cobrar pedidos» en el menú */
+.nav a .nav-n{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ds-danger, #d92d20);color:var(--ds-on-ink, #fff);font:700 11px/18px var(--ds-font, inherit);text-align:center}

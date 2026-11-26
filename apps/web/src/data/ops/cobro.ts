@@ -29,7 +29,7 @@ export const FORMAS: Array<{ id: FormaPago; texto: string; ayuda: string; grupo:
   { id: 'tarjeta', texto: 'Tarjeta', ayuda: 'Ya la pasaste en la terminal', grupo: 'ya' },
   { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya llegó (referencia opcional)', grupo: 'ya' },
   // POR-COBRAR (26 nov 2026, dueño): vender ahora y cobrar durante el día o cuando pague, sin crédito.
-  { id: 'por_cobrar', texto: 'Paga más tarde', ayuda: 'Se vende ya y se cobra hoy o cuando pague, desde los pedidos por cobrar. No es crédito', grupo: 'despues' },
+  { id: 'por_cobrar', texto: 'Paga más tarde', ayuda: 'Queda por confirmar: pasa a Almacén cuando confirmes el pago. No es crédito', grupo: 'despues' },
   { id: 'al_recibir', texto: 'Paga al recibir', ayuda: 'Al chofer o al recoger: efectivo, terminal o transferencia', grupo: 'despues' },
   { id: 'link', texto: 'Link de pago', ayuda: 'Le mandas un link de BanBajío', grupo: 'despues' },
   { id: 'credito', texto: 'Crédito', ayuda: 'Paga después, con fecha límite', grupo: 'despues' },
@@ -97,7 +97,7 @@ export function resultadoCobro(c: CobroElegido, vence?: string | null): { pagado
       return { pagado: false, texto: `pasa a Almacén y se cobra${con} al entregarlo (o al recogerlo en sucursal).` }
     }
     case 'por_cobrar':
-      return { pagado: false, texto: 'quedó POR COBRAR: cóbralo en «Cobrar pedidos» cuando pague. Pasa a Almacén al pagarse.' }
+      return { pagado: false, texto: 'quedó POR CONFIRMAR: cuando pague, tócalo en «Cobrar pedidos» → Confirmar venta, y en ese momento pasa a Almacén.' }
     case 'link':
       return { pagado: false, texto: 'quedó por cobrar con link de pago: sácalo en la app de BanBajío y pégalo en «Cobrar pedidos». Pasa a Almacén cuando se pague.' }
   }

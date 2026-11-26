@@ -11,6 +11,9 @@ import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
 import { Ajustes } from '../screens/Ajustes'
 import { BrandLogo } from './BrandLogo'
+import { useAllOrders } from '../data/hooks/useOrders'
+import { useOrderMoney } from '../data/hooks/useMoney'
+import { pedidosPorConfirmar } from '../data/ops/porConfirmar'   // POR CONFIRMAR · contador en el menú
 
 // SECCIONES PLEGABLES (como en CuboPolar): se pica el encabezado y se abre o se cierra; la preferencia se recuerda en
 // este navegador. La sección de la pantalla activa se abre sola. Sin preferencia guardada, Dirección arranca con lo de
@@ -60,6 +63,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // sin la píldora de rol y sin la firma del operador. Es la cara de la marca.
   const plano = role === 'doctor'
 
+  // POR CONFIRMAR (dueño, 26 nov 2026: «que el sistema nos avise que hay pedidos por confirmar»): contador en el menú.
+  const { data: pedidosMenu } = useAllOrders()
+  const { byOrder: dineroMenu } = useOrderMoney()
+  const porConfirmarN = role === 'admin' || role === 'pos' || role === 'billing' ? pedidosPorConfirmar(pedidosMenu, dineroMenu).length : 0
+  const CON_CONTADOR = new Set(['links_pago', 'g_cobros'])
   const Link = (s: ScreenDef) => (
     // R-36/R-24: enlaces sin href → damos foco por teclado (role=button, tabIndex) y activación
     // con Enter/Espacio; antes no recibían foco ni respondían al teclado.
@@ -71,6 +79,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     >
       <Icon name={s.icon} />
       <span>{s.label}</span>
+      {CON_CONTADOR.has(s.key) && porConfirmarN > 0 && <span className="nav-n" title={`${porConfirmarN} por confirmar`} data-testid="menu-por-confirmar">{porConfirmarN}</span>}
     </a>
   )
 

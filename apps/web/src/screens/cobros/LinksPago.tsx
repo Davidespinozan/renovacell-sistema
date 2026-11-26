@@ -13,6 +13,9 @@ import { money } from '../../lib/format'
 import { capitalizarNombre } from '../../lib/nombres'
 import { Vacio } from '../../app/EmptyState'
 import { useAllOrders } from '../../data/hooks/useOrders'
+import { useOrderMoney } from '../../data/hooks/useMoney'
+import { pedidosPorConfirmar } from '../../data/ops/porConfirmar'   // POR CONFIRMAR (dueño, 26 nov)
+import { fmtDate } from '../../lib/format'
 
 const ETIQUETA: Record<LinkPago['estado'], string> = { solicitado: 'Por enviar', enviado: 'Enviado · esperando pago', pagado: 'Pagado', cancelado: 'Cancelado' }
 const VIA: Record<LinkPago['via'], string> = { portal: 'lo pidió en el portal', whatsapp: 'lo pidió por WhatsApp', personal: 'lo pidió su vendedor' }
@@ -34,6 +37,12 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
   const conLink = new Set(activos.map((l) => l.order_id))
   const porCobrar = pedidos.filter((o) => o.status !== 'cancelled' && o.status !== 'draft' && o.payment_status !== 'paid' && o.payment_status !== 'refunded'
     && !conLink.has(o.id) && (o.total ?? 0) > 0)   // COBRO-U · también las ventas de Caja a crédito
+  // POR CONFIRMAR (dueño, 26 nov 2026): primero lo que espera el pago para pasar a Almacén; luego lo que ya salió sin pagar.
+  const { byOrder: dinero } = useOrderMoney()
+  const idsPorConfirmar = new Set(pedidosPorConfirmar(porCobrar, dinero).map((o) => o.id))
+  const porConfirmar = porCobrar.filter((o) => idsPorConfirmar.has(o.id))
+  const yaSalieron = porCobrar.filter((o) => !idsPorConfirmar.has(o.id))
+  const clienteDe = (o: { shipping_meta?: unknown }) => capitalizarNombre(((o.shipping_meta as { customer?: { name?: string } } | null)?.customer?.name) ?? '') || 'Cliente'
   const [pidiendo, setPidiendo] = useState<string | null>(null)
   const [cobrando, setCobrando] = useState<{ id: string; external_ref: string | null; total: number | null; shipping_meta?: unknown } | null>(null)
   const pedir = async (id: string, folio: string) => {
@@ -48,15 +57,26 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
   return (
     <div className="card sgs" data-testid="links-pago">
       {cobrando && <CobrarPedido pedido={cobrando} onClose={() => setCobrando(null)} onHecho={(t) => { setCobrando(null); setAviso(t); void cargar() }} />}
-      <div className="sgs-h"><h2>Cobrar pedidos</h2><span>{activos.length ? `${activos.length} por atender` : ''}</span></div>
+      <div className="sgs-h"><h2>Cobrar y confirmar pedidos</h2><span>{activos.length ? `${activos.length} por atender` : ''}</span></div>
       <p className="sgs-sub">Pedidos sin pagar: cóbralos con cualquier forma de pago (efectivo, tarjeta, transferencia, link, al recibir o crédito). Con link: saca el link en la app de BanBajío por el <b>monto exacto</b> y pégalo aquí. Se lo mandamos por su WhatsApp, por correo y queda en su pedido.{cobra ? ' Al ver el cobro en el banco, márcalo pagado.' : ' Dirección lo marca pagado al ver el cobro en el banco.'}</p>
       {error && <div className="pce-error" role="alert">{error}</div>}
       {aviso && <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)' }}>{aviso}</div>}
-      {porCobrar.length > 0 && (
-        <section className="sgs-grupo" data-testid="links-pedir"><h3>Pedidos sin pagar <small>({porCobrar.length})</small></h3>
-          <ul>{porCobrar.slice(0, 30).map((o) => (
+      {porConfirmar.length > 0 && (
+        <section className="sgs-grupo" data-testid="por-confirmar"><h3>Por confirmar · falta el pago <small>({porConfirmar.length})</small></h3>
+          <p className="sgs-sub" style={{ marginTop: 0 }}>No pasan a Almacén hasta confirmar la venta. Cuando el cliente pague, toca <b>Confirmar venta</b> y registra el pago.</p>
+          <ul>{porConfirmar.slice(0, 50).map((o) => (
+            <li key={o.id} className="sgs-item" data-testid="pedido-por-confirmar">
+              <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'} · {clienteDe(o)}</b><span>{money(o.total ?? 0)} · {fmtDate(o.created_at)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
+              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar"><Check size={14} aria-hidden /> Confirmar venta</button>}
+              <button type="button" className="btn ghost sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
+            </li>))}</ul>
+        </section>
+      )}
+      {yaSalieron.length > 0 && (
+        <section className="sgs-grupo" data-testid="links-pedir"><h3>Ya en Almacén o entregados · falta cobrar <small>({yaSalieron.length})</small></h3>
+          <ul>{yaSalieron.slice(0, 30).map((o) => (
             <li key={o.id} className="sgs-item">
-              <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'}</b><span>{money(o.total ?? 0)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
+              <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'} · {clienteDe(o)}</b><span>{money(o.total ?? 0)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
               {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar">Cobrar</button>}
               <button type="button" className="btn ghost sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
             </li>))}</ul>
