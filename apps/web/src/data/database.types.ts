@@ -5614,6 +5614,7 @@ export type Database = {
           id: string
           image_url: string | null
           junta_mayoreo: boolean
+          sobre_pedido: boolean
           line: string | null
           metadata: Json | null
           name: string
@@ -5636,6 +5637,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           junta_mayoreo?: boolean
+          sobre_pedido?: boolean
           line?: string | null
           metadata?: Json | null
           name: string
@@ -5658,6 +5660,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           junta_mayoreo?: boolean
+          sobre_pedido?: boolean
           line?: string | null
           metadata?: Json | null
           name?: string
@@ -6742,6 +6745,7 @@ export type Database = {
           parent_product_id: string | null
           price: number | null
           junta_mayoreo: boolean | null
+          sobre_pedido: boolean | null
           sellable: boolean | null
           show_landing: boolean | null
           show_portal: boolean | null

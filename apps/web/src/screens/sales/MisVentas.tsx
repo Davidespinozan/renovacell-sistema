@@ -86,7 +86,7 @@ export function MisVentas() {
                 const pago = etiquetaPago(o)
                 const st = statusView(o.status)
                 const s = seg[o.id]
-                const et = s ? etapaSeguimiento({ status: o.status, payment_method: o.payment_method, seguimiento: s }) : null
+                const et = s ? etapaSeguimiento({ status: o.status, payment_method: o.payment_method, shipping_meta: o.shipping_meta, seguimiento: s }) : null
                 const abiertoEste = abierto === o.id
                 return (
                   <React.Fragment key={o.id}>

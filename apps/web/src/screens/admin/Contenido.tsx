@@ -157,6 +157,7 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
   const [active, setActive] = useState(product?.active !== false)
   const [showLanding, setShowLanding] = useState(product?.show_landing !== false)
   const [showPortal, setShowPortal] = useState(product?.show_portal !== false)
+  const [sobrePedido, setSobrePedido] = useState(product?.sobre_pedido === true)   // SOBRE PEDIDO (26 nov 2026)
   // El costo no viene con el producto: vive en otra tabla y se pide aparte.
   const [cost, setCost] = useState('')
   const [costLoading, setCostLoading] = useState(Boolean(product))
@@ -260,6 +261,14 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
               Ocultarlo de la página o del portal <b>no impide venderlo</b>: Ventas lo sigue teniendo
               en el mostrador. Útil mientras un producto no tiene fotografía.
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, fontSize: 13.5, cursor: 'pointer' }} data-testid="producto-sobre-pedido">
+              <input type="checkbox" checked={sobrePedido} onChange={(e) => setSobrePedido(e.target.checked)} />
+              <span>Se puede vender <b>sobre pedido</b> (aunque no haya en almacén)</span>
+            </label>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4, lineHeight: 1.5 }}>
+              En Levantar pedido se puede pedir más de lo que hay. Ese pedido queda «esperando mercancía», no se factura
+              hasta surtirse y Almacén recibe aviso cuando llega.
+            </div>
           </div>
 
           {errorGuardar && (
@@ -276,7 +285,7 @@ function ProductModal({ product, unidadesUsadas, onClose, onSave }: {
                 setGuardando(true); setErrorGuardar(null)
                 // El costo va a `product_costs`, no a `products`: se guarda aparte. Al CREAR,
                 // createProduct lo persiste con el id real; al EDITAR, aquí con setProductCost.
-                const r = await onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), unit: unit.trim() || null, description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, cost: cValid ? c : undefined })
+                const r = await onSave({ name: name.trim(), sku: sku.trim(), line, category: category.trim(), unit: unit.trim() || null, description: description.trim(), price: priceNum, image_url: imageUrl.trim() || null, active, show_landing: showLanding, show_portal: showPortal, sobre_pedido: sobrePedido, cost: cValid ? c : undefined })
                 setGuardando(false)
                 if (!r.ok) { setErrorGuardar(r.error ?? 'No se pudo guardar el producto.'); return }
                 if (product && cValid) {

@@ -180,9 +180,11 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     })()
   }, [invoice, fiscalLoaded, fiscalPermanente])
 
+  // SOBRE PEDIDO (26 nov 2026, dueño): los productos marcados se venden aunque no haya existencia.
+  const sobrePedidoDe = (id: string) => products.find((x) => x.id === id)?.sobre_pedido === true
   const add = (id: string) => setCart((c) => {
     const info = stockInfoFor(stockMap, id)
-    const max = info.tracked ? info.qty : 0
+    const max = sobrePedidoDe(id) ? Number.MAX_SAFE_INTEGER : info.tracked ? info.qty : 0
     const next = (c[id] ?? 0) + 1
     return next > max ? c : { ...c, [id]: next }
   })
@@ -303,15 +305,19 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 {visibles.map((p) => {
                   const qty = cart[p.id] ?? 0
                   const stock = stockInfoFor(stockMap, p.id)
-                  const out = !stock.tracked || stock.qty <= 0
+                  const sinStock = !stock.tracked || stock.qty <= 0
+                  const sp = p.sobre_pedido === true
+                  const out = sinStock && !sp
+                  const faltanSP = sp ? Math.max(0, qty - (stock.tracked ? stock.qty : 0)) : 0
                   return (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, opacity: out ? 0.55 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.name}</div>
                         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                           {/* CAJAS-MEDIOS: precio por caja y existencias en cajas para la media caja */}
-                          {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(precioVista(p, effOf(p, qty) ?? 0))}</b> : money(p.price == null ? p.price : precioVista(p, p.price))}{esMediaCaja(p) ? ' por caja' : ''}{out ? ' · Agotado' : stock.status === 'low' ? ` · Quedan ${cantidadVista(p, stock.qty)}` : ''}
+                          {qty > 0 && (effOf(p, qty) ?? 0) < (p.price ?? 0) ? <b style={{ color: 'var(--green-deep)' }}>{money(precioVista(p, effOf(p, qty) ?? 0))}</b> : money(p.price == null ? p.price : precioVista(p, p.price))}{esMediaCaja(p) ? ' por caja' : ''}{out ? ' · Agotado' : sp && sinStock ? ' · Sin existencia: se vende sobre pedido' : stock.status === 'low' ? ` · Quedan ${cantidadVista(p, stock.qty)}` : ''}
                         </div>
+                        {faltanSP > 0 && <div style={{ fontSize: 11, color: 'var(--warn)', fontWeight: 600 }} data-testid="np-sobre-pedido">Sobre pedido: {numeroVista(p, faltanSP)} sin existencia · se envía cuando llegue y se factura hasta surtir</div>}
                         {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}

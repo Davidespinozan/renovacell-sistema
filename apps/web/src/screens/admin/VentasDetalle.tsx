@@ -195,6 +195,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
             <option value="todos">Todo seguimiento</option>
             <option value="por_confirmar">Por confirmar (falta el pago)</option>
+            <option value="esperando_mercancia">Esperando mercancía (sobre pedido)</option>
             <option value="almacen">Aún en almacén</option>
             <option value="empacado">Empacado</option>
             <option value="salio">Salió del almacén</option>

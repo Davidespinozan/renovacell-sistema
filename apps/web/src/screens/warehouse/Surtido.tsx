@@ -22,6 +22,8 @@ import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 import { clienteDePedido } from '../../data/mock/profiles'   // el nombre del cliente junto al folio (Almacén lo pidió)
+// SOBRE PEDIDO (26 nov 2026): el pedido se vendió sin existencia y espera mercancía.
+const esSobrePedido = (o: { shipping_meta?: unknown }) => (((o.shipping_meta as { sobre_pedido?: unknown[] } | null)?.sobre_pedido) ?? []).length > 0
 
 export function Surtido() {
   const { data: orders } = useAllOrders()
@@ -158,7 +160,8 @@ export function Surtido() {
                     </span>
                   })()}
                   <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
-                  {!canDo && <span className="pill p-dang">Sin stock suficiente</span>}
+                  {!canDo && (esSobrePedido(o) ? <span className="pill p-warn" data-testid="surtido-esperando">Esperando mercancía · sobre pedido</span> : <span className="pill p-dang">Sin stock suficiente</span>)}
+                  {canDo && esSobrePedido(o) && <span className="pill p-ok" data-testid="surtido-ya-llego">Sobre pedido · ya llegó, se puede surtir</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
                 </div>
                 {o.items.map((it) => (

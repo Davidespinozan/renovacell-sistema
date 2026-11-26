@@ -14,7 +14,7 @@ const fallback: ProductSafe[] = MOCK_PRODUCTS.map((p) => ({ active: true, ...p }
 const live = makeLive<ProductSafe>(async () => {
   const { data, error } = await supabase
     .from('products_safe')
-    .select('id, sku, name, line, category, description, price, unit, image_url, active, show_landing, show_portal, family, parent_product_id, sellable, junta_mayoreo')
+    .select('id, sku, name, line, category, description, price, unit, image_url, active, show_landing, show_portal, family, parent_product_id, sellable, junta_mayoreo, sobre_pedido')
     .order('line')
     .order('name')
   if (error) throw error
@@ -35,6 +35,7 @@ const live = makeLive<ProductSafe>(async () => {
     parent_product_id: (r as { parent_product_id?: string | null }).parent_product_id ?? null,
     sellable: (r as { sellable?: boolean }).sellable ?? true,
     junta_mayoreo: r.junta_mayoreo ?? true,   // MAYOREO-50
+    sobre_pedido: (r as { sobre_pedido?: boolean }).sobre_pedido ?? false,   // SOBRE PEDIDO
   }))
 }, fallback)
 
@@ -56,6 +57,7 @@ export interface ProductInput {
   active: boolean
   show_landing?: boolean
   show_portal?: boolean
+  sobre_pedido?: boolean   // SOBRE PEDIDO · se vende aunque no haya existencia
   cost?: number | null // NO es columna de `products`: se guarda aparte en product_costs
 }
 
