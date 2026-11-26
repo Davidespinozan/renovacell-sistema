@@ -12,7 +12,7 @@ import { Placeholder } from './Placeholder'
 const Tablero = lazyPantalla(() => import('./admin/Tablero').then((m) => m.Tablero))
 const Ventas = lazyPantalla(() => import('./admin/Ventas').then((m) => m.Ventas))
 import { Pestanas } from '../app/Pestanas'
-import { COMMON_SCREEN, CHAT_SCREEN, getRole, type RoleKey } from '../app/roles'
+import { COMMON_SCREEN, CHAT_SCREEN, getRole, puedeStryvCare, type RoleKey } from '../app/roles'
 import { FEATURES } from '../app/config'
 import { Icon } from '../app/icons'
 import { RoleHome } from './home/RoleHome'   // CHV2-B · Inicio por rol
@@ -198,7 +198,7 @@ function RedirigirChat() {
 
 const conCarga = (el: React.ReactNode) => <React.Suspense fallback={<Cargando />}>{el}</React.Suspense>
 
-export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
+export function renderScreen(role: RoleKey, screen: string, capabilities: string[] = []): React.ReactNode {
   if (screen === COMMON_SCREEN.key) {
     if (FEATURES.comunicacionInterna) return conCarga(<CommonView />)
     return <AddOnInactive title="Vista común" addon="Comunicación interna" />
@@ -209,8 +209,8 @@ export function renderScreen(role: RoleKey, screen: string): React.ReactNode {
     if (FEATURES.comunicacionInterna) return conCarga(<Chat />)
     return <AddOnInactive title="Chat" addon="Comunicación interna" />
   }
-  // STRYV Care: solo Dirección (la Edge también lo exige; aquí no se muestra a nadie más).
-  if (screen === 'stryv_care') return role === 'admin' ? conCarga(<StryvCare />) : <Placeholder role={role} screen={screen} />
+  // STRYV Care: Dirección o quien tenga la capacidad 'stryv_care' (la Edge también lo exige).
+  if (screen === 'stryv_care') return puedeStryvCare(role, capabilities) ? conCarga(<StryvCare />) : <Placeholder role={role} screen={screen} />
   const real = SCREENS[screen]
   if (real) return conCarga(real())
   return <Placeholder role={role} screen={screen} />

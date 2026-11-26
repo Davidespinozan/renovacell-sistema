@@ -70,7 +70,10 @@ Deno.serve(conCors(async (req) => {
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
     const q = await resolverQuien(caller, admin)
     if (!q.ok) return json(q.status, q.body)
-    if (!tieneRol(q.quien, ['admin'])) return json(403, { error: 'Solo Dirección puede ver STRYV Care.' })
+    // 26 nov 2026: además de Dirección, el personal con la capacidad 'stryv_care' (Alberto la activa).
+    const caps = Array.isArray(q.quien.meta?.capabilities) ? (q.quien.meta.capabilities as unknown[]) : []
+    const conCapacidad = q.quien.role !== '' && q.quien.role !== 'doctor' && caps.includes('stryv_care')
+    if (!tieneRol(q.quien, ['admin']) && !conCapacidad) return json(403, { error: 'Solo Dirección puede ver STRYV Care.' })
 
     const { action } = await req.json().catch(() => ({ action: 'status' }))
     const stripe = getStripe()

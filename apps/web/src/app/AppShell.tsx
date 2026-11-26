@@ -25,7 +25,7 @@ export const tituloPestana = (role: string | null | undefined): string =>
 const NOMBRE_VISTA: Record<string, string> = { pos: 'Ventas', warehouse: 'Almacén', packing: 'Auxiliar de almacén', driver: 'Chofer', doctor: 'Portal del Doctor' }
 
 export function AppShell() {
-  const { role, screen, verified, user, setScreen, vistaPrevia, verComo } = useRole()
+  const { role, screen, verified, user, setScreen, vistaPrevia, verComo, capabilities } = useRole()
   const [drawer, setDrawer] = useState(false)
 
   // La pestaña: "Sistema operativo" es solo del equipo (ERP); el doctor ve la marca del negocio (decisión del dueño).
@@ -81,7 +81,7 @@ export function AppShell() {
           {!import.meta.env.DEV && <VersionNueva />}
           <div id="content" key={`${role}:${screen}`}>
             {role === 'doctor' && !verified && <AvisoVerificacion />}
-            {renderScreen(role, screen)}
+            {renderScreen(role, screen, capabilities)}
           </div>
         </main>
       </div>

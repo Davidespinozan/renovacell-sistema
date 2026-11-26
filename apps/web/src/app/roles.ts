@@ -14,7 +14,7 @@ export type RoleKey =
   | 'admin' | 'doctor' | 'warehouse' | 'packing' | 'pos' | 'driver'
 
 // Responsabilidades que Administración suma a un usuario sobre su rol base.
-export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas' | 'dueno'
+export type CapabilityKey = 'diseno' | 'eventos' | 'anuncios' | 'contenido' | 'conversaciones' | 'nuevos_clientes' | 'jefe_ventas' | 'dueno' | 'stryv_care'
 
 export interface ScreenDef {
   key: string
@@ -194,6 +194,9 @@ export const CAPABILITIES: CapabilityDef[] = [
   // DUEÑO (23 nov 2026, Toño): superusuario. Con el rol de Dirección, trabaja en TODOS los roles («Ver como…» al pie del
   // menú): en cada uno ve lo de todos y hace lo de todos con su cuenta (el servidor ya le da acceso total a Dirección).
   { key: 'dueno', label: 'Dueño: todos los roles', modules: [] },
+  // STRYV CARE (26 nov 2026, dueño: «Alberto lo va a activar»): además de Dirección, quien tenga esta capacidad abre
+  // «Ver mi plan STRYV Care» al pie del menú y puede suscribir/administrar el plan. La Edge stryv-care lo exige igual.
+  { key: 'stryv_care', label: 'STRYV Care (plan del sistema)', modules: [] },
   { key: 'jefe_ventas', label: 'Jefe de ventas', modules: [{ key: 'av_comisiones', label: 'Metas y comisiones', icon: 'chart', section: 'Mi cartera' }, { key: 'ventas_equipo', label: 'Ventas del equipo', icon: 'chart', section: 'Mi cartera' }] },   // VENTAS DEL EQUIPO (25 nov 2026, Roberto)
   {
     key: 'contenido', label: 'Catálogo y sitio web',
@@ -237,6 +240,9 @@ export const getScreenDef = (role: RoleDef, key: string, features: Features = FE
 
 // Quién puede gestionar la vista común (crear/editar anuncios/avisos/assets):
 // Administración. El resto del staff la ve en modo lectura.
+// ¿Puede abrir y activar STRYV Care? Dirección siempre; el resto, solo con la capacidad 'stryv_care'.
+export const puedeStryvCare = (role: RoleKey | null | undefined, caps: string[] = []): boolean => role === 'admin' || (!!role && role !== 'doctor' && caps.includes('stryv_care'))
+
 export const canManageHub = (key: RoleKey): boolean => key === 'admin'
 
 // ── MENÚ AGRUPADO (dueño, 17 oct 2026) ─────────────────────────────────────────────────────────────────
