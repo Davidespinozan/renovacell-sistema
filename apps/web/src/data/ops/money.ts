@@ -28,7 +28,7 @@ export const METODOS: { value: PaymentMethod; label: string }[] = [
 ]
 
 // CALIDAD VISUAL · el método de pago SIEMPRE en palabras (el doctor veía «contra_pedido»). Desconocido → tal cual, sin guiones bajos.
-const METODO_TEXTO: Record<string, string> = { ...Object.fromEntries(METODOS.map((m) => [m.value, m.label])), contra_pedido: 'Pago contra pedido', credito: 'Crédito', contra_entrega: 'Paga al recibir', link_tarjeta: 'Link de pago con tarjeta', tarjeta_link: 'Link de pago con tarjeta', cybersource: 'Tarjeta en línea', deposito: 'Depósito' }
+const METODO_TEXTO: Record<string, string> = { ...Object.fromEntries(METODOS.map((m) => [m.value, m.label])), contra_pedido: 'Pago contra pedido', credito: 'Crédito', contra_entrega: 'Paga al recibir', por_cobrar: 'Por cobrar', link_tarjeta: 'Link de pago con tarjeta', tarjeta_link: 'Link de pago con tarjeta', cybersource: 'Tarjeta en línea', deposito: 'Depósito' }
 export function textoMetodoPago(m: string | null | undefined): string {
   const k = (m ?? '').trim(); if (!k) return ''
   return METODO_TEXTO[k] ?? (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ')

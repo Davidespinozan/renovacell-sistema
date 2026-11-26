@@ -5,7 +5,7 @@
 import { supabase } from '../../lib/supabase'
 import { sumarDias } from '../periodo'
 
-export type FormaPago = 'efectivo' | 'tarjeta' | 'transferencia' | 'link' | 'al_recibir' | 'credito'
+export type FormaPago = 'efectivo' | 'tarjeta' | 'transferencia' | 'por_cobrar' | 'link' | 'al_recibir' | 'credito'
 export interface CobroElegido {
   forma: FormaPago
   /** Efectivo: con cuánto paga el cliente (para el cambio). */
@@ -28,6 +28,8 @@ export const FORMAS: Array<{ id: FormaPago; texto: string; ayuda: string; grupo:
   { id: 'efectivo', texto: 'Efectivo', ayuda: 'Ya te lo dio', grupo: 'ya' },
   { id: 'tarjeta', texto: 'Tarjeta', ayuda: 'Ya la pasaste en la terminal', grupo: 'ya' },
   { id: 'transferencia', texto: 'Transferencia', ayuda: 'Ya llegó (referencia opcional)', grupo: 'ya' },
+  // POR-COBRAR (26 nov 2026, dueño): vender ahora y cobrar durante el día o cuando pague, sin crédito.
+  { id: 'por_cobrar', texto: 'Paga más tarde', ayuda: 'Se vende ya y se cobra hoy o cuando pague, desde los pedidos por cobrar. No es crédito', grupo: 'despues' },
   { id: 'al_recibir', texto: 'Paga al recibir', ayuda: 'Al chofer o al recoger: efectivo, terminal o transferencia', grupo: 'despues' },
   { id: 'link', texto: 'Link de pago', ayuda: 'Le mandas un link de BanBajío', grupo: 'despues' },
   { id: 'credito', texto: 'Crédito', ayuda: 'Paga después, con fecha límite', grupo: 'despues' },
@@ -94,6 +96,8 @@ export function resultadoCobro(c: CobroElegido, vence?: string | null): { pagado
       const con = c.con === 'tarjeta' ? ' con terminal' : c.con === 'transferencia' ? ' por transferencia' : c.con === 'efectivo' ? ' en efectivo' : ''
       return { pagado: false, texto: `pasa a Almacén y se cobra${con} al entregarlo (o al recogerlo en sucursal).` }
     }
+    case 'por_cobrar':
+      return { pagado: false, texto: 'quedó POR COBRAR: cóbralo en «Cobrar pedidos» cuando pague. Pasa a Almacén al pagarse.' }
     case 'link':
       return { pagado: false, texto: 'quedó por cobrar con link de pago: sácalo en la app de BanBajío y pégalo en «Cobrar pedidos». Pasa a Almacén cuando se pague.' }
   }
