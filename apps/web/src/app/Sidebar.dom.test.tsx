@@ -44,7 +44,7 @@ describe('<Sidebar> · secciones plegables (como en CuboPolar)', () => {
     expect(fin.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(fin)
     expect(screen.getByText('Cobros')).toBeTruthy(); expect(fin.getAttribute('aria-expanded')).toBe('true')
-    expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones') ?? '{}').Finanzas).toBe(true)
+    expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones_v2') ?? '{}').Finanzas).toBe(true)
     expect(screen.getByTestId('seccion-Clientes y conversaciones').getAttribute('aria-expanded')).toBe('true')   // MENÚ ORDENADO · Clientes y Conversaciones juntos, abierta por defecto
     expect(screen.queryAllByText('Clientes').filter((el) => el.closest('a'))).toHaveLength(1)
     // el Hub también se pliega (y la pantalla activa, Inicio, lo vuelve a abrir al navegar a él)

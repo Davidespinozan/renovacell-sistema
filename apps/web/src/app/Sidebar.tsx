@@ -18,7 +18,9 @@ import { pedidosPorConfirmar } from '../data/ops/porConfirmar'   // POR CONFIRMA
 // SECCIONES PLEGABLES (como en CuboPolar): se pica el encabezado y se abre o se cierra; la preferencia se recuerda en
 // este navegador. La sección de la pantalla activa se abre sola. Sin preferencia guardada, Dirección arranca con lo de
 // uso diario abierto (Mi trabajo, Clientes, Conversaciones) y el resto plegado; los demás roles ven todo abierto.
-const CLAVE_SECCIONES = 'rc_sidebar_secciones'
+// MENÚ CORTO (26 nov 2026): clave nueva = el menú vuelve a arrancar corto para todos UNA vez (solo lo del día a día
+// abierto); lo que cada quien abra o cierre a partir de ahora se recuerda como siempre.
+const CLAVE_SECCIONES = 'rc_sidebar_secciones_v2'
 const HUB = 'Hub Renovacell'
 const ABIERTAS_POR_DEFECTO = new Set([HUB, 'Mi trabajo', 'Clientes y conversaciones'])
 const leerSecciones = (): Record<string, boolean> | null => { try { const v = localStorage.getItem(CLAVE_SECCIONES); return v ? JSON.parse(v) as Record<string, boolean> : null } catch { return null } }

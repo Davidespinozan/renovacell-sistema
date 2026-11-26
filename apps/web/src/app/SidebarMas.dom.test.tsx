@@ -20,7 +20,7 @@ describe('<Sidebar> Almacén · sección «Más»', () => {
     for (const t of ['Promociones', 'Catálogo y sitio', 'Eventos', 'Diseño']) expect(screen.queryByText(t)).toBeNull()
     fireEvent.click(mas)
     for (const t of ['Promociones', 'Catálogo y sitio', 'Eventos', 'Diseño']) expect(screen.getByText(t)).toBeTruthy()
-    expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones') ?? '{}')['Más']).toBe(true)
+    expect(JSON.parse(localStorage.getItem('rc_sidebar_secciones_v2') ?? '{}')['Más']).toBe(true)
   })
   it('si está parado en una pantalla de «Más», la sección se abre sola', () => {
     h.screen = 'g_eventos'
