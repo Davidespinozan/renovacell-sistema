@@ -264,6 +264,8 @@ const MENSAJES: Record<string, string> = {
   uq_entry_external_ref: 'Esa referencia de pago ya está registrada en otro cobro, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago (no el número de cuenta ni el banco).',
   // REF-DUP (26 nov 2026, Toño): el servidor dice EN QUÉ venta ya está esa referencia (folio y cliente) y se anexa.
   REFERENCIA_DUPLICADA: 'Esa referencia de pago ya está registrada en otro cobro, así que no se guardó nada. Escribe la clave de rastreo o la referencia del comprobante de ESTE pago',
+  // FACTURA EN EL MES (26 nov 2026, dueño): pasado el mes de la venta va a la factura global a público en general.
+  FACTURA_FUERA_DE_MES: 'Esta venta ya no se puede facturar a nombre del cliente: la factura se pide a más tardar el último día del mes de la venta. Ahora va en la factura global del mes a público en general',
   ENVIO_EXTRA_PAQUETERIA: 'La paquetería de un envío extra no está disponible. Elige otra.',
 }
 
