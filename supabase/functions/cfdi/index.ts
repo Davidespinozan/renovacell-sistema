@@ -20,7 +20,7 @@ import { conCors } from '../_shared/cors.ts'
 import { resolverQuien, tieneRol } from '../_shared/quien.ts'
 import { resolverFacturama } from '../_shared/facturama.ts'
 import { buscarPorSerieFolio, sanitiza, timbrarEnPAC, type DepsPAC } from '../_shared/pac.ts'
-import { armarConceptos, comprobante, type Preparado } from '../_shared/cfdiConceptos.ts'
+import { armarConceptos, comprobante, armarGlobal, comprobanteGlobal, type Preparado, type PreparadoGlobal } from '../_shared/cfdiConceptos.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -38,9 +38,10 @@ Deno.serve(conCors(async (req) => {
   if (!q.ok) return json(q.status, q.body)
   if (!tieneRol(q.quien, ['admin', 'billing'])) return json(403, { error: 'no_autorizado', message: 'Solo Dirección o Facturación timbran.' })
 
-  const b = await req.json().catch(() => ({})) as { accion?: string; doc_id?: string; order_id?: string; forma_pago?: string | null }
+  const b = await req.json().catch(() => ({})) as { accion?: string; doc_id?: string; order_id?: string; forma_pago?: string | null; anio?: number; mes?: number; global_id?: string }
   const accion = b.accion ?? 'preparar'
-  if (!['preparar', 'timbrar', 'conciliar'].includes(accion)) return json(400, { error: 'accion_invalida' })
+  if (!['preparar', 'timbrar', 'conciliar', 'global_preparar', 'global_timbrar', 'global_conciliar'].includes(accion)) return json(400, { error: 'accion_invalida' })
+  if (accion.startsWith('global_')) return await facturaGlobal(accion, b, caller)
   let doc = UUID.test(b.doc_id ?? '') ? b.doc_id! : null
   if (!doc && UUID.test(b.order_id ?? '')) {
     const { data } = await admin.from('fiscal_documents').select('id').eq('order_id', b.order_id).in('status', ['pendiente', 'en_proceso', 'incierto']).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -125,3 +126,61 @@ Deno.serve(conCors(async (req) => {
   }
   return json(res.clase === 'fallido' ? 422 : 202, { status: 'incierto', message: res.clase === 'fallido' ? `Facturama rechazó el reenvío: ${sanitiza(res.message ?? '')}` : 'Sigue sin respuesta clara de Facturama; vuelve a conciliar más tarde.' })
 }))
+
+// ============================================================================
+// FACTURA GLOBAL MENSUAL (26 nov 2026). Mismo camino seguro: vista previa sin escribir; el reclamo congela las ventas y la
+// identidad ANTES de salir a Facturama; lo dudoso queda `incierto` y se concilia por serie+folio.
+// ============================================================================
+async function facturaGlobal(accion: string, b: { anio?: number; mes?: number; forma_pago?: string | null; global_id?: string }, caller: ReturnType<typeof createClient>): Promise<Response> {
+  const ent = resolverFacturama(Deno.env.get('FACTURAMA_ENV'))
+  const user = Deno.env.get('FACTURAMA_USER') ?? ''; const pass = Deno.env.get('FACTURAMA_PASSWORD') ?? ''
+  const configurado = ent.ok && !!user && !!pass
+  const deps: DepsPAC | null = configurado && ent.ok ? { fetch, base: ent.base, auth: 'Basic ' + btoa(`${user}:${pass}`) } : null
+
+  if (accion === 'global_conciliar') {
+    if (!UUID.test(b.global_id ?? '')) return json(400, { error: 'global_id' })
+    if (!deps || !ent.ok) return json(501, { error: 'config_incompleta', message: ent.ok ? 'Faltan las credenciales de Facturama.' : ent.message })
+    const { data: idn, error } = await caller.rpc('factura_global_identidad', { p_id: b.global_id })
+    if (error || !idn) return json(409, { error: 'identidad', message: 'No se pudo leer la factura global.' })
+    const i = idn as { status: string; serie: string; folio: string; claim_id: string; claimed_at: string }
+    if (i.status !== 'incierto' && i.status !== 'en_proceso') return json(409, { error: 'no_conciliable', message: `La factura global está en estado ${i.status}.` })
+    if (i.status === 'en_proceso' && Date.now() - new Date(i.claimed_at).getTime() < 2 * 60_000) return json(409, { error: 'en_proceso', message: 'Hay un timbrado en curso; espera un par de minutos.' })
+    const busq = await buscarPorSerieFolio(deps, i.serie, i.folio)
+    const cand = busq.outcome === 'encontrado' ? busq.candidatos[0] : null
+    if (cand?.uuid) {
+      const { error: e } = await caller.rpc('factura_global_registrar', { p_id: b.global_id, p_claim: i.claim_id, p_resultado: 'timbrado', p_uuid: cand.uuid, p_provider_ref: cand.providerRef ?? null })
+      return e ? json(409, { error: 'registrar', message: sanitiza(e.message) }) : json(200, { status: 'timbrado', uuid: cand.uuid, serie: i.serie, folio: i.folio, message: 'La factura global sí existía en Facturama: quedó registrada.' })
+    }
+    if (busq.outcome === 'vacio' && i.status === 'en_proceso') {
+      await caller.rpc('factura_global_registrar', { p_id: b.global_id, p_claim: i.claim_id, p_resultado: 'incierto', p_error_code: 'reclamo_abandonado', p_error_message: 'El timbrado no terminó de registrarse.' })
+    }
+    return json(202, { status: 'incierto', message: busq.outcome === 'error' ? 'No se pudo consultar Facturama; intenta de nuevo en unos minutos.' : 'No aparece en Facturama todavía. Vuelve a conciliar más tarde; no se timbra otra.' })
+  }
+
+  const anio = Number(b.anio); const mes = Number(b.mes)
+  if (!Number.isInteger(anio) || !Number.isInteger(mes) || mes < 1 || mes > 12) return json(400, { error: 'periodo', message: 'Elige el mes y el año.' })
+  const { data, error } = await caller.rpc('factura_global_preparar', { p_anio: anio, p_mes: mes })
+  if (error || !data) return json(409, { error: 'preparar', message: sanitiza(error?.message ?? 'No se pudo leer el mes.') })
+  const prep = data as PreparadoGlobal & { globales: unknown[] }
+  const a = armarGlobal(prep, b.forma_pago)
+  const requiereTarjeta = !a.ok && a.faltantes.some((f) => f.includes('crédito (04) o débito (28)'))
+  if (accion === 'global_preparar') {
+    return json(200, { anio, mes, entorno: ent.ok ? ent.entorno : null, configurado, listo: a.ok, faltantes: a.ok ? [] : a.faltantes, requiere_forma_tarjeta: requiereTarjeta,
+      ventas: prep.pedidos.length, ventas_total: prep.pedidos.reduce((s, o) => s + Number(o.total), 0),
+      resumen: a.ok ? { conceptos: a.items.length, subtotal: a.subtotal, iva: a.iva, total: a.total, forma_pago: a.formaPago } : null, globales: prep.globales })
+  }
+  // global_timbrar
+  if (!a.ok) return json(409, { error: 'faltantes', faltantes: a.faltantes, requiere_forma_tarjeta: requiereTarjeta })
+  if (!deps || !ent.ok) return json(501, { error: 'config_incompleta', message: ent.ok ? 'Faltan las credenciales de Facturama.' : ent.message })
+  const { data: rec, error: eRec } = await caller.rpc('factura_global_reclamar', { p_anio: anio, p_mes: mes, p_provider_env: ent.entorno, p_pedidos: a.pedidos,
+    p_subtotal: a.subtotal, p_iva: a.iva, p_total: a.total, p_forma_pago: a.formaPago })
+  if (eRec || !rec) return json(409, { error: 'reclamo', message: sanitiza(eRec?.message ?? 'No se pudo reservar el folio.') })
+  const r = rec as { id: string; serie: string; folio: string; provider_date_sent: string; order_number: string; claim_id: string }
+  const res = await timbrarEnPAC(deps, comprobanteGlobal(r, prep, a))
+  const { error: eReg } = await caller.rpc('factura_global_registrar', { p_id: r.id, p_claim: r.claim_id, p_resultado: res.clase, p_uuid: res.uuid ?? null, p_provider_ref: res.providerRef ?? null,
+    p_error_code: res.clase === 'timbrado' ? null : (res.code ?? 'desconocido'), p_error_message: res.clase === 'timbrado' ? null : sanitiza(res.message ?? '') })
+  if (eReg) return json(202, { status: 'incierto', serie: r.serie, folio: r.folio, message: 'Facturama respondió pero no se pudo guardar el resultado. Usa "Conciliar"; no vuelvas a timbrar.' })
+  const http = res.clase === 'timbrado' ? 200 : res.clase === 'fallido' ? 422 : 202
+  return json(http, { status: res.clase, uuid: res.uuid ?? null, serie: r.serie, folio: r.folio, entorno: ent.entorno, total: a.total, ventas: a.pedidos.length,
+    message: res.clase === 'timbrado' ? `Factura global ${r.serie}-${r.folio} timbrada (${a.pedidos.length} ventas).` : res.clase === 'fallido' ? `Facturama la rechazó: ${sanitiza(res.message ?? '')}. Las ventas quedaron libres para intentarlo de nuevo.` : 'No hubo respuesta clara de Facturama: NO vuelvas a timbrar; usa "Conciliar".' })
+}

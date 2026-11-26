@@ -26,6 +26,7 @@ import { cifra } from '../../app/Kpi'
 import { tieneCfdi, cfdiTimbradoReal, estadoCancelacion } from '../../data/ops/cfdi'
 import { estadoFiscalPedido, mensajeEstadoFiscal, SIN_SOLICITUD, type EstadoFiscalPedido } from '../../data/ops/fiscalIntent'
 import { TimbrarCFDI } from './TimbrarCFDI'   // TIMBRADO REAL (2 nov 2026)
+import { FacturaGlobal } from './FacturaGlobal'   // FACTURA GLOBAL MENSUAL (26 nov 2026)
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
@@ -209,6 +210,9 @@ export function Facturacion() {
           ]}
         />
       </div>
+
+      {/* FACTURA GLOBAL · lo que nadie facturó en el mes, a público en general */}
+      {hasSupabase && <FacturaGlobal />}
 
       {/* Tabla */}
       <div className="card" style={{ padding: 0 }}>

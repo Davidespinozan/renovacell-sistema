@@ -111,3 +111,67 @@ export function comprobante(id: { serie: string; folio: string; provider_date_se
   }
   return { NameId: '1', ...construirCFDI(ident, a.items), PaymentForm: a.formaPago, PaymentMethod: 'PUE', Exportation: '01' }
 }
+
+// ============================================================================
+// FACTURA GLOBAL MENSUAL A PÚBLICO EN GENERAL (26 nov 2026). Mismas reglas que la factura del pedido (IVA desde el precio
+// final, configuración fiscal VALIDADA), pero un CONCEPTO POR VENTA (por tasa de IVA si la venta mezcla tasas), como pide
+// el SAT para la global: ClaveProdServ 01010101, ClaveUnidad ACT, cantidad 1, NoIdentificacion = folio de la venta.
+// ============================================================================
+export interface PedidoGlobal { order_id: string; folio: string | null; total: number; shipping_cost: number; lineas: LineaFiscal[]; cobros: Array<{ method: string; amount: number }> }
+export interface PreparadoGlobal {
+  anio: number; mes: number; periodo_fin: string
+  emisor: Preparado['emisor']; envio: ConceptoFiscal | null; pedidos: PedidoGlobal[]; faltantes: string[]
+}
+export type ArmadoGlobal = { ok: true; items: ItemFacturama[]; subtotal: number; iva: number; total: number; formaPago: string; pedidos: string[] } | { ok: false; faltantes: string[]; pedidos: number }
+
+export const RECEPTOR_PUBLICO_GENERAL = { Rfc: 'XAXX010101000', Name: 'PUBLICO EN GENERAL', CfdiUse: 'S01', FiscalRegime: '616' }
+
+export function armarGlobal(p: PreparadoGlobal, formaElegida?: string | null): ArmadoGlobal {
+  const falta: string[] = [...(p.faltantes ?? [])]
+  if (!p.pedidos.length) falta.push('No hay ventas pagadas sin facturar en ese mes.')
+  const items: ItemFacturama[] = []; let base = 0; let iva = 0
+  for (const o of p.pedidos) {
+    const grupos = new Map<string, { objeto: string; rate: number | null; base: number; iva: number }>()
+    const sumar = (it: ItemFacturama, b: number, v: number) => {
+      const rate = it.Taxes?.[0]?.Rate ?? null
+      const k = `${it.TaxObject}|${rate ?? '-'}`
+      const g = grupos.get(k) ?? { objeto: it.TaxObject, rate, base: 0, iva: 0 }
+      g.base += b; g.iva += v; grupos.set(k, g)
+    }
+    let okPedido = true
+    for (const l of o.lineas) {
+      const c = concepto(l.nombre, l.sku, Number(l.qty), Number(l.qty) * Number(l.unit_price), l)
+      if (c.ok) sumar(c.item, c.base, c.iva); else { falta.push(c.error); okPedido = false }
+    }
+    if (Number(o.shipping_cost) > 0) {
+      if (!p.envio) { falta.push('Envío: configura y valida su clave SAT en Revisión fiscal.'); okPedido = false }
+      else { const c = concepto('Envío', null, 1, Number(o.shipping_cost), p.envio); if (c.ok) sumar(c.item, c.base, c.iva); else { falta.push(c.error); okPedido = false } }
+    }
+    if (!okPedido) continue
+    let totPedido = 0
+    for (const g of grupos.values()) {
+      const b = r2(g.base); const v = r2(g.iva)
+      items.push({ ProductCode: '01010101', IdentificationNumber: (o.folio ?? o.order_id).slice(0, 100), Description: 'Venta', Unit: 'Actividad', UnitCode: 'ACT',
+        UnitPrice: b, Quantity: 1, Subtotal: b, TaxObject: g.objeto,
+        ...(g.objeto === '02' ? { Taxes: [{ Total: v, Name: 'IVA' as const, Base: b, Rate: g.rate ?? 0, IsRetention: false as const }] } : {}), Total: r2(b + v) })
+      base += b; iva += v; totPedido += b + v
+    }
+    if (Math.abs(r2(totPedido) - r2(Number(o.total))) > 0.01) falta.push(`Venta ${o.folio ?? o.order_id}: los conceptos suman ${r2(totPedido).toFixed(2)} y la venta ${Number(o.total).toFixed(2)}.`)
+  }
+  const fp = formaDePago(p.pedidos.flatMap((o) => o.cobros).reduce<Array<{ method: string; amount: number }>>((acc, c) => {
+    const x = acc.find((a) => a.method === c.method); if (x) x.amount += Number(c.amount); else acc.push({ method: c.method, amount: Number(c.amount) }); return acc
+  }, []), formaElegida)
+  if (!fp.ok) falta.push(fp.error)
+  if (falta.length) return { ok: false, faltantes: [...new Set(falta)], pedidos: p.pedidos.length }
+  return { ok: true, items, subtotal: r2(base), iva: r2(iva), total: r2(items.reduce((s, i) => s + i.Total, 0)), formaPago: (fp as { forma: string }).forma, pedidos: p.pedidos.map((o) => o.order_id) }
+}
+
+/** Sobre de la global con su identidad congelada y la InformacionGlobal (mensual). */
+export function comprobanteGlobal(id: { serie: string; folio: string; provider_date_sent: string; order_number: string }, p: PreparadoGlobal, a: Extract<ArmadoGlobal, { ok: true }>): Record<string, unknown> {
+  const ident: IdentidadCFDI = {
+    serie: id.serie, folio: id.folio, providerDateSent: id.provider_date_sent, orderNumber: id.order_number, expeditionPlace: p.emisor.cp, currency: 'MXN',
+    receiver: { ...RECEPTOR_PUBLICO_GENERAL, TaxZipCode: p.emisor.cp },
+  }
+  return { NameId: '1', ...construirCFDI(ident, a.items), PaymentForm: a.formaPago, PaymentMethod: 'PUE', Exportation: '01',
+    GlobalInformation: { Periodicity: '04', Months: String(p.mes).padStart(2, '0'), Year: p.anio } }
+}

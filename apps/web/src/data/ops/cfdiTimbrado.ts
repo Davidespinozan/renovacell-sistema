@@ -7,7 +7,10 @@ export interface RespuestaCfdi {
   faltantes?: string[]; requiere_forma_tarjeta?: boolean; message?: string; error?: string
   resumen?: { conceptos: number; subtotal: number; iva: number; total: number; forma_pago: string } | null
   uuid?: string | null; serie?: string; folio?: string; correo_enviado?: boolean
+  // FACTURA GLOBAL (26 nov 2026)
+  ventas?: number; ventas_total?: number; globales?: GlobalMes[]
 }
+export interface GlobalMes { id: string; anio: number; mes: number; status: string; serie: string; folio: string; uuid: string | null; pedidos: number; total: number | null; provider_env: string; error_message: string | null; created_at: string }
 async function llamar(body: Record<string, unknown>): Promise<RespuestaCfdi> {
   const { data, error } = await supabase.functions.invoke('cfdi', { body })
   if (!error) return data as RespuestaCfdi
@@ -18,6 +21,10 @@ export const cfdiTimbrado = {
   preparar: (doc: string, forma?: string | null) => llamar({ accion: 'preparar', doc_id: doc, forma_pago: forma ?? null }),
   timbrar: (doc: string, forma?: string | null) => llamar({ accion: 'timbrar', doc_id: doc, forma_pago: forma ?? null }),
   conciliar: (doc: string, forma?: string | null) => llamar({ accion: 'conciliar', doc_id: doc, forma_pago: forma ?? null }),
+  // FACTURA GLOBAL MENSUAL a público en general
+  globalPreparar: (anio: number, mes: number, forma?: string | null) => llamar({ accion: 'global_preparar', anio, mes, forma_pago: forma ?? null }),
+  globalTimbrar: (anio: number, mes: number, forma?: string | null) => llamar({ accion: 'global_timbrar', anio, mes, forma_pago: forma ?? null }),
+  globalConciliar: (id: string) => llamar({ accion: 'global_conciliar', global_id: id }),
 }
 export type ClienteCfdiTimbrado = typeof cfdiTimbrado
 export const FORMAS_TARJETA = [{ v: '04', t: 'Tarjeta de crédito (04)' }, { v: '28', t: 'Tarjeta de débito (28)' }] as const
