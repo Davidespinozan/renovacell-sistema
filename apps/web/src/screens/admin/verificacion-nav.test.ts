@@ -22,13 +22,13 @@ describe('Verificación de doctores — cockpit reconectado (av_verif)', () => {
     const nav = getNav(getRole('admin'))
     const entry = nav.find((s) => s.key === 'g_clientes')
     expect(entry).toBeTruthy(); expect(entry?.label).toBe('Clientes'); expect(entry?.section).toBe('Clientes y conversaciones')
-    expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'av_repetidos', label: 'Repetidos' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'llamar_hoy', label: 'Prospección' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }])   // INVITA-1 (sin masivas desde 23 nov) · CRM (2 nov 2026) · CARTERA-PLAZO (3 nov 2026) · REPETIDOS (23 nov 2026)
+    expect(SUBPANTALLAS.g_clientes).toEqual([{ key: 'av_doc', label: 'Clientes' }, { key: 'av_repetidos', label: 'Repetidos' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'llamar_hoy', label: 'Prospección' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_clasificar', label: 'Clasificar' }])   // MENÚ SIN DUPLICADOS (26 nov 2026): se declara «Clasificar», que la pantalla ya mostraba · INVITA-1 (sin masivas desde 23 nov) · CRM (2 nov 2026) · CARTERA-PLAZO (3 nov 2026) · REPETIDOS (23 nov 2026)
     // un aviso "por verificar" (screen av_verif) abre el grupo con esa pestaña pedida
     expect(resolverDestino(nav, 'av_verif')).toEqual({ screen: 'g_clientes', pestana: 'av_verif' })
     expect(pantallasAlcanzables(nav).has('av_verif')).toBe(true)
   })
   it('roles.ts declara la pestaña av_verif dentro de g_clientes y el registro la monta', () => {
-    expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'av_repetidos', label: 'Repetidos' \}, \{ key: 'crm_embudo', label: 'Embudo de ventas' \}, \{ key: 'llamar_hoy', label: 'Prospección' \}, \{ key: 'cartera_plazos', label: 'Plazos de cartera' \}, \{ key: 'av_verif', label: 'Por verificar' \}\]/)
+    expect(rolesSrc).toMatch(/g_clientes: \[\{ key: 'av_doc', label: 'Clientes' \}, \{ key: 'av_repetidos', label: 'Repetidos' \}, \{ key: 'crm_embudo', label: 'Embudo de ventas' \}, \{ key: 'llamar_hoy', label: 'Prospección' \}, \{ key: 'cartera_plazos', label: 'Plazos de cartera' \}, \{ key: 'av_verif', label: 'Por verificar' \}, \{ key: 'av_clasificar', label: 'Clasificar' \}\]/)
     expect(registrySrc).toMatch(/g_clientes: \(\) => <Pestanas grupo="g_clientes"[\s\S]*key: 'av_verif', label: 'Por verificar', render: \(\) => <Doctores \/>/)
   })
   it('menú de Dirección: Clientes con Conversaciones; Ventas en Mi trabajo (no con Clientes); Comisiones dentro de Equipo', () => {

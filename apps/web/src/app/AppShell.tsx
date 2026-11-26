@@ -18,6 +18,7 @@ import { instalarRefresco, refrescarDatos } from '../data/store/refrescar'
 import { regresoDeStripe, CLAVE_REGRESO_CARE } from '../data/ops/stryvCare'
 import { useAbrirDesdeAviso } from '../data/ops/abrirAviso'
 import { PuertaAvisos } from './PuertaAvisos'
+import { fijarRolDeUso, registrarUso } from '../data/ops/usoPantallas'   // MEDIDOR DE USO (auditoría de UX)
 
 export const tituloPestana = (role: string | null | undefined): string =>
   role && role !== 'doctor' ? 'Renovacell · Sistema operativo' : 'Renovacell · Tecnologías Antiedad'
@@ -30,6 +31,10 @@ export function AppShell() {
 
   // La pestaña: "Sistema operativo" es solo del equipo (ERP); el doctor ve la marca del negocio (decisión del dueño).
   useEffect(() => { document.title = tituloPestana(role) }, [role])
+
+  // MEDIDOR DE USO · qué pantalla abre cada quien (con el rol con el que trabaja: el dueño puede «Ver como…»).
+  fijarRolDeUso(user ? (vistaPrevia ?? role) : null)   // en el render: las pestañas (hijas) registran antes que este efecto
+  useEffect(() => { if (user && screen) registrarUso(screen) }, [screen, role, vistaPrevia, user])
 
   // Drawer móvil: el CSS del demo usa body.drawer-open.
   useEffect(() => {

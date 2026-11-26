@@ -2,7 +2,8 @@
 // UNA entrada del menú con pestañas internas; cada pestaña renderiza la pantalla existente tal cual (misma lógica, mismos
 // permisos). La pestaña elegida se recuerda por grupo. Las claves originales siguen en el registro para los avisos y
 // enlaces profundos (abren la pantalla sola, como antes).
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { registrarUso } from '../data/ops/usoPantallas'   // MEDIDOR DE USO (auditoría de UX)
 import { Cargando } from './EmptyState'
 
 export interface PestanaDef { key: string; label: string; render: () => React.ReactNode; conteo?: number }
@@ -17,6 +18,7 @@ const tomarPedida = (grupo: string): string | null => { const p = pedidas[grupo]
 export function Pestanas({ grupo, pestanas, inicial }: { grupo: string; pestanas: PestanaDef[]; inicial?: string }) {
   const [activa, setActiva] = useState<string>(() => { const r = tomarPedida(grupo) ?? leer(grupo); return pestanas.some((p) => p.key === r) ? (r as string) : inicial ?? pestanas[0].key })
   const actual = pestanas.find((p) => p.key === activa) ?? pestanas[0]
+  useEffect(() => { registrarUso(grupo, actual.key) }, [grupo, actual.key])
   return (
     <div className="grid" style={{ gap: 14 }} data-testid={`pestanas-${grupo}`}>
       <div className="seg seg--pestanas" role="tablist" aria-label="Secciones">

@@ -206,6 +206,11 @@ export const CAPABILITIES: CapabilityDef[] = [
     ],
   },
 ]
+// Pantallas de una capacidad que, para cierto rol, viven juntas en UNA entrada con pestañas (registry g_*).
+const G_DISENO: ScreenDef = { key: 'g_diseno', label: 'Diseño', icon: 'image', section: 'Catálogo y web' }
+const GRUPO_DE_CAPACIDAD: Partial<Record<RoleKey, Record<string, ScreenDef>>> = {
+  admin: { dis_solicitudes: G_DISENO, dis_calendario: G_DISENO },
+}
 export const getCapability = (k: CapabilityKey): CapabilityDef | undefined => CAPABILITIES.find((c) => c.key === k)
 export const capabilityModules = (caps: string[]): ScreenDef[] =>
   caps.flatMap((k) => getCapability(k as CapabilityKey)?.modules ?? [])
@@ -224,7 +229,17 @@ export const getNav = (role: RoleDef, features: Features = FEATURES, capabilitie
   if (role.isStaff && features.comunicacionInterna) nav.push(...HUB_SCREENS)
   nav.push(...role.modules)
   const have = new Set(nav.map((s) => s.key))
-  capabilityModules(capabilities).forEach((m) => { if (!have.has(m.key)) { nav.push(m); have.add(m.key) } })
+  // MENÚ SIN DUPLICADOS (26 nov 2026, auditoría de UX): una capacidad NO agrega una entrada que el rol ya tiene como
+  // pestaña de uno de sus grupos (a Dirección le salían «Conversaciones» y «Catálogo» dos veces y «Eventos» en dos
+  // lugares), y sus pantallas sueltas se juntan en UNA entrada con pestañas cuando el rol tiene dónde ponerla.
+  const enGrupoDelRol = (key: string) => Object.keys(GRUPOS).some((g) => have.has(g) && GRUPOS[g].includes(key))
+  const agrupar = GRUPO_DE_CAPACIDAD[role.key] ?? {}
+  capabilityModules(capabilities).forEach((m) => {
+    if (have.has(m.key) || enGrupoDelRol(m.key)) return
+    const grupo = agrupar[m.key]
+    if (grupo) { if (!have.has(grupo.key)) { nav.push(grupo); have.add(grupo.key) } return }
+    nav.push(m); have.add(m.key)
+  })
   return nav
 }
 
@@ -250,11 +265,12 @@ export const canManageHub = (key: RoleKey): boolean => key === 'admin'
 // siguen existiendo (avisos, tareas, búsqueda y enlaces profundos las usan): `resolverDestino` las traduce al grupo y
 // deja pedida la pestaña. Lo que ya no tiene entrada propia (bandeja, seguimiento del vendedor, hoy de Almacén) cae en Inicio.
 export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>> = {
-  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_repetidos', label: 'Repetidos' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'llamar_hoy', label: 'Prospección' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }],   // DUEÑO 23 nov 2026: «nosotros no mandamos nada a los clientes; eso lo harán los vendedores» → sin invitaciones masivas de Dirección
-  g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }, { key: 'difusiones', label: 'Difusiones' }, { key: 'av_ia', label: 'Asesora IA' }],   // DIFUSIONES (2 nov 2026) · Dirección manda a todos o a un grupo
+  g_clientes: [{ key: 'av_doc', label: 'Clientes' }, { key: 'av_repetidos', label: 'Repetidos' }, { key: 'crm_embudo', label: 'Embudo de ventas' }, { key: 'llamar_hoy', label: 'Prospección' }, { key: 'cartera_plazos', label: 'Plazos de cartera' }, { key: 'av_verif', label: 'Por verificar' }, { key: 'av_clasificar', label: 'Clasificar' }],   // DUEÑO 23 nov 2026: «nosotros no mandamos nada a los clientes; eso lo harán los vendedores» → sin invitaciones masivas de Dirección
+  g_conversaciones: [{ key: 'av_atencion', label: 'Bandeja' }, { key: 'asesorias', label: 'Asignadas' }, { key: 'av_mensajes', label: 'Correos al cliente' }, { key: 'difusiones', label: 'Difusiones' }, { key: 'seguimientos', label: 'Pendientes' }, { key: 'av_ia', label: 'Asesora IA' }],   // DIFUSIONES (2 nov 2026) · Dirección manda a todos o a un grupo
   g_catalogo: [{ key: 'av_catalogo', label: 'Productos' }, { key: 'av_precios', label: 'Precios' }, { key: 'av_promociones', label: 'Promociones' }, { key: 'av_conocimiento', label: 'Conocimiento de producto' }, { key: 'av_manual_ventas', label: 'Manual de ventas' }],
-  g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }, { key: 'eventos', label: 'Eventos' }],
-  g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }],
+  g_inventario: [{ key: 'av_existencias', label: 'Existencias' }, { key: 'av_entradas', label: 'Entradas' }, { key: 'av_traza', label: 'Trazabilidad' }, { key: 'av_mermas', label: 'Mermas' }, { key: 'av_control_inv', label: 'Control de inventario' }, { key: 'av_custodias', label: 'Custodias' }, { key: 'eventos', label: 'Eventos' }, { key: 'vev', label: 'Ventas desde custodia' }],
+  g_envios: [{ key: 'despacho', label: 'Despacho' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }, { key: 'agenda_entregas', label: 'Horarios de entrega' }],
+  g_diseno: [{ key: 'dis_solicitudes', label: 'Solicitudes de recurso' }, { key: 'dis_calendario', label: 'Calendario' }],   // Dirección con la capacidad Diseño
   g_pedidos: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'guia', label: 'Guías' }, { key: 'despacho', label: 'Despacho' }, { key: 'para_recoger', label: 'Para recoger' }, { key: 'seguimiento', label: 'Seguimiento' }, { key: 'mapa_choferes', label: 'Choferes en ruta' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Almacén (Alberto)
   g_finanzas: [{ key: 'av_finanzas', label: 'Finanzas' }, { key: 'av_cierre', label: 'Cierre de caja' }],
   g_cobros: [{ key: 'av_pagos', label: 'Pagos por validar' }, { key: 'av_links', label: 'Cobrar pedidos' }, { key: 'av_revision', label: 'Revisión económica' }],
