@@ -309,7 +309,7 @@ export function evidenciaDe(nombre: string, salida: unknown): Evidencia[] {
       // La proyección trae precio/disponibilidad calculados por la MISMA autoridad de CC-4 (solo si el lector puede verlos).
       const items = Array.isArray(o.items) ? (o.items as Array<Record<string, unknown>>) : []
       const conPrecio = o.puede_precio === true && items.some((i) => (i.precio as Record<string, unknown> | undefined)?.estado === 'autorizado')
-      const conStock = o.puede_precio === true && items.some((i) => ['disponible', 'no_disponible', 'no_vendible'].includes(String(i.disponibilidad)))
+      const conStock = o.puede_precio === true && items.some((i) => ['disponible', 'sobre_pedido', 'no_disponible', 'no_vendible'].includes(String(i.disponibilidad)))
       return o.cart_id ? (['CART_READ_EVIDENCE', ...(conPrecio ? ['PRICE_EVIDENCE'] : []), ...(conStock ? ['STOCK_EVIDENCE'] : [])] as Evidencia[]) : []
     }
     case 'agregar_al_carrito': case 'actualizar_carrito': case 'quitar_del_carrito': case 'vaciar_carrito':
