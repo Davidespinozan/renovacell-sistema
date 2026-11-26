@@ -4,7 +4,7 @@
 import { Info } from 'lucide-react'
 import React, { useState } from 'react'
 import { useRole } from '../auth/RoleContext'
-import { getNav, getRole } from './roles'
+import { getNav, getRole, pantallasAlcanzables } from './roles'
 
 const CLAVE = 'rc_guia_inventario_oculta'
 // `destino` es solo el rótulo del botón («Ir a …»); la pantalla real la decide `keys` según el menú del rol.
@@ -18,7 +18,7 @@ export function GuiaInventario({ paso }: { paso?: 1 | 2 | 3 }) {
   const { role, capabilities, setScreen } = useRole()
   // CALIDAD VISUAL (7 nov) · plegada por defecto (ocupaba media primera pantalla en Inventario); se abre con «Ver» y se recuerda.
   const [oculta, setOculta] = useState(() => { try { return localStorage.getItem(CLAVE) !== '0' } catch { return true } })
-  const nav = new Set(getNav(getRole(role), undefined, capabilities).map((s) => s.key))
+  const nav = pantallasAlcanzables(getNav(getRole(role), undefined, capabilities))   // entradas del menú y pestañas de sus grupos
   const alternar = () => { setOculta((v) => { try { localStorage.setItem(CLAVE, v ? '0' : '1') } catch { /* sin almacenamiento */ } return !v }) }
   return (
     // UX MODERNO · un enlace discreto (antes una tarjeta con título y botón "Ver" encima de la pantalla).

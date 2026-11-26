@@ -27,7 +27,7 @@ describe('getNav', () => {
   it('suma los módulos de las capabilities al rol base (sin duplicar)', () => {
     const base = getNav(getRole('warehouse')).map((s) => s.key)
     const conDiseno = getNav(getRole('warehouse'), undefined, ['diseno']).map((s) => s.key)
-    expect(conDiseno).toContain('dis_calendario')
+    expect(conDiseno).toContain('g_diseno')   // MENÚ CORTO (26 nov 2026): en Almacén, Diseño es una entrada con pestañas (Solicitudes · Calendario)
     expect(conDiseno.length).toBeGreaterThan(base.length)
     // sin claves repetidas
     expect(new Set(conDiseno).size).toBe(conDiseno.length)

@@ -21,6 +21,8 @@ export interface ScreenDef {
   label: string
   icon: IconName
   section?: string // agrupa los módulos del sidebar (evita el "muro" de links)
+  /** MENÚ CORTO (26 nov 2026): entrada de uso ocasional; baja a la sección «Más» cuando esa sección existe para la persona. */
+  mas?: boolean
 }
 
 export interface RoleDef {
@@ -100,16 +102,14 @@ export const ROLES: RoleDef[] = [
       // ENTRA (una compra se pide en Compras a proveedores y se vuelve inventario al Recibir mercancía).
       // Pedidos ARRIBA (23 nov 2026, dueño): es el trabajo del día; antes quedaba suelto debajo de «Compras y entradas» y
       // parecía parte de esa sección. Mismo lugar para Blanca.
-      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Día a día' },
-      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Día a día' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Día a día' },
-      { key: 'compras', label: 'Compras a proveedores', icon: 'cart', section: 'Compras y entradas' },   // solo lectura para Almacén: qué viene en camino
-      { key: 'entradas', label: 'Recibir mercancía', icon: 'download', section: 'Compras y entradas' },   // UX-2 · aquí nace el inventario
-      { key: 'carga_inventario', label: 'Cargar inventario (CSV)', icon: 'download', section: 'Compras y entradas' },   // ALMACÉN CONTROL TOTAL (19 nov 2026)
-      { key: 'devoluciones', label: 'Devoluciones', icon: 'box', section: 'Compras y entradas' },
-      { key: 'consigna_alm', label: 'Custodia', icon: 'box', section: 'Compras y entradas' },
-      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers (Alberto)
-      { key: 'plantillas_wa', label: 'Plantillas de WhatsApp', icon: 'megaphone', section: 'Promociones y WhatsApp' },   // WA-PLANTILLAS-ALM (23 nov 2026): Alberto las manda a autorización de Meta
+      // MENÚ CORTO (26 nov 2026, auditoría de UX; Alberto: «demasiadas opciones en el menú lateral»): de 20 entradas a 6 a
+      // la vista. Lo de almacén sigue el recorrido en TRES entradas con pestañas —lo que se pide (Pedidos), lo que hay
+      // (Inventario) y lo que entra (Entradas)— y lo ocasional (promociones, catálogo, eventos, diseño) vive en «Más»,
+      // que arranca cerrada. Las claves de siempre siguen abriendo su pestaña (resolverDestino).
+      { key: 'g_pedidos', label: 'Pedidos', icon: 'layers', section: 'Almacén' },
+      { key: 'g_inv_alm', label: 'Inventario', icon: 'box', section: 'Almacén' },          // Existencias · Por caducar · Devoluciones · Custodia
+      { key: 'g_ent_alm', label: 'Entradas', icon: 'download', section: 'Almacén' },       // Recibir mercancía · Compras a proveedores · Cargar inventario (CSV)
+      { key: 'g_promo_alm', label: 'Promociones', icon: 'megaphone', section: 'Almacén', mas: true },   // Promociones · Plantillas de WhatsApp
       // UX MODERNO · Fase 3 (15 nov 2026, auditoría: "un pedido se trabaja en seis menús"): UNA entrada "Pedidos" con
       // pestañas por etapa (Preparar → Por enviar → Guías → Despacho → Seguimiento → Horarios). Las claves sueltas
       // siguen abriendo su pestaña (resolverDestino).
@@ -122,9 +122,8 @@ export const ROLES: RoleDef[] = [
     key: 'packing', label: 'Auxiliar de almacén', group: 'Empaque y despacho',
     icon: 'pkg', isStaff: true, ready: true,
     modules: [
-      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Día a día' },
-      { key: 'stock', label: 'Inventario', icon: 'box', section: 'Día a día' },
-      { key: 'caduc', label: 'Por caducar', icon: 'clock', section: 'Día a día' },
+      { key: 'g_pedidos_aux', label: 'Pedidos', icon: 'layers', section: 'Almacén' },
+      { key: 'g_inv_aux', label: 'Inventario', icon: 'box', section: 'Almacén' },   // MENÚ CORTO (26 nov 2026): Existencias · Por caducar, igual que Alberto en lo suyo
       // MISMO ORDEN QUE ALBERTO (23 nov 2026, dueño: "él debe poder ver todo lo que ve Blanca porque es su jefe"):
       // una entrada «Pedidos» con las MISMAS pestañas y nombres que la de Almacén, sin las que son solo de Alberto.
     ],
@@ -208,8 +207,15 @@ export const CAPABILITIES: CapabilityDef[] = [
 ]
 // Pantallas de una capacidad que, para cierto rol, viven juntas en UNA entrada con pestañas (registry g_*).
 const G_DISENO: ScreenDef = { key: 'g_diseno', label: 'Diseño', icon: 'image', section: 'Catálogo y web' }
+/** Sección de lo ocasional: arranca cerrada (Sidebar) y nunca queda con una sola opción (getNav). */
+export const SECCION_MAS = 'Más'
+const G_DISENO_MAS: ScreenDef = { ...G_DISENO, section: SECCION_MAS }
+const G_CATSITIO: ScreenDef = { key: 'g_catsitio', label: 'Catálogo y sitio', icon: 'bag', section: SECCION_MAS }
+const G_EVENTOS: ScreenDef = { key: 'g_eventos', label: 'Eventos', icon: 'store', section: SECCION_MAS }
 const GRUPO_DE_CAPACIDAD: Partial<Record<RoleKey, Record<string, ScreenDef>>> = {
   admin: { dis_solicitudes: G_DISENO, dis_calendario: G_DISENO },
+  // MENÚ CORTO de Almacén: cada responsabilidad extra es UNA entrada con pestañas, en «Más».
+  warehouse: { dis_solicitudes: G_DISENO_MAS, dis_calendario: G_DISENO_MAS, av_catalogo: G_CATSITIO, av_sitio: G_CATSITIO, eventos: G_EVENTOS, caja: G_EVENTOS, vev: G_EVENTOS },
 }
 export const getCapability = (k: CapabilityKey): CapabilityDef | undefined => CAPABILITIES.find((c) => c.key === k)
 export const capabilityModules = (caps: string[]): ScreenDef[] =>
@@ -240,7 +246,9 @@ export const getNav = (role: RoleDef, features: Features = FEATURES, capabilitie
     if (grupo) { if (!have.has(grupo.key)) { nav.push(grupo); have.add(grupo.key) } return }
     nav.push(m); have.add(m.key)
   })
-  return nav
+  // «Más» solo existe si hay algo ocasional de una responsabilidad extra; entonces también baja ahí lo marcado `mas` del
+  // rol. Sin responsabilidades extra no hay «Más» (no se deja una sección con una sola opción).
+  return nav.some((s) => s.section === SECCION_MAS) ? nav.map((s) => (s.mas ? { ...s, section: SECCION_MAS } : s)) : nav
 }
 
 // Pantalla de entrada tras "login": la primera de su navegación (CHV2-B: Inicio para todos).
@@ -277,6 +285,13 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_facturacion: [{ key: 'av_fin', label: 'Facturación' }, { key: 'av_fiscal', label: 'Revisión fiscal' }],
   g_equipo: [{ key: 'av_equipo', label: 'Personas' }, { key: 'av_cartera', label: 'Cartera y horario' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],
   g_sistema: [{ key: 'av_config', label: 'Configuración' }, { key: 'av_audit', label: 'Bitácora' }, { key: 'sistema_errores', label: 'Errores' }],
+  // MENÚ CORTO de Almacén (26 nov 2026)
+  g_inv_alm: [{ key: 'stock', label: 'Existencias' }, { key: 'caduc', label: 'Por caducar' }, { key: 'devoluciones', label: 'Devoluciones' }, { key: 'consigna_alm', label: 'Custodia' }],
+  g_ent_alm: [{ key: 'entradas', label: 'Recibir mercancía' }, { key: 'compras', label: 'Compras a proveedores' }, { key: 'carga_inventario', label: 'Cargar inventario (CSV)' }],
+  g_promo_alm: [{ key: 'av_promociones', label: 'Promociones' }, { key: 'plantillas_wa', label: 'Plantillas de WhatsApp' }],
+  g_catsitio: [{ key: 'av_catalogo', label: 'Catálogo' }, { key: 'av_sitio', label: 'Sitio web' }],
+  g_eventos: [{ key: 'eventos', label: 'Eventos' }, { key: 'caja', label: 'Punto de venta' }, { key: 'vev', label: 'Ventas desde custodia' }],
+  g_inv_aux: [{ key: 'stock', label: 'Existencias' }, { key: 'caduc', label: 'Por caducar' }],   // Auxiliar (Blanca)
   g_pedidos_aux: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'despacho', label: 'Despacho' }, { key: 'para_recoger', label: 'Para recoger' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Auxiliar (Blanca): mismas pestañas que Alberto
   g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }

@@ -10,7 +10,7 @@ import storeSrc from '../store/comprasStore.ts?raw'
 import w1Src from './w1Command.ts?raw'
 import mig from '../../../../../supabase/migrations/20261105120000_ux_compras_idempotentes_chat_leido.sql?raw'
 import down from '../../../../../supabase/rollback/ux_compras_chat/99_down.sql?raw'
-import { getRole, getNav } from '../../app/roles'
+import { getRole, getNav, SUBPANTALLAS } from '../../app/roles'
 
 const codigo = (s: string) => s.split('\n').filter((l) => !/^\s*(--|\/\/)/.test(l)).join('\n')
 const fuentes = import.meta.glob(['../../**/*.ts', '../../**/*.tsx', '!../../**/*.test.ts', '!../../**/*.test.tsx'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -18,12 +18,16 @@ const fuentes = import.meta.glob(['../../**/*.ts', '../../**/*.tsx', '!../../**/
 describe('UX-2 · terminología', () => {
   it('13 · Almacén y Dirección usan los MISMOS nombres; "Registrar entradas" y "Compras" a secas desaparecieron', () => {
     const wh = getNav(getRole('warehouse')); const adm = getNav(getRole('admin'))
-    expect(wh.find((s) => s.key === 'entradas')?.label).toBe('Recibir mercancía')
-    expect(wh.find((s) => s.key === 'compras')?.label).toBe('Compras a proveedores')
+    // MENÚ CORTO (26 nov 2026): en Almacén son pestañas de «Entradas»; los nombres no cambian.
+    expect(wh.some((s) => s.key === 'g_ent_alm')).toBe(true)
+    expect(SUBPANTALLAS.g_ent_alm.find((s) => s.key === 'entradas')?.label).toBe('Recibir mercancía')
+    expect(SUBPANTALLAS.g_ent_alm.find((s) => s.key === 'compras')?.label).toBe('Compras a proveedores')
     expect(adm.find((s) => s.key === 'av_inv')?.label).toBe('Compras a proveedores')
     expect(codigo(rolesSrc)).not.toMatch(/label: 'Compras'|Registrar entradas/)
     // "Inventario" nombra SOLO las existencias del almacén (decisión del dueño, 13 oct 2026); la compra nunca se llama así.
-    expect([...wh, ...adm].filter((s) => s.label === 'Inventario').map((s) => s.key)).toEqual(['stock'])
+    // MENÚ CORTO: la entrada «Inventario» de Almacén agrupa lo que HAY (Existencias, Por caducar, Devoluciones, Custodia).
+    expect([...wh, ...adm].filter((s) => s.label === 'Inventario').map((s) => s.key)).toEqual(['g_inv_alm'])
+    expect(SUBPANTALLAS.g_inv_alm.map((s) => s.label)).toEqual(['Existencias', 'Por caducar', 'Devoluciones', 'Custodia'])
     for (const [p, src] of Object.entries(fuentes)) if (!/guard/.test(p)) expect(src, p).not.toMatch(/Registrar entradas/)
     expect(comprasSrc).toMatch(/<PageHead title="Compras a proveedores">/)
     expect(entradasSrc).toMatch(/<PageHead title="Recibir mercancía">/)

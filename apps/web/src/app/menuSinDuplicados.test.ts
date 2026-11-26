@@ -26,9 +26,10 @@ describe('menú sin duplicados', () => {
     expect(resolverDestino(n, 'seguimientos')).toEqual({ screen: 'g_conversaciones', pestana: 'seguimientos' })
     expect(resolverDestino(n, 'agenda_entregas')).toEqual({ screen: 'g_envios', pestana: 'agenda_entregas' })
   })
-  it('Dirección sin la capacidad Diseño no ve la entrada; los demás roles no cambian', () => {
+  it('Dirección sin la capacidad Diseño no ve la entrada; Ventas no cambia', () => {
     expect(nav('admin', []).some((x) => x.key === 'g_diseno')).toBe(false)
-    expect(nav('warehouse', ['diseno', 'eventos', 'contenido']).map((x) => x.key)).toEqual(expect.arrayContaining(['dis_solicitudes', 'dis_calendario', 'eventos', 'vev', 'av_catalogo']))
+    // Almacén las junta en «Más» (menuCortoAlmacen.test.ts); Ventas las conserva sueltas hasta su propia reorganización.
+    expect(nav('warehouse', ['diseno', 'eventos', 'contenido']).map((x) => x.key)).toEqual(expect.arrayContaining(['g_diseno', 'g_eventos', 'g_catsitio']))
     expect(nav('pos', ['conversaciones', 'eventos']).map((x) => x.key)).toEqual(expect.arrayContaining(['asesorias', 'seguimientos', 'eventos', 'vev']))
   })
   it('SUBPANTALLAS = pestañas reales de cada grupo en el registro', () => {

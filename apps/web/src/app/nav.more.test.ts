@@ -6,7 +6,8 @@ import { statusView } from '../screens/doctor/orderStatus'
 describe('getNav — contenido por rol', () => {
   it('Almacén incluye existencias y surtido', () => {
     const keys = getNav(getRole('warehouse')).map((s) => s.key)
-    expect(keys).toContain('stock')
+    expect(keys).toContain('g_inv_alm')   // MENÚ CORTO (26 nov 2026) · Existencias vive en la pestaña de "Inventario"
+    expect(resolverDestino(getNav(getRole('warehouse')), 'stock')).toEqual({ screen: 'g_inv_alm', pestana: 'stock' })
     expect(keys).toContain('g_pedidos')   // UX MODERNO · Preparar vive en la pestaña de "Pedidos"
     expect(resolverDestino(getNav(getRole('warehouse')), 'surtido')).toEqual({ screen: 'g_pedidos', pestana: 'surtido' })
     expect(resolverDestino(getNav(getRole('admin')), 'despacho')).toEqual({ screen: 'g_envios', pestana: 'despacho' })   // Dirección sigue en Envíos

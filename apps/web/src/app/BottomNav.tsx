@@ -18,11 +18,11 @@ function short(label: string, key: string): string {
 export const BARRA_POR_ROL: Record<string, string[]> = {
   admin: ['inicio', 'g_conversaciones', 'av_ventas', 'g_clientes'], billing: ['inicio', 'g_conversaciones', 'av_ventas', 'g_clientes'], comm: ['inicio', 'g_conversaciones', 'av_ventas', 'g_clientes'],
   pos: ['inicio', 'asesorias', 'caja', 'clientes'],
-  warehouse: ['inicio', 'g_pedidos', 'stock', 'entradas'], packing: ['inicio', 'g_pedidos_aux', 'stock', 'caduc'],
+  warehouse: ['inicio', 'g_pedidos', 'g_inv_alm', 'g_ent_alm'], packing: ['inicio', 'g_pedidos_aux', 'g_inv_aux'],   // MENÚ CORTO (26 nov 2026)
   driver: ['inicio', 'driver_home', 'chat'],
   doctor: ['inicio', 'catalogo', 'g_pedidosdr'],
 }
-const CORTO_BARRA: Record<string, string> = { g_pedidos: 'Pedidos', g_pedidos_aux: 'Pedidos', caduc: 'Caducar', entradas: 'Recibir', g_conversaciones: 'Mensajes', asesorias: 'Mensajes', caja: 'Vender', surtido: 'Preparar', cola: 'Por enviar', stock: 'Inventario', driver_home: 'Mi ruta', av_ventas: 'Ventas', g_clientes: 'Clientes', g_pedidosdr: 'Pedidos' }
+const CORTO_BARRA: Record<string, string> = { g_inv_alm: 'Inventario', g_ent_alm: 'Entradas', g_inv_aux: 'Inventario', g_pedidos: 'Pedidos', g_pedidos_aux: 'Pedidos', caduc: 'Caducar', entradas: 'Recibir', g_conversaciones: 'Mensajes', asesorias: 'Mensajes', caja: 'Vender', surtido: 'Preparar', cola: 'Por enviar', stock: 'Inventario', driver_home: 'Mi ruta', av_ventas: 'Ventas', g_clientes: 'Clientes', g_pedidosdr: 'Pedidos' }
 
 export function BottomNav({ onMenu }: { onMenu: () => void }) {
   const { role, screen, setScreen, capabilities, verified } = useRole()

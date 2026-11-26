@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react'
 import { confirmar } from './dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { ChevronRight, LogOut, Settings } from 'lucide-react'
 import { Icon } from './icons'
-import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, puedeStryvCare, availableRoles, type RoleKey, type ScreenDef } from './roles'
+import { getRole, getNav, HUB_KEYS, STRYV_CARE_SCREEN, SECCION_MAS, puedeStryvCare, availableRoles, type RoleKey, type ScreenDef } from './roles'
 import { useRole } from '../auth/RoleContext'
 import { initials } from '../lib/format'
 import { ProfileModal } from '../screens/MiPerfil'
@@ -54,8 +54,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // Secciones abiertas: preferencia guardada → defecto por rol. La de la pantalla activa siempre se muestra.
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>(() => leerSecciones() ?? (role === 'admin' ? Object.fromEntries([HUB, ...groups.map((g) => g.header)].map((h) => [h, ABIERTAS_POR_DEFECTO.has(h)])) : {}))
   const seccionActiva = hub.some((m) => m.key === screen) ? HUB : (modules.find((m) => m.key === screen)?.section ?? null)
-  useEffect(() => { if (seccionActiva && abiertas[seccionActiva] === false) setAbiertas((a) => ({ ...a, [seccionActiva]: true })) }, [seccionActiva])   // eslint-disable-line react-hooks/exhaustive-deps
-  const estaAbierta = (h: string) => abiertas[h] !== false
+  // MENÚ CORTO · «Más» (lo ocasional) arranca CERRADA para todos; el resto, abierta salvo que la persona la haya cerrado.
+  const estaAbierta = (h: string) => (h === SECCION_MAS ? abiertas[h] === true : abiertas[h] !== false)
+  useEffect(() => { if (seccionActiva && !estaAbierta(seccionActiva)) setAbiertas((a) => ({ ...a, [seccionActiva]: true })) }, [seccionActiva])   // eslint-disable-line react-hooks/exhaustive-deps
   const alternar = (h: string) => setAbiertas((a) => { const n = { ...a, [h]: !estaAbierta(h) }; guardarSecciones(n); return n })
 
   const go = (key: string) => { setScreen(key); onNavigate?.() }
@@ -66,7 +67,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // POR CONFIRMAR (dueño, 26 nov 2026: «que el sistema nos avise que hay pedidos por confirmar»): contador en el menú.
   const { data: pedidosMenu } = useAllOrders()
   const { byOrder: dineroMenu } = useOrderMoney()
-  const porConfirmarN = role === 'admin' || role === 'pos' || role === 'billing' ? pedidosPorConfirmar(pedidosMenu, dineroMenu).length : 0
+  const porConfirmarN = role === 'admin' || role === 'pos' ? pedidosPorConfirmar(pedidosMenu, dineroMenu).length : 0
   const CON_CONTADOR = new Set(['links_pago', 'g_cobros'])
   const Link = (s: ScreenDef) => (
     // R-36/R-24: enlaces sin href → damos foco por teclado (role=button, tabIndex) y activación

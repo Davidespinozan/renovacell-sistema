@@ -14,7 +14,7 @@ import { Prospectar } from '../pos/Prospectar'   // PROSPECTAR · registrar + pr
 import { Icon } from '../../app/icons'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
-import { getNav, getRole, type RoleKey } from '../../app/roles'
+import { getNav, getRole, pantallasAlcanzables, type RoleKey } from '../../app/roles'
 import { useBandeja, ListaTareas, porUrgencia, type Task } from '../Bandeja'
 import { HoyAlmacen } from '../warehouse/HoyAlmacen'
 import { Seguimiento } from '../logistics/Seguimiento'
@@ -54,7 +54,9 @@ function homeEquipo(role: string | null) {
 /** Atajos (solo móvil) acotados a lo que el rol puede abrir (nunca un destino fuera de su navegación). */
 function useAccesos(defs: Array<Omit<Acceso, 'onClick'>>): Acceso[] {
   const { role, capabilities, setScreen } = useRole()
-  const nav = useMemo(() => new Set(getNav(getRole(role as RoleKey), undefined, capabilities).map((s) => s.key)), [role, capabilities])
+  // MENÚ CORTO (26 nov 2026): cuenta también las pestañas de los grupos (antes solo las entradas del menú, y los atajos
+  // a una pestaña —Preparar, Por enviar, Recibir mercancía— desaparecían al agruparlas).
+  const nav = useMemo(() => pantallasAlcanzables(getNav(getRole(role as RoleKey), undefined, capabilities)), [role, capabilities])
   return defs.filter((d) => nav.has(d.key)).map((d) => ({ ...d, onClick: () => setScreen(d.key) }))
 }
 
