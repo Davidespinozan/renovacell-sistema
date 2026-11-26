@@ -19,7 +19,7 @@ const h = vi.hoisted(() => ({
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, user: { name: 'Lucía' } }) }))
 vi.mock('../../lib/supabase', () => {
   const cadena = (tabla: string) => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq']) c[k] = () => c; c.maybeSingle = async () => ({ data: tabla === 'customers' ? { id: 'CU-1', meta: { fiscal: h.maestro } } : null, error: null }); return c }
-  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { h.rpcs.push(fn); return { data: null, error: null } } } }
+  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { if (fn !== 'cliente_entrega_preferida') h.rpcs.push(fn); return { data: null, error: null } } } }   // ENTREGA PREFERIDA (cliente_entrega_preferida) no es lectura fiscal
 })
 vi.mock('../../data/store/customersStore', () => ({
   customerFiscal: (c: { meta?: { fiscal?: unknown } } | null) => ({ rfc: '', razon_social: '', regimen: '', cp: '', uso_cfdi: '', email_facturacion: '', ...((c?.meta?.fiscal as object) ?? {}) }),
@@ -57,7 +57,7 @@ const exito = (extra: object = {}) => ({ ok: true, order: { external_ref: 'S1001
 const montar = (props: Partial<React.ComponentProps<typeof NuevoPedido>> = {}) => render(<NuevoPedido customer={CLIENTE} placedBy="Lucía (Ventas)" onClose={() => {}} {...props} />)
 const boton = () => screen.getByRole('button', { name: /crear pedido|creando|guardando|reintentar envío/i }) as HTMLButtonElement
 const armar = () => { fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0]); fireEvent.click(screen.getByText('poner domicilio')) }
-const pedirFactura = () => fireEvent.click(screen.getByRole('checkbox'))
+const pedirFactura = () => fireEvent.click(screen.getAllByRole('checkbox').find((c) => !c.closest('[data-testid="np-entrega-preferida"]'))!)
 const alerta = vi.fn()
 
 beforeEach(() => {

@@ -12,7 +12,9 @@ import { diasEntre, sumarDias } from '../data/periodo'   // SALIDA PROGRAMADA ·
 /** ENT-H · el horario elegido viaja solo cuando existe (sin la llave en null). */
 const hor = (v: EleccionEntregaServidor | null | undefined): { horario?: HorarioElegido; servicio?: ServicioElegido; salida_programada?: string } => ({ ...(v?.horario ? { horario: v.horario } : {}), ...(v?.servicio ? { servicio: v.servicio } : {}), ...(v?.salida_programada ? { salida_programada: v.salida_programada } : {}) })   // SALIDA PROGRAMADA · también se conserva   // ENTREGA-SERVICIO · el servicio elegido también se conserva
 
-export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios, piezas = 0, destino, cargarServicios }: {
+export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcionesEntrega, cargarHorarios, piezas = 0, destino, cargarServicios, preferida = null }: {
+  /** ENTREGA PREFERIDA (26 nov 2026) · opción que el cliente ya tiene establecida: se elige sola si está disponible. */
+  preferida?: string | null
   subtotal: number
   cp: string | null
   /** PAQ-SIMPLE · piezas del pedido para cotizar la FECHA de DHL (0 = sin cotizar: rango de la regla). */
@@ -32,6 +34,9 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
   const [motivo, setMotivo] = useState('')
   const [ajustar, setAjustar] = useState(false)
   const vivo = useRef(true); const pedido = useRef(0)
+  // ENTREGA PREFERIDA · se aplica al cargar opciones y, si llega después, mientras el usuario no haya elegido a mano.
+  const preferidaRef = useRef<string | null>(preferida); preferidaRef.current = preferida
+  const tocado = useRef(false)
   useEffect(() => { vivo.current = true; return () => { vivo.current = false } }, [])
 
   // Opciones del servidor: se piden al cambiar el importe de productos o el CP (con una pequeña espera).
@@ -46,7 +51,9 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
       setError(null); setOps(r.data)
       // La elección vigente sigue si existe; si no, la sugerida del servidor.
       const actual = opcionDe(r.data, value?.opcion)
-      const id = actual && actual.permitido && actual.disponible ? actual.id : r.data.sugerida ?? r.data.opciones.find((o) => o.permitido && o.disponible)?.id ?? null
+      const pref = opcionDe(r.data, preferidaRef.current)
+      const prefOk = pref && pref.permitido && pref.disponible ? pref.id : null
+      const id = actual && actual.permitido && actual.disponible ? actual.id : prefOk ?? r.data.sugerida ?? r.data.opciones.find((o) => o.permitido && o.disponible)?.id ?? null
       if (!id) { onChange(null, r.data); return }
       const o = opcionDe(r.data, id)!
       if (value?.opcion === id && value.flete != null && value.flete !== o.flete) onChange({ opcion: id, flete: value.flete, motivo: value.motivo, ...hor(value) }, r.data)   // ajuste conservado
@@ -76,7 +83,12 @@ export function SelectorEntrega({ subtotal, cp, value, onChange, cargar = opcion
   const llegadaForanea = (o: OpcionEntrega) => o.paqueteria === 'dhl' && promesaDhl.llega_fecha ? textoLlegada(promesaDhl.llega_fecha, promesaDhl.llega_fecha, hoy)
     : o.paqueteria === 'dhl' && promesaDhl.estado === 'cargando' ? 'Consultando la fecha con DHL…'
     : textoLlegada(o.llega_desde, o.llega_hasta, hoy)
-  const elegir = (id: string) => { const o = opcionDe(ops, id); if (!o || !o.permitido || !o.disponible) return; setAjustar(false); setFleteTxt(''); setMotivo(''); onChange({ opcion: id }, ops) }
+  useEffect(() => {
+    if (!preferida || tocado.current || !ops || value?.opcion === preferida) return
+    const o = opcionDe(ops, preferida)
+    if (o && o.permitido && o.disponible) { setAjustar(false); setFleteTxt(''); setMotivo(''); onChange({ opcion: preferida }, ops) }
+  }, [preferida, ops])   // eslint-disable-line react-hooks/exhaustive-deps
+  const elegir = (id: string) => { const o = opcionDe(ops, id); if (!o || !o.permitido || !o.disponible) return; tocado.current = true; setAjustar(false); setFleteTxt(''); setMotivo(''); onChange({ opcion: id }, ops) }
   const aplicarAjuste = (txt: string, mot: string) => {
     if (!sel) return
     const n = Number(txt)

@@ -386,3 +386,16 @@ export function entregaDeVenta(o: { shipping_meta?: unknown; external_ref?: stri
   if (m.channel === 'pos' || (o.external_ref ?? '').startsWith('POS-')) return { tipo: 'mostrador', corto: TIPO_ENTREGA_TEXTO.mostrador, promesa: null, extras: 0 }
   return { tipo: 'sin_dato', corto: TIPO_ENTREGA_TEXTO.sin_dato, promesa: null, extras: 0 }
 }
+
+// ENTREGA PREFERIDA POR CLIENTE (26 nov 2026, dueño): la opción que se preselecciona al levantarle un pedido.
+type RpcPref = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
+export async function leerEntregaPreferida(customerId: string): Promise<string | null> {
+  if (!hasSupabase) return null
+  const { data, error } = await (supabase.rpc as unknown as RpcPref)('cliente_entrega_preferida', { p_customer: customerId })
+  return error || typeof data !== 'string' ? null : data
+}
+export async function guardarEntregaPreferida(customerId: string, opcion: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!hasSupabase) return { ok: true }
+  const { error } = await (supabase.rpc as unknown as RpcPref)('cliente_entrega_preferida_guardar', { p_customer: customerId, p_opcion: opcion })
+  return error ? { ok: false, error: 'No se pudo guardar la preferencia de entrega del cliente.' } : { ok: true }
+}

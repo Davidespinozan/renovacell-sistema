@@ -25,7 +25,7 @@ import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
 import { FormaDePago } from '../../app/FormaDePago'
 import { cobroParaServidor, faltaEnCobro, resultadoCobro, type CobroElegido } from '../../data/ops/cobro'
 import { hoyNegocio } from '../../data/periodo'
-import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcionDe, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
+import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcionDe, leerEntregaPreferida, guardarEntregaPreferida, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
 import type { ShippingAddress } from '../../data/ops/shippingAddress'
 import { useRole } from '../../auth/RoleContext'
@@ -110,6 +110,15 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const [custDom, setCustDom] = useState<DomicilioElegido | null>(null) // flujo customer: domicilio guardado, otro o nuevo
   // ENT-2 · entrega elegida por el vendedor (id de la opción del servidor; flete ajustado con motivo si lo cambia).
   const [entrega, setEntrega] = useState<EleccionEntregaServidor | null>(null)
+  // ENTREGA PREFERIDA (26 nov 2026, dueño): la del cliente se elige sola y se puede fijar desde aquí.
+  const [prefEntrega, setPrefEntrega] = useState<string | null>(null)
+  const [guardandoPref, setGuardandoPref] = useState(false)
+  useEffect(() => {
+    if (!hasSupabase || !customer?.id) { setPrefEntrega(null); return }
+    let vivo = true
+    void leerEntregaPreferida(customer.id).then((p) => { if (vivo) setPrefEntrega(p) })
+    return () => { vivo = false }
+  }, [customer?.id])
   const [opsEntrega, setOpsEntrega] = useState<OpcionesEntrega | null>(null)
   const [promesa, setPromesa] = useState<{ texto: string; promesa: string; flete: number } | null>(null)
   const [folio, setFolio] = useState<string | null>(null)
@@ -330,7 +339,21 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               {hasSupabase && (
                 <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Entrega</div>
-                  <SelectorEntrega subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                  <SelectorEntrega preferida={prefEntrega} subtotal={total} cp={shipping?.cp ?? null} piezas={Object.values(cart).reduce((a, n) => a + n, 0)} destino={{ ciudad: shipping?.city, estado: shipping?.state }} value={entrega} onChange={(e, ops) => { setEntrega(e); setOpsEntrega(ops) }} />
+                  {isCustomer && entrega?.opcion && (
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, fontSize: 12.5, color: 'var(--ink-2)' }} data-testid="np-entrega-preferida">
+                      <input type="checkbox" checked={prefEntrega === entrega.opcion} disabled={guardandoPref}
+                        onChange={async (e) => {
+                          const nueva = e.target.checked ? entrega.opcion : null
+                          setGuardandoPref(true)
+                          const r = await guardarEntregaPreferida(customer!.id, nueva)
+                          setGuardandoPref(false)
+                          if (r.ok) setPrefEntrega(nueva); else void avisar(r.error ?? 'No se pudo guardar.')
+                        }} />
+                      Usar siempre esta entrega para {customer!.name || 'este cliente'}
+                      {prefEntrega && prefEntrega === entrega.opcion && <span className="pill p-ok" style={{ marginLeft: 4 }}>Preferencia del cliente</span>}
+                    </label>
+                  )}
                   {tipoEntrega === 'foraneo' && (
                     <EnviosExtra cart={cart} value={extras} onChange={setExtras}
                       paqueterias={(opsEntrega?.opciones ?? []).filter((o) => o.tipo === 'foraneo' && o.disponible && esPaqueteriaExtra(o.paqueteria)).map((o) => o.paqueteria as PaqueteriaExtra)}
