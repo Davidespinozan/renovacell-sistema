@@ -7,7 +7,7 @@ import { CON_AL_RECIBIR, FORMAS, MAX_DIAS_CREDITO, faltaEnCobro, formaNoDisponib
 
 const input: React.CSSProperties = { flex: 1, minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface, #fff)' }
 
-export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, testId = 'forma-pago' }: {
+export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, testId = 'forma-pago', preguntar = false }: {
   total: number
   modo: ModoCobro
   /** Tipo de entrega elegido (local, recoge, foraneo…): «Paga al recibir» solo aplica a chofer o recoger. */
@@ -15,12 +15,23 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
   value: CobroElegido | null
   onChange: (c: CobroElegido | null) => void
   testId?: string
+  /** «¿YA PAGÓ?» (27 nov 2026) · al levantar un pedido primero se contesta sí o todavía no y solo se ven las formas de esa
+   *  respuesta (antes salían las siete juntas). Son las mismas formas y guardan lo mismo; solo cambia el orden en que se ven. */
+  preguntar?: boolean
 }) {
   const hoy = hoyNegocio()
   // COBRO-ENTREGA (24 nov 2026) · en un pedido con chofer o para recoger, «Efectivo» de «Ya pagó» se confundía con «paga en
   // efectivo al recibir» y el pedido quedaba pagado sin que el chofer supiera que debía cobrar: se pregunta antes.
   const [preguntaEfectivo, setPreguntaEfectivo] = React.useState(false)
   const cobraAlRecibir = modo === 'pedido' && (tipoEntrega === 'local' || tipoEntrega === 'recoge')
+  const grupoDe = (f: FormaPago) => FORMAS.find((x) => x.id === f)?.grupo ?? 'ya'
+  const [respuesta, setRespuesta] = React.useState<'ya' | 'despues' | null>(null)
+  // Si ya hay una forma elegida, manda ella (p. ej. «No, lo cobra el chofer» pasa de «ya pagó» a «todavía no»).
+  const grupoVisible = !preguntar ? null : value ? grupoDe(value.forma) : respuesta
+  const responder = (g: 'ya' | 'despues') => {
+    setRespuesta(g); setPreguntaEfectivo(false)
+    if (value && grupoDe(value.forma) !== g) onChange(null)   // cambió de respuesta: la forma elegida ya no aplica
+  }
   const elegir = (forma: FormaPago) => {
     if (formaNoDisponible(forma, modo, tipoEntrega)) return
     if (value?.forma === forma) return
@@ -33,10 +44,20 @@ export function FormaDePago({ total, modo, tipoEntrega = null, value, onChange, 
 
   return (
     <div data-testid={testId}>
-      {(['ya', 'despues'] as const).map((g) => (
-        <div key={g} style={{ marginTop: g === 'despues' ? 12 : 0 }} data-testid={`${testId}-grupo-${g}`}>
+      {preguntar && (
+        <div role="group" aria-label="¿Ya pagó?" data-testid={`${testId}-ya-pago`}>
+          <div className="fp-pregunta">¿Ya pagó?</div>
+          <div className="fp-resp">
+            <button type="button" className={grupoVisible === 'ya' ? 'on' : undefined} aria-pressed={grupoVisible === 'ya'} onClick={() => responder('ya')} data-testid={`${testId}-ya-pago-si`}>Sí, ya pagó</button>
+            <button type="button" className={grupoVisible === 'despues' ? 'on' : undefined} aria-pressed={grupoVisible === 'despues'} onClick={() => responder('despues')} data-testid={`${testId}-ya-pago-no`}>Todavía no</button>
+          </div>
+          {!grupoVisible && <div className="fp-pista" data-testid={`${testId}-ya-pago-pista`}>Con «Todavía no» eliges: más tarde, al recibir, link de pago o crédito.</div>}
+        </div>
+      )}
+      {(['ya', 'despues'] as const).filter((g) => !preguntar || g === grupoVisible).map((g) => (
+        <div key={g} style={{ marginTop: preguntar || g === 'despues' ? 12 : 0 }} data-testid={`${testId}-grupo-${g}`}>
           <div style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 700, margin: '0 0 6px' }}>
-            {g === 'ya' ? (modo === 'mostrador' ? 'Cobra ahora' : 'Ya pagó') : 'Paga después'}
+            {preguntar ? (g === 'ya' ? '¿Cómo pagó?' : '¿Cómo va a pagar?') : g === 'ya' ? (modo === 'mostrador' ? 'Cobra ahora' : 'Ya pagó') : 'Paga después'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
         {FORMAS.filter((f) => f.grupo === g).map((f) => {

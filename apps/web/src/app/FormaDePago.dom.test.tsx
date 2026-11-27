@@ -112,3 +112,63 @@ describe('pantalla «Forma de pago»', () => {
     expect(o2).toHaveBeenLastCalledWith({ forma: 'efectivo' })
   })
 })
+
+// «¿YA PAGÓ?» (27 nov 2026) · al levantar un pedido primero se contesta sí o todavía no; solo se ven las formas de esa
+// respuesta. Son las mismas formas y guardan lo mismo. En Caja y en «Cobrar pedidos» la pantalla no cambia.
+function Pregunta({ tipoEntrega = null }: { tipoEntrega?: string | null }) {
+  const [v, setV] = useState<CobroElegido | null>(null)
+  return <><FormaDePago total={1000} modo="pedido" tipoEntrega={tipoEntrega} value={v} onChange={setV} preguntar /><output data-testid="valor">{JSON.stringify(v)}</output></>
+}
+describe('«¿Ya pagó?» al levantar un pedido', () => {
+  it('al abrir solo está la pregunta: ninguna forma hasta contestar', () => {
+    render(<Pregunta />)
+    expect(screen.getByTestId('forma-pago-ya-pago')).toHaveTextContent('¿Ya pagó?')
+    expect(screen.getByTestId('forma-pago-ya-pago-pista')).toBeTruthy()
+    for (const f of ['efectivo', 'tarjeta', 'transferencia', 'por_cobrar', 'link', 'al_recibir', 'credito']) expect(screen.queryByTestId(`forma-pago-${f}`)).toBeNull()
+    expect(valor()).toBeNull()
+  })
+  it('«Sí, ya pagó» muestra solo efectivo, tarjeta y transferencia; se guarda igual que antes', () => {
+    render(<Pregunta tipoEntrega="foraneo" />)
+    fireEvent.click(screen.getByTestId('forma-pago-ya-pago-si'))
+    expect(screen.getByTestId('forma-pago-ya-pago-si').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('forma-pago-grupo-ya')).toHaveTextContent('¿Cómo pagó?')
+    for (const f of ['efectivo', 'tarjeta', 'transferencia']) expect(screen.getByTestId(`forma-pago-${f}`)).toBeTruthy()
+    for (const f of ['por_cobrar', 'link', 'al_recibir', 'credito']) expect(screen.queryByTestId(`forma-pago-${f}`)).toBeNull()
+    fireEvent.click(screen.getByTestId('forma-pago-transferencia'))
+    expect(valor()).toEqual({ forma: 'transferencia' })
+  })
+  it('«Todavía no» muestra más tarde, al recibir, link y crédito', () => {
+    render(<Pregunta tipoEntrega="local" />)
+    fireEvent.click(screen.getByTestId('forma-pago-ya-pago-no'))
+    expect(screen.getByTestId('forma-pago-grupo-despues')).toHaveTextContent('¿Cómo va a pagar?')
+    for (const f of ['por_cobrar', 'link', 'al_recibir', 'credito']) expect(screen.getByTestId(`forma-pago-${f}`)).toBeTruthy()
+    for (const f of ['efectivo', 'tarjeta', 'transferencia']) expect(screen.queryByTestId(`forma-pago-${f}`)).toBeNull()
+    fireEvent.click(screen.getByTestId('forma-pago-por_cobrar'))
+    expect(valor()).toEqual({ forma: 'por_cobrar' })
+  })
+  it('cambiar la respuesta borra la forma que ya no aplica (no queda una elegida y escondida)', () => {
+    render(<Pregunta tipoEntrega="foraneo" />)
+    fireEvent.click(screen.getByTestId('forma-pago-ya-pago-si'))
+    fireEvent.click(screen.getByTestId('forma-pago-tarjeta'))
+    expect(valor()).toEqual({ forma: 'tarjeta' })
+    fireEvent.click(screen.getByTestId('forma-pago-ya-pago-no'))
+    expect(valor()).toBeNull()
+    expect(screen.queryByTestId('forma-pago-tarjeta')).toBeNull()
+    expect(screen.getByTestId('forma-pago-credito')).toBeTruthy()
+  })
+  it('con chofer, «Efectivo» sigue preguntando si ya lo tiene; «No» lo pasa a «Todavía no» por cobrar al chofer', () => {
+    render(<Pregunta tipoEntrega="local" />)
+    fireEvent.click(screen.getByTestId('forma-pago-ya-pago-si'))
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo'))
+    expect(valor()).toBeNull()                                              // todavía no registra nada
+    fireEvent.click(screen.getByTestId('forma-pago-efectivo-al-recibir'))
+    expect(valor()).toEqual({ forma: 'al_recibir', con: 'efectivo' })
+    expect(screen.getByTestId('forma-pago-ya-pago-no').getAttribute('aria-pressed')).toBe('true')   // la respuesta sigue a lo elegido
+    expect(screen.getByTestId('forma-pago-al-recibir-monto')).toHaveTextContent('el chofer cobra $1,000')
+  })
+  it('sin `preguntar` (Caja y Cobrar pedidos) todo sigue a la vista, sin pregunta', () => {
+    render(<Prueba modo="pedido" tipoEntrega="local" />)
+    expect(screen.queryByTestId('forma-pago-ya-pago')).toBeNull()
+    for (const f of ['efectivo', 'tarjeta', 'transferencia', 'por_cobrar', 'link', 'al_recibir', 'credito']) expect(screen.getByTestId(`forma-pago-${f}`)).toBeTruthy()
+  })
+})

@@ -14,9 +14,10 @@ const CAPTURA = { rfc: 'XAXX010101000', razon_social: 'CAPTURA DEL PEDIDO', regi
 
 const h = vi.hoisted(() => ({
   role: 'pos', tablas: [] as string[], rpcs: [] as string[], upserts: [] as unknown[][], pedidos: [] as Array<Record<string, unknown>>,
-  respuestaPedido: null as unknown, cola: [] as unknown[], diferido: null as null | { soltar: (v: unknown) => void }, respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown,
+  ancho: false, respuestaPedido: null as unknown, cola: [] as unknown[], diferido: null as null | { soltar: (v: unknown) => void }, respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown,
 }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, user: { name: 'Lucía' } }) }))
+vi.mock('../../app/useAnchoMinimo', () => ({ useAnchoMinimo: () => h.ancho }))   // computadora (true) o celular (false)
 vi.mock('../../lib/supabase', () => {
   const cadena = (tabla: string) => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq']) c[k] = () => c; c.maybeSingle = async () => ({ data: tabla === 'customers' ? { id: 'CU-1', meta: { fiscal: h.maestro } } : null, error: null }); return c }
   return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { if (fn !== 'cliente_entrega_preferida') h.rpcs.push(fn); return { data: null, error: null } } } }   // ENTREGA PREFERIDA (cliente_entrega_preferida) no es lectura fiscal
@@ -42,7 +43,7 @@ vi.mock('../../app/FormaDePago', () => ({
   FormaDePago: ({ onChange }: { onChange: (c: unknown) => void }) => { React.useEffect(() => { onChange({ forma: 'efectivo' }) }, []); return <div data-testid="forma-pago" /> },   // eslint-disable-line react-hooks/exhaustive-deps
 }))
 vi.mock('../../app/SelectorEntrega', () => ({
-  SelectorEntrega: ({ onChange }: { onChange: (e: unknown, ops: unknown) => void }) => { React.useEffect(() => { onChange({ opcion: 'foraneo_dhl' }, { corte: { hoy: '2026-10-21' }, opciones: [{ id: 'foraneo_dhl', tipo: 'foraneo', flete: 600, permitido: true, disponible: true }] }) }, []); return <div data-testid="sel-entrega" /> },   // eslint-disable-line react-hooks/exhaustive-deps
+  SelectorEntrega: ({ onChange }: { onChange: (e: unknown, ops: unknown) => void }) => { React.useEffect(() => { onChange({ opcion: 'foraneo_dhl' }, { corte: { hoy: '2026-10-21' }, opciones: [{ id: 'foraneo_dhl', tipo: 'foraneo', flete: 600, permitido: true, disponible: true, texto: 'DHL · sale hoy' }] }) }, []); return <div data-testid="sel-entrega" /> },   // eslint-disable-line react-hooks/exhaustive-deps
   eleccionCompleta: (v: unknown) => !!v,
 }))
 vi.mock('../../app/DeliveryLocationPicker', () => ({ DeliveryLocationPicker: ({ onChange }: { onChange: (a: unknown) => void }) => <button type="button" onClick={() => onChange({ address: { line1: 'Consultorio', city: 'Culiacán', phone: '' }, locationId: null })}>poner domicilio</button> }))
@@ -65,7 +66,7 @@ const pedirFactura = () => fireEvent.click(screen.getAllByRole('checkbox', { hid
 const alerta = vi.fn()
 
 beforeEach(() => {
-  cleanup(); h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.cola = []; h.diferido = null; h.respuestaUpsert = { ok: true }
+  cleanup(); h.ancho = false; h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.cola = []; h.diferido = null; h.respuestaUpsert = { ok: true }
   h.maestro = MAESTRO; h.captura = CAPTURA; alerta.mockReset(); window.alert = alerta
 })
 
@@ -411,5 +412,35 @@ describe('Levantar pedido · por pasos', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Productos' }))
     expect(visible('np-paso-1')).toBe(true)
     expect(pasos.getAttribute('aria-label')).toBe('Paso 2 de 4')
+  })
+})
+
+describe('Levantar pedido · resumen al lado (computadora)', () => {
+  it('en computadora el resumen acompaña los pasos: cliente, productos, entrega, pago y total', () => {
+    h.ancho = true
+    montar()
+    const lado = screen.getByTestId('np-lado')
+    expect(lado).toHaveTextContent('Resumen del pedido'); expect(lado).toHaveTextContent('Ana Prueba')
+    expect(screen.getByTestId('np-lado-productos')).toHaveTextContent('Todavía ninguno')
+    armar()
+    expect(screen.getByTestId('np-lado-productos')).toHaveTextContent('Producto Uno')
+    expect(screen.getByTestId('np-lado-entrega')).toHaveTextContent('DHL')        // la que propone el servidor
+    expect(screen.getByTestId('np-lado-pago')).toHaveTextContent('Efectivo')
+    expect(lado).toHaveTextContent('$700')                                        // 100 + flete 600
+  })
+  it('en el celular y junto al chat no hay resumen al lado: el total sigue en el pie', () => {
+    montar()
+    expect(screen.queryByTestId('np-lado')).toBeNull()
+    cleanup(); h.ancho = true
+    montar({ acoplado: true })
+    expect(screen.queryByTestId('np-lado')).toBeNull()
+  })
+  it('el resumen solo muestra: el pedido se crea con lo mismo', async () => {
+    h.ancho = true
+    montar(); armar()
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos[0].lines).toEqual([{ product_id: 'P1', qty: 1, unit_price: 100 }])
+    expect(screen.queryByTestId('np-lado')).toBeNull()                            // ya creado, no hace falta
   })
 })

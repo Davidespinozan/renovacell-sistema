@@ -24,7 +24,8 @@ import { DeliveryLocationPicker, type DeliveryChoice } from '../../app/DeliveryL
 import { DomicilioClientePicker, type DomicilioElegido } from '../../app/DomicilioClientePicker'
 import { SelectorEntrega, eleccionCompleta } from '../../app/SelectorEntrega'
 import { FormaDePago } from '../../app/FormaDePago'
-import { cobroParaServidor, faltaEnCobro, resultadoCobro, type CobroElegido } from '../../data/ops/cobro'
+import { FORMAS, cobroParaServidor, faltaEnCobro, resultadoCobro, type CobroElegido } from '../../data/ops/cobro'
+import { useAnchoMinimo } from '../../app/useAnchoMinimo'
 import { hoyNegocio } from '../../data/periodo'
 import { fleteDeEleccion, promesaDe, requiereDireccion, resumenPaqueteria, opcionDe, leerEntregaPreferida, guardarEntregaPreferida, type EleccionEntregaServidor, type OpcionesEntrega } from '../../data/ops/entrega'
 import { clientOf } from '../../data/mock/profiles'
@@ -284,10 +285,15 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const pasoFinal = paso === 3 || pendienteIncierto || bloqueado
   const faltaAhora = creando || savingFiscal || pendienteIncierto || bloqueado ? null : pasoFinal ? (faltaPaso[1] ?? faltaPaso[2] ?? faltaPaso[3]) : faltaPaso[paso]
   const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // PAQ-SIMPLE · solo la regla (o el ajuste con motivo)
+  // RESUMEN AL LADO (27 nov 2026): en computadora el pedido se ve completo mientras se arma (cliente, productos, entrega,
+  // pago y total). En el celular y junto al chat no cabe: ahí sigue el total en el pie. Solo muestra; no cambia nada.
+  const ancho = useAnchoMinimo(1000)
+  const conLado = ancho && !acoplado && !folio
+  const opElegida = opcionDe(opsEntrega, entrega?.opcion)
 
   return (
     <div className={'overlay' + (acoplado ? ' overlay--acoplado' : '')} onClick={acoplado ? undefined : onClose} hidden={oculto}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className={'modal' + (conLado ? ' np-modal' : '')} onClick={(e) => e.stopPropagation()}>
         {folio ? (
           <div className="mbody">
             <div className="success">
@@ -313,7 +319,8 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 </li>
               ))}
             </ol>
-            <div className="mbody">
+            <div className={'mbody' + (conLado ? ' np-cuerpo' : '')}>
+              <div className="np-main">
               {avisoBorrador && (
                 <div className="borrador-aviso" role="status" data-testid="borrador-recuperado">
                   <span>Recuperamos tu borrador de este pedido.</span>
@@ -412,7 +419,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               {hasSupabase && (
                 <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Forma de pago</div>
-                  <FormaDePago total={total + fleteCobro} modo="pedido" tipoEntrega={tipoEntrega} value={cobro} onChange={setCobro} testId="np-forma-pago" />
+                  <FormaDePago total={total + fleteCobro} modo="pedido" tipoEntrega={tipoEntrega} value={cobro} onChange={setCobro} testId="np-forma-pago" preguntar />
                 </>
               )}
 
@@ -443,6 +450,27 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                   <b>{errorPedido.motivo === 'incierto' ? 'No se pudo confirmar el pedido.' : errorPedido.motivo === 'conflicto' ? 'No se creó un pedido nuevo.' : errorPedido.motivo === 'fiscal' ? 'El pedido no se creó: revisa los datos fiscales.' : 'El pedido no se creó.'}</b> {errorPedido.msg}
                   {formCambio && <div data-testid="np-reenvio-original" style={{ marginTop: 6 }}>Se reenviará el pedido ORIGINAL; los cambios que hiciste después no se aplican hasta confirmarlo.</div>}
                 </div>
+              )}
+              </div>
+              {conLado && (
+                <aside className="np-lado" aria-label="Resumen del pedido" data-testid="np-lado">
+                  <b className="np-lado-t">Resumen del pedido</b>
+                  <dl>
+                    <div><dt>Cliente</dt><dd>{capitalizarNombre(target.name) || target.name}</dd></div>
+                    <div data-testid="np-lado-productos"><dt>Productos</dt>
+                      {lines.length === 0 ? <dd className="np-lado-falta">Todavía ninguno</dd> : (
+                        <dd>
+                          {lines.slice(0, 5).map((l) => <span key={l.p!.id} className="np-lado-linea">{cantidadVista(l.p!, l.qty)} × {l.p!.name}</span>)}
+                          {lines.length > 5 && <span className="np-lado-linea np-lado-falta">y {lines.length - 5} más</span>}
+                        </dd>
+                      )}
+                    </div>
+                    <div data-testid="np-lado-entrega"><dt>Entrega</dt>{opElegida ? <dd>{opElegida.texto || 'Elegida'}</dd> : <dd className="np-lado-falta">{paso < 2 ? 'Se elige en el paso 3' : 'Falta elegirla'}</dd>}</div>
+                    <div data-testid="np-lado-pago"><dt>Pago</dt>{cobro ? <dd>{FORMAS.find((f) => f.id === cobro.forma)?.texto ?? 'Elegido'}</dd> : <dd className="np-lado-falta">{paso < 3 ? 'Se elige en el paso 4' : 'Falta elegirlo'}</dd>}</div>
+                  </dl>
+                  {flete + costoExtras > 0 && <div className="np-lado-renglon"><span>Envío</span><span className="mono">{money(flete + costoExtras)}</span></div>}
+                  <div className="np-lado-total"><span>Total</span><b className="mono">{money(total + flete + costoExtras)}</b></div>
+                </aside>
               )}
               {/* CALIDAD VISUAL · el total y «Crear pedido» siempre a la vista (pie fijo del modal) */}
               {/* Un botón apagado dice qué falta (antes «Crear pedido» se apagaba sin explicar). */}

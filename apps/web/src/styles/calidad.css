@@ -488,4 +488,27 @@ input.interruptor:focus-visible{outline:2px solid var(--green-deep);outline-offs
 .np-cant{appearance:textfield;-moz-appearance:textfield}
 .np-cant::-webkit-outer-spin-button,.np-cant::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .np-pie .btn{white-space:nowrap}
+/* Forma de pago · pregunta «¿Ya pagó?» (27 nov 2026) */
+.fp-pregunta{font-size:var(--ds-fs-md);font-weight:600;color:var(--ink);margin:0 0 8px}
+.fp-resp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fp-resp button{min-height:48px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--ds-r);background:var(--cp-surface);font-family:inherit;font-size:var(--ds-fs-sm);font-weight:600;line-height:1.2;color:var(--ink);cursor:pointer}
+.fp-resp button:hover{background:var(--cp-slate-50)}
+.fp-resp button.on{border-color:var(--green-deep);background:var(--ok-bg);color:var(--green-deep)}
+.fp-resp button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.fp-pista{margin-top:8px;font-size:var(--ds-fs-xs);color:var(--ink-3)}
+/* Levantar pedido en computadora: los pasos a la izquierda y el resumen del pedido al lado (27 nov 2026). */
+.np-modal{width:min(1020px,94vw)}
+.np-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:24px;align-items:start}
+.np-cuerpo > .np-main{min-width:0}
+.np-cuerpo > .np-falta,.np-cuerpo > .np-pie{grid-column:1 / -1}
+.np-lado{position:sticky;top:12px;display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:var(--ds-r-lg);background:var(--ds-subtle)}
+.np-lado-t{font-size:var(--ds-fs-md);font-weight:600;color:var(--ink)}
+.np-lado dl{margin:0;display:grid;gap:10px}
+.np-lado dt{font-size:var(--ds-fs-xs);color:var(--ink-3);margin-bottom:2px}
+.np-lado dd{margin:0;font-size:var(--ds-fs-sm);color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+.np-lado dd.np-lado-falta,.np-lado .np-lado-falta{color:var(--ink-3);font-weight:400}
+.np-lado-linea{display:block}
+.np-lado-renglon{display:flex;justify-content:space-between;font-size:var(--ds-fs-sm);color:var(--ink-2)}
+.np-lado-total{display:flex;justify-content:space-between;align-items:baseline;padding-top:12px;border-top:1px solid var(--line);font-size:var(--ds-fs-sm);color:var(--ink-3)}
+.np-lado-total b{font-size:var(--ds-fs-xl);color:var(--ink);letter-spacing:-.01em}
 @media (max-width:420px){.np-pie .btn{padding-inline:12px}}
