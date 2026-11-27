@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react'
 import { registrarUso } from '../data/ops/usoPantallas'   // MEDIDOR DE USO (auditoría de UX)
 import { Cargando } from './EmptyState'
+import { CONTEOS_POR_GRUPO, pestanaConTrabajo, type Conteos } from './conteosPestanas'   // PESTAÑAS CON SU NÚMERO
 
 export interface PestanaDef { key: string; label: string; render: () => React.ReactNode; conteo?: number }
 const CLAVE = (grupo: string) => `rc_pestana_${grupo}`
@@ -15,8 +16,28 @@ const pedidas: Record<string, string> = {}
 export function pedirPestana(grupo: string, pestana: string) { pedidas[grupo] = pestana }
 const tomarPedida = (grupo: string): string | null => { const p = pedidas[grupo] ?? null; delete pedidas[grupo]; return p }
 
-export function Pestanas({ grupo, pestanas, inicial }: { grupo: string; pestanas: PestanaDef[]; inicial?: string }) {
-  const [activa, setActiva] = useState<string>(() => { const r = tomarPedida(grupo) ?? leer(grupo); return pestanas.some((p) => p.key === r) ? (r as string) : inicial ?? pestanas[0].key })
+type Props = { grupo: string; pestanas: PestanaDef[]; inicial?: string }
+// Los grupos con trabajo contable (Pedidos de Almacén) muestran cuántos hay en cada pestaña. El conteo es un hook, así
+// que vive en su propio componente: el resto de los grupos no cargan nada extra.
+export function Pestanas(props: Props) {
+  const usar = CONTEOS_POR_GRUPO[props.grupo]
+  return usar ? <ConConteos {...props} usar={usar} /> : <Barra {...props} />
+}
+function ConConteos({ usar, ...p }: Props & { usar: () => Conteos }) {
+  const conteos = usar()
+  return <Barra {...p} conteos={conteos} />
+}
+
+function Barra({ grupo, pestanas, inicial, conteos }: Props & { conteos?: Conteos }) {
+  const [activa, setActiva] = useState<string>(() => {
+    const existe = (k: string | null): k is string => !!k && pestanas.some((p) => p.key === k)
+    const pedida = tomarPedida(grupo)
+    if (existe(pedida)) return pedida                       // un aviso o enlace pidió ESA pestaña: manda
+    const guardada = leer(grupo)
+    const recordada = existe(guardada) ? guardada : null
+    const conTrabajo = conteos ? pestanaConTrabajo(pestanas.map((p) => p.key), recordada, conteos) : null
+    return conTrabajo ?? recordada ?? inicial ?? pestanas[0].key
+  })
   const actual = pestanas.find((p) => p.key === activa) ?? pestanas[0]
   useEffect(() => { registrarUso(grupo, actual.key) }, [grupo, actual.key])
   return (
@@ -25,7 +46,7 @@ export function Pestanas({ grupo, pestanas, inicial }: { grupo: string; pestanas
         {pestanas.map((p) => (
           <button key={p.key} type="button" role="tab" aria-selected={p.key === actual.key} className={p.key === actual.key ? 'active' : undefined} data-testid={`pestana-${p.key}`}
             onClick={() => { setActiva(p.key); guardar(grupo, p.key) }}>
-            {p.label}{p.conteo ? <span className="seg-conteo">{p.conteo}</span> : null}
+            {p.label}{(p.conteo ?? conteos?.[p.key]) ? <span className="seg-conteo" data-testid={`conteo-${p.key}`}>{p.conteo ?? conteos?.[p.key]}</span> : null}
           </button>
         ))}
       </div>
