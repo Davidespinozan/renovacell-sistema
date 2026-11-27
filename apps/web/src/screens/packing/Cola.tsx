@@ -136,7 +136,7 @@ export function Cola() {
       <div className="eyebrow crumb">Envíos · Por enviar</div>
 
       {queue.length === 0 ? (
-        <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
+        <Vacio icono="pkg" titulo="No hay pedidos preparados por enviar." pista="Cuando prepares un pedido, llega aquí." />
       ) : (
         /* LISTA + DETALLE (27 nov 2026): antes era una tarjeta grande por pedido con tres botones cada una. Ahora los
            pedidos van en renglones cortos y el elegido se abre al lado (en el celular, debajo de su renglón), con los

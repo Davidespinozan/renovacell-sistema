@@ -23,13 +23,13 @@ describe('<Surtido>', () => {
     expect(screen.getByText('Preparar pedidos')).toBeInTheDocument()
   })
 
-  it('permite seleccionar varios pedidos surtibles y muestra la barra de lote', () => {
+  it('permite seleccionar varios pedidos con existencia y muestra la barra de lote', () => {
     renderWithRole(<Surtido />)
     const checks = screen.queryAllByRole('checkbox')
     expect(checks.length).toBeGreaterThan(0) // el mock tiene pedidos pagados con stock
     fireEvent.click(checks[0])
     // al seleccionar aparece la acción de surtido en lote (no se confirma → no muta)
-    expect(screen.getByRole('button', { name: /Surtir seleccionados/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Preparar seleccionados/ })).toBeInTheDocument()
   })
 })
 

@@ -91,7 +91,7 @@ export function Surtido() {
       primero = false
       const r = await surtirPedido(o)
       if (r.ok) ok += 1
-      else { fail += 1; errors.push(`${o.external_ref ?? o.id}: ${r.error ?? 'no se pudo surtir'}`) }
+      else { fail += 1; errors.push(`${o.external_ref ?? o.id}: ${r.error ?? 'no se pudo preparar'}`) }
     }
     setBatchResult({ ok, fail, errors })
     setSelected(new Set())
@@ -101,17 +101,17 @@ export function Surtido() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <PageHead title="Preparar pedidos">
-        Pedidos que ya se pagaron y están listos para preparar. Selecciona varios para
-        surtirlos de una, o abre uno para ver de qué lote tomar cada producto (siempre el
-        que caduca primero). Al confirmar se descuenta el inventario.
+        Pedidos que ya se pagaron y están listos para preparar. Marca varios para
+        prepararlos de una vez, o abre uno para ver de qué lote tomar cada producto (siempre
+        el que caduca primero). Al confirmar se descuenta el inventario.
       </PageHead>
 
       {batchResult && (
         <div className="sysnote" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="check" />
           <span style={{ flex: 1 }}>
-            Surtiste <b>{batchResult.ok}</b> {batchResult.ok === 1 ? 'pedido' : 'pedidos'}.{' '}
-            {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no se pudieron surtir y quedaron pendientes.</span>}
+            Preparaste <b>{batchResult.ok}</b> {batchResult.ok === 1 ? 'pedido' : 'pedidos'}.{' '}
+            {batchResult.fail > 0 && <span style={{ color: 'var(--warn)' }}>{batchResult.fail} no se pudieron preparar y quedaron pendientes.</span>}
             {batchResult.errors.map((e) => <span key={e} style={{ display: 'block', fontSize: 12, color: 'var(--danger)' }}>{e}</span>)}
           </span>
           <button className="mclose" type="button" aria-label="Cerrar" onClick={() => setBatchResult(null)}><Icon name="x" /></button>
@@ -124,7 +124,7 @@ export function Surtido() {
           <span className="mono" style={{ color: 'var(--ink-3)' }}>{selUnits} u</span>
           <button className="btn ghost sm" type="button" onClick={clearSel}>Limpiar</button>
           <button className="btn" type="button" style={{ marginLeft: 'auto' }} onClick={surtirLote} disabled={batchBusy}>
-            <Icon name="layers" /> {batchBusy ? 'Surtiendo…' : 'Surtir seleccionados'}
+            <Icon name="layers" /> {batchBusy ? 'Preparando…' : 'Preparar seleccionados'}
           </button>
         </div>
       )}
@@ -135,7 +135,7 @@ export function Surtido() {
         <>
           {allFulfillable.length > 1 && selIds.length === 0 && (
             <button className="btn ghost sm" type="button" style={{ alignSelf: 'flex-start' }} onClick={selectAll}>
-              <Icon name="check" /> Seleccionar todos los surtibles ({allFulfillable.length})
+              <Icon name="check" /> Seleccionar todos los que tienen existencia ({allFulfillable.length})
             </button>
           )}
           {/* LISTA + DETALLE (27 nov 2026): antes era una tarjeta grande por pedido, con el mismo botón repetido. Ahora los
@@ -256,7 +256,7 @@ export function SurtirModal({
           <div className="mbody">
             <div className="success">
               <div className="ck"><Icon name="check" /></div>
-              <h3>Pedido surtido</h3>
+              <h3>Pedido preparado</h3>
               <p>
                 <b>{order.external_ref}</b> quedó <b>preparado</b>. Ya se descontó del inventario
                 y quedó registrado de dónde salió cada producto. El doctor ya lo ve en su seguimiento.

@@ -102,7 +102,7 @@ export function Despacho() {
       </PageHead>
 
       {manifiestos.length === 0 ? (
-        <Vacio icono="truck" titulo="Nada por despachar." pista="Los envíos empacados y asignados a un chofer aparecerán aquí." />
+        <Vacio icono="truck" titulo="Nada por despachar." pista="Los pedidos preparados y asignados a un chofer aparecerán aquí." />
       ) : manifiestos.map((mf) => (
         <div key={mf.driverId} className="card" style={{ padding: 0 }}>
           <div style={{ padding: '16px 16px 6px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
