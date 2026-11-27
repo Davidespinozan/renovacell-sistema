@@ -34,7 +34,8 @@ import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { BotonNotaVenta } from '../../app/NotaVenta'
-import { AvisosDelPedido } from '../../app/AvisosDelPedido'   // AVISOS AL CLIENTE, a la vista (27 nov 2026)
+import { AvisosDelPedido } from '../../app/AvisosDelPedido'
+import { BotonModificarPedido } from '../../app/ModificarPedido'   // MODIFICAR PEDIDO antes de salir de Almacén (27 nov 2026)   // AVISOS AL CLIENTE, a la vista (27 nov 2026)
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 import { enPeriodo, hoyNegocio, rangoPeriodo, type PeriodoRapido } from '../../data/periodo'
@@ -439,7 +440,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
             <span className={'pill ' + p.pill}>{p.label}</span>
             <span className={'pill ' + sv.pill}>{sv.label}</span>
             {order.invoice_requested && <span className="pill p-blue"><FileText size={12} /> CFDI solicitado</span>}
-            <span style={{ marginLeft: 'auto' }}><BotonNotaVenta order={order} /></span>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>{!soloLectura && <BotonModificarPedido order={order} />}<BotonNotaVenta order={order} /></span>
           </div>
 
           <EntregaDeLaVenta order={order} />
