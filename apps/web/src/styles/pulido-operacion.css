@@ -97,3 +97,29 @@
 .hoy-grupo svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
 .hoy-grupo span{font-weight:500;color:var(--ink-3)}
 .hoy-grupo--atrasado,.hoy-grupo--atrasado svg{color:var(--danger)}
+
+/* RECIBIR LA COMPRA COMPLETA (27 nov 2026) · un renglón por producto: lote, caducidad y lo que llegó. */
+.modal.rc-modal{max-width:860px}
+.rc-filas{display:grid;gap:10px}
+.rc-fila{display:grid;grid-template-columns:minmax(150px,2fr) minmax(120px,1.3fr) 150px 110px;gap:8px 10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:var(--ds-r);background:var(--cp-surface)}
+.rc-fila--hecha{background:var(--ds-success-bg);border-color:var(--ds-success-line)}
+.rc-fila-prod{display:grid;gap:2px;align-self:center;min-width:0}
+.rc-fila-prod b{font-size:14px;overflow-wrap:anywhere}
+.rc-fila-prod span{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--ink-3)}
+.rc-fila--hecha .rc-fila-prod span{color:var(--ds-success);font-weight:600}
+.rc-fila label{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--ink-3);min-width:0}
+.rc-fila input{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--ds-r);font:inherit;font-size:14px;color:var(--ink);background:var(--cp-surface)}
+.rc-fila input:disabled{background:var(--ds-subtle);color:var(--ink-3)}
+.rc-fila-error,.rc-fila-falta{grid-column:1 / -1;font-size:12.5px}
+.rc-fila-error{color:var(--danger)}
+.rc-fila-falta{color:var(--warn)}
+@media (max-width:640px){
+  .rc-fila{grid-template-columns:1fr 1fr}
+  .rc-fila-prod{grid-column:1 / -1}
+  .rc-fila label:first-of-type{grid-column:1 / -1}
+}
+.rc-juntas{display:grid;gap:8px;padding:6px 14px 10px}
+.rc-junta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;padding:12px 14px;border:1px solid var(--ds-success-line);border-radius:var(--ds-r);background:var(--ds-success-bg)}
+.rc-junta > div{display:grid;gap:2px;min-width:0}
+.rc-junta b{font-size:14px}
+.rc-junta span{font-size:12.5px;color:var(--ink-3)}

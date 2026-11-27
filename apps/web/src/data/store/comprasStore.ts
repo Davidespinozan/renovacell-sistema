@@ -27,6 +27,7 @@ export interface PurchaseOrder {
   created_at: string
   received_qty?: number          // acumulado recibido (lo mantiene el servidor)
   close_reason?: string | null
+  compra_id?: string | null      // COMPRA CON FACTURA · renglones de una misma compra (se reciben juntos)
 }
 // Pendiente por recibir de una orden (lo que aún admite recepción).
 export const pendingQty = (o: PurchaseOrder): number => Math.max(0, o.qty - (o.received_qty ?? 0))
@@ -36,7 +37,7 @@ const isUuid = (s: string | null | undefined): boolean => !!s && /^[0-9a-f]{8}-[
 
 const live = makeLive<PurchaseOrder>(async () => {
   const { data, error } = await leerTodo('las compras', (a, b) => supabase.from('replenishments')
-    .select('id, product_id, product_name, qty, unit_cost, kind, supplier, status, paid, created_at, received_qty, close_reason')
+    .select('id, product_id, product_name, qty, unit_cost, kind, supplier, status, paid, created_at, received_qty, close_reason, compra_id')
     .order('created_at', { ascending: false }).order('id').range(a, b))
   if (error) throw error
   return (data ?? []) as unknown as PurchaseOrder[]

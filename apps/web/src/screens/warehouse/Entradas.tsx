@@ -21,6 +21,8 @@ import { useOpId } from '../../data/hooks/useOpId'
 import { hasSupabase } from '../../lib/supabase'
 import { pendingQty, isOpen } from '../../data/store/comprasStore'
 import { RecibirMercanciaModal, STATUS_LABEL, STATUS_PILL, TIPO_LABEL } from './RecibirMercanciaModal'
+import { RecibirCompraModal } from './RecibirCompraModal'
+import { comprasPorRecibir, type CompraPorRecibir } from '../../data/ops/recibirCompra'
 import { aInterno, cantidadVista, esMediaCaja, factor } from '../../lib/cajas'
 
 // W1 · D-04: una entrada SIN compra requiere Dirección y motivo. "Carga inicial" NO va aquí (Importar / Migración).
@@ -56,10 +58,12 @@ export function Entradas() {
   const { role } = useRole()
   const isAdmin = role === 'admin' || role === 'warehouse'   // ALMACÉN CONTROL TOTAL (19 nov 2026): Alberto registra también entradas sin compra
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
+  const [recibiendoCompra, setRecibiendoCompra] = useState<CompraPorRecibir | null>(null)   // RECIBIR LA COMPRA COMPLETA
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const avisar = (ok: boolean, text: string) => { setToast({ ok, text }); if (ok) window.setTimeout(() => setToast(null), 4000) }
 
   const pendientes = useMemo(() => compras.filter(isOpen), [compras])
+  const comprasJuntas = useMemo(() => comprasPorRecibir(pendientes), [pendientes])
   const cerradas = useMemo(() => compras.filter((o) => !isOpen(o)).slice(0, 8), [compras])
 
   const lotById = useMemo(() => {
@@ -90,6 +94,17 @@ export function Entradas() {
           <Icon name="download" />
           <div className="eyebrow" style={{ margin: 0 }}>Compras pendientes de recibir · {pendientes.length}</div>
         </div>
+        {/* RECIBIR LA COMPRA COMPLETA (27 nov 2026) · una compra con varios productos se recibe en una sola pantalla. */}
+        {comprasJuntas.length > 0 && (
+          <div className="rc-juntas" data-testid="compras-juntas">
+            {comprasJuntas.map((c) => (
+              <div key={c.compra_id} className="rc-junta">
+                <div><b>{c.proveedor ?? 'Compra a proveedor'}</b><span>{c.lineas.length} productos por recibir · registrada el {fmtDate(c.fecha)}</span></div>
+                <button className="btn sm" type="button" onClick={() => setRecibiendoCompra(c)} data-testid="btn-recibir-compra"><Icon name="check" /> Recibir toda la compra</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Tipo · proveedor</th><th>Pedido</th><th>Recibido</th><th>Pendiente</th><th>Estado</th><th></th></tr></thead>
@@ -180,6 +195,9 @@ export function Entradas() {
         </div>
       </div>
 
+      {recibiendoCompra && (
+        <RecibirCompraModal compra={recibiendoCompra} onClose={() => setRecibiendoCompra(null)} onDone={(msg) => { setRecibiendoCompra(null); avisar(true, msg) }} />
+      )}
       {receiving && (
         <RecibirMercanciaModal po={receiving} isAdmin={isAdmin} onClose={() => setReceiving(null)} onDone={(msg) => { setReceiving(null); avisar(true, msg) }} />
       )}
