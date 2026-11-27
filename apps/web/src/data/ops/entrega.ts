@@ -424,3 +424,24 @@ export function salidaDePedido(e: Pick<EntregaPedido, 'tipo' | 'salida'> & Parti
   const etiqueta = cuando === 'atrasado' ? `${verbo[0]} ${ddmm}${conHora}` : cuando === 'hoy' ? `${verbo[1]}${conHora}` : `${verbo[2]} ${ddmm}${conHora}`
   return { etiqueta, hora, cuando, orden: `${dia}T${hora ?? '23:59'}` }
 }
+
+/** FILA DEL DÍA (27 nov 2026, «sistema sencillo por rol») · el Inicio de Almacén agrupa los pedidos por cuándo salen y
+ *  con quién: «Sale hoy antes de las 3:30 p.m. · DHL», «Sale hoy antes de las 4:00 p.m. · chofer», «Lo recogen hoy». */
+export interface GrupoSalida { titulo: string; cuando: SalidaPedido['cuando'] | 'sin' }
+export function grupoDeSalida(e: Parameters<typeof salidaDePedido>[0], hoy: string, corte: string = CORTE_POR_DEFECTO): GrupoSalida {
+  const s = salidaDePedido(e, hoy, corte)
+  if (!e || !s) return { titulo: e?.tipo === 'mostrador' ? 'Entrega en mostrador' : 'Sin fecha de salida', cuando: 'sin' }
+  const medio = e.tipo === 'recoge' ? null : e.tipo === 'local' ? 'chofer' : e.paqueteria ? (NOMBRE_PAQUETERIA[e.paqueteria] ?? e.paqueteria.toUpperCase()) : 'paquetería'
+  return { titulo: medio ? `${s.etiqueta} · ${medio}` : s.etiqueta, cuando: s.cuando }
+}
+/** Agrupa una lista YA ordenada por salida en tramos consecutivos con el mismo título. */
+export function agruparPorSalida<T>(lista: T[], grupoDe: (x: T) => GrupoSalida): Array<GrupoSalida & { items: T[] }> {
+  const out: Array<GrupoSalida & { items: T[] }> = []
+  for (const x of lista) {
+    const g = grupoDe(x)
+    const ult = out[out.length - 1]
+    if (ult && ult.titulo === g.titulo) ult.items.push(x)
+    else out.push({ ...g, items: [x] })
+  }
+  return out
+}

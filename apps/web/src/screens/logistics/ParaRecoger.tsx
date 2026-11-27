@@ -12,6 +12,7 @@ import { esRecoge, envioVigente } from '../../data/ops/seguimiento'
 import { entregarRecoge } from '../../data/store/ordersStore'
 import { clienteDePedido } from '../../data/mock/profiles'
 import { cantidadVista } from '../../lib/cajas'
+import { nombreSugerido } from '../../data/ops/rutaChofer'   // el nombre del cliente se toca en vez de escribirse
 
 /** Listos para recoger: despachados como «recoge en sucursal», sin envío de paquetería ni chofer. */
 export function paraRecoger(orders: OrderWithItems[], tieneEnvio: (id: string) => boolean): OrderWithItems[] {
@@ -29,17 +30,19 @@ export function ParaRecoger() {
       <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Pedidos listos en sucursal. Cuando el cliente pase, entrégaselo y márcalo aquí con el nombre de quien lo recogió.</div>
       {lista.length === 0
         ? <Vacio icono="box" titulo="No hay pedidos esperando a que los recojan." />
-        : lista.map((o) => <Fila key={o.id} o={o} nombreProducto={(id) => byId[id]?.name ?? 'Producto'} producto={(id) => byId[id]} />)}
+        : lista.map((o) => <FilaRecoger key={o.id} o={o} nombreProducto={(id) => byId[id]?.name ?? 'Producto'} producto={(id) => byId[id]} />)}
     </div>
   )
 }
 
-function Fila({ o, nombreProducto, producto }: { o: OrderWithItems; nombreProducto: (id: string) => string; producto: (id: string) => Parameters<typeof cantidadVista>[0] }) {
+// Exportada (27 nov 2026): la misma fila vive también en el Inicio de Almacén, para que quien recoge no quede escondido en una pestaña.
+export function FilaRecoger({ o, nombreProducto, producto }: { o: OrderWithItems; nombreProducto: (id: string) => string; producto: (id: string) => Parameters<typeof cantidadVista>[0] }) {
   const [abierto, setAbierto] = useState(false)
   const [recogio, setRecogio] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cliente = clienteDePedido(o)
+  const sugerido = nombreSugerido(cliente.name)
   const confirmar = async () => {
     if (!recogio.trim() || guardando) return
     setGuardando(true); setError(null)
@@ -65,9 +68,10 @@ function Fila({ o, nombreProducto, producto }: { o: OrderWithItems; nombreProduc
               style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, outline: 'none', backgroundColor: 'var(--cp-surface)' }} data-testid="recoger-quien" />
             <button className="btn sm" type="button" disabled={!recogio.trim() || guardando} onClick={() => void confirmar()} data-testid="recoger-confirmar"><Icon name="check" /> {guardando ? 'Guardando…' : 'Confirmar entrega'}</button>
             <button className="btn ghost sm" type="button" onClick={() => setAbierto(false)}>Cancelar</button>
+            {!recogio.trim() && sugerido && <button className="btn ghost sm" type="button" onClick={() => setRecogio(sugerido)} data-testid="recoger-sugerido">Lo recogió {sugerido}</button>}
           </>
         ) : (
-          <button className="btn sm" type="button" onClick={() => setAbierto(true)} data-testid="recoger-entregar"><Icon name="check" /> Entregado al cliente</button>
+          <button className="btn sm" type="button" onClick={() => setAbierto(true)} data-testid="recoger-entregar"><Icon name="check" /> Ya lo recogió</button>
         )}
       </div>
       {error && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--danger)' }}>{error}</div>}
