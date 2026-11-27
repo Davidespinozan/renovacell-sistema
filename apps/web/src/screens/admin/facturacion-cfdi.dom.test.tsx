@@ -39,6 +39,14 @@ describe('<BillDetail> · acción fiscal', () => {
     expect(screen.queryByText('Emitir CFDI')).toBeNull()
   })
 
+  it('pedido pagado que NO pidió factura al comprar → sus datos fiscales se capturan ahí mismo (27 nov 2026)', () => {
+    const order = mkOrder({ payment_status: 'paid', invoice_requested: false, items: [mkItem()], invoice_meta: null })
+    render(<BillDetail order={order} {...props} />)
+    expect(screen.getByTestId('fact-sin-solicitud')).toHaveTextContent('El cliente no pidió factura al comprar')
+    expect(screen.getByText('Guardar datos fiscales')).toBeInTheDocument()      // la captura ya viene abierta
+    expect(screen.queryByText('Solicitar factura')).toBeNull()                  // primero los datos; luego se solicita
+  })
+
   it('pedido pagado SIN datos fiscales → NO ofrece nada; pide completar datos', () => {
     const order = mkOrder({ payment_status: 'paid', invoice_requested: true, items: [mkItem()], invoice_meta: null })
     render(<BillDetail order={order} {...props} />)

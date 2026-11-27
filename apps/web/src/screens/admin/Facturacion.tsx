@@ -363,7 +363,10 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
   const snapshot = normalizeFiscalProfile(invMeta.receiver ?? {})
   const snapOk = isFiscalProfileComplete(snapshot)
   const [fiscal, setFiscal] = useState<FiscalProfile>(snapshot)
-  const [editingFiscal, setEditingFiscal] = useState(false)
+  // FACTURA PEDIDA DESPUÉS (27 nov 2026): lo normal es que el cliente pida la factura DESPUÉS de comprar. Antes este bloque
+  // solo aparecía si el pedido se había levantado con «Solicitar factura», y no había dónde capturar los datos: ahora
+  // aparece siempre y, si el pedido no trae datos, abre directo en la captura.
+  const [editingFiscal, setEditingFiscal] = useState(!order.invoice_requested && !snapOk)
   const [saveMaster, setSaveMaster] = useState(false)
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const [savingFiscal, setSavingFiscal] = useState(false)
@@ -542,14 +545,15 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
             </div>
           )}
 
-          {order.invoice_requested && (
-            <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--line)', borderRadius: 12 }}>
+          {(order.invoice_requested || !emitida) && (
+            <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--line)', borderRadius: 12 }} data-testid="fact-datos-fiscales">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="eyebrow" style={{ margin: 0 }}>Datos fiscales del pedido</div>
                 <span className={'pill ' + (emitida ? 'p-ok' : snapOk ? 'p-ok' : 'p-warn')} style={{ marginLeft: 'auto' }}>
-                  {emitida ? 'Timbrado' : snapOk ? 'Datos completos' : 'Datos incompletos'}
+                  {emitida ? 'Timbrado' : snapOk ? 'Datos completos' : order.invoice_requested ? 'Datos incompletos' : 'Sin capturar'}
                 </span>
               </div>
+              {!order.invoice_requested && !snapOk && <div className="ms" style={{ marginTop: 6, color: 'var(--ink-3)' }} data-testid="fact-sin-solicitud">El cliente no pidió factura al comprar. Captura aquí sus datos fiscales para facturarle.</div>}
               {editingFiscal && !emitida ? (
                 <div style={{ marginTop: 8 }}>
                   <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
@@ -558,7 +562,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                     Guardar también para futuras compras (actualiza la ficha del cliente)
                   </label>
                   <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-                    <button className="btn ghost sm" type="button" disabled={savingFiscal} onClick={() => { setEditingFiscal(false); setFiscal(snapshot) }}>Cancelar</button>
+                    {(order.invoice_requested || snapOk) && <button className="btn ghost sm" type="button" disabled={savingFiscal} onClick={() => { setEditingFiscal(false); setFiscal(snapshot) }}>Cancelar</button>}
                     <button className="btn sm" type="button" disabled={savingFiscal} onClick={guardarFiscal}>{savingFiscal ? 'Guardando…' : 'Guardar datos fiscales'}</button>
                   </div>
                 </div>
