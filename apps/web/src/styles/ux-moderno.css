@@ -417,6 +417,8 @@ button.cifra-v{cursor:pointer}
 /* BLOQUE1 · efectivo que trae el chofer: resalta si hay que entregarlo */
 .mi-efectivo-pend { border-left: 4px solid var(--ds-warning); }
 
+/* SEGUIMIENTO · filtros: por dónde viaja (arriba) y en qué va (abajo) */
+.seg-filtros { display: grid; gap: 8px; }
 /* BLOQUE1 · incidencia: reintentar / cambiar chofer / regresó al almacén */
 .seg-inc-acciones { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .seg-chofer { padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13px; background: var(--ds-surface, transparent); }

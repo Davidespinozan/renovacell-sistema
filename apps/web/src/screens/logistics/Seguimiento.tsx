@@ -21,9 +21,14 @@ import { useRole } from '../../auth/RoleContext'
 import { driverName, getDrivers } from '../../data/mock/shipments'
 import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { diagnoseShipment, envioVigente, esRecoge } from '../../data/ops/seguimiento'
+import { ETAPAS, ETIQUETA_ETAPA, ETIQUETA_MEDIO, MEDIOS, contar, diagnosticoEnAlmacen, esperaEnAlmacen, etapaDe, medioDe, metodoPrometido, type EtapaEnvio, type MedioEnvio } from '../../data/ops/seguimientoVista'
+import { useOrderMoney } from '../../data/hooks/useMoney'
+import { useCorteEntrega } from '../../data/hooks/useCorteEntrega'
+import { hoyNegocio } from '../../data/periodo'
 import { entregarRecoge } from '../../data/store/ordersStore'
 import type { Shipment } from '../../data/types'
 import { cantidadVista } from '../../lib/cajas'
+import { capitalizarNombre } from '../../lib/nombres'
 
 interface Row {
   order: OrderWithItems
@@ -32,6 +37,9 @@ interface Row {
   reason: string
   statusLabel: string
   statusPill: string
+  medio: MedioEnvio | null      // por dónde viaja: paquetería, chofer o lo recogen
+  etapa: EtapaEnvio             // en qué va: por preparar → preparado → en camino → entregado
+  salida?: string | null        // solo «por preparar»: cuándo sale (o cuándo debió salir)
 }
 
 /**
@@ -47,6 +55,15 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
   const { role, user } = useRole()
   const puedeAlmacen = role === 'admin' || role === 'warehouse' || role === 'packing'
   const [cambioDe, setCambioDe] = useState<string | null>(null)
+  // TRAZABILIDAD COMPLETA (27 nov 2026, dueño: «¿por qué en Envíos nada más se ven las entregas locales? ¿no hay manera
+  // de ver trazabilidad de envíos foráneos?»). La lista solo traía pedidos YA preparados: los foráneos pagados que
+  // seguían en Almacén sin guía no existían aquí. Ahora entran también los que esperan en Almacén, y se filtra por
+  // dónde viajan y en qué van. La vista embebida del vendedor («en camino») queda como estaba.
+  const { byOrder } = useOrderMoney()
+  const corte = useCorteEntrega()
+  const hoy = hoyNegocio()
+  const [medio, setMedio] = useState<MedioEnvio | 'todos'>('todos')
+  const [etapa, setEtapa] = useState<EtapaEnvio | 'todas'>('todas')
   // BLOQUE1 · el pedido regresó (rechazado, no estaba…): vuelve a Surtido para asignar otro chofer.
   const regresar = async (shipmentId: string, folio: string) => {
     const motivo = await pedirTexto(`¿Por qué regresó ${folio} al almacén? (vuelve a Surtido para asignarle chofer de nuevo)`)
@@ -86,24 +103,34 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
   }, [products])
 
   const rows = useMemo(() => {
-    const inFlight = orders.filter(
-      (o) =>
-        ['packed', 'shipped', 'delivered'].includes(o.status ?? '') &&
-        (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos' && // POS no es envío
-        inCartera(o),
-    )
-    return inFlight
+    const noEsPos = (o: OrderWithItems) => (o.shipping_meta as { channel?: string } | null)?.channel !== 'pos'   // POS no es envío
+    const inFlight = orders.filter((o) => ['packed', 'shipped', 'delivered'].includes(o.status ?? '') && noEsPos(o) && inCartera(o))
+    const enCurso = inFlight
       .map((o): Row => {
         const shipment = envioVigente(shipments, o.id)
+        const base = { order: o, shipment, medio: medioDe(o, shipment), etapa: etapaDe(o) }
         // REVISIÓN 19 nov · la vendedora ve el pedido pero no su envío (permisos): sin envío legible no se inventa
         // «sin asignar · N días detenido»; se muestra el estado del pedido.
-        if (role === 'pos' && !shipment && o.status !== 'delivered') return { order: o, shipment, stuck: false, reason: '', statusLabel: o.status === 'shipped' ? 'En camino' : 'Preparando envío', statusPill: 'p-neu' }
-        return { order: o, shipment, ...diagnoseShipment(o, shipment) }
+        if (role === 'pos' && !shipment && o.status !== 'delivered') return { ...base, stuck: false, reason: '', statusLabel: o.status === 'shipped' ? 'En camino' : 'Preparando envío', statusPill: 'p-neu' }
+        return { ...base, ...diagnoseShipment(o, shipment) }
       })
+    // Los que ya le tocan a Almacén y siguen sin prepararse (pagados o con crédito): sin ellos, un foráneo sin guía no existía aquí.
+    const enAlmacen = embebido ? [] : orders
+      .filter((o) => noEsPos(o) && inCartera(o) && esperaEnAlmacen(o, byOrder[o.id]))
+      .map((o): Row => ({ order: o, shipment: undefined, medio: medioDe(o, undefined), etapa: 'por_preparar', ...diagnosticoEnAlmacen(o, hoy, corte) }))
+    return [...enAlmacen, ...enCurso]
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || (a.order.created_at < b.order.created_at ? 1 : -1))
-  }, [orders, shipments, role, user, ownerByDoctor])
+  }, [orders, shipments, role, user, ownerByDoctor, byOrder, hoy, corte, embebido])
+  const cuenta = useMemo(() => contar(rows, medio), [rows, medio])
+  const visibles = embebido ? rows : rows.filter((r) => (medio === 'todos' || r.medio === medio) && (etapa === 'todas' || r.etapa === etapa))
+  // Lo que sigue en Almacén se avisa aparte de los «atorados»: así el número de atorados es el MISMO que ven en Inicio y en
+  // el Tablero (preparados sin salir o con entrega vencida), y lo que Almacén no ha preparado tiene su propio aviso.
+  const delMedio = rows.filter((r) => medio === 'todos' || r.medio === medio)
+  const enAlmacenN = delMedio.filter((r) => r.etapa === 'por_preparar').length
+  const pasadosN = delMedio.filter((r) => r.etapa === 'por_preparar' && r.stuck).length
+  const sinGuia = delMedio.filter((r) => r.etapa === 'por_preparar' && r.medio === 'paqueteria').length
+  const stuckCount = (embebido ? rows : delMedio).filter((r) => r.stuck && r.etapa !== 'por_preparar').length
 
-  const stuckCount = rows.filter((r) => r.stuck).length
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -116,9 +143,9 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
             const client = clienteDePedido(r.order)
             const method = r.shipment
               ? r.shipment.driver_id ? `Chofer propio · ${driverName(r.shipment.driver_id)}` : `${r.shipment.carrier}${r.shipment.tracking_number ? ` · guía ${r.shipment.tracking_number}` : ''}`
-              : 'Sin asignar'
+              : metodoPrometido(r.order)
             return {
-              folio: r.order.external_ref, estatus: r.statusLabel, detenido: r.stuck ? 'Sí' : 'No', motivo: r.reason,
+              folio: r.order.external_ref, viaja: r.medio ? ETIQUETA_MEDIO[r.medio] : '', estatus: r.statusLabel, detenido: r.stuck ? 'Sí' : 'No', motivo: r.reason || (r.salida ?? ''),
               cliente: client?.name ?? '', metodo: method,
               productos: r.order.items.map((it) => prodName[it.product_id ?? ''] ?? 'Producto').join(', '),
               estimada: r.shipment?.estimated_delivery_at ?? '',
@@ -126,6 +153,7 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
           })}
           columns={[
             { key: 'folio', label: 'Folio' },
+            { key: 'viaja', label: 'Viaja por' },
             { key: 'estatus', label: 'Estatus' },
             { key: 'detenido', label: 'Detenido' },
             { key: 'motivo', label: 'Motivo' },
@@ -136,6 +164,32 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
           ]}
         />
       </div>}
+
+      {!embebido && (
+        <div className="seg-filtros" data-testid="seg-filtros">
+          <div className="hoy-filtros" role="group" aria-label="Por dónde viaja">
+            <button type="button" className={'fchip' + (medio === 'todos' ? ' on' : '')} aria-pressed={medio === 'todos'} onClick={() => setMedio('todos')} data-testid="seg-medio-todos">Todos <b>{rows.length}</b></button>
+            {MEDIOS.map((m) => (
+              <button key={m} type="button" className={'fchip' + (medio === m ? ' on' : '')} aria-pressed={medio === m} onClick={() => setMedio(m)} data-testid={`seg-medio-${m}`}>{ETIQUETA_MEDIO[m]} <b>{cuenta.porMedio[m]}</b></button>
+            ))}
+          </div>
+          <div className="hoy-filtros" role="group" aria-label="En qué va">
+            {ETAPAS.map((e) => (
+              <button key={e} type="button" className={'fchip' + (etapa === e ? ' on' : '')} aria-pressed={etapa === e} onClick={() => setEtapa(etapa === e ? 'todas' : e)} data-testid={`seg-etapa-${e}`}>{ETIQUETA_ETAPA[e]} <b>{cuenta.porEtapa[e]}</b></button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!embebido && enAlmacenN > 0 && (etapa === 'todas' || etapa === 'por_preparar') && (
+        <div className="sysnote" data-testid="seg-en-almacen" style={pasadosN > 0 ? { background: 'var(--warn-bg)', borderColor: 'var(--warn-line)', color: 'var(--warn)' } : undefined}>
+          <Icon name="truck" />
+          <span>
+            <b>{enAlmacenN} {enAlmacenN === 1 ? 'pedido sigue' : 'pedidos siguen'} en Almacén sin preparar</b>{pasadosN > 0 ? ` · ${pasadosN} ya ${pasadosN === 1 ? 'pasó' : 'pasaron'} su fecha de salida` : ''}.
+            {sinGuia > 0 && <> {sinGuia === 1 ? '1 va por paquetería y aún no tiene guía' : `${sinGuia} van por paquetería y aún no tienen guía`}: el rastreo aparece aquí en cuanto Almacén la registra.</>}
+          </span>
+        </div>
+      )}
 
       {stuckCount > 0 && (
         <div className="alert">
@@ -183,7 +237,11 @@ export function Seguimiento({ embebido = false }: { embebido?: boolean } = {}) {
         <div className="op-vacio"><Vacio plano icono="truck" titulo="Sin pedidos en camino" data-testid="seguimiento-vacio" /></div>
       )}
 
-      {rows.map((r) => (
+      {!embebido && rows.length > 0 && visibles.length === 0 && (
+        <div className="op-vacio"><Vacio plano icono="truck" titulo="Nada con ese filtro" data-testid="seg-filtro-vacio" /></div>
+      )}
+
+      {visibles.map((r) => (
         <ShipmentRow key={r.order.id} row={r} prodName={prodName} />
       ))}
     </div>
@@ -207,7 +265,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
     ? shipment.driver_id
       ? `Chofer propio · ${driverName(shipment.driver_id)}`
       : `${shipment.carrier}${shipment.tracking_number ? ` · guía ${shipment.tracking_number}` : ''}`
-    : recoge ? 'Recoge en sucursal' : 'Sin asignar'
+    : recoge ? 'Recoge en sucursal' : metodoPrometido(order)
   // Recoge en sucursal: se cierra aquí cuando el cliente pasa por su pedido (no hay chofer ni guía que lo cierren).
   const puedeEntregarRecoge = recoge && !shipment && order.status === 'shipped'
   const recogioYa = (order.shipping_meta as { recogio?: string } | null)?.recogio
@@ -247,7 +305,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
   }
 
   return (
-    <div className="card" style={stuck ? { borderLeft: '4px solid var(--danger)' } : undefined}>
+    <div className="card" style={stuck ? { borderLeft: '4px solid var(--danger)' } : undefined} data-testid={`seg-fila-${order.external_ref ?? order.id}`} data-medio={row.medio ?? ''} data-etapa={row.etapa}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
         <span className={'pill ' + statusPill}><span className="d" /> {statusLabel}</span>
@@ -265,7 +323,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, fontSize: 13 }}>
-        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{client.name}{client.clinic ? ` · ${client.clinic}` : ''}</div>
+        <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Cliente</div>{capitalizarNombre(client.name)}{client.clinic ? ` · ${client.clinic}` : ''}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Dirección</div>{deliv.addr}</div>
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Método</div>{method}
           {cambiable && (cambiando ? (
@@ -276,6 +334,7 @@ function ShipmentRow({ row, prodName }: { row: Row; prodName: Record<string, str
             </select>
           ) : <> · <button className="rc-link" type="button" onClick={() => setCambiando(true)} data-testid="fila-cambiar-chofer">Cambiar</button></>)}
         </div>
+        {row.etapa === 'por_preparar' && row.salida && !stuck && <div data-testid="seg-salida"><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Salida</div>{row.salida}</div>}
         <div><div className="lt" style={{ color: 'var(--ink-3)', fontSize: 11 }}>Productos</div>{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${cantidadVista(products.find((p) => p.id === it.product_id), it.qty)}`).join(', ')}</div>
       </div>
 
