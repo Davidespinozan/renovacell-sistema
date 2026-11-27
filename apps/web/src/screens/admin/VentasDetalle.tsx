@@ -8,7 +8,8 @@ import { capitalizarNombre } from '../../lib/nombres'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, ShoppingBag, Receipt, Store, Search, X, FileText, Undo2 } from 'lucide-react'
+import { Search, X, FileText, Undo2, SlidersHorizontal } from 'lucide-react'
+import { useAnchoMinimo } from '../../app/useAnchoMinimo'
 import { money, fmtDate } from '../../lib/format'
 import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { useAllOrders, isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -26,6 +27,8 @@ import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/o
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
 import { salesSummary, topProducts, canalDeVenta, ventasPorCanal, CANALES, CANAL_TEXTO, type CanalVenta } from '../../data/metrics'
+
+const VENDIDO_EN: Record<string, string> = { hoy: 'Vendido hoy', ayer: 'Vendido ayer', semana: 'Vendido esta semana', mes: 'Vendido este mes', todo: 'Vendido en total', otro: 'Vendido en esas fechas' }
 import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
@@ -118,9 +121,15 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   // «en_almacen» junta por preparar y preparado: es el paso que cuenta el Inicio de Dirección.
   const [etapa, setEtapa] = useState<'todos' | 'en_almacen' | EtapaSeguimiento>(() => (llegada?.startsWith('paso:') ? (llegada.slice(5) as 'en_almacen' | EtapaSeguimiento) : 'todos'))
   const [q, setQ] = useState('')
+  // MÁS FILTROS (27 nov 2026): a la vista quedan el buscador y los periodos; lo demás se abre con un botón que dice cuántos
+  // hay puestos. Llegando desde una cifra de Inicio («paso:…») se abre solo, para que se vea por qué la lista viene filtrada.
+  const [masFiltros, setMasFiltros] = useState(() => !!llegada?.startsWith('paso:'))
+  // VENTA AL LADO (27 nov 2026): en computadora la venta elegida se abre junto a la lista y se puede pasar de una a otra
+  // sin cerrar. En el celular sigue abriendo su ventana.
+  const ancho = useAnchoMinimo(1100)
   const [selected, setSelected] = useState<string | null>(() => (llegada?.startsWith('pedido:') ? llegada.slice(7) : null))
   // Si Ventas ya está abierta y se busca otro pedido, llega aquí al momento.
-  useEffect(() => (fuente ? undefined : escucharFiltro('av_ventas', (f) => { elegirPeriodo('todo'); if (f.startsWith('pedido:')) setSelected(f.slice(7)); if (f.startsWith('paso:')) setEtapa(f.slice(5) as 'en_almacen' | EtapaSeguimiento) })), [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => (fuente ? undefined : escucharFiltro('av_ventas', (f) => { elegirPeriodo('todo'); if (f.startsWith('pedido:')) setSelected(f.slice(7)); if (f.startsWith('paso:')) { setEtapa(f.slice(5) as 'en_almacen' | EtapaSeguimiento); setMasFiltros(true) } })), [])   // eslint-disable-line react-hooks/exhaustive-deps
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
   // pedido está en la lista de este usuario; se consume una sola vez.
   const intento = useIntentoVentas()
@@ -158,6 +167,19 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const ch = ventasPorCanal(rows)
   const prods = topProducts(rows, productsById, 3)
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
+  const alLado = ancho && !!selectedOrder
+  useEffect(() => {
+    if (!alLado) return
+    document.body.classList.add('rc-acoplado')
+    return () => document.body.classList.remove('rc-acoplado')
+  }, [alLado])
+  // Cobrado y por cobrar de los pedidos del filtro (los cancelados y los borradores no cuentan). «Vendido» conserva su
+  // definición de siempre (pedidos ya confirmados); los que esperan pago se ven en «Por cobrar».
+  const vivos = rows.filter((o) => o.status !== 'cancelled' && o.status !== 'draft')
+  const cobrado = vivos.reduce((t, o) => t + (byOrder[o.id] ? Math.max(0, byOrder[o.id].cobrado_neto) : o.payment_status === 'paid' ? (o.total ?? 0) : 0), 0)
+  const conSaldo = vivos.filter((o) => (byOrder[o.id] ? byOrder[o.id].saldo : o.payment_status === 'paid' ? 0 : (o.total ?? 0)) > 0.0001)
+  const porCobrar = conSaldo.reduce((t, o) => t + (byOrder[o.id] ? byOrder[o.id].saldo : (o.total ?? 0)), 0)
+  const filtrosPuestos = [channel !== 'todos', pay !== 'todos', entrega !== 'todos', vendedor !== 'todos', etapa !== 'todos', periodo === 'otro' && !!(from || to)].filter(Boolean).length
 
   if (cargandoPedidos && orders.length === 0) {
     return (<div className="grid" style={{ gap: 16 }}><CargandoKpis n={5} /><Cargando filas={6} /></div>)
@@ -176,13 +198,21 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         ))}
         {periodo === 'otro' && <span className="vd-periodo-otro">Otras fechas</span>}
       </div>
-      {/* Agregados del periodo filtrado */}
-      <div className="grid sigs">
-        <Stat icon={<TrendingUp size={18} />} v={money(sum.revenue)} k="Total vendido" s={`${sum.orders} ventas`} />
-        <Stat icon={<ShoppingBag size={18} />} v={String(sum.orders)} k="Nº de ventas" s="en el filtro" />
-        <Stat icon={<Receipt size={18} />} v={money(sum.avgTicket)} k="Ticket promedio" s="por venta" />
-        <Stat icon={<Store size={18} />} v={`${money(ch.vendedor.revenue + ch.direccion.revenue)} / ${money(ch.mostrador.revenue + ch.evento.revenue)} / ${money(ch.portal.revenue)}`} k="Vendedores / Caja / Portal" s={`${ch.vendedor.orders + ch.direccion.orders} · ${ch.mostrador.orders + ch.evento.orders} · ${ch.portal.orders}`} />
-        <Stat icon={<Receipt size={18} />} v={prods[0]?.name ?? '—'} k="Top producto" s={prods[0] ? money(prods[0].revenue) : ''} />
+      {/* RESUMEN (27 nov 2026): tres cifras grandes —vendido, cobrado, por cobrar— y lo demás en una línea. Antes eran
+          cinco tarjetas del mismo peso. Las mismas cifras siguen aquí; el desglose completo está en «Resumen». */}
+      <div className="card vd-resumen" data-testid="vd-resumen">
+        <div className="vd-resumen-cifras">
+          <div title="Pedidos ya confirmados. Los que esperan pago se cuentan en «Por cobrar»."><b className="mono" data-testid="vd-vendido">{money(sum.revenue)}</b><span>{VENDIDO_EN[periodo] ?? 'Vendido'} · {sum.orders} {sum.orders === 1 ? 'venta' : 'ventas'}</span></div>
+          <div><b className="mono vd-ok" data-testid="vd-cobrado">{money(cobrado)}</b><span>Cobrado</span></div>
+          <div><b className={'mono' + (porCobrar > 0 ? ' vd-warn' : '')} data-testid="vd-por-cobrar">{money(porCobrar)}</b><span>Por cobrar{conSaldo.length ? ` · ${conSaldo.length} ${conSaldo.length === 1 ? 'pedido' : 'pedidos'}` : ''}</span></div>
+        </div>
+        <div className="vd-resumen-extra" data-testid="vd-resumen-extra">
+          <span>Ticket promedio <b>{money(sum.avgTicket)}</b></span>
+          <span>Vendedores <b>{money(ch.vendedor.revenue + ch.direccion.revenue)}</b> ({ch.vendedor.orders + ch.direccion.orders})</span>
+          <span>Caja <b>{money(ch.mostrador.revenue + ch.evento.revenue)}</b> ({ch.mostrador.orders + ch.evento.orders})</span>
+          <span>Portal <b>{money(ch.portal.revenue)}</b> ({ch.portal.orders})</span>
+          {prods[0] && <span>Más vendido <b>{prods[0].name}</b> ({money(prods[0].revenue)})</span>}
+        </div>
       </div>
 
       {/* Filtros */}
@@ -191,6 +221,8 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           <Search size={15} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cliente o folio…" />
         </div>
+        <button type="button" className={'btn ghost sm vd-mas' + (masFiltros ? ' on' : '')} aria-expanded={masFiltros} onClick={() => setMasFiltros((v) => !v)} data-testid="vd-mas-filtros"><SlidersHorizontal size={14} /> Más filtros{filtrosPuestos ? ` · ${filtrosPuestos}` : ''}</button>
+        <div className="vd-filtros-mas" hidden={!masFiltros} data-testid="vd-filtros-mas">
         <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Del <input type="date" style={sel} value={from} onChange={(e) => { setFrom(e.target.value); setPeriodo('otro') }} /></label>
         <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>al <input type="date" style={sel} value={to} onChange={(e) => { setTo(e.target.value); setPeriodo('otro') }} /></label>
         <select style={sel} value={channel} onChange={(e) => setChannel(e.target.value as ChannelFilter)}>
@@ -224,6 +256,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
             <option value="entregado">Entregado</option>
           </select>
         )}
+        </div>
         {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || vendedor !== 'todos' || etapa !== 'todos' || q) && (
           <button className="btn ghost sm" type="button" onClick={() => { elegirPeriodo('todo'); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setEtapa('todos'); setQ('') }}>Limpiar</button>
         )}
@@ -277,23 +310,23 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
       {/* Tabla */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '8px 14px 0' }}>
-          <table className="tbl-cards">
+          <table className={'tbl-cards' + (alLado ? ' vd-angosta' : '')}>
             <thead>
               {/* MENOS COLUMNAS (27 nov 2026, «sistema sencillo por rol»): de 11 a 7. Canal y entrega van como segunda línea
                   del cliente; productos y estado del pedido se ven al abrir la venta. El Excel conserva todas las columnas. */}
-              <tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Monto</th><th>Cobro</th>{conSeguimiento && <th>Dónde va</th>}</tr>
+              <tr><th>Folio</th><th className="vd-sec">Fecha</th><th>Cliente</th><th className="vd-sec">Vendedor</th><th>Monto</th><th className="vd-sec">Cobro</th>{conSeguimiento && <th>Dónde va</th>}</tr>
             </thead>
             <tbody>
               {rows.map((o) => {
                 const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) }); const canal = channelOf(o)
                 return (
-                  <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
+                  <tr key={o.id} className={'clickrow' + (alLado && o.id === selected ? ' vd-elegida' : '')} aria-selected={alLado ? o.id === selected : undefined} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
-                    <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
+                    <td data-label="Fecha" className="vd-sec" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                     <td data-label="Cliente"><div className="vd-cliente"><b>{capitalizarNombre(clientName(o)) || clientName(o)}</b><small>{CANAL_TEXTO[canal]} · <span data-testid="venta-entrega">{entregaDeVenta(o).corto}</span></small></div></td>
-                    <td data-label="Vendedor">{vendedorDeVenta(o).nombre}</td>
+                    <td data-label="Vendedor" className="vd-sec">{vendedorDeVenta(o).nombre}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
-                    <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span>{avisoRef(o.id) && <span className="pill p-warn" style={{ marginLeft: 4 }} title={`Referencia repetida: ${avisoRef(o.id)}`} data-testid="venta-ref-repetida">Ref. repetida</span>}</td>
+                    <td data-label="Cobro" className="vd-sec"><span className={'pill ' + p.pill}>{p.label}</span>{avisoRef(o.id) && <span className="pill p-warn" style={{ marginLeft: 4 }} title={`Referencia repetida: ${avisoRef(o.id)}`} data-testid="venta-ref-repetida">Ref. repetida</span>}</td>
                     {conSeguimiento
                       ? (() => { const et = etapaSeguimiento(o); return <td data-label="Dónde va" data-rol="estado" data-testid="venta-seguimiento"><span className={'pill ' + et.pill}>{et.texto}</span></td> })()
                       : <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>}
@@ -307,23 +340,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
       </div>
 
       {selectedOrder && (
-        <SaleDetail avisoRepetida={avisoRef(selectedOrder.id)} order={selectedOrder} productsById={productsById} clientName={capitalizarNombre(clientName(selectedOrder)) || clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
+        <SaleDetail key={selectedOrder.id} acoplado={alLado} avisoRepetida={avisoRef(selectedOrder.id)} order={selectedOrder} productsById={productsById} clientName={capitalizarNombre(clientName(selectedOrder)) || clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
       )}
       {cancelling && (
         <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
           onClose={() => { setCancelling(null); setSelected(null) }} />
       )}
-    </div>
-  )
-}
-
-function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; s: string }) {
-  return (
-    <div className="card sig">
-      <div className="chip">{icon}</div>
-      <div className="v" style={{ fontSize: 18 }}>{v}</div>
-      <div className="k">{k}</div>
-      <div className="s">{s}</div>
     </div>
   )
 }
@@ -366,7 +388,9 @@ function SeguimientoDeLaVenta({ order }: { order: OrderWithItems }) {
   )
 }
 
-function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel, soloLectura = false, avisoRepetida = null }: {
+function SaleDetail({ order, productsById, clientName, channel, dinero = null, onClose, onCancel, soloLectura = false, avisoRepetida = null, acoplado = false }: {
+  /** En computadora la venta va junto a la lista (sin velo); se cierra con la X o con Esc. */
+  acoplado?: boolean
   soloLectura?: boolean
   avisoRepetida?: string | null
   order: OrderWithItems
@@ -392,8 +416,14 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   const puedeDevolver = !soloLectura && order.status !== 'draft' && topeReembolso > 0.0001
   const lib = dinero ? etiquetaLiberacion(dinero) : null
   const [showForm, setShowForm] = useState(false)
+  useEffect(() => {
+    if (!acoplado) return
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('.overlay:not(.overlay--acoplado)')) onClose() }
+    window.addEventListener('keydown', f)
+    return () => window.removeEventListener('keydown', f)
+  }, [acoplado, onClose])
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className={'overlay' + (acoplado ? ' overlay--acoplado' : '')} onClick={acoplado ? undefined : onClose} data-testid="venta-detalle">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="mhead">
           <div>
