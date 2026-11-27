@@ -29,6 +29,7 @@ import { useOrders } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { seedReorder } from '../../data/store/reorderStore'
 import { isPast, statusView } from '../doctor/orderStatus'
+import { esRecoge } from '../../data/ops/seguimiento'   // MISMO IDIOMA: quien recoge ve «Listo para recoger» también en Inicio
 import { subtituloDe } from '../chat/ChatCanonico'
 import { Bienvenida, Seccion } from './primitives'
 import { primerNombre, saludo } from '../../lib/nombres'
@@ -120,7 +121,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
     <Fila key="carrito" testid="doctor-carrito" icono={<ShoppingBag />} titulo={`Tu carrito${cart.total.estado === 'completo' && cart.total.monto != null ? ` · ${formatoMXN(cart.total.monto)}` : ''}`}
       detalle={`${cart.n_items} producto${cart.n_items === 1 ? '' : 's'}${cart.items[0]?.nombre ? ` · ${cart.items[0].nombre}` : ''} · Continuar compra`} onClick={() => setScreen('catalogo')} />)
   enCurso.slice(0, 1).forEach((o) => filas.push(
-    <Fila key="pedido" testid="doctor-pedido" icono={<Package />} titulo={`Pedido ${o.external_ref ?? ''}`.trim()} estado={statusView(o.status).label} pill={statusView(o.status).pill}
+    <Fila key="pedido" testid="doctor-pedido" icono={<Package />} titulo={`Pedido ${o.external_ref ?? ''}`.trim()} estado={statusView(o.status, { recoge: esRecoge(o) }).label} pill={statusView(o.status, { recoge: esRecoge(o) }).pill}
       detalle={enCurso.length > 1 ? `Ver seguimiento · ${enCurso.length - 1} más en curso` : 'Ver seguimiento'} onClick={() => setScreen('pedidosdr')} />))
   if (ultimo && enCurso.length === 0) filas.push(
     <Fila key="reorden" testid="doctor-ultimo" icono={<RotateCcw />} titulo="Volver a pedir tu último pedido"
@@ -210,7 +211,7 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
       {enCurso.slice(0, 1).map((o) => (
         <button key={o.id} type="button" className="tienda-pedido" onClick={() => setScreen('pedidosdr')} data-testid="doctor-pedido">
           <span className="tienda-pedido-ic" aria-hidden><Package size={20} /></span>
-          <span className="tienda-pedido-tx"><b>Tu pedido {o.external_ref ?? ''}</b><small>{statusView(o.status).label}{enCurso.length > 1 ? ` · ${enCurso.length - 1} más en curso` : ''}</small></span>
+          <span className="tienda-pedido-tx"><b>Tu pedido {o.external_ref ?? ''}</b><small>{statusView(o.status, { recoge: esRecoge(o) }).label}{enCurso.length > 1 ? ` · ${enCurso.length - 1} más en curso` : ''}</small></span>
           <ChevronRight size={18} aria-hidden />
         </button>
       ))}

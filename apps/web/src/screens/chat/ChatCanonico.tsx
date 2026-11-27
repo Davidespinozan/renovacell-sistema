@@ -979,7 +979,7 @@ export function ChatCanonico({ embebido = false, conversationId, asesor = false,
       </form>
       {notaRedactor && <div className="rc-nota-redactor">{notaRedactor}</div>}
       {!asesor && conv && !cerrada && (modo === 'ai_active' || modo === 'human_offered') && (
-        <div className="rc-foot"><button type="button" className="rc-link" onClick={() => accion(() => cliente.solicitarAsesor(convId!))} data-testid="btn-asesor">¿Prefieres hablar con un asesor?</button></div>
+        <div className="rc-foot"><button type="button" className="btn ghost sm rc-pedir-asesor" onClick={() => accion(() => cliente.solicitarAsesor(convId!))} data-testid="btn-asesor">Hablar con un asesor</button></div>
       )}
       {!asesor && conv && !cerrada && modo === 'human_ended' && (
         <div className="rc-foot"><button type="button" className="rc-link" onClick={() => accion(() => cliente.reanudarIA(convId!))} data-testid="btn-reanudar">Seguir con el asistente</button></div>

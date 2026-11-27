@@ -262,6 +262,10 @@ function OfrecerPromo({ onVer, cargar = oportunidadesPromo }: { onVer: () => voi
 }
 
 // ── DIRECCIÓN ─────────────────────────────────────────────────────────────────────────────────────────
+// Lo que NO avanza hasta que Dirección decide: cancelar un pedido, validar un pago reportado, resolver un reembolso,
+// decidir el destino de una devolución y qué hacer con un pago de más. El resto de la bandeja se vigila.
+export const DECIDE_HOY = new Set(['cancelaciones', 'transfer', 'reembolso', 'disponer', 'sobrepago'])
+
 export function HomeDireccion() {
   const { user, setScreen } = useRole()
   const est = useAtencionComercial('direccion')
@@ -307,11 +311,25 @@ export function HomeDireccion() {
         )}
       </Seccion>
       {/* MENÚ (dueño, 17 oct 2026): Inicio ES Mi bandeja: la lista completa, sin "ver toda". */}
-      {(() => { const resto = [...tareas].sort(porUrgencia).filter((t) => t.id !== 'comercial'); return (
-        <Seccion titulo="Pendientes" nivel="continuar" conteo={resto.reduce((s, t) => s + t.count, 0)} id="bandeja">
-          {resto.length === 0 ? <Vacio titulo="El resto de tu bandeja está al día." /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={resto} onGo={setScreen} /></div>}
-        </Seccion>
-      ) })()}
+      {/* DECIDE HOY / VIGILA (27 nov 2026, «sistema sencillo por rol») · «Pendientes» juntaba hasta 16 renglones del mismo
+          peso. Arriba queda SOLO lo que está detenido hasta que Dirección responda; lo demás se vigila. Son los mismos
+          renglones y llevan a las mismas pantallas: nada se quitó. */}
+      {(() => {
+        const resto = [...tareas].sort(porUrgencia).filter((t) => t.id !== 'comercial')
+        const decide = resto.filter((t) => DECIDE_HOY.has(t.id)); const vigila = resto.filter((t) => !DECIDE_HOY.has(t.id))
+        return (
+          <>
+            {decide.length > 0 && (
+              <Seccion titulo="Decide hoy" nivel="atencion" conteo={decide.reduce((s, t) => s + t.count, 0)} id="decide">
+                <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={decide} onGo={setScreen} /></div>
+              </Seccion>
+            )}
+            <Seccion titulo="Vigila" nivel="continuar" conteo={vigila.reduce((s, t) => s + t.count, 0)} id="bandeja">
+              {vigila.length === 0 ? <Vacio titulo={decide.length ? 'Lo demás está al día.' : 'Tu bandeja está al día.'} /> : <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={vigila} onGo={setScreen} /></div>}
+            </Seccion>
+          </>
+        )
+      })()}
       <AtajosMovil items={atajos} />
     </div>
   )

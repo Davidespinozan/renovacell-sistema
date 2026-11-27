@@ -6,6 +6,7 @@
 // se conserva el carrito local.
 // Sin costo/margen (forma products_safe). Todos los productos tienen precio.
 import { useRole } from '../../auth/RoleContext'
+import { confirmar } from '../../app/dialogos'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money } from '../../lib/format'
@@ -100,8 +101,22 @@ export function Catalogo({ verified = true }: { verified?: boolean }) {
       if (q < qty) capped += 1
       next[product_id] = q
     })
+    // VOLVER A PEDIR SIN BORRAR (27 nov 2026): si ya había algo en el carrito, antes se reemplazaba en silencio. Ahora
+    // se pregunta y, si acepta, lo del pedido anterior se SUMA (con tope de existencia); si no, el carrito queda igual.
+    const yaHabia = Object.values(cart).some((n) => n > 0)
+    if (Object.keys(next).length > 0 && yaHabia) {
+      void (async () => {
+        const ok = await confirmar('Ya tienes productos en tu carrito. ¿Agrego también los de tu pedido anterior?', { aceptar: 'Agregar' })
+        if (!ok) return
+        const suma: Cart = { ...cart }
+        for (const [pid, q] of Object.entries(next)) { const info = stockInfoFor(stockMap, pid); suma[pid] = Math.min((cart[pid] ?? 0) + q, info.tracked ? info.qty : 0) }
+        if (hasSupabase) { for (const pid of Object.keys(next)) await canon.fijar(pid, suma[pid]) } else setCartLocal(suma)
+        setReorderNote('Agregamos tu pedido anterior a lo que ya tenías. Revísalo y confírmalo.')
+      })()
+      return
+    }
     if (Object.keys(next).length > 0) {
-      // Rearmar = reemplazar el carrito (canónico: vaciar y fijar cada renglón, serializado).
+      // Carrito vacío: rearmar (canónico: vaciar y fijar cada renglón, serializado).
       if (hasSupabase) void (async () => { await canon.vaciar(); for (const [pid, q] of Object.entries(next)) await canon.fijar(pid, q) })()
       else setCartLocal(next)
     }

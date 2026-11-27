@@ -230,6 +230,12 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
   const desglose = !!ops && ((envio ?? 0) > 0 || conVolumen)
 
   const bloqueado = (necesitaDireccion && !choice?.address) || (!!ops && !sel) || (necesitaHorario && !horario) || creando || (invoice && !fiscalOk) || cargandoInicial || obsoleto
+  // Un botón apagado dice qué falta (antes «Crear pedido» se apagaba sin explicar).
+  const falta = creando || cargandoInicial || obsoleto ? null
+    : necesitaDireccion && !choice?.address ? 'Falta la dirección de entrega.'
+    : ops && !sel ? 'Elige cómo quieres recibirlo.'
+    : necesitaHorario && !horario ? 'Elige a qué hora lo recibes.'
+    : invoice && !fiscalOk ? 'Completa tus datos de factura o quita la factura.' : null
   const confirm = async () => {
     if (necesitaDireccion && !choice?.address) return // a domicilio: exige dirección de entrega (recoger no)
     if (ops && !sel) return
@@ -462,7 +468,8 @@ export function CheckoutCanonico({ base, servidor, local, previas = [], onPay, o
                     <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Total{ops && intencion === 'domicilio' && !esDomicilioSel ? ' · envío por definir' : ''}</div>
                     <b data-testid="checkout-total" style={{ fontSize: 22, fontVariantNumeric: 'tabular-nums', opacity: obsoleto ? 0.5 : 1 }}>{cargandoInicial ? 'Calculando…' : totalConEnvio != null ? money(totalConEnvio) : motor.revisando ? 'Calculando…' : '—'}</b>
                   </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+                {falta && <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--warn)' }} role="status" data-testid="checkout-falta">{falta}</span>}
                 <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
                 <button className="btn" type="button" onClick={confirm} disabled={bloqueado} aria-busy={creando} style={bloqueado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} data-testid="checkout-crear"><Icon name="check" /> {creando ? 'Creando pedido…' : 'Crear pedido'}</button>
               </div>

@@ -30,7 +30,7 @@ import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
-import { enPeriodo, hoyNegocio } from '../../data/periodo'
+import { enPeriodo, hoyNegocio, rangoPeriodo, type PeriodoRapido } from '../../data/periodo'
 import { entregaDeVenta, TIPO_ENTREGA_TEXTO, type TipoEntregaVenta } from '../../data/ops/entrega'   // ENTREGA EN VENTAS
 import { extrasDe, nombrePaqueteriaExtra } from '../../data/ops/enviosExtra'
 import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
@@ -95,8 +95,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
     return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
   }
 
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  // ABRE EN «HOY» (27 nov 2026): la pregunta de todos los días es «¿qué se vendió hoy?» y contestarla costaba poner la
+  // fecha dos veces. Los botones de periodo llenan las fechas; escribir una fecha a mano deja el periodo en «otras fechas».
+  const [periodo, setPeriodo] = useState<PeriodoRapido | 'otro'>('hoy')
+  const [from, setFrom] = useState(() => rangoPeriodo('hoy', hoyNegocio()).from)
+  const [to, setTo] = useState(() => rangoPeriodo('hoy', hoyNegocio()).to)
+  const elegirPeriodo = (p: PeriodoRapido) => { const r = rangoPeriodo(p, hoyNegocio()); setPeriodo(p); setFrom(r.from); setTo(r.to) }
   const [channel, setChannel] = useState<ChannelFilter>('todos')
   const [pay, setPay] = useState<PayFilter>('todos')
   const [entrega, setEntrega] = useState<EntregaFilter>('todos')
@@ -164,14 +168,20 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         <Stat icon={<Receipt size={18} />} v={prods[0]?.name ?? '—'} k="Top producto" s={prods[0] ? money(prods[0].revenue) : ''} />
       </div>
 
+      <div className="vd-periodos" role="group" aria-label="Periodo" data-testid="vd-periodos">
+        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['todo', 'Todo']] as Array<[PeriodoRapido, string]>).map(([k, t]) => (
+          <button key={k} type="button" className={'fchip' + (periodo === k ? ' on' : '')} aria-pressed={periodo === k} onClick={() => elegirPeriodo(k)} data-testid={`vd-periodo-${k}`}>{t}</button>
+        ))}
+        {periodo === 'otro' && <span className="vd-periodo-otro">Otras fechas</span>}
+      </div>
       {/* Filtros */}
       <div className="card filters">
         <div className="searchbox">
           <Search size={15} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cliente o folio…" />
         </div>
-        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Del <input type="date" style={sel} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>al <input type="date" style={sel} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>Del <input type="date" style={sel} value={from} onChange={(e) => { setFrom(e.target.value); setPeriodo('otro') }} /></label>
+        <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>al <input type="date" style={sel} value={to} onChange={(e) => { setTo(e.target.value); setPeriodo('otro') }} /></label>
         <select style={sel} value={channel} onChange={(e) => setChannel(e.target.value as ChannelFilter)}>
           <option value="todos">Todos los canales</option>
           {CANALES.map((c) => <option key={c} value={c}>{CANAL_TEXTO[c]}</option>)}
@@ -203,7 +213,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           </select>
         )}
         {(from || to || channel !== 'todos' || pay !== 'todos' || entrega !== 'todos' || vendedor !== 'todos' || etapa !== 'todos' || q) && (
-          <button className="btn ghost sm" type="button" onClick={() => { setFrom(''); setTo(''); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setEtapa('todos'); setQ('') }}>Limpiar</button>
+          <button className="btn ghost sm" type="button" onClick={() => { elegirPeriodo('todo'); setChannel('todos'); setPay('todos'); setEntrega('todos'); setVendedor('todos'); setEtapa('todos'); setQ('') }}>Limpiar</button>
         )}
         <ExportButton name="ventas" label="Por pedido" rows={rows} style={{ marginLeft: 'var(--filters-end, auto)' }} columns={[
           { key: 'external_ref', label: 'Folio' },

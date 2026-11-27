@@ -21,16 +21,19 @@ vi.mock('../../data/ops/ventasEquipo', async (orig) => ({ ...(await orig<object>
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'pos', user: { name: 'Roberto' } }), useRoleOpcional: () => ({ role: 'pos' }) }))
 import { VentasEquipo } from '../../screens/sales/VentasEquipo'
 
+// La pantalla abre en «Hoy» (27 nov 2026); estas ventas de prueba son de otras fechas: se pasa a «Todo», como haría la persona.
+const verTodo = () => fireEvent.click(screen.getByTestId('vd-periodo-todo'))
+
 describe('Ventas del equipo (jefe de ventas)', () => {
   it('ve las ventas de los dos vendedores con su nombre y puede filtrar por vendedor', () => {
-    render(<VentasEquipo />)
+    render(<VentasEquipo />); verTodo()
     expect(screen.getByText('S1')).toBeTruthy(); expect(screen.getByText('S2')).toBeTruthy()
     expect(screen.getAllByText('Alejandra').length).toBeGreaterThan(0)
     fireEvent.change(screen.getByTestId('ventas-filtro-vendedor'), { target: { value: 'ale@x' } })
     expect(screen.queryByText('S2')).toBeNull(); expect(screen.getByText('S1')).toBeTruthy()
   })
   it('SEGUIMIENTO: cuándo salió del almacén y cuándo se entregó, con chofer y quién recibió; filtra por etapa', () => {
-    render(<VentasEquipo />)
+    render(<VentasEquipo />); verTodo()
     const celdas = screen.getAllByTestId('venta-seguimiento').map((c) => c.textContent)
     expect(celdas.some((t) => /Entregado 24 nov/.test(t ?? ''))).toBe(true)
     expect(celdas).toContain('Aún en almacén')
@@ -43,7 +46,7 @@ describe('Ventas del equipo (jefe de ventas)', () => {
     expect(det).toMatch(/recibió Melyna · con foto de evidencia/)
   })
   it('el detalle es solo consulta: sin cancelar ni devolver', () => {
-    render(<VentasEquipo />)
+    render(<VentasEquipo />); verTodo()
     fireEvent.click(screen.getByText('S1'))
     expect(screen.queryByText('Cancelar pedido')).toBeNull()
     expect(screen.queryByText(/Devolver \/ Corregir/)).toBeNull()
@@ -54,5 +57,16 @@ describe('Ventas del equipo (jefe de ventas)', () => {
     expect(mig).toMatch(/not public\._jefe_ventas\(\)/)
     expect(mig).not.toMatch(/create policy|alter policy/i)
     expect(mig).toMatch(/revoke all on function public\.ventas_equipo\(integer\) from public, anon/)
+  })
+})
+
+describe('Ventas · abre en «Hoy»', () => {
+  it('al entrar muestra solo lo de hoy; «Todo» trae las ventas de otras fechas', () => {
+    render(<VentasEquipo />)
+    expect(screen.getByTestId('vd-periodo-hoy').getAttribute('aria-pressed')).toBe('true')
+    const antes = screen.queryAllByRole('row').length
+    verTodo()
+    expect(screen.getByTestId('vd-periodo-todo').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryAllByRole('row').length).toBeGreaterThan(antes)
   })
 })

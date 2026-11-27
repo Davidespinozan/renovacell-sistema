@@ -9,6 +9,7 @@ import { BandejaConversaciones, estadoLinea, telefono, hace } from './BandejaCon
 import { ClienteAtencion, type ItemBandeja } from '../../data/ops/atencion'
 import { ClienteChat } from '../../data/ops/chat'
 import { ClienteCanalOperacion } from '../../data/ops/canalOperacion'
+import { pedirIntento, intentoActual, consumirIntento } from '../../data/store/navIntentStore'
 
 afterEach(cleanup)
 const it0 = (o: Partial<ItemBandeja>): ItemBandeja => ({ conversation_id: 'x', grupo: 'ia', modo: 'ai_active', dueno: 'visitante', profile_id: null, nombre: 'Visitante', seller_id: null, seller_nombre: null,
@@ -85,5 +86,26 @@ describe('<BandejaConversaciones>', () => {
     const m = await screen.findByTestId('bq-modal-ajustes')
     expect(await within(m).findByTestId('bq-horario')).toHaveTextContent(/horario/i)
     expect(m.textContent).toMatch(/Enlace de contacto/)
+  })
+})
+
+// «REASIGNAR» DESDE INICIO (27 nov 2026): hacía lo mismo que «Abrir»; adentro había que volver a tocar Reasignar.
+describe('<BandejaConversaciones> · llegada desde «Reasignar» de Inicio', () => {
+  const asignada = it0({ conversation_id: 'ra', grupo: 'en_atencion', modo: 'human_assigned', seller_id: 's1', seller_nombre: 'Lucía · Ventas', dueno: 'doctor', profile_id: 'p9', nombre: 'Dra. Ana Ruiz',
+    contacto: { fuente: 'portal', nombre: null, detalle: null, ultimo_texto: 'Necesito asesor', ultimo_at: null } })
+  afterEach(() => { const i = intentoActual(); if (i) consumirIntento(i.id); const k = ITEMS.indexOf(asignada); if (k >= 0) ITEMS.splice(k, 1) })
+
+  it('con «Reasignar» se abre sola la ventana para elegir a quién se la pasa', async () => {
+    ITEMS.push(asignada)
+    pedirIntento({ destino: 'av_atencion', conversationId: 'ra', reasignar: true, origen: 'inicio' })
+    montar()
+    expect(await screen.findByRole('heading', { name: /Reasignar esta solicitud/ })).toBeTruthy()
+  })
+  it('con «Abrir» solo se abre la conversación, sin ventana', async () => {
+    ITEMS.push(asignada)
+    pedirIntento({ destino: 'av_atencion', conversationId: 'ra', origen: 'inicio' })
+    montar()
+    await screen.findByTestId('bq-reasignar')
+    expect(screen.queryByRole('heading', { name: /Reasignar esta solicitud/ })).toBeNull()
   })
 })

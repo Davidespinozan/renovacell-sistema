@@ -82,10 +82,13 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
   useEffect(() => {
     if (!intento) return
     consumirIntento(intento.id); setAbierta(intento.conversationId)
+    // «Reasignar» en Inicio hacía lo mismo que «Abrir»: había que volver a tocar Reasignar adentro. Ahora abre su ventana.
+    if (intento.reasignar) setReasignar(intento.conversationId)
     const c = datos?.conversaciones.find((x) => x.conversation_id === intento.conversationId)
     if (c) setVista(c.grupo)
   }, [intento, datos])
   const alCambiar = useCallback(async () => { await cargar(); void recargarAtencion() }, [cargar])
+  const [reasignar, setReasignar] = useState<string | null>(null)
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -152,7 +155,7 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
         </aside>
         <section className="bq-panel card" aria-label="Conversación abierta">
           {abierta
-            ? <Panel key={abierta} id={abierta} c={seleccion} cliente={cliente} chat={chat} canalOp={canalOp} onCambio={alCambiar} onCerrar={() => setAbierta(null)} />
+            ? <Panel key={abierta} id={abierta} c={seleccion} cliente={cliente} chat={chat} canalOp={canalOp} onCambio={alCambiar} onCerrar={() => setAbierta(null)} abrirReasignar={reasignar === abierta} onReasignarAbierto={() => setReasignar(null)} />
             : <div className="bq-vacio bq-elige"><span className="bq-elige-ico"><MessageCircle size={28} /></span><b>Conversaciones de clientes</b><span>Elige una conversación de la lista para leerla y atenderla.</span></div>}
         </section>
       </div>
@@ -161,7 +164,7 @@ export function BandejaConversaciones({ cliente = clientePorDefecto, chat = chat
   )
 }
 
-function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: string; c: ItemBandeja | null; cliente: ClienteAtencion; chat: ClienteChat; canalOp: ClienteCanalOperacion; onCambio: () => void; onCerrar: () => void }) {
+function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar, abrirReasignar = false, onReasignarAbierto }: { id: string; c: ItemBandeja | null; cliente: ClienteAtencion; chat: ClienteChat; canalOp: ClienteCanalOperacion; onCambio: () => void; onCerrar: () => void; abrirReasignar?: boolean; onReasignarAbierto?: () => void }) {
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
   const [sel, setSel] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
@@ -173,6 +176,8 @@ function Panel({ id, c, cliente, chat, canalOp, onCambio, onCerrar }: { id: stri
   // Solo se ofrece «Asignar» si de verdad nadie la tiene: ni asignada ahora ni vendedora de cartera.
   const sinAsesor = !!c && !c.seller_id && !c.responsable_id && c.grupo !== 'en_atencion'
   const reasignable = !!c && (c.modo === 'human_requested' || c.modo === 'human_assigned')
+  // Llegada desde «Reasignar» de Inicio: la ventana se abre sola (solo si esa conversación se puede reasignar).
+  useEffect(() => { if (abrirReasignar && reasignable && c?.seller_id) { setModal('solicitud'); onReasignarAbierto?.() } }, [abrirReasignar, reasignable, c?.seller_id, onReasignarAbierto])
   const asignar = async () => {
     if (!c || !sel) return
     setMsg(null)

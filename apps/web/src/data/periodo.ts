@@ -126,3 +126,15 @@ export function ultimosMeses(n: number, ahora: Date = new Date()): Mes[] {
   const actual = mesNegocio(ahora)
   return Array.from({ length: n }, (_, i) => sumarMeses(actual, i - (n - 1)))
 }
+
+/** PERIODOS RÁPIDOS (27 nov 2026, «sistema sencillo por rol») · ver «las ventas de hoy» costaba poner la fecha dos veces.
+ *  Devuelve el rango (días inclusive) de cada botón; «todo» es sin fechas. La semana empieza en lunes. */
+export type PeriodoRapido = 'hoy' | 'ayer' | 'semana' | 'mes' | 'todo'
+export function rangoPeriodo(p: PeriodoRapido, hoy: Dia): { from: string; to: string } {
+  if (p === 'todo') return { from: '', to: '' }
+  if (p === 'hoy') return { from: hoy, to: hoy }
+  if (p === 'ayer') { const a = sumarDias(hoy, -1); return { from: a, to: a } }
+  if (p === 'mes') return { from: hoy.slice(0, 8) + '01', to: hoy }
+  const dow = new Date(hoy + 'T12:00:00Z').getUTCDay()   // 0 = domingo
+  return { from: sumarDias(hoy, -((dow + 6) % 7)), to: hoy }
+}
