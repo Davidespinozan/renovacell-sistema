@@ -51,6 +51,12 @@ export function guardarArchivo(a: { filename: string; contentType: string; base6
   } finally { URL.revokeObjectURL(url) }
 }
 
+/** Mensaje de WhatsApp para ENTREGAR una factura ya emitida (dueño, 27 nov: «todo lo que enviemos debe poder mandarse
+ *  también por WhatsApp»): lleva el enlace del recibo, donde el cliente la descarga en PDF y XML con su RFC. */
+export function textoFacturaWhatsApp(folio: string | null | undefined, url: string): string {
+  return [`Hola, te compartimos la factura de tu compra${folio ? ` ${folio}` : ''} en *Renovacell*.`, '', 'Descárgala aquí en PDF y XML:', url, '', 'Te pedirá el RFC con el que se facturó.'].join('\n')
+}
+
 // Enlaces ya pedidos en esta sesión: el recibo se abre varias veces y la llave de una compra no cambia.
 const cache = new Map<string, EnlaceFactura>()
 export async function enlacesFactura(ids: string[], invocar: Invocar = invocarPorDefecto): Promise<Record<string, EnlaceFactura>> {

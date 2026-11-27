@@ -5,17 +5,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
-const h = vi.hoisted(() => ({ sendCfdi: vi.fn() }))
+const h = vi.hoisted(() => ({ sendCfdi: vi.fn(), enlaces: vi.fn() }))
 // Mockea solo sendCfdi; conserva el emailValido real.
 vi.mock('../../data/ops/cfdiSend', async (orig) => {
   const actual = await (orig() as Promise<Record<string, unknown>>)
   return { ...actual, sendCfdi: h.sendCfdi }
 })
 
+// El enlace del recibo lo entrega el servidor: aquí se simula (lo demás del módulo es el real).
+vi.mock('../../data/ops/autofactura', async (orig) => ({ ...(await (orig() as Promise<Record<string, unknown>>)), enlacesFactura: h.enlaces }))
+
 import { BillDetail } from './Facturacion'
 import { mkOrder, mkItem } from '../../test/factories'
 
-beforeEach(() => { cleanup(); h.sendCfdi.mockReset() })
+beforeEach(() => { cleanup(); h.sendCfdi.mockReset(); h.enlaces.mockReset(); h.enlaces.mockResolvedValue({}) })
 
 const productsById = { p1: { id: 'p1', name: 'Golden Serum' } as never }
 const base = { productsById, clientName: 'Dra. Uno', onClose: () => {} }
@@ -78,5 +81,58 @@ describe('<BillDetail> · enviar factura', () => {
     await waitFor(() => expect(h.sendCfdi).toHaveBeenCalledTimes(1))
     expect(screen.getByText('Enviar factura')).toBeInTheDocument()
     expect(screen.queryByText('Reenviar factura')).toBeNull()
+  })
+})
+
+// POR WHATSAPP (dueño, 27 nov 2026: «todo lo que enviemos debe poder mandarse también por WhatsApp»).
+describe('<BillDetail> · enviar la factura por WhatsApp', () => {
+  const URL_QR = 'https://sistema.renovacell.mx/factura#11111111-1111-4111-8111-111111111111.AAAAAAAAAAAAAAAAAAAAAA'
+  const orden = (x: Record<string, unknown> = {}) => mkOrder({ id: 'o-wa', external_ref: 'S298415', payment_status: 'paid', invoice_requested: true, items: [mkItem()], invoice_meta: TIMBRADA as never, ...x } as never)
+
+  it('con la factura timbrada abre WhatsApp del cliente con el enlace para bajarla', async () => {
+    h.enlaces.mockResolvedValue({ 'o-wa': { url: URL_QR, limite: '2026-11-30' } })
+    const abrir = vi.fn(); window.open = abrir as never
+    render(<BillDetail order={orden({ shipping_meta: { customer: { name: 'Dra. Uno', phone: '667 123 4567' } } })} {...base} />)
+    const b = screen.getByTestId('fact-whatsapp') as HTMLButtonElement
+    expect(b).toBeDisabled()                                                    // mientras llega el enlace
+    expect(screen.getByTestId('fact-whatsapp-nota')).toHaveTextContent('Preparando el enlace')
+    await waitFor(() => expect(b).not.toBeDisabled())
+    expect(h.enlaces).toHaveBeenCalledWith(['o-wa'])
+    fireEvent.click(b)
+    const url = decodeURIComponent(String(abrir.mock.calls[0][0]))
+    expect(url).toContain('wa.me/526671234567')
+    expect(url).toContain('factura de tu compra S298415'); expect(url).toContain(URL_QR); expect(url).toContain('RFC')
+  })
+
+  it('sin teléfono en el pedido usa el del doctor; sin ninguno, WhatsApp deja elegir a quién', async () => {
+    h.enlaces.mockResolvedValue({ 'o-wa': { url: URL_QR, limite: '2026-11-30' } })
+    const abrir = vi.fn(); window.open = abrir as never
+    render(<BillDetail order={orden()} clientPhone="6679990000" {...base} />)
+    await waitFor(() => expect(screen.getByTestId('fact-whatsapp')).not.toBeDisabled())
+    fireEvent.click(screen.getByTestId('fact-whatsapp'))
+    expect(String(abrir.mock.calls[0][0])).toContain('wa.me/526679990000?text=')
+    cleanup(); abrir.mockClear()
+    render(<BillDetail order={orden()} {...base} />)
+    await waitFor(() => expect(screen.getByTestId('fact-whatsapp')).not.toBeDisabled())
+    fireEvent.click(screen.getByTestId('fact-whatsapp'))
+    expect(String(abrir.mock.calls[0][0])).toContain('wa.me/?text=')
+  })
+
+  it('si el enlace no se pudo preparar lo dice y no abre nada', async () => {
+    const abrir = vi.fn(); window.open = abrir as never
+    render(<BillDetail order={orden()} {...base} />)
+    await waitFor(() => expect(screen.getByTestId('fact-whatsapp-nota')).toHaveTextContent('No se pudo preparar el enlace'))
+    expect(screen.getByTestId('fact-whatsapp')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('fact-whatsapp'))
+    expect(abrir).not.toHaveBeenCalled()
+  })
+
+  it('sin factura real, o con la factura cancelada, no se ofrece (ni se pide el enlace)', () => {
+    render1({ status: 'emitida', uuid: 'SIM', simulated: true })
+    expect(screen.queryByTestId('fact-whatsapp')).toBeNull()
+    cleanup()
+    render1({ ...TIMBRADA, cancel: { status: 'cancelada', motive: '02' } })
+    expect(screen.queryByTestId('fact-whatsapp')).toBeNull()
+    expect(h.enlaces).not.toHaveBeenCalled()
   })
 })

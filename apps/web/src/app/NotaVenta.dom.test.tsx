@@ -94,4 +94,13 @@ describe('<BotonNotaVenta>', () => {
     const t = textoNotaVenta(pedido(), () => 'Producto ×1', null)
     expect(t).not.toMatch(/factura\?/i); expect(t).toContain('no es un comprobante fiscal')
   })
+  it('con la factura ya emitida el mensaje dice dónde bajarla, no que la pida; con cancelación en curso no ofrece nada', () => {
+    const TIMBRADA = { status: 'timbrada', uuid: 'SAT-9', facturama_id: 'FAC-9', simulated: false }
+    const t = textoNotaVenta(pedido({ invoice_meta: TIMBRADA }), () => 'Producto ×1', h.enlace)
+    expect(t).toContain('Tu factura ya está lista'); expect(t).toContain(URL_QR); expect(t).toContain('RFC'); expect(t).not.toContain('Pídela aquí')
+    const c = textoNotaVenta(pedido({ invoice_meta: { ...TIMBRADA, cancel: { status: 'cancelada' } } }), () => 'Producto ×1', h.enlace)
+    expect(c).not.toContain(URL_QR)
+    const r = textoNotaVenta(pedido({ invoice_meta: { ...TIMBRADA, cancel: { status: 'rechazada' } } }), () => 'Producto ×1', h.enlace)
+    expect(r).toContain('Tu factura ya está lista')
+  })
 })

@@ -16,6 +16,7 @@ import { currentCompany } from '../data/store/companyStore'
 import { textoMetodoPago } from '../data/ops/money'
 import { useEnlaceFactura, type EnlaceFactura } from '../data/ops/autofactura'
 import { fechaLarga } from '../../../../supabase/functions/_shared/autofactura'
+import { cfdiTimbradoReal, estadoCancelacion } from '../data/ops/cfdi'
 import type { OrderWithItems } from '../data/hooks/useOrders'
 
 export const LEMA_MARCA = 'Tecnologías Antiedad'
@@ -97,7 +98,10 @@ export function textoNotaVenta(order: OrderWithItems, renglon: (it: OrderWithIte
   const envio = Number((order as { shipping_cost?: number | null }).shipping_cost ?? 0)
   if (envio > 0) L.push(`Envío — ${money(envio)}`)
   L.push('', `*Total: ${money(order.total ?? 0)}*`, `Pago: ${textoMetodoPago(order.payment_method)} · ${order.payment_status === 'paid' ? 'Pagado' : 'Por cobrar'}`)
-  if (enlace) L.push('', `¿Necesitas factura? Pídela aquí hasta el ${fechaLarga(enlace.limite)}:`, enlace.url)
+  // Con factura ya emitida y vigente, el mismo enlace sirve para bajarla; con una cancelación en curso no se ofrece nada.
+  const cancelacion = estadoCancelacion(order)
+  if (enlace && cfdiTimbradoReal(order)) { if (cancelacion === null || cancelacion === 'rechazada') L.push('', 'Tu factura ya está lista. Descárgala aquí en PDF y XML (te pedirá tu RFC):', enlace.url) }
+  else if (enlace) L.push('', `¿Necesitas factura? Pídela aquí hasta el ${fechaLarga(enlace.limite)}:`, enlace.url)
   L.push('', 'Este mensaje no es un comprobante fiscal.')
   return L.join('\n')
 }

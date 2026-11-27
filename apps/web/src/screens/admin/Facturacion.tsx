@@ -8,7 +8,7 @@ import { tomarFiltro, verFiltro } from '../../data/store/filtroInicial'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
-import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw } from 'lucide-react'
+import { Receipt, FileText, FileCheck2, BadgeDollarSign, Clock, X, Download, Mail, Ban, RefreshCw, MessageCircle } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { cantidadVista } from '../../lib/cajas'   // CAJAS-MEDIOS
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -30,6 +30,8 @@ import { TimbrarCFDI } from './TimbrarCFDI'   // TIMBRADO REAL (2 nov 2026)
 import { FacturaGlobal } from './FacturaGlobal'   // FACTURA GLOBAL MENSUAL (26 nov 2026)
 import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
+import { enlacesFactura, textoFacturaWhatsApp, type EnlaceFactura } from '../../data/ops/autofactura'
+import { whatsappCon } from '../../data/ops/busqueda'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
 
 import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
@@ -279,17 +281,18 @@ export function Facturacion() {
       </div>
 
       {selectedOrder && (
-        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} dinero={byOrder[selectedOrder.id] ?? null} claim={claimByOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} />
+        <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} clientPhone={selectedOrder.doctor_id ? ((doctorsById[selectedOrder.doctor_id]?.meta ?? {}) as { phone?: string }).phone ?? '' : ''} dinero={byOrder[selectedOrder.id] ?? null} claim={claimByOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} />
       )}
     </div>
   )
 }
 
-export function BillDetail({ order, productsById, clientName, clientEmail = '', dinero = null, claim = null, onClose }: {
+export function BillDetail({ order, productsById, clientName, clientEmail = '', clientPhone = '', dinero = null, claim = null, onClose }: {
   order: OrderWithItems
   productsById: Record<string, ProductSafe | undefined>
   clientName: string
   clientEmail?: string
+  clientPhone?: string
   dinero?: OrderMoney | null
   claim?: PaymentClaim | null
   onClose: () => void
@@ -338,6 +341,21 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
     if (sending || !emailOk) return // bloquea doble clic y email inválido antes del invoke
     setSending(true)
     try { const ok = await sendCfdi(order.id, email.trim().toLowerCase()); if (ok) setSent(true) } finally { setSending(false) }
+  }
+  // POR WHATSAPP (dueño, 27 nov: «todo lo que enviemos debe poder mandarse también por WhatsApp»): se manda el enlace del
+  // recibo de ESA compra; el cliente lo abre y baja su factura en PDF y XML escribiendo su RFC. `undefined` = buscando.
+  const [enlaceWa, setEnlaceWa] = useState<EnlaceFactura | null | undefined>(undefined)
+  useEffect(() => {
+    if (!enviable) return
+    let vivo = true
+    setEnlaceWa(undefined)
+    void enlacesFactura([order.id]).then((m) => { if (vivo) setEnlaceWa(m[order.id] ?? null) })
+    return () => { vivo = false }
+  }, [enviable, order.id])
+  const enviarWhatsApp = () => {
+    if (!enlaceWa) return
+    const tel = ((order.shipping_meta ?? {}) as { customer?: { phone?: string } | null }).customer?.phone || clientPhone
+    window.open(whatsappCon(tel || null, textoFacturaWhatsApp(order.external_ref, enlaceWa.url)), '_blank')
   }
   const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
 
@@ -471,18 +489,25 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   type="email"
-                  className="inp"
                   placeholder="correo@cliente.mx"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={sending}
-                  style={{ flex: 1, minWidth: 220 }}
+                  style={{ flex: 1, minWidth: 220, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, backgroundColor: 'var(--cp-surface)' }}
                 />
                 <button className="btn" type="button" disabled={sending || !emailOk} onClick={enviarFactura}>
                   <Mail size={15} /> {sending ? 'Enviando…' : sent ? 'Reenviar factura' : 'Enviar factura'}
                 </button>
               </div>
               {email.length > 0 && !emailOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 4 }}>Correo no válido.</div>}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
+                <button className="btn ghost" type="button" disabled={!enlaceWa} onClick={enviarWhatsApp} data-testid="fact-whatsapp">
+                  <MessageCircle size={15} /> Enviar por WhatsApp
+                </button>
+                <span className="ms" style={{ color: 'var(--ink-3)', flex: 1, minWidth: 200 }} data-testid="fact-whatsapp-nota">
+                  {enlaceWa ? 'Abre WhatsApp con el enlace para que el cliente la descargue con su RFC.' : enlaceWa === undefined ? 'Preparando el enlace…' : 'No se pudo preparar el enlace. Cierra el pedido y vuelve a abrirlo.'}
+                </span>
+              </div>
             </div>
           )}
 
