@@ -13,7 +13,8 @@ import { useShipments } from '../../data/hooks/useShipments'
 import { isSurtible } from '../../data/ops/seguimiento'
 import { orderAddress, formatAddress } from '../../data/ops/shippingAddress'
 import { recoleccionDe } from '../../data/shipping/recoleccion'
-import { AsignarModal, EntregaPill, entregaDe, ordenarPorSalida } from '../packing/Cola'
+import { AsignarModal, EntregaPill, entregaDe, metodoSugerido, ordenarPorSalida } from '../packing/Cola'
+import { textoSiguientePaso } from '../../data/ops/entregarChofer'
 import { SurtirModal } from './Surtido'
 import { useAgendaEntregas } from '../logistics/AgendaEntregas'
 import { useRole } from '../../auth/RoleContext'
@@ -109,7 +110,7 @@ export function HoyAlmacen() {
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               {o.__accion.tipo === 'preparar'
                 ? <button className="btn" type="button" onClick={() => setPreparar(o)} data-testid={`hoy-preparar-${o.id}`}><Icon name="layers" /> Preparar pedido</button>
-                : <button className="btn" type="button" onClick={() => setEnviar(o)} data-testid={`hoy-enviar-${o.id}`}><Icon name="truck" /> Asignar envío</button>}
+                : <button className="btn" type="button" onClick={() => setEnviar(o)} data-testid={`hoy-enviar-${o.id}`}><Icon name="truck" /> {textoSiguientePaso(ent ? metodoSugerido(ent) : null)}</button>}
             </div>
           </div>
         )

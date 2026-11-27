@@ -2,6 +2,7 @@
 // para enviar. Asignar envío por paquetería (carrier+guía) o chofer propio.
 // Al asignar se crea el shipment y el pedido pasa a "En camino".
 import { clienteDePedido } from '../../data/mock/profiles'   // nombre del cliente junto al folio
+import { choferSugerido, leerUltimoChofer, recordarChofer, textoSiguientePaso } from '../../data/ops/entregarChofer'   // ALMACÉN · entregar al chofer en un paso
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
@@ -175,8 +176,9 @@ export function Cola() {
                   <Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}
                 </button>
               ) : (
-                <button className="btn" type="button" onClick={() => setActive(o)} disabled={!!sol} title={sol ? 'Hay una cancelación por resolver' : undefined}>
-                  <Icon name="truck" /> Asignar envío
+                <button className="btn" type="button" onClick={() => setActive(o)} disabled={!!sol} title={sol ? 'Hay una cancelación por resolver' : undefined} data-testid="cola-siguiente">
+                  {/* El botón dice el paso que sigue según cómo se vendió (antes «Asignar envío» hasta para el que recoge). */}
+                  <Icon name="truck" /> {(() => { const e = entregaDe(o); return textoSiguientePaso(e ? metodoSugerido(e) : null) })()}
                 </button>
               ) })()}
               <BotonRemision order={o} className="btn ghost" />
@@ -219,7 +221,9 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
   const [proveedor, setProveedor] = useState<GuiaCon>(entregaPedido?.paqueteria === 't1' ? 't1' : esPaqManual(entregaPedido?.paqueteria) ? entregaPedido!.paqueteria as PaqManual : 'dhl')
   const manual: PaqManual | null = esPaqManual(proveedor) ? proveedor : null   // PAQ-AUTOBÚS · paquetería sin API: guía a mano
   const [doneRecoge, setDoneRecoge] = useState(false)
-  const [driverId, setDriverId] = useState('')
+  // ENTREGAR AL CHOFER EN UN PASO (27 nov 2026) · el chofer ya viene elegido: el único que hay o el último que se eligió.
+  const [driverId, setDriverId] = useState(() => choferSugerido(getDrivers(), leerUltimoChofer()))
+  const choferVinoElegido = useMemo(() => choferSugerido(getDrivers(), leerUltimoChofer()), [])
 
   // Paquetería: datos reales del pedido/empresa → validar → cotizar → guía.
   // El pedido manda. Si su domicilio no trae C.P. estructurado o teléfono utilizable (domicilios en texto libre),
@@ -337,7 +341,9 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
     setBusy(false)
   }
 
-  const asignarChofer = async () => {
+  // `entregarYa` = «Entregar al chofer»: asigna Y da salida en el mismo toque (la carga ya está en sus manos). Sin él
+  // es «sale después»: solo asigna y el despacho queda para el manifiesto, igual que antes.
+  const asignarChofer = async (entregarYa = false) => {
     if (!driverId || busy) return   // AUDITORÍA · sin doble toque (la base además exige un solo envío vivo por pedido)
     const drv = getDrivers().find((d) => d.id === driverId)
     setBusy('chofer'); setError(null)
@@ -346,26 +352,30 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
       // La estimada sale de lo que se le PROMETIÓ al cliente (horario o día de llegada); solo sin promesa, +2 días.
       estimated_delivery_at: estimadaDe(entregaPedido) ?? new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'por_despachar',
     })
-    setBusy(false)
-    if (!r.ok) { setError(`No se asignó el chofer. ${r.error}`); return }
+    if (!r.ok) { setBusy(false); setError(`No se asignó el chofer. ${r.error}`); return }
+    recordarChofer(driverId)
     // R-62: NO marcamos el pedido "En camino" aquí (sigue en el almacén, por_despachar). El
     // chofer y el manifiesto ya lo ven por el shipment. El pedido pasa a "enviado" al DESPACHAR
     // el manifiesto (Despacho), para no falsear el Tablero mostrando en tránsito lo que sigue
     // en el estante.
-    setAsignado({ shipmentId: r.shipment.id, driverId, chofer: drv?.name ?? 'el chofer' })
+    const a = { shipmentId: r.shipment.id, driverId, chofer: drv?.name ?? 'el chofer' }
+    setAsignado(a)
+    if (entregarYa) { await despachar(a); return }
+    setBusy(false)
   }
 
-  // Igual que Despacho: primero el envío y, solo si quedó, el pedido pasa a "enviado".
-  const despacharAhora = async () => {
-    if (!asignado) return
+  // Igual que Despacho: primero el envío y, solo si quedó, el pedido pasa a "enviado". Si el despacho falla, el envío
+  // queda asignado («por despachar») y la pantalla lo dice con el botón para reintentar: nada se pierde.
+  const despachar = async (a: { shipmentId: string; driverId: string; chofer: string }) => {
     setBusy('chofer'); setError(null)
-    const d = await dispatchShipment(asignado.shipmentId, sesion?.user?.name ?? 'Almacén', orderRef)
+    const d = await dispatchShipment(a.shipmentId, sesion?.user?.name ?? 'Almacén', orderRef)
     if (!d.ok) { setBusy(false); setError(`La carga NO quedó despachada. ${d.error}`); return }
-    const e = await markShipped(order.id, { method: 'chofer', driver: asignado.chofer, driver_id: asignado.driverId })
+    const e = await markShipped(order.id, { method: 'chofer', driver: a.chofer, driver_id: a.driverId })
     setBusy(false)
     if (!e.ok) { setError(`La carga quedó despachada, pero el pedido NO pasó a En camino. ${e.error}`); return }
     setDespachado(true)
   }
+  const despacharAhora = async () => { if (asignado) await despachar(asignado) }
 
   // ENT-3 · Recoger en sucursal / mostrador: no hay guía ni chofer; el pedido queda "listo para recoger" (enviado) y se
   // entrega al cliente desde Seguimiento cuando pase por él.
@@ -438,7 +448,7 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
           <>
             <div className="mhead">
               <div>
-                <h3>{paquete > 0 ? `Envío extra ${paquete}` : 'Asignar envío'} · {order.external_ref}</h3>
+                <h3>{paquete > 0 ? `Envío extra ${paquete}` : textoSiguientePaso(entregaPedido ? method : null)} · {order.external_ref}</h3>
                 <div className="ms">{paquete > 0 ? `Guía de paquetería a ${lugarDe(receiver.address as EnvioExtra['address'])}. El envío principal no cambia.` : 'Genera la guía con la paquetería o asígnalo a un chofer propio.'}</div>
               </div>
               <button className="mclose" type="button" onClick={onClose}><Icon name="x" /></button>
@@ -623,10 +633,16 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
                     <option value="">Selecciona…</option>
                     {getDrivers().map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+                  {/* Un botón apagado dice qué falta; un chofer que ya vino elegido se avisa para que se revise. */}
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6 }} data-testid="chofer-pista">
+                    {!driverId ? 'Elige el chofer para continuar.' : choferVinoElegido === driverId ? 'Ya viene elegido. Cámbialo si la carga va con otro chofer.' : 'Al entregarle la carga, a él le aparece para que confirme que la recibió.'}
+                  </div>
+                  {error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 10 }} data-testid="chofer-error">{error}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                    <button className="btn" type="button" onClick={asignarChofer} disabled={!driverId || !!busy} style={!driverId ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-                      <Icon name="check" /> {busy === 'chofer' ? 'Asignando…' : 'Asignar a chofer'}
+                    <button className="btn ghost" type="button" onClick={() => void asignarChofer(false)} disabled={!driverId || !!busy} data-testid="solo-asignar">Solo asignar: sale después</button>
+                    <button className="btn" type="button" onClick={() => void asignarChofer(true)} disabled={!driverId || !!busy} data-testid="entregar-chofer">
+                      <Icon name="truck" /> {busy === 'chofer' ? 'Entregando…' : 'Entregar al chofer'}
                     </button>
                   </div>
                 </>

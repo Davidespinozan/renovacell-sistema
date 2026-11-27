@@ -43,17 +43,19 @@ describe('ENT-3 · Empaque', () => {
     render(<Cola />)
     expect(screen.getByTestId('cola-entrega')).toHaveTextContent(/Recoger en Sucursal Renovacell/)
     expect(screen.getByTestId('cola-entrega')).toHaveTextContent(/Listo para recoger/)
-    fireEvent.click(screen.getByText('Asignar envío'))
+    // El botón dice el paso que sigue: a quien recoge no se le «asigna envío».
+    expect(screen.getByTestId('cola-siguiente')).toHaveTextContent('Listo para recoger')
+    fireEvent.click(screen.getByTestId('cola-siguiente'))
     expect(screen.getByTestId('asignar-entrega')).toHaveTextContent(/Se vendió como: Recoger en Sucursal Renovacell/)
     expect(screen.getByTestId('metodo-recoge').className).toBe('active')   // preseleccionado
     fireEvent.click(screen.getByTestId('btn-listo-recoger'))
-    await waitFor(() => expect(screen.getByText('Listo para recoger')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Listo para recoger' })).toBeInTheDocument())
     expect(h.markShipped).toHaveBeenCalledWith('S1', { method: 'recoge', carrier: null, tracking: null })
   })
   it('elegir otro método que el vendido se avisa (el cliente espera lo prometido)', () => {
     h.orders = [pedido('S2', '2026-10-20T10:00Z', ent({}))]
     render(<Cola />)
-    fireEvent.click(screen.getByText('Asignar envío'))
+    fireEvent.click(screen.getByTestId('cola-siguiente'))
     expect(screen.getByTestId('asignar-entrega')).not.toHaveTextContent(/Estás eligiendo otro método/)
     fireEvent.click(screen.getByText('Chofer propio'))
     expect(screen.getByTestId('asignar-entrega')).toHaveTextContent(/Estás eligiendo otro método/)
@@ -61,7 +63,7 @@ describe('ENT-3 · Empaque', () => {
   it('EMP-1 · elegir un empaque del catálogo llena las medidas (y el peso vacío si se conoce) para cotizar', async () => {
     h.orders = [pedido('S3', '2026-10-20T10:00Z', ent({}))]
     render(<Cola />)
-    fireEvent.click(screen.getByText('Asignar envío'))
+    fireEvent.click(screen.getByTestId('cola-siguiente'))
     const sel = await screen.findByTestId('empaque-select')
     expect(sel).toHaveTextContent(/Hielera chica #4 · 20×23×22 cm · La que se utiliza más/)
     fireEvent.change(sel, { target: { value: 'h4' } })
