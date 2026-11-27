@@ -3,6 +3,7 @@
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
 import { orderClientName } from '../../data/ops/orderClient'
+import { capitalizarNombre } from '../../lib/nombres'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -267,7 +268,9 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         <div style={{ padding: '8px 14px 0' }}>
           <table className="tbl-cards">
             <thead>
-              <tr><th>Folio</th><th>Fecha</th><th>Canal</th><th>Vendedor</th><th>Entrega</th><th>Cliente</th><th>Productos</th><th>Monto</th><th>Cobro</th><th>Pedido</th>{conSeguimiento && <th>Salida / entrega</th>}</tr>
+              {/* MENOS COLUMNAS (27 nov 2026, «sistema sencillo por rol»): de 11 a 7. Canal y entrega van como segunda línea
+                  del cliente; productos y estado del pedido se ven al abrir la venta. El Excel conserva todas las columnas. */}
+              <tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Monto</th><th>Cobro</th>{conSeguimiento && <th>Dónde va</th>}</tr>
             </thead>
             <tbody>
               {rows.map((o) => {
@@ -276,19 +279,17 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
                   <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
-                    <td data-label="Canal"><span className={'pill ' + (canal === 'portal' ? 'p-blue' : 'p-neu')}>{CANAL_TEXTO[canal]}</span></td>
+                    <td data-label="Cliente"><div className="vd-cliente"><b>{capitalizarNombre(clientName(o)) || clientName(o)}</b><small>{CANAL_TEXTO[canal]} · <span data-testid="venta-entrega">{entregaDeVenta(o).corto}</span></small></div></td>
                     <td data-label="Vendedor">{vendedorDeVenta(o).nombre}</td>
-                    <td data-label="Entrega" data-testid="venta-entrega">{entregaDeVenta(o).corto}</td>
-                    <td data-label="Cliente">{clientName(o)}</td>
-                    <td data-label="Productos" style={{ color: 'var(--ink-2)' }}>{productsSummary(o)}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
                     <td data-label="Cobro"><span className={'pill ' + p.pill}>{p.label}</span>{avisoRef(o.id) && <span className="pill p-warn" style={{ marginLeft: 4 }} title={`Referencia repetida: ${avisoRef(o.id)}`} data-testid="venta-ref-repetida">Ref. repetida</span>}</td>
-                    <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>
-                    {conSeguimiento && (() => { const et = etapaSeguimiento(o); return <td data-label="Salida / entrega" data-testid="venta-seguimiento"><span className={'pill ' + et.pill}>{et.texto}</span></td> })()}
+                    {conSeguimiento
+                      ? (() => { const et = etapaSeguimiento(o); return <td data-label="Dónde va" data-rol="estado" data-testid="venta-seguimiento"><span className={'pill ' + et.pill}>{et.texto}</span></td> })()
+                      : <td data-label="Pedido" data-rol="estado"><span className={'pill ' + sv.pill}>{sv.label}</span></td>}
                   </tr>
                 )
               })}
-              {rows.length === 0 && <tr><td colSpan={conSeguimiento ? 11 : 10} style={{ color: 'var(--ink-3)' }} data-testid="vd-vacio">{periodo === 'hoy' ? 'Todavía no hay ventas hoy con esos filtros. Mira ayer o esta semana con los botones de arriba.' : 'Sin ventas con esos filtros.'}</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-3)' }} data-testid="vd-vacio">{periodo === 'hoy' ? 'Todavía no hay ventas hoy con esos filtros. Mira ayer o esta semana con los botones de arriba.' : 'Sin ventas con esos filtros.'}</td></tr>}
             </tbody>
           </table>
         </div>
