@@ -11,6 +11,8 @@ import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { FiscalFields, FiscalSummary } from '../../app/FiscalFields'
 import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
+import { fiscalDelExpediente, pedirFacturaConExpediente, type FiscalEnExpediente } from '../../data/ops/fiscalExpediente'   // DATOS FISCALES DEL EXPEDIENTE (27 nov 2026)
+import { FiscalDelExpediente } from '../../app/FiscalDelExpediente'
 import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
@@ -149,6 +151,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const [editingFiscal, setEditingFiscal] = useState(false)
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const [savingFiscal, setSavingFiscal] = useState(false)
+  // EXPEDIENTE (27 nov 2026): si el cliente ya tiene datos fiscales, Ventas pide la factura con ellos sin teclearlos (ni
+  // verlos completos: el servidor los pone). `usaExp` = eligió usarlos; puede capturar otros para este pedido.
+  const [expediente, setExpediente] = useState<FiscalEnExpediente | null>(null)
+  const [usaExp, setUsaExp] = useState(true)
+  const facturaConExp = useRef(false)   // lo que se decidió al mandar el pedido (se conserva en un reintento)
+  const [avisoFactura, setAvisoFactura] = useState<{ ok: boolean; texto: string } | null>(null)
   // El pedido solo "se creó" cuando el servidor lo confirmó. Mientras tanto el
   // botón queda ocupado, para que un segundo clic no mande otro pedido.
   const [creando, setCreando] = useState(false)
@@ -156,16 +164,24 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const enviando = useRef(false)                 // candado SÍNCRONO: un doble clic no alcanza a mandar dos solicitudes
   const intento = useRef<Intento | null>(null)   // la operación en curso (su id se conserva entre reintentos)
   const fiscalOk = isFiscalProfileComplete(fiscal)
+  // Factura con los datos del expediente: el pedido se crea sin receptor y enseguida se pide la factura; el servidor
+  // toma el perfil fiscal predeterminado del cliente.
+  const conExpediente = invoice && !fiscalPermanente && !!expediente && usaExp
 
   useEffect(() => {
     if (!invoice || fiscalLoaded) return
     ;(async () => {
       if (!fiscalPermanente) {
-        setEditingFiscal(true)                         // captura para el pedido: formulario en blanco, sin lecturas
+        setEditingFiscal(true)                         // captura para el pedido: formulario en blanco
+        // …pero si el expediente ya tiene datos fiscales, se ofrece usarlos (RFC enmascarado; el servidor los pone).
+        if (isCustomer && customer?.id) { const exp = await fiscalDelExpediente(customer.id); setExpediente(exp); setUsaExp(!!exp) }
       } else if (hasSupabase && isCustomer && customer?.id) {
         setFiscalCustomerId(customer.id)
         const { data } = await supabase.from('customers').select('meta').eq('id', customer.id).maybeSingle()
-        const m = customerFiscal(data as { meta: unknown } | null); setFiscal(m); setEditingFiscal(!isFiscalProfileComplete(m))
+        let m = customerFiscal(data as { meta: unknown } | null)
+        // El perfil predeterminado del expediente manda sobre la ficha antigua cuando esta viene vacía.
+        if (!m.rfc) { const exp = await fiscalDelExpediente(customer.id); if (exp?.completo) m = exp.completo }
+        setFiscal(m); setEditingFiscal(!isFiscalProfileComplete(m))
       } else if (hasSupabase && doctor?.id) {
         const { data: cust } = await supabase.from('customers').select('id, meta').eq('profile_id', doctor.id).maybeSingle()
         if (cust?.id) setFiscalCustomerId(cust.id)
@@ -212,10 +228,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const solicitudActual = (): Solicitud => ({
     lines: lines.map((l) => ({ product_id: l.p!.id, qty: l.qty, unit_price: effOf(l.p!, l.qty) ?? l.p!.price })),
     total,
-    invoice_requested: invoice,
+    invoice_requested: invoice && !conExpediente,
     placedBy,
     shipping,
-    receiver: invoice ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3)
+    receiver: invoice && !conExpediente ? normalizeFiscalProfile(fiscal) : null,   // sin factura no viaja receptor (D-F3); con expediente lo pone el servidor
     ...(hasSupabase && entrega ? { entrega: extras.length ? { ...entrega, extras: extrasParaServidor(extras) } as EleccionEntregaServidor : entrega } : {}),   // ENT-2 · la entrega viaja con el pedido (una transacción) · ENVÍOS EXTRA
     ...(hasSupabase && cobro ? { cobro: cobroParaServidor(cobro) } : {}),   // COBRO-U · y la forma de pago, en la misma transacción
     ...(isCustomer
@@ -232,6 +248,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
       const r = await createOrder({ ...it.solicitud, operacion: it.op })
       if (r.ok) {
         intento.current = null; setRepetido(!!r.repetido); setCobroHecho(cobro)
+        if (facturaConExp.current) {
+          const f = await pedirFacturaConExpediente(r.order.id)
+          setAvisoFactura(f.ok ? { ok: true, texto: 'Factura pedida con los datos fiscales de su expediente.' }
+            : { ok: false, texto: `El pedido SÍ se creó, pero la factura no quedó pedida: ${f.error} Pídela desde Facturación o avisa a Dirección.` })
+          if (!f.ok) void avisar(`El pedido SÍ se creó, pero la factura no quedó pedida. ${f.error}`)
+        }
         const e = (r.order.shipping_meta as { entrega?: { texto?: string; flete?: number; tipo?: string; paqueteria?: string | null; salida?: string; llega_desde?: string; llega_hasta?: string; recoge?: { lugar: string; horario: string }; horario?: { fecha: string; inicio: string; fin: string } | null } } | null)?.entrega
         if (e?.texto && e.tipo && e.salida && e.llega_desde && e.llega_hasta) setPromesa({ texto: resumenPaqueteria({ tipo: e.tipo as 'foraneo', paqueteria: (e.paqueteria ?? null) as 'dhl' | null, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta }, opsEntrega?.corte.hoy) ?? e.texto, flete: Number(e.flete ?? 0), promesa: promesaDe({ tipo: e.tipo as 'recoge', salida: e.salida, llega_desde: e.llega_desde, llega_hasta: e.llega_hasta, recoge: e.recoge, horario: e.horario ?? null }, opsEntrega?.corte.hoy) })   // ENT-H · con horario si es entrega local
         borrarBorrador(claveBorrador)
@@ -256,8 +278,9 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     const previo = intento.current
     if (previo?.incierto) { enviando.current = true; await enviar(previo); return }   // MISMA operación, mismo contenido
     if (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || faltaExtras) return
-    if (invoice && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
+    if (invoice && !conExpediente && !fiscalOk) { setShowFiscalErr(true); setEditingFiscal(true); return } // HARD GATE
     enviando.current = true
+    facturaConExp.current = conExpediente
     if (invoice && fiscalPermanente && fiscalCustomerId && editingFiscal) {
       setSavingFiscal(true)
       const res = await upsertCustomerFiscal(fiscalCustomerId, fiscal)
@@ -272,14 +295,14 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const fleteCobro = (hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0) + costoExtras
   const cobroListo = !hasSupabase || faltaEnCobro(cobro, total + fleteCobro, 'pedido', tipoEntrega, hoyNegocio()) == null
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
-  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || !!faltaExtras || (invoice && !fiscalOk)))
+  const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || !!faltaExtras || (invoice && !conExpediente && !fiscalOk)))
   // PEDIDO POR PASOS (27 nov 2026, «sistema sencillo por rol») · antes era una sola hoja larga con productos, dirección,
   // entrega, pago y factura. Ahora es una pregunta por pantalla. Las tres partes siguen MONTADAS (lo capturado no se
   // pierde al ir y volver; la lógica y lo que se manda no cambian): solo se muestra una. Un botón apagado dice qué falta.
   const faltaPaso: Record<1 | 2 | 3, string | null> = {
     1: lines.length === 0 ? 'Agrega al menos un producto.' : null,
     2: entregaNecesitaDireccion && !shipping ? 'Falta la dirección de entrega.' : !entregaLista ? 'Falta elegir cómo se entrega.' : faltaExtras ? 'Revisa los envíos extra.' : null,
-    3: !cobroListo ? (cobro ? 'Completa la forma de pago.' : 'Elige cómo paga el cliente.') : invoice && !fiscalOk ? 'Completa los datos fiscales o quita la factura.' : null,
+    3: !cobroListo ? (cobro ? 'Completa la forma de pago.' : 'Elige cómo paga el cliente.') : invoice && !conExpediente && !fiscalOk ? 'Completa los datos fiscales o quita la factura.' : null,
   }
   // Un envío sin confirmar o un conflicto se resuelven con el botón final, esté donde esté la persona.
   const pasoFinal = paso === 3 || pendienteIncierto || bloqueado
@@ -303,6 +326,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
               {promesa && <p data-testid="np-promesa" style={{ fontSize: 13.5 }}><b>{promesa.texto}</b>{promesa.flete > 0 ? ` · flete ${money(promesa.flete)}` : ' · sin flete'}<br />{promesa.promesa}</p>}
               {extras.length > 0 && <p data-testid="np-extras-ok" style={{ fontSize: 13.5 }}>Más <b>{extras.length === 1 ? '1 envío extra' : `${extras.length} envíos extra`}</b> ({money(costoExtras)}): Almacén saca una guía para cada uno y al cliente le llega su número de rastreo.</p>}
               {repetido && <p className="ms" data-testid="np-repetido" style={{ color: 'var(--ink-3)' }}>Ya había quedado registrado en el envío anterior; no se creó otro.</p>}
+              {avisoFactura && <p className="ms" data-testid="np-factura-expediente" style={{ color: avisoFactura.ok ? 'var(--green-deep)' : 'var(--warn)' }}>{avisoFactura.texto}</p>}
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>
             </div>
           </div>
@@ -432,15 +456,16 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                     <div className="eyebrow" style={{ margin: 0 }}>{fiscalPermanente ? 'Datos fiscales del cliente' : 'Datos fiscales para este pedido'}</div>
                     {fiscalPermanente && fiscalOk && !editingFiscal && <button type="button" className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setEditingFiscal(true)}>Editar</button>}
                   </div>
-                  {!fiscalPermanente && <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="np-fiscal-solo-pedido">Se guardan solo en este pedido. El perfil fiscal del cliente no se consulta ni se modifica.</div>}
+                  {!fiscalPermanente && expediente && fiscalLoaded && <div style={{ marginTop: 8 }}><FiscalDelExpediente info={expediente} usar={usaExp} onCambiar={(v) => { setUsaExp(v); setShowFiscalErr(false) }} testid="np-fiscal-expediente" /></div>}
+                  {!fiscalPermanente && !conExpediente && <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 6 }} data-testid="np-fiscal-solo-pedido">Se guardan solo en este pedido. El perfil fiscal del cliente no se modifica.</div>}
                   {!fiscalLoaded ? (
                     <div className="ms" style={{ color: 'var(--ink-3)', marginTop: 8 }}>Cargando…</div>
-                  ) : editingFiscal ? (
+                  ) : conExpediente ? null : editingFiscal ? (
                     <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
                   ) : (
                     <FiscalSummary value={fiscal} />
                   )}
-                  {!fiscalOk && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>Completa los datos fiscales para poder solicitar la factura.</div>}
+                  {!fiscalOk && !conExpediente && <div className="ms" style={{ color: 'var(--warn)', marginTop: 8 }}>Completa los datos fiscales para poder solicitar la factura.</div>}
                 </div>
               )}
 

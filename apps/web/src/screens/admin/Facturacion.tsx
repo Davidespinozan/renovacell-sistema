@@ -33,6 +33,7 @@ import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { enlacesFactura, textoFacturaWhatsApp, type EnlaceFactura } from '../../data/ops/autofactura'
 import { whatsappCon } from '../../data/ops/busqueda'
 import { QueEs } from '../../app/QueEs'
+import { fiscalDelExpediente } from '../../data/ops/fiscalExpediente'   // DATOS FISCALES DEL EXPEDIENTE (27 nov 2026)
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
 
 import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
@@ -390,13 +391,20 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
   const [saveMaster, setSaveMaster] = useState(false)
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const [savingFiscal, setSavingFiscal] = useState(false)
+  const [delExpediente, setDelExpediente] = useState(false)   // los datos que se ven vienen del expediente del cliente
   // Si el snapshot está incompleto, precarga el master del cliente para facilitar la corrección.
   useEffect(() => {
     if (snapOk || !hasSupabase || !order.customer_id) return
-    supabase.from('customers').select('meta').eq('id', order.customer_id).maybeSingle().then(({ data }) => {
+    let vivo = true
+    void (async () => {
+      const exp = await fiscalDelExpediente(order.customer_id)
+      if (!vivo) return
+      if (exp?.completo) { const c = exp.completo; setFiscal((cur) => (cur.rfc ? cur : c)); setDelExpediente(true); return }
+      const { data } = await supabase.from('customers').select('meta').eq('id', order.customer_id as string).maybeSingle()
       const m = normalizeFiscalProfile((data?.meta as { fiscal?: unknown } | null)?.fiscal ?? {})
-      if (m.rfc) setFiscal((cur) => (cur.rfc ? cur : m))
-    })
+      if (vivo && m.rfc) { setFiscal((cur) => (cur.rfc ? cur : m)); setDelExpediente(true) }
+    })()
+    return () => { vivo = false }
   }, [order.customer_id])
   const guardarFiscal = async () => {
     if (!isFiscalProfileComplete(fiscal)) { setShowFiscalErr(true); return }
@@ -581,6 +589,7 @@ export function BillDetail({ order, productsById, clientName, clientEmail = '', 
                 </span>
               </div>
               {!order.invoice_requested && !snapOk && <div className="ms" style={{ marginTop: 6, color: 'var(--ink-3)' }} data-testid="fact-sin-solicitud">El cliente no pidió factura al comprar. Captura aquí sus datos fiscales para facturarle.</div>}
+              {delExpediente && !snapOk && !emitida && <div className="ms" style={{ marginTop: 6, color: 'var(--green-deep)' }} data-testid="fact-del-expediente">Estos datos vienen del expediente del cliente. Revísalos y guárdalos para este pedido.</div>}
               {editingFiscal && !emitida ? (
                 <div style={{ marginTop: 8 }}>
                   <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />

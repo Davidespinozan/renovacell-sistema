@@ -10,6 +10,9 @@ import { cantidadVista, esMediaCaja, numeroVista, precioVista } from '../../lib/
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { FiscalFields } from '../../app/FiscalFields'
 import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
+import { fiscalDelExpediente, pedirFacturaConExpediente, type FiscalEnExpediente } from '../../data/ops/fiscalExpediente'   // DATOS FISCALES DEL EXPEDIENTE (27 nov 2026)
+import { FiscalDelExpediente } from '../../app/FiscalDelExpediente'
+import { avisar } from '../../app/dialogos'
 import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { enviarReciboWhatsApp, imprimirVenta, VentaTicketPrint } from './ventaRecibo'
 import { useEnlaceFactura } from '../../data/ops/autofactura'   // QR para pedir la factura
@@ -142,6 +145,11 @@ export function Caja() {
   const [fiscal, setFiscal] = useState<FiscalProfile>(emptyFiscalProfile())
   const [showFiscalErr, setShowFiscalErr] = useState(false)
   const fiscalKeyRef = useRef<string>('')
+  // EXPEDIENTE (27 nov 2026): si el cliente ya tiene datos fiscales, Ventas pide la factura con ellos sin teclearlos (ni
+  // verlos completos: el servidor los pone al pedir la factura). Puede capturar otros para esta venta.
+  const [expediente, setExpediente] = useState<FiscalEnExpediente | null>(null)
+  const [usaExp, setUsaExp] = useState(true)
+  const conExpediente = invoiceReq && !esDireccion && !!expediente && usaExp
   // W1: identidad estable de la venta EN CURSO. Mientras la misma venta se reintenta tras una
   // respuesta ambigua se reusa el mismo order_id/folio (el servidor no duplica); se renueva al
   // confirmar o ante un rechazo definitivo.
@@ -153,13 +161,21 @@ export function Caja() {
     const key = `${invoiceReq ? '1' : '0'}|${client?.id ?? ''}`
     if (key === fiscalKeyRef.current) return
     fiscalKeyRef.current = key
+    setExpediente(null)
     if (!invoiceReq) return
+    const elegido = client?.id ?? null
+    const sigue = () => fiscalKeyRef.current === key   // si cambió de cliente mientras llegaba, se descarta
     ;(async () => {
-      if (esDireccion && hasSupabase && client?.id) {
-        const { data } = await supabase.from('customers').select('meta').eq('id', client.id).maybeSingle()
-        setFiscal(customerFiscal(data as { meta: unknown } | null))
+      if (esDireccion && hasSupabase && elegido) {
+        const { data } = await supabase.from('customers').select('meta').eq('id', elegido).maybeSingle()
+        let m = customerFiscal(data as { meta: unknown } | null)
+        // El perfil predeterminado del expediente manda sobre la ficha antigua cuando esta viene vacía.
+        if (!m.rfc) { const exp = await fiscalDelExpediente(elegido); if (exp?.completo) m = exp.completo }
+        if (sigue()) setFiscal(m)
       } else {
         setFiscal(emptyFiscalProfile())
+        // Ventas: formulario en blanco, pero si el expediente ya tiene datos fiscales se ofrece usarlos.
+        if (!esDireccion && elegido) { const exp = await fiscalDelExpediente(elegido); if (sigue()) { setExpediente(exp); setUsaExp(!!exp) } }
       }
     })()
   }, [invoiceReq, client?.id, esDireccion])
@@ -214,7 +230,7 @@ export function Caja() {
       // CFDI omnicanal: Dirección guarda el perfil fiscal en el MASTER del cliente (si hay) vía RPC. Para todos,
       // el SNAPSHOT del receptor queda en el pedido (invoice_meta.receiver, atómico en vender_pos).
       let invoiceMeta: Record<string, unknown> | null = null
-      if (invoiceReq) {
+      if (invoiceReq && !conExpediente) {
         if (!isFiscalProfileComplete(fiscal)) { setCobrando(false); setShowFiscalErr(true); return }   // sin receptor válido no se cobra
         if (esDireccion && client?.id) {
           const saved = await upsertCustomerFiscal(client.id, fiscal)
@@ -222,7 +238,7 @@ export function Caja() {
         }
         invoiceMeta = { receiver: normalizeFiscalProfile(fiscal) }
       }
-      const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq, invoiceMeta })
+      const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq: invoiceReq && !conExpediente, invoiceMeta })
       if (posOpRef.current && posOpRef.current.fp !== fp) {
         // La venta anterior quedó AMBIGUA y el carrito cambió: antes de cobrar otra, verifica.
         const prev = await estadoOperacion(posOpRef.current.op.orderId)
@@ -240,7 +256,7 @@ export function Caja() {
       res = await venderPOS(posLines, total, method, {
         customerId: client?.id ?? null,
         customer: client ? { name: client.name, phone: client.phone ?? null } : null,
-        seller: user?.email ?? null, invoiceRequested: invoiceReq, invoiceMeta, op,
+        seller: user?.email ?? null, invoiceRequested: invoiceReq && !conExpediente, invoiceMeta, op,
         custodyId,
         // Efectivo con el que paga el cliente: viaja al servidor como evidencia del
         // asiento (recibido/cambio) para que el corte de caja pueda explicarse.
@@ -252,6 +268,11 @@ export function Caja() {
     setCobrando(false)
     if (res.ok && res.order) {
       const order = res.order
+      // Factura con los datos del expediente: la venta ya quedó; ahora se pide la factura y el servidor pone el receptor.
+      if (conExpediente) {
+        const f = await pedirFacturaConExpediente(order.id)
+        if (!f.ok) void avisar(`La venta SÍ quedó registrada, pero la factura no quedó pedida. ${f.error} Pídela desde Facturación o avisa a Dirección.`)
+      }
       const pago = recibidoN != null ? { recibido: recibidoN, cambio } : null
       setLastPago(pago)
       setVentasTurno((v) => [{ order, clientName: clientNameFor(order), pago }, ...v].slice(0, 50))
@@ -433,18 +454,21 @@ export function Caja() {
                 </label>
                 {invoiceReq && (
                   <div style={{ marginTop: 8 }}>
+                    {!esDireccion && expediente && <FiscalDelExpediente info={expediente} usar={usaExp} onCambiar={(v) => { setUsaExp(v); setShowFiscalErr(false) }} testid="caja-fiscal-expediente" />}
+                    {conExpediente ? null : <>
                     {esDireccion
                       ? client && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Datos fiscales de {client.name} (se guardan en su ficha para futuras compras).</div>
                       : <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }} data-testid="caja-fiscal-solo-venta"><b>Datos fiscales para esta venta.</b> Estos datos se utilizarán únicamente para la operación actual. No modificarán el perfil fiscal permanente del cliente.</div>}
                     <FiscalFields value={fiscal} onChange={setFiscal} showErrors={showFiscalErr} />
                     {!isFiscalProfileComplete(fiscal) && <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 6 }}>Completa los 6 campos fiscales para poder facturar.</div>}
+                    </>}
                   </div>
                 )}
               </div>
             )}
 
             {(() => {
-              const cfdiOk = !invoiceReq || isFiscalProfileComplete(fiscal)
+              const cfdiOk = !invoiceReq || conExpediente || isFiscalProfileComplete(fiscal)
               const puede = !cobrando && efectivoOk && cfdiOk
               return (<>
             <button className="btn" type="button" style={{ width: '100%', marginTop: 14, ...(puede ? {} : { opacity: 0.6, cursor: cobrando ? 'wait' : 'not-allowed' }) }} onClick={cobrar} disabled={!puede}>

@@ -417,6 +417,12 @@ button.cifra-v{cursor:pointer}
 /* BLOQUE1 · efectivo que trae el chofer: resalta si hay que entregarlo */
 .mi-efectivo-pend { border-left: 4px solid var(--ds-warning); }
 
+/* «ESTE CLIENTE YA TIENE DATOS FISCALES» en el punto de venta (app/FiscalDelExpediente.tsx) */
+.fiscal-exp { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
+.fiscal-exp > svg { margin-top: 2px; }
+.fiscal-exp-tx { display: grid; gap: 8px; min-width: 0; font-size: var(--fs-sm, 13.5px); line-height: 1.45; }
+.fiscal-exp-seg { justify-self: start; flex-wrap: wrap; }
+.fiscal-exp-nota { color: var(--ux-ink-2, var(--ink-2)); }
 /* AVISOS AL CLIENTE dentro de la venta (app/AvisosDelPedido.tsx) */
 .avisos-pedido { display: grid; gap: 6px; margin-bottom: 14px; }
 .avisos-pedido-cab { font-size: var(--fs-sm, 13.5px); }

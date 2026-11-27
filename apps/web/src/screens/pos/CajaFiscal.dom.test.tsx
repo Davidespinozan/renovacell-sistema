@@ -14,13 +14,13 @@ const ID = '11111111-1111-4111-8111-111111111111', ID2 = '22222222-2222-4222-822
 
 type Venta = { lines: unknown; total: number; method: string; opts: Record<string, unknown> }
 const h = vi.hoisted(() => ({
-  role: 'pos', tablas: [] as string[], rpcs: [] as string[], upserts: [] as unknown[][], ventas: [] as Venta[], ops: 0, estados: [] as string[],
+  role: 'pos', tablas: [] as string[], rpcs: [] as string[], upserts: [] as unknown[][], ventas: [] as Venta[], ops: 0, estados: [] as string[], expediente: null as unknown,
   respuestas: [] as unknown[], respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown, previa: false, elegir: null as unknown,
 }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, user: { name: 'Lucía', email: 'lucia@ventas.test' }, logout: () => {} }) }))
 vi.mock('../../lib/supabase', () => {
   const cadena = (t: string) => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq']) c[k] = () => c; c.maybeSingle = async () => ({ data: t === 'customers' ? { meta: { fiscal: h.maestro } } : null, error: null }); return c }
-  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { h.rpcs.push(fn); return { data: null, error: null } } } }
+  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { h.rpcs.push(fn); return { data: fn === 'cliente_perfiles_fiscales' ? h.expediente : fn === 'solicitar_cfdi' ? { status: 'applied' } : null, error: null } } } }
 })
 vi.mock('../../data/store/customersStore', () => ({
   listCustomers: async () => [{ id: ID, full_name: 'Cliente Directorio', phone: null, city: null, profile_id: null }],
@@ -38,7 +38,7 @@ vi.mock('../../data/ops/pos', () => ({
   newPosOp: () => ({ orderId: `OP-${++h.ops}`, folio: `POS-${h.ops}` }),
   venderPOS: async (lines: unknown, total: number, method: string, opts: Record<string, unknown>) => { h.ventas.push({ lines, total, method, opts }); return h.respuestas[Math.min(h.ventas.length - 1, h.respuestas.length - 1)] },
 }))
-vi.mock('../../data/ops/w1Command', () => ({ estadoOperacion: async (id: string) => { h.estados.push(id); return h.previa } }))
+vi.mock('../../data/ops/w1Command', async (orig) => ({ ...(await orig<typeof import('../../data/ops/w1Command')>()), estadoOperacion: async (id: string) => { h.estados.push(id); return h.previa } }))   // el resto (newOpId, mensajes) es el real: lo usa la solicitud de factura
 vi.mock('./ventaRecibo', () => ({ enviarReciboWhatsApp: () => {}, imprimirVenta: () => {}, VentaTicketPrint: () => null }))
 vi.mock('./BarraVenta', () => ({ BarraVenta: () => null }))
 vi.mock('../../app/FiscalFields', () => ({ FiscalFields: ({ value, onChange }: { value: { rfc: string }; onChange: (f: unknown) => void }) => <button type="button" data-testid="form-fiscal" onClick={() => onChange(h.captura)}>fiscal:{value.rfc || 'vacío'}</button> }))
@@ -58,9 +58,14 @@ const elegirCliente = async (c: unknown = { id: ID, name: 'Ana Prueba', phone: n
 }
 const llenar = async () => { fireEvent.click(await screen.findByTestId('form-fiscal')); await waitFor(() => expect(cobrar().disabled).toBe(false)) }
 const vendido = () => waitFor(() => expect(screen.getByText('Venta registrada')).toBeTruthy())
+// 27 nov 2026 · La regla, precisa: Ventas NO lee la tabla de clientes ni recibe datos fiscales completos. Lo único que
+// puede preguntar es `cliente_perfiles_fiscales` (la función del expediente, que a Ventas le contesta con el RFC
+// ENMASCARADO). Cualquier otra llamada fiscal sigue prohibida.
+const soloExpediente = () => h.rpcs.filter((x) => x !== 'cliente_perfiles_fiscales')
+const CON_EXPEDIENTE = { customer_id: ID, puede_editar: false, perfiles: [{ id: 'PF-1', alias: 'Consultorio', rfc: 'GAP*******5K2', es_predeterminado: true }] }
 
 beforeEach(() => {
-  cleanup(); h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.ventas = []; h.ops = 0; h.estados = []; h.previa = false
+  cleanup(); h.role = 'pos'; h.tablas = []; h.rpcs = []; h.expediente = null; h.upserts = []; h.ventas = []; h.ops = 0; h.estados = []; h.previa = false
   h.respuestas = [exito()]; h.respuestaUpsert = { ok: true }; h.maestro = MAESTRO; h.captura = CAPTURA
 })
 
@@ -92,7 +97,7 @@ describe('SEC-C4-B5b · Ventas', () => {
     render(<Caja />); agregar(); await elegirCliente(); pedirFactura()
     expect(await screen.findByTestId('form-fiscal')).toHaveTextContent('fiscal:vacío')
     await new Promise((r) => setTimeout(r, 30))
-    expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([])
+    expect(h.tablas).toEqual([]); expect(soloExpediente()).toEqual([])
     expect(cobrar().disabled).toBe(true)
     const t = document.body.textContent ?? ''
     for (const s of [MAESTRO.rfc, MAESTRO.razon_social, MAESTRO.email_facturacion]) expect(t).not.toContain(s)
@@ -101,7 +106,7 @@ describe('SEC-C4-B5b · Ventas', () => {
   it('cliente comercial con factura: cobra con el receptor capturado y NO escribe el perfil permanente', async () => {
     render(<Caja />); agregar(); await elegirCliente(); pedirFactura(); await llenar()
     fireEvent.click(cobrar()); await vendido()
-    expect(h.upserts).toEqual([]); expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([])
+    expect(h.upserts).toEqual([]); expect(h.tablas).toEqual([]); expect(soloExpediente()).toEqual([])
     expect(h.ventas).toHaveLength(1)
     const o = h.ventas[0].opts
     expect(o.customerId).toBe(ID); expect(o.invoiceRequested).toBe(true); expect(o.invoiceMeta).toEqual({ receiver: CAPTURA }); expect(o.seller).toBe('lucia@ventas.test')
@@ -131,7 +136,7 @@ describe('SEC-C4-B5b · Ventas', () => {
       await waitFor(() => expect(screen.getByText(error)).toBeTruthy())
       await new Promise((r) => setTimeout(r, 40))
       expect(screen.queryByText('Venta registrada')).toBeNull()
-      expect(h.ventas).toHaveLength(1); expect(h.upserts).toEqual([]); expect(h.rpcs).toEqual([])
+      expect(h.ventas).toHaveLength(1); expect(h.upserts).toEqual([]); expect(soloExpediente()).toEqual([])
     }
   })
   it('otros roles sin permiso fiscal: mismo trato que Ventas', async () => {
@@ -220,13 +225,17 @@ describe('SEC-C4-B5b · Dirección conserva su flujo', () => {
 describe('SEC-C4-B5b · guardas de fuente', () => {
   const c = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
   it('lectura y escritura del perfil permanente solo para Dirección; una sola ruta de cobro', () => {
-    expect(c).toMatch(/if \(esDireccion && hasSupabase && client\?\.id\) \{\s*const \{ data \} = await supabase\.from\('customers'\)\.select\('meta'\)/)
+    // 27 nov 2026 · la lectura de la ficha del cliente sigue siendo SOLO de Dirección (ahora sobre el cliente elegido al activar la factura)
+    expect(c).toMatch(/if \(esDireccion && hasSupabase && elegido\) \{\s*const \{ data \} = await supabase\.from\('customers'\)\.select\('meta'\)/)
     expect(c).toMatch(/if \(esDireccion && client\?\.id\) \{\s*const saved = await upsertCustomerFiscal\(client\.id, fiscal\)/)
     expect(c.match(/\.from\(/g)).toHaveLength(1); expect(c.match(/upsertCustomerFiscal\(/g)).toHaveLength(1); expect(c.match(/venderPOS\(/g)).toHaveLength(1)
     for (const p of [/set_order_fiscal_snapshot|setOrderFiscalSnapshot/, /cliente_fiscal_guardar|customer_fiscal_profiles|cliente_perfiles_fiscales/, /service_role/, /console\./, /localStorage|sessionStorage/]) expect(c).not.toMatch(p)
   })
   it('la huella de idempotencia no cambió', () => {
-    expect(c).toContain("const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq, invoiceMeta })")   // COBRO-U · la forma de pago también es parte de la venta
+    // 27 nov 2026 · la huella lleva lo que DE VERDAD se manda: con «usar los datos del expediente» la venta viaja sin factura
+    // (la factura se pide enseguida, aparte), así que su huella es la de una venta sin factura.
+    expect(c).toContain("const fp = JSON.stringify({ posLines, total, method, cobro: cobro ? cobroParaServidor(cobro) : null, client: client?.id ?? null, invoiceReq: invoiceReq && !conExpediente, invoiceMeta })")   // COBRO-U · la forma de pago también es parte de la venta
+    expect(c).toContain("invoiceRequested: invoiceReq && !conExpediente, invoiceMeta, op,")
     expect(c).toContain('const op = posOpRef.current?.op ?? newPosOp()')
   })
 })
@@ -245,5 +254,34 @@ describe('ENT-POS · pedidos con entrega desde el Punto de venta (dueño, 17 oct
     fireEvent.click(screen.getByTestId('pos-continuar-entrega'))
     expect(screen.getByTestId('nuevo-pedido')).toHaveTextContent(/pedido para Ana Prueba · \{"P1":1\}/)   // el carrito viaja al pedido
     expect(h.ventas).toHaveLength(0)                                         // no se vendió por mostrador
+  })
+})
+
+// DATOS FISCALES DEL EXPEDIENTE (27 nov 2026, dueño: «al solicitar factura en los puntos de venta no se llena, a pesar de
+// que muchos clientes ya tienen información fiscal en su expediente»).
+describe('Caja · Ventas · el cliente ya tiene datos fiscales en su expediente', () => {
+  it('lo avisa con el RFC enmascarado, sin formulario; cobra SIN receptor y enseguida pide la factura al servidor', async () => {
+    h.expediente = CON_EXPEDIENTE
+    render(<Caja />); agregar(); await elegirCliente(); pedirFactura()
+    const aviso = await screen.findByTestId('caja-fiscal-expediente')
+    expect(aviso).toHaveTextContent('GAP*******5K2'); expect(screen.queryByTestId('caja-fiscal-solo-venta')).toBeNull()
+    expect(cobrar().disabled).toBe(false)                                    // ya no exige teclear los seis datos
+    fireEvent.click(cobrar()); await vendido()
+    expect(h.ventas).toHaveLength(1)
+    expect(h.ventas[0].opts.invoiceRequested).toBe(false); expect(h.ventas[0].opts.invoiceMeta).toBeNull()   // ningún dato fiscal viaja desde la pantalla
+    await waitFor(() => expect(h.rpcs).toEqual(['cliente_perfiles_fiscales', 'solicitar_cfdi']))
+    expect(h.tablas).toEqual([]); expect(h.upserts).toEqual([])
+  })
+  it('«Capturar otros datos» regresa al formulario de siempre', async () => {
+    h.expediente = CON_EXPEDIENTE
+    render(<Caja />); agregar(); await elegirCliente(); pedirFactura()
+    fireEvent.click(await screen.findByTestId('caja-fiscal-expediente-otros'))
+    expect(screen.getByTestId('caja-fiscal-solo-venta')).toBeTruthy()
+    expect(cobrar().disabled).toBe(true)                                     // sin capturar no se cobra con factura
+  })
+  it('venta de mostrador sin cliente: no hay expediente que consultar', async () => {
+    h.expediente = CON_EXPEDIENTE
+    render(<Caja />); agregar(); pedirFactura()
+    expect(screen.queryByTestId('caja-fiscal-expediente')).toBeNull(); expect(h.rpcs).toEqual([])
   })
 })

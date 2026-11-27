@@ -13,14 +13,14 @@ const MAESTRO = { rfc: 'MAE010101AB1', razon_social: 'PERFIL PERMANENTE SA', reg
 const CAPTURA = { rfc: 'XAXX010101000', razon_social: 'CAPTURA DEL PEDIDO', regimen: '616', cp: '80010', uso_cfdi: 'S01', email_facturacion: 'captura@pedido.test' }
 
 const h = vi.hoisted(() => ({
-  role: 'pos', tablas: [] as string[], rpcs: [] as string[], upserts: [] as unknown[][], pedidos: [] as Array<Record<string, unknown>>,
+  role: 'pos', tablas: [] as string[], rpcs: [] as string[], expediente: null as unknown, errorSolicitud: null as null | { message: string }, upserts: [] as unknown[][], pedidos: [] as Array<Record<string, unknown>>,
   ancho: false, respuestaPedido: null as unknown, cola: [] as unknown[], diferido: null as null | { soltar: (v: unknown) => void }, respuestaUpsert: { ok: true } as { ok: boolean; error?: string }, maestro: null as unknown, captura: null as unknown,
 }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, user: { name: 'Lucía' } }) }))
 vi.mock('../../app/useAnchoMinimo', () => ({ useAnchoMinimo: () => h.ancho }))   // computadora (true) o celular (false)
 vi.mock('../../lib/supabase', () => {
   const cadena = (tabla: string) => { const c: Record<string, unknown> = {}; for (const k of ['select', 'eq']) c[k] = () => c; c.maybeSingle = async () => ({ data: tabla === 'customers' ? { id: 'CU-1', meta: { fiscal: h.maestro } } : null, error: null }); return c }
-  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { if (fn !== 'cliente_entrega_preferida') h.rpcs.push(fn); return { data: null, error: null } } } }   // ENTREGA PREFERIDA (cliente_entrega_preferida) no es lectura fiscal
+  return { hasSupabase: true, currentUserId: () => 'U-1', supabase: { from: (t: string) => { h.tablas.push(t); return cadena(t) }, rpc: async (fn: string) => { if (fn !== 'cliente_entrega_preferida') h.rpcs.push(fn); return { data: fn === 'cliente_perfiles_fiscales' ? h.expediente : fn === 'solicitar_cfdi' ? { status: 'applied' } : null, error: fn === 'solicitar_cfdi' ? h.errorSolicitud : null } } } }   // ENTREGA PREFERIDA (cliente_entrega_preferida) no es lectura fiscal
 })
 vi.mock('../../data/store/customersStore', () => ({
   customerFiscal: (c: { meta?: { fiscal?: unknown } } | null) => ({ rfc: '', razon_social: '', regimen: '', cp: '', uso_cfdi: '', email_facturacion: '', ...((c?.meta?.fiscal as object) ?? {}) }),
@@ -54,6 +54,11 @@ vi.mock('../../app/FiscalFields', () => ({
 import { NuevoPedido } from './NuevoPedido'
 
 const CLIENTE = { id: '11111111-1111-4111-8111-111111111111', name: 'Ana Prueba', phone: null }
+// 27 nov 2026 · La regla, precisa: Ventas NO lee la tabla de clientes ni recibe datos fiscales completos. Lo único que
+// puede preguntar es `cliente_perfiles_fiscales`, la misma función del expediente, que a Ventas le contesta con el RFC
+// ENMASCARADO. Cualquier otra llamada fiscal sigue prohibida.
+const soloExpediente = () => h.rpcs.filter((x) => x !== 'cliente_perfiles_fiscales')
+const CON_EXPEDIENTE = { customer_id: CLIENTE.id, puede_editar: false, perfiles: [{ id: 'PF-1', alias: 'Consultorio', rfc: 'GAP*******5K2', es_predeterminado: true }] }
 const exito = (extra: object = {}) => ({ ok: true, order: { external_ref: 'S1001' }, ...extra })
 const montar = (props: Partial<React.ComponentProps<typeof NuevoPedido>> = {}) => render(<NuevoPedido customer={CLIENTE} placedBy="Lucía (Ventas)" onClose={() => {}} {...props} />)
 // PEDIDO POR PASOS (27 nov 2026) · productos, entrega y pago van en tres pantallas (las tres siguen montadas). Los
@@ -66,7 +71,7 @@ const pedirFactura = () => fireEvent.click(screen.getAllByRole('checkbox', { hid
 const alerta = vi.fn()
 
 beforeEach(() => {
-  cleanup(); h.ancho = false; h.role = 'pos'; h.tablas = []; h.rpcs = []; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.cola = []; h.diferido = null; h.respuestaUpsert = { ok: true }
+  cleanup(); h.ancho = false; h.role = 'pos'; h.tablas = []; h.rpcs = []; h.expediente = null; h.errorSolicitud = null; h.upserts = []; h.pedidos = []; h.respuestaPedido = exito(); h.cola = []; h.diferido = null; h.respuestaUpsert = { ok: true }
   h.maestro = MAESTRO; h.captura = CAPTURA; alerta.mockReset(); window.alert = alerta
 })
 
@@ -83,7 +88,7 @@ describe('SEC-C4-B5 · Ventas · pedido sin factura', () => {
     expect(p).not.toHaveProperty('doctor_id'); expect(p).not.toHaveProperty('seller'); expect(p).not.toHaveProperty('seller_id')
     expect(p.lines).toEqual([{ product_id: 'P1', qty: 1, unit_price: 100 }])
     expect(p.entrega).toEqual({ opcion: 'foraneo_dhl' })   // ENT-2 · la entrega viaja con el pedido (solo el id de la opción)
-    expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([]); expect(h.upserts).toEqual([])
+    expect(h.tablas).toEqual([]); expect(soloExpediente()).toEqual([]); expect(h.upserts).toEqual([])
   })
   it('rechazo del servidor: se muestra y NO se anuncia éxito', async () => {
     h.respuestaPedido = { ok: false, error: 'No tienes permiso para levantar este pedido.', ambiguous: false }
@@ -107,7 +112,7 @@ describe('SEC-C4-B5 · Ventas · pedido con factura (captura solo para el pedido
     expect(await screen.findByTestId('form-fiscal')).toBeTruthy()
     expect(screen.getByTestId('np-fiscal-solo-pedido')).toHaveTextContent('solo en este pedido')
     expect(screen.getByText('Datos fiscales para este pedido')).toBeTruthy()
-    expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([])
+    expect(h.tablas).toEqual([]); expect(soloExpediente()).toEqual([])
     const t = document.body.textContent ?? ''
     for (const s of [MAESTRO.rfc, MAESTRO.razon_social, MAESTRO.email_facturacion]) expect(t).not.toContain(s)
     expect(screen.queryByTestId('resumen-fiscal')).toBeNull(); expect(screen.queryByText('Editar')).toBeNull()
@@ -130,7 +135,7 @@ describe('SEC-C4-B5 · Ventas · pedido con factura (captura solo para el pedido
     fireEvent.click(boton())
     await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
     expect(h.upserts).toEqual([])                           // NO upsert_customer_fiscal
-    expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual([])
+    expect(h.tablas).toEqual([]); expect(soloExpediente()).toEqual([])
     expect(h.pedidos[0].invoice_requested).toBe(true); expect(h.pedidos[0].receiver).toEqual(CAPTURA)
     expect(h.pedidos[0].customer_id).toBe(CLIENTE.id)
     expect(screen.queryByTestId('np-fiscal-pendiente')).toBeNull()
@@ -145,7 +150,7 @@ describe('SEC-C4-B5 · Ventas · pedido con factura (captura solo para el pedido
     await waitFor(() => expect(boton().disabled).toBe(false))
     fireEvent.click(boton())
     expect(await screen.findByRole('alert')).toHaveTextContent('El pedido no se creó')
-    expect(h.upserts).toEqual([]); expect(h.rpcs).toEqual([]); expect(h.pedidos).toHaveLength(1)
+    expect(h.upserts).toEqual([]); expect(soloExpediente()).toEqual([]); expect(h.pedidos).toHaveLength(1)
   })
   it('otra cuenta (pantalla nueva): no arrastra los datos fiscales capturados para la anterior', async () => {
     const a = montar(); armar(); pedirFactura()
@@ -242,7 +247,7 @@ describe('SEC-C4-FISCAL-3-FE · operación, reintentos y estados', () => {
     expect(h.pedidos).toHaveLength(1)
     expect(op(0).id).toMatch(/^[0-9a-f-]{36}$/); expect(op(0).folio).toMatch(/^S\d{6}$/)
     expect(h.pedidos[0].invoice_requested).toBe(true); expect(h.pedidos[0].receiver).toEqual(CAPTURA)
-    expect(h.rpcs).toEqual([]); expect(h.upserts).toEqual([])
+    expect(soloExpediente()).toEqual([]); expect(h.upserts).toEqual([])
   })
   it('doble clic: una sola solicitud', async () => {
     h.diferido = { soltar: () => {} }
@@ -442,5 +447,54 @@ describe('Levantar pedido · resumen al lado (computadora)', () => {
     await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
     expect(h.pedidos[0].lines).toEqual([{ product_id: 'P1', qty: 1, unit_price: 100 }])
     expect(screen.queryByTestId('np-lado')).toBeNull()                            // ya creado, no hace falta
+  })
+})
+
+// DATOS FISCALES DEL EXPEDIENTE (27 nov 2026, dueño: «al solicitar factura en los puntos de venta no se llena, a pesar de
+// que muchos clientes ya tienen información fiscal en su expediente»). Ventas no ve los datos completos; el servidor los
+// pone al pedir la factura sin receptor.
+describe('Ventas · el cliente ya tiene datos fiscales en su expediente', () => {
+  it('lo avisa con el RFC enmascarado y NO muestra el formulario; nunca lee la tabla de clientes', async () => {
+    h.expediente = CON_EXPEDIENTE
+    montar(); armar(); pedirFactura()
+    const aviso = await screen.findByTestId('np-fiscal-expediente')
+    expect(aviso).toHaveTextContent('Este cliente ya tiene datos fiscales en su expediente'); expect(aviso).toHaveTextContent('GAP*******5K2')
+    expect(screen.queryByTestId('form-fiscal')).toBeNull()
+    expect(screen.getByTestId('np-fiscal-expediente-nota')).toHaveTextContent('no hay que volver a escribirlos')
+    expect(h.tablas).toEqual([]); expect(h.rpcs).toEqual(['cliente_perfiles_fiscales']); expect(h.upserts).toEqual([])
+  })
+  it('crea el pedido SIN receptor y enseguida pide la factura: el servidor pone los datos del expediente', async () => {
+    h.expediente = CON_EXPEDIENTE; h.respuestaPedido = exito({ order: { id: 'O-1', external_ref: 'S1001' } })
+    montar(); armar(); pedirFactura()
+    await screen.findByTestId('np-fiscal-expediente')
+    fireEvent.click(boton())
+    expect(await screen.findByTestId('np-factura-expediente')).toHaveTextContent('Factura pedida con los datos fiscales de su expediente.')
+    expect(h.pedidos).toHaveLength(1)
+    expect(h.pedidos[0].invoice_requested).toBe(false); expect(h.pedidos[0].receiver).toBeNull()   // ningún dato fiscal viaja desde la pantalla
+    expect(h.rpcs).toEqual(['cliente_perfiles_fiscales', 'solicitar_cfdi']); expect(h.tablas).toEqual([]); expect(h.upserts).toEqual([])
+  })
+  it('si la factura no se pudo pedir, dice que el pedido SÍ se creó y por qué no quedó la factura', async () => {
+    h.expediente = CON_EXPEDIENTE; h.respuestaPedido = exito({ order: { id: 'O-1', external_ref: 'S1001' } }); h.errorSolicitud = { message: 'DATOS_FISCALES_REQUERIDOS: incompletos' }
+    montar(); armar(); pedirFactura()
+    await screen.findByTestId('np-fiscal-expediente')
+    fireEvent.click(boton())
+    const a = await screen.findByTestId('np-factura-expediente')
+    expect(a).toHaveTextContent('El pedido SÍ se creó, pero la factura no quedó pedida'); expect(a).toHaveTextContent('Pídela desde Facturación')
+    expect(h.pedidos).toHaveLength(1)
+  })
+  it('«Capturar otros datos» regresa al formulario y el pedido viaja con lo capturado, como siempre', async () => {
+    h.expediente = CON_EXPEDIENTE
+    montar(); armar(); pedirFactura()
+    fireEvent.click(await screen.findByTestId('np-fiscal-expediente-otros'))
+    fireEvent.click(await screen.findByTestId('form-fiscal'))
+    fireEvent.click(boton())
+    await waitFor(() => expect(h.pedidos).toHaveLength(1))
+    expect(h.pedidos[0].invoice_requested).toBe(true); expect(h.pedidos[0].receiver).toEqual(CAPTURA)
+    expect(h.rpcs).toEqual(['cliente_perfiles_fiscales'])                                          // no se pide por el expediente
+  })
+  it('sin datos en el expediente, o si la consulta falla: formulario en blanco, igual que antes', async () => {
+    h.expediente = { customer_id: CLIENTE.id, puede_editar: false, perfiles: [] }
+    montar(); armar(); pedirFactura()
+    expect(await screen.findByTestId('form-fiscal')).toBeTruthy(); expect(screen.queryByTestId('np-fiscal-expediente')).toBeNull()
   })
 })
