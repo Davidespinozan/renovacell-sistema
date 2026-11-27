@@ -71,6 +71,35 @@ describe('<FacturaCliente>', () => {
     render(<FacturaCliente enlace={ENLACE} ver={async () => ({ ok: true, data: vista({ estado: 'cancelada', mensaje: 'Esta compra fue cancelada: no se factura.' }) })} pedir={vi.fn()} />)
     expect(await screen.findByTestId('factura-cancelada')).toHaveTextContent('cancelada')
   })
+  it('ya timbrada: se descarga aquí mismo en PDF o XML, escribiendo el RFC de la factura', async () => {
+    const archivo = { filename: 'S298415_UUID.pdf', contentType: 'application/pdf', base64: 'JVBERi0=' }
+    const descargar = vi.fn(async () => ({ ok: true as const, data: archivo })); const guardar = vi.fn()
+    render(<FacturaCliente enlace={ENLACE} ver={async () => ({ ok: true, data: vista({ estado: 'facturada', mensaje: 'Tu factura ya fue emitida y se envió a tu correo. También puedes descargarla aquí.' }) })} pedir={vi.fn()} descargar={descargar} guardar={guardar} />)
+    await screen.findByTestId('factura-descarga')
+    fireEvent.click(screen.getByTestId('factura-pdf'))                           // sin RFC no sale al servidor
+    expect(screen.getByTestId('factura-descarga-error')).toHaveTextContent('Escribe el RFC')
+    expect(descargar).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText(/escribe el RFC con el que se facturó/), { target: { value: 'gode561231gr8' } })
+    fireEvent.click(screen.getByTestId('factura-pdf'))
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith(archivo))
+    expect(descargar).toHaveBeenCalledWith(P, 'AAAAAAAAAAAAAAAAAAAAAA', 'GODE561231GR8', 'pdf')
+    fireEvent.click(screen.getByTestId('factura-xml'))
+    await waitFor(() => expect(descargar).toHaveBeenLastCalledWith(P, 'AAAAAAAAAAAAAAAAAAAAAA', 'GODE561231GR8', 'xml'))
+  })
+  it('con otro RFC el servidor no la entrega y la página lo dice', async () => {
+    const descargar = vi.fn(async () => ({ ok: false as const, mensaje: 'Ese RFC no coincide con el de la factura. Escríbelo tal como lo capturaste.' })); const guardar = vi.fn()
+    render(<FacturaCliente enlace={ENLACE} ver={async () => ({ ok: true, data: vista({ estado: 'facturada', mensaje: 'Tu factura ya fue emitida.' }) })} pedir={vi.fn()} descargar={descargar} guardar={guardar} />)
+    await screen.findByTestId('factura-descarga')
+    fireEvent.change(screen.getByLabelText(/escribe el RFC con el que se facturó/), { target: { value: 'XAXX010101000' } })
+    fireEvent.click(screen.getByTestId('factura-pdf'))
+    await waitFor(() => expect(screen.getByTestId('factura-descarga-error')).toHaveTextContent('no coincide'))
+    expect(guardar).not.toHaveBeenCalled()
+  })
+  it('mientras no esté timbrada no se ofrece descarga', async () => {
+    render(<FacturaCliente enlace={ENLACE} ver={async () => ({ ok: true, data: vista() })} pedir={vi.fn()} />)
+    await screen.findByTestId('factura-form')
+    expect(screen.queryByTestId('factura-descarga')).toBeNull()
+  })
   it('un enlace incompleto o que el servidor no reconoce no muestra ninguna compra', async () => {
     const ver = vi.fn()
     const r = render(<FacturaCliente enlace="#roto" ver={ver} pedir={vi.fn()} />)

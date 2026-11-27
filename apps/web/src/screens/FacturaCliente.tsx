@@ -7,7 +7,7 @@ import { BrandLogo } from '../app/BrandLogo'
 import { money } from '../lib/format'
 import { REGIMENES_OPTIONS } from '../data/sat/regimenesFiscales'
 import { USOS_CFDI_OPTIONS } from '../data/sat/usosCfdi'
-import { pedirFactura as pedirPorDefecto, verFactura as verPorDefecto, type VistaFactura } from '../data/ops/autofactura'
+import { descargarFactura as descargarPorDefecto, guardarArchivo, pedirFactura as pedirPorDefecto, verFactura as verPorDefecto, type VistaFactura } from '../data/ops/autofactura'
 import { faltaEnReceptor, fechaLarga, leerEnlace, limpiarReceptor, type Receptor } from '../../../../supabase/functions/_shared/autofactura'
 
 const fragmento = (): string => (typeof window !== 'undefined' ? window.location.hash : '')
@@ -18,8 +18,8 @@ const VACIO: Receptor = { rfc: '', razon_social: '', regimen: '', cp: '', uso_cf
 
 type Estado = { fase: 'cargando' } | { fase: 'invalido'; mensaje: string } | { fase: 'vista'; v: VistaFactura }
 
-export function FacturaCliente({ ver = verPorDefecto, pedir = pedirPorDefecto, enlace = fragmento() }: {
-  ver?: typeof verPorDefecto; pedir?: typeof pedirPorDefecto; enlace?: string
+export function FacturaCliente({ ver = verPorDefecto, pedir = pedirPorDefecto, descargar = descargarPorDefecto, guardar = guardarArchivo, enlace = fragmento() }: {
+  ver?: typeof verPorDefecto; pedir?: typeof pedirPorDefecto; descargar?: typeof descargarPorDefecto; guardar?: typeof guardarArchivo; enlace?: string
 }) {
   const datos = leerEnlace(enlace)
   const [estado, setEstado] = useState<Estado>({ fase: 'cargando' })
@@ -28,6 +28,19 @@ export function FacturaCliente({ ver = verPorDefecto, pedir = pedirPorDefecto, e
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [recien, setRecien] = useState(false)   // acaba de pedirla en esta visita
+  // DESCARGA: la factura ya timbrada se baja aquí mismo (por si el correo no llegó). Pide el RFC con el que se facturó.
+  const [rfcDescarga, setRfcDescarga] = useState('')
+  const [bajando, setBajando] = useState<'pdf' | 'xml' | null>(null)
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null)
+  const bajar = async (formato: 'pdf' | 'xml') => {
+    if (bajando || !datos) return
+    if (rfcDescarga.trim().length < 12) { setErrorDescarga('Escribe el RFC con el que se hizo la factura.'); return }
+    setBajando(formato); setErrorDescarga(null)
+    const r = await descargar(datos.pedido, datos.llave, rfcDescarga.trim().toUpperCase(), formato)
+    setBajando(null)
+    if (!r.ok) { setErrorDescarga(r.mensaje); return }
+    guardar(r.data)
+  }
 
   useEffect(() => {
     let vivo = true
@@ -96,6 +109,18 @@ export function FacturaCliente({ ver = verPorDefecto, pedir = pedirPorDefecto, e
                 <div className={'fc-aviso' + (v.estado === 'facturada' || v.estado === 'en_proceso' ? ' fc-aviso--ok' : '')} role="status" data-testid={`factura-${v.estado}`}>
                   <span>{v.mensaje}</span>
                   {(v.estado === 'fuera_de_mes' || v.estado === 'en_global') && <span className="fc-dato">El plazo era hasta el {fechaLarga(v.limite)}.</span>}
+                </div>
+              )}
+
+              {v.estado === 'facturada' && (
+                <div className="fc-descarga" data-testid="factura-descarga">
+                  <div className="rc-campo"><label htmlFor="fc-rfc-descarga">Para descargarla, escribe el RFC con el que se facturó</label>
+                    <input id="fc-rfc-descarga" value={rfcDescarga} maxLength={13} autoCapitalize="characters" autoComplete="off" placeholder="12 o 13 letras y números" onChange={(e) => { setRfcDescarga(e.target.value.toUpperCase().replace(/\s/g, '')); setErrorDescarga(null) }} /></div>
+                  {errorDescarga && <div role="alert" className="rc-error rc-error--inline" data-testid="factura-descarga-error">{errorDescarga}</div>}
+                  <div className="fc-botones">
+                    <button type="button" className="rc-pre-enviar" disabled={bajando !== null} onClick={() => void bajar('pdf')} data-testid="factura-pdf">{bajando === 'pdf' ? 'Descargando…' : 'Descargar PDF'}</button>
+                    <button type="button" className="rc-pre-enviar fc-secundario" disabled={bajando !== null} onClick={() => void bajar('xml')} data-testid="factura-xml">{bajando === 'xml' ? 'Descargando…' : 'Descargar XML'}</button>
+                  </div>
                 </div>
               )}
 

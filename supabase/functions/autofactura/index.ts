@@ -9,6 +9,8 @@
 //   ver        — sin sesión, con la llave del enlace. Folio, fecha, total, fecha límite y en qué va la factura.
 //   solicitar  — sin sesión, con la llave del enlace. Registra la solicitud con los datos fiscales (misma orden
 //                `solicitar_cfdi` que usa el personal: aplica la regla del mes y la de la factura global).
+//   descargar  — sin sesión, con la llave del enlace Y el RFC de la factura. Entrega el PDF o el XML de una factura
+//                YA timbrada (misma lectura a Facturama que la descarga del personal). Solo lectura.
 //
 // La llave es un HMAC del pedido con un secreto del servidor: no se guarda y no se puede fabricar. Viaja solo en el
 // cuerpo (nunca en la URL de esta función). Lo público tiene límite por IP y techo global.
@@ -18,8 +20,10 @@ import { resolverQuien, esSesionDeUsuario } from '../_shared/quien.ts'
 import { limitarTodas, respuestaLimite, sujetoPublico, sujetoUid } from '../_shared/limite.ts'
 import {
   correoEnmascarado, diaNegocio, enlaceFactura, estadoAutofactura, faltaEnReceptor, fechaLimite, limpiarReceptor, llaveDePedido,
-  llaveValida, mensajeDeError, MENSAJE_ESTADO, URL_SISTEMA,
+  llaveValida, mensajeDeError, MENSAJE_ESTADO, rfcIgual, URL_SISTEMA,
 } from '../_shared/autofactura.ts'
+import { formatoValido, mimeDe, nombreArchivo, puedeDescargar } from '../cfdi-download/rules.ts'
+import { resolverFacturama } from '../_shared/facturama.ts'
 
 const cors = { 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -35,7 +39,7 @@ Deno.serve(conCors(async (req) => {
   const admin = createClient(url, servicio, { auth: { persistSession: false } })
   const base = Deno.env.get('AUTOFACTURA_URL_BASE') ?? URL_SISTEMA
 
-  const b = await req.json().catch(() => ({})) as { accion?: string; pedidos?: unknown; pedido?: string; llave?: string; receptor?: unknown }
+  const b = await req.json().catch(() => ({})) as { accion?: string; pedidos?: unknown; pedido?: string; llave?: string; receptor?: unknown; rfc?: string; formato?: unknown }
   const accion = b.accion ?? ''
 
   // ── enlaces: personal con sesión; solo de las compras que su sesión ya puede leer ──
@@ -59,12 +63,14 @@ Deno.serve(conCors(async (req) => {
     return json(200, { enlaces })
   }
 
-  if (accion !== 'ver' && accion !== 'solicitar') return json(400, { error: 'accion_invalida' })
+  if (accion !== 'ver' && accion !== 'solicitar' && accion !== 'descargar') return json(400, { error: 'accion_invalida' })
 
   // ── público: límite antes de mirar nada (también frena adivinar llaves) ──
   const sujeto = await sujetoPublico(req)
   const v = await limitarTodas(admin, accion === 'ver'
     ? [{ scope: 'autofactura_ver', sujeto }, { scope: 'autofactura_ver_global', sujeto: 'global' }]
+    : accion === 'descargar'
+    ? [{ scope: 'autofactura_descargar', sujeto }, { scope: 'autofactura_descargar_global', sujeto: 'global' }]
     : [{ scope: 'autofactura_solicitar', sujeto }, { scope: 'autofactura_solicitar_global', sujeto: 'global' }])
   if (!v.permitido) return respuestaLimite(v)
 
@@ -94,6 +100,25 @@ Deno.serve(conCors(async (req) => {
   if (accion === 'ver') {
     const r = await leer()
     return r ? json(200, r) : json(404, NO_EXISTE)
+  }
+
+  // ── descargar: solo una factura YA timbrada, y solo a quien además sabe a qué RFC se facturó ──
+  if (accion === 'descargar') {
+    if (!formatoValido(b.formato)) return json(422, { error: 'formato', message: 'Elige PDF o XML.' })
+    const { data: o } = await admin.from('orders').select('external_ref, invoice_meta').eq('id', pedido).maybeSingle()
+    if (!o) return json(404, NO_EXISTE)
+    const meta = (o.invoice_meta ?? {}) as { receiver?: { rfc?: string } }
+    const gate = puedeDescargar(o.invoice_meta)
+    if (!gate.ok) return json(409, { error: 'sin_factura', message: 'Tu factura todavía no está lista para descargar.' })
+    if (!rfcIgual(b.rfc, meta.receiver?.rfc)) return json(403, { error: 'rfc', message: 'Ese RFC no coincide con el de la factura. Escríbelo tal como lo capturaste.' })
+    const usuario = Deno.env.get('FACTURAMA_USER'); const clave = Deno.env.get('FACTURAMA_PASSWORD')
+    const fac = resolverFacturama(Deno.env.get('FACTURAMA_ENV'))
+    if (!usuario || !clave || !fac.ok) return json(503, { error: 'no_disponible', message: 'La descarga no está disponible en este momento. Revisa tu correo o pídela a tu asesor.' })
+    // Misma lectura que la descarga del personal (cfdi-download): el identificador sale de la base, nunca del cliente.
+    const r = await fetch(`${fac.base}/api/Cfdi/${b.formato}/issued/${gate.facturamaId}`, { headers: { Authorization: 'Basic ' + btoa(`${usuario}:${clave}`), Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) }).catch(() => null)
+    const cuerpo = r ? await r.json().catch(() => ({})) as { Content?: string } : {}
+    if (!r || !r.ok || !cuerpo.Content) return json(502, { error: 'proveedor', message: 'No se pudo obtener tu factura en este momento. Intenta de nuevo en unos minutos.' })
+    return json(200, { filename: nombreArchivo(o.external_ref, gate.uuid, b.formato), contentType: mimeDe(b.formato), base64: cuerpo.Content })
   }
 
   // ── solicitar ──

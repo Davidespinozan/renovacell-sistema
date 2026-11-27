@@ -87,6 +87,8 @@ export const LIMITES: Record<string, Regla> = {
   autofactura_ver_global:        { limite: 3000, ventanaSegs: 3600 },
   autofactura_solicitar:         { limite: 12,  ventanaSegs: 3600 },
   autofactura_solicitar_global:  { limite: 600, ventanaSegs: 3600 },
+  autofactura_descargar:         { limite: 20,  ventanaSegs: 3600 },
+  autofactura_descargar_global:  { limite: 1000, ventanaSegs: 3600 },
   // VERIF-VENDEDOR: enlaces temporales a la evidencia (solo personal autorizado).
   verificacion_evidencia_uid:  { limite: 120, ventanaSegs: 3600 },
   // chat (CC-2): abrir es barato; enviar cuesta (y puede llamar a la IA); solicitar asesor es raro.

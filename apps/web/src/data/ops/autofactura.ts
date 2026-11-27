@@ -35,6 +35,22 @@ async function llamar<T>(body: Record<string, unknown>, invocar: Invocar): Promi
 export const verFactura = (pedido: string, llave: string, invocar: Invocar = invocarPorDefecto) => llamar<VistaFactura>({ accion: 'ver', pedido, llave }, invocar)
 export const pedirFactura = (pedido: string, llave: string, receptor: Receptor, invocar: Invocar = invocarPorDefecto) => llamar<VistaFactura>({ accion: 'solicitar', pedido, llave, receptor }, invocar)
 
+/** Baja la factura ya timbrada (PDF o XML) con la llave del recibo y el RFC de la factura. */
+export const descargarFactura = (pedido: string, llave: string, rfc: string, formato: 'pdf' | 'xml', invocar: Invocar = invocarPorDefecto) =>
+  llamar<{ filename: string; contentType: string; base64: string }>({ accion: 'descargar', pedido, llave, rfc, formato }, invocar)
+
+/** Entrega al navegador un archivo que llegó en base64 (lo guarda con su nombre). */
+export function guardarArchivo(a: { filename: string; contentType: string; base64: string }): void {
+  const bin = atob(a.base64); const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  const url = URL.createObjectURL(new Blob([bytes], { type: a.contentType || 'application/octet-stream' }))
+  try {
+    const e = document.createElement('a')
+    e.href = url; e.download = a.filename.replace(/[^\w.-]+/g, '_') || 'factura'
+    document.body.appendChild(e); e.click(); e.remove()
+  } finally { URL.revokeObjectURL(url) }
+}
+
 // Enlaces ya pedidos en esta sesión: el recibo se abre varias veces y la llave de una compra no cambia.
 const cache = new Map<string, EnlaceFactura>()
 export async function enlacesFactura(ids: string[], invocar: Invocar = invocarPorDefecto): Promise<Record<string, EnlaceFactura>> {

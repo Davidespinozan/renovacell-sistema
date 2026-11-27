@@ -233,6 +233,9 @@
 .fc-aviso{display:grid;gap:6px;padding:14px;border-radius:12px;background:var(--warn-bg);color:var(--ink);font-size:14px;line-height:1.5}
 .fc-aviso--ok{background:var(--ok-bg)}
 .fc-dato{font-size:12.5px;color:var(--ink-3)}
+.fc-descarga{margin-top:16px}
+.fc-botones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rc-pre-enviar.fc-secundario{background:#fff;color:var(--green-deep);border:1px solid var(--green-deep);box-shadow:none}
 .fc-enlace{all:unset;cursor:pointer;justify-self:start;color:var(--green-deep);font-weight:600;font-size:13.5px;text-decoration:underline}
 .fc-enlace:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
 

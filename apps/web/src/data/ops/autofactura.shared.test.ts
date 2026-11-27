@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   correoEnmascarado, diaNegocio, enlaceFactura, estadoAutofactura, faltaEnReceptor, fechaLarga, fechaLimite, leerEnlace, limpiarReceptor,
-  llaveDePedido, llaveValida, mensajeDeError, MENSAJE_ESTADO,
+  llaveDePedido, llaveValida, mensajeDeError, MENSAJE_ESTADO, rfcIgual,
 } from '../../../../../supabase/functions/_shared/autofactura'
 import edge from '../../../../../supabase/functions/autofactura/index.ts?raw'
 import mig from '../../../../../supabase/migrations/20270408060000_autofactura_qr.sql?raw'
@@ -105,10 +105,33 @@ describe('datos fiscales que escribe el cliente', () => {
   })
 })
 
+describe('descargar la factura ya timbrada', () => {
+  it('el RFC debe ser el de la factura (sin importar espacios ni mayúsculas); vacío o parecido no pasa', () => {
+    expect(rfcIgual('gode561231gr8', 'GODE561231GR8')).toBe(true)
+    expect(rfcIgual(' GODE561231GR8 ', 'GODE561231GR8')).toBe(true)
+    expect(rfcIgual('GODE561231GR9', 'GODE561231GR8')).toBe(false)
+    expect(rfcIgual('', '')).toBe(false); expect(rfcIgual(null, undefined)).toBe(false)
+    expect(rfcIgual('GODE561231GR', 'GODE561231GR8')).toBe(false)
+  })
+  it('la Edge exige límite, llave, factura timbrada y RFC ANTES de pedirle nada a Facturama', () => {
+    const i = edge.indexOf("if (accion === 'descargar') {")
+    const bloque = edge.slice(i, edge.indexOf('// ── solicitar ──'))
+    expect(i).toBeGreaterThan(edge.indexOf('llaveValida(pedido'))                 // la llave ya se validó
+    expect(edge).toContain("scope: 'autofactura_descargar'")
+    const orden = ['puedeDescargar(o.invoice_meta)', 'rfcIgual(b.rfc, meta.receiver?.rfc)', 'fetch(`${fac.base}/api/Cfdi/'].map((t) => bloque.indexOf(t))
+    expect(orden.every((n) => n >= 0)).toBe(true)
+    expect(orden[0]).toBeLessThan(orden[1]); expect(orden[1]).toBeLessThan(orden[2])
+    expect(bloque).toContain('gate.facturamaId')                                  // el identificador sale de la base, no del cliente
+  })
+})
+
 describe('la Edge y la base', () => {
   it('lo público pasa por el límite ANTES de validar la llave, y nunca timbra', () => {
     expect(edge.indexOf("scope: 'autofactura_ver'")).toBeLessThan(edge.indexOf('llaveValida(pedido'))
-    expect(edge).not.toMatch(/timbrarEnPAC|reclamar_cfdi|facturama/i)
+    // Nunca timbra ni reserva folio: lo único que le pide a Facturama es LEER una factura ya timbrada (sin método POST).
+    expect(edge).not.toMatch(/timbrarEnPAC|reclamar_cfdi|adoptar_cfdi|\/3\/cfdis/i)
+    expect((edge.match(/fetch\(/g) ?? []).length).toBe(1)
+    expect(edge).not.toMatch(/method:\s*'POST'/)
     expect(edge).toContain("admin.rpc('solicitar_cfdi'")
   })
   it('los enlaces solo salen de pedidos que la sesión de quien pregunta ya puede leer', () => {

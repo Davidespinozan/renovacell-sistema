@@ -81,7 +81,7 @@ export const MENSAJE_ESTADO: Record<EstadoAutofactura, string> = {
   disponible: 'Captura tus datos fiscales para pedir tu factura.',
   solicitada: 'Ya recibimos tus datos. Te enviaremos la factura a tu correo.',
   en_proceso: 'Tu factura se está emitiendo. Te la enviaremos a tu correo.',
-  facturada: 'Tu factura ya fue emitida y se envió a tu correo. Si no la encuentras, pídela a tu asesor.',
+  facturada: 'Tu factura ya fue emitida y se envió a tu correo. También puedes descargarla aquí.',
   fuera_de_mes: 'El plazo para facturar esta compra terminó. Ya forma parte de la factura global del mes a público en general y no puede facturarse a tu nombre.',
   en_global: 'Esta compra ya forma parte de la factura global del mes a público en general y no puede facturarse a tu nombre.',
   cancelada: 'Esta compra fue cancelada: no se factura.',
@@ -120,6 +120,17 @@ export function mensajeDeError(m: string | null | undefined): { estado: EstadoAu
   if (/DATOS_FISCALES_REQUERIDOS|FISCAL_INVALIDO/.test(t)) return { estado: 'error', mensaje: 'Revisa tus datos fiscales: alguno falta o no tiene el formato correcto.' }
   if (/ESPERA|SOBRE_PEDIDO/.test(t)) return { estado: 'error', mensaje: 'Tu compra todavía no se surte por completo. Podrás pedir la factura cuando recibas tu producto.' }
   return { estado: 'error', mensaje: 'No se pudo registrar tu solicitud. Intenta de nuevo en unos minutos o pídela a tu asesor.' }
+}
+
+/** ¿Es el mismo RFC? Sin espacios ni diferencias de mayúsculas. Vacío nunca coincide.
+ *  Se pide para DESCARGAR la factura: quien trae el recibo además debe saber a qué RFC se facturó. */
+export function rfcIgual(a: string | null | undefined, b: string | null | undefined): boolean {
+  const n = (x: string | null | undefined) => (x ?? '').toUpperCase().replace(/[^A-Z0-9Ñ&]/g, '')
+  const x = n(a); const y = n(b)
+  if (x.length < 12 || x.length !== y.length) return false
+  let d = 0
+  for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i)
+  return d === 0
 }
 
 /** j•••@dominio.mx — para confirmar a dónde llegará sin mostrar el correo completo. */
