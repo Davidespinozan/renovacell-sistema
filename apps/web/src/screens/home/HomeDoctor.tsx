@@ -14,6 +14,7 @@
 // autoridades de lanzamientos, seguimiento posventa o envíos activos, se agregan como bloques aquí sin rehacer la pantalla.
 // Nunca lee colas de staff: el chat responde solo la conversación propia (JWT del doctor).
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { pedirAbrirChat } from '../../data/store/chatUiStore'
 import { ChevronRight, Minus, Package, Plus, RotateCcw, Search, ShoppingBag, Sparkles, Star, Trash2 } from 'lucide-react'
 import { useMasPedidos } from '../../data/ops/masPedidos'
 import { hasSupabase } from '../../lib/supabase'
@@ -123,7 +124,8 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
   enCurso.slice(0, 1).forEach((o) => filas.push(
     <Fila key="pedido" testid="doctor-pedido" icono={<Package />} titulo={`Pedido ${o.external_ref ?? ''}`.trim()} estado={statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) }).label} pill={statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) }).pill}
       detalle={enCurso.length > 1 ? `Ver seguimiento · ${enCurso.length - 1} más en curso` : 'Ver seguimiento'} onClick={() => setScreen('pedidosdr')} />))
-  if (ultimo && enCurso.length === 0) filas.push(
+  // El verificado ya tiene el botón «Volver a pedir lo de siempre» arriba: el renglón queda solo para quien no lo ve.
+  if (ultimo && enCurso.length === 0 && !verified) filas.push(
     <Fila key="reorden" testid="doctor-ultimo" icono={<RotateCcw />} titulo="Volver a pedir tu último pedido"
       // CAJAS-MEDIOS · la cantidad se lee en cajas con medios
       detalle={ultimo.items.slice(0, 2).map((it) => { const p = porId.get(it.product_id ?? ''); return `${cantidadVista(p, it.qty)} × ${p?.name ?? 'producto'}` }).join(' · ') || null}
@@ -216,8 +218,17 @@ export function HomeDoctor({ cliente = porDefecto.chat, clienteCarrito = porDefe
         </button>
       ))}
 
+      {/* LO DE SIEMPRE Y MI ASESOR, A LA VISTA (27 nov 2026, «sistema sencillo por rol»): volver a pedir era un enlace chico
+          junto a un título y hablar con el asesor, una etiqueta que no se podía tocar. */}
+      <div className="tienda-acciones" data-testid="doctor-acciones">
+        {verified && ultimo && (
+          <button type="button" className="btn" onClick={() => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') }} data-testid="doctor-repetir">Volver a pedir lo de siempre</button>
+        )}
+        <button type="button" className="btn ghost" onClick={() => pedirAbrirChat()} data-testid="doctor-hablar">{conAsesor && conv && primerNombre(conv.asesor_nombre) ? `Hablar con ${primerNombre(conv.asesor_nombre)}` : 'Hablar con Renovacell'}</button>
+      </div>
+
       {verified && deSiempre.length > 0 && (
-        <Seccion titulo="Vuelve a comprar" nivel="continuar" id="de-siempre" accion={ultimo ? { label: 'Repetir último pedido', onClick: () => { seedReorder(ultimo.items.map((it) => ({ product_id: it.product_id ?? '', qty: it.qty }))); setScreen('catalogo') } } : undefined}>
+        <Seccion titulo="Vuelve a comprar" nivel="continuar" id="de-siempre">
           <div className="tienda-tira" data-testid="doctor-de-siempre">{deSiempre.map((p) => <React.Fragment key={p.id}>{producto(p)}</React.Fragment>)}</div>
         </Seccion>
       )}

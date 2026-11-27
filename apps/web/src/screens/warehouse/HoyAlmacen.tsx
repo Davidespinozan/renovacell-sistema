@@ -60,7 +60,7 @@ export function HoyAlmacen() {
   const [preparar, setPreparar] = useState<OrderWithItems | null>(null)
   const [enviar, setEnviar] = useState<OrderWithItems | null>(null)
   const hoy = hoyLocal()
-  const { setScreen, user } = useRole()
+  const { setScreen, user, role } = useRole()
   const corte = useCorteEntrega()
   // FILA DEL DÍA (27 nov 2026) · el Inicio muestra TODO lo que le toca a Almacén, agrupado por cuándo sale: también lo
   // que ya tiene chofer y espera salida (antes desaparecía de aquí) y lo que espera a que el cliente lo recoja.
@@ -121,11 +121,14 @@ export function HoyAlmacen() {
     const d = orderAddress(o.shipping_meta, null)
     return [d?.city, d?.state].filter(Boolean).join(', ') || 'Sin dirección'
   }
-  const pasoDe = (o: Caso) => (o.__accion.tipo === 'preparar' ? { texto: 'Por preparar', pill: 'p-warn' } : o.__accion.tipo === 'despacho' ? { texto: 'Falta darle salida', pill: 'p-blue' } : { texto: 'Preparado', pill: 'p-ok' })
+  // AUXILIAR (Blanca): la guía de paquetería la genera Almacén. En vez de un botón que la lleva a un aviso, lo dice aquí.
+  const leTocaAAlmacen = (o: Caso) => role === 'packing' && o.__accion.tipo === 'enviar' && metodoSugerido(entregaDe(o)) === 'paqueteria'
+  const pasoDe = (o: Caso) => (leTocaAAlmacen(o) ? { texto: 'Espera la guía', pill: 'p-neu' } : o.__accion.tipo === 'preparar' ? { texto: 'Por preparar', pill: 'p-warn' } : o.__accion.tipo === 'despacho' ? { texto: 'Falta darle salida', pill: 'p-blue' } : { texto: 'Preparado', pill: 'p-ok' })
   // En el celular el detalle es una hoja: se cierra antes de abrir la ventana de la acción (no se enciman dos capas).
   const accion = (o: Caso, que: 'preparar' | 'enviar') => { if (!ancho) setSel(null); if (que === 'preparar') setPreparar(o); else setEnviar(o) }
   const boton = (o: Caso) => {
     const ent = entregaDe(o); const envio = envioDe[o.id]
+    if (leTocaAAlmacen(o)) return <span className="hoy-le-toca" data-testid={`hoy-le-toca-${o.id}`}>Le toca a Alberto: generar la guía. Déjalo empacado y listo.</span>
     return o.__accion.tipo === 'preparar'
       ? <button className="btn hoy-accion" type="button" onClick={() => accion(o, 'preparar')} data-testid={`hoy-preparar-${o.id}`}><Icon name="layers" /> Preparar pedido</button>
       : o.__accion.tipo === 'despacho' && envio

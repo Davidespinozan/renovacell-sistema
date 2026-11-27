@@ -32,6 +32,10 @@ import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { CobrarPedido } from '../cobros/LinksPago'
 import { pedidosPorConfirmar } from '../../data/ops/porConfirmar'
+import { etapaSeguimiento, useSeguimiento } from '../../data/ops/seguimientoVenta'
+import { seSurteSinPago, statusView } from '../doctor/orderStatus'
+import { esRecoge } from '../../data/ops/seguimiento'
+import { pedirFiltro } from '../../data/store/filtroInicial'
 import { useOrderMoney } from '../../data/hooks/useMoney'
 import { telParaMarcar } from '../../lib/telefono'
 import { deliveryOf } from '../../data/mock/profiles'
@@ -92,6 +96,11 @@ export function HomeVendedor() {
   const [pedidoPara, setPedidoPara] = useState<{ id: string; name: string } | null>(null)
   const [cobrando, setCobrando] = useState<(typeof pedidos)[number] | null>(null)
   const clienteDe = (o: { shipping_meta?: unknown }) => capitalizarNombre(((o.shipping_meta as { customer?: { name?: string } } | null)?.customer?.name) ?? '') || 'Cliente'
+  // MIS PEDIDOS EN CURSO (27 nov 2026): los que ya van caminando, con las mismas palabras y el mismo avance de cuatro
+  // pasos que ven Almacén y el doctor. Los que esperan pago ya están arriba, con su botón.
+  const enCursoTodos = useMemo(() => { const esperan = new Set(porConfirmar.map((o) => o.id)); return pedidos.filter((o) => !['cancelled', 'draft', 'delivered', 'fulfilled'].includes(o.status ?? '') && !esperan.has(o.id)).sort((a, b) => ((a.created_at ?? '') < (b.created_at ?? '') ? 1 : -1)) }, [pedidos, porConfirmar])
+  const enCurso = enCursoTodos.slice(0, 5)
+  const segCurso = useSeguimiento(enCurso.map((o) => o.id))
   const detalle = !fuente ? 'Tu cartera y tus ventas de hoy.'
     : solicitudes.length ? solicitudes.length === 1 ? 'Un cliente te espera. El asistente lo atiende mientras llegas.' : `${solicitudes.length} clientes te esperan. El asistente los atiende mientras llegas.`
       : 'Sin solicitudes de asesor por ahora.'
@@ -123,6 +132,26 @@ export function HomeVendedor() {
       )}
       {pedidoPara && <NuevoPedido customer={{ id: pedidoPara.id, name: pedidoPara.name, phone: null }} placedBy={`${user?.name ?? 'Ventas'} (Ventas)`} onClose={() => setPedidoPara(null)} />}
       {cobrando && <CobrarPedido pedido={cobrando} onClose={() => setCobrando(null)} onHecho={(t) => { setCobrando(null); toast(t) }} />}
+      {enCurso.length > 0 && (
+        <Seccion titulo="Tus pedidos en curso" nivel="continuar" conteo={enCursoTodos.length} id="en-curso" accion={{ label: 'Ver todos', onClick: () => abrirMisVentas(setScreen, 'todos') }}>
+          <div className="tasklist">
+            {enCurso.map((o) => {
+              const sv = statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) })
+              const et = etapaSeguimiento({ status: o.status, payment_method: o.payment_method, shipping_meta: o.shipping_meta, seguimiento: segCurso[o.id] })
+              return (
+                <button key={o.id} type="button" className="taskrow" onClick={() => abrirMisVentas(setScreen, 'todos')} data-testid="inicio-en-curso">
+                  <span className="rh-encurso">
+                    <span className="taskrow-t">{clienteDe(o)}</span>
+                    <span className="taskrow-d"><span className="mono">{o.external_ref}</span> · {et.texto}</span>
+                    <span className="rh-avance" aria-hidden>{[0, 1, 2, 3].map((i) => <i key={i} className={i <= sv.step ? 'on' : undefined} />)}</span>
+                  </span>
+                  <span className={'pill ' + sv.pill}>{sv.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </Seccion>
+      )}
       <CifrasVendedor esperan={solicitudes.length + activas.reduce((n, c) => n + (c.sin_leer > 0 ? 1 : 0), 0)} onEsperan={() => setScreen('asesorias')} />
       <BandaProspectar />
       {fuente && (
@@ -278,6 +307,21 @@ export function HomeDireccion() {
     { key: 'av_pagos', label: 'Pagos por validar', icon: 'receipt' },
   ])
   const urgentes = tareas.filter((t) => t.tone === 'dang' && t.id !== 'comercial').length
+  // PEDIDOS POR PASO (27 nov 2026): cuántos pedidos vivos hay en cada paso, con las mismas palabras de todo el sistema.
+  // Cada cifra abre Ventas ya filtrada por ese paso.
+  const { data: pedidosDir } = useAllOrders()
+  const porPaso = useMemo(() => {
+    const c = { por_confirmar: 0, en_almacen: 0, salio: 0 }
+    for (const o of pedidosDir) {
+      if (o.status === 'cancelled' || o.status === 'draft') continue
+      const e = etapaSeguimiento({ status: o.status, payment_method: o.payment_method, shipping_meta: o.shipping_meta }).etapa
+      if (e === 'por_confirmar') c.por_confirmar += 1
+      else if (e === 'almacen' || e === 'empacado') c.en_almacen += 1
+      else if (e === 'salio') c.salio += 1
+    }
+    return c
+  }, [pedidosDir])
+  const irPaso = (paso: string) => { pedirFiltro('av_ventas', 'paso:' + paso); setScreen('av_ventas') }
   return (
     <div className="rh" data-testid="home-direccion">
       {fuentes}
@@ -311,6 +355,13 @@ export function HomeDireccion() {
         )}
       </Seccion>
       {/* MENÚ (dueño, 17 oct 2026): Inicio ES Mi bandeja: la lista completa, sin "ver toda". */}
+      <Seccion titulo="Pedidos en curso" nivel="info" id="pasos">
+        <div className="rh-pasos" data-testid="dir-pasos">
+          <button type="button" className="rh-paso" onClick={() => irPaso('por_confirmar')} data-testid="dir-paso-por_confirmar"><b>{porPaso.por_confirmar}</b><span>Por confirmar</span></button>
+          <button type="button" className="rh-paso" onClick={() => irPaso('en_almacen')} data-testid="dir-paso-en_almacen"><b>{porPaso.en_almacen}</b><span>En almacén</span></button>
+          <button type="button" className="rh-paso" onClick={() => irPaso('salio')} data-testid="dir-paso-salio"><b>{porPaso.salio}</b><span>En camino o para recoger</span></button>
+        </div>
+      </Seccion>
       {/* DECIDE HOY / VIGILA (27 nov 2026, «sistema sencillo por rol») · «Pendientes» juntaba hasta 16 renglones del mismo
           peso. Arriba queda SOLO lo que está detenido hasta que Dirección responda; lo demás se vigila. Son los mismos
           renglones y llevan a las mismas pantallas: nada se quitó. */}

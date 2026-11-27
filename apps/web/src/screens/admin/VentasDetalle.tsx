@@ -115,11 +115,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const [vendedor, setVendedor] = useState<string>('todos')
   // SEGUIMIENTO · solo en Ventas del equipo (el servidor manda cuándo se empacó, salió y se entregó cada pedido).
   const conSeguimiento = true
-  const [etapa, setEtapa] = useState<'todos' | EtapaSeguimiento>('todos')
+  // «en_almacen» junta por preparar y preparado: es el paso que cuenta el Inicio de Dirección.
+  const [etapa, setEtapa] = useState<'todos' | 'en_almacen' | EtapaSeguimiento>(() => (llegada?.startsWith('paso:') ? (llegada.slice(5) as 'en_almacen' | EtapaSeguimiento) : 'todos'))
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<string | null>(() => (llegada?.startsWith('pedido:') ? llegada.slice(7) : null))
   // Si Ventas ya está abierta y se busca otro pedido, llega aquí al momento.
-  useEffect(() => (fuente ? undefined : escucharFiltro('av_ventas', (f) => { elegirPeriodo('todo'); if (f.startsWith('pedido:')) setSelected(f.slice(7)) })), [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => (fuente ? undefined : escucharFiltro('av_ventas', (f) => { elegirPeriodo('todo'); if (f.startsWith('pedido:')) setSelected(f.slice(7)); if (f.startsWith('paso:')) setEtapa(f.slice(5) as 'en_almacen' | EtapaSeguimiento) })), [])   // eslint-disable-line react-hooks/exhaustive-deps
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
   // pedido está en la lista de este usuario; se consume una sola vez.
   const intento = useIntentoVentas()
@@ -140,7 +141,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         if (pay !== 'todos' && payInfo(o, byOrder[o.id]).key !== pay) return false
         if (entrega !== 'todos' && entregaDeVenta(o).tipo !== entrega) return false
         if (vendedor !== 'todos' && vendedorDeVenta(o).clave !== vendedor) return false
-        if (conSeguimiento && etapa !== 'todos' && etapaSeguimiento(o).etapa !== etapa) return false
+        if (conSeguimiento && etapa !== 'todos') { const e = etapaSeguimiento(o).etapa; if (etapa === 'en_almacen' ? !(e === 'almacen' || e === 'empacado') : e !== etapa) return false }
         if (query) {
           const hay = `${o.external_ref ?? ''} ${clientName(o)}`.toLowerCase()
           if (!hay.includes(query)) return false
@@ -212,8 +213,9 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           {opcionesVendedor.map((v) => <option key={v.clave} value={v.clave}>{v.nombre}</option>)}
         </select>
         {conSeguimiento && (
-          <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
+          <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | 'en_almacen' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
             <option value="todos">En cualquier paso</option>
+            <option value="en_almacen">En almacén (todos)</option>
             <option value="por_confirmar">Por confirmar · falta el pago</option>
             <option value="esperando_mercancia">Esperando mercancía (sobre pedido)</option>
             <option value="almacen">En almacén · por preparar</option>

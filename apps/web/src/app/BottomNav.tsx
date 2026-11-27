@@ -48,7 +48,7 @@ export function BottomNav({ onMenu }: { onMenu: () => void }) {
     <nav className="bnav">
       {primary.map((s) => (
         <a key={s.key} role="button" tabIndex={0} aria-current={s.key === screen ? 'page' : undefined}
-          className={s.key === screen ? 'on' : undefined}
+          className={[s.key === screen ? 'on' : '', role === 'pos' && s.key === 'caja' ? 'bnav-principal' : ''].filter(Boolean).join(' ') || undefined}
           onClick={() => setScreen(s.key)} onKeyDown={onKey(() => setScreen(s.key))}>
           <Icon name={s.icon} />
           <span>{CORTO_BARRA[s.key] ?? short(s.label, s.key)}</span>

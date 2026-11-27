@@ -5,9 +5,9 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 
-const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn(), ancho: true }))
+const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn(), ancho: true, role: 'warehouse' }))
 vi.mock('../../app/useAnchoMinimo', () => ({ useAnchoMinimo: () => h.ancho }))
-vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'warehouse', setScreen: vi.fn(), user: { name: 'Alberto', email: 'a@x' } }), useRoleOpcional: () => ({ role: 'warehouse', user: { name: 'Alberto' } }) }))
+vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, setScreen: vi.fn(), user: { name: 'Alberto', email: 'a@x' } }), useRoleOpcional: () => ({ role: h.role, user: { name: 'Alberto' } }) }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: h.orders }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }) }))
 vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [{ id: 'p1', name: 'Exosomas' }] }) }))
@@ -24,7 +24,7 @@ const DHL = { opcion: 'foraneo', tipo: 'foraneo', paqueteria: 'dhl', texto: 'DHL
 const LOCAL = { opcion: 'local', tipo: 'local', paqueteria: 'chofer', texto: 'Entrega local', flete: 0, salida: HOY, llega_desde: HOY, llega_hasta: HOY, horario: { fecha: HOY, inicio: '16:00', fin: '18:00' } }
 
 beforeEach(() => {
-  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset(); h.ancho = true
+  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset(); h.ancho = true; h.role = 'warehouse'
   h.orders = [
     { ...base('o1', 'S1', 'ROCIO UGALDE PEDROZA'), status: 'paid', shipping_meta: meta('ROCIO UGALDE PEDROZA', DHL) },
     { ...base('o2', 'S2', 'Dr. Ruiz'), status: 'packed', shipping_meta: meta('Dr. Ruiz', LOCAL) },
@@ -131,6 +131,32 @@ describe('<HoyAlmacen> · lista y detalle (computadora)', () => {
   it('los números del día siguen ahí, debajo de la fila', () => {
     render(<HoyAlmacen />)
     for (const t of ['hoy-decision', 'hoy-guias', 'hoy-camino']) expect(screen.getByTestId(t)).toBeTruthy()
+  })
+})
+
+describe('<HoyAlmacen> · auxiliar de almacén', () => {
+  it('en un pedido de paquetería ya preparado no ve un botón que no es suyo: ve a quién le toca', () => {
+    h.role = 'packing'
+    h.orders = [
+      { ...base('o5', 'S5', 'Dra. Paz'), status: 'packed', shipping_meta: meta('Dra. Paz', DHL) },
+      { ...base('o2', 'S2', 'Dr. Ruiz'), status: 'packed', shipping_meta: meta('Dr. Ruiz', LOCAL) },
+    ]
+    h.envios = []
+    render(<HoyAlmacen />)
+    expect(within(screen.getByTestId('hoy-caso-o5')).getByTestId('hoy-paso')).toHaveTextContent('Espera la guía')
+    fireEvent.click(screen.getByTestId('hoy-caso-o5'))
+    expect(screen.getByTestId('hoy-le-toca-o5')).toHaveTextContent('Le toca a Alberto: generar la guía')
+    expect(screen.queryByTestId('hoy-enviar-o5')).toBeNull()
+    fireEvent.click(screen.getByTestId('hoy-caso-o2'))                 // el de chofer sí es suyo: conserva su botón
+    expect(screen.getByTestId('hoy-enviar-o2')).toBeTruthy()
+    expect(screen.queryByTestId('hoy-le-toca-o2')).toBeNull()
+  })
+  it('a Almacén (Alberto) le sigue saliendo su botón en ese mismo pedido', () => {
+    h.orders = [{ ...base('o5', 'S5', 'Dra. Paz'), status: 'packed', shipping_meta: meta('Dra. Paz', DHL) }]
+    h.envios = []
+    render(<HoyAlmacen />)
+    expect(screen.getByTestId('hoy-enviar-o5')).toBeTruthy()
+    expect(screen.queryByTestId('hoy-le-toca-o5')).toBeNull()
   })
 })
 

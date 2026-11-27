@@ -132,6 +132,32 @@ describe('Inicio de Ventas · vender y cobrar sin pasar por el menú', () => {
     expect(screen.getByTestId('cobrar-pedido')).toHaveTextContent('Confirmar pago de S201')
   })
 
+  it('«Tus pedidos en curso»: los que ya van caminando, con su paso y el avance; los que esperan pago no se repiten', async () => {
+    ped.lista = [
+      pedido('o1', 'S201', 'RENATO VEGA OSUNA'),                                                           // espera pago → va arriba, no aquí
+      pedido('o2', 'S202', 'DRA. LUNA PEREZ', { payment_status: 'paid', status: 'paid', created_at: '2026-11-26T18:00:00Z' }),
+      pedido('o3', 'S203', 'Dr. Ruiz', { payment_status: 'paid', status: 'shipped', created_at: '2026-11-25T18:00:00Z' }),
+      pedido('o4', 'S204', 'Entregado', { payment_status: 'paid', status: 'delivered' }),
+      pedido('o5', 'S205', 'Cancelado', { status: 'cancelled' }),
+    ]
+    render(<RoleHome />)
+    const filas = await screen.findAllByTestId('inicio-en-curso')
+    expect(filas.map((f) => f.textContent)).toEqual([expect.stringContaining('S202'), expect.stringContaining('S203')])   // el más reciente primero
+    expect(filas[0]).toHaveTextContent('Dra. Luna Perez'); expect(filas[0]).toHaveTextContent('En almacén')
+    expect(filas[0].querySelectorAll('.rh-avance i.on')).toHaveLength(2)      // Pedido + En almacén
+    expect(filas[1]).toHaveTextContent('En camino'); expect(filas[1].querySelectorAll('.rh-avance i.on')).toHaveLength(3)
+    expect(filas[1].querySelectorAll('.rh-avance i')).toHaveLength(4)         // siempre los mismos cuatro pasos
+    fireEvent.click(filas[0])
+    expect(srv.setScreen).toHaveBeenCalled()                                  // abre Mis ventas
+  })
+
+  it('sin pedidos en curso, esa sección no ocupa lugar', async () => {
+    ped.lista = [pedido('o1', 'S201', 'RENATO VEGA OSUNA'), pedido('o4', 'S204', 'Entregado', { payment_status: 'paid', status: 'delivered' })]
+    render(<RoleHome />)
+    await screen.findByTestId('home-vendedor')
+    expect(screen.queryByTestId('inicio-en-curso')).toBeNull()
+  })
+
   it('sin pedidos esperando pago, esa sección no ocupa lugar', async () => {
     render(<RoleHome />)
     await screen.findByTestId('home-vendedor')

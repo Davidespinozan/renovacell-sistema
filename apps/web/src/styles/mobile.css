@@ -82,6 +82,9 @@ button.taskrow:focus-visible { outline: 2px solid rgba(0, 115, 17, .6); outline-
   .bnav a span::first-letter { text-transform: uppercase; }
   .bnav a.on { background: none; color: #fff; font-weight: 600; }
   .bnav a.on svg { background: rgba(255, 255, 255, .14); color: var(--green-soft); }
+  /* «Vender» es lo principal de Ventas: va resaltado en la barra (27 nov 2026). */
+  .bnav a.bnav-principal { color: #fff; font-weight: 600; }
+  .bnav a.bnav-principal svg { background: var(--green-soft); color: var(--side-bg); }
 }
 
 @media (max-width: 640px) {

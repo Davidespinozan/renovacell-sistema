@@ -19,7 +19,8 @@ const bj = vi.hoisted(() => ({ tareas: [] as unknown[] }))
 vi.mock('../Bandeja', async (orig) => ({ ...(await orig<typeof import('../Bandeja')>()), useBandeja: () => ({ tareas: bj.tareas, fuentes: null }) }))
 vi.mock('../../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, capabilities: srv.capabilities, setScreen: srv.setScreen, user: srv.user, screen: 'inicio' }), useRoleOpcional: () => null }))
-vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: [] }), useOrders: () => ({ data: [] }) }))
+const ped = vi.hoisted(() => ({ lista: [] as unknown[] }))
+vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: ped.lista }), useOrders: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
@@ -40,6 +41,7 @@ import { _simularLlegada, type Notif } from '../../data/store/notificationsStore
 import { intentoActual, consumirIntento, pedirIntento } from '../../data/store/navIntentStore'
 import { marcar } from '../../lib/avisosPestanas'
 import { RoleHome } from './RoleHome'
+import { tomarFiltro } from '../../data/store/filtroInicial'
 import { configurarClientesInicioDoctor } from './HomeDoctor'
 import { Bandeja } from '../Bandeja'
 import { AlertaComercial } from '../../app/AlertaComercial'
@@ -110,7 +112,26 @@ beforeEach(() => {
 
 describe('Inicio de Dirección · Decide hoy y Vigila', () => {
   const t = (id: string, title: string, count = 1, tone = 'warn') => ({ id, icon: 'receipt', title, detail: 'detalle', count, tone, screen: 'av_ventas' })
-  beforeEach(() => { srv.role = 'admin'; srv.capabilities = []; bj.tareas = [] })
+  beforeEach(() => { srv.role = 'admin'; srv.capabilities = []; bj.tareas = []; ped.lista = []; tomarFiltro('av_ventas') })
+
+  it('«Pedidos en curso»: cuántos hay en cada paso, y cada cifra abre Ventas ya filtrada', async () => {
+    const o = (id: string, status: string, extra: Record<string, unknown> = {}) => ({ id, external_ref: 'S' + id, status, payment_status: 'paid', payment_method: 'transfer', total: 100, created_at: '2026-11-26T18:00:00Z', items: [], shipping_meta: {}, ...extra })
+    ped.lista = [
+      o('1', 'pending_payment', { payment_status: 'pending' }), o('2', 'pending_payment', { payment_status: 'pending' }),   // por confirmar
+      o('3', 'pending_payment', { payment_status: 'pending', payment_method: 'contra_entrega' }),                          // se surte sin pago → en almacén
+      o('4', 'paid'), o('5', 'packed'),                                                                                    // en almacén
+      o('6', 'shipped'),                                                                                                   // en camino
+      o('7', 'delivered'), o('8', 'cancelled'), o('9', 'draft'),                                                           // no cuentan
+    ]
+    render(<RoleHome />); await flush()
+    const pasos = await screen.findByTestId('dir-pasos')
+    expect(within(pasos).getByTestId('dir-paso-por_confirmar')).toHaveTextContent('2Por confirmar')
+    expect(within(pasos).getByTestId('dir-paso-en_almacen')).toHaveTextContent('3En almacén')
+    expect(within(pasos).getByTestId('dir-paso-salio')).toHaveTextContent('1En camino o para recoger')
+    fireEvent.click(within(pasos).getByTestId('dir-paso-en_almacen'))
+    expect(srv.setScreen).toHaveBeenCalledWith('av_ventas')
+    expect(tomarFiltro('av_ventas')).toBe('paso:en_almacen')
+  })
 
   it('arriba queda solo lo que espera una decisión; lo demás va en «Vigila»', async () => {
     bj.tareas = [t('transfer', 'Pagos por validar', 2), t('cfdi', 'CFDI por emitir', 3), t('cancelaciones', 'Solicitudes de cancelación'), t('caduc', 'Lotes por caducar', 4), t('cobrar', 'Por cobrar', 5)]

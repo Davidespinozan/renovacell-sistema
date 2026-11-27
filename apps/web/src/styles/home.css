@@ -243,3 +243,20 @@
 .rh-vender{justify-self:start;min-height:52px;padding:0 22px;font-size:15px}
 .rh-vender svg{width:18px;height:18px}
 @media (max-width:640px){.rh-vender{justify-self:stretch;justify-content:center}}
+
+/* 27 nov 2026 · el aviso de «Activa los avisos» no va pegado al saludo */
+.rc-recordatorio{margin-bottom:14px}
+/* Doctor · lo de siempre y mi asesor, a la vista */
+.tienda-acciones{display:flex;flex-wrap:wrap;gap:10px}
+.tienda-acciones .btn{flex:1 1 220px;min-height:50px;justify-content:center}
+/* Dirección · pedidos vivos por paso */
+.rh-pasos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rh-paso{display:grid;gap:2px;padding:14px 16px;text-align:left;font:inherit;color:var(--ink);background:var(--cp-surface);border:1px solid var(--line);border-radius:var(--ds-r-lg);cursor:pointer}
+.rh-paso:hover{background:var(--cp-slate-50)}
+.rh-paso b{font-size:var(--ds-fs-xl);font-weight:600;line-height:1.2}
+.rh-paso span{font-size:13px;color:var(--ink-3)}
+/* Ventas · mis pedidos en curso con su avance */
+.rh-avance{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px;max-width:340px}
+.rh-avance i{height:4px;border-radius:999px;background:var(--line)}
+.rh-avance i.on{background:var(--green)}
+.rh-encurso{display:grid;gap:2px;min-width:0;flex:1}
